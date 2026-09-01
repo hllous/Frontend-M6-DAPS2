@@ -35,3 +35,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# skills
+.claude/skills
+.agents/skills
+.github/skills
+.github/agents
+.github/hooks
+.codex
+skills-lock.json
