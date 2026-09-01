@@ -27,3 +27,23 @@ _Avoid_: Offline queue, pending sync, cached submission
 **Conflict** (Service):
 The state where a field crew's manually resubmitted local draft can't be applied because the Service changed server-side (reassigned, cancelled, rescheduled) while the crew was working it offline. Always surfaced explicitly to a human; never resolved by last-write-wins.
 _Avoid_: Sync error, merge conflict
+
+**Office**:
+An M6 actor that schedules and assigns Services, configures catalogs, and holds every elevated capability — Service reschedule/cancellation, ViolationNotice issuance, TreeIntervention authorization. Mutually exclusive with Field; see [ADR-0002](docs/adr/0002-office-and-field-actors-are-mutually-exclusive.md).
+_Avoid_: Supervisor, admin, back-office
+
+**Field**:
+An M6 actor that executes an assigned Service, including running environmental inspections — "Inspector" is not a distinct actor kind, just a Field actor whose current Service is an inspection. Splits into Crew Leader and Crew Member. Mutually exclusive with Office; see [ADR-0002](docs/adr/0002-office-and-field-actors-are-mutually-exclusive.md).
+_Avoid_: Crew (the team a Field actor belongs to, not the actor itself), worker, inspector (as a separate actor kind)
+
+**Crew Leader**:
+The Field actor within a Crew authorized to perform state-changing actions on its assigned Service — start, suspend, resume, submit results and evidence. Corresponds to a Crew's `leaderUserId`.
+_Avoid_: Foreman, crew lead
+
+**Crew Member**:
+A Field actor belonging to a Crew who can view but not act on the Crew's assigned Service; only that Crew's Leader may submit outcomes.
+_Avoid_: Worker, staff
+
+**Capability**:
+The atomic unit of M6 authorization — a named permission (e.g. `service:schedule`, `violationNotice:issue`, `treeIntervention:authorize`) granted to an actor. Resolved from M1's identity claims through a frontend-owned mapping layer once M1 publishes its claims contract; never inferred from a hardcoded role string.
+_Avoid_: Role, permission, scope
