@@ -51,3 +51,7 @@ _Avoid_: Worker, staff
 **Capability**:
 The atomic unit of M6 authorization — a named permission (e.g. `service:schedule`, `violationNotice:issue`, `treeIntervention:authorize`) granted to an actor. Resolved from M1's identity claims through a frontend-owned mapping layer once M1 publishes its claims contract; never inferred from a hardcoded role string.
 _Avoid_: Role, permission, scope
+
+**My Work**:
+The capability-scoped landing view every actor sees on entry. For Field, it's their assigned Services; for Office, it's a personal action queue — items waiting on that specific Office actor, such as an unassigned Service. Never a cross-team or cross-zone summary; that belongs to a dashboard, not to My Work.
+_Avoid_: Home, Inbox, Dashboard (as a synonym for this view)
