@@ -28,6 +28,10 @@ _Avoid_: Offline queue, pending sync, cached submission
 The state where a field crew's manually resubmitted local draft can't be applied because the Service changed server-side (reassigned, cancelled, rescheduled) while the crew was working it offline. Always surfaced explicitly to a human; never resolved by last-write-wins.
 _Avoid_: Sync error, merge conflict
 
+**Evidence**:
+A reason, a note, and a photo (where feasible), uploaded separately and attached by reference to a Service outcome. Mandatory on every exception outcome (`PARTIALLY_COMPLETED`, any `PARTIAL`/`NOT_SERVICED` zone, `CANCELLED`, `SUSPENDED`); optional on a clean completion.
+_Avoid_: Attachment, proof, documentation
+
 **Office**:
 An M6 actor that schedules and assigns Services, configures catalogs, and holds every elevated capability — Service reschedule/cancellation, ViolationNotice issuance, TreeIntervention authorization. Mutually exclusive with Field; see [ADR-0002](docs/adr/0002-office-and-field-actors-are-mutually-exclusive.md).
 _Avoid_: Supervisor, admin, back-office
