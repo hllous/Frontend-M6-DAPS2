@@ -23,6 +23,10 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copia el resto del código fuente (respeta .dockerignore).
 COPY . .
 
+# URL del backend API (se inyecta en build time para client-side).
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Compila la app y genera el servidor standalone (.next/standalone).
 RUN npm run build
 
