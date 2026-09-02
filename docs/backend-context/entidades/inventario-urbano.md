@@ -1,5 +1,3 @@
-> **Espejo de solo lectura**, copiado de `Backend/docs/entidades/inventario-urbano.md` el 2026-09-01. Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad. Fuera de este espejo: `docs/eventos/`, `docs/bloqueantes.md`.
-
 # Inventario urbano
 
 El patrimonio ambiental que administramos, sin contar los contenedores ([container.md](container.md)) ni las intervenciones sobre el arbolado ([tree-intervention.md](tree-intervention.md)).
@@ -19,7 +17,7 @@ El árbol es la entidad estable; el relevamiento es la foto. **`Tree` guarda el 
 
 El relevamiento es el que decide: `riskLevel` y `riskType` salen de acá, y `suggestedIntervention` es lo que después se materializa en una [`TreeIntervention`](tree-intervention.md).
 
-**Un `TreeSurvey` con `riskLevel` en `HIGH` o `CRITICAL` dispara `treeRiskDetected`** → M3 y M7 (ver `docs/eventos/` en el repo Backend). Con cualquier otro valor no sale nada.
+**Un `TreeSurvey` con `riskLevel` en `HIGH` o `CRITICAL` dispara [`treeRiskDetected`](../eventos/publicados/treeRiskDetected.md)** → M3 y M7. Con cualquier otro valor no sale nada.
 
 `requiresPublicWorks` señala el componente que no nos corresponde (una raíz que levantó la vereda); `requiresStreetClosure` anticipa que la intervención va a necesitar cortar la calle.
 

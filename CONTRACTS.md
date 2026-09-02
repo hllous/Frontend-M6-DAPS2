@@ -79,20 +79,124 @@ Drawn directly from [#10](https://github.com/hllous/Frontend-M6-DAPS2/issues/10)
 
 | Endpoint | Capability | Purpose | Status |
 |---|---|---|---|
-| `POST /services` | `service:schedule` | Create — generic `PLANNED`/`MANUAL` form, or linked-create prefilled from a `TICKET`/`INSPECTION`/`WEATHER_ALERT` reference | hypothesis |
-| `GET /services` | — (scoped by actor per #8) | List — paginated, filterable (status, crewId, vehicleId, dateRange, mode), sortable | hypothesis |
-| `GET /services/:id` | — (scoped by actor per #8) | Detail | hypothesis |
-| `POST /services/:id/assign` | `service:assign` | Attach crew + vehicle to an already-scheduled Service; accepts `overrideNote` when double-booked | hypothesis |
-| `POST /services/:id/start` | Crew Leader of the assigned crew | Only the assigned crew; allowed outside window (flagged, not blocked) | hypothesis |
-| `POST /services/:id/zones/:zoneId/result` | Crew Leader of the assigned crew | ROUTE mode only — record one zone's outcome; any order | hypothesis |
-| `POST /services/:id/complete` | Crew Leader of the assigned crew | POINT mode only — single outcome on the Service record itself (status/reason/notes/evidence) | hypothesis |
-| `POST /services/:id/suspend` | Crew Leader of the assigned crew | Reuses `NotServicedReason`; evidence required | hypothesis |
-| `POST /services/:id/resume` | Crew Leader of the assigned crew | Field self-resume for transient causes | hypothesis |
-| `POST /services/:id/cancel` | `service:cancel` | Office-only; only reachable from `SUSPENDED` | hypothesis |
-| `POST /services/:id/reschedule` | `service:reschedule` | Office-only; preserves the existing `zoneIds` snapshot verbatim | hypothesis |
-| `POST /services/:id/delayed-notice` | Crew Leader of the assigned crew | Field-raised badge (note + revised ETA); not a status change | hypothesis |
-| `POST /services/:id/evidence` | Crew Leader of the assigned crew | Upload one evidence file, returns a reference | hypothesis |
+| `POST /services` | `service:schedule` | Create — generic `PLANNED`/`MANUAL` form, or linked-create prefilled from a `TICKET`/`INSPECTION`/`WEATHER_ALERT` reference. `mode` is copied from the `ServiceType`, never chosen directly | confirmed shape, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /services` | — (scoped by actor per #8) | List — paginated, filterable (`status`, `serviceTypeId`, `mode`, `origin`, `crewId`, `vehicleId`, `zoneId`, `ticketId`, `scheduledFrom`, `scheduledTo`), sortable | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /services/:id` | — (scoped by actor per #8) | Detail, with zones, ZoneResults and CollectionRecords | confirmed |
+| `POST /services/:id/assign-crew` | `service:assign` | Attach crew + vehicle to an already-scheduled Service; accepts `overrideNote` when double-booked | **gap identified** — real `AssignCrewDto` has only `crewId`/`vehicleId`, no `overrideNote` field, no server-side double-booking check |
+| `POST /services/:id/start` | Crew Leader of the assigned crew | Only the assigned crew; allowed outside window (flagged, not blocked); 409 without an assigned crew, or without a vehicle if the `ServiceType` requires one | confirmed |
+| `POST /services/:id/zone-results` | Crew Leader of the assigned crew | Record one zone's ZoneResult; applies to **both** ROUTE and POINT — a POINT Service still carries exactly one zone in `zoneIds[]` and needs its ZoneResult recorded before it can complete. `reason` required unless `status = SERVICED` | **corrected** — real path/shape differs from the original hypothesis (`zone-results`, not `zones/:zoneId/result`), and there is no POINT-only outcome shortcut; see note below |
+| `POST /services/:id/complete` | Crew Leader of the assigned crew | Takes **no request body**. 409 if any of the Service's zones (ROUTE's several, or POINT's one) is missing its ZoneResult. `COMPLETED` if every ZoneResult is `SERVICED`, else `PARTIALLY_COMPLETED` — computed server-side, never chosen by the caller | **corrected** — the original hypothesis split this into a separate POINT-only shape; the real backend uses one uniform action for both modes |
+| `POST /services/:id/suspend` | Crew Leader of the assigned crew | `IN_PROGRESS → SUSPENDED`. `reason` required (`StatusChangeDto`) | confirmed |
+| `POST /services/:id/resume` | Crew Leader of the assigned crew | `SUSPENDED → IN_PROGRESS`. Field self-resume for transient causes; clears the prior reason | confirmed |
+| `POST /services/:id/cancel` | `service:cancel` | `SCHEDULED` **or** `SUSPENDED` → `CANCELLED`. `reason` required. Not reachable directly from `IN_PROGRESS` — an in-progress Service must be suspended first | **corrected** — the original hypothesis said "only reachable from `SUSPENDED`," which drops the direct `SCHEDULED → CANCELLED` path; #10's actual resolution comment already had this right, only this table's summary was too compressed |
+| `POST /services/:id/reschedule` + `POST /services/:id/confirm-reschedule` | `service:reschedule` | `SCHEDULED → RESCHEDULED` with `reason`, then `RESCHEDULED → SCHEDULED` with the new date/window via a second call. Preserves the existing `zoneIds` snapshot verbatim — neither call touches it | confirmed (as two calls, not one) |
+| — | Crew Leader of the assigned crew | Delayed notice (field-raised badge: note + revised ETA) | **no real endpoint** — `DELAYED` exists only as an internal, non-persisted fact per `docs/backend-context/entidades/service.md`; nothing in the 94 routes exposes writing one yet |
+| — | Crew Leader of the assigned crew | Evidence upload, attached by reference to a Service or ZoneResult outcome | **no real endpoint** — `Service.attachments[]`/`ZoneResult.attachments[]` exist in the data model, but the write path is Backend Phase 7 (alongside `citizen-portal`), not built yet |
 
-The ROUTE-mode completion rollup (all zones `SERVICED` → `COMPLETED`, any other mix → `PARTIALLY_COMPLETED`) is computed server-side and reflected in the Service's status after each zone-result call — the frontend never computes it locally.
+**Corrections against the real backend (`docs/backend-context/`, refreshed 2026-09-02, commit `9634379`):** the original table modeled ROUTE and POINT as needing two different completion mechanisms (per-zone ZoneResults vs. a single Service-level outcome). The real backend doesn't draw that line — every Service, POINT included, carries a non-empty `zoneIds[]` and needs a ZoneResult per zone before `POST /services/:id/complete` will succeed; POINT just always has exactly one. Delayed notice and Evidence upload stay pure hypothesis with no endpoint to check against yet — not downgraded further, just still unconfirmed. Not reopening #10 over any of this: the actor-facing workflow it resolved (who can do what, when) still holds; only this table's endpoint-level shape needed correcting.
 
-Other resources (containers, trees, green spaces, environmental reports/inspections, crews, vehicles) follow the same pattern above but aren't drafted here — each gets its contract detail when its own domain-area ticket graduates from the map's fog.
+## Worked example: Zones, Routes and Service Frequencies
+
+Drawn from [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36). `Zone` and `Route` are plain catalog CRUD, same alta/baja `status` posture as the other catalogs — codes are immutable after creation. `ServiceFrequency` is the one exception: it has no `active` column at all, closing via `validTo` instead (see the **Validity (ServiceFrequency)** term in `CONTEXT.md`). Capability names (`zone:manage`, `route:manage`, `serviceFrequency:manage`) are a frontend hypothesis, same rationale as the catalogs above.
+
+| Endpoint | Capability | Purpose | Status |
+|---|---|---|---|
+| `POST /zones` | `zone:manage` | Create — `code`, `name` | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `GET /zones` | — (any authenticated actor; used across Route/Service/Container/Tree scoping) | List — paginated, filterable (`active`, `search`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /zones/:id` | — | Detail, with assigned neighborhoods | confirmed |
+| `PATCH /zones/:id` | `zone:manage` | Update `name`, `active`. `code` is **immutable after creation** | confirmed immutability rule, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `DELETE /zones/:id` | `zone:manage` | Logical delete. Backend performs **no referential check** — a Zone still listed in an active Route's stops, or still carrying Containers/Trees/GreenSpaces, deactivates without complaint | **gap identified** — frontend adds its own warn-but-allow confirmation (lists what still references the Zone) before submitting; backend itself has no guard, see `zones.service.ts` |
+| `POST /zones/:id/neighborhoods` | `zone:manage` | Assign one or more M9 neighborhoods (`neighborhoodIds[]`); duplicates silently ignored | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md) — but the neighborhood **picker itself has no real data source**: M9's neighborhood catalog is an unpublished 🔴 blocker (`docs/backend-context/bloqueantes.md`). Frontend hypothesizes a separate adapter to M9's catalog (search + id→name resolution), mocked via fixtures, same posture as the M1 identity hypothesis |
+| `DELETE /zones/:id/neighborhoods/:neighborhoodId` | `zone:manage` | Remove one neighborhood; 404 if not assigned | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `POST /routes` | `route:manage` | Create — `code`, `name`. Nace sin paradas (no stops) | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `GET /routes` | — (any authenticated actor; used for Service/ServiceFrequency scheduling forms) | List — paginated, filterable (`active`, `zoneId`, `search`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /routes/:id` | — | Detail, with the stop sequence in order | confirmed |
+| `PATCH /routes/:id` | `route:manage` | Update `name`, `active`. `code` is **immutable after creation** | confirmed immutability rule; capability name is hypothesis |
+| `DELETE /routes/:id` | `route:manage` | Logical delete — already-scheduled Services keep their `routeId`, so this is soft by design. No referential check against active ServiceFrequencies referencing the Route | **gap identified** — same warn-but-allow treatment as Zone deactivation above |
+| `PUT /routes/:id/stops` | `route:manage` | **Full-replacement** of the stop sequence in one atomic call — add/remove/reorder all collapse into this single request; array order is stop order; empty array is valid (route left with no stops). 400 if a zone repeats | confirmed route and semantics, [endpoints.md](docs/backend-context/api/endpoints.md) and `routes.service.ts` |
+| — (client-side only) | — | Advisory `updatedAt` staleness pre-check before submitting the stop-sequence replace | **gap identified** — the real endpoint is an unconditional delete-and-recreate with **no concurrency guard at all** (unlike Service's mutations, which at least get a server-side 409 backstop). Frontend adds the same advisory pre-check pattern from the Concurrency section above as its only protection against two Office users clobbering each other's edits |
+| `POST /service-frequencies` | `serviceFrequency:manage` | Create the rule — `serviceTypeId` (must be `ROUTE`-mode, 400 otherwise; frontend pre-filters the picker to avoid a guaranteed-failure submit), `routeId`, `weekdays[]`, `shift`, `validFrom`, optional `validTo` | confirmed route and validation, [endpoints.md](docs/backend-context/api/endpoints.md) and `service-frequencies.service.ts` |
+| `GET /service-frequencies` | — (any authenticated actor) | List — paginated, filterable (`serviceTypeId`, `routeId`, `shift`, `weekday`, `validOn`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /service-frequencies/:id` | — | Detail, with weekdays | confirmed |
+| `PATCH /service-frequencies/:id` | `serviceFrequency:manage` | Update `weekdays[]` (replaces the full set), `shift`, `validFrom`/`validTo`. `serviceTypeId`/`routeId` are **immutable** | confirmed immutability rule, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `DELETE /service-frequencies/:id` | `serviceFrequency:manage` | **"Cerrar vigencia"** — closes `validTo` at today, or at `validFrom` if the rule hasn't started yet. Not a deactivation (no `active` column exists); does not touch any Service already created | confirmed route and semantics, [endpoints.md](docs/backend-context/api/endpoints.md) and `service-frequencies.service.ts` |
+| — | — | Automatic generation of `PLANNED`-origin Services from a ServiceFrequency rule | **no real mechanism at all** — no cron/scheduled job exists anywhere in the backend, and `Service` has **no `frequencyId` FK** in `schema.prisma`. A ServiceFrequency is a pure stored configuration rule today, with zero automated effect. Frontend scope is rule-authoring CRUD only; it does not build a stand-in "generate Services" workaround (see #36's resolution comment) |
+
+**Structural note (not a gap to fix, a fact to document):** because `Service` carries no `frequencyId`, a ServiceFrequency's validity window can never retroactively affect an already-created Service — they're fully disconnected records the moment a Service exists, the same snapshot posture as `Route.zoneIds` → `Service.ServiceZone`.
+
+## Worked example: Service Types and Disposal Sites
+
+Drawn from [#39](https://github.com/hllous/Frontend-M6-DAPS2/issues/39). Plain catalog CRUD — neither entity has its own state machine; `status` is alta/baja (active/inactive), not a lifecycle, per `docs/backend-context/entidades/configuracion-y-recursos.md`. Capability names (`serviceType:manage`, `disposalSite:manage`) are a frontend hypothesis, following the `<resource>:<action>` pattern the Service table above uses — [#8](https://github.com/hllous/Frontend-M6-DAPS2/issues/8) only established that Office "configures catalogs" generically, it didn't enumerate per-resource capability names.
+
+| Endpoint | Capability | Purpose | Status |
+|---|---|---|---|
+| `POST /service-types` | `serviceType:manage` | Create — `code`, `name`, `category`, `mode`, `requiresVehicle` | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `GET /service-types` | — (any authenticated actor; used for Service scheduling forms) | List — paginated, filterable (`active`, `category`, `mode`, `search`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /service-types/:id` | — | Detail | confirmed |
+| `PATCH /service-types/:id` | `serviceType:manage` | Update `name`, `requiresVehicle`, `active`. `code`, `category` and `mode` are **immutable after creation** — already-scheduled Services copied them, so changing them retroactively would desync those Services | confirmed immutability rule, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `DELETE /service-types/:id` | `serviceType:manage` | Logical delete (deactivate) — no hard delete | confirmed route; capability name is hypothesis |
+| `POST /disposal-sites` | `disposalSite:manage` | Create — `code`, `siteType`, `name` | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `GET /disposal-sites` | — (any authenticated actor; used for CollectionRecord entry) | List — paginated, filterable (`active`, `siteType`, `search`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /disposal-sites/:id` | — | Detail | confirmed |
+| `PATCH /disposal-sites/:id` | `disposalSite:manage` | Update name, `siteType`, `active` | confirmed route; capability name is hypothesis |
+| `DELETE /disposal-sites/:id` | `disposalSite:manage` | Logical delete only — already-recorded `CollectionRecord`s reference the site by id, so a hard delete would orphan them | confirmed rationale, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+
+## Worked example: Crews and Vehicles
+
+Drawn from [#40](https://github.com/hllous/Frontend-M6-DAPS2/issues/40). Plain catalog CRUD, same alta/baja `status` posture as above. `Crew.leaderUserId`/`memberUserIds[]` are M1 user ids — M6 doesn't issue or store identity beyond the id; resolving a display name is a separate REST call to M1, still unconfirmed per [configuracion-y-recursos.md](docs/backend-context/entidades/configuracion-y-recursos.md#crew). `Crew.organizationId` is also M1's: cooperatives and contractors exist here as crews, not as a separate M6 concept. Capability names (`crew:manage`, `vehicle:manage`) are hypothesis, same rationale as the catalogs above.
+
+| Endpoint | Capability | Purpose | Status |
+|---|---|---|---|
+| `POST /crews` | `crew:manage` | Create — `name`, `crewType`, `leaderUserId`, `organizationId` (M1 org id; relevant for `COOPERATIVE`/`CONTRACTOR` crews), `defaultShift` | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `GET /crews` | — (any authenticated actor; Field sees only their own per [#8](https://github.com/hllous/Frontend-M6-DAPS2/issues/8)) | List — paginated, filterable (`active`, `crewType`, `defaultShift`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /crews/:id` | — (scoped by actor per #8) | Detail, including `memberUserIds[]` (integrantes) | confirmed |
+| `PATCH /crews/:id` | `crew:manage` | Update | confirmed route; capability name is hypothesis |
+| `DELETE /crews/:id` | `crew:manage` | Logical delete | confirmed route; capability name is hypothesis |
+| `POST /crews/:id/members` | `crew:manage` | Add one or more members (M1 user ids) to the crew | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `DELETE /crews/:id/members/:userId` | `crew:manage` | Remove one member | confirmed route; capability name is hypothesis |
+| `POST /vehicles` | `vehicle:manage` | Create — `plate`, `vehicleType`, `capacity` | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `GET /vehicles` | — (any authenticated actor; used for Service assignment) | List — paginated, filterable (`active`, `vehicleType`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /vehicles/:id` | — | Detail | confirmed |
+| `PATCH /vehicles/:id` | `vehicle:manage` | Update | confirmed route; capability name is hypothesis |
+| `DELETE /vehicles/:id` | `vehicle:manage` | Logical delete | confirmed route; capability name is hypothesis |
+
+## Worked example: Green Spaces
+
+Drawn from [#41](https://github.com/hllous/Frontend-M6-DAPS2/issues/41). Plain catalog CRUD, same alta/baja `status` posture as above. A `GreenSpace` (plaza, parque, cantero or rambla) carries no action endpoints of its own — watering and mowing are scheduled as ordinary `Service`s *against* the space (`ServiceCategory.GREEN_SPACES`), not as `green-spaces/:id/...` actions. Capability name (`greenSpace:manage`) is hypothesis, same rationale as the catalogs above.
+
+| Endpoint | Capability | Purpose | Status |
+|---|---|---|---|
+| `POST /green-spaces` | `greenSpace:manage` | Create — `name`, `spaceType`, `areaM2`, `zoneId` | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `GET /green-spaces` | — (any authenticated actor; used for Service scheduling and the Mapa layer) | List — paginated, filterable (`active`, `spaceType`, `zoneId`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /green-spaces/:id` | — | Detail | confirmed |
+| `PATCH /green-spaces/:id` | `greenSpace:manage` | Update | confirmed route; capability name is hypothesis |
+| `DELETE /green-spaces/:id` | `greenSpace:manage` | Logical delete | confirmed route; capability name is hypothesis |
+
+## Worked example: Containers and Green Points
+
+Drawn from [#37](https://github.com/hllous/Frontend-M6-DAPS2/issues/37). `Container` is the one catalog in this batch with a real state machine (`ACTIVE`/`OVERFLOWED`/`DAMAGED`/`UNDER_REPAIR`/`RELOCATING`/`REMOVED`); `GreenPoint` is plain alta/baja CRUD like the others. Capability names (`container:report`, `container:manage`, `greenPoint:manage`) are a frontend hypothesis: `report` covers ambient field/office reporting of a problem (no assignment required), `manage` covers Office dispatch decisions, following the Office-holds-elevated-actions split from [ADR-0002](docs/adr/0002-office-and-field-actors-are-mutually-exclusive.md).
+
+| Endpoint | Capability | Purpose | Status |
+|---|---|---|---|
+| `POST /containers` | `container:manage` | Create — `code`, `containerType`, `zoneId`, `capacityLiters`, `address`/`lat`/`lng`. Nace en `ACTIVE` | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `GET /containers` | — (any authenticated actor) | List — paginated, filterable (`status`, `containerType`, `zoneId`, `search`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /containers/:id` | — | Detail | confirmed |
+| `PATCH /containers/:id` | `container:manage` | Update `zoneId`, `capacityLiters`, `address`/`lat`/`lng`. `code` and `containerType` are **immutable after creation**; status-machine fields never go through this endpoint, only the transition endpoints below | confirmed, `containers.service.ts`; capability name is hypothesis |
+| `POST /containers/:id/report-overflow` | `container:report` | `ACTIVE → OVERFLOWED`. Real endpoint takes **no request body** | confirmed route and semantics, [endpoints.md](docs/backend-context/api/endpoints.md) and `containers.service.ts` |
+| `POST /containers/:id/empty` | — (bridged, not a standalone entry point) | `OVERFLOWED → ACTIVE`. Reached by completing the linked `POINT` Service (`targetRef` = this Container) — the frontend fires this call as a second request in that Service's completion submission, one crew action driving two API calls | **gap identified** — the backend's Service-completion path never touches `Container.status` itself (confirmed: no write-back to `container` anywhere in `services.service.ts`, despite `container.md` describing emptying as "executed as a Service"). The frontend bridges the two calls by convention only, with no backend-enforced atomicity between them |
+| `POST /containers/:id/report-damage` | `container:report` | `ACTIVE → DAMAGED`. `damageType`, `severity`, `requiresPublicWorks` (defaults `false`); `true` fires `containerDamaged` → M3 | confirmed route and payload, [endpoints.md](docs/backend-context/api/endpoints.md) and `report-damage.dto.ts` |
+| `POST /containers/:id/start-repair` | `container:manage` | `DAMAGED → UNDER_REPAIR`. Office dispatch decision, no request body | confirmed |
+| `POST /containers/:id/complete-repair` | `container:manage` (standalone) or bridged, same as `empty` | `UNDER_REPAIR → ACTIVE`. Standalone Office action when no repair Service was scheduled for it; bridged from a completed Service the same way as `empty` when one was | confirmed route; bridging is the same frontend-only convention as `empty` above, same gap |
+| `POST /containers/:id/relocate` | `container:manage` | `ACTIVE → RELOCATING`. Office dispatch decision (the *initiating* half), no request body | confirmed |
+| `POST /containers/:id/confirm-relocation` | — (bridged, same as `empty`) | `RELOCATING → ACTIVE` with the new `address`/`lat`/`lng` | same bridging gap as `empty` above |
+| `POST /containers/:id/remove` | `container:manage` | Terminal state, no further transitions | **corrected** — the controller's own Swagger description claims `ACTIVE\|DAMAGED → REMOVED`, but the real `VALID_TRANSITIONS` table in `containers.service.ts` only allows `DAMAGED → REMOVED`; `endpoints.md` already had this right ("Solo desde `DAMAGED`"), only the controller docstring is stale |
+| — (client-side only) | — | Evidence (photo/note) on `report-overflow`, `report-damage`, `remove`, and standalone `complete-repair` | **gap identified** — same posture as Service's own evidence gap above, not a lesser standard: `POST /containers/:id/evidence` is hypothesized (idempotent upload, attach-by-reference, per the Evidence/upload contract section), but no real endpoint exists yet, same Backend Phase 7 dependency. `start-repair` and `relocate` (the initiating call) stay bare — they're dispatch decisions to act, not records of a finding or a result |
+| `POST /green-points` | `greenPoint:manage` | Create — `code`, `name`, `zoneId`, `wasteTypes[]`, `address`/`lat`/`lng` | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
+| `GET /green-points` | — (any authenticated actor) | List — paginated, filterable (`active`, `zoneId`, `wasteType`, `search`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /green-points/:id` | — | Detail, with accepted waste types | confirmed |
+| `PATCH /green-points/:id` | `greenPoint:manage` | Update. `wasteTypes[]` **fully replaces** the accepted set (composite key, not an ordered list — same full-replace posture as Route's stop-sequence `PUT`) | confirmed, `green-points.service.ts` |
+| `DELETE /green-points/:id` | `greenPoint:manage` | Logical delete (`active = false`) | confirmed |
+
+**Structural note:** `GreenPoint` has no state machine and no report/transition endpoints of its own — emptying and upkeep are scheduled as ordinary `Service`s (`mode = POINT`, `targetRef` = the Green Point), same as `GreenSpace`. Only `Container` carries real lifecycle state; the bridging gap above is specific to it.
+
+Other resources (trees, environmental reports/inspections) follow the same pattern above but aren't drafted here — each gets its contract detail when its own domain-area ticket graduates from the map's fog.
