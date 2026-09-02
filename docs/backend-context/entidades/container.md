@@ -1,5 +1,3 @@
-> **Espejo de solo lectura**, copiado de `Backend/docs/entidades/container.md` el 2026-09-01. Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad. Fuera de este espejo: `docs/eventos/`, `docs/bloqueantes.md`.
-
 # `Container` — contenedores
 
 Los contenedores de la vía pública, con su ciclo de desborde, daño, reparación y reubicación. Los puntos verdes de entrega voluntaria (`GreenPoint`) son otra cosa y están en [inventario-urbano.md](inventario-urbano.md).
@@ -34,5 +32,5 @@ El vaciado y la reubicación se ejecutan como [`Service`](service.md) con `mode 
 
 ## Qué publica
 
-- Al pasar a `DAMAGED`: `containerDamaged` → M3 (ver `docs/eventos/` en el repo Backend).
-- Al pasar a `OVERFLOWED`: **nada sale al bus** (`containerOverflowed` está descartado). Si el desborde lo reportó un vecino hay `ticketId` y sale un `updateTicketStatus` hacia M2; si lo detectamos nosotros en la recorrida, no hay reclamo al que contestarle y no sale nada.
+- Al pasar a `DAMAGED`: [`containerDamaged`](../eventos/publicados/containerDamaged.md) → M3.
+- Al pasar a `OVERFLOWED`: **nada sale al bus** (`containerOverflowed` está [descartado](../eventos/publicados/descartados.md)). Si el desborde lo reportó un vecino hay `ticketId` y sale un [`updateTicketStatus`](../eventos/publicados/updateTicketStatus.md) hacia M2; si lo detectamos nosotros en la recorrida, no hay reclamo al que contestarle y no sale nada.

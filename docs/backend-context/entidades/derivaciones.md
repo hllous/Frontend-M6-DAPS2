@@ -1,5 +1,3 @@
-> **Espejo de solo lectura**, copiado de `Backend/docs/entidades/derivaciones.md` el 2026-09-01. Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad. Fuera de este espejo: `docs/eventos/`, `docs/bloqueantes.md`.
-
 # Derivaciones salientes
 
 Las dos entidades que representan un pedido a otro módulo. Existen para poder **seguir el pedido**: publicar el evento no alcanza, porque la respuesta vuelve asincrónica y hay que saber a qué solicitud contesta.
@@ -19,11 +17,11 @@ Un daño de infraestructura que detectamos pero que no nos corresponde arreglar:
 
 | Momento | Qué pasa |
 |---|---|
-| Se crea | Publicamos `infrastructureRepairRequested` |
-| Llega `workOrderScheduled` | Pasa a en curso |
-| Llega `workOrderCompleted` | Se cierra |
+| Se crea | Publicamos [`infrastructureRepairRequested`](../eventos/publicados/infrastructureRepairRequested.md) |
+| Llega [`workOrderScheduled`](../eventos/consumidos/workOrderScheduled.md) | Pasa a en curso |
+| Llega [`workOrderCompleted`](../eventos/consumidos/workOrderCompleted.md) | Se cierra |
 
-Las dos respuestas dependen de que M3 devuelva nuestro `requestId` como `sourceRequestId`; sin ese campo hay que correlacionar por dirección, que es frágil. Y sigue sin confirmarse **cuándo** dispara M3 su `workOrderScheduled` (ver `bloqueantes.md` en el repo Backend).
+Las dos respuestas dependen de que M3 devuelva nuestro `requestId` como `sourceRequestId`; sin ese campo hay que correlacionar por dirección, que es frágil. Y sigue sin confirmarse **cuándo** dispara M3 su `workOrderScheduled`: ver [bloqueantes.md](../bloqueantes.md#m3--obras-públicas--con-una-pregunta).
 
 Un [`Container`](container.md) con `requiresPublicWorks = true` también le llega a M3, pero por otra vía: el evento `containerDamaged`, no una `RepairRequest`.
 
@@ -33,9 +31,9 @@ El corte de calle que necesita un servicio o una poda. `sourceRef` apunta al [`S
 
 | Momento | Qué pasa |
 |---|---|
-| Se crea | Publicamos `streetClosureRequested`, con `sourceModule = M6` |
-| Llega `streetClosureApproved` | Se habilita la ejecución del servicio bloqueado |
-| Llega `streetClosureRejected` | Se reprograma o se cancela el servicio dependiente |
-| Llega `streetClosureEnded` | Se libera la dependencia |
+| Se crea | Publicamos [`streetClosureRequested`](../eventos/publicados/streetClosureRequested.md), con `sourceModule = M6` |
+| Llega [`streetClosureApproved`](../eventos/consumidos/streetClosureApproved.md) | Se habilita la ejecución del servicio bloqueado |
+| Llega [`streetClosureRejected`](../eventos/consumidos/streetClosureRejected.md) | Se reprograma o se cancela el servicio dependiente |
+| Llega [`streetClosureEnded`](../eventos/consumidos/streetClosureEnded.md) | Se libera la dependencia |
 
 Las tres respuestas traen `closureRequestId` y `requestingModule` (nombres de M7, no los que pedimos, pero el mismo dato) — confirmado desde el 25/08, y desde el 30/08 también en `streetClosureEnded`, que antes era la excepción.

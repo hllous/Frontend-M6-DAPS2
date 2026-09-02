@@ -1,4 +1,4 @@
-> **Espejo de solo lectura**, copiado de `Backend/docs/README.md` el 2026-09-01. Mantenido acá para tener el modelo de dominio y el estándar de API como contexto en el frontend mientras los endpoints reales del backend todavía no están definidos. Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad — no editar este archivo para cambiar el contrato: corregir en `Backend` y volver a copiar.
+> **Espejo de solo lectura**, actualizado desde `Backend/docs/` el 2026-09-02 (commit `9634379`). Mantenido acá para tener el modelo de dominio y el estándar de API como contexto en el frontend. `api/endpoints.md` ya lista 94 rutas reales sobre `zones`, `routes`, `service-frequencies`, `services`, `service-types`, `disposal-sites`, `crews`, `vehicles`, `containers`, `green-points`, `trees` y `green-spaces`; `environmental-reports`, `environmental-inspections`, `outbound-requests` y `citizen-portal` siguen sin implementar (fases 4-7 del backend). Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad — no editar este archivo para cambiar el contrato: corregir en `Backend` y volver a copiar.
 >
 > Fuera de este espejo (no migrado, son de integración backend-a-backend vía bus de eventos, no algo que el frontend consuma): `docs/eventos/`, `docs/bloqueantes.md`, `Acuerdo-Eventos-M6.md`, `Cruce-Eventos-M6.md`. Los links de este archivo hacia esas rutas no resuelven acá.
 
@@ -45,6 +45,7 @@ Detalle funcional de cada área (qué se puede hacer, no solo el título): ver [
 ## Mapa de esta carpeta
 
 - [entidades/](entidades/) — modelo de datos y estados
+- [api/](api/) — estándar de Swagger y catálogo de endpoints reales (`api/endpoints.md`)
 - [eventos/publicados/](eventos/publicados/) — lo que este módulo emite
 - [eventos/consumidos/](eventos/consumidos/) — lo que este módulo escucha
 - [bloqueantes.md](bloqueantes.md) — estado vivo de la integración
