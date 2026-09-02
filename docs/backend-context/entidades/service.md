@@ -1,5 +1,3 @@
-> **Espejo de solo lectura**, copiado de `Backend/docs/entidades/service.md` el 2026-09-01. Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad. Fuera de este espejo: `docs/eventos/`, `docs/bloqueantes.md`.
-
 # `Service` — la entidad central
 
 Un **`Service`** es toda unidad de trabajo programable del módulo: siempre tiene tipo, fecha, ventana horaria, cuadrilla, vehículo si corresponde, estado y evidencia. Lo que varía es sobre qué se ejecuta.
@@ -28,7 +26,7 @@ Referencias a otras entidades: `serviceTypeId` → [`ServiceType`](configuracion
 
 Enums: `mode` es `ServiceMode`, `status` es `ServiceStatus`, `origin` es `ServiceOrigin`, `ZoneResult.status` es `ZoneResultStatus`, `ZoneResult.reason` es `NotServicedReason`, `wasteType` es `WasteType`, `siteType` es `DisposalSiteType` — ver [enumeraciones.md](../enumeraciones.md).
 
-`ticketId` es de M2 y viaja solo cuando `origin = TICKET`. Es lo único que necesitamos guardar para correlacionar: la v1.5 sacó `publicId` y `expectedTicketVersion` del contrato, así que no hace falta persistir `ticketVersion` (ver `updateTicketStatus` en `docs/eventos/` del repo Backend).
+`ticketId` es de M2 y viaja solo cuando `origin = TICKET`. Es lo único que necesitamos guardar para correlacionar: la v1.5 sacó `publicId` y `expectedTicketVersion` del contrato, así que no hace falta persistir `ticketVersion` (ver [`updateTicketStatus`](../eventos/publicados/updateTicketStatus.md)).
 
 ## Estados
 
@@ -55,7 +53,7 @@ stateDiagram-v2
 
 ## Qué publica
 
-- Al agendarse: `urbanServiceScheduled` → M7.
-- Si nació de un reclamo (`origin = TICKET`), cada cambio relevante dispara un `updateTicketStatus` → M2. **Si no hay `ticketId`, no sale nada hacia M2**: un servicio planificado —la recolección de todos los martes— no proyecta.
+- Al agendarse: [`urbanServiceScheduled`](../eventos/publicados/urbanServiceScheduled.md) → M7.
+- Si nació de un reclamo (`origin = TICKET`), cada cambio relevante dispara un [`updateTicketStatus`](../eventos/publicados/updateTicketStatus.md) → M2. **Si no hay `ticketId`, no sale nada hacia M2**: un servicio planificado —la recolección de todos los martes— no proyecta.
 
-Los hechos de inicio, demora, cierre y zona no atendida existen en el modelo pero **no salen al bus** (ver `docs/eventos/publicados/descartados.md` en el repo Backend).
+Los hechos de inicio, demora, cierre y zona no atendida existen en el modelo pero **no salen al bus**: ver [descartados.md](../eventos/publicados/descartados.md).

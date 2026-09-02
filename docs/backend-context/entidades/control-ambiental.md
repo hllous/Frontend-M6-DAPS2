@@ -1,5 +1,3 @@
-> **Espejo de solo lectura**, copiado de `Backend/docs/entidades/control-ambiental.md` el 2026-09-01. Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad. Fuera de este espejo: `docs/eventos/`, `docs/bloqueantes.md`.
-
 # Control ambiental — inspección, acta y resolución
 
 Las tres entidades del tramo sancionatorio, aguas abajo del [`EnvironmentalReport`](environmental-report.md): qué encontró el inspector, qué constatamos formalmente y qué resolvió M4.
@@ -22,16 +20,16 @@ La inspección se **ejecuta como un [`Service`](service.md)**: `serviceId` dice 
 
 **Inmutable una vez emitida.** Es un acto administrativo formal: si hay un error, se emite otra, no se corrige esta.
 
-**`establishmentId` es obligatorio.** Intimar, clausurar y multar se le aplican a un comercio habilitado, que es lo único sobre lo que M4 puede actuar: un acta sin establecimiento no les sirve. Si no identificamos el establecimiento **no derivamos el acta** y el expediente cierra de nuestro lado. Para completarlo antes de emitir necesitamos la búsqueda REST de establecimiento de M4, pendiente.
+**`establishmentId` es obligatorio.** Intimar, clausurar y multar se le aplican a un comercio habilitado, que es lo único sobre lo que M4 puede actuar: un acta sin establecimiento no les sirve. Si no identificamos el establecimiento **no derivamos el acta** y el expediente cierra de nuestro lado. Para completarlo antes de emitir necesitamos la búsqueda REST de establecimiento de M4, [pendiente](../bloqueantes.md#m4--habilitaciones-).
 
 `suggestedAction` **no es vinculante**: la decisión es de M4.
 
-Al emitirse sale `environmentalViolationDetected` → M4 (ver `docs/eventos/` en el repo Backend), con `priorNoticeCount` —cuántas actas previas tiene ese mismo establecimiento en nuestro histórico— para adelantarles la reincidencia.
+Al emitirse sale [`environmentalViolationDetected`](../eventos/publicados/environmentalViolationDetected.md) → M4, con `priorNoticeCount` —cuántas actas previas tiene ese mismo establecimiento en nuestro histórico— para adelantarles la reincidencia.
 
 ## `SanctionOutcome`
 
 **Espejo de solo lectura de lo que decidió M4.** No lo editamos: existe para poder cerrar el expediente y para mostrar en qué terminó.
 
-Se llena al recibir `commercialFineGenerated`, `closureOrdered` o `closureLifted`. Los tres tienen que traer `sourceViolationId` —el `violationId` que mandamos en el acta— y **eso es lo que hoy no devuelven**: sin ese campo no sabemos cuál de nuestras actas resolvieron y el expediente queda en `NOTICE_ISSUED` para siempre. Es uno de los pedidos abiertos con M4 (ver `bloqueantes.md` en el repo Backend).
+Se llena al recibir [`commercialFineGenerated`](../eventos/consumidos/commercialFineGenerated.md), [`closureOrdered`](../eventos/consumidos/closureOrdered.md) o [`closureLifted`](../eventos/consumidos/closureLifted.md). Los tres tienen que traer `sourceViolationId` —el `violationId` que mandamos en el acta— y **eso es lo que hoy no devuelven**: sin ese campo no sabemos cuál de nuestras actas resolvieron y el expediente queda en `NOTICE_ISSUED` para siempre. Es uno de los [pedidos abiertos](../bloqueantes.md#tablero).
 
 `dismissalReason` no llega por evento: **M4 no publica nada cuando decide que no corresponde castigo.** Ese caso se cierra por vencimiento de plazo, sin `SanctionOutcome` — ver [`EnvironmentalReport`](environmental-report.md#estados).

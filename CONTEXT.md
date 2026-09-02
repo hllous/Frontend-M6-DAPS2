@@ -12,6 +12,14 @@ _Avoid_: Job, task, work order
 The act of attaching a crew and vehicle to an already-scheduled Service. A distinct step from scheduling: a Service can exist scheduled but unassigned.
 _Avoid_: Staffing, dispatch
 
+**Zone (M6)**:
+An M6 operational grouping of one or more M9 Neighborhoods, used to compose Routes and assign Crews. It is not M9's own "zona" concept. This cross-module naming collision remains unresolved; M6's term will be renamed if M9 retains ownership of "Zone". Neighborhoods are assigned to and removed from a Zone through a hypothesized adapter to M9's own, still-unpublished neighborhood catalog.
+_Avoid_: M9 zone, neighborhood (the M9-owned unit a Zone groups, not a Zone itself)
+
+**Validity (ServiceFrequency)**:
+The date window in which a ServiceFrequency rule applies. Closing a Frequency ends that window by setting `validTo`; it is not a deactivation and does not alter Services already generated from the rule. Zone and Route deactivation, by contrast, is their catalog active/inactive state.
+_Avoid_: Frequency deactivation, generic close
+
 **ZoneResult**:
 The recorded outcome (serviced / partial / not-serviced) for one zone within a ROUTE Service.
 _Avoid_: Zone status, stop result
@@ -29,7 +37,7 @@ The state where a field crew's manually resubmitted local draft can't be applied
 _Avoid_: Sync error, merge conflict
 
 **Evidence**:
-A reason, a note, and a photo (where feasible), uploaded separately and attached by reference to a Service outcome. Mandatory on every exception outcome (`PARTIALLY_COMPLETED`, any `PARTIAL`/`NOT_SERVICED` zone, `CANCELLED`, `SUSPENDED`); optional on a clean completion.
+A reason, a note, and a photo (where feasible), uploaded separately and attached by reference to a Service outcome or another resource's report/decision action (e.g. a Container overflow report, damage report, removal, or standalone repair completion — see that resource's `CONTRACTS.md` entry for which actions require it). Mandatory on every Service exception outcome (`PARTIALLY_COMPLETED`, any `PARTIAL`/`NOT_SERVICED` zone, `CANCELLED`, `SUSPENDED`); optional on a clean completion. For a non-Service action, an outcome reached *through* a linked Service uses that Service's own Evidence rather than a second, separate one.
 _Avoid_: Attachment, proof, documentation
 
 **Office**:
