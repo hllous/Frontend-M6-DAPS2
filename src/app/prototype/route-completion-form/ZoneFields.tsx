@@ -107,9 +107,15 @@ export function ZoneResultFields({
             </form.Subscribe>
           </>
         ) : (
-          <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
-            Sin excepción. La evidencia fotográfica es opcional para una zona atendida.
-          </p>
+          <>
+            <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
+              Sin excepción. La evidencia fotográfica es opcional para una zona atendida.
+            </p>
+            <div>
+              <FieldLabel optional>Evidencia fotográfica</FieldLabel>
+              {evidence}
+            </div>
+          </>
         )}
       </form.Subscribe>
     </div>

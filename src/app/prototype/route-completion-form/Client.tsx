@@ -17,7 +17,7 @@ import { VariantA, VariantB, VariantC } from "./variants";
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
 const VARIANTS: VariantMeta[] = [
   { key: "A", name: "Matriz operativa" },
-  { key: "B", name: "Banco de evidencias" },
+  { key: "B", name: "Mix seleccionado" },
   { key: "C", name: "Paso enfocado" },
 ];
 
@@ -32,7 +32,7 @@ function DraftWatcher({ values, snapshot, onDirty }: { values: CompletionValues;
 
 export function RouteCompletionPrototype() {
   const searchParams = useSearchParams();
-  const variant = searchParams.get("variant") ?? "A";
+  const variant = searchParams.get("variant") ?? "B";
   const [offline, setOffline] = useState(false);
   const [serverChanged, setServerChanged] = useState(false);
   const failNextUpload = useRef(false);
@@ -42,7 +42,6 @@ export function RouteCompletionPrototype() {
   const [draftSnapshot, setDraftSnapshot] = useState<CompletionValues | null>(null);
   const [conflictOpen, setConflictOpen] = useState(false);
   const [invalidZoneIndex, setInvalidZoneIndex] = useState<number | null>(null);
-  const [invalidField, setInvalidField] = useState<string | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [currentCrew, setCurrentCrew] = useState("Cuadrilla Norte 2");
 
@@ -145,7 +144,6 @@ export function RouteCompletionPrototype() {
     onRemove: removeUpload,
     onZoneServiced: clearZoneUploads,
     invalidZoneIndex,
-    invalidField,
   };
   const uploadsBlockingSubmission = !offline && uploads.some((upload) => upload.state !== "uploaded");
 
@@ -230,7 +228,6 @@ export function RouteCompletionPrototype() {
             const zoneIssue = result.error.issues.find((issue) => issue.path[0] === "zoneResults");
             const zoneIndex = typeof zoneIssue?.path[1] === "number" ? zoneIssue.path[1] : null;
             setInvalidZoneIndex(zoneIndex);
-            setInvalidField(typeof zoneIssue?.path[2] === "string" ? zoneIssue.path[2] : null);
             setValidationMessage(zoneIndex === null ? result.error.issues[0]?.message ?? "Revisá los campos obligatorios." : `Revisá ${form.state.values.zoneResults[zoneIndex].zoneName}: ${zoneIssue?.message}`);
             void form.handleSubmit();
             setTimeout(() => {
@@ -242,7 +239,6 @@ export function RouteCompletionPrototype() {
             return;
           }
           setInvalidZoneIndex(null);
-          setInvalidField(null);
           setValidationMessage(null);
           void form.handleSubmit();
         }}

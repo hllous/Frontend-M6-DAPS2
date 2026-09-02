@@ -1,7 +1,6 @@
 "use client";
 
 import * as Select from "@radix-ui/react-select";
-import * as Tabs from "@radix-ui/react-tabs";
 import {
   AlertTriangle,
   Camera,
@@ -15,7 +14,7 @@ import {
   UploadCloud,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { REASONS, ZONE_STATUSES, type EvidenceUpload, type ZoneStatus } from "./model";
 
@@ -193,25 +192,6 @@ export function EvidenceQueue({
         ))}
       </ul>
     </div>
-  );
-}
-
-export function ResultEvidenceTabs({ result, evidence, showEvidence = false }: { result: ReactNode; evidence: ReactNode; showEvidence?: boolean }) {
-  const [tab, setTab] = useState<"result" | "evidence">("result");
-
-  useEffect(() => {
-    if (showEvidence) setTab("evidence");
-  }, [showEvidence]);
-
-  return (
-    <Tabs.Root value={tab} onValueChange={(value) => setTab(value as "result" | "evidence")}>
-      <Tabs.List className="mb-5 flex border-b border-neutral-200" aria-label="Datos de la zona">
-        <Tabs.Trigger value="result" className="border-b-2 border-transparent px-1 pb-2.5 pr-5 text-sm font-semibold text-neutral-500 data-[state=active]:border-navy data-[state=active]:text-navy">Resultado</Tabs.Trigger>
-        <Tabs.Trigger value="evidence" className="border-b-2 border-transparent px-5 pb-2.5 text-sm font-semibold text-neutral-500 data-[state=active]:border-navy data-[state=active]:text-navy">Evidencia</Tabs.Trigger>
-      </Tabs.List>
-      <Tabs.Content value="result" className="outline-none">{result}</Tabs.Content>
-      <Tabs.Content value="evidence" className="outline-none">{evidence}</Tabs.Content>
-    </Tabs.Root>
   );
 }
 

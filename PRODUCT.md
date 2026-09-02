@@ -41,14 +41,14 @@ M6 joins office planning and field execution around the same capability-gated Se
 
 ## Brand Commitments
 
-The user has pinned a palette and typeface as binding (not open to the direction roll):
+The prototype currently uses the following palette and typeface as provisional scaffolding, not as a durable brand decision. The Wayfinder ticket **Decide the visual system and DESIGN.md standard** will replace or confirm them and publish the authoritative `DESIGN.md`:
 
 - **Navy** `#0F2C59` (light `#163D75`) as the primary institutional color — dark surfaces, headings, primary buttons, navbar.
 - **Coral** `#D63031` (light `#E74C3C`) as the accent only — CTAs, alerts, urgent/destructive emphasis. Never a second base color.
 - Ground `#FAFAFA`, card surface `#FFFFFF` with a `border-neutral-200` border, text `#1A1A1A` primary / `#525252` secondary.
 - Typeface: Inter (400/500/600/700/800), `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` fallback.
 
-A first batch of component references (dashboards, sidebars, breadcrumbs, steppers, status badges, alerts, loaders, charts — mostly sourced from 21st.dev) is catalogued with borrow/avoid notes and a mapping to M6 concepts at `docs/design/inspiration/README.md`. These are inspiration to recompose, not components to copy verbatim. Icon library is still undecided; several candidate sources are named in that catalog.
+A first batch of component references (dashboards, sidebars, breadcrumbs, steppers, status badges, alerts, loaders, charts — mostly sourced from 21st.dev) is catalogued with borrow/avoid notes and a mapping to M6 concepts at `docs/design/inspiration/README.md`. These are inspiration to recompose, not components to copy verbatim. Icon library, final palette, typography, and durable component language remain open for the `DESIGN.md` decision.
 
 ## Evidence on Hand
 
@@ -57,7 +57,7 @@ A first batch of component references (dashboards, sidebars, breadcrumbs, steppe
 - Frontend-facing backend domain mirror: `docs/backend-context/`.
 - Contract hypotheses: `CONTRACTS.md`.
 - UI inspiration catalog (palette, type, component references): `docs/design/inspiration/README.md`.
-- No approved visual identity, production UI, or validated component system exists yet — the palette/type above are pinned, but DESIGN.md itself is not yet written.
+- No approved visual identity, production UI, or validated component system exists yet. The prototype palette/type above are provisional; DESIGN.md itself is not yet written.
 
 ## Product Principles
 
