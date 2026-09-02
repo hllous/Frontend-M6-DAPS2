@@ -20,6 +20,24 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.prototype-form {
+  caret-color: #0f2c59;
+  scrollbar-color: #9ca3af #f5f5f5;
+  scrollbar-width: thin;
+}
+
+.prototype-form ::selection {
+  color: #ffffff;
+  background: #0f2c59;
+}
+
+.prototype-form button,
+.prototype-form summary,
+.prototype-form input,
+.prototype-form textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
