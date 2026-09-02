@@ -1,0 +1,5 @@
+# No offline queue for field Service actions
+
+The map's connectivity Notes commit to "resilient drafts, retryable uploads, visible synchronization state" for the whole effort, which reads as a background sync queue. For field Service actions specifically (start, suspend/resume, record ZoneResult, complete/partially-complete, evidence capture) we deliberately chose not to build one: an action composed offline is kept as a local draft on-device so nothing typed is lost, but there is no automatic retry — the crew must manually resubmit once reconnected, and a manual resubmission is rejected with an explicit conflict prompt (never silently applied) if the Service changed server-side in the meantime.
+
+We picked this over a background sync queue because a queue has to solve reconciliation for every action type against a Service that may have been reassigned, rescheduled, or cancelled while offline, which is a meaningful chunk of engineering for a case field conditions studies suggest is short-lived signal loss, not extended offline work. Manual resubmission gets the same loss-prevention guarantee with far less machinery, at the cost of an extra tap from the crew.
