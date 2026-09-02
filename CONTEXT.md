@@ -49,7 +49,7 @@ A Field actor belonging to a Crew who can view but not act on the Crew's assigne
 _Avoid_: Worker, staff
 
 **Capability**:
-The atomic unit of M6 authorization — a named permission (e.g. `service:schedule`, `violationNotice:issue`, `treeIntervention:authorize`) granted to an actor, resolved from M1's identity claims through a frontend-owned mapping layer once M1 publishes its claims contract; never inferred from a hardcoded role string. Optimistic at the frontend — UI-only; M6 Backend is the sole authorizing authority, see [ADR-0005](docs/adr/0005-m6-backend-is-the-sole-authorization-authority.md).
+The atomic unit of M6 authorization — a named permission (e.g. `service:schedule`, `violationNotice:issue`, `treeIntervention:authorize`) granted to an actor, resolved from M1 identity roles/claims through a versioned M6 mapping layer. M1 confirmed its roles but has not yet published the JWT claims contract, so the exact extraction remains a hypothesis. Optimistic at the frontend — UI-only; M6 Backend is the sole authorizing authority, see [ADR-0005](docs/adr/0005-m6-backend-is-the-sole-authorization-authority.md).
 _Avoid_: Role, permission, scope
 
 **My Work**:
