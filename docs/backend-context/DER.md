@@ -1,7 +1,3 @@
-> **Espejo de solo lectura**, copiado de `Backend/docs/DER.md` el 2026-09-01. Mantenido acá para tener el modelo de dominio como contexto en el frontend mientras los endpoints reales del backend todavía no están definidos. Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad — no editar este archivo para cambiar el contrato: corregir en `Backend` y volver a copiar.
->
-> Fuera de este espejo (no migrado, son de integración backend-a-backend vía bus de eventos, no algo que el frontend consuma): `docs/eventos/`, `docs/bloqueantes.md`, `Acuerdo-Eventos-M6.md`, `Cruce-Eventos-M6.md`.
-
 # DER — Backend Módulo 6 (Ambiente, Higiene y Servicios Urbanos)
 
 Modelo relacional derivado de `docs/entidades/` del Módulo 6. Convenciones aplicadas al pasar del modelo conceptual (documentado) al relacional (implementable):
@@ -382,7 +378,7 @@ erDiagram
 
 ## Riesgos abiertos que impactan el esquema
 
-Salen de `bloqueantes.md` (repo Backend) y de las divergencias de enums. Ninguno bloquea empezar, pero conviene tenerlos a la vista antes de escribir la primera migración:
+Salen de `bloqueantes.md` y de las divergencias de enums. Ninguno bloquea empezar, pero conviene tenerlos a la vista antes de escribir la primera migración:
 
 - **`sourceViolationId` que M4 no devuelve.** Sin ese campo en `commercialFineGenerated` / `closureOrdered` / `closureLifted` no se sabe a qué acta corresponde la resolución, y `SANCTION_OUTCOME` nunca se llena. El esquema soporta el caso (el expediente cierra por `deadline_at`), pero el dato se pierde.
 - **`sourceRequestId` de M3 y M7.** Mismo problema en `REPAIR_REQUEST` y `STREET_CLOSURE_REQUEST`: las columnas `work_order_id` / `closure_id` existen para correlacionar, pero hoy la respuesta no trae con qué llenarlas.
