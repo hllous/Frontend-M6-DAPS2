@@ -1,0 +1,17 @@
+# Dependencias y artefactos locales (se regeneran dentro de la imagen)
+node_modules
+.next
+out
+
+# Git
+.git
+.gitignore
+
+# Secretos y entorno local (nunca van a la imagen)
+.env
+*.log
+npm-debug.log*
+
+# Archivos propios de Docker
+Dockerfile
+.dockerignore
