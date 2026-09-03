@@ -120,12 +120,14 @@ The system has two named layout breakpoints. They mark the change of operating p
 
 | Token | Value | Boundary |
 | --- | --- | --- |
-| `--bp-field` | `760px` | Below this width the interface takes the Field posture |
-| `--bp-office-wide` | `1024px` | At or above this width Office may show the sidebar and a secondary panel at once |
+| `--bp-field` | `760px` | Field posture applies at this width **and below** (`@media (max-width: 760px)`); Office begins at 761 px |
+| `--bp-office-wide` | `1024px` | Wide Office applies at this width **and above** (`@media (min-width: 1024px)`) |
 
-- Below `--bp-field`, apply the Field posture as a whole: bottom navigation replaces the sidebar, task controls become 48 px, dense tables transform into lists or detail views, and gutters drop to 16 px. Do not apply parts of this posture independently.
-- Between the two breakpoints, keep the Office shell but allow the sidebar to collapse to its 72 px rail and secondary panels to stack below primary content.
-- At or above `--bp-office-wide`, the full Office composition is available. It is a ceiling for layout, not a licence for wider line lengths; keep reading measures bounded.
+Both bounds are inclusive of the stated value; a viewport of exactly 760 px is Field, and exactly 1024 px is wide Office. State the query as written above rather than deriving it, so the boundary never drifts by a pixel between components.
+
+- At `--bp-field` and below, apply the Field posture as a whole: bottom navigation replaces the sidebar, task controls become 48 px, dense tables transform into lists or detail views, and gutters drop to 16 px. Do not apply parts of this posture independently.
+- Between 761 px and 1023 px, keep the Office shell but allow the sidebar to collapse to its 72 px rail and secondary panels to stack below primary content.
+- At `--bp-office-wide` and above, the full Office composition is available. It is a ceiling for layout, not a licence for wider line lengths; keep reading measures bounded.
 - Component-local breakpoints are permitted and expected. Choose them where the component's own content breaks, not from a device list, and keep them local to that component rather than promoting them to the two names above.
 - Only these two values are normative. Intermediate widths used inside the comparison prototypes were content-driven and carry no authority.
 - Never switch posture on user-agent sniffing or on a touch-capability test. Width is the only signal; a touch screen at Office width remains Office.
@@ -418,3 +420,4 @@ The comparison prototype at `src/app/prototype/do-dont/` (`npm run prototype:do-
 - Change the example in the same commit as the rule it illustrates. An example that contradicts its rule is worse than no example.
 - The examples page uses the same token values as production. When a token changes, open the page and confirm the pair still demonstrates its rule.
 - Run the design detector over the page after editing it: `node .claude/skills/impeccable/scripts/detect.mjs docs/design/examples/index.html`. The page is expected to report zero anti-patterns, because it is the reference for the standard.
+- Open the page at both postures, above and below `--bp-field`, and confirm control heights change from 40 px to 48 px. A static check cannot catch a missing media query; a browser can.
