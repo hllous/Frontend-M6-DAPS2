@@ -16,6 +16,12 @@
     "prototype:basemap": "node src/app/prototype/basemap/server.mjs",
     "prototype:clustering": "node src/app/prototype/clustering/server.mjs",
     "prototype:charts": "node src/app/prototype/charts/server.mjs",
+    "prototype:spacing": "node src/app/prototype/spacing/server.mjs",
+    "prototype:typography-reconsideration": "node src/app/prototype/typography-reconsideration/server.mjs",
+    "prototype:components": "node src/app/prototype/component-anatomy/server.mjs",
+    "prototype:motion": "node src/app/prototype/motion/server.mjs",
+    "prototype:ux-writing": "node src/app/prototype/ux-writing/server.mjs",
+    "prototype:do-dont": "node src/app/prototype/do-dont/server.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."

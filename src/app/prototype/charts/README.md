@@ -2,6 +2,10 @@
 
 Thirteenth focused iteration for [Decide the visual system and DESIGN.md standard](https://github.com/hllous/Frontend-M6-DAPS2/issues/12).
 
+## Resolution
+
+Approved on 2026-09-03: **A · Barras directas** is the default for immediate categorical comparison and **C · Tabla visual** is its detailed accessible companion. **B · Columnas de tablero** remains available only when the task genuinely compares two meaningful series. This is a chart-selection rule, not a single universal chart design.
+
 ## Decision isolated
 
 Choose the default presentation for comparing weekly service completion by zone. Values, date range, filters, shell, palette, type, density, and surface treatment remain fixed.
@@ -22,4 +26,4 @@ Open `http://localhost:3012/?chart=A`. Use the floating arrows or keyboard left/
 
 Judge comparison speed, exact-value lookup, accessibility without color, and usefulness on narrow screens. Do not judge the already approved shell or visual tokens.
 
-The static prototype uses HTML/CSS. Production chart composition should use the project’s shadcn Chart wrapper and its Recharts foundation.
+The static prototype isolates information structure; it is not final production rendering. Production chart composition should use the project’s shadcn Chart wrapper and its Recharts foundation as a quality and composition reference, while applying M6 tokens and the rules in `DESIGN.md` rather than copying gallery examples verbatim.
