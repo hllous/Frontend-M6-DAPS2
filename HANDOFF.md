@@ -1,33 +1,59 @@
-# Continuar el sistema visual de M6
+# Handoff: M6 visual system and DESIGN.md
 
-## Objetivo
+## Objective
 
-Continuar [Frontend #12 — Decide the visual system and DESIGN.md standard](https://github.com/hllous/Frontend-M6-DAPS2/issues/12), dentro del mapa [#6](https://github.com/hllous/Frontend-M6-DAPS2/issues/6), mediante una decisión visual validada por el usuario por vez.
+Continue GitHub issue [Frontend #12 — Decide the visual system and DESIGN.md standard](https://github.com/hllous/Frontend-M6-DAPS2/issues/12), which belongs to map issue [#6](https://github.com/hllous/Frontend-M6-DAPS2/issues/6). Keep iterating through one tangible design decision at a time until `DESIGN.md` is complete.
 
-## Inicio de la próxima sesión
+## Repository state
 
-1. Leer `AGENTS.md`.
-2. Leer `PRODUCT.md` y `DESIGN.md`; son las fuentes de verdad del producto y de las decisiones aprobadas.
-3. Leer `src/app/prototype/charts/README.md`.
-4. Ejecutar `npm run prototype:charts` y abrir `http://localhost:3012/?chart=A`.
-5. Pedir al usuario que elija la presentación de gráficos. La opción A está recomendada, pero todavía no fue aprobada.
+- Repository: `hllous/Frontend-M6-DAPS2`
+- Branch: `feature/012-design-system-standard`
+- Latest commit: `5c11443caac4ec3ebbfb1e420627f7fe7a682bb1` (`feat(design): capture approved visual system prototypes`)
+- Commit is pushed to `origin/feature/012-design-system-standard`.
+- The only remaining working-tree item was untracked `.claude/`, which is user-owned/local and was intentionally not committed.
 
-Cuando el usuario elija, registrar el veredicto en `DESIGN.md` y en el README del prototipo. Después, preparar automáticamente una sola comparación para la siguiente decisión pendiente indicada en `DESIGN.md` y esperar su validación. Avanzar sin pedir permiso para preparar el próximo prototipo; nunca aprobar una opción en nombre del usuario.
+Read the repository `AGENTS.md` before acting. The backend mirror under `docs/backend-context/` is read-only and should only be consulted when a decision depends on domain/API truth.
 
-El brief original del proceso se llama `design-brief-message.md` y está en la carpeta Downloads del usuario que inició el trabajo.
+## Authoritative context
 
-## Estado técnico
+- Approved decisions and remaining decision categories: `DESIGN.md`
+- Product context: `PRODUCT.md`
+- Individual prototype questions, options, and recorded verdicts: `src/app/prototype/*/README.md`
+- User-supplied process brief: locate `design-brief-message.md` in the current Windows user's Downloads directory and read it before continuing.
 
-- Rama de trabajo: `feature/012-design-system-standard`.
-- Los prototipos son HTML/CSS descartable; la producción debe respetar la configuración shadcn Base UI de `components.json`.
-- La última validación comprobó sintaxis de todos los `server.mjs`, contraste de paletas y detector de Impeccable sin hallazgos.
-- `node_modules` no estaba instalado; ejecutar ESLint solamente después de instalar las dependencias.
-- `.claude/` es contenido local del usuario y queda fuera de los commits de este trabajo.
+Do not restate or reinterpret the approved choices here; use `DESIGN.md` as the source of truth.
+
+## Exact continuation point
+
+The next prototype is already prepared, but the user has **not** selected a winner:
+
+```powershell
+npm run prototype:charts
+```
+
+Then open `http://localhost:3012/?chart=A` and ask the user to validate the chart-comparison decision. The three options are documented in `src/app/prototype/charts/README.md`. Option A was recommended, but must not be recorded as approved until the user explicitly chooses it.
+
+After approval:
+
+1. Record the verdict in `DESIGN.md` and `src/app/prototype/charts/README.md`.
+2. Immediately prepare exactly one next pending design decision from `DESIGN.md`.
+3. Present 2–3 tangible variants, recommend one, and wait for the user's validation before making that decision normative.
+
+The user explicitly wants forward progress without permission prompts, but also explicitly wants every new design decision validated. Therefore, automatically build the next comparison after an approval; never auto-select its winner.
+
+## Verification notes
+
+- `node --check` passed for every prototype `server.mjs`.
+- `node src/app/prototype/palette/contrast-check.mjs` passed all palette comparisons.
+- `node .agents/skills/impeccable/scripts/detect.mjs --json` returned `[]` before commit.
+- `git diff --check` passed, with only expected LF-to-CRLF warnings.
+- `node_modules` is absent, so ESLint could not be executed. Do not claim lint has passed unless dependencies are installed in the next session.
+- Prototypes are intentionally static HTML/CSS for quick comparison. Production components should follow the existing shadcn Base UI configuration in `components.json`.
 
 ## Suggested skills
 
-- `wayfinder`: continuar el flujo del issue y su mapa, si está disponible.
-- `prototype`: construir comparaciones enfocadas y con variantes por URL.
-- `impeccable`: mantener el estándar visual y revisar los hooks de diseño.
-- `shadcn`: alinear las decisiones con la base de componentes de producción.
-- `browser`: verificar las variantes en escritorio y móvil.
+- `wayfinder` — continue the issue/map workflow if available in the next session.
+- `prototype` — build each focused, URL-switchable comparison.
+- `impeccable` — preserve design quality, run context/detector guidance, and triage hook findings.
+- `shadcn` — keep production recommendations aligned with the project's Base UI setup.
+- `browser` — inspect desktop and mobile variants when local browser automation is available.
