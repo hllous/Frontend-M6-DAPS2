@@ -19,10 +19,8 @@ It carries one canonical do/don't pair and one PR review checklist for each of t
 - `DESIGN.md` is normative. When the page and the standard disagree, the standard wins and the example is corrected.
 - Change an example in the same commit as the rule it illustrates.
 - Keep exactly one pair per area. Adding a second means revisiting the approved format, not editing this page.
-- After editing, the page must report zero anti-patterns:
+- After editing, open the page in a browser at a width above 760 px and again at or below it. Controls must measure 40 px in the first case and 48 px in the second, and neither view may scroll the body horizontally. This check is required, because a file-level review cannot see a missing media query.
 
-```bash
-node .claude/skills/impeccable/scripts/detect.mjs docs/design/examples/index.html
-```
+An automated design-lint pass is a useful supplement where that tooling is available locally, but it lives under `.claude/skills/`, which this repository does not vendor. Do not treat it as a gate.
 
 The comparison prototype that produced this decision is at `src/app/prototype/do-dont/`. It is throwaway history and carries no authority.
