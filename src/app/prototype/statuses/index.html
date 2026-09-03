@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es" data-status-style="A">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Estados operativos · M6</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --theme: #12315b; --action: #1d4f82; --canvas: #f4f7fa; --surface: #ffffff;
+        --subtle: #eaf0f5; --ink: #172337; --muted: #536174; --line: #cbd5df;
+        --focus: #2377bd;
+        --planned-bg: #eef1f4; --planned-fg: #405266;
+        --scheduled-bg: #e0eef8; --scheduled-fg: #15537e;
+        --active-bg: #dbe9f6; --active-fg: #12315b;
+        --delayed-bg: #f8e8cf; --delayed-fg: #7b480e;
+        --done-bg: #deefe7; --done-fg: #1d6247;
+        --cancelled-bg: #f7e1e2; --cancelled-fg: #96313c;
+      }
+      * { box-sizing: border-box; }
+      html { background: var(--canvas); color: var(--ink); font-family: "Inter", system-ui, sans-serif; }
+      body { margin: 0; min-width: 320px; background: var(--canvas); }
+      button { cursor: pointer; font: inherit; }
+      :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+      .experiment-note { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 24px; padding: 9px 24px; border-bottom: 1px solid var(--line); background: var(--subtle); font-size: 13px; }
+      .experiment-note strong { color: var(--theme); }
+      .experiment-note span:last-child { color: var(--muted); }
+      .shell { display: grid; min-height: calc(100vh - 44px); grid-template-columns: 220px minmax(0, 1fr); }
+      .sidebar { background: var(--theme); color: var(--surface); }
+      .brand { display: flex; min-height: 64px; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid rgb(255 255 255 / 20%); }
+      .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgb(255 255 255 / 48%); border-radius: 12px; font-size: 14px; font-weight: 700; }
+      .brand strong, .brand small { display: block; }
+      .brand strong { font-size: 14px; }
+      .brand small { margin-top: 2px; color: rgb(255 255 255 / 74%); font-size: 11px; }
+      .nav { display: flex; flex-direction: column; gap: 4px; padding: 12px 10px; }
+      .nav button { min-height: 40px; border: 0; border-radius: 12px; padding: 0 12px; background: transparent; color: rgb(255 255 255 / 82%); text-align: left; font-size: 13px; font-weight: 600; }
+      .nav button[aria-current="page"] { background: var(--surface); color: var(--theme); }
+      .content { min-width: 0; }
+      .topbar { display: flex; min-height: 64px; align-items: center; justify-content: space-between; padding: 10px 24px; border-bottom: 1px solid var(--line); background: var(--surface); }
+      .topbar h1 { margin: 0; font-size: 20px; }
+      .topbar span { color: var(--muted); font-size: 13px; }
+      .workspace { padding: 24px 24px 100px; }
+      .heading { margin-bottom: 24px; }
+      .heading h2 { margin: 0; font-size: 28px; line-height: 1.2; letter-spacing: -0.025em; }
+      .heading p { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+      .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; }
+      .panel { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+      .panel-head { display: grid; min-height: 50px; grid-template-columns: minmax(0, 1fr) 150px; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--subtle); }
+      .panel-head strong, .panel-head span { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
+      .panel-head span { color: var(--muted); }
+      .rows { margin: 0; padding: 0; list-style: none; }
+      .row { --row-color: var(--planned-fg); display: grid; min-height: 62px; grid-template-columns: minmax(0, 1fr) 150px; align-items: center; gap: 14px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+      .row:last-child { border-bottom: 0; }
+      .row strong, .row small { display: block; }
+      .row strong { overflow: hidden; font-size: 14px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+      .row small { margin-top: 3px; color: var(--muted); font-size: 12px; }
+      .planned { --status-bg: var(--planned-bg); --status-fg: var(--planned-fg); --row-color: var(--planned-fg); }
+      .scheduled { --status-bg: var(--scheduled-bg); --status-fg: var(--scheduled-fg); --row-color: var(--scheduled-fg); }
+      .active { --status-bg: var(--active-bg); --status-fg: var(--active-fg); --row-color: var(--active-fg); }
+      .suspended, .rescheduled, .partial { --status-bg: var(--delayed-bg); --status-fg: var(--delayed-fg); --row-color: var(--delayed-fg); }
+      .done { --status-bg: var(--done-bg); --status-fg: var(--done-fg); --row-color: var(--done-fg); }
+      .cancelled { --status-bg: var(--cancelled-bg); --status-fg: var(--cancelled-fg); --row-color: var(--cancelled-fg); }
+      .status { display: inline-flex; width: fit-content; min-height: 28px; align-items: center; gap: 6px; color: var(--status-fg); font-size: 12px; font-weight: 700; }
+      .status-icon { width: 15px; height: 15px; flex: 0 0 15px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+      [data-status-style="A"] .status { border-radius: 999px; padding: 4px 9px; background: var(--status-bg); }
+      [data-status-style="B"] .status { padding-inline: 0; }
+      [data-status-style="B"] .status-icon { width: 26px; height: 26px; flex-basis: 26px; border-radius: 8px; padding: 5px; background: var(--status-bg); }
+      [data-status-style="C"] .status-icon { width: 9px; height: 9px; border-radius: 50%; background: var(--status-fg); stroke: none; }
+      .detail { align-self: start; padding: 16px; }
+      .detail h3 { margin: 0 0 4px; font-size: 18px; }
+      .detail > p { margin: 0 0 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+      .detail dl { margin: 0; }
+      .detail dt { margin-top: 14px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+      .detail dd { margin: 5px 0 0; font-size: 14px; }
+      .detail .status { margin-top: 2px; }
+      .alert { display: flex; align-items: flex-start; gap: 8px; margin-top: 18px; border: 1px solid #e9c98f; border-radius: 12px; padding: 10px; background: var(--delayed-bg); color: var(--delayed-fg); font-size: 12px; line-height: 1.45; }
+      .alert .status-icon { margin-top: 1px; }
+      .rule { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+      .switcher { position: fixed; z-index: 5; bottom: 18px; left: 50%; display: flex; align-items: center; gap: 6px; transform: translateX(-50%); border-radius: 999px; padding: 6px; background: #111820; color: #ffffff; }
+      .switcher button { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 19px; }
+      .switcher button:hover { background: rgb(255 255 255 / 14%); }
+      .switcher-output { min-width: 224px; text-align: center; }
+      .switcher-output strong, .switcher-output small { display: block; }
+      .switcher-output strong { font-size: 12px; }
+      .switcher-output small { margin-top: 2px; color: #bdc7d0; font-size: 10px; }
+      @media (max-width: 760px) {
+        .experiment-note { display: block; padding: 10px 14px; line-height: 1.4; }
+        .experiment-note span:last-child, .sidebar, .topbar span { display: none; }
+        .shell { display: block; }
+        .topbar { padding: 10px 14px; }
+        .workspace { padding: 16px 14px 100px; }
+        .heading h2 { font-size: 26px; }
+        .layout { grid-template-columns: 1fr; gap: 16px; }
+        .detail { display: none; }
+        .panel-head, .row { grid-template-columns: minmax(0, 1fr) 122px; }
+        .panel-head { padding-inline: 12px; }
+        .row { padding-inline: 12px; }
+        .switcher-output { min-width: 190px; }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 9v6m4-6v6"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4m8-4v4M3 10h18m-5 4-3 3-2-2"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19ZM12 9v4m0 3h.01"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+      <symbol id="i-cancel" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/></symbol>
+    </defs></svg>
+    <div class="experiment-note"><span><strong>Decisión aislada: representación de estados.</strong> Colores, contenido y densidad permanecen fijos.</span><span>Datos ilustrativos · sin acciones reales</span></div>
+    <div class="shell"><aside class="sidebar"><div class="brand"><span class="brand-mark">M6</span><span><strong>Ambiente e Higiene</strong><small>Municipalidad UADE</small></span></div><nav class="nav"><button type="button">Mi trabajo</button><button type="button" aria-current="page">Servicios</button><button type="button">Inventario</button><button type="button">Control ambiental</button><button type="button">Mapa</button></nav></aside>
+      <main class="content"><header class="topbar"><h1>Servicios</h1><span>Actualizado 10:42 ART</span></header><section class="workspace"><div class="heading"><h2>Estados operativos</h2><p>Compará qué tan rápido se distinguen las situaciones que requieren atención.</p></div><div class="layout"><section class="panel"><div class="panel-head"><strong>Servicio</strong><span>Estado</span></div><ul class="rows">
+        <li class="row scheduled"><span><strong>Poda preventiva en espacio verde</strong><small>Villa Devoto · SV-1042</small></span><span class="status"><svg class="status-icon"><use href="#i-clock"/></svg>Programado</span></li>
+        <li class="row active"><span><strong>Vaciado y revisión de contenedor</strong><small>Villa Devoto · SV-1043</small></span><span class="status"><svg class="status-icon"><use href="#i-play"/></svg>En curso</span></li>
+        <li class="row suspended"><span><strong>Recolección de residuos voluminosos</strong><small>Villa del Parque · SV-1044</small></span><span class="status"><svg class="status-icon"><use href="#i-pause"/></svg>Suspendido</span></li>
+        <li class="row rescheduled"><span><strong>Inspección ambiental extraordinaria</strong><small>Villa General Mitre · SV-1045</small></span><span class="status"><svg class="status-icon"><use href="#i-calendar"/></svg>A reprogramar</span></li>
+        <li class="row done"><span><strong>Mantenimiento de sumidero</strong><small>Parque Chas · SV-1046</small></span><span class="status"><svg class="status-icon"><use href="#i-check"/></svg>Completado</span></li>
+        <li class="row partial"><span><strong>Recorrido de recolección domiciliaria</strong><small>Zona Norte · SV-1047</small></span><span class="status"><svg class="status-icon"><use href="#i-alert"/></svg>Parcial</span></li>
+        <li class="row cancelled"><span><strong>Control de disposición inicial</strong><small>Agronomía · SV-1048</small></span><span class="status"><svg class="status-icon"><use href="#i-cancel"/></svg>Cancelado</span></li>
+      </ul></section><aside class="panel detail scheduled"><h3>Poda preventiva</h3><p>El servicio permanece programado y tiene una cuadrilla asignada.</p><dl><dt>Estado actual</dt><dd><span class="status"><svg class="status-icon"><use href="#i-clock"/></svg>Programado</span></dd><dt>Responsable</dt><dd>Cuadrilla 12</dd><dt>Último cambio</dt><dd>Hoy, 10:26 ART</dd></dl><div class="alert"><svg class="status-icon"><use href="#i-alert"/></svg><span><strong>Aviso de demora</strong><br />La demora se muestra aparte; no reemplaza el estado del servicio.</span></div><p class="rule">El texto siempre acompaña al indicador visual. El color nunca comunica el estado por sí solo.</p></aside></div></section></main>
+    </div>
+    <div class="switcher" aria-label="Selector de estilo de estado"><button id="previous" type="button" aria-label="Variante anterior">←</button><div class="switcher-output" aria-live="polite"><strong id="status-name"></strong><small>Solo cambia la representación del estado</small></div><button id="next" type="button" aria-label="Variante siguiente">→</button></div>
+    <script>
+      const variants = [{ key: "A", name: "A · Etiqueta semántica" }, { key: "B", name: "B · Ícono destacado" }, { key: "C", name: "C · Punto + texto" }]
+      const params = new URLSearchParams(location.search)
+      let current = Math.max(0, variants.findIndex(({ key }) => key === params.get("status")?.toUpperCase()))
+      const output = document.querySelector("#status-name")
+      function render() { const variant = variants[current]; document.documentElement.dataset.statusStyle = variant.key; output.textContent = variant.name; params.set("status", variant.key); history.replaceState(null, "", `${location.pathname}?${params}`) }
+      function cycle(direction) { current = (current + direction + variants.length) % variants.length; render() }
+      document.querySelector("#previous").addEventListener("click", () => cycle(-1))
+      document.querySelector("#next").addEventListener("click", () => cycle(1))
+      addEventListener("keydown", (event) => { if (event.key === "ArrowLeft") cycle(-1); if (event.key === "ArrowRight") cycle(1) })
+      render()
+    </script>
+  </body>
+</html>

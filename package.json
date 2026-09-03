@@ -5,6 +5,17 @@
   "scripts": {
     "dev": "next dev",
     "prototype:palette": "node src/app/prototype/palette/server.mjs",
+    "prototype:typography": "node src/app/prototype/typography/server.mjs",
+    "prototype:density": "node src/app/prototype/density/server.mjs",
+    "prototype:surfaces": "node src/app/prototype/surfaces/server.mjs",
+    "prototype:navigation": "node src/app/prototype/navigation/server.mjs",
+    "prototype:mobile-navigation": "node src/app/prototype/mobile-navigation/server.mjs",
+    "prototype:statuses": "node src/app/prototype/statuses/server.mjs",
+    "prototype:map-markers": "node src/app/prototype/map-markers/server.mjs",
+    "prototype:mobile-workspace": "node src/app/prototype/mobile-workspace/server.mjs",
+    "prototype:basemap": "node src/app/prototype/basemap/server.mjs",
+    "prototype:clustering": "node src/app/prototype/clustering/server.mjs",
+    "prototype:charts": "node src/app/prototype/charts/server.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."

@@ -2,6 +2,10 @@
 
 Second, narrower iteration for [Decide the visual system and DESIGN.md standard](https://github.com/hllous/Frontend-M6-DAPS2/issues/12).
 
+## Resolution
+
+Approved on 2026-09-03: **A · Azul institucional**. The prototype remains as the primary comparison source; later design steps must not reopen the palette family without an explicit reason.
+
 ## Decision isolated
 
 Choose one **palette family**. The HTML structure, content, typeface, spacing, density, radii, component shapes, status presentation, responsive behavior, and map geometry are shared by all three variants. Only semantic color variables change.
