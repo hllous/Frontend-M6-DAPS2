@@ -110,6 +110,8 @@ No hay que hacer nada manual en el día a día.
 
 > `NEXT_PUBLIC_*` se inyecta en **build time** (client-side). Si el backend cambia de URL, hay que actualizar la variable y redeployar.
 
+> **Estado transitorio**: `NEXT_PUBLIC_API_URL` describe únicamente el scaffold actual y no es el contrato final de integración. La implementación objetivo es server-only/BFF: la URL del backend debe vivir en una variable no pública (por ejemplo `M6_BACKEND_URL`) y el navegador debe hablar con Route Handlers del frontend. No exponer secretos ni interpretar el gating de capabilities como autorización hasta resolver [#46](https://github.com/hllous/Frontend-M6-DAPS2/issues/46).
+
 ---
 
 ## 5. Gotchas conocidos
@@ -131,7 +133,7 @@ La infraestructura está deployada, las migraciones corren solas en cada deploy 
 | 2 | **Services de dominio** | Backend | ✅ Completos — las siete fases del plan, incluidas control ambiental, derivaciones, evidencia, indicadores y portal del ciudadano. |
 | 3 | **Autenticación** | Backend / M1 | ⚠️ Provisoria. Todo endpoint exige JWT (guard global), pero la verificación es HS256 contra `JWT_SECRET` hasta que M1 publique su contrato de firma y claims. **La autorización por rol todavía no existe**: cualquier usuario autenticado puede llamar cualquier endpoint. Es el bloqueante que más afecta al frontend — ver [ADR-0005](adr/0005-m6-backend-is-the-sole-authorization-authority.md). |
 | 4 | **Bus de eventos** | M9 / cohorte | ⚠️ Outbox e inbox implementados, pero sin `KAFKA_BROKERS` no hay broker: los eventos se encolan y se loguean, no se publican. No bloquea al frontend (es tráfico backend-a-backend). |
-| 5 | **UI del frontend** | Frontend | El frontend es un esqueleto (landing + health). Falta construir las vistas que consuman la API por `NEXT_PUBLIC_API_URL`. Es el único pendiente grande de este lado. |
+| 5 | **UI del frontend** | Frontend | El frontend es un esqueleto (landing + health). Falta construir las vistas. El scaffold actual consume la API por `NEXT_PUBLIC_API_URL`, pero la arquitectura objetivo es BFF/server-only y queda pendiente de la decisión de auth de [#46](https://github.com/hllous/Frontend-M6-DAPS2/issues/46). |
 
 **Prueba rápida** (todo endpoint de dominio exige token):
 
