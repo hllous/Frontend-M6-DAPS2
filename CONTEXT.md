@@ -37,7 +37,7 @@ The state where a field crew's manually resubmitted local draft can't be applied
 _Avoid_: Sync error, merge conflict
 
 **Evidence**:
-A reason, a note, and a photo (where feasible), uploaded separately and attached by reference to a Service outcome or another resource's report/decision action (e.g. a Container overflow report, damage report, removal, or standalone repair completion — see that resource's `CONTRACTS.md` entry for which actions require it). Mandatory on every Service exception outcome (`PARTIALLY_COMPLETED`, any `PARTIAL`/`NOT_SERVICED` zone, `CANCELLED`, `SUSPENDED`); optional on a clean completion. For a non-Service action, an outcome reached *through* a linked Service uses that Service's own Evidence rather than a second, separate one.
+A reason, a note, and a photo (where feasible), uploaded separately and attached by reference to a Service outcome or another resource's report/decision action (e.g. a Container overflow report, damage report, removal, or standalone repair completion — see that resource's `CONTRACTS.md` entry for which actions require it). Mandatory on every Service exception outcome (`PARTIALLY_COMPLETED`, any `PARTIAL`/`NOT_SERVICED` zone, `CANCELLED`, `SUSPENDED`); optional on a clean completion. For a non-Service action, an outcome reached *through* a linked Service uses that Service's own Evidence rather than a second, separate one. Backend attaches Evidence to a **resource**, not to the individual action: `POST /evidence` accepts exactly four owner types — `SERVICE`, `ZONE_RESULT`, `INSPECTION`, `CONTAINER` — so a tree, a tree survey and a tree intervention cannot carry Evidence at all, and a Container's photos are a flat list across all its reports.
 _Avoid_: Attachment, proof, documentation
 
 **Office**:

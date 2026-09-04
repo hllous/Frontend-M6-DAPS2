@@ -1,10 +1,10 @@
-> **Espejo de solo lectura**, actualizado desde `Backend/docs/` el 2026-09-02 (commit `9634379`). Mantenido acá para tener el modelo de dominio y el estándar de API como contexto en el frontend. `api/endpoints.md` ya lista 94 rutas reales sobre `zones`, `routes`, `service-frequencies`, `services`, `service-types`, `disposal-sites`, `crews`, `vehicles`, `containers`, `green-points`, `trees` y `green-spaces`; `environmental-reports`, `environmental-inspections`, `outbound-requests` y `citizen-portal` siguen sin implementar (fases 4-7 del backend). Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad — no editar este archivo para cambiar el contrato: corregir en `Backend` y volver a copiar.
+> **Espejo de solo lectura**, actualizado desde `Backend/docs/` el 2026-09-03 (rama `develop`, commit `ffaa479`). Mantenido acá para tener el modelo de dominio y el estándar de API como contexto en el frontend. El backend cerró las siete fases de su plan: `api/endpoints.md` lista 130 rutas reales en 23 tags de Swagger, y ya incluye lo que en el espejo anterior figuraba como no implementado — `environmental-reports`, `environmental-inspections`, `repair-requests`, `street-closure-requests`, `evidence` (subida genérica a Cloudflare R2 con `Idempotency-Key`), `indicators` (las cuatro familias del tablero) y `citizen-portal` (`/public/*`, los únicos endpoints sin JWT). Lo único pendiente sigue siendo el envío de `evidence` hacia M2. Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad — no editar este archivo para cambiar el contrato: corregir en `Backend` y volver a copiar.
 >
 > Fuera de este espejo (no migrado, son de integración backend-a-backend vía bus de eventos, no algo que el frontend consuma): `docs/eventos/`, `docs/bloqueantes.md`, `Acuerdo-Eventos-M6.md`, `Cruce-Eventos-M6.md`. Los links de este archivo hacia esas rutas no resuelven acá.
 
 # Módulo 6 — Ambiente, Higiene y Servicios Urbanos
 
-> Fuente original: [`fuentes/alcance-entregable.md`](../fuentes/alcance-entregable.md) §1-2. Esta versión es la que se mantiene viva; el entregable formal se sigue generando de la fuente original hasta que se unifique el pipeline (ver [bloqueantes.md](bloqueantes.md)).
+> Fuente original: `fuentes/alcance-entregable.md` §1-2, en el repositorio de documentación. Esta versión es la que se mantiene viva; el entregable formal se sigue generando de la fuente original hasta que se unifique el pipeline (ver [bloqueantes.md](bloqueantes.md)).
 
 Módulo operativo de campo de la higiene urbana y el control ambiental. Planifica y ejecuta los servicios de recolección, limpieza, arbolado y espacios verdes; administra el inventario urbano ambiental; y tramita las denuncias ambientales hasta el acta de constatación, registrando después la resolución sancionatoria que devuelve M4.
 
@@ -21,9 +21,9 @@ Módulo operativo de campo de la higiene urbana y el control ambiental. Planific
 | **Arbolado** | Censo con historial de relevamientos; poda, extracción, plantación y tratamiento |
 | **Espacios verdes** | Plazas y parques, con riego y corte de césped |
 | **Control ambiental** | Denuncias ambientales —ruidos, vertidos, microbasurales, emisiones—, inspección, acta de constatación y violación constatada |
-| **Seguimiento del ciudadano** | Publicamos el avance de la inspección para que M2 lo muestre, y ofrecemos una vista de consulta complementaria con el detalle operativo |
+| **Seguimiento del ciudadano** | Publicamos el avance de la inspección para que M2 lo muestre, y servimos sin token la consulta complementaria bajo `/public`: seguimiento de la denuncia, cuándo pasa el servicio y dónde están los puntos verdes |
 
-Detalle funcional de cada área (qué se puede hacer, no solo el título): ver [`fuentes/alcance-entregable.md`](../fuentes/alcance-entregable.md) §3. No se migró acá porque cambia poco y no es algo que otro módulo necesite consultar — si empieza a cambiar seguido, se trocea.
+Detalle funcional de cada área (qué se puede hacer, no solo el título): ver `fuentes/alcance-entregable.md` §3, en el repositorio de documentación. No se migró acá porque cambia poco y no es algo que otro módulo necesite consultar — si empieza a cambiar seguido, se trocea.
 
 ## Glosario
 
@@ -35,17 +35,20 @@ Detalle funcional de cada área (qué se puede hacer, no solo el título): ver [
 | **Acta** (`ViolationNotice`) | Lo que emitimos al constatar una violación. Inmutable una vez emitida. Ver [entidades/control-ambiental.md](entidades/control-ambiental.md) |
 | **Cuadrilla** (`Crew`) | Equipo de trabajo, municipal o de cooperativa, que ejecuta servicios |
 
-## Tablero de indicadores (a construir)
+## Tablero de indicadores
+
+Cuatro familias, una por endpoint bajo `/indicators` — ver [api/endpoints.md](api/endpoints.md).
 
 - **Cobertura**: objetivos atendidos sobre programados, por período, zona y tipo de servicio.
 - **Cumplimiento**: servicios finalizados en término, demorados, y ranking de zonas no atendidas con sus motivos.
 - **Incidencias**: contenedores desbordados y dañados por zona, árboles por nivel de riesgo, denuncias por tipo y estado, y tiempo medio de resolución.
-- **Residuos**: toneladas y metros cúbicos por tipo y destino, y porcentaje desviado a reciclaje.
+- **Residuos**: kilos y metros cúbicos por tipo y destino, y porcentaje desviado a reciclaje.
+
+**El objetivo es el par (servicio, zona), no el servicio.** Un recorrido que pasa por cuatro zonas y atiende tres son tres objetivos cumplidos y uno no; medirlo por servicio perdería justamente la zona que quedó sin atender.
 
 ## Mapa de esta carpeta
 
 - [entidades/](entidades/) — modelo de datos y estados
-- [api/](api/) — estándar de Swagger y catálogo de endpoints reales (`api/endpoints.md`)
 - [eventos/publicados/](eventos/publicados/) — lo que este módulo emite
 - [eventos/consumidos/](eventos/consumidos/) — lo que este módulo escucha
 - [bloqueantes.md](bloqueantes.md) — estado vivo de la integración
