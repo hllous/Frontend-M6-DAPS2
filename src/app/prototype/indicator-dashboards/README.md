@@ -117,14 +117,14 @@ The prototype mirrors shadcn's `Skeleton`, `Empty`, and `Alert` compositions wit
 
 ### Decision 8 — narrow-screen behavior
 
-Under review. Compare below 760 px at `http://localhost:3018/?study=narrow-screen&choice=B`.
+Approved: `C · Vistas por tarea`. Compare below 760 px at `http://localhost:3018/?study=narrow-screen&choice=C`.
 
 - `A · Secuencia continua`: all dashboard regions remain visible in one long column.
 - `B · Secciones desplegables`: trend, territorial ranking, and related records use accordion-style disclosure; the trend starts open.
 - `C · Vistas por tarea`: summary, trend, territory, and records become separate task tabs.
 
-B is recommended because it reduces the initial mobile load while keeping every available section visible as a labeled destination. It follows the shadcn Accordion interaction model; C follows shadcn Tabs. This throwaway HTML only simulates those structures, while production should use the actual project-owned shadcn primitives.
+C was selected because a narrow screen benefits from focusing on one task at a time: summary, trend, territory, or records. It reduces the initial information load more decisively than the accordion while preserving the selected-family signal as context. The production implementation should use the project-owned shadcn `Tabs` primitive; this throwaway HTML only simulates its structure.
 
 The seven approved decisions remain fixed in all three alternatives. Changing `Estado de datos` also preserves the approved per-module response and the four independently loading family signals.
 
-No scope decisions remain after this comparison.
+All eight scope decisions are now approved.
