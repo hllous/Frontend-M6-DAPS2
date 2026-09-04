@@ -93,10 +93,12 @@ The losing variants remain in the throwaway prototype as primary evidence for th
 
 Pending validation. Each visualization now exposes the same exact values through a semantic table; only the table's presentation and relationship to its chart changes.
 
-Open `http://localhost:3018/?study=table-companion&choice=A`.
+Open the refined candidate at `http://localhost:3018/?study=table-companion&choice=C`.
 
 - `A · Pares adyacentes`: each chart keeps its complete table immediately below and always visible.
 - `B · Bandeja común`: both tables share one full-width data tray after the chart row.
-- `C · Alternar en contexto`: each panel switches independently between chart and table in the same position.
+- `C · Panel desplegable`: the charts remain visible while one compact disclosure reveals both exact-data tables on demand.
 
 The approved family band, balanced focus, explicit scope controls, global freshness semantics, and in-context path to Zona Sur records remain fixed. The operational-record table is also preserved and is not treated as a substitute for the chart data tables.
+
+The user preferred C's progressive-disclosure direction over showing both tables by default because permanent duplication overloaded the dashboard. The original per-panel switch was then replaced with one in-flow collapsible panel, following shadcn/Base UI's `Collapsible` composition. Final approval remains pending on this refinement.
