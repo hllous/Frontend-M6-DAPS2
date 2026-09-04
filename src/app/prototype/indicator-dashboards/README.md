@@ -43,6 +43,8 @@ Only the family-summary component changes. The selected coverage trend, territor
 
 ### Decision 2 — selected-family focus
 
+Approved: `A · Equilibrio paralelo`. Trend and territorial ranking share the first detail row; neither becomes a preliminary gate to the underlying records.
+
 Open `http://localhost:3018/?study=focus-layout&choice=A`.
 
 - `A · Equilibrio paralelo`: trend and territorial ranking share the first detail row.
@@ -50,3 +52,13 @@ Open `http://localhost:3018/?study=focus-layout&choice=A`.
 - `C · Territorio primero`: territorial ranking dominates the row and the trend becomes compact context.
 
 The approved horizontal family band and the operational-record table remain identical. Only the hierarchy between trend and territorial ranking changes.
+
+### Decision 3 — dashboard scope controls
+
+Open `http://localhost:3018/?study=filter-context&choice=A`.
+
+- `A · Barra explícita`: period and family remain visible as global selects.
+- `B · Período + banda`: the global bar keeps only period; the approved family band owns family selection.
+- `C · Panel de alcance`: period and family stack together beside their date and freshness context.
+
+The approved family band, balanced focus row, chart geometry, and operational-record table remain identical. Only the composition of period, family, and context changes.
