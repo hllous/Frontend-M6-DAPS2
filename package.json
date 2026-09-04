@@ -22,6 +22,7 @@
     "prototype:motion": "node src/app/prototype/motion/server.mjs",
     "prototype:ux-writing": "node src/app/prototype/ux-writing/server.mjs",
     "prototype:do-dont": "node src/app/prototype/do-dont/server.mjs",
+    "prototype:indicator-dashboards": "node src/app/prototype/indicator-dashboards/server.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."
