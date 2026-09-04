@@ -91,7 +91,7 @@ The losing variants remain in the throwaway prototype as primary evidence for th
 
 ### Decision 6 — accessible table companion
 
-Pending validation. Each visualization now exposes the same exact values through a semantic table; only the table's presentation and relationship to its chart changes.
+Approved: `C · Detalle sobre dato`. Exact values stay out of the initial layout: hover or keyboard focus shows an anchored detail, click or touch pins it, and the full semantic table remains available through a secondary control.
 
 Open the refined candidate at `http://localhost:3018/?study=table-companion&choice=C`.
 
@@ -101,4 +101,4 @@ Open the refined candidate at `http://localhost:3018/?study=table-companion&choi
 
 The approved family band, balanced focus, explicit scope controls, global freshness semantics, and in-context path to Zona Sur records remain fixed. The operational-record table is also preserved and is not treated as a substitute for the chart data tables.
 
-The user preferred C's progressive-disclosure direction over showing both tables by default because permanent duplication overloaded the dashboard. The first per-panel switch and the subsequent prominent collapsible panel were replaced with shadcn-style chart tooltips plus click/touch persistence. A compact table disclosure remains as the complete accessible fallback. Final approval remains pending on this refinement.
+The user approved C's progressive-disclosure direction because permanent table duplication overloaded the dashboard. The first per-panel switch and the subsequent prominent collapsible panel were replaced with shadcn-style chart tooltips plus click/touch persistence. A compact table disclosure remains as the complete accessible fallback. Production should implement this with the real shadcn `ChartTooltip`/Recharts composition and project-owned shadcn primitives rather than promoting the prototype's custom JavaScript.
