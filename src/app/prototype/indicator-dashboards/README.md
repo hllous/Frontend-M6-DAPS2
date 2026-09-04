@@ -102,3 +102,15 @@ Open the refined candidate at `http://localhost:3018/?study=table-companion&choi
 The approved family band, balanced focus, explicit scope controls, global freshness semantics, and in-context path to Zona Sur records remain fixed. The operational-record table is also preserved and is not treated as a substitute for the chart data tables.
 
 The user approved C's progressive-disclosure direction because permanent table duplication overloaded the dashboard. The first per-panel switch and the subsequent prominent collapsible panel were replaced with shadcn-style chart tooltips plus click/touch persistence. A compact table disclosure remains as the complete accessible fallback. Production should implement this with the real shadcn `ChartTooltip`/Recharts composition and project-owned shadcn primitives rather than promoting the prototype's custom JavaScript.
+
+### Decision 7 — loading, empty, and error scope
+
+Pending validation. The three alternatives preserve the approved filters and use the `Estado de datos` control to compare loading, no-results, and error recovery.
+
+Open `http://localhost:3018/?study=state-presentation&choice=A&state=loading`.
+
+- `A · Contexto conservado`: the family band remains visible while one contextual state replaces the selected-family detail.
+- `B · Lienzo de estado`: one centralized state replaces the complete data canvas below the filters.
+- `C · Respuesta por módulo`: trend, territorial ranking, and related records each expose their own local state.
+
+The prototype mirrors shadcn's `Skeleton`, `Empty`, and `Alert` compositions without installing them into the throwaway HTML. Production should use the actual project-owned shadcn primitives. The approved chart detail, accessible table disclosure, and Zona Sur record path return unchanged in the ready state.
