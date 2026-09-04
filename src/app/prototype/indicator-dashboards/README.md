@@ -105,12 +105,14 @@ The user approved C's progressive-disclosure direction because permanent table d
 
 ### Decision 7 — loading, empty, and error scope
 
-Pending validation. The three alternatives preserve the approved filters and use the `Estado de datos` control to compare loading, no-results, and error recovery.
+Approved: `C · Respuesta por módulo`. Trend, territorial ranking, and related records communicate their own state. During loading, the four-family band also replaces its values with independent skeletons; during no-results or error it remains available for orientation and family switching.
 
-Open `http://localhost:3018/?study=state-presentation&choice=A&state=loading`.
+Open the approved state at `http://localhost:3018/?study=state-presentation&choice=C&state=loading`.
 
 - `A · Contexto conservado`: the family band remains visible while one contextual state replaces the selected-family detail.
 - `B · Lienzo de estado`: one centralized state replaces the complete data canvas below the filters.
 - `C · Respuesta por módulo`: trend, territorial ranking, and related records each expose their own local state.
 
 The prototype mirrors shadcn's `Skeleton`, `Empty`, and `Alert` compositions without installing them into the throwaway HTML. Production should use the actual project-owned shadcn primitives. The approved chart detail, accessible table disclosure, and Zona Sur record path return unchanged in the ready state.
+
+One scope decision remains after this checkpoint: narrow-screen behavior.
