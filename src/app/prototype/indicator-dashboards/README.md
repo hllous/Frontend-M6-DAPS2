@@ -79,12 +79,12 @@ The accepted global status remains deliberately compact; exact cut, unit, and ta
 
 ### Decision 5 — signal-to-record path
 
+Approved: `A · Detalle en contexto`. Selecting Zona Sur keeps the actor in the dashboard, filters the accessible table below the ranking, and preserves the explanation chain from signal to a specific operational record. Record management remains in the Services surface.
+
 Open `http://localhost:3018/?study=signal-to-record&choice=A`.
 
 - `A · Detalle en contexto`: selecting Zona Sur filters and anchors the accessible record table below the ranking.
 - `B · Panel lateral`: the persistent button below the territorial ranking opens, closes, and reopens a preview while the dashboard remains behind it.
 - `C · Salto a Servicios`: selecting Zona Sur sends the actor directly to the operational Services list with period, family, result, and zone preserved.
 
-Recommendation: `A · Detalle en contexto`, because it preserves the complete explanation chain—signal, trend, territorial ranking, and records—in the document flow while keeping every record one explicit action away.
-
-Evaluate whether the next step after selecting Zona Sur is obvious, whether the applied context remains visible, and whether reaching a specific service feels direct without turning the dashboard into the place where that service is managed.
+The losing variants remain in the throwaway prototype as primary evidence for the decision.
