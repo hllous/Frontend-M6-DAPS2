@@ -88,3 +88,15 @@ Open `http://localhost:3018/?study=signal-to-record&choice=A`.
 - `C · Salto a Servicios`: selecting Zona Sur sends the actor directly to the operational Services list with period, family, result, and zone preserved.
 
 The losing variants remain in the throwaway prototype as primary evidence for the decision.
+
+### Decision 6 — accessible table companion
+
+Pending validation. Each visualization now exposes the same exact values through a semantic table; only the table's presentation and relationship to its chart changes.
+
+Open `http://localhost:3018/?study=table-companion&choice=A`.
+
+- `A · Pares adyacentes`: each chart keeps its complete table immediately below and always visible.
+- `B · Bandeja común`: both tables share one full-width data tray after the chart row.
+- `C · Alternar en contexto`: each panel switches independently between chart and table in the same position.
+
+The approved family band, balanced focus, explicit scope controls, global freshness semantics, and in-context path to Zona Sur records remain fixed. The operational-record table is also preserved and is not treated as a substitute for the chart data tables.
