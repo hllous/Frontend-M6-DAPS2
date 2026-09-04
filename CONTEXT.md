@@ -67,3 +67,43 @@ _Avoid_: Home, Inbox, Dashboard (as a synonym for this view)
 **Sensitivity Tier**:
 A three-level classification (Tier 0 operational/catalog data, Tier 1 internal-operational/identity-adjacent data, Tier 2 regulated third-party data — a citizen's identity on an EnvironmentalReport, inspector findings, ViolationNotice/SanctionOutcome detail) that drives client storage, export, and audit rules everywhere in M6. Capability-gating stays per-resource (see Capability); Tier is a separate, orthogonal axis about how the data itself must be handled once an actor is authorized to see it. See [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md).
 _Avoid_: PII flag, confidential, sensitive (as an undefined adjective)
+
+**RepairRequest**:
+An M6 tracking record for infrastructure damage detected through a Service or EnvironmentalInspection and explicitly referred to M3. It follows the external repair request, not the M3 work order itself; Office sees all records, while Field sees only records related to its assigned work. `publicSafetyRisk` is an explicit fact separate from `severity`. A Container damage path that emits `containerDamaged` is not a RepairRequest.
+_Avoid_: work order, repair task
+
+**StreetClosureRequest**:
+An M6 tracking record for a street closure explicitly requested from M7 on behalf of a Service or an authorized TreeIntervention. Its response can affect whether the related work may proceed: a pending request blocks the Service from starting. It is created by Office; Field sees only the request context attached to its assigned Service.
+_Avoid_: traffic ticket, closure status (when referring to the M7 response)
+
+**Stale external referral**:
+An operational warning that a pending RepairRequest or StreetClosureRequest has exceeded its expected response window without a corresponding external update. It is not a new domain status and never changes the referral automatically.
+_Avoid_: failed referral, timed-out request
+
+**Manual referral recovery**:
+An explicit Office-only action used when an expected external event has not arrived, invoking the available transition after review and confirmation. It is exceptional reconciliation, not the normal way a referral changes state.
+_Avoid_: manual status edit, force transition
+
+**Street-closure dependency**:
+The operational dependency between a StreetClosureRequest and its source Service: a pending request prevents that Service from starting, approval permits execution, rejection requires an Office reschedule-or-cancel decision, and ending the closure releases the dependency. It is not a new Service status.
+_Avoid_: blocked Service status, traffic approval
+
+**Referral context**:
+The source reference that explains why a RepairRequest or StreetClosureRequest exists. The reference is canonical; the interface may show a readable summary and navigation back to the source, but it does not create a second authoritative copy of the source.
+_Avoid_: copied source, external work order
+
+**Duplicate referral candidate**:
+An existing active referral with the same source, referral kind, damage type when applicable, and location. It is a warning for human review, not an automatic merge or a guaranteed duplicate.
+_Avoid_: duplicate by text, automatic merge
+
+**Referral reconciliation**:
+An Office review of a referral whose source changed, whose external response is missing or out of order, or whose submission result is uncertain. Reconciliation preserves the recorded facts and never lets a local state overwrite an external decision.
+_Avoid_: force sync, last-write-wins
+
+**Uncorrelated external response**:
+An external response that cannot be matched confidently to the referral and source it claims to update. It is retained for review without changing the M6 referral or reopening its Service.
+_Avoid_: orphan event, automatic recovery
+
+**Unsent referral**:
+An attempted referral for which M6 has no created tracking record because submission failed before creation. It is distinct from a pending referral, which has a created record and is awaiting the external module.
+_Avoid_: failed status, pending request
