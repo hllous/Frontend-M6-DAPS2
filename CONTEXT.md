@@ -63,3 +63,7 @@ _Avoid_: Role, permission, scope
 **My Work**:
 The capability-scoped landing view every actor sees on entry. For Field, it's their assigned Services; for Office, it's a personal action queue — items waiting on that specific Office actor, such as an unassigned Service. Never a cross-team or cross-zone summary; that belongs to a dashboard, not to My Work.
 _Avoid_: Home, Inbox, Dashboard (as a synonym for this view)
+
+**Sensitivity Tier**:
+A three-level classification (Tier 0 operational/catalog data, Tier 1 internal-operational/identity-adjacent data, Tier 2 regulated third-party data — a citizen's identity on an EnvironmentalReport, inspector findings, ViolationNotice/SanctionOutcome detail) that drives client storage, export, and audit rules everywhere in M6. Capability-gating stays per-resource (see Capability); Tier is a separate, orthogonal axis about how the data itself must be handled once an actor is authorized to see it. See [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md).
+_Avoid_: PII flag, confidential, sensitive (as an undefined adjective)
