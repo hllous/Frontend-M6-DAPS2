@@ -55,6 +55,8 @@ The approved horizontal family band and the operational-record table remain iden
 
 ### Decision 3 — dashboard scope controls
 
+Approved: `A · Barra explícita`. Period and family remain visible as global selects, even though the horizontal band also selects the family detail; explicit scope wins over removing the apparent duplication.
+
 Open `http://localhost:3018/?study=filter-context&choice=A`.
 
 - `A · Barra explícita`: period and family remain visible as global selects.
@@ -62,3 +64,15 @@ Open `http://localhost:3018/?study=filter-context&choice=A`.
 - `C · Panel de alcance`: period and family stack together beside their date and freshness context.
 
 The approved family band, balanced focus row, chart geometry, and operational-record table remain identical. Only the composition of period, family, and context changes.
+
+### Decision 4 — freshness and target semantics
+
+Open `http://localhost:3018/?study=data-semantics&choice=A`.
+
+- `A · Estado global`: one compact freshness badge serves the complete dashboard; targets remain inline in the family band.
+- `B · Frescura por familia`: each family signal exposes its own data cut beside its target.
+- `C · Trazabilidad seleccionada`: the selected family gets a dedicated row for data cut, observed period, target validity, and calculation unit.
+
+Recommendation: `C · Trazabilidad seleccionada`, because the four indicator families do not necessarily share a data cut and operational truth is clearer without adding metadata to every family tile.
+
+Evaluate whether the data's cut, period, target, and unit are understandable before reading the chart, and whether that context feels proportionate rather than repetitive.
