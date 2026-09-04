@@ -67,12 +67,24 @@ The approved family band, balanced focus row, chart geometry, and operational-re
 
 ### Decision 4 — freshness and target semantics
 
+Approved: `A · Estado global`. The page keeps one compact “Actualizado hoy, 10:42” status for the complete dashboard and leaves each target inline in the family band. This is a global last-updated marker, not a formal data-cut timestamp or a per-family traceability statement.
+
 Open `http://localhost:3018/?study=data-semantics&choice=A`.
 
 - `A · Estado global`: one compact freshness badge serves the complete dashboard; targets remain inline in the family band.
 - `B · Frescura por familia`: each family signal exposes its own data cut beside its target.
 - `C · Trazabilidad seleccionada`: the selected family gets a dedicated row for data cut, observed period, target validity, and calculation unit.
 
-Recommendation: `C · Trazabilidad seleccionada`, because the four indicator families do not necessarily share a data cut and operational truth is clearer without adding metadata to every family tile.
+The accepted global status remains deliberately compact; exact cut, unit, and target-validity metadata are not promoted into a dedicated row.
 
-Evaluate whether the data's cut, period, target, and unit are understandable before reading the chart, and whether that context feels proportionate rather than repetitive.
+### Decision 5 — signal-to-record path
+
+Open `http://localhost:3018/?study=signal-to-record&choice=A`.
+
+- `A · Detalle en contexto`: selecting Zona Sur filters and anchors the accessible record table below the ranking.
+- `B · Panel lateral`: selecting Zona Sur previews its records in a side panel while the dashboard remains behind it.
+- `C · Salto a Servicios`: selecting Zona Sur sends the actor directly to the operational Services list with period, family, result, and zone preserved.
+
+Recommendation: `A · Detalle en contexto`, because it preserves the complete explanation chain—signal, trend, territorial ranking, and records—in the document flow while keeping every record one explicit action away.
+
+Evaluate whether the next step after selecting Zona Sur is obvious, whether the applied context remains visible, and whether reaching a specific service feels direct without turning the dashboard into the place where that service is managed.
