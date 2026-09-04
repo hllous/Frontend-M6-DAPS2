@@ -38,6 +38,7 @@ The product is online-first. Field work must preserve drafts, expose synchroniza
 - Validated complex operational-form prototype: `prototype/complex-operational-form`.
 - Civic operations and accessibility research: `docs/011-research-geospatial-platform` and `docs/013-research-civic-visual-accessibility`.
 - No production brand assets or approved municipal seal are present; future design work must not fabricate them.
+- The capability- and dependency-based implementation sequence, its typed gates, and phase acceptance evidence are recorded in `ROADMAP.md`.
 
 ## Product Principles
 
