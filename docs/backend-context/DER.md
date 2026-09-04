@@ -1,3 +1,7 @@
+> **Espejo de solo lectura**, copiado de `Backend/docs/DER.md` el 2026-09-03 (`develop`, `ffaa479`). No editar acá: corregir en `Backend` y volver a copiar.
+>
+> ⚠️ **Este archivo quedó atrás respecto del propio backend.** Entre el espejo anterior y este, Backend actualizó `docs/DER.puml` pero no `docs/DER.md`, así que faltan acá: `EnvironmentalReport.escalated` y `citizen_response` (los escribe M2 vía `ticketUpdated`), `RepairRequest.public_safety_risk` (obligatorio, no derivado de `severity`), los `status` de `RepairRequest`/`StreetClosureRequest` promovidos de `varchar` a enum, `closure_from`/`closure_to` ahora opcionales, y las columnas de reintento del outbox/inbox. Para esos campos, la fuente es `entidades/` y `api/endpoints.md`, no este diagrama.
+
 # DER — Backend Módulo 6 (Ambiente, Higiene y Servicios Urbanos)
 
 Modelo relacional derivado de `docs/entidades/` del Módulo 6. Convenciones aplicadas al pasar del modelo conceptual (documentado) al relacional (implementable):

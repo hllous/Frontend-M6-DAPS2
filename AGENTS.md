@@ -2,7 +2,9 @@
 
 ## Contexto de dominio (backend)
 
-Backend endpoints aren't modeled yet. [`docs/backend-context/`](docs/backend-context/) mirrors Backend's domain model and API standard (entities, enums, DER, Swagger convention) — read-only, dated per file; diverges from `Backend/docs/` over time. Event/integration docs (`eventos/`, `bloqueantes.md`) aren't mirrored: backend-to-backend traffic, not frontend-facing.
+Backend has finished all seven phases of its plan: 130 REST routes in 23 Swagger tags, live at `/api/docs`. [`docs/backend-context/`](docs/backend-context/) mirrors Backend's domain model, API standard and full endpoint catalogue (entities, enums, DER, Swagger convention, `api/endpoints.md`) — read-only, refreshed 2026-09-03 from `develop` commit `ffaa479`; diverges from `Backend/docs/` over time, so re-copy rather than edit. Event/integration docs (`eventos/`, `bloqueantes.md`) aren't mirrored: backend-to-backend traffic, not frontend-facing.
+
+`CONTRACTS.md` reads endpoint shapes off that mirror. Anything still marked `hypothesis` there is genuinely unconfirmed (capability names, M1's JWT claims, client-side-only rules) — not "Backend hasn't built it yet."
 
 ## Git Flow
 

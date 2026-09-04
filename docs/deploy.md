@@ -1,7 +1,8 @@
 # Despliegue y estado del Módulo 6
 
-> Estado del despliegue de producción del M6 (Ambiente, Higiene y Servicios Urbanos) al **01/09/2026**.
+> Estado del despliegue de producción del M6 (Ambiente, Higiene y Servicios Urbanos) al **03/09/2026**.
 > Mantenido por DevOps. Si algo cambia de plataforma o de URL, actualizar este archivo.
+> La parte de backend está sincronizada con `Backend/docs/deploy.md` en `develop` (`ffaa479`); ante discrepancias, ese archivo manda.
 
 ---
 
@@ -13,7 +14,9 @@
 | **PostgreSQL** | Render (Managed, free) | ✅ Available | (Internal URL, no accesible desde afuera) |
 | **Frontend** (Next.js) | Vercel (free) | ✅ Live | `https://m6-ambiente-frontend.vercel.app` |
 
-El deploy está **enlazado a la rama `develop`** de cada repo: al pushear código a `develop`, Render y Vercel buildean y depliegan automáticamente (~2-5 min).
+El deploy está **enlazado a la rama `develop`** de cada repo: al pushear código a `develop` se actualiza automáticamente — el backend vía GitHub Actions + Deploy Hook de Render, el frontend vía auto-deploy nativo de Vercel (~2-5 min).
+
+El backend cerró las siete fases de su plan: 130 rutas REST en 23 tags de Swagger, con migraciones de Prisma corriendo solas en cada deploy. El catálogo completo está espejado en [`backend-context/api/endpoints.md`](backend-context/api/endpoints.md).
 
 ---
 
@@ -40,8 +43,9 @@ curl https://m6-ambiente-frontend.vercel.app/api/health
 # → {"status":"ok","timestamp":"...","service":"m6-ambiente-frontend"}
 ```
 
-- **Swagger UI** en `.../api/docs` lista los endpoints REST (zones, crews, vehicles, containers, trees, green-spaces, etc.).
+- **Swagger UI** en `.../api/docs` lista las 130 rutas REST en 23 tags, en orden de lectura: primero sobre qué se programa (zones, routes, service-frequencies, service-types, disposal-sites), después la operación (crews, vehicles, services), después el inventario (containers, green-points, trees, green-spaces), y al final control ambiental, derivaciones, evidence, indicators y citizen-portal.
 - **Nota**: un `GET /` (raíz) del backend devuelve `404 Cannot GET /` — es esperado, el backend no expone una ruta raíz. Usar `/health` o `/api/docs` para probar.
+- **Todo endpoint de dominio exige JWT** (guard global). Un `curl` sin `Authorization` devuelve `401`, no datos. Los únicos públicos son `/health` y los cuatro de `/public/*` (portal del ciudadano).
 
 ---
 
@@ -49,16 +53,33 @@ curl https://m6-ambiente-frontend.vercel.app/api/health
 
 ### Automático (lo normal)
 
+**Backend (Render)** — lo dispara GitHub Actions:
+
 ```
 git push origin develop
     ↓
-Render detecta cambios en Backend-M6-DAPS2 → buildea Docker → deploya
+GitHub Actions corre build + test (CI)
+    ↓  si ambos pasan
+Job "deploy" dispara el Deploy Hook de Render (con el commit exacto)
+    ↓
+Render buildea Docker y deploya
+    ↓
+Backend actualizado en ~3-5 min
+```
+
+**Frontend (Vercel)** — deploy nativo:
+
+```
+git push origin develop
+    ↓
 Vercel detecta cambios en Frontend-M6-DAPS2 → buildea Next.js → deploya
     ↓
-Servicios actualizados en ~2-5 min
+Frontend actualizado en ~2-5 min
 ```
 
 No hay que hacer nada manual en el día a día.
+
+> **Nota**: el job `deploy` de GitHub Actions depende de `build`+`test`: si el CI falla, **no** se deploya. La config es el secret `RENDER_DEPLOY_HOOK_URL` + **Auto-Deploy apagado** en Render (para evitar dobles deploys).
 
 ### Deploy manual (cuando hace falta forzarlo)
 
@@ -75,6 +96,9 @@ No hay que hacer nada manual en el día a día.
 | `JWT_SECRET` | secreto ≥ 8 caracteres (generar random) |
 | `JWT_EXPIRATION` | `3600` |
 | `NODE_ENV` | `production` |
+| `SANCTION_DEADLINE_DAYS` | `30` — plazo que se le da a M4 antes de cerrar el expediente por vencimiento |
+| `KAFKA_CLIENT_ID` / `KAFKA_GROUP_ID` | `m6-ambiente` / `m6-ambiente-group`. Sin `KAFKA_BROKERS` la app arranca igual: los eventos quedan en el outbox y se loguean, sin publicarse |
+| `R2_*` (`ACCOUNT_ID`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `BUCKET`, `PUBLIC_URL_BASE`) | Cloudflare R2 para evidencia. Sin ellas la app arranca, pero `POST /evidence` falla al subir |
 
 > **Importante**: **NO** setear `PORT` a mano. Render inyecta su propio `PORT` automáticamente; pisarlo rompe el health check del deploy (la app corre en `10000` en free tier).
 
@@ -99,22 +123,25 @@ No hay que hacer nada manual en el día a día.
 
 ## 6. Pendientes para que la app funcione end-to-end
 
-Hoy la infraestructura está deployada y los health checks pasan, pero la app todavía **no** funciona de punta a punta. Falta:
+La infraestructura está deployada, las migraciones corren solas en cada deploy y el backend terminó su plan. Lo que falta para el end-to-end:
 
 | # | Pendiente | Responsable | Detalle |
 |---|---|---|---|
-| 1 | **Migraciones de Prisma** | Backend | Generar la primera migración desde `schema.prisma` y **sumar `npx prisma migrate deploy` al Dockerfile** (hoy está comentado en el CMD). Sin esto la DB no tiene tablas y los endpoints de dominio devuelven `500`. |
-| 2 | **Terminar services de dominio** | Backend | Los controllers ya existen (rutas mapeadas), pero los services pueden estar a medio completar. |
-| 3 | **UI del frontend** | Frontend | El frontend es un esqueleto (landing + health). Falta construir las vistas que consuman la API del backend por `NEXT_PUBLIC_API_URL`. |
+| 1 | **Migraciones de Prisma** | Backend | ✅ Resuelto. El `CMD` del Dockerfile corre `npx prisma migrate deploy` antes de arrancar; si la migración falla, el contenedor no levanta (deliberado: mejor no servir contra un esquema desactualizado). |
+| 2 | **Services de dominio** | Backend | ✅ Completos — las siete fases del plan, incluidas control ambiental, derivaciones, evidencia, indicadores y portal del ciudadano. |
+| 3 | **Autenticación** | Backend / M1 | ⚠️ Provisoria. Todo endpoint exige JWT (guard global), pero la verificación es HS256 contra `JWT_SECRET` hasta que M1 publique su contrato de firma y claims. **La autorización por rol todavía no existe**: cualquier usuario autenticado puede llamar cualquier endpoint. Es el bloqueante que más afecta al frontend — ver [ADR-0005](adr/0005-m6-backend-is-the-sole-authorization-authority.md). |
+| 4 | **Bus de eventos** | M9 / cohorte | ⚠️ Outbox e inbox implementados, pero sin `KAFKA_BROKERS` no hay broker: los eventos se encolan y se loguean, no se publican. No bloquea al frontend (es tráfico backend-a-backend). |
+| 5 | **UI del frontend** | Frontend | El frontend es un esqueleto (landing + health). Falta construir las vistas que consuman la API por `NEXT_PUBLIC_API_URL`. Es el único pendiente grande de este lado. |
 
-**Prueba rápida del bloqueo actual** (sin migraciones):
+**Prueba rápida** (todo endpoint de dominio exige token):
 
 ```bash
 curl https://m6-backend-m64k.onrender.com/zones
-# → 500 {"statusCode":500,"message":"Error interno del servidor",...}
-```
+# → 401 {"statusCode":401,"message":"Unauthorized",...}   ← esperado, falta el Bearer
 
-Cuando existan las migraciones, esto debería devolver `[]` (o los datos reales).
+curl https://m6-backend-m64k.onrender.com/public/zones
+# → 200, las zonas activas (endpoint público del portal del ciudadano)
+```
 
 ---
 
