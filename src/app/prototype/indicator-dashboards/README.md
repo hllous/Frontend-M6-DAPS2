@@ -82,7 +82,7 @@ The accepted global status remains deliberately compact; exact cut, unit, and ta
 Open `http://localhost:3018/?study=signal-to-record&choice=A`.
 
 - `A · Detalle en contexto`: selecting Zona Sur filters and anchors the accessible record table below the ranking.
-- `B · Panel lateral`: selecting Zona Sur previews its records in a side panel while the dashboard remains behind it.
+- `B · Panel lateral`: the persistent button below the territorial ranking opens, closes, and reopens a preview while the dashboard remains behind it.
 - `C · Salto a Servicios`: selecting Zona Sur sends the actor directly to the operational Services list with period, family, result, and zone preserved.
 
 Recommendation: `A · Detalle en contexto`, because it preserves the complete explanation chain—signal, trend, territorial ranking, and records—in the document flow while keeping every record one explicit action away.
