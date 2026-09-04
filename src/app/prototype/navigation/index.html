@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="es" data-shell="A">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Navegación de escritorio · M6</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --theme: #12315b; --action: #1d4f82; --canvas: #f4f7fa; --surface: #ffffff;
+        --subtle: #eaf0f5; --ink: #172337; --muted: #536174; --line: #cbd5df;
+        --on-theme: #ffffff; --focus: #2377bd; --info-bg: #e0eef8; --info-fg: #15537e;
+        --warning-bg: #f8e8cf; --warning-fg: #7b480e;
+      }
+      * { box-sizing: border-box; }
+      html { background: var(--canvas); color: var(--ink); font-family: "Inter", system-ui, sans-serif; }
+      body { margin: 0; min-width: 320px; background: var(--canvas); }
+      button { cursor: pointer; font: inherit; }
+      :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+      .experiment-note { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 24px; padding: 9px 24px; border-bottom: 1px solid var(--line); background: var(--subtle); font-size: 13px; }
+      .experiment-note strong { color: var(--theme); }
+      .experiment-note span:last-child { color: var(--muted); }
+      .shell { min-height: calc(100vh - 44px); }
+      .sidebar { z-index: 2; background: var(--theme); color: var(--on-theme); }
+      .brand { display: flex; min-height: 64px; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid rgb(255 255 255 / 20%); white-space: nowrap; }
+      .brand-mark { display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; border: 1px solid rgb(255 255 255 / 48%); border-radius: 12px; font-size: 14px; font-weight: 700; }
+      .brand strong, .brand small { display: block; }
+      .brand strong { font-size: 14px; }
+      .brand small { margin-top: 2px; color: rgb(255 255 255 / 74%); font-size: 11px; }
+      .nav { display: flex; gap: 4px; padding: 12px 10px; }
+      .nav button { display: flex; min-height: 40px; align-items: center; gap: 10px; border: 0; border-radius: 12px; padding: 0 12px; background: transparent; color: rgb(255 255 255 / 82%); font-size: 13px; font-weight: 600; white-space: nowrap; }
+      .nav button:hover { background: rgb(255 255 255 / 10%); color: var(--on-theme); }
+      .nav button[aria-current="page"] { background: var(--surface); color: var(--theme); }
+      .icon { width: 18px; height: 18px; flex: 0 0 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+      .collapse-control { display: none; min-height: 40px; align-items: center; gap: 10px; margin: auto 10px 12px; border: 1px solid rgb(255 255 255 / 24%); border-radius: 12px; padding: 0 12px; background: transparent; color: rgb(255 255 255 / 82%); font-size: 13px; font-weight: 600; }
+      .collapse-control:hover { background: rgb(255 255 255 / 10%); color: var(--on-theme); }
+      .content { min-width: 0; }
+      .topbar { display: flex; min-height: 64px; align-items: center; justify-content: space-between; gap: 20px; padding: 10px 24px; border-bottom: 1px solid var(--line); background: var(--surface); }
+      .topbar h1 { margin: 0; font-size: 20px; line-height: 1.4; }
+      .topbar p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+      .user { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+      .avatar { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--subtle); color: var(--theme); font-size: 12px; font-weight: 700; }
+      .workspace { padding: 24px 24px 100px; }
+      .heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+      .heading h2 { margin: 0; font-size: 28px; line-height: 1.2; letter-spacing: -0.025em; }
+      .heading p { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+      .primary { min-height: 40px; border: 0; border-radius: 12px; padding: 0 14px; background: var(--action); color: var(--on-theme); font-size: 14px; font-weight: 600; }
+      .layout { display: grid; grid-template-columns: minmax(330px, 0.82fr) minmax(390px, 1.18fr); gap: 24px; }
+      .panel { overflow: hidden; min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+      .panel-head { display: flex; min-height: 50px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+      .panel-head strong { font-size: 14px; }
+      .panel-head span { color: var(--muted); font-size: 12px; }
+      .rows { margin: 0; padding: 0; list-style: none; }
+      .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+      .row:last-child { border-bottom: 0; }
+      .row strong, .row small { display: block; }
+      .row strong { overflow: hidden; font-size: 14px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+      .row small { margin-top: 3px; color: var(--muted); font-size: 12px; }
+      .status { align-self: center; border-radius: 999px; padding: 4px 8px; background: var(--info-bg); color: var(--info-fg); font-size: 11px; font-weight: 700; }
+      .status.warning { background: var(--warning-bg); color: var(--warning-fg); }
+      .map { position: relative; min-height: 360px; overflow: hidden; background: #e5ecdf; }
+      .district { position: absolute; border: 2px solid #91a88a; border-radius: 46% 54% 42% 58%; background: #d5e2cf; }
+      .district.one { inset: 36px 38% 46% 12%; transform: rotate(-8deg); }
+      .district.two { inset: 48% 12% 34px 42%; transform: rotate(6deg); }
+      .road { position: absolute; height: 8px; border: 2px solid #c3a978; border-width: 2px 0; background: #fffdf3; transform-origin: left center; }
+      .road.one { top: 45%; left: -4%; width: 112%; transform: rotate(-7deg); }
+      .road.two { top: 13%; left: 58%; width: 72%; transform: rotate(69deg); }
+      .pin { position: absolute; display: grid; width: 28px; height: 28px; place-items: center; border: 3px solid var(--surface); border-radius: 50% 50% 50% 6px; background: var(--action); color: var(--on-theme); transform: rotate(-45deg); }
+      .pin span { transform: rotate(45deg); font-size: 10px; font-weight: 700; }
+      .pin.one { top: 30%; left: 32%; } .pin.two { top: 62%; left: 66%; } .pin.three { top: 41%; left: 76%; }
+      .mobile-nav { display: none; }
+      .switcher { position: fixed; z-index: 6; bottom: 18px; left: 50%; display: flex; align-items: center; gap: 6px; transform: translateX(-50%); border-radius: 999px; padding: 6px; background: #111820; color: #ffffff; }
+      .switcher button { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 19px; }
+      .switcher button:hover { background: rgb(255 255 255 / 14%); }
+      .switcher-output { min-width: 230px; text-align: center; }
+      .switcher-output strong, .switcher-output small { display: block; }
+      .switcher-output strong { font-size: 12px; }
+      .switcher-output small { margin-top: 2px; color: #bdc7d0; font-size: 10px; }
+
+      [data-shell="A"] .shell, [data-shell="B"] .shell { display: grid; }
+      [data-shell="A"] .shell { grid-template-columns: 220px minmax(0, 1fr); }
+      [data-shell="A"] .sidebar, [data-shell="B"] .sidebar { display: flex; flex-direction: column; }
+      [data-shell="A"] .nav, [data-shell="B"] .nav { flex-direction: column; }
+      [data-shell="A"] .nav button { width: 100%; }
+      [data-shell="A"] .collapse-control { display: flex; }
+      [data-shell="A"][data-collapsed="true"] .shell { grid-template-columns: 72px minmax(0, 1fr); }
+      [data-shell="A"][data-collapsed="true"] .brand { justify-content: center; padding-inline: 10px; }
+      [data-shell="A"][data-collapsed="true"] .brand-copy,
+      [data-shell="A"][data-collapsed="true"] .nav-label,
+      [data-shell="A"][data-collapsed="true"] .collapse-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+      [data-shell="A"][data-collapsed="true"] .nav button,
+      [data-shell="A"][data-collapsed="true"] .collapse-control { justify-content: center; padding-inline: 0; }
+      [data-shell="A"][data-collapsed="true"] .collapse-control .icon { transform: rotate(180deg); }
+      [data-shell="B"] .shell { grid-template-columns: 72px minmax(0, 1fr); }
+      [data-shell="B"] .brand { justify-content: center; padding-inline: 10px; }
+      [data-shell="B"] .brand-copy, [data-shell="B"] .nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+      [data-shell="B"] .nav button { justify-content: center; padding: 0; }
+      [data-shell="C"] .sidebar { display: flex; min-height: 64px; align-items: stretch; }
+      [data-shell="C"] .brand { flex: 0 0 220px; border-right: 1px solid rgb(255 255 255 / 20%); border-bottom: 0; }
+      [data-shell="C"] .nav { flex: 1; align-items: center; padding: 10px 16px; overflow-x: auto; }
+      [data-shell="C"] .nav button { padding-inline: 14px; }
+
+      @media (max-width: 760px) {
+        .experiment-note { display: block; padding: 10px 14px; line-height: 1.4; }
+        .experiment-note span:last-child { display: none; }
+        [data-shell] .shell { display: block; }
+        [data-shell] .sidebar { display: block; min-height: auto; }
+        [data-shell] .brand { min-height: 56px; border: 0; padding: 10px 14px; }
+        [data-shell] .brand-copy { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+        [data-shell] .sidebar .nav { display: none; }
+        [data-shell] .collapse-control { display: none; }
+        .topbar { min-height: 56px; padding: 8px 14px; }
+        .topbar p, .user span { display: none; }
+        .workspace { padding: 16px 14px 150px; }
+        .heading { align-items: flex-start; }
+        .heading h2 { font-size: 26px; }
+        .heading .primary { display: none; }
+        .layout { grid-template-columns: 1fr; gap: 16px; }
+        .map { min-height: 300px; }
+        .mobile-nav { position: fixed; z-index: 5; right: 10px; bottom: 10px; left: 10px; display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+        .mobile-nav button { display: grid; min-height: 56px; place-items: center; gap: 2px; border: 0; background: transparent; color: var(--muted); font-size: 10px; font-weight: 600; }
+        .mobile-nav button[aria-current="page"] { color: var(--action); }
+        .mobile-nav .icon { width: 20px; height: 20px; }
+        .switcher { bottom: 78px; }
+        .switcher-output { min-width: 185px; }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></symbol>
+      <symbol id="i-service" viewBox="0 0 24 24"><path d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"/></symbol>
+      <symbol id="i-box" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4Zm0 0v10l8 4 8-4V7M12 11v10"/></symbol>
+      <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 4C10 4 5 9 5 16c5 1 12-2 15-12ZM4 20c3-5 7-8 12-11"/></symbol>
+      <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Zm6-3v15m6-12v15"/></symbol>
+      <symbol id="i-collapse" viewBox="0 0 24 24"><path d="m14 7-5 5 5 5M20 4v16"/></symbol>
+    </defs></svg>
+    <div class="experiment-note"><span><strong>Decisión aislada: navegación de escritorio.</strong> El sistema visual aprobado permanece fijo.</span><span>Datos ilustrativos · sin acciones reales</span></div>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">M6</span><span class="brand-copy"><strong>Ambiente e Higiene</strong><small>Municipalidad UADE</small></span></div>
+        <nav class="nav" aria-label="Módulos principales">
+          <button type="button" title="Mi trabajo"><svg class="icon"><use href="#i-home"/></svg><span class="nav-label">Mi trabajo</span></button>
+          <button type="button" title="Servicios" aria-current="page"><svg class="icon"><use href="#i-service"/></svg><span class="nav-label">Servicios</span></button>
+          <button type="button" title="Inventario"><svg class="icon"><use href="#i-box"/></svg><span class="nav-label">Inventario</span></button>
+          <button type="button" title="Control ambiental"><svg class="icon"><use href="#i-leaf"/></svg><span class="nav-label">Control ambiental</span></button>
+          <button type="button" title="Mapa"><svg class="icon"><use href="#i-map"/></svg><span class="nav-label">Mapa</span></button>
+        </nav>
+        <button class="collapse-control" id="collapse" type="button" aria-expanded="true" title="Contraer navegación"><svg class="icon"><use href="#i-collapse"/></svg><span class="collapse-label">Contraer</span></button>
+      </aside>
+      <main class="content">
+        <header class="topbar"><div><h1>Servicios</h1><p>Planificación y seguimiento territorial</p></div><div class="user"><span>Lucía Fernández</span><span class="avatar">LF</span></div></header>
+        <section class="workspace">
+          <div class="heading"><div><h2>Operación de hoy</h2><p>Revisá prioridades y contexto territorial antes de actuar.</p></div><button class="primary" type="button">Asignar cuadrilla</button></div>
+          <div class="layout">
+            <section class="panel"><div class="panel-head"><strong>Servicios prioritarios</strong><span>4 resultados</span></div><ul class="rows">
+              <li class="row"><span><strong>Inspección ambiental extraordinaria</strong><small>Villa General Mitre · 10:00</small></span><span class="status warning">Demorado</span></li>
+              <li class="row"><span><strong>Recolección de residuos voluminosos</strong><small>Villa del Parque · 08:30</small></span><span class="status">Asignado</span></li>
+              <li class="row"><span><strong>Mantenimiento de espacio verde</strong><small>Parque Chas · 09:15</small></span><span class="status warning">Planificado</span></li>
+              <li class="row"><span><strong>Vaciado y revisión de contenedor</strong><small>Villa Devoto · 10:30</small></span><span class="status">En curso</span></li>
+            </ul></section>
+            <section class="panel" aria-label="Mapa ilustrativo"><div class="panel-head"><strong>Contexto territorial</strong><span>Vista de mapa</span></div><div class="map"><span class="district one"></span><span class="district two"></span><span class="road one"></span><span class="road two"></span><span class="pin one"><span>1</span></span><span class="pin two"><span>2</span></span><span class="pin three"><span>3</span></span></div></section>
+          </div>
+        </section>
+      </main>
+    </div>
+    <nav class="mobile-nav" aria-label="Navegación móvil de muestra"><button type="button"><svg class="icon"><use href="#i-home"/></svg>Inicio</button><button type="button" aria-current="page"><svg class="icon"><use href="#i-service"/></svg>Servicios</button><button type="button"><svg class="icon"><use href="#i-box"/></svg>Inventario</button><button type="button"><svg class="icon"><use href="#i-map"/></svg>Mapa</button></nav>
+    <div class="switcher" aria-label="Selector de navegación"><button id="previous" type="button" aria-label="Variante anterior">←</button><div class="switcher-output" aria-live="polite"><strong id="shell-name"></strong><small>Solo cambia la navegación de escritorio</small></div><button id="next" type="button" aria-label="Variante siguiente">→</button></div>
+    <script>
+      const shells = [{ key: "A", name: "A · Sidebar plegable" }, { key: "B", name: "B · Rail compacta" }, { key: "C", name: "C · Barra modular" }]
+      const params = new URLSearchParams(location.search)
+      let current = Math.max(0, shells.findIndex(({ key }) => key === params.get("shell")?.toUpperCase()))
+      const output = document.querySelector("#shell-name")
+      const collapse = document.querySelector("#collapse")
+      function setCollapsed(collapsed) {
+        document.documentElement.dataset.collapsed = String(collapsed)
+        collapse.setAttribute("aria-expanded", String(!collapsed))
+        collapse.title = collapsed ? "Expandir navegación" : "Contraer navegación"
+        collapse.querySelector(".collapse-label").textContent = collapsed ? "Expandir" : "Contraer"
+      }
+      function render() { const shell = shells[current]; document.documentElement.dataset.shell = shell.key; output.textContent = shell.name; params.set("shell", shell.key); history.replaceState(null, "", `${location.pathname}?${params}`); if (shell.key !== "A") setCollapsed(false) }
+      function cycle(direction) { current = (current + direction + shells.length) % shells.length; render() }
+      document.querySelector("#previous").addEventListener("click", () => cycle(-1))
+      document.querySelector("#next").addEventListener("click", () => cycle(1))
+      collapse.addEventListener("click", () => setCollapsed(document.documentElement.dataset.collapsed !== "true"))
+      addEventListener("keydown", (event) => { if (event.key === "ArrowLeft") cycle(-1); if (event.key === "ArrowRight") cycle(1) })
+      setCollapsed(params.get("collapsed") === "true")
+      render()
+    </script>
+  </body>
+</html>

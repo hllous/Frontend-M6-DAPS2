@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="es" data-marker="A">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Marcadores de mapa · M6</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --theme: #12315b; --action: #1d4f82; --accent: #c34f3d; --canvas: #f4f7fa;
+        --surface: #ffffff; --subtle: #eaf0f5; --ink: #172337; --muted: #536174;
+        --line: #cbd5df; --focus: #2377bd; --info-bg: #e0eef8; --info-fg: #15537e;
+        --warning-bg: #f8e8cf; --warning-fg: #7b480e;
+      }
+      * { box-sizing: border-box; }
+      html { background: var(--canvas); color: var(--ink); font-family: "Inter", system-ui, sans-serif; }
+      body { margin: 0; min-width: 320px; background: var(--canvas); }
+      button { cursor: pointer; font: inherit; }
+      :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+      .experiment-note { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 24px; padding: 9px 24px; border-bottom: 1px solid var(--line); background: var(--subtle); font-size: 13px; }
+      .experiment-note strong { color: var(--theme); }
+      .experiment-note span:last-child { color: var(--muted); }
+      .shell { display: grid; min-height: calc(100vh - 44px); grid-template-columns: 220px minmax(0, 1fr); }
+      .sidebar { background: var(--theme); color: var(--surface); }
+      .brand { display: flex; min-height: 64px; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid rgb(255 255 255 / 20%); }
+      .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgb(255 255 255 / 48%); border-radius: 12px; font-size: 14px; font-weight: 700; }
+      .brand strong, .brand small { display: block; }
+      .brand strong { font-size: 14px; }
+      .brand small { margin-top: 2px; color: rgb(255 255 255 / 74%); font-size: 11px; }
+      .nav { display: flex; flex-direction: column; gap: 4px; padding: 12px 10px; }
+      .nav button { min-height: 40px; border: 0; border-radius: 12px; padding: 0 12px; background: transparent; color: rgb(255 255 255 / 82%); text-align: left; font-size: 13px; font-weight: 600; }
+      .nav button[aria-current="page"] { background: var(--surface); color: var(--theme); }
+      .content { min-width: 0; }
+      .topbar { display: flex; min-height: 64px; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 24px; border-bottom: 1px solid var(--line); background: var(--surface); }
+      .topbar h1 { margin: 0; font-size: 20px; }
+      .topbar p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+      .primary { min-height: 40px; border: 0; border-radius: 12px; padding: 0 14px; background: var(--action); color: var(--surface); font-size: 14px; font-weight: 600; }
+      .workspace { padding: 24px 24px 100px; }
+      .heading { margin-bottom: 20px; }
+      .heading h2 { margin: 0; font-size: 28px; line-height: 1.2; letter-spacing: -0.025em; }
+      .heading p { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+      .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; }
+      .panel { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+      .panel-head { display: flex; min-height: 50px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+      .panel-head strong { font-size: 14px; }
+      .panel-head span { color: var(--muted); font-size: 12px; }
+      .map { position: relative; min-height: 520px; overflow: hidden; background: #e5ecdf; }
+      .district { position: absolute; border: 2px solid #91a88a; border-radius: 46% 54% 42% 58%; background: #d5e2cf; }
+      .district.one { inset: 28px 41% 54% 8%; transform: rotate(-8deg); }
+      .district.two { inset: 45% 10% 24px 44%; transform: rotate(6deg); }
+      .road { position: absolute; height: 9px; border: 2px solid #c3a978; border-width: 2px 0; background: #fffdf3; transform-origin: left center; }
+      .road.one { top: 43%; left: -4%; width: 112%; transform: rotate(-7deg); }
+      .road.two { top: 5%; left: 63%; width: 86%; transform: rotate(68deg); }
+      .street { position: absolute; height: 4px; background: #f8faf5; transform-origin: left center; }
+      .street.one { top: 68%; left: 2%; width: 80%; transform: rotate(12deg); }
+      .street.two { top: 15%; left: 24%; width: 62%; transform: rotate(82deg); }
+      .marker { position: absolute; z-index: 2; display: grid; place-items: center; border: 3px solid var(--surface); background: var(--action); color: var(--surface); font-size: 11px; font-weight: 700; }
+      .marker.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
+      .marker-label { display: none; }
+      .m1 { top: 24%; left: 24%; } .m2 { top: 35%; left: 47%; } .m3 { top: 59%; left: 62%; } .m4 { top: 67%; left: 35%; } .m5 { top: 30%; left: 76%; }
+      [data-marker="A"] .marker { width: 34px; height: 34px; border-radius: 50% 50% 50% 7px; transform: translate(-50%, -50%) rotate(-45deg); }
+      [data-marker="A"] .marker-short { transform: rotate(45deg); }
+      [data-marker="B"] .marker { width: 28px; height: 28px; border-radius: 50%; transform: translate(-50%, -50%); }
+      [data-marker="C"] .marker { display: flex; width: max-content; max-width: 158px; min-height: 34px; gap: 7px; border-width: 2px; border-radius: 12px; padding: 5px 9px; transform: translate(-14px, -50%); text-align: left; }
+      [data-marker="C"] .marker-short { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; border-radius: 50%; background: var(--surface); color: var(--action); }
+      [data-marker="C"] .marker-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .map-card { position: absolute; z-index: 4; top: var(--card-y, 43%); left: var(--card-x, 51%); display: none; width: 250px; border: 1px solid var(--line); border-radius: 16px; padding: 12px; background: var(--surface); }
+      [data-marker="A"] .map-card[data-open="true"] { display: block; }
+      .map-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+      .map-card-head strong { font-size: 14px; line-height: 1.35; }
+      .map-card-close { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 0; border-radius: 10px; background: var(--subtle); color: var(--theme); font-size: 18px; line-height: 1; }
+      .map-card-type { margin: 3px 0 10px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+      .map-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+      .map-card-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+      .map-card-action { width: 100%; min-height: 40px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--action); font-size: 13px; font-weight: 700; }
+      .map-card-action:hover { background: var(--subtle); }
+      .rows { margin: 0; padding: 0; list-style: none; }
+      .row { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+      .row:last-child { border-bottom: 0; }
+      .row.selected { background: var(--subtle); }
+      .row-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+      .row strong { font-size: 14px; line-height: 1.4; }
+      .row small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+      .status { display: inline-flex; flex: 0 0 auto; min-height: 26px; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 8px; background: var(--info-bg); color: var(--info-fg); font-size: 11px; font-weight: 700; }
+      .status.warning { background: var(--warning-bg); color: var(--warning-fg); }
+      .legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+      .legend span { display: flex; align-items: center; gap: 5px; }
+      .legend-dot { width: 9px; height: 9px; border: 2px solid var(--action); border-radius: 50%; background: var(--surface); }
+      .legend-dot.selected { border-color: var(--accent); }
+      .switcher { position: fixed; z-index: 6; bottom: 18px; left: 50%; display: flex; align-items: center; gap: 6px; transform: translateX(-50%); border-radius: 999px; padding: 6px; background: #111820; color: #ffffff; }
+      .switcher button { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 19px; }
+      .switcher button:hover { background: rgb(255 255 255 / 14%); }
+      .switcher-output { min-width: 220px; text-align: center; }
+      .switcher-output strong, .switcher-output small { display: block; }
+      .switcher-output strong { font-size: 12px; }
+      .switcher-output small { margin-top: 2px; color: #bdc7d0; font-size: 10px; }
+      @media (max-width: 760px) {
+        .experiment-note { display: block; padding: 10px 14px; line-height: 1.4; }
+        .experiment-note span:last-child, .sidebar, .topbar p, .topbar .primary { display: none; }
+        .shell { display: block; }
+        .topbar { padding: 10px 14px; }
+        .workspace { padding: 16px 14px 100px; }
+        .heading h2 { font-size: 26px; }
+        .layout { display: flex; flex-direction: column; gap: 16px; }
+        .map-panel { order: 1; }
+        .list-panel { order: 2; }
+        .map { min-height: 390px; }
+        [data-marker="C"] .marker { max-width: 112px; }
+        .switcher-output { min-width: 186px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="experiment-note"><span><strong>Decisión aislada: marcador de servicio.</strong> El mapa, el listado y el sistema visual permanecen fijos.</span><span>Datos ilustrativos · sin acciones reales</span></div>
+    <div class="shell"><aside class="sidebar"><div class="brand"><span class="brand-mark">M6</span><span><strong>Ambiente e Higiene</strong><small>Municipalidad UADE</small></span></div><nav class="nav"><button type="button">Mi trabajo</button><button type="button">Servicios</button><button type="button">Inventario</button><button type="button">Control ambiental</button><button type="button" aria-current="page">Mapa</button></nav></aside>
+      <main class="content"><header class="topbar"><div><h1>Mapa operativo</h1><p>Servicios programados para hoy</p></div><button class="primary" type="button">Filtrar mapa</button></header><section class="workspace"><div class="heading"><h2>Recorrido Zona Norte</h2><p>Compará la precisión y legibilidad de los puntos del recorrido.</p></div><div class="layout">
+        <section class="panel map-panel"><div class="panel-head"><strong>Contexto territorial</strong><span>5 paradas</span></div><div class="map"><span class="district one"></span><span class="district two"></span><span class="road one"></span><span class="road two"></span><span class="street one"></span><span class="street two"></span>
+          <button class="marker m1" type="button" aria-label="Parada 1, Plaza Arenales" data-index="1" data-name="Plaza Arenales" data-type="Poda preventiva" data-time="08:00–08:30" data-status="Programado" data-tone="info" data-card-x="28%" data-card-y="31%"><span class="marker-short">1</span><span class="marker-label">Plaza Arenales</span></button>
+          <button class="marker m2 selected" type="button" aria-label="Parada 2 seleccionada, Contenedor CT-0442" data-index="2" data-name="Contenedor CT-0442" data-type="Vaciado y revisión" data-time="08:30–09:00" data-status="Suspendido" data-tone="warning" data-card-x="51%" data-card-y="43%"><span class="marker-short">2</span><span class="marker-label">Contenedor CT-0442</span></button>
+          <button class="marker m3" type="button" aria-label="Parada 3, Nueva York 4100" data-index="3" data-name="Nueva York 4100" data-type="Inspección ambiental" data-time="09:00–09:30" data-status="Programado" data-tone="info" data-card-x="45%" data-card-y="66%"><span class="marker-short">3</span><span class="marker-label">Nueva York 4100</span></button>
+          <button class="marker m4" type="button" aria-label="Parada 4, Bahía Blanca 3200" data-index="4" data-name="Bahía Blanca 3200" data-type="Recolección de voluminosos" data-time="09:30–10:00" data-status="Programado" data-tone="info" data-card-x="27%" data-card-y="54%"><span class="marker-short">4</span><span class="marker-label">Bahía Blanca 3200</span></button>
+          <button class="marker m5" type="button" aria-label="Parada 5, Parque Elías Alippi" data-index="5" data-name="Parque Elías Alippi" data-type="Mantenimiento de espacio verde" data-time="10:00–10:30" data-status="Programado" data-tone="info" data-card-x="55%" data-card-y="26%"><span class="marker-short">5</span><span class="marker-label">Parque Elías Alippi</span></button>
+          <aside class="map-card" data-open="true" aria-live="polite"><div class="map-card-head"><strong id="card-name">Contenedor CT-0442</strong><button class="map-card-close" type="button" aria-label="Cerrar información">×</button></div><p class="map-card-type" id="card-type">Vaciado y revisión</p><div class="map-card-meta"><span class="status warning" id="card-status">Suspendido</span><span class="map-card-time" id="card-time">08:30–09:00</span></div><button class="map-card-action" type="button">Ver detalle del servicio</button></aside>
+        </div><div class="legend"><span><i class="legend-dot"></i>Parada</span><span><i class="legend-dot selected"></i>Selección actual</span></div></section>
+        <section class="panel list-panel"><div class="panel-head"><strong>Orden del recorrido</strong><span>08:00–12:00</span></div><ol class="rows"><li class="row"><div class="row-head"><strong>1 · Plaza Arenales</strong><span class="status">Programado</span></div><small>Poda preventiva</small></li><li class="row selected"><div class="row-head"><strong>2 · Contenedor CT-0442</strong><span class="status warning">Suspendido</span></div><small>Vaciado y revisión</small></li><li class="row"><div class="row-head"><strong>3 · Nueva York 4100</strong><span class="status">Programado</span></div><small>Inspección ambiental</small></li><li class="row"><div class="row-head"><strong>4 · Bahía Blanca 3200</strong><span class="status">Programado</span></div><small>Recolección voluminosos</small></li><li class="row"><div class="row-head"><strong>5 · Parque Elías Alippi</strong><span class="status">Programado</span></div><small>Mantenimiento verde</small></li></ol></section>
+      </div></section></main></div>
+    <div class="switcher" aria-label="Selector de marcador"><button id="previous" type="button" aria-label="Variante anterior">←</button><div class="switcher-output" aria-live="polite"><strong id="marker-name"></strong><small>Solo cambia el marcador de servicio</small></div><button id="next" type="button" aria-label="Variante siguiente">→</button></div>
+    <script>
+      const variants = [{ key: "A", name: "A · Pin numerado" }, { key: "B", name: "B · Círculo compacto" }, { key: "C", name: "C · Etiqueta persistente" }]
+      const params = new URLSearchParams(location.search)
+      let current = Math.max(0, variants.findIndex(({ key }) => key === params.get("marker")?.toUpperCase()))
+      const output = document.querySelector("#marker-name")
+      const card = document.querySelector(".map-card")
+      const cardName = document.querySelector("#card-name")
+      const cardType = document.querySelector("#card-type")
+      const cardStatus = document.querySelector("#card-status")
+      const cardTime = document.querySelector("#card-time")
+      function selectMarker(marker) {
+        document.querySelectorAll(".marker").forEach((item) => item.classList.toggle("selected", item === marker))
+        document.querySelectorAll(".row").forEach((row, index) => row.classList.toggle("selected", index + 1 === Number(marker.dataset.index)))
+        cardName.textContent = marker.dataset.name
+        cardType.textContent = marker.dataset.type
+        cardStatus.textContent = marker.dataset.status
+        cardStatus.classList.toggle("warning", marker.dataset.tone === "warning")
+        cardTime.textContent = marker.dataset.time
+        card.style.setProperty("--card-x", marker.dataset.cardX)
+        card.style.setProperty("--card-y", marker.dataset.cardY)
+        card.dataset.open = "true"
+      }
+      function render() { const variant = variants[current]; document.documentElement.dataset.marker = variant.key; output.textContent = variant.name; params.set("marker", variant.key); history.replaceState(null, "", `${location.pathname}?${params}`) }
+      function cycle(direction) { current = (current + direction + variants.length) % variants.length; render() }
+      document.querySelector("#previous").addEventListener("click", () => cycle(-1))
+      document.querySelector("#next").addEventListener("click", () => cycle(1))
+      document.querySelectorAll(".marker").forEach((marker) => marker.addEventListener("click", () => selectMarker(marker)))
+      document.querySelector(".map-card-close").addEventListener("click", () => { card.dataset.open = "false" })
+      addEventListener("keydown", (event) => { if (event.key === "ArrowLeft") cycle(-1); if (event.key === "ArrowRight") cycle(1) })
+      render()
+    </script>
+  </body>
+</html>
