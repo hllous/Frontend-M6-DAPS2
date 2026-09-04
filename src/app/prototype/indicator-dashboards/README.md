@@ -97,8 +97,8 @@ Open the refined candidate at `http://localhost:3018/?study=table-companion&choi
 
 - `A · Pares adyacentes`: each chart keeps its complete table immediately below and always visible.
 - `B · Bandeja común`: both tables share one full-width data tray after the chart row.
-- `C · Panel desplegable`: the charts remain visible while one compact disclosure reveals both exact-data tables on demand.
+- `C · Detalle sobre dato`: hover or keyboard focus shows an anchored value box; click or touch pins it, while a secondary `Ver tabla de datos` control reveals both semantic tables on demand.
 
 The approved family band, balanced focus, explicit scope controls, global freshness semantics, and in-context path to Zona Sur records remain fixed. The operational-record table is also preserved and is not treated as a substitute for the chart data tables.
 
-The user preferred C's progressive-disclosure direction over showing both tables by default because permanent duplication overloaded the dashboard. The original per-panel switch was then replaced with one in-flow collapsible panel, following shadcn/Base UI's `Collapsible` composition. Final approval remains pending on this refinement.
+The user preferred C's progressive-disclosure direction over showing both tables by default because permanent duplication overloaded the dashboard. The first per-panel switch and the subsequent prominent collapsible panel were replaced with shadcn-style chart tooltips plus click/touch persistence. A compact table disclosure remains as the complete accessible fallback. Final approval remains pending on this refinement.
