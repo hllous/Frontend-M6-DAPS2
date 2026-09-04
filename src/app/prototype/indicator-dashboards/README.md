@@ -31,6 +31,8 @@ The approved composite D is preserved at `?variant=D`. The restarted issue now v
 
 ### Decision 1 — family summary and selection
 
+Approved: `A · Banda horizontal`. The four families remain simultaneously visible and selectable without imposing a priority order.
+
 Open `http://localhost:3018/?study=family-summary&choice=A`.
 
 - `A · Banda horizontal`: four equal-width signals in one scannable band.
@@ -38,3 +40,13 @@ Open `http://localhost:3018/?study=family-summary&choice=A`.
 - `C · Tabla compacta`: one semantic row per family for dense comparison.
 
 Only the family-summary component changes. The selected coverage trend, territorial ranking, filters, records, and shell remain identical.
+
+### Decision 2 — selected-family focus
+
+Open `http://localhost:3018/?study=focus-layout&choice=A`.
+
+- `A · Equilibrio paralelo`: trend and territorial ranking share the first detail row.
+- `B · Tendencia en secuencia`: the full-width trend precedes a horizontal territorial ranking.
+- `C · Territorio primero`: territorial ranking dominates the row and the trend becomes compact context.
+
+The approved horizontal family band and the operational-record table remain identical. Only the hierarchy between trend and territorial ranking changes.
