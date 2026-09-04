@@ -26,7 +26,8 @@ The product is online-first. Field work must preserve drafts, expose synchroniza
 ## Capabilities and Constraints
 
 - M1 owns users, organizations, and JWT issuance; M6 must not introduce competing identity concepts.
-- Backend endpoints are not yet complete. Frontend contracts remain explicit hypotheses behind typed, replaceable adapters until OpenAPI becomes authoritative.
+- Backend finished its implementation plan on 2026-09-03: 130 REST routes, mirrored in `docs/backend-context/api/endpoints.md`. Endpoint shapes in `CONTRACTS.md` are now checked against it; what stays hypothesis is narrower (capability names, M1's JWT claims, client-side-only rules). Adapters remain typed and replaceable, and the Zod validation layer stays permanently — a shipped backend is not a verified one.
+- Role-based authorization does not exist server-side: any authenticated user can call any endpoint until M1 publishes its role taxonomy. Frontend capability gating shapes the UI; it is not a security boundary today.
 - Product terminology follows `CONTEXT.md` and `docs/backend-context/`.
 - The application information architecture and core Service workflow are recorded in the Wayfinder map and its linked decisions.
 - Spanish is the product language.
