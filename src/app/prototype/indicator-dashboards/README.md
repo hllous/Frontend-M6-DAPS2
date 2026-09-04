@@ -115,4 +115,16 @@ Open the approved state at `http://localhost:3018/?study=state-presentation&choi
 
 The prototype mirrors shadcn's `Skeleton`, `Empty`, and `Alert` compositions without installing them into the throwaway HTML. Production should use the actual project-owned shadcn primitives. The approved chart detail, accessible table disclosure, and Zona Sur record path return unchanged in the ready state.
 
-One scope decision remains after this checkpoint: narrow-screen behavior.
+### Decision 8 — narrow-screen behavior
+
+Under review. Compare below 760 px at `http://localhost:3018/?study=narrow-screen&choice=B`.
+
+- `A · Secuencia continua`: all dashboard regions remain visible in one long column.
+- `B · Secciones desplegables`: trend, territorial ranking, and related records use accordion-style disclosure; the trend starts open.
+- `C · Vistas por tarea`: summary, trend, territory, and records become separate task tabs.
+
+B is recommended because it reduces the initial mobile load while keeping every available section visible as a labeled destination. It follows the shadcn Accordion interaction model; C follows shadcn Tabs. This throwaway HTML only simulates those structures, while production should use the actual project-owned shadcn primitives.
+
+The seven approved decisions remain fixed in all three alternatives. Changing `Estado de datos` also preserves the approved per-module response and the four independently loading family signals.
+
+No scope decisions remain after this comparison.
