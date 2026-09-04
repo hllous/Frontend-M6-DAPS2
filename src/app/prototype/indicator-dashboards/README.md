@@ -24,3 +24,17 @@ npm run prototype:indicator-dashboards
 Open `http://localhost:3018/?variant=A`. Use the floating arrows or keyboard left/right arrows to compare variants. Use the `Estado de datos` control to inspect loading, no-results, and error recovery states.
 
 This code is intentionally throwaway and must not be promoted directly to production.
+
+## Iterative restart
+
+The approved composite D is preserved at `?variant=D`. The restarted issue now validates one dashboard decision at a time while D's downstream content stays fixed.
+
+### Decision 1 — family summary and selection
+
+Open `http://localhost:3018/?study=family-summary&choice=A`.
+
+- `A · Banda horizontal`: four equal-width signals in one scannable band.
+- `B · Cola priorizada`: exceptions ordered by operational urgency.
+- `C · Tabla compacta`: one semantic row per family for dense comparison.
+
+Only the family-summary component changes. The selected coverage trend, territorial ranking, filters, records, and shell remain identical.
