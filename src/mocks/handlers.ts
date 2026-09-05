@@ -6,9 +6,12 @@ import {
   filterServiceFixtures,
   paginateServiceFixtures,
   serviceFixtures,
+  updateServiceFixture,
 } from "@/lib/services-fixtures";
 import {
+  assignCrewInputSchema,
   createServiceInputSchema,
+  CREW_CATALOG,
   ROUTE_CATALOG,
   SERVICE_TYPE_CATALOG,
   type Service,
@@ -16,6 +19,7 @@ import {
   type ServiceOrigin,
   type ServiceQuery,
   type ServiceStatus,
+  VEHICLE_CATALOG,
 } from "@/lib/services";
 import { filterZoneFixtures, paginateZoneFixtures, zoneFixtures } from "@/lib/zones-fixtures";
 import type { ZoneQuery } from "@/lib/zones";
@@ -164,6 +168,86 @@ export const handlers = [
 
     addServiceFixture(newService);
     return HttpResponse.json(newService, { status: 201 });
+  }),
+  http.post("*/api/services/:serviceId/assign-crew", async ({ params, request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El cuerpo de la solicitud no es un JSON válido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/assign-crew`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const parsed = assignCrewInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: parsed.error.issues.map((issue) => issue.message).join(" "),
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/assign-crew`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const service = serviceFixtures.find((s) => s.id === params.serviceId);
+    if (!service) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Servicio no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/assign-crew`,
+        },
+        { status: 404 },
+      );
+    }
+
+    const serviceType = SERVICE_TYPE_CATALOG.find((t) => t.id === service.serviceTypeId);
+    if (serviceType?.requiresVehicle && (!parsed.data.vehicleId || !parsed.data.vehicleId.trim())) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El tipo de servicio requiere la asignación obligatoria de un vehículo operativo.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/assign-crew`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const crew = CREW_CATALOG.find((c) => c.id === parsed.data.crewId);
+    const vehicle = parsed.data.vehicleId
+      ? VEHICLE_CATALOG.find((v) => v.id === parsed.data.vehicleId)
+      : null;
+
+    const historyEntry = {
+      label: "Asignado",
+      at: new Date().toISOString().slice(0, 16).replace("T", " "),
+      done: true,
+    };
+
+    const updated = updateServiceFixture(service.id, {
+      crewId: parsed.data.crewId,
+      crewName: crew?.name ?? parsed.data.crewId,
+      vehicleId: parsed.data.vehicleId ?? null,
+      vehiclePlate: vehicle?.plate ?? null,
+      history: [...service.history, historyEntry],
+    });
+
+    return HttpResponse.json(updated, { status: 200 });
   }),
   http.post("*/api/session/logout", () => new HttpResponse(null, { status: 200 })),
 ];

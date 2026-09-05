@@ -166,6 +166,43 @@ export const ROUTE_CATALOG: RouteCatalogItem[] = [
   { id: "route-4", code: "R-04", name: "Recorrido 4 Norte", zoneIds: ["zone-1"], zoneNames: ["Zona Norte"] },
 ];
 
+export type CrewCatalogItem = {
+  id: string;
+  name: string;
+  crewType: string;
+  defaultShift: string;
+  leaderName?: string;
+};
+
+export const CREW_CATALOG: CrewCatalogItem[] = [
+  { id: "crew-a", name: "Cuadrilla A · López", crewType: "URBAN_SERVICE", defaultShift: "Turno mañana", leaderName: "Carlos López" },
+  { id: "crew-b", name: "Cuadrilla B · Fernández", crewType: "URBAN_SERVICE", defaultShift: "Turno mañana", leaderName: "María Fernández" },
+  { id: "crew-c", name: "Cuadrilla C · Ibáñez", crewType: "TREE_CARE", defaultShift: "Turno tarde", leaderName: "Jorge Ibáñez" },
+  { id: "crew-d", name: "Cuadrilla D · Gómez", crewType: "CLEANING", defaultShift: "Turno noche", leaderName: "Lucía Gómez" },
+];
+
+export type VehicleCatalogItem = {
+  id: string;
+  plate: string;
+  vehicleType: string;
+  model?: string;
+};
+
+export const VEHICLE_CATALOG: VehicleCatalogItem[] = [
+  { id: "veh-101", plate: "AF 123 CD", vehicleType: "COMPACTOR", model: "Camión compactador 16m³" },
+  { id: "veh-102", plate: "AE 456 FG", vehicleType: "SWEEPER", model: "Barredora mecánica vial" },
+  { id: "veh-103", plate: "AD 789 GH", vehicleType: "CRANE", model: "Grúa hidráulica para contenedores" },
+  { id: "veh-104", plate: "AC 321 JK", vehicleType: "OPEN_BED", model: "Camión volcador 10m³" },
+  { id: "veh-105", plate: "AB 654 LM", vehicleType: "UTILITY", model: "Camioneta utilitaria de inspección" },
+];
+
+export const assignCrewInputSchema = z.object({
+  crewId: z.string().min(1, "Debe seleccionar una cuadrilla"),
+  vehicleId: z.string().nullable().optional(),
+});
+
+export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
+
 export type ServiceQuery = {
   status?: ServiceStatus | ServiceStatus[];
   mode?: ServiceMode;
@@ -421,4 +458,119 @@ export const servicesAdapter = {
 
     return parsed.data;
   },
+
+  async assignCrew(serviceId: string, input: AssignCrewInput): Promise<Service> {
+    const parsedInput = assignCrewInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para la asignación de recursos son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/services/${serviceId}/assign-crew`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de asignación de servicio no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const raw =
+      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+        ? (payload as { data: unknown }).data
+        : payload;
+
+    const parsed = serviceSchema.safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de asignación de servicio no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
 };
+
+function timeWindowsOverlap(
+  w1Start?: string | null,
+  w1End?: string | null,
+  w2Start?: string | null,
+  w2End?: string | null,
+): boolean {
+  if (!w1Start || !w1End || !w2Start || !w2End) {
+    return true;
+  }
+  return w1Start < w2End && w2Start < w1End;
+}
+
+export function checkAssignmentConflicts({
+  service,
+  crewId,
+  vehicleId,
+  allServices,
+}: {
+  service: Service;
+  crewId?: string | null;
+  vehicleId?: string | null;
+  allServices: Service[];
+}): {
+  crewConflict: Service | null;
+  vehicleConflict: Service | null;
+} {
+  let crewConflict: Service | null = null;
+  let vehicleConflict: Service | null = null;
+
+  for (const other of allServices) {
+    if (other.id === service.id) continue;
+    if (other.status === "CANCELLED") continue;
+    if (other.scheduledDate !== service.scheduledDate) continue;
+
+    const overlaps = timeWindowsOverlap(
+      service.windowFrom,
+      service.windowTo,
+      other.windowFrom,
+      other.windowTo,
+    );
+    if (!overlaps) continue;
+
+    if (!crewConflict && crewId && other.crewId === crewId) {
+      crewConflict = other;
+    }
+    if (!vehicleConflict && vehicleId && other.vehicleId === vehicleId) {
+      vehicleConflict = other;
+    }
+
+    if (crewConflict && (vehicleConflict || !vehicleId)) {
+      break;
+    }
+  }
+
+  return { crewConflict, vehicleConflict };
+}

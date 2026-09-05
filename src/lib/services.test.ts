@@ -5,7 +5,12 @@ import { HttpResponse, http } from "msw";
 import { handlers } from "@/mocks/handlers";
 import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_SERVICES_QUERY } from "./services-fixtures";
-import { ServiceContractError, ServiceRequestError, servicesAdapter } from "./services";
+import {
+  checkAssignmentConflicts,
+  ServiceContractError,
+  ServiceRequestError,
+  servicesAdapter,
+} from "./services";
 
 const server = setupServer(...handlers);
 
@@ -235,5 +240,161 @@ describe("services adapter", () => {
         timeWindow: { start: "08:00", end: "12:00" },
       }),
     ).rejects.toBeInstanceOf(ServiceContractError);
+  });
+
+  it("attaches a crew and vehicle to an already-scheduled service via assignCrew", async () => {
+    server.use(
+      http.post("*/api/services/:serviceId/assign-crew", async ({ params, request }) => {
+        const body = (await request.json()) as any;
+        return HttpResponse.json({
+          id: params.serviceId,
+          serviceTypeId: "st-waste-route",
+          serviceTypeName: "Recolección de residuos",
+          title: "Recolección de residuos — Recorrido 4",
+          mode: "ROUTE",
+          status: "SCHEDULED",
+          origin: "PLANNED",
+          zoneIds: ["zone-1"],
+          zoneNames: ["Zona Norte"],
+          scheduledDate: "2026-09-05",
+          windowFrom: "09:00",
+          windowTo: "13:00",
+          crewId: body.crewId,
+          crewName: "Cuadrilla A · López",
+          vehicleId: body.vehicleId ?? null,
+          vehiclePlate: body.vehicleId ? "AF 123 CD" : null,
+          history: [
+            { label: "Programado", at: "2026-09-04 18:40", done: true },
+            { label: "Asignado", at: "2026-09-05 10:00", done: true },
+          ],
+        });
+      }),
+    );
+
+    const updated = await servicesAdapter.assignCrew("SVC-1043", {
+      crewId: "crew-a",
+      vehicleId: "veh-101",
+    });
+
+    expect(updated.id).toBe("SVC-1043");
+    expect(updated.crewId).toBe("crew-a");
+    expect(updated.crewName).toBe("Cuadrilla A · López");
+    expect(updated.vehicleId).toBe("veh-101");
+    expect(updated.vehiclePlate).toBe("AF 123 CD");
+  });
+
+  it("rejects invalid assignCrew input with ServiceContractError before sending request", async () => {
+    await expect(
+      servicesAdapter.assignCrew("SVC-1043", {
+        crewId: "",
+      }),
+    ).rejects.toBeInstanceOf(ServiceContractError);
+  });
+
+  it("fails explicitly when the server response for assignCrew is malformed", async () => {
+    server.use(
+      http.post("*/api/services/:serviceId/assign-crew", () =>
+        HttpResponse.json({ unexpected: 123 }, { status: 200 }),
+      ),
+    );
+
+    await expect(
+      servicesAdapter.assignCrew("SVC-1043", {
+        crewId: "crew-a",
+      }),
+    ).rejects.toBeInstanceOf(ServiceContractError);
+  });
+
+  it("detects non-authoritative double-booking conflicts for overlapping crew and vehicle assignments", () => {
+    const targetService = {
+      id: "SVC-TARGET",
+      serviceTypeId: "st-waste-route",
+      title: "Servicio Objetivo",
+      mode: "ROUTE" as const,
+      status: "SCHEDULED" as const,
+      origin: "PLANNED" as const,
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "10:00",
+      windowTo: "14:00",
+    };
+
+    const overlappingOther = {
+      id: "SVC-OTHER",
+      serviceTypeId: "st-waste-route",
+      title: "Otro servicio en el mismo horario",
+      mode: "ROUTE" as const,
+      status: "SCHEDULED" as const,
+      origin: "PLANNED" as const,
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "11:00",
+      windowTo: "13:00",
+      crewId: "crew-a",
+      crewName: "Cuadrilla A · López",
+      vehicleId: "veh-101",
+      vehiclePlate: "AF 123 CD",
+    };
+
+    const nonOverlappingDifferentDate = {
+      id: "SVC-DIFF-DATE",
+      serviceTypeId: "st-waste-route",
+      title: "Servicio en otra fecha",
+      mode: "ROUTE" as const,
+      status: "SCHEDULED" as const,
+      origin: "PLANNED" as const,
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-06",
+      windowFrom: "10:00",
+      windowTo: "14:00",
+      crewId: "crew-a",
+      vehicleId: "veh-101",
+    };
+
+    const cancelledServiceSameTime = {
+      id: "SVC-CANCELLED",
+      serviceTypeId: "st-waste-route",
+      title: "Servicio cancelado",
+      mode: "ROUTE" as const,
+      status: "CANCELLED" as const,
+      origin: "PLANNED" as const,
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "10:00",
+      windowTo: "14:00",
+      crewId: "crew-a",
+      vehicleId: "veh-101",
+    };
+
+    const allServices = [
+      targetService as any,
+      overlappingOther as any,
+      nonOverlappingDifferentDate as any,
+      cancelledServiceSameTime as any,
+    ];
+
+    // Conflict detected when crew-a and veh-101 are selected
+    const conflictResult = checkAssignmentConflicts({
+      service: targetService as any,
+      crewId: "crew-a",
+      vehicleId: "veh-101",
+      allServices,
+    });
+
+    expect(conflictResult.crewConflict).not.toBeNull();
+    expect(conflictResult.crewConflict?.id).toBe("SVC-OTHER");
+    expect(conflictResult.vehicleConflict).not.toBeNull();
+    expect(conflictResult.vehicleConflict?.id).toBe("SVC-OTHER");
+
+    // No conflict when assigning different crew and vehicle
+    const noConflictResult = checkAssignmentConflicts({
+      service: targetService as any,
+      crewId: "crew-b",
+      vehicleId: "veh-102",
+      allServices,
+    });
+
+    expect(noConflictResult.crewConflict).toBeNull();
+    expect(noConflictResult.vehicleConflict).toBeNull();
   });
 });

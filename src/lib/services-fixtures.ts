@@ -323,6 +323,19 @@ export function addServiceFixture(service: Service): void {
   serviceFixtures.unshift(service);
 }
 
+export function updateServiceFixture(id: string, updates: Partial<Service>): Service | null {
+  const index = serviceFixtures.findIndex((s) => s.id === id);
+  if (index === -1) return null;
+  const existing = serviceFixtures[index];
+  const updated: Service = {
+    ...existing,
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+  serviceFixtures[index] = updated;
+  return updated;
+}
+
 export function resetServiceFixtures(): void {
   serviceFixtures.splice(0, serviceFixtures.length, ...INITIAL_SERVICE_FIXTURES);
 }
