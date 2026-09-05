@@ -1,7 +1,7 @@
 .shell { min-height: 100dvh; background: var(--color-canvas); color: var(--color-text); display: grid; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: auto 1fr; }
 .skipLink { position: fixed; z-index: 100; top: var(--space-8); left: var(--space-8); transform: translateY(-200%); background: var(--color-surface); color: var(--color-text); border: 3px solid var(--color-focus); border-radius: 12px; padding: var(--space-12); }
 .skipLink:focus { transform: translateY(0); }
-.sidebar { grid-row: 1 / -1; background: var(--color-institutional); color: var(--color-on-institutional); display: flex; flex-direction: column; gap: var(--space-24); padding: var(--space-16) var(--space-12); transition: width 280ms cubic-bezier(0.16, 1, 0.3, 1); }
+.sidebar { grid-row: 1 / -1; background: var(--color-institutional); color: var(--color-on-institutional); display: flex; flex-direction: column; gap: var(--space-24); padding: var(--space-16) var(--space-12); }
 .brand { display: flex; align-items: center; gap: var(--space-10); min-height: 48px; padding: 0 var(--space-6); font-weight: 700; line-height: 1.1; }
 .brandMark { display: grid; place-items: center; flex: 0 0 32px; }
 .brandMark svg { width: 28px; height: 28px; }
