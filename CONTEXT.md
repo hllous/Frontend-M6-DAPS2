@@ -107,3 +107,55 @@ _Avoid_: orphan event, automatic recovery
 **Unsent referral**:
 An attempted referral for which M6 has no created tracking record because submission failed before creation. It is distinct from a pending referral, which has a created record and is awaiting the external module.
 _Avoid_: failed status, pending request
+
+**Weather-triggered Service response**:
+An office decision applied to an existing Service whose origin is `WEATHER_ALERT`; it is handled per Service rather than as a shared batch state.
+_Avoid_: Weather cancellation, weather batch
+
+**Inspection follow-up**:
+An operational Service scheduled after an EnvironmentalInspection to address a finding. The finding is not itself a scheduled Service and does not automatically produce a set of Services.
+_Avoid_: Inspection batch, finding task
+
+**EnvironmentalReport**:
+The M6 environmental case file for a report or own-initiative detection, progressing through the eleven operational statuses from receipt to closure. It is distinct from M1's digital `caseFile`.
+_Avoid_: caseFile, ticket (when referring to the M6 case file)
+
+**Own-initiative detection**:
+An environmental situation observed by a Field actor outside an M2 citizen ticket, entering the received intake for Office triage.
+_Avoid_: ticket, complaint
+
+**Triage**:
+The Office review of a received EnvironmentalReport that determines whether M6 proceeds with inspection, returns it to M2, or dismisses it.
+_Avoid_: dispatch, approval
+
+**EnvironmentalInspection**:
+The inspection record attached to an EnvironmentalReport and executed through a POINT Service. It contains the checklist, findings, evidence, and inspection outcome.
+_Avoid_: inspection task, finding task
+
+**Inspection checklist**:
+A versioned set of checks that must be completed as part of an EnvironmentalInspection before its outcome is recorded.
+_Avoid_: inspection form, task list
+
+**Reinspection**:
+A new EnvironmentalInspection scheduled after an inconclusive inspection; the previous inspection remains part of the case history.
+_Avoid_: repeat inspection, inspection retry
+
+**ViolationNotice**:
+The formal, immutable act issued by Office after an inspection finds a violation. It may be recorded without being referred to M4 when no establishment can be identified.
+_Avoid_: sanction, fine, warning
+
+**Non-forwarded notice**:
+A recorded ViolationNotice that cannot be sent to M4 because no establishment was identified; it closes the M6 case without claiming an external sanctioning action.
+_Avoid_: failed notice, pending notice
+
+**SanctionOutcome**:
+The read-only M4 resolution associated with a ViolationNotice, representing the external decision that completes the sanctioning path.
+_Avoid_: internal resolution, notice status
+
+**Deadline closure**:
+The automatic closure of a case after the M4 response deadline expires, distinct from a sanction decision or an explicit dismissal by M4.
+_Avoid_: timeout dismissal, automatic rejection
+
+**Bulk Service operation**:
+A coordinated action intended to mutate multiple Services as one operational decision. It is outside the initial M6 blueprint until its backend authorization, audit, and partial-failure contract is defined.
+_Avoid_: Mass action, bulk edit
