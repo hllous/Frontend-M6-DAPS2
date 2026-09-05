@@ -509,4 +509,133 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(preview.getByText("SVC-1055")).toBeVisible();
     await expect(preview.getByText("Parcial").first()).toBeVisible();
   });
+
+  test("Crew Leader suspends an in-progress service with reason, note and evidence, then resumes it clearing the reason, reflected in Office", async ({ page }) => {
+    // 1. Crew Leader starts SVC-1080
+    await loginViaApi(page, "field-crew-leader-route");
+    await page.goto("/app");
+
+    const card1080 = page.locator("li").filter({ hasText: "SVC-1080" });
+    await expect(card1080).toBeVisible();
+    await card1080.getByRole("button", { name: "Iniciar servicio" }).click();
+    await expect(card1080.getByText("En curso")).toBeVisible();
+
+    // 2. Open detail view and suspend it
+    await card1080.getByRole("button", { name: "Ver detalle" }).click();
+    const detailRegion = page.getByRole("region", { name: /Detalle completo de SVC-1080/i });
+    await expect(detailRegion).toBeVisible();
+
+    await detailRegion.getByRole("button", { name: "Suspender servicio" }).click();
+
+    const suspendDialog = page.getByRole("dialog");
+    await expect(suspendDialog).toBeVisible();
+    await expect(suspendDialog.getByRole("heading", { name: /Suspender SVC-1080/i })).toBeVisible();
+
+    // Required reason + note
+    await suspendDialog.getByLabel(/Motivo de suspensión/i).selectOption("VEHICLE_BREAKDOWN");
+    await suspendDialog.getByLabel(/^Nota/i).fill("El camión no arranca, se solicitó grúa.");
+
+    // Applicable evidence attached
+    const fileInput = suspendDialog.locator("input[type='file']");
+    await fileInput.setInputFiles({
+      name: "Foto Desperfecto Vehicular.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("fake-breakdown-evidence"),
+    });
+    await expect(suspendDialog.getByText("Foto Desperfecto Vehicular.jpg")).toBeVisible();
+
+    await suspendDialog.getByRole("button", { name: "Suspender servicio" }).click();
+    await expect(suspendDialog).not.toBeVisible();
+
+    // Service reflects SUSPENDED with the recorded reason and note
+    await expect(detailRegion.getByText("Suspendido").first()).toBeVisible();
+    await expect(detailRegion.getByText(/desperfecto vehicular/i)).toBeVisible();
+    await expect(detailRegion.getByText(/el camión no arranca, se solicitó grúa/i)).toBeVisible();
+
+    // 3. Crew Leader resumes it — clears the prior reason, no Office intervention needed
+    await detailRegion.getByRole("button", { name: "Reanudar servicio" }).click();
+    await expect(detailRegion.getByText("En curso").first()).toBeVisible();
+    await expect(detailRegion.getByText(/desperfecto vehicular/i)).toHaveCount(0);
+
+    // 4. Cross-view reflection in Office workspace
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=services");
+
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const serviceRow = table.getByRole("row", { name: /SVC-1080/ });
+    await expect(serviceRow).toBeVisible();
+    await expect(serviceRow.getByText("En curso")).toBeVisible();
+  });
+
+  test("Crew Member cannot suspend or resume a service assigned to their crew", async ({ page }) => {
+    await loginViaApi(page, "field-crew-member-route");
+    await page.goto("/app");
+
+    // Whatever status SVC-1080 is in, a Crew Member never gets state-changing controls in its detail view.
+    const card1080 = page.locator("li").filter({ hasText: "SVC-1080" });
+    await card1080.getByRole("button", { name: "Ver detalle" }).click();
+
+    const detailRegion = page.getByRole("region", { name: /Detalle completo de SVC-1080/i });
+    await expect(detailRegion).toBeVisible();
+    await expect(detailRegion.getByRole("button", { name: "Suspender servicio" })).toHaveCount(0);
+    await expect(detailRegion.getByRole("button", { name: "Reanudar servicio" })).toHaveCount(0);
+  });
+});
+
+test.describe("Office two-step Service reschedule flow @smoke", () => {
+  test("Office moves a scheduled service to RESCHEDULED with a reason, then confirms a new date/window, preserving zones verbatim", async ({ page }) => {
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await openServices(page);
+
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = table.getByRole("row", { name: /SVC-1062/ });
+    await row.click();
+    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+
+    const detailRegion = page.getByRole("region", { name: /Detalle completo de SVC-1062/i });
+    await expect(detailRegion).toBeVisible();
+    await expect(detailRegion.getByText("Zona Sur").first()).toBeVisible();
+
+    // Step 1: reason moves SCHEDULED -> RESCHEDULED
+    await detailRegion.getByRole("button", { name: "Reprogramar" }).click();
+    const reasonDialog = page.getByRole("dialog");
+    await expect(reasonDialog).toBeVisible();
+    await expect(reasonDialog.getByText(/Paso 1 de 2/i)).toBeVisible();
+    await reasonDialog.getByLabel(/^Motivo/i).fill("Alerta meteorológica: vientos fuertes previstos.");
+    await reasonDialog.getByRole("button", { name: "Mover a reprogramar" }).click();
+    await expect(reasonDialog).not.toBeVisible();
+
+    // Intermediate RESCHEDULED state is visible in the workspace, not collapsed into one interaction
+    await expect(detailRegion.getByText("A reprogramar").first()).toBeVisible();
+    await expect(detailRegion.getByText(/vientos fuertes previstos/i)).toBeVisible();
+    await expect(detailRegion.getByRole("button", { name: "Reprogramar" })).toHaveCount(0);
+
+    // Step 2: a separate call supplies the new date/window
+    await detailRegion.getByRole("button", { name: "Confirmar nueva fecha" }).click();
+    const confirmDialog = page.getByRole("dialog");
+    await expect(confirmDialog).toBeVisible();
+    await expect(confirmDialog.getByText(/Paso 2 de 2/i)).toBeVisible();
+    // zoneIds snapshot is shown untouched ahead of confirming
+    await expect(confirmDialog.getByText("Zona Sur")).toBeVisible();
+
+    await confirmDialog.locator("input[type='date']").fill("2026-09-13");
+    await confirmDialog.getByRole("button", { name: "Confirmar nueva fecha" }).click();
+    await expect(confirmDialog).not.toBeVisible();
+
+    // Back to SCHEDULED with the new date, zones preserved verbatim
+    await expect(detailRegion.getByText("Programado").first()).toBeVisible();
+    await expect(detailRegion.getByText("2026-09-13")).toBeVisible();
+    await expect(detailRegion.getByText("Zona Sur").first()).toBeVisible();
+  });
+
+  test("Field actors cannot reschedule a Service", async ({ page }) => {
+    await loginViaApi(page, "field-crew-leader-route");
+    await page.goto("/app");
+
+    const card1050 = page.locator("li").filter({ hasText: "SVC-1050" });
+    await card1050.getByRole("button", { name: "Ver detalle" }).click();
+
+    await expect(page.getByRole("button", { name: "Reprogramar" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Confirmar nueva fecha" })).toHaveCount(0);
+  });
 });
