@@ -139,3 +139,16 @@
     @apply font-sans;
   }
 }
+
+/* Approved Phase 0 institutional tokens. */
+:root {
+  --color-institutional: #12315B; --color-action: #1D4F82; --color-accent: #C34F3D; --color-canvas: #F4F7FA; --color-surface: #FFFFFF; --color-surface-subtle: #EAF0F5; --color-text: #172337; --color-text-secondary: #536174; --color-border: #CBD5DF; --color-border-strong: #70849A; --color-focus: #2377BD; --color-on-institutional: #FFFFFF; --color-on-institutional-secondary: #B7C6D8; --color-info: #1C4F74; --color-info-fill: #DFECF6; --color-info-line: #A8C7DD; --color-success: #1D6247; --color-danger: #9F2F27;
+  --space-4: 4px; --space-6: 6px; --space-8: 8px; --space-10: 10px; --space-12: 12px; --space-14: 14px; --space-16: 16px; --space-24: 24px; --space-32: 32px;
+  --background: var(--color-canvas); --foreground: var(--color-text); --card: var(--color-surface); --card-foreground: var(--color-text); --popover: var(--color-surface); --popover-foreground: var(--color-text); --primary: var(--color-action); --primary-foreground: var(--color-on-institutional); --secondary: var(--color-surface-subtle); --secondary-foreground: var(--color-text); --muted: var(--color-surface-subtle); --muted-foreground: var(--color-text-secondary); --accent: var(--color-surface-subtle); --accent-foreground: var(--color-text); --destructive: var(--color-danger); --border: var(--color-border); --input: var(--color-border-strong); --ring: var(--color-focus); --radius: 0.75rem;
+}
+
+@layer base {
+  body { font-family: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+}
