@@ -1,15 +1,19 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { setupServer } from "msw/node";
 import { HttpResponse, http } from "msw";
 
 import { handlers } from "@/mocks/handlers";
+import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_ZONES_QUERY } from "./zones-fixtures";
 import { ZoneContractError, ZoneRequestError, zonesAdapter } from "./zones";
 
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+});
 afterAll(() => server.close());
 
 describe("zones adapter", () => {
@@ -59,5 +63,17 @@ describe("zones adapter", () => {
     server.use(http.get("*/api/zones", () => HttpResponse.json({ oops: true }, { status: 500 })));
 
     await expect(zonesAdapter.list()).rejects.toBeInstanceOf(ZoneContractError);
+  });
+
+  it("exposes a transport failure as a retryable network error and records allowlisted telemetry", async () => {
+    server.use(http.get("*/api/zones", () => HttpResponse.error()));
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await expect(zonesAdapter.list()).rejects.toBeInstanceOf(NetworkFailureError);
+
+    expect(infoSpy).toHaveBeenCalledWith(
+      "[m6-telemetry]",
+      { name: "request_network_failure", resource: "zones" },
+    );
   });
 });

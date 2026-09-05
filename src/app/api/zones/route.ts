@@ -2,8 +2,28 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { recordTelemetryEvent } from "@/lib/telemetry";
 import { filterZoneFixtures, paginateZoneFixtures } from "@/lib/zones-fixtures";
 import type { ZoneQuery } from "@/lib/zones";
+
+const ERROR_LABELS: Record<number, string> = {
+  401: "Unauthorized",
+  503: "Service Unavailable",
+  500: "Internal Server Error",
+};
+
+function errorResponse(status: number, message: string, path: string) {
+  return NextResponse.json(
+    {
+      statusCode: status,
+      message,
+      error: ERROR_LABELS[status] ?? "Error",
+      timestamp: new Date().toISOString(),
+      path,
+    },
+    { status },
+  );
+}
 
 function parseZoneQuery(url: URL): ZoneQuery {
   return {
@@ -26,6 +46,8 @@ function backendQueryString(query: ZoneQuery): string {
 }
 
 export async function GET(request: Request) {
+  const path = new URL(request.url).pathname;
+
   try {
     const session = getRequiredSession(request);
     const query = parseZoneQuery(new URL(request.url));
@@ -42,11 +64,12 @@ export async function GET(request: Request) {
     return NextResponse.json(paginateZoneFixtures(filterZoneFixtures(query), query.page, query.pageSize));
   } catch (error) {
     if (error instanceof InvalidSessionError) {
-      return NextResponse.json({ message: "La sesión no está activa." }, { status: 401 });
+      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
+      return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) {
-      return NextResponse.json({ message: error.message }, { status: 503 });
+      return errorResponse(503, error.message, path);
     }
-    return NextResponse.json({ message: "No se pudieron cargar las zonas." }, { status: 500 });
+    return errorResponse(500, "No se pudieron cargar las zonas.", path);
   }
 }

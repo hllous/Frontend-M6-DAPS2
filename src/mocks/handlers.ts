@@ -31,4 +31,5 @@ export const handlers = [
     const query = zoneQueryFromUrl(request.url);
     return HttpResponse.json(paginateZoneFixtures(filterZoneFixtures(query), query.page, query.pageSize));
   }),
+  http.post("*/api/session/logout", () => new HttpResponse(null, { status: 200 })),
 ];

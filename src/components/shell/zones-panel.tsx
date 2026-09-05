@@ -1,34 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { zonesAdapter, type Zone } from "@/lib/zones";
+import { ZoneRequestError, zonesAdapter, type Zone } from "@/lib/zones";
+
+import { ShellError, ShellForbidden, ShellUnauthenticated } from "./shell-states";
 
 type ZonesLoadState =
   | { status: "loading" }
+  | { status: "unauthenticated" }
+  | { status: "forbidden" }
   | { status: "error" }
   | { status: "ready"; zones: Zone[] };
 
 export function ZonesPanel() {
   const [state, setState] = useState<ZonesLoadState>({ status: "loading" });
+  const [requestVersion, setRequestVersion] = useState(0);
 
   useEffect(() => {
     let isCurrent = true;
-    zonesAdapter
-      .list()
-      .then((page) => {
+    async function requestZones() {
+      setState({ status: "loading" });
+      try {
+        const page = await zonesAdapter.list();
         if (isCurrent) setState({ status: "ready", zones: page.zones });
-      })
-      .catch(() => {
-        if (isCurrent) setState({ status: "error" });
-      });
+      } catch (caught) {
+        if (!isCurrent) return;
+        if (caught instanceof ZoneRequestError && caught.status === 401) {
+          setState({ status: "unauthenticated" });
+          return;
+        }
+        if (caught instanceof ZoneRequestError && caught.status === 403) {
+          setState({ status: "forbidden" });
+          return;
+        }
+        setState({ status: "error" });
+      }
+    }
+    void requestZones();
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [requestVersion]);
+
+  const retry = useCallback(() => setRequestVersion((version) => version + 1), []);
 
   if (state.status === "loading") {
     return (
@@ -40,12 +57,16 @@ export function ZonesPanel() {
     );
   }
 
+  if (state.status === "unauthenticated") return <ShellUnauthenticated />;
+  if (state.status === "forbidden") return <ShellForbidden />;
+
   if (state.status === "error") {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>No se pudieron cargar las zonas</AlertTitle>
-        <AlertDescription>Verifique la conexión local y vuelva a intentarlo.</AlertDescription>
-      </Alert>
+      <ShellError
+        onRetry={retry}
+        title="No se pudieron cargar las zonas"
+        description="Verifique la conexión local y vuelva a intentarlo."
+      />
     );
   }
 

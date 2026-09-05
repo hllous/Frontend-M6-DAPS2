@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
+import { ZoneRequestError, zonesAdapter } from "@/lib/zones";
 import { GET } from "./route";
 
 afterEach(() => {
@@ -24,10 +25,29 @@ async function authenticatedCookie(scenarioId: string, mode = "mock") {
 }
 
 describe("authenticated zones BFF route", () => {
-  it("requires an active session", async () => {
+  it("requires an active session and returns the documented error envelope", async () => {
     const response = await GET(new Request("http://localhost/api/zones"));
 
     expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      statusCode: 401,
+      message: expect.any(String),
+      error: "Unauthorized",
+      timestamp: expect.any(String),
+      path: "/api/zones",
+    });
+  });
+
+  it("returns a 401 body the zones adapter parses as a typed request error, not a contract violation", async () => {
+    const response = await GET(new Request("http://localhost/api/zones"));
+    const body = await response.json();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(body), { status: 401 }));
+
+    const error = await zonesAdapter.list().catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ZoneRequestError);
+    expect((error as ZoneRequestError).status).toBe(401);
   });
 
   it("serves deterministic fixtures in mock mode without any capability requirement", async () => {

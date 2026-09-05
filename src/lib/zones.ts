@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import { recordTelemetryEvent } from "./telemetry";
+
 export type ZoneQuery = {
   active?: boolean;
   search?: string;
@@ -75,18 +78,28 @@ async function readJsonBody(response: Response): Promise<unknown> {
   try {
     return await response.json();
   } catch (cause) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "zones" });
     throw new ZoneContractError("La respuesta de zonas no es JSON válido.", { cause });
   }
 }
 
 export const zonesAdapter = {
   async list(query: ZoneQuery = {}): Promise<ZonesPage> {
-    const response = await fetch(`/api/zones${buildZonesQueryString(query)}`, { cache: "no-store" });
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/zones${buildZonesQueryString(query)}`);
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "zones" });
+      }
+      throw cause;
+    }
     const payload = await readJsonBody(response);
 
     if (!response.ok) {
       const parsedError = errorResponseSchema.safeParse(payload);
       if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "zones" });
         throw new ZoneContractError(
           "La respuesta de error de zonas no respeta el contrato documentado.",
           { cause: parsedError.error },
@@ -101,6 +114,7 @@ export const zonesAdapter = {
 
     const parsed = zonesEnvelopeSchema.safeParse(payload);
     if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "zones" });
       throw new ZoneContractError("La respuesta de zonas no respeta el contrato esperado.", {
         cause: parsed.error,
       });
