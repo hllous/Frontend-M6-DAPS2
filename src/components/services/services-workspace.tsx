@@ -43,6 +43,9 @@ import { AssignCrewDialog } from "./assign-crew-dialog";
 import { ScheduleServiceDialog } from "./schedule-service-dialog";
 import { ServiceDetail } from "./service-detail";
 import { ServicePreview } from "./service-preview";
+import { SuspendServiceDialog } from "./suspend-service-dialog";
+import { RescheduleReasonDialog } from "./reschedule-reason-dialog";
+import { ConfirmRescheduleDialog } from "./confirm-reschedule-dialog";
 import {
   ServicesTable,
   type ColumnFilters,
@@ -148,6 +151,15 @@ export function ServicesWorkspace({
   const [assigningServiceId, setAssigningServiceId] = useState<string | null>(() => {
     return getParam("action") === "assign" ? getParam("serviceId") : null;
   });
+
+  // Suspend modal state (Field crew leader)
+  const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
+  const [resumingId, setResumingId] = useState<string | null>(null);
+  const [resumeErrors, setResumeErrors] = useState<Record<string, string>>({});
+
+  // Reschedule modal state (Office two-step flow)
+  const [reschedulingServiceId, setReschedulingServiceId] = useState<string | null>(null);
+  const [confirmingRescheduleServiceId, setConfirmingRescheduleServiceId] = useState<string | null>(null);
 
   // Layout presentation
   const [mapSide, setMapSide] = useState<"left" | "right">(() => {
@@ -391,6 +403,7 @@ export function ServicesWorkspace({
   const isField = scenario?.actor.kind === "FIELD";
   const canAssignCrew = !isField;
   const canSchedule = !isField;
+  const canReschedule = !isField;
   const canExecuteService = Boolean(scenario?.capabilities.includes("service:execute"));
 
   const handleStartService = useCallback(async (service: Service) => {
@@ -406,6 +419,62 @@ export function ServicesWorkspace({
     } catch {
       // Handled in dialog or caller
     }
+  }, []);
+
+  const handleResumeService = useCallback(async (service: Service) => {
+    setResumingId(service.id);
+    setResumeErrors((prev) => ({ ...prev, [service.id]: "" }));
+    try {
+      const updated = await servicesAdapter.resume(service.id);
+      setLoadState((prev) => {
+        if (prev.status !== "ready") return prev;
+        return {
+          ...prev,
+          services: prev.services.map((s) => (s.id === updated.id ? updated : s)),
+        };
+      });
+    } catch (cause) {
+      const msg =
+        cause instanceof ServiceRequestError
+          ? cause.message
+          : "No se pudo registrar la reanudación del servicio.";
+      setResumeErrors((prev) => ({ ...prev, [service.id]: msg }));
+    } finally {
+      setResumingId(null);
+    }
+  }, []);
+
+  const handleServiceSuspended = useCallback((updatedService: Service) => {
+    setLoadState((prev) => {
+      if (prev.status !== "ready") return prev;
+      return {
+        ...prev,
+        services: prev.services.map((s) => (s.id === updatedService.id ? updatedService : s)),
+      };
+    });
+    setSuspendingServiceId(null);
+  }, []);
+
+  const handleServiceRescheduled = useCallback((updatedService: Service) => {
+    setLoadState((prev) => {
+      if (prev.status !== "ready") return prev;
+      return {
+        ...prev,
+        services: prev.services.map((s) => (s.id === updatedService.id ? updatedService : s)),
+      };
+    });
+    setReschedulingServiceId(null);
+  }, []);
+
+  const handleRescheduleConfirmed = useCallback((updatedService: Service) => {
+    setLoadState((prev) => {
+      if (prev.status !== "ready") return prev;
+      return {
+        ...prev,
+        services: prev.services.map((s) => (s.id === updatedService.id ? updatedService : s)),
+      };
+    });
+    setConfirmingRescheduleServiceId(null);
   }, []);
 
   const hasActiveFilters =
@@ -424,7 +493,13 @@ export function ServicesWorkspace({
           onBack={() => setDetailId(null)}
           onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
           onStartService={canExecuteService ? handleStartService : undefined}
+          onSuspendService={canExecuteService ? (s) => setSuspendingServiceId(s.id) : undefined}
+          onResumeService={canExecuteService ? handleResumeService : undefined}
+          onReschedule={canReschedule ? (s) => setReschedulingServiceId(s.id) : undefined}
+          onConfirmReschedule={canReschedule ? (s) => setConfirmingRescheduleServiceId(s.id) : undefined}
           canStartService={canExecuteService}
+          isResuming={resumingId === detailService.id}
+          resumeError={resumeErrors[detailService.id] ?? null}
         />
         {canAssignCrew && (
           <AssignCrewDialog
@@ -436,6 +511,38 @@ export function ServicesWorkspace({
             allServices={loadState.status === "ready" ? loadState.services : []}
             onAssigned={handleServiceAssigned}
           />
+        )}
+        {canExecuteService && (
+          <SuspendServiceDialog
+            open={Boolean(suspendingServiceId && detailService.id === suspendingServiceId)}
+            onOpenChange={(open) => {
+              if (!open) setSuspendingServiceId(null);
+            }}
+            service={suspendingServiceId ? detailService : null}
+            onSuspended={handleServiceSuspended}
+          />
+        )}
+        {canReschedule && (
+          <>
+            <RescheduleReasonDialog
+              open={Boolean(reschedulingServiceId && detailService.id === reschedulingServiceId)}
+              onOpenChange={(open) => {
+                if (!open) setReschedulingServiceId(null);
+              }}
+              service={reschedulingServiceId ? detailService : null}
+              onRescheduled={handleServiceRescheduled}
+            />
+            <ConfirmRescheduleDialog
+              open={Boolean(
+                confirmingRescheduleServiceId && detailService.id === confirmingRescheduleServiceId,
+              )}
+              onOpenChange={(open) => {
+                if (!open) setConfirmingRescheduleServiceId(null);
+              }}
+              service={confirmingRescheduleServiceId ? detailService : null}
+              onConfirmed={handleRescheduleConfirmed}
+            />
+          </>
         )}
       </>
     );

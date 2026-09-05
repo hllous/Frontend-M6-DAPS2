@@ -45,6 +45,7 @@ const mockRouteService: Service = {
   vehicleId: "veh-102",
   vehiclePlate: "AE 456 FG",
   coordinates: { x: -34.6037, y: -58.3816 },
+  attachments: [],
   history: [],
 };
 
@@ -64,6 +65,7 @@ const mockPointService: Service = {
   crewId: "crew-b",
   crewName: "Cuadrilla B · Fernández",
   coordinates: { x: -34.6037, y: -58.3816 },
+  attachments: [],
   history: [],
 };
 

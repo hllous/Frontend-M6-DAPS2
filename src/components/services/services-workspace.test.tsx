@@ -288,4 +288,62 @@ describe("ServicesWorkspace component", () => {
     expect(within(dialog).getByRole("heading", { name: "Asignar cuadrilla y vehículo" })).toBeInTheDocument();
     expect(within(dialog).getByText("SVC-1043")).toBeInTheDocument();
   });
+
+  it("reschedules a scheduled service through the two-step Office flow, preserving its zones", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = within(table).getByText("Barrido mecánico — Bulevar Costero").closest("tr")!;
+    await user.click(row);
+
+    const detailBtn = await screen.findByRole("button", { name: /Ver detalle completo/ });
+    await user.click(detailBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "Detalle completo de SVC-1050" })).toBeInTheDocument();
+    });
+
+    // Step 1: reason moves SCHEDULED -> RESCHEDULED
+    await user.click(screen.getByRole("button", { name: "Reprogramar" }));
+    const reasonDialog = await screen.findByRole("dialog");
+    expect(within(reasonDialog).getByText(/Paso 1 de 2/i)).toBeInTheDocument();
+    await user.type(
+      within(reasonDialog).getByLabelText(/^Motivo/i),
+      "Alerta meteorológica: vientos fuertes previstos.",
+    );
+    await user.click(within(reasonDialog).getByRole("button", { name: "Mover a reprogramar" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    // Intermediate RESCHEDULED state is visible in the detail view
+    await waitFor(() => {
+      expect(screen.getByText("A reprogramar")).toBeVisible();
+    });
+    expect(screen.getByText(/vientos fuertes previstos/i)).toBeVisible();
+
+    // Step 2: new date/window moves RESCHEDULED -> SCHEDULED
+    await user.click(screen.getByRole("button", { name: "Confirmar nueva fecha" }));
+    const confirmDialog = await screen.findByRole("dialog");
+    expect(within(confirmDialog).getByText(/Paso 2 de 2/i)).toBeInTheDocument();
+    // zoneIds snapshot is shown untouched
+    expect(within(confirmDialog).getByText("Zona Centro")).toBeInTheDocument();
+
+    const dateInput = within(confirmDialog).getByLabelText(/Nueva fecha/i);
+    fireEvent.change(dateInput, { target: { value: "2026-09-12" } });
+    await user.click(within(confirmDialog).getByRole("button", { name: "Confirmar nueva fecha" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Programado")).toBeVisible();
+    });
+    expect(screen.getByText("2026-09-12")).toBeVisible();
+    // zoneIds preserved verbatim
+    expect(screen.getByText("Zona Centro")).toBeVisible();
+  });
 });

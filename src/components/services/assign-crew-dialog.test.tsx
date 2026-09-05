@@ -35,6 +35,7 @@ const mockServiceRequiringVehicle: Service = {
   vehicleId: null,
   vehiclePlate: null,
   coordinates: { x: 50, y: 50 },
+  attachments: [],
   history: [],
 };
 
@@ -56,6 +57,7 @@ const mockServiceNoVehicleRequired: Service = {
   vehicleId: null,
   vehiclePlate: null,
   coordinates: { x: 50, y: 50 },
+  attachments: [],
   history: [],
 };
 
@@ -77,6 +79,7 @@ const mockOverlappingService: Service = {
   vehicleId: "veh-101",
   vehiclePlate: "AF 123 CD",
   coordinates: { x: 50, y: 50 },
+  attachments: [],
   history: [],
 };
 

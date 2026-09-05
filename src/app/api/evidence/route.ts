@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import {
+  addAttachmentToService,
   addAttachmentToZoneResult,
   evidenceCache,
   sanitizeFilename,
+  serviceFixtures,
   zoneResultFixtures,
 } from "@/lib/services-fixtures";
 import {
@@ -138,6 +140,12 @@ export async function POST(request: Request) {
         return errorResponse(404, `El resultado de zona ${ownerId} no existe.`, path);
       }
     }
+    if (ownerType === "SERVICE") {
+      const service = serviceFixtures.find((s) => s.id === ownerId);
+      if (!service) {
+        return errorResponse(404, `El servicio ${ownerId} no existe.`, path);
+      }
+    }
 
     const rawNameFromForm = formData.get("fileName");
     const fileObjName = (file as { name?: string }).name;
@@ -157,6 +165,9 @@ export async function POST(request: Request) {
 
     if (ownerType === "ZONE_RESULT") {
       addAttachmentToZoneResult(ownerId, attachment);
+    }
+    if (ownerType === "SERVICE") {
+      addAttachmentToService(ownerId, attachment);
     }
 
     evidenceCache.set(cacheKey, attachment);

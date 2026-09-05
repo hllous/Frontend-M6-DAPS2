@@ -469,6 +469,141 @@ describe("services adapter", () => {
     );
   });
 
+  describe("servicesAdapter suspend, resume and reschedule", () => {
+    it("suspends a service via servicesAdapter.suspend with a required reason and note", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/suspend", async ({ params, request }) => {
+          const body = (await request.json()) as any;
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "SUSPENDED",
+            statusReason: `Desperfecto vehicular: ${body.note}`,
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [{ label: "Suspendido", at: "2026-09-05 11:00", done: true }],
+          });
+        }),
+      );
+
+      const suspended = await servicesAdapter.suspend("SVC-1050", {
+        reason: "VEHICLE_BREAKDOWN",
+        note: "El camión no arranca.",
+      });
+
+      expect(suspended.status).toBe("SUSPENDED");
+      expect(suspended.statusReason).toContain("El camión no arranca.");
+    });
+
+    it("rejects invalid suspend input (missing note) with ServiceContractError before sending request", async () => {
+      await expect(
+        servicesAdapter.suspend("SVC-1050", {
+          reason: "VEHICLE_BREAKDOWN",
+          note: "",
+        }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+    });
+
+    it("resumes a service via servicesAdapter.resume with no body and clears the reason", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/resume", ({ params }) => {
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "IN_PROGRESS",
+            statusReason: null,
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [{ label: "Reanudado", at: "2026-09-05 12:00", done: true }],
+          });
+        }),
+      );
+
+      const resumed = await servicesAdapter.resume("SVC-1050");
+      expect(resumed.status).toBe("IN_PROGRESS");
+      expect(resumed.statusReason).toBeNull();
+    });
+
+    it("reschedules a service via servicesAdapter.reschedule, moving it to RESCHEDULED with a reason", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/reschedule", async ({ params, request }) => {
+          const body = (await request.json()) as any;
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "RESCHEDULED",
+            statusReason: body.reason,
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [{ label: "A reprogramar", at: "2026-09-05 08:00", done: true }],
+          });
+        }),
+      );
+
+      const rescheduled = await servicesAdapter.reschedule("SVC-1051", {
+        reason: "Alerta meteorológica",
+      });
+
+      expect(rescheduled.status).toBe("RESCHEDULED");
+      expect(rescheduled.statusReason).toBe("Alerta meteorológica");
+    });
+
+    it("rejects invalid reschedule input (missing reason) with ServiceContractError before sending request", async () => {
+      await expect(
+        servicesAdapter.reschedule("SVC-1051", { reason: "" }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+    });
+
+    it("confirms a new date/window via servicesAdapter.confirmReschedule, moving it back to SCHEDULED", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/confirm-reschedule", async ({ params, request }) => {
+          const body = (await request.json()) as any;
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "SCHEDULED",
+            statusReason: null,
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: body.scheduledDate,
+            windowFrom: body.timeWindow.start,
+            windowTo: body.timeWindow.end,
+            history: [{ label: "Programado", at: "2026-09-05 09:00", done: true }],
+          });
+        }),
+      );
+
+      const confirmed = await servicesAdapter.confirmReschedule("SVC-1053", {
+        scheduledDate: "2026-09-12",
+        timeWindow: { start: "09:00", end: "13:00" },
+      });
+
+      expect(confirmed.status).toBe("SCHEDULED");
+      expect(confirmed.scheduledDate).toBe("2026-09-12");
+      expect(confirmed.windowFrom).toBe("09:00");
+    });
+
+    it("rejects invalid confirmReschedule input with ServiceContractError before sending request", async () => {
+      await expect(
+        servicesAdapter.confirmReschedule("SVC-1053", {
+          scheduledDate: "not-a-date",
+          timeWindow: { start: "09:00", end: "13:00" },
+        }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+    });
+  });
+
   describe("checkServiceWindowTiming", () => {
     const testService = {
       id: "SVC-TEST",

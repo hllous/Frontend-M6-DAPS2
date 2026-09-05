@@ -23,6 +23,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehiclePlate: "AF 123 CD",
     coordinates: { x: 22, y: 30 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-04 18:40", done: true },
       { label: "Asignado", at: "2026-09-04 19:05", done: true },
@@ -51,6 +52,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewName: null,
     coordinates: { x: 28, y: 22 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 08:00", done: true },
     ],
@@ -80,6 +82,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehiclePlate: "AE 456 FG",
     coordinates: { x: 34, y: 34 },
     flag: "conflict",
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-03 10:00", done: true },
       { label: "En curso", at: "2026-09-04 11:05", done: true },
@@ -109,6 +112,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehiclePlate: "AE 456 FG",
     coordinates: { x: 50, y: 44 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 06:00", done: true },
       { label: "Asignado", at: "2026-09-05 06:30", done: true },
@@ -137,6 +141,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehiclePlate: "AG 789 HI",
     coordinates: { x: 52, y: 46 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 07:00", done: true },
       { label: "Asignado", at: "2026-09-05 07:20", done: true },
@@ -164,6 +169,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehiclePlate: "AG 789 HI",
     coordinates: { x: 53, y: 45 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 07:00", done: true },
       { label: "Asignado", at: "2026-09-05 07:30", done: true },
@@ -191,6 +197,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewName: "Cuadrilla B · Fernández",
     coordinates: { x: 58, y: 40 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 07:00", done: true },
       { label: "En curso", at: "2026-09-05 08:05", done: true },
@@ -220,6 +227,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehiclePlate: null,
     coordinates: { x: 55, y: 48 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 08:00", done: true },
       { label: "Asignado", at: "2026-09-05 08:30", done: true },
@@ -245,6 +253,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewName: "Cuadrilla C · Ibáñez",
     coordinates: { x: 47, y: 55 },
     flag: "delayed",
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 06:30", done: true },
       { label: "A reprogramar", at: "2026-09-05 10:15", done: true },
@@ -272,6 +281,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehiclePlate: "AE 321 ZA",
     coordinates: { x: 40, y: 74 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-04 20:00", done: true },
       { label: "En curso", at: "2026-09-05 07:05", done: true },
@@ -299,6 +309,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewName: null,
     coordinates: { x: 46, y: 82 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 10:00", done: true },
     ],
@@ -324,6 +335,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewName: "Cuadrilla D · Gómez",
     coordinates: { x: 33, y: 68 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 06:00", done: true },
       { label: "En curso", at: "2026-09-05 10:05", done: true },
@@ -349,6 +361,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewName: null,
     coordinates: { x: 70, y: 60 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-02 12:00", done: true },
       { label: "Cancelado", at: "2026-09-04 18:00", done: true },
@@ -372,6 +385,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewName: "Cuadrilla C · Ibáñez",
     coordinates: { x: 76, y: 50 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 08:30", done: true },
     ],
@@ -394,11 +408,41 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewName: "Cuadrilla C · Ibáñez",
     coordinates: { x: 80, y: 42 },
     flag: null,
+    attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 06:00", done: true },
       { label: "En curso", at: "2026-09-05 07:35", done: true },
       { label: "Completado", at: "2026-09-05 08:15", done: true },
     ],
+  },
+  {
+    id: "SVC-1080",
+    serviceTypeId: "st-waste-route",
+    serviceTypeName: "Recolección de residuos",
+    title: "Recolección de residuos — Recorrido 5",
+    mode: "ROUTE",
+    status: "SCHEDULED",
+    statusReason: null,
+    origin: "PLANNED",
+    zoneIds: ["zone-1"],
+    zoneNames: ["Zona Norte"],
+    routeId: "route-3",
+    routeName: "Recorrido 3 Norte",
+    scheduledDate: "2026-09-05",
+    windowFrom: "07:00",
+    windowTo: "11:00",
+    crewId: "crew-b",
+    crewName: "Cuadrilla B · Fernández",
+    vehicleId: "veh-105",
+    vehiclePlate: "AB 654 LM",
+    coordinates: { x: 25, y: 26 },
+    flag: null,
+    attachments: [],
+    history: [
+      { label: "Programado", at: "2026-09-05 06:00", done: true },
+      { label: "Asignado", at: "2026-09-05 06:20", done: true },
+    ],
+    notes: "Recorrido de apoyo para casos de suspensión y reprogramación.",
   },
 ];
 
@@ -486,6 +530,16 @@ export function sanitizeFilename(originalName: string, mimeType: string): string
 
 export function addZoneResultFixture(result: ZoneResult): void {
   zoneResultFixtures.push(result);
+}
+
+export function addAttachmentToService(serviceId: string, attachment: Attachment): boolean {
+  const index = serviceFixtures.findIndex((s) => s.id === serviceId);
+  if (index === -1) return false;
+  serviceFixtures[index] = {
+    ...serviceFixtures[index],
+    attachments: [...(serviceFixtures[index].attachments ?? []), attachment],
+  };
+  return true;
 }
 
 export function getZoneResultsByServiceId(serviceId: string): ZoneResult[] {

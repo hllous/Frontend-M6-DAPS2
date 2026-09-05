@@ -4,10 +4,13 @@ import {
   AlertTriangle,
   ArrowLeft,
   Calendar,
+  CalendarClock,
   Clock,
   FileText,
   MapPin,
+  Pause,
   Play,
+  PlayCircle,
   Route,
   ShieldCheck,
   Truck,
@@ -24,20 +27,32 @@ export function ServiceDetail({
   onBack,
   onAssignCrew,
   onStartService,
+  onSuspendService,
+  onResumeService,
+  onReschedule,
+  onConfirmReschedule,
   onServiceUpdated,
   canStartService = false,
   isStarting = false,
   startError = null,
+  isResuming = false,
+  resumeError = null,
   backLabel = "Volver a Servicios",
 }: {
   service: Service;
   onBack: () => void;
   onAssignCrew?: (service: Service) => void;
   onStartService?: (service: Service) => void | Promise<void>;
+  onSuspendService?: (service: Service) => void;
+  onResumeService?: (service: Service) => void | Promise<void>;
+  onReschedule?: (service: Service) => void;
+  onConfirmReschedule?: (service: Service) => void;
   onServiceUpdated?: (service: Service) => void;
   canStartService?: boolean;
   isStarting?: boolean;
   startError?: string | null;
+  isResuming?: boolean;
+  resumeError?: string | null;
   backLabel?: string;
 }) {
   const windowTiming = checkServiceWindowTiming(service);
@@ -67,6 +82,29 @@ export function ServiceDetail({
               <span>{isStarting ? "Iniciando..." : "Iniciar servicio"}</span>
             </Button>
           )}
+          {canStartService && onSuspendService && service.status === "IN_PROGRESS" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onSuspendService(service)}
+              className="gap-1.5 text-xs font-semibold text-[var(--color-warning)] border-[var(--color-warning-line)] hover:bg-[var(--color-warning-fill)]/40"
+            >
+              <Pause className="h-3.5 w-3.5" aria-hidden />
+              <span>Suspender servicio</span>
+            </Button>
+          )}
+          {canStartService && onResumeService && service.status === "SUSPENDED" && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => onResumeService(service)}
+              disabled={isResuming}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <PlayCircle className="h-3.5 w-3.5" aria-hidden />
+              <span>{isResuming ? "Reanudando..." : "Reanudar servicio"}</span>
+            </Button>
+          )}
           {onAssignCrew && (service.status === "SCHEDULED" || service.status === "RESCHEDULED") && (
             <Button
               variant="default"
@@ -76,6 +114,28 @@ export function ServiceDetail({
             >
               <Users className="h-3.5 w-3.5" aria-hidden />
               <span>{service.crewId ? "Reasignar cuadrilla" : "Asignar cuadrilla"}</span>
+            </Button>
+          )}
+          {onReschedule && service.status === "SCHEDULED" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onReschedule(service)}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <CalendarClock className="h-3.5 w-3.5" aria-hidden />
+              <span>Reprogramar</span>
+            </Button>
+          )}
+          {onConfirmReschedule && service.status === "RESCHEDULED" && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => onConfirmReschedule(service)}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <CalendarClock className="h-3.5 w-3.5" aria-hidden />
+              <span>Confirmar nueva fecha</span>
             </Button>
           )}
           {!canStartService && (
@@ -160,6 +220,21 @@ export function ServiceDetail({
               </div>
               <p className="mt-1 text-sm text-[var(--color-danger)]">
                 {startError}
+              </p>
+            </div>
+          )}
+
+          {resumeError && (
+            <div
+              role="alert"
+              className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/50 p-4"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-danger)] uppercase tracking-wide">
+                <AlertTriangle className="h-4 w-4" aria-hidden />
+                Error al reanudar servicio
+              </div>
+              <p className="mt-1 text-sm text-[var(--color-danger)]">
+                {resumeError}
               </p>
             </div>
           )}

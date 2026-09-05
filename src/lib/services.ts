@@ -42,6 +42,15 @@ export const coordinatesSchema = z.object({
 });
 export type Coordinates = z.infer<typeof coordinatesSchema>;
 
+export const attachmentSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  filename: z.string(),
+  contentType: z.string(),
+  uploadedAt: z.string(),
+});
+export type Attachment = z.infer<typeof attachmentSchema>;
+
 export const serviceSchema = z.object({
   id: z.string(),
   serviceTypeId: z.string(),
@@ -69,6 +78,7 @@ export const serviceSchema = z.object({
   notes: z.string().nullable().optional(),
   flag: serviceFlagSchema.nullable().optional(),
   coordinates: coordinatesSchema.optional().default({ x: 50, y: 50 }),
+  attachments: z.array(attachmentSchema).optional().default([]),
   history: z.array(statusEventSchema).optional().default([]),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -218,14 +228,27 @@ export const notServicedReasonSchema = z.enum([
 ]);
 export type NotServicedReason = z.infer<typeof notServicedReasonSchema>;
 
-export const attachmentSchema = z.object({
-  id: z.string(),
-  url: z.string(),
-  filename: z.string(),
-  contentType: z.string(),
-  uploadedAt: z.string(),
+export const suspendServiceInputSchema = z.object({
+  reason: notServicedReasonSchema,
+  note: z.string().min(1, "La nota es obligatoria para suspender el servicio"),
 });
-export type Attachment = z.infer<typeof attachmentSchema>;
+export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
+
+export const rescheduleServiceInputSchema = z.object({
+  reason: z.string().min(1, "El motivo es obligatorio para reprogramar el servicio"),
+});
+export type RescheduleServiceInput = z.infer<typeof rescheduleServiceInputSchema>;
+
+export const confirmRescheduleInputSchema = z.object({
+  scheduledDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
+  timeWindow: z.object({
+    start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
+    end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
+  }),
+});
+export type ConfirmRescheduleInput = z.infer<typeof confirmRescheduleInputSchema>;
 
 export const zoneResultSchema = z.object({
   id: z.string(),
@@ -646,6 +669,224 @@ export const servicesAdapter = {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
       throw new ServiceContractError(
         "La respuesta de inicio de servicio no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async suspend(serviceId: string, input: SuspendServiceInput): Promise<Service> {
+    const parsedInput = suspendServiceInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para suspender el servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/services/${serviceId}/suspend`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de suspensión de servicio no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const raw =
+      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+        ? (payload as { data: unknown }).data
+        : payload;
+
+    const parsed = serviceSchema.safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de suspensión de servicio no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async resume(serviceId: string): Promise<Service> {
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/services/${serviceId}/resume`, {
+        method: "POST",
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de reanudación de servicio no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const raw =
+      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+        ? (payload as { data: unknown }).data
+        : payload;
+
+    const parsed = serviceSchema.safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de reanudación de servicio no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async reschedule(serviceId: string, input: RescheduleServiceInput): Promise<Service> {
+    const parsedInput = rescheduleServiceInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para reprogramar el servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/services/${serviceId}/reschedule`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de reprogramación de servicio no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const raw =
+      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+        ? (payload as { data: unknown }).data
+        : payload;
+
+    const parsed = serviceSchema.safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de reprogramación de servicio no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async confirmReschedule(serviceId: string, input: ConfirmRescheduleInput): Promise<Service> {
+    const parsedInput = confirmRescheduleInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para confirmar la nueva fecha del servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/services/${serviceId}/confirm-reschedule`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de confirmación de reprogramación no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const raw =
+      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+        ? (payload as { data: unknown }).data
+        : payload;
+
+    const parsed = serviceSchema.safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de confirmación de reprogramación no respeta el contrato esperado.",
         { cause: parsed.error },
       );
     }

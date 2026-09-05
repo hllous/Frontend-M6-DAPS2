@@ -15,6 +15,7 @@ import { filterServiceFixtures } from "@/lib/services-fixtures";
 import styles from "@/components/shell/app-shell.module.css";
 import { ServiceDetail } from "./service-detail";
 import { StatusBadge } from "./status-badge";
+import { SuspendServiceDialog } from "./suspend-service-dialog";
 
 export function FieldWorkPanel({
   scenario,
@@ -31,6 +32,9 @@ export function FieldWorkPanel({
   const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null);
   const [startingId, setStartingId] = useState<string | null>(null);
   const [startErrors, setStartErrors] = useState<Record<string, string>>({});
+  const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
+  const [resumingId, setResumingId] = useState<string | null>(null);
+  const [resumeErrors, setResumeErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let isCurrent = true;
@@ -68,26 +72,70 @@ export function FieldWorkPanel({
     }
   };
 
+  const handleResumeService = async (service: Service) => {
+    setResumingId(service.id);
+    setResumeErrors((prev) => ({ ...prev, [service.id]: "" }));
+    try {
+      const updated = await servicesAdapter.resume(service.id);
+      setServices((prev) =>
+        prev.map((s) => (s.id === updated.id ? updated : s)),
+      );
+    } catch (cause) {
+      const msg =
+        cause instanceof ServiceRequestError
+          ? cause.message
+          : "No se pudo registrar la reanudación del servicio.";
+      setResumeErrors((prev) => ({ ...prev, [service.id]: msg }));
+    } finally {
+      setResumingId(null);
+    }
+  };
+
   const handleServiceUpdated = (updated: Service) => {
     setServices((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+  };
+
+  const handleServiceSuspended = (updated: Service) => {
+    setServices((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    setSuspendingServiceId(null);
   };
 
   const selectedService = selectedDetailId
     ? services.find((s) => s.id === selectedDetailId) ?? null
     : null;
 
+  const suspendingService = suspendingServiceId
+    ? services.find((s) => s.id === suspendingServiceId) ?? null
+    : null;
+
   if (selectedService) {
     return (
-      <ServiceDetail
-        service={selectedService}
-        onBack={() => setSelectedDetailId(null)}
-        onStartService={mayExecuteService ? handleStartService : undefined}
-        onServiceUpdated={handleServiceUpdated}
-        canStartService={mayExecuteService}
-        isStarting={startingId === selectedService.id}
-        startError={startErrors[selectedService.id] ?? null}
-        backLabel="Volver a Servicios asignados"
-      />
+      <>
+        <ServiceDetail
+          service={selectedService}
+          onBack={() => setSelectedDetailId(null)}
+          onStartService={mayExecuteService ? handleStartService : undefined}
+          onSuspendService={mayExecuteService ? (s) => setSuspendingServiceId(s.id) : undefined}
+          onResumeService={mayExecuteService ? handleResumeService : undefined}
+          onServiceUpdated={handleServiceUpdated}
+          canStartService={mayExecuteService}
+          isStarting={startingId === selectedService.id}
+          startError={startErrors[selectedService.id] ?? null}
+          isResuming={resumingId === selectedService.id}
+          resumeError={resumeErrors[selectedService.id] ?? null}
+          backLabel="Volver a Servicios asignados"
+        />
+        {mayExecuteService && (
+          <SuspendServiceDialog
+            open={Boolean(suspendingService)}
+            onOpenChange={(open) => {
+              if (!open) setSuspendingServiceId(null);
+            }}
+            service={suspendingService}
+            onSuspended={handleServiceSuspended}
+          />
+        )}
+      </>
     );
   }
 

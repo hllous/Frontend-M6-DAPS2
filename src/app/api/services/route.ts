@@ -193,6 +193,7 @@ export async function POST(request: Request) {
       notes: input.notes ?? null,
       flag: null,
       coordinates: { x: 50, y: 50 },
+      attachments: [],
       history: [{ label: "Programado", at: new Date().toISOString().slice(0, 16).replace("T", " "), done: true }],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

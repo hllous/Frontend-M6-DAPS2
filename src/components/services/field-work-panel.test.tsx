@@ -55,8 +55,30 @@ const server = setupServer(
             vehiclePlate: null,
             history: [{ label: "Programado", at: "2026-09-05 08:00", done: true }],
           },
+          {
+            id: "SVC-1060",
+            serviceTypeId: "st-street-cleaning",
+            serviceTypeName: "Barrido mecánico",
+            title: "Barrido mecánico — Recorrido en curso",
+            mode: "ROUTE",
+            status: "IN_PROGRESS",
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            zoneNames: ["Zona Centro"],
+            scheduledDate: "2026-09-05",
+            windowFrom: "08:00",
+            windowTo: "12:00",
+            crewId: "crew-b",
+            crewName: "Cuadrilla B · Fernández",
+            vehicleId: "veh-102",
+            vehiclePlate: "AE 456 FG",
+            history: [
+              { label: "Programado", at: "2026-09-05 06:00", done: true },
+              { label: "En curso", at: "2026-09-05 08:05", done: true },
+            ],
+          },
         ],
-        meta: { total: 2, page: 1, pageSize: 50, totalPages: 1 },
+        meta: { total: 3, page: 1, pageSize: 50, totalPages: 1 },
       });
     }
     return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 0 } });
@@ -94,6 +116,56 @@ const server = setupServer(
       history: [
         { label: "Programado", at: "2026-09-05 06:00", done: true },
         { label: "En curso", at: "2026-09-05 09:00", done: true },
+      ],
+    });
+  }),
+  http.post("*/api/services/:serviceId/suspend", async ({ params, request }) => {
+    const body = (await request.json()) as { reason: string; note: string };
+    return HttpResponse.json({
+      id: params.serviceId,
+      serviceTypeId: "st-street-cleaning",
+      serviceTypeName: "Barrido mecánico",
+      title: "Barrido mecánico — Recorrido en curso",
+      mode: "ROUTE",
+      status: "SUSPENDED",
+      statusReason: `Desperfecto vehicular: ${body.note}`,
+      origin: "PLANNED",
+      zoneIds: ["zone-3"],
+      zoneNames: ["Zona Centro"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+      crewId: "crew-b",
+      crewName: "Cuadrilla B · Fernández",
+      history: [
+        { label: "Programado", at: "2026-09-05 06:00", done: true },
+        { label: "En curso", at: "2026-09-05 08:05", done: true },
+        { label: "Suspendido", at: "2026-09-05 10:00", done: true },
+      ],
+    });
+  }),
+  http.post("*/api/services/:serviceId/resume", ({ params }) => {
+    return HttpResponse.json({
+      id: params.serviceId,
+      serviceTypeId: "st-street-cleaning",
+      serviceTypeName: "Barrido mecánico",
+      title: "Barrido mecánico — Recorrido en curso",
+      mode: "ROUTE",
+      status: "IN_PROGRESS",
+      statusReason: null,
+      origin: "PLANNED",
+      zoneIds: ["zone-3"],
+      zoneNames: ["Zona Centro"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+      crewId: "crew-b",
+      crewName: "Cuadrilla B · Fernández",
+      history: [
+        { label: "Programado", at: "2026-09-05 06:00", done: true },
+        { label: "En curso", at: "2026-09-05 08:05", done: true },
+        { label: "Suspendido", at: "2026-09-05 10:00", done: true },
+        { label: "Reanudado", at: "2026-09-05 10:30", done: true },
       ],
     });
   }),
@@ -162,9 +234,9 @@ describe("FieldWorkPanel component", () => {
     // Crew Leader starts the service
     await user.click(startButtons[0]);
 
-    // Transitions to IN_PROGRESS
+    // Transitions to IN_PROGRESS (SVC-1060 is already IN_PROGRESS in the fixture, so at least 2 now)
     await waitFor(() => {
-      expect(screen.getByText("En curso")).toBeVisible();
+      expect(screen.getAllByText("En curso").length).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -184,5 +256,58 @@ describe("FieldWorkPanel component", () => {
     // Backend error is surfaced in role="alert"
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("El tipo de servicio requiere un vehículo operativo asignado para iniciar.");
+  });
+
+  it("allows Crew Leader to suspend an in-progress service with a reason and note, then resume it clearing the reason", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Barrido mecánico — Recorrido en curso")).toBeVisible();
+    });
+
+    const detailButtons = screen.getAllByRole("button", { name: "Ver detalle" });
+    // SVC-1060 is the third item rendered
+    await user.click(detailButtons[2]);
+
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+
+    expect(screen.getByRole("heading", { name: /Suspender SVC-1060/i })).toBeVisible();
+
+    await user.selectOptions(
+      screen.getByLabelText(/Motivo de suspensión/i),
+      "VEHICLE_BREAKDOWN",
+    );
+    await user.type(screen.getByLabelText(/^Nota/i), "El camión no arranca.");
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Suspendido")).toBeVisible();
+    });
+    expect(screen.getByText(/desperfecto vehicular/i)).toBeVisible();
+    expect(screen.getByText(/el camión no arranca/i)).toBeVisible();
+
+    // Resume clears the prior reason
+    await user.click(screen.getByRole("button", { name: "Reanudar servicio" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("En curso")).toBeVisible();
+    });
+    expect(screen.queryByText(/desperfecto vehicular/i)).not.toBeInTheDocument();
+  });
+
+  it("does not offer suspend/resume actions to a Crew Member", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewMember} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Barrido mecánico — Recorrido en curso")).toBeVisible();
+    });
+
+    const detailButtons = screen.getAllByRole("button", { name: "Ver detalle" });
+    await user.click(detailButtons[2]);
+
+    expect(screen.queryByRole("button", { name: "Suspender servicio" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reanudar servicio" })).not.toBeInTheDocument();
   });
 });

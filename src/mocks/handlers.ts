@@ -2,6 +2,7 @@ import { HttpResponse, http } from "msw";
 
 import { getScenario, scenarios, type ScenarioId } from "@/lib/scenarios";
 import {
+  addAttachmentToService,
   addAttachmentToZoneResult,
   addServiceFixture,
   addZoneResultFixture,
@@ -16,12 +17,16 @@ import {
 } from "@/lib/services-fixtures";
 import {
   assignCrewInputSchema,
+  confirmRescheduleInputSchema,
   createServiceInputSchema,
   CREW_CATALOG,
   evidenceOwnerTypeSchema,
+  NOT_SERVICED_REASON_LABEL,
   recordZoneResultInputSchema,
+  rescheduleServiceInputSchema,
   ROUTE_CATALOG,
   SERVICE_TYPE_CATALOG,
+  suspendServiceInputSchema,
   type Attachment,
   type Service,
   type ServiceMode,
@@ -171,6 +176,7 @@ export const handlers = [
       notes: input.notes ?? null,
       flag: null,
       coordinates: { x: 50, y: 50 },
+      attachments: [],
       history: [{ label: "Programado", at: new Date().toISOString().slice(0, 16).replace("T", " "), done: true }],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -323,6 +329,273 @@ export const handlers = [
     const updated = updateServiceFixture(service.id, {
       status: "IN_PROGRESS",
       history: [...service.history, historyEntry],
+    });
+
+    return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.post("*/api/services/:serviceId/suspend", async ({ params, request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El cuerpo de la solicitud no es un JSON válido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/suspend`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const parsed = suspendServiceInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: parsed.error.issues.map((i) => i.message).join(" "),
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/suspend`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const service = serviceFixtures.find((s) => s.id === params.serviceId);
+    if (!service) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: `Servicio ${params.serviceId} no encontrado.`,
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/suspend`,
+        },
+        { status: 404 },
+      );
+    }
+
+    if (service.status !== "IN_PROGRESS") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se pueden suspender servicios en curso (IN_PROGRESS) (estado actual: ${service.status}).`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/suspend`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const statusReason = `${NOT_SERVICED_REASON_LABEL[parsed.data.reason]}: ${parsed.data.note}`;
+
+    const updated = updateServiceFixture(service.id, {
+      status: "SUSPENDED",
+      statusReason,
+      history: [
+        ...service.history,
+        {
+          label: "Suspendido",
+          at: new Date().toISOString().slice(0, 16).replace("T", " "),
+          done: true,
+        },
+      ],
+    });
+
+    return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.post("*/api/services/:serviceId/resume", ({ params }) => {
+    const service = serviceFixtures.find((s) => s.id === params.serviceId);
+    if (!service) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: `Servicio ${params.serviceId} no encontrado.`,
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/resume`,
+        },
+        { status: 404 },
+      );
+    }
+
+    if (service.status !== "SUSPENDED") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se pueden reanudar servicios suspendidos (SUSPENDED) (estado actual: ${service.status}).`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/resume`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const updated = updateServiceFixture(service.id, {
+      status: "IN_PROGRESS",
+      statusReason: null,
+      history: [
+        ...service.history,
+        {
+          label: "Reanudado",
+          at: new Date().toISOString().slice(0, 16).replace("T", " "),
+          done: true,
+        },
+      ],
+    });
+
+    return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.post("*/api/services/:serviceId/reschedule", async ({ params, request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El cuerpo de la solicitud no es un JSON válido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/reschedule`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const parsed = rescheduleServiceInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: parsed.error.issues.map((i) => i.message).join(" "),
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/reschedule`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const service = serviceFixtures.find((s) => s.id === params.serviceId);
+    if (!service) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: `Servicio ${params.serviceId} no encontrado.`,
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/reschedule`,
+        },
+        { status: 404 },
+      );
+    }
+
+    if (service.status !== "SCHEDULED") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se pueden reprogramar servicios programados (SCHEDULED) (estado actual: ${service.status}).`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/reschedule`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const updated = updateServiceFixture(service.id, {
+      status: "RESCHEDULED",
+      statusReason: parsed.data.reason,
+      history: [
+        ...service.history,
+        {
+          label: "A reprogramar",
+          at: new Date().toISOString().slice(0, 16).replace("T", " "),
+          done: true,
+        },
+      ],
+    });
+
+    return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.post("*/api/services/:serviceId/confirm-reschedule", async ({ params, request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El cuerpo de la solicitud no es un JSON válido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/confirm-reschedule`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const parsed = confirmRescheduleInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: parsed.error.issues.map((i) => i.message).join(" "),
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/confirm-reschedule`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const service = serviceFixtures.find((s) => s.id === params.serviceId);
+    if (!service) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: `Servicio ${params.serviceId} no encontrado.`,
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/confirm-reschedule`,
+        },
+        { status: 404 },
+      );
+    }
+
+    if (service.status !== "RESCHEDULED") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se puede confirmar la nueva fecha de servicios a reprogramar (RESCHEDULED) (estado actual: ${service.status}).`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/confirm-reschedule`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const updated = updateServiceFixture(service.id, {
+      status: "SCHEDULED",
+      statusReason: null,
+      scheduledDate: parsed.data.scheduledDate,
+      windowFrom: parsed.data.timeWindow.start,
+      windowTo: parsed.data.timeWindow.end,
+      history: [
+        ...service.history,
+        {
+          label: "Programado",
+          at: new Date().toISOString().slice(0, 16).replace("T", " "),
+          done: true,
+        },
+      ],
     });
 
     return HttpResponse.json(updated, { status: 200 });
@@ -641,6 +914,21 @@ export const handlers = [
         );
       }
     }
+    if (parsedOwnerType.data === "SERVICE") {
+      const service = serviceFixtures.find((s) => s.id === ownerId);
+      if (!service) {
+        return HttpResponse.json(
+          {
+            statusCode: 404,
+            message: `El servicio ${ownerId} no existe.`,
+            error: "Not Found",
+            timestamp: new Date().toISOString(),
+            path: "/api/evidence",
+          },
+          { status: 404 },
+        );
+      }
+    }
 
     const rawNameFromForm = formData.get("fileName");
     const fileObjName = (file as { name?: string }).name;
@@ -660,6 +948,9 @@ export const handlers = [
 
     if (parsedOwnerType.data === "ZONE_RESULT") {
       addAttachmentToZoneResult(ownerId, attachment);
+    }
+    if (parsedOwnerType.data === "SERVICE") {
+      addAttachmentToService(ownerId, attachment);
     }
 
     evidenceCache.set(cacheKey, attachment);
