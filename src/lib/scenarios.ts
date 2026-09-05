@@ -1,10 +1,16 @@
 export type Capability =
   | "service:view"
   | "service:execute"
+  // Frontend hypothesis: #8 defines Office catalog configuration, but not per-resource names.
+  | "serviceType:manage"
+  | "disposalSite:manage"
   | "inventory:view"
   | "environmentalReport:view"
   | "map:view"
   | "catalog:view"
+  // Frontend hypotheses for Phase 2 resource management; M1 capability claims remain unconfirmed.
+  | "vehicle:manage"
+  | "crew:manage"
   | "indicator:view";
 
 export type ScenarioId =
@@ -45,6 +51,10 @@ export const scenarios: Record<
       "environmentalReport:view",
       "map:view",
       "catalog:view",
+      "serviceType:manage",
+      "disposalSite:manage",
+      "vehicle:manage",
+      "crew:manage",
       "indicator:view",
     ],
     work: {

@@ -40,6 +40,7 @@ import type { Capability, OperationalScenario } from "@/lib/scenarios";
 import styles from "./app-shell.module.css";
 import { FieldWorkPanel } from "@/components/services/field-work-panel";
 import { ServicesWorkspace } from "@/components/services/services-workspace";
+import { CatalogLanding } from "@/components/catalog/catalog-landing";
 import { ZonesPanel } from "./zones-panel";
 
 type Destination = "work" | "services" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
@@ -152,7 +153,10 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
         ) : destination === "services" ? (
           <ServicesWorkspace scenario={scenario} />
         ) : destination === "catalog" ? (
-          <ZonesPanel />
+          <div className="flex flex-col gap-8">
+            <CatalogLanding scenario={scenario} />
+            <ZonesPanel />
+          </div>
         ) : (
           <FoundationPlaceholder
             item={navigation.find((item) => item.id === destination)!}
