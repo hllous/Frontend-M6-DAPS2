@@ -20,6 +20,8 @@ export type OperationalScenario = {
     name: string;
     kind: "OFFICE" | "FIELD";
     fieldRole?: "CREW_LEADER" | "CREW_MEMBER";
+    crewId?: string;
+    crewName?: string;
   };
   capabilities: Capability[];
   work: {
@@ -62,6 +64,8 @@ export const scenarios: Record<
       name: "Martín Acosta",
       kind: "FIELD",
       fieldRole: "CREW_LEADER",
+      crewId: "crew-b",
+      crewName: "Cuadrilla B · Fernández",
     },
     capabilities: ["service:view", "service:execute", "map:view"],
     work: {
@@ -80,6 +84,8 @@ export const scenarios: Record<
       name: "Sofía Navarro",
       kind: "FIELD",
       fieldRole: "CREW_MEMBER",
+      crewId: "crew-b",
+      crewName: "Cuadrilla B · Fernández",
     },
     capabilities: ["service:view", "map:view"],
     work: {

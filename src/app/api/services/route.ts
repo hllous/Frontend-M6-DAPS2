@@ -16,6 +16,7 @@ import {
   type ServiceQuery,
   type ServiceStatus,
 } from "@/lib/services";
+import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { zoneFixtures } from "@/lib/zones-fixtures";
@@ -93,7 +94,13 @@ export async function GET(request: Request) {
 
   try {
     const session = getRequiredSession(request);
+    const scenario = getScenario(session.scenarioId);
     const query = parseServiceQuery(new URL(request.url));
+
+    // Field actors can only see services assigned to their own crew
+    if (scenario.actor.kind === "FIELD" && scenario.actor.crewId) {
+      query.crewId = scenario.actor.crewId;
+    }
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
       const backendResponse = await fetchBackend(request, `/services${backendQueryString(query)}`);

@@ -516,6 +516,54 @@ export const servicesAdapter = {
 
     return parsed.data;
   },
+
+  async start(serviceId: string): Promise<Service> {
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/services/${serviceId}/start`, {
+        method: "POST",
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de inicio de servicio no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const raw =
+      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+        ? (payload as { data: unknown }).data
+        : payload;
+
+    const parsed = serviceSchema.safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de inicio de servicio no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
 };
 
 function timeWindowsOverlap(
@@ -573,4 +621,61 @@ export function checkAssignmentConflicts({
   }
 
   return { crewConflict, vehicleConflict };
+}
+
+export type ServiceWindowTiming = {
+  isOutside: boolean;
+  timing: "within" | "early" | "late";
+  message: string | null;
+};
+
+export function checkServiceWindowTiming(
+  service: Service,
+  now: Date = new Date(),
+): ServiceWindowTiming {
+  if (!service.windowFrom || !service.windowTo) {
+    return { isOutside: false, timing: "within", message: null };
+  }
+
+  const currentYear = now.getFullYear();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+  const currentDay = String(now.getDate()).padStart(2, "0");
+  const currentDateStr = `${currentYear}-${currentMonth}-${currentDay}`;
+
+  const currentHours = String(now.getHours()).padStart(2, "0");
+  const currentMinutes = String(now.getMinutes()).padStart(2, "0");
+  const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+  if (service.scheduledDate < currentDateStr) {
+    return {
+      isOutside: true,
+      timing: "late",
+      message: `Inicio fuera de ventana horaria: la fecha programada fue el ${service.scheduledDate} (${service.windowFrom} – ${service.windowTo}).`,
+    };
+  }
+  if (service.scheduledDate > currentDateStr) {
+    return {
+      isOutside: true,
+      timing: "early",
+      message: `Inicio fuera de ventana horaria: el servicio está programado para el ${service.scheduledDate} (${service.windowFrom} – ${service.windowTo}).`,
+    };
+  }
+
+  if (currentTimeStr < service.windowFrom) {
+    return {
+      isOutside: true,
+      timing: "early",
+      message: `Inicio fuera de ventana horaria: la ventana programada inicia a las ${service.windowFrom} (actual: ${currentTimeStr}).`,
+    };
+  }
+
+  if (currentTimeStr > service.windowTo) {
+    return {
+      isOutside: true,
+      timing: "late",
+      message: `Inicio fuera de ventana horaria: la ventana programada finalizó a las ${service.windowTo} (actual: ${currentTimeStr}).`,
+    };
+  }
+
+  return { isOutside: false, timing: "within", message: null };
 }

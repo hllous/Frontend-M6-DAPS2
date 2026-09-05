@@ -249,5 +249,73 @@ export const handlers = [
 
     return HttpResponse.json(updated, { status: 200 });
   }),
+  http.post("*/api/services/:serviceId/start", ({ params }) => {
+    const service = serviceFixtures.find((s) => s.id === params.serviceId);
+    if (!service) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: `Servicio ${params.serviceId} no encontrado.`,
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/start`,
+        },
+        { status: 404 },
+      );
+    }
+
+    if (service.status !== "SCHEDULED") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se pueden iniciar servicios en estado SCHEDULED (estado actual: ${service.status}).`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/start`,
+        },
+        { status: 409 },
+      );
+    }
+
+    if (!service.crewId) {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: "No se puede iniciar el servicio sin una cuadrilla asignada.",
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/start`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const serviceType = SERVICE_TYPE_CATALOG.find((t) => t.id === service.serviceTypeId);
+    if (serviceType?.requiresVehicle && (!service.vehicleId || !service.vehicleId.trim())) {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: "El tipo de servicio requiere un vehículo operativo asignado para iniciar.",
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/start`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const historyEntry = {
+      label: "En curso",
+      at: new Date().toISOString().slice(0, 16).replace("T", " "),
+      done: true,
+    };
+
+    const updated = updateServiceFixture(service.id, {
+      status: "IN_PROGRESS",
+      history: [...service.history, historyEntry],
+    });
+
+    return HttpResponse.json(updated, { status: 200 });
+  }),
   http.post("*/api/session/logout", () => new HttpResponse(null, { status: 200 })),
 ];

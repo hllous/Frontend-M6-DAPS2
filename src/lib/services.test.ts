@@ -7,6 +7,7 @@ import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_SERVICES_QUERY } from "./services-fixtures";
 import {
   checkAssignmentConflicts,
+  checkServiceWindowTiming,
   ServiceContractError,
   ServiceRequestError,
   servicesAdapter,
@@ -396,5 +397,124 @@ describe("services adapter", () => {
 
     expect(noConflictResult.crewConflict).toBeNull();
     expect(noConflictResult.vehicleConflict).toBeNull();
+  });
+
+  it("starts a service via servicesAdapter.start and returns updated service in IN_PROGRESS", async () => {
+    server.use(
+      http.post("*/api/services/:serviceId/start", ({ params }) => {
+        return HttpResponse.json({
+          id: params.serviceId,
+          serviceTypeId: "st-street-cleaning",
+          serviceTypeName: "Barrido mecánico",
+          title: "Barrido mecánico — Bulevar Costero",
+          mode: "ROUTE",
+          status: "IN_PROGRESS",
+          origin: "PLANNED",
+          zoneIds: ["zone-3"],
+          zoneNames: ["Zona Centro"],
+          scheduledDate: "2026-09-05",
+          windowFrom: "08:00",
+          windowTo: "12:00",
+          crewId: "crew-b",
+          crewName: "Cuadrilla B · Fernández",
+          vehicleId: "veh-102",
+          vehiclePlate: "AE 456 FG",
+          history: [
+            { label: "Programado", at: "2026-09-05 06:00", done: true },
+            { label: "Asignado", at: "2026-09-05 06:30", done: true },
+            { label: "En curso", at: "2026-09-05 09:15", done: true },
+          ],
+        });
+      }),
+    );
+
+    const started = await servicesAdapter.start("SVC-1050");
+    expect(started.id).toBe("SVC-1050");
+    expect(started.status).toBe("IN_PROGRESS");
+    expect(started.history).toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "En curso", done: true })]),
+    );
+  });
+
+  it("surfaces a 409 error response from the backend during start as a ServiceRequestError", async () => {
+    server.use(
+      http.post("*/api/services/:serviceId/start", () => {
+        return HttpResponse.json(
+          {
+            statusCode: 409,
+            message: "El tipo de servicio requiere un vehículo operativo asignado para iniciar.",
+            error: "Conflict",
+            timestamp: new Date().toISOString(),
+            path: "/api/services/SVC-1054/start",
+          },
+          { status: 409 },
+        );
+      }),
+    );
+
+    await expect(servicesAdapter.start("SVC-1054")).rejects.toThrow(
+      "El tipo de servicio requiere un vehículo operativo asignado para iniciar.",
+    );
+  });
+
+  it("fails explicitly when the server response for start is malformed", async () => {
+    server.use(
+      http.post("*/api/services/:serviceId/start", () =>
+        HttpResponse.json({ unexpected: 123 }, { status: 200 }),
+      ),
+    );
+
+    await expect(servicesAdapter.start("SVC-1050")).rejects.toBeInstanceOf(
+      ServiceContractError,
+    );
+  });
+
+  describe("checkServiceWindowTiming", () => {
+    const testService = {
+      id: "SVC-TEST",
+      serviceTypeId: "st-street-cleaning",
+      title: "Test Service",
+      mode: "ROUTE" as const,
+      status: "SCHEDULED" as const,
+      origin: "PLANNED" as const,
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "10:00",
+      windowTo: "14:00",
+    };
+
+    it("detects when starting early (before window start on the scheduled date)", () => {
+      // 09:00 on 2026-09-05 is before 10:00
+      const earlyDate = new Date(2026, 8, 5, 9, 0);
+      const result = checkServiceWindowTiming(testService as any, earlyDate);
+      expect(result.isOutside).toBe(true);
+      expect(result.timing).toBe("early");
+      expect(result.message).toMatch(/Inicio fuera de ventana horaria/i);
+    });
+
+    it("detects when starting late (after window end on the scheduled date)", () => {
+      // 15:00 on 2026-09-05 is after 14:00
+      const lateDate = new Date(2026, 8, 5, 15, 0);
+      const result = checkServiceWindowTiming(testService as any, lateDate);
+      expect(result.isOutside).toBe(true);
+      expect(result.timing).toBe("late");
+      expect(result.message).toMatch(/Inicio fuera de ventana horaria/i);
+    });
+
+    it("detects when within the planned window", () => {
+      // 12:00 on 2026-09-05 is between 10:00 and 14:00
+      const withinDate = new Date(2026, 8, 5, 12, 0);
+      const result = checkServiceWindowTiming(testService as any, withinDate);
+      expect(result.isOutside).toBe(false);
+      expect(result.timing).toBe("within");
+      expect(result.message).toBeNull();
+    });
+
+    it("detects when scheduled date is in the past", () => {
+      const pastDate = new Date(2026, 8, 6, 12, 0);
+      const result = checkServiceWindowTiming(testService as any, pastDate);
+      expect(result.isOutside).toBe(true);
+      expect(result.timing).toBe("late");
+    });
   });
 });
