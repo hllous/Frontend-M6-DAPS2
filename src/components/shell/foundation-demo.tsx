@@ -6,6 +6,7 @@ import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { loadScenario, ScenarioRequestError } from "@/lib/scenario-client";
 import type { OperationalScenario, ScenarioId } from "@/lib/scenarios";
 import { onRemoteLogout } from "@/lib/session-client";
+import { ensureMockWorkerStarted } from "@/mocks/ensure-worker-started";
 
 import { AppShell } from "./app-shell";
 import { ShellError, ShellForbidden, ShellLoading, ShellUnauthenticated } from "./shell-states";
@@ -50,9 +51,11 @@ export function FoundationDemo({
     async function requestScenario() {
       setState({ status: "loading" });
       try {
-        if (process.env.NODE_ENV === "development") {
-          const { worker } = await import("@/mocks/browser");
-          await worker.start({ onUnhandledRequest: "bypass" });
+        // The Playwright suite (#88) disables this: MSW's service worker would otherwise
+        // intercept /api/mock/scenarios and /api/zones before the fault-injection specs'
+        // own page.route() handlers ever see the request.
+        if (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DISABLE_MSW !== "true") {
+          await ensureMockWorkerStarted();
         }
         const nextScenario = await loadScenario(scenarioId);
         if (isCurrent) setState({ status: "ready", scenario: nextScenario });
