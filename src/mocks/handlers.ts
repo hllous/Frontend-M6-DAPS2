@@ -175,7 +175,6 @@ export const handlers = [
       vehiclePlate: null,
       ticketId: input.origin === "TICKET" ? (input.ticketId ?? null) : null,
       notes: input.notes ?? null,
-      flag: null,
       coordinates: { x: 50, y: 50 },
       attachments: [],
       history: [{ label: "Programado", at: new Date().toISOString().slice(0, 16).replace("T", " "), done: true }],

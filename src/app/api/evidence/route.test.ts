@@ -48,6 +48,56 @@ describe("POST /api/evidence BFF route", () => {
     expect(response.status).toBe(401);
   });
 
+  it("returns 403 for an actor without service:execute (Evidence is a Crew Leader action)", async () => {
+    const cookie = await authenticatedCookie("office-duty-queue");
+    const formData = new FormData();
+    formData.append("file", new Blob(["test"], { type: "image/jpeg" }), "test.jpg");
+    formData.append("ownerType", "ZONE_RESULT");
+    formData.append("ownerId", "ZR-1");
+
+    const response = await POST(
+      new Request("http://localhost/api/evidence", {
+        method: "POST",
+        headers: { cookie, "Idempotency-Key": "key-office" },
+        body: formData,
+      }),
+    );
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.message).toMatch(/cuadrilla/i);
+  });
+
+  it("returns 403 when the Field actor's crew does not own the target Service", async () => {
+    // SVC-1042 belongs to crew-a; field-crew-leader-route is crew-b
+    addZoneResultFixture({
+      id: "ZR-OTHER-CREW",
+      serviceId: "SVC-1042",
+      zoneId: "zone-1",
+      status: "SERVICED",
+      reason: null,
+      notes: null,
+      attachments: [],
+      recordedAt: "2026-09-05 10:00",
+    });
+
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const formData = new FormData();
+    formData.append("file", new Blob(["test"], { type: "image/jpeg" }), "test.jpg");
+    formData.append("ownerType", "ZONE_RESULT");
+    formData.append("ownerId", "ZR-OTHER-CREW");
+
+    const response = await POST(
+      new Request("http://localhost/api/evidence", {
+        method: "POST",
+        headers: { cookie, "Idempotency-Key": "key-other-crew" },
+        body: formData,
+      }),
+    );
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.message).toMatch(/cuadrilla asignada/i);
+  });
+
   it("requires Idempotency-Key header and returns 400 when missing", async () => {
     const cookie = await authenticatedCookie("field-crew-leader-route");
     const formData = new FormData();

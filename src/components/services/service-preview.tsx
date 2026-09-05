@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { Service } from "@/lib/services";
 import { cn } from "@/lib/utils";
-import { FlagBadge, StatusBadge } from "./status-badge";
+import { StatusBadge } from "./status-badge";
 
 export function ServicePreview({
   service,
@@ -88,7 +88,6 @@ export function ServicePreview({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={service.status} />
-          {service.flag && <FlagBadge flag={service.flag} />}
         </div>
 
         {service.statusReason && (

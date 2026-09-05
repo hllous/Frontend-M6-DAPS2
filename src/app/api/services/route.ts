@@ -129,6 +129,12 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
+    const scenario = getScenario(session.scenarioId);
+
+    // Permission check: scheduling is an Office decision, not a Field action.
+    if (scenario.actor.kind !== "OFFICE") {
+      return errorResponse(403, "Solo Oficina puede programar un servicio.", path);
+    }
 
     let body: unknown;
     try {
@@ -191,7 +197,6 @@ export async function POST(request: Request) {
       vehiclePlate: null,
       ticketId: input.origin === "TICKET" ? (input.ticketId ?? null) : null,
       notes: input.notes ?? null,
-      flag: null,
       coordinates: { x: 50, y: 50 },
       attachments: [],
       history: [{ label: "Programado", at: new Date().toISOString().slice(0, 16).replace("T", " "), done: true }],

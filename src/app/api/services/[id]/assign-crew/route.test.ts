@@ -47,6 +47,22 @@ describe("POST /api/services/[id]/assign-crew BFF route", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
+  it("returns 403 for a Field actor (assignment is an Office decision)", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1043/assign-crew", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ crewId: "crew-a" }),
+      }),
+      { params: Promise.resolve({ id: "SVC-1043" }) },
+    );
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.message).toMatch(/oficina/i);
+  });
+
   it("returns 400 if the request body is invalid JSON or missing crewId", async () => {
     const cookie = await authenticatedCookie("office-duty-queue");
     const response = await POST(

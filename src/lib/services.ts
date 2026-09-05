@@ -26,9 +26,6 @@ export const serviceOriginSchema = z.enum([
 ]);
 export type ServiceOrigin = z.infer<typeof serviceOriginSchema>;
 
-export const serviceFlagSchema = z.enum(["delayed", "conflict"]);
-export type ServiceFlag = z.infer<typeof serviceFlagSchema>;
-
 export const statusEventSchema = z.object({
   label: z.string(),
   at: z.string(),
@@ -76,7 +73,6 @@ export const serviceSchema = z.object({
   vehiclePlate: z.string().nullable().optional(),
   ticketId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  flag: serviceFlagSchema.nullable().optional(),
   coordinates: coordinatesSchema.optional().default({ x: 50, y: 50 }),
   attachments: z.array(attachmentSchema).optional().default([]),
   history: z.array(statusEventSchema).optional().default([]),

@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import type { Service, ServiceStatus } from "@/lib/services";
 import { STATUS_LABEL, STATUS_ORDER } from "@/lib/services";
 import { cn } from "@/lib/utils";
-import { FlagBadge, StatusBadge } from "./status-badge";
+import { StatusBadge } from "./status-badge";
 
 export type SortKey = "service" | "zone" | "status" | "crew" | "scheduled";
 export type SortDir = "asc" | "desc";
@@ -415,7 +415,6 @@ export function ServicesTable({
                   <td className="p-3">
                     <div className="flex flex-col gap-1 items-start">
                       <StatusBadge status={service.status} />
-                      {service.flag && <FlagBadge flag={service.flag} />}
                     </div>
                   </td>
 

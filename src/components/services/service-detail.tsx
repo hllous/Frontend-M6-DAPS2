@@ -21,7 +21,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { checkServiceWindowTiming, type Service } from "@/lib/services";
-import { FlagBadge, StatusBadge } from "./status-badge";
+import { StatusBadge } from "./status-badge";
 import { ZoneExecutionPanel } from "./zone-execution-panel";
 
 export function ServiceDetail({
@@ -203,7 +203,6 @@ export function ServiceDetail({
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <StatusBadge status={service.status} />
-              {service.flag && <FlagBadge flag={service.flag} />}
               <span className="rounded-lg bg-[var(--color-surface-subtle)] px-2.5 py-1 text-xs font-medium text-[var(--color-text)]">
                 Origen: {service.origin}
               </span>

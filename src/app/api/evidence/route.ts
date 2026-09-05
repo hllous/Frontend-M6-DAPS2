@@ -13,6 +13,7 @@ import {
   evidenceOwnerTypeSchema,
   type Attachment,
 } from "@/lib/services";
+import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -52,6 +53,16 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
+    const scenario = getScenario(session.scenarioId);
+
+    // Permission check: only the assigned Crew Leader uploads Evidence, not Office or a Crew Member.
+    if (!scenario.capabilities.includes("service:execute")) {
+      return errorResponse(
+        403,
+        "No tiene permisos para subir evidencia. Solo la persona responsable de la cuadrilla puede hacerlo.",
+        path,
+      );
+    }
 
     const idempotencyKey = request.headers.get("Idempotency-Key") || request.headers.get("idempotency-key");
     if (!idempotencyKey || !idempotencyKey.trim()) {
@@ -133,18 +144,29 @@ export async function POST(request: Request) {
       });
     }
 
-    // Validate owner exists
+    // Validate owner exists and resolve the Service it belongs to, for the crew-ownership check below
+    let owningService = null;
     if (ownerType === "ZONE_RESULT") {
       const zoneResult = zoneResultFixtures.find((zr) => zr.id === ownerId);
       if (!zoneResult) {
         return errorResponse(404, `El resultado de zona ${ownerId} no existe.`, path);
       }
+      owningService = serviceFixtures.find((s) => s.id === zoneResult.serviceId) ?? null;
     }
     if (ownerType === "SERVICE") {
-      const service = serviceFixtures.find((s) => s.id === ownerId);
-      if (!service) {
+      owningService = serviceFixtures.find((s) => s.id === ownerId) ?? null;
+      if (!owningService) {
         return errorResponse(404, `El servicio ${ownerId} no existe.`, path);
       }
+    }
+
+    if (
+      owningService &&
+      scenario.actor.kind === "FIELD" &&
+      scenario.actor.crewId &&
+      owningService.crewId !== scenario.actor.crewId
+    ) {
+      return errorResponse(403, "Solo la cuadrilla asignada al servicio puede subir evidencia.", path);
     }
 
     const rawNameFromForm = formData.get("fileName");

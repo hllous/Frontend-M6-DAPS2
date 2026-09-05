@@ -11,6 +11,7 @@ import {
   SERVICE_TYPE_CATALOG,
   VEHICLE_CATALOG,
 } from "@/lib/services";
+import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -46,6 +47,12 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
+    const scenario = getScenario(session.scenarioId);
+
+    // Permission check: crew/vehicle assignment is an Office decision, not a Field action.
+    if (scenario.actor.kind !== "OFFICE") {
+      return errorResponse(403, "Solo Oficina puede asignar cuadrilla y vehículo a un servicio.", path);
+    }
 
     let body: unknown;
     try {

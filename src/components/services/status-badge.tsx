@@ -9,7 +9,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import type { ServiceFlag, ServiceStatus } from "@/lib/services";
+import type { ServiceStatus } from "@/lib/services";
 import { STATUS_LABEL } from "@/lib/services";
 import { cn } from "@/lib/utils";
 
@@ -54,31 +54,6 @@ export function StatusBadge({
       aria-label={`Estado: ${label}`}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span>{label}</span>
-    </span>
-  );
-}
-
-export function FlagBadge({
-  flag,
-  className,
-}: {
-  flag: ServiceFlag;
-  className?: string;
-}) {
-  const isDelayed = flag === "delayed";
-  const label = isDelayed ? "Demorado" : "Conflicto";
-
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-warning)]",
-        className,
-      )}
-      role="note"
-      aria-label={`Aviso: ${label}`}
-    >
-      <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden />
       <span>{label}</span>
     </span>
   );

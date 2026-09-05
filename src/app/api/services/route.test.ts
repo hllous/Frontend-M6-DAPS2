@@ -108,6 +108,27 @@ describe("authenticated services BFF route", () => {
     expect(response.status).toBe(401);
   });
 
+  it("POST returns 403 for a Field actor (scheduling is an Office decision)", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const response = await POST(
+      new Request("http://localhost/api/services", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          serviceTypeId: "st-waste-route",
+          origin: "PLANNED",
+          zoneIds: ["zone-1"],
+          scheduledDate: "2026-09-10",
+          timeWindow: { start: "08:00", end: "12:00" },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.message).toMatch(/oficina/i);
+  });
+
   it("POST rejects malformed or invalid input with 400", async () => {
     const cookie = await authenticatedCookie("office-duty-queue");
     const response = await POST(

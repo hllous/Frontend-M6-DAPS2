@@ -22,7 +22,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-101",
     vehiclePlate: "AF 123 CD",
     coordinates: { x: 22, y: 30 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-04 18:40", done: true },
@@ -51,7 +50,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewId: null,
     crewName: null,
     coordinates: { x: 28, y: 22 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 08:00", done: true },
@@ -81,7 +79,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-102",
     vehiclePlate: "AE 456 FG",
     coordinates: { x: 34, y: 34 },
-    flag: "conflict",
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-03 10:00", done: true },
@@ -111,7 +108,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-102",
     vehiclePlate: "AE 456 FG",
     coordinates: { x: 50, y: 44 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 06:00", done: true },
@@ -140,7 +136,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-103",
     vehiclePlate: "AG 789 HI",
     coordinates: { x: 52, y: 46 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 07:00", done: true },
@@ -168,7 +163,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-103",
     vehiclePlate: "AG 789 HI",
     coordinates: { x: 53, y: 45 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 07:00", done: true },
@@ -196,7 +190,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewId: "crew-b",
     crewName: "Cuadrilla B · Fernández",
     coordinates: { x: 58, y: 40 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 07:00", done: true },
@@ -226,7 +219,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: null,
     vehiclePlate: null,
     coordinates: { x: 55, y: 48 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 08:00", done: true },
@@ -252,7 +244,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewId: "crew-c",
     crewName: "Cuadrilla C · Ibáñez",
     coordinates: { x: 47, y: 55 },
-    flag: "delayed",
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 06:30", done: true },
@@ -280,7 +271,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-104",
     vehiclePlate: "AE 321 ZA",
     coordinates: { x: 40, y: 74 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-04 20:00", done: true },
@@ -308,7 +298,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewId: null,
     crewName: null,
     coordinates: { x: 46, y: 82 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 10:00", done: true },
@@ -334,7 +323,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewId: "crew-d",
     crewName: "Cuadrilla D · Gómez",
     coordinates: { x: 33, y: 68 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 06:00", done: true },
@@ -360,7 +348,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewId: null,
     crewName: null,
     coordinates: { x: 70, y: 60 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-02 12:00", done: true },
@@ -384,7 +371,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewId: "crew-c",
     crewName: "Cuadrilla C · Ibáñez",
     coordinates: { x: 76, y: 50 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 08:30", done: true },
@@ -407,7 +393,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewId: "crew-c",
     crewName: "Cuadrilla C · Ibáñez",
     coordinates: { x: 80, y: 42 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 06:00", done: true },
@@ -436,7 +421,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-105",
     vehiclePlate: "AB 654 LM",
     coordinates: { x: 25, y: 26 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 06:00", done: true },
@@ -464,7 +448,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewId: null,
     crewName: null,
     coordinates: { x: 24, y: 36 },
-    flag: null,
     attachments: [],
     history: [{ label: "Programado", at: "2026-09-05 08:00", done: true }],
     notes: "Reservado para pruebas de cancelación desde SCHEDULED.",
@@ -487,7 +470,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     crewId: "crew-a",
     crewName: "Cuadrilla A · López",
     coordinates: { x: 27, y: 38 },
-    flag: "delayed",
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 07:00", done: true },
@@ -518,7 +500,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-102",
     vehiclePlate: "AE 456 FG",
     coordinates: { x: 29, y: 40 },
-    flag: "conflict",
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-04 10:00", done: true },
@@ -548,7 +529,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-101",
     vehiclePlate: "AF 123 CD",
     coordinates: { x: 31, y: 32 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-04 18:00", done: true },
@@ -577,7 +557,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-102",
     vehiclePlate: "AE 456 FG",
     coordinates: { x: 54, y: 47 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-04 18:00", done: true },
@@ -606,7 +585,6 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     vehicleId: "veh-103",
     vehiclePlate: "AG 789 HI",
     coordinates: { x: 56, y: 49 },
-    flag: null,
     attachments: [],
     history: [
       { label: "Programado", at: "2026-09-05 07:00", done: true },
