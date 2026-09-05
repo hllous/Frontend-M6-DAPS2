@@ -232,4 +232,60 @@ describe("ServicesWorkspace component", () => {
     expect(screen.getByText("Origen vinculado preservado")).toBeInTheDocument();
     expect(screen.getByText("TK-9921")).toBeInTheDocument();
   });
+
+  it("opens assign crew dialog from live preview, attaches crew, and reflects immediately in table and preview", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+
+    // Find and select unassigned service SVC-1043
+    const row = within(table).getByText("Poda de árbol — Av. Rivadavia 2200").closest("tr")!;
+    await user.click(row);
+
+    // Live preview opens
+    const preview = await screen.findByRole("complementary");
+    expect(preview).toHaveTextContent("SVC-1043");
+    expect(preview).toHaveTextContent("Sin asignar");
+
+    // Click "Asignar cuadrilla" button in preview
+    const assignBtn = within(preview).getByRole("button", { name: "Asignar cuadrilla" });
+    await user.click(assignBtn);
+
+    // AssignCrewDialog opens
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: "Asignar cuadrilla y vehículo" })).toBeInTheDocument();
+    expect(within(dialog).getByText("SVC-1043")).toBeInTheDocument();
+
+    // Select crew-c
+    const crewSelect = within(dialog).getByLabelText(/Cuadrilla asignada/i);
+    await user.selectOptions(crewSelect, "crew-c");
+
+    // Submit assignment
+    const submitBtn = within(dialog).getByRole("button", { name: "Confirmar asignación" });
+    await user.click(submitBtn);
+
+    // Dialog closes
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    // Preview immediately reflects the assigned crew
+    await waitFor(() => {
+      expect(screen.getByRole("complementary")).toHaveTextContent("Cuadrilla C · Ibáñez");
+    });
+
+    // Table row also displays the assigned crew
+    expect(within(row).getByText("Cuadrilla C · Ibáñez")).toBeInTheDocument();
+  });
+
+  it("opens assign crew dialog via URL parameters and updates the service", async () => {
+    window.history.replaceState(null, "", "/app?destination=services&action=assign&serviceId=SVC-1043");
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    // Dialog opens automatically based on URL params
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: "Asignar cuadrilla y vehículo" })).toBeInTheDocument();
+    expect(within(dialog).getByText("SVC-1043")).toBeInTheDocument();
+  });
 });

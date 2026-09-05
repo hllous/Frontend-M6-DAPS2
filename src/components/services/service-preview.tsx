@@ -20,11 +20,13 @@ import { FlagBadge, StatusBadge } from "./status-badge";
 export function ServicePreview({
   service,
   onOpenDetail,
+  onAssignCrew,
   onClose,
   className,
 }: {
   service: Service;
   onOpenDetail: (id: string) => void;
+  onAssignCrew?: (service: Service) => void;
   onClose?: () => void;
   className?: string;
 }) {
@@ -178,14 +180,28 @@ export function ServicePreview({
         )}
       </div>
 
-      <div className="border-t border-[var(--color-border)] p-3 bg-[var(--color-canvas)]">
+      <div className="border-t border-[var(--color-border)] p-3 bg-[var(--color-canvas)] flex flex-col gap-2">
+        {onAssignCrew && (service.status === "SCHEDULED" || service.status === "RESCHEDULED") && (
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={() => onAssignCrew(service)}
+            className="w-full justify-center text-xs font-semibold gap-1.5"
+          >
+            <Users className="h-3.5 w-3.5" aria-hidden />
+            <span>{service.crewId ? "Reasignar cuadrilla" : "Asignar cuadrilla"}</span>
+          </Button>
+        )}
         <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => onOpenDetail(service.id)}
-          className="w-full justify-center text-xs font-semibold"
+          className="w-full justify-center text-xs font-semibold gap-1.5"
         >
           <span>Ver detalle completo</span>
-          <ExternalLink data-icon="inline-end" aria-hidden />
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
         </Button>
       </div>
     </aside>

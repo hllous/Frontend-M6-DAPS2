@@ -19,9 +19,11 @@ import { FlagBadge, StatusBadge } from "./status-badge";
 export function ServiceDetail({
   service,
   onBack,
+  onAssignCrew,
 }: {
   service: Service;
   onBack: () => void;
+  onAssignCrew?: (service: Service) => void;
 }) {
   return (
     <div className="flex h-full flex-col bg-[var(--color-surface)] overflow-hidden" role="region" aria-label={`Detalle completo de ${service.id}`}>
@@ -35,9 +37,22 @@ export function ServiceDetail({
           <ArrowLeft className="h-4 w-4" aria-hidden />
           Volver a Servicios
         </Button>
-        <span className="text-xs font-medium text-[var(--color-text-secondary)]">
-          {service.id} · Detalle operativo
-        </span>
+        <div className="flex items-center gap-3">
+          {onAssignCrew && (service.status === "SCHEDULED" || service.status === "RESCHEDULED") && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => onAssignCrew(service)}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <Users className="h-3.5 w-3.5" aria-hidden />
+              <span>{service.crewId ? "Reasignar cuadrilla" : "Asignar cuadrilla"}</span>
+            </Button>
+          )}
+          <span className="text-xs font-medium text-[var(--color-text-secondary)]">
+            {service.id} · Detalle operativo
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -87,9 +102,20 @@ export function ServiceDetail({
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-canvas)]">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">
-                <Users className="h-4 w-4 text-[var(--color-action)]" aria-hidden />
-                Cuadrilla asignada
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">
+                  <Users className="h-4 w-4 text-[var(--color-action)]" aria-hidden />
+                  Cuadrilla asignada
+                </div>
+                {onAssignCrew && (service.status === "SCHEDULED" || service.status === "RESCHEDULED") && (
+                  <button
+                    type="button"
+                    onClick={() => onAssignCrew(service)}
+                    className="text-[11px] font-semibold text-[var(--color-action)] hover:underline focus:outline-none"
+                  >
+                    {service.crewId ? "Reasignar" : "Asignar"}
+                  </button>
+                )}
               </div>
               <div className="mt-2 text-sm font-bold text-[var(--color-text)]">
                 {service.crewName ?? "Sin asignar"}

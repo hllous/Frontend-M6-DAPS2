@@ -38,6 +38,7 @@ import {
 } from "@/lib/services";
 import { cn } from "@/lib/utils";
 import { MapView } from "./map-view";
+import { AssignCrewDialog } from "./assign-crew-dialog";
 import { ScheduleServiceDialog } from "./schedule-service-dialog";
 import { ServiceDetail } from "./service-detail";
 import { ServicePreview } from "./service-preview";
@@ -142,6 +143,11 @@ export function ServicesWorkspace({
     );
   });
 
+  // Assignment modal state
+  const [assigningServiceId, setAssigningServiceId] = useState<string | null>(() => {
+    return getParam("action") === "assign" ? getParam("serviceId") : null;
+  });
+
   // Layout presentation
   const [mapSide, setMapSide] = useState<"left" | "right">(() => {
     return getParam("mapSide") === "left" ? "left" : "right";
@@ -228,6 +234,11 @@ export function ServicesWorkspace({
       if (scheduleReferenceId) newParams.set("referenceId", scheduleReferenceId);
     }
 
+    if (assigningServiceId) {
+      newParams.set("action", "assign");
+      newParams.set("serviceId", assigningServiceId);
+    }
+
     const newQuery = newParams.toString();
     const newUrl = `${url.pathname}${newQuery ? `?${newQuery}` : ""}`;
     window.history.replaceState(null, "", newUrl);
@@ -243,6 +254,7 @@ export function ServicesWorkspace({
     isScheduleOpen,
     scheduleOrigin,
     scheduleReferenceId,
+    assigningServiceId,
   ]);
 
   // Client-side filtering of loaded services
@@ -306,6 +318,11 @@ export function ServicesWorkspace({
     return loadState.services.find((s) => s.id === detailId) ?? null;
   }, [detailId, loadState]);
 
+  const assigningService = useMemo(() => {
+    if (!assigningServiceId || loadState.status !== "ready") return null;
+    return loadState.services.find((s) => s.id === assigningServiceId) ?? null;
+  }, [assigningServiceId, loadState]);
+
   const handleSelect = useCallback((id: string) => {
     setSelectedId((prev) => (prev === id ? null : id));
   }, []);
@@ -355,6 +372,17 @@ export function ServicesWorkspace({
     setScheduleReferenceId(undefined);
   }, []);
 
+  const handleServiceAssigned = useCallback((updatedService: Service) => {
+    setLoadState((prev) => {
+      if (prev.status !== "ready") return prev;
+      return {
+        ...prev,
+        services: prev.services.map((s) => (s.id === updatedService.id ? updatedService : s)),
+      };
+    });
+    setAssigningServiceId(null);
+  }, []);
+
   const hasActiveFilters =
     Boolean(search.trim()) ||
     columnFilters.zones.size > 0 ||
@@ -364,7 +392,24 @@ export function ServicesWorkspace({
 
   // Full detail view (explicit action)
   if (detailService) {
-    return <ServiceDetail service={detailService} onBack={() => setDetailId(null)} />;
+    return (
+      <>
+        <ServiceDetail
+          service={detailService}
+          onBack={() => setDetailId(null)}
+          onAssignCrew={(s) => setAssigningServiceId(s.id)}
+        />
+        <AssignCrewDialog
+          open={Boolean(assigningService)}
+          onOpenChange={(open) => {
+            if (!open) setAssigningServiceId(null);
+          }}
+          service={assigningService}
+          allServices={loadState.status === "ready" ? loadState.services : []}
+          onAssigned={handleServiceAssigned}
+        />
+      </>
+    );
   }
 
   return (
@@ -537,6 +582,7 @@ export function ServicesWorkspace({
                     <ServicePreview
                       service={selectedService}
                       onOpenDetail={(id) => setDetailId(id)}
+                      onAssignCrew={(s) => setAssigningServiceId(s.id)}
                       onClose={() => setSelectedId(null)}
                     />
                   </div>
@@ -646,6 +692,7 @@ export function ServicesWorkspace({
                     <ServicePreview
                       service={selectedService}
                       onOpenDetail={(id) => setDetailId(id)}
+                      onAssignCrew={(s) => setAssigningServiceId(s.id)}
                       onClose={() => setSelectedId(null)}
                     />
                   </div>
@@ -663,6 +710,17 @@ export function ServicesWorkspace({
         onCreated={handleServiceCreated}
         initialOrigin={scheduleOrigin}
         initialReferenceId={scheduleReferenceId}
+      />
+
+      {/* Assign Crew and Vehicle Dialog */}
+      <AssignCrewDialog
+        open={Boolean(assigningService)}
+        onOpenChange={(open) => {
+          if (!open) setAssigningServiceId(null);
+        }}
+        service={assigningService}
+        allServices={loadState.status === "ready" ? loadState.services : []}
+        onAssigned={handleServiceAssigned}
       />
     </div>
   );
