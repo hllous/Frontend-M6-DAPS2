@@ -284,3 +284,104 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(row.getByText("Cuadrilla A · López")).toBeVisible();
   });
 });
+
+test.describe("Field assigned service viewing, start action, and cross-view status @smoke", () => {
+  test("Field My Work scopes strictly to actor crew and Crew Member sees read-only detail", async ({ page }) => {
+    await loginViaApi(page, "field-crew-member-route");
+    await page.goto("/app");
+
+    // Header and context
+    await expect(page.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
+    await expect(page.getByText("Integrante de cuadrilla")).toBeVisible();
+
+    // Services assigned to Cuadrilla B are visible
+    await expect(page.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible();
+    await expect(page.getByText("Reparación de contenedor CT-0112")).toBeVisible();
+
+    // Other crews' services are out of scope (e.g. Recolección de residuos assigned to Cuadrilla A)
+    await expect(page.getByText("Recolección de residuos — Recorrido 4")).toHaveCount(0);
+
+    // Crew Member sees no state-changing start buttons
+    await expect(page.getByRole("button", { name: "Iniciar servicio" })).toHaveCount(0);
+    await expect(page.getByText("Solo consulta").first()).toBeVisible();
+    await expect(
+      page.getByText("La persona responsable de la cuadrilla registra los cambios de estado del servicio."),
+    ).toBeVisible();
+
+    // Crew Member can open detail view for assigned service
+    const firstDetailButton = page.getByRole("button", { name: "Ver detalle" }).first();
+    await firstDetailButton.click();
+
+    // Detail view is open and read-only
+    await expect(page.getByRole("region", { name: /Detalle completo de SVC-1050/i })).toBeVisible();
+    await expect(page.getByText("Solo consulta")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Iniciar servicio" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /asignar cuadrilla/i })).toHaveCount(0);
+
+    // Can return back to assigned services list
+    await page.getByRole("button", { name: "Volver a Servicios asignados" }).click();
+    await expect(page.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
+  });
+
+  test("Crew Leader starts assigned service with advisory window warning, rejects invalid start, and reflects IN_PROGRESS in Office workspace", async ({ page }) => {
+    // 1. Crew Leader logs in to Field view
+    await loginViaApi(page, "field-crew-leader-route");
+    await page.goto("/app");
+
+    await expect(page.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
+    await expect(page.getByText("Responsable de cuadrilla")).toBeVisible();
+
+    // Scoped list displays scheduled services
+    await expect(page.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible();
+    await expect(page.getByText("Reparación de contenedor CT-0112")).toBeVisible();
+
+    // Out of window warning is rendered (08:00 - 12:00 window)
+    await expect(page.getByText(/Inicio fuera de ventana horaria/i).first()).toBeVisible();
+
+    // 2. Reject starting service missing a required vehicle (SVC-1054)
+    const card1054 = page.locator("li").filter({ hasText: "SVC-1054" });
+    await card1054.getByRole("button", { name: "Iniciar servicio" }).click();
+
+    // Backend 409 error is surfaced in UI alert
+    const alert = card1054.getByRole("alert");
+    await expect(alert).toBeVisible();
+    await expect(alert).toHaveText(/El tipo de servicio requiere un vehículo operativo asignado para iniciar/i);
+
+    // 3. Crew Leader successfully starts scheduled service with vehicle (SVC-1050)
+    const card1050 = page.locator("li").filter({ hasText: "SVC-1050" });
+    await card1050.getByRole("button", { name: "Iniciar servicio" }).click();
+
+    // Status transitions to IN_PROGRESS ("En curso") in My Work list
+    await expect(card1050.getByText("En curso")).toBeVisible();
+
+    // 4. Open detail view and verify IN_PROGRESS reflection
+    await card1050.getByRole("button", { name: "Ver detalle" }).click();
+
+    await expect(page.getByRole("region", { name: /Detalle completo de SVC-1050/i })).toBeVisible();
+    // In detail view, StatusBadge shows "En curso"
+    await expect(page.getByRole("region", { name: /Detalle completo de SVC-1050/i }).getByText("En curso")).toBeVisible();
+    // In progress service cannot be started again
+    await expect(page.getByRole("button", { name: "Iniciar servicio" })).toHaveCount(0);
+
+    // 5. Verify cross-view reflection in Office workspace
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=services");
+
+    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+
+    // Select row for SVC-1050 in table
+    const serviceRow = table.getByRole("row", { name: /SVC-1050/ });
+    await expect(serviceRow).toBeVisible();
+    // Table row reflects "En curso"
+    await expect(serviceRow.getByText("En curso")).toBeVisible();
+
+    // Click row to open preview
+    await serviceRow.click();
+    const preview = page.locator("aside[aria-labelledby='preview-title']");
+    await expect(preview).toBeVisible();
+    await expect(preview.getByText("SVC-1050")).toBeVisible();
+    // Preview reflects "En curso"
+    await expect(preview.getByText("En curso").first()).toBeVisible();
+  });
+});

@@ -18,7 +18,7 @@ test.describe("Office and Field mock entry and navigation @smoke", () => {
     await loginViaUi(page, "Campo · responsable de recorrido");
 
     await expect(page.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Iniciar servicio" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Iniciar servicio" }).first()).toBeVisible();
 
     await page.getByRole("button", { name: "Mapa" }).click();
     await expect(page.getByText("Este destino estará disponible")).toBeVisible();
@@ -31,7 +31,7 @@ test.describe("Crew Leader versus Crew Member presentation @smoke", () => {
     await page.goto("/app");
 
     await expect(page.getByText("Responsable de cuadrilla")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Iniciar servicio" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Iniciar servicio" }).first()).toBeVisible();
   });
 
   test("Crew Member is presented a read-only turn with no state-changing action", async ({ page }) => {
