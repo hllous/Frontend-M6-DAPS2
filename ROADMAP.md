@@ -40,7 +40,6 @@ None of these block writing this roadmap (confirmed when ticket #67 was claimed:
 | M2's visible-to-citizen attachment policy and event shape are unresolved | Unresolved hypothesis | Phase 8 | `CONTRACTS.md` → Remaining contract gaps |
 | Better Auth remains conditional on a compatible M1 OIDC contract | Unresolved hypothesis | Phase 0 / Phase 8 architecture choice | [#17](https://github.com/hllous/Frontend-M6-DAPS2/issues/17), [#18](https://github.com/hllous/Frontend-M6-DAPS2/issues/18) |
 | Route stop-sequence `PUT` has no server-side concurrency guard | Unresolved hypothesis (documented backend limitation; frontend ships an advisory-only precheck) | Phase 2c | [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36) |
-| Container's completed-Service → status bridge has no backend atomicity | Unresolved hypothesis (documented backend limitation) | Phase 4 | [#37](https://github.com/hllous/Frontend-M6-DAPS2/issues/37) |
 | TreeSurvey → TreeIntervention has no foreign key; the link is UI convention only | Unresolved hypothesis | Phase 5 | [#38](https://github.com/hllous/Frontend-M6-DAPS2/issues/38) |
 
 ## Phase 0 — Foundation
@@ -70,7 +69,7 @@ None of these block writing this roadmap (confirmed when ticket #67 was claimed:
 - A ROUTE Service reaches `COMPLETED` only once every zone reaches `SERVICED`; a `PARTIAL`/`NOT_SERVICED` `ZoneResult` requires Evidence.
 - Local Drafts persist field input without connectivity and require manual resubmission; a stale-server `Conflict` (per `CONTEXT.md`) is surfaced explicitly, never silently overwritten.
 
-**Unblocks**: Phases 2a–2d, 3, 4, 5 (via Phase 4), 7 (fixture-based start).
+**Unblocks**: Phases 2a–2d, 3, 4, 5, 7 (fixture-based start).
 
 ## Phase 2 — Service-supporting catalogs
 
@@ -139,28 +138,28 @@ A vertical slice attached to Phase 1, not a horizontal sweep across every domain
 
 **Depends on**: Phase 1; [Define the Container lifecycle and Green Points management workflows](https://github.com/hllous/Frontend-M6-DAPS2/issues/37).
 
-**Why this early**: not because it's small, but because its Service-completion path establishes the non-atomic resource↔Service "bridge" pattern that Phase 5 (Tree) reuses. Proving it once here, cheaply, de-risks Phase 5.
+**Why this early**: a small, self-contained state machine with an already-confirmed contract (see `CONTRACTS.md` → Worked example: Containers and Green Points) — it exercises the ambient-report / Office-dispatch split and evidence-attachment pattern other resources reuse, without waiting on any external gate.
 
 **Acceptance evidence**:
 - `container:report` (overflow/damage reporting) is available to both Field and Office without a Service assignment; `container:manage` (repair/removal/relocation dispatch) is Office-only.
-- Completing a POINT Service is **bridged where applicable**: `empty`, `confirm-relocation`, and standalone `complete-repair` each fire a second, non-atomic frontend call against the Container after the Service-completion call succeeds — test coverage includes the case where the second call fails after the first succeeds. `remove` is a **direct** Container transition, reachable only from `DAMAGED`, and does not go through this bridge.
+- Completing a linked `POINT` Service atomically transitions the Container (`empty`, `complete-repair`, `confirm-relocation`) in the same backend transaction — no second frontend call is issued for these three when reached through a Service; the standalone `container:manage` endpoints exist only for the no-Service case. `remove` is a **direct** Container transition, reachable only from `DAMAGED`.
 - Evidence uploads use `ownerType=CONTAINER` and attach to the Container as a flat list, not per-transition.
 - Green Points CRUD has no status or state-machine tests, matching its plain-catalog shape.
 
-**Unblocks**: Phase 5 (bridge pattern reused).
+**Unblocks**: nothing phase-specific beyond Phase 1's own downstream phases.
 
 ## Phase 5 — Tree census, survey, and intervention authorization
 
 **Outcome**: Office registers Trees; Field or Office records TreeSurveys; Office authorizes and schedules a TreeIntervention. Phase 3's referral gains its TreeIntervention-sourced `StreetClosureRequest` path.
 
-**Depends on**: Phase 1 (Service), Phase 4 (bridge pattern), Phase 3 (referral extension point); [Define the Tree census, survey, and intervention authorization workflows](https://github.com/hllous/Frontend-M6-DAPS2/issues/38).
+**Depends on**: Phase 1 (Service), Phase 3 (referral extension point); [Define the Tree census, survey, and intervention authorization workflows](https://github.com/hllous/Frontend-M6-DAPS2/issues/38).
 
 **Acceptance evidence**:
 - `tree:manage` gates Tree registration CRUD to Office; `tree:survey` allows both Field and Office to record a TreeSurvey.
 - `treeIntervention:request` is Office-only. Every intervention type — not REMOVAL alone — requires an explicit `authorize()` call before scheduling; the UI shows one universal Authorize action regardless of type.
 - A REMOVAL intervention is rejected client-side without a `justification`; a high-risk survey is rejected client-side without a `riskType` — both enforced despite being backend-unenforced.
 - The TreeSurvey → suggested-TreeIntervention link is UI convention only (no FK); tests cover the link surviving independently of any backend enforcement.
-- The guided "authorize + schedule" action creates the Service and calls `assign-service` as one bundled user action; tests cover partial failure between the two calls, following Phase 4's bridge-coverage approach.
+- The guided "authorize + schedule" action creates the Service and calls `assign-service` as one bundled user action, a genuine two-call frontend bridge (`authorize()` and `assign-service` are separate backend calls, unlike Phase 4's Container transitions); tests cover partial failure between the two calls.
 - Creating a `StreetClosureRequest` from an authorized TreeIntervention is now available (Phase 3's extension); creating one from an unauthorized intervention is not.
 
 **Unblocks**: Phase 6 need not wait on this phase — they're independent — but both feed Phase 7.
@@ -227,7 +226,7 @@ A vertical slice attached to Phase 1, not a horizontal sweep across every domain
 | 2a–2d | Yes | Once Phase 1 ships |
 | 3 | Yes | Once Phase 1 ships |
 | 4 | Yes | Once Phase 1 ships |
-| 5 | Yes | Once Phases 1, 3, 4 ship |
+| 5 | Yes | Once Phases 1, 3 ship |
 | 6 | Yes | Once Phases 1, 3 ship (M4 gate permitting) |
 | 7 | Yes | Once Phase 1 ships (acceptance gate waits on Phases 1–6) |
 | 8 | Yes | Once Phases 1–7 ship and all "blocks production readiness" gates close |
