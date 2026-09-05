@@ -17,6 +17,7 @@ import {
 } from "@/lib/services-fixtures";
 import {
   assignCrewInputSchema,
+  cancelServiceInputSchema,
   confirmRescheduleInputSchema,
   createServiceInputSchema,
   CREW_CATALOG,
@@ -592,6 +593,83 @@ export const handlers = [
         ...service.history,
         {
           label: "Programado",
+          at: new Date().toISOString().slice(0, 16).replace("T", " "),
+          done: true,
+        },
+      ],
+    });
+
+    return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.post("*/api/services/:serviceId/cancel", async ({ params, request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El cuerpo de la solicitud no es un JSON válido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/cancel`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const parsed = cancelServiceInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: parsed.error.issues.map((i) => i.message).join(" "),
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/cancel`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const service = serviceFixtures.find((s) => s.id === params.serviceId);
+    if (!service) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: `Servicio ${params.serviceId} no encontrado.`,
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/cancel`,
+        },
+        { status: 404 },
+      );
+    }
+
+    if (!["SCHEDULED", "RESCHEDULED", "SUSPENDED"].includes(service.status)) {
+      const message =
+        service.status === "IN_PROGRESS"
+          ? "No se puede cancelar un servicio en curso (IN_PROGRESS) directamente; debe suspenderse primero."
+          : `Solo se pueden cancelar servicios programados (SCHEDULED), a reprogramar (RESCHEDULED) o suspendidos (SUSPENDED) (estado actual: ${service.status}).`;
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/cancel`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const updated = updateServiceFixture(service.id, {
+      status: "CANCELLED",
+      statusReason: parsed.data.reason,
+      history: [
+        ...service.history,
+        {
+          label: "Cancelado",
           at: new Date().toISOString().slice(0, 16).replace("T", " "),
           done: true,
         },

@@ -46,6 +46,7 @@ import { ServicePreview } from "./service-preview";
 import { SuspendServiceDialog } from "./suspend-service-dialog";
 import { RescheduleReasonDialog } from "./reschedule-reason-dialog";
 import { ConfirmRescheduleDialog } from "./confirm-reschedule-dialog";
+import { CancelServiceDialog } from "./cancel-service-dialog";
 import {
   ServicesTable,
   type ColumnFilters,
@@ -160,6 +161,9 @@ export function ServicesWorkspace({
   // Reschedule modal state (Office two-step flow)
   const [reschedulingServiceId, setReschedulingServiceId] = useState<string | null>(null);
   const [confirmingRescheduleServiceId, setConfirmingRescheduleServiceId] = useState<string | null>(null);
+
+  // Cancel modal state (Office action)
+  const [cancelingServiceId, setCancelingServiceId] = useState<string | null>(null);
 
   // Layout presentation
   const [mapSide, setMapSide] = useState<"left" | "right">(() => {
@@ -477,6 +481,17 @@ export function ServicesWorkspace({
     setConfirmingRescheduleServiceId(null);
   }, []);
 
+  const handleServiceCancelled = useCallback((updatedService: Service) => {
+    setLoadState((prev) => {
+      if (prev.status !== "ready") return prev;
+      return {
+        ...prev,
+        services: prev.services.map((s) => (s.id === updatedService.id ? updatedService : s)),
+      };
+    });
+    setCancelingServiceId(null);
+  }, []);
+
   const hasActiveFilters =
     Boolean(search.trim()) ||
     columnFilters.zones.size > 0 ||
@@ -497,6 +512,7 @@ export function ServicesWorkspace({
           onResumeService={canExecuteService ? handleResumeService : undefined}
           onReschedule={canReschedule ? (s) => setReschedulingServiceId(s.id) : undefined}
           onConfirmReschedule={canReschedule ? (s) => setConfirmingRescheduleServiceId(s.id) : undefined}
+          onCancelService={canReschedule ? (s) => setCancelingServiceId(s.id) : undefined}
           canStartService={canExecuteService}
           isResuming={resumingId === detailService.id}
           resumeError={resumeErrors[detailService.id] ?? null}
@@ -541,6 +557,14 @@ export function ServicesWorkspace({
               }}
               service={confirmingRescheduleServiceId ? detailService : null}
               onConfirmed={handleRescheduleConfirmed}
+            />
+            <CancelServiceDialog
+              open={Boolean(cancelingServiceId && detailService.id === cancelingServiceId)}
+              onOpenChange={(open) => {
+                if (!open) setCancelingServiceId(null);
+              }}
+              service={cancelingServiceId ? detailService : null}
+              onCancelled={handleServiceCancelled}
             />
           </>
         )}

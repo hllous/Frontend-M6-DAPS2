@@ -346,4 +346,61 @@ describe("ServicesWorkspace component", () => {
     // zoneIds preserved verbatim
     expect(screen.getByText("Zona Centro")).toBeVisible();
   });
+
+  it("cancels a SUSPENDED service from its detail view with a required reason", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = within(table).getByText("Retiro de contenedor dañado CT-0442").closest("tr")!;
+    await user.click(row);
+
+    const detailBtn = await screen.findByRole("button", { name: /Ver detalle completo/ });
+    await user.click(detailBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "Detalle completo de SVC-1044" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Cancelar servicio" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: "Cancelar SVC-1044" })).toBeInTheDocument();
+
+    // Empty reason is rejected
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar servicio" }));
+    expect(within(dialog).getByText(/motivo de la cancelación/i)).toBeVisible();
+
+    await user.type(
+      within(dialog).getByLabelText(/^Motivo/i),
+      "Solicitud del cliente: ya no requiere el servicio.",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar servicio" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Cancelado")).toBeVisible();
+    });
+    expect(screen.getByText(/ya no requiere el servicio/i)).toBeVisible();
+  });
+
+  it("does not offer a cancel action for an IN_PROGRESS service", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = within(table).getByText("Recolección de residuos — Recorrido 4").closest("tr")!;
+    await user.click(row);
+
+    const detailBtn = await screen.findByRole("button", { name: /Ver detalle completo/ });
+    await user.click(detailBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "Detalle completo de SVC-1042" })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("button", { name: "Cancelar servicio" })).not.toBeInTheDocument();
+  });
 });

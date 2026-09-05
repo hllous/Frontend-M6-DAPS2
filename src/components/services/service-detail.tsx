@@ -3,6 +3,7 @@
 import {
   AlertTriangle,
   ArrowLeft,
+  Ban,
   Calendar,
   CalendarClock,
   Clock,
@@ -31,6 +32,7 @@ export function ServiceDetail({
   onResumeService,
   onReschedule,
   onConfirmReschedule,
+  onCancelService,
   onServiceUpdated,
   canStartService = false,
   isStarting = false,
@@ -47,6 +49,7 @@ export function ServiceDetail({
   onResumeService?: (service: Service) => void | Promise<void>;
   onReschedule?: (service: Service) => void;
   onConfirmReschedule?: (service: Service) => void;
+  onCancelService?: (service: Service) => void;
   onServiceUpdated?: (service: Service) => void;
   canStartService?: boolean;
   isStarting?: boolean;
@@ -138,6 +141,20 @@ export function ServiceDetail({
               <span>Confirmar nueva fecha</span>
             </Button>
           )}
+          {onCancelService &&
+            (service.status === "SCHEDULED" ||
+              service.status === "RESCHEDULED" ||
+              service.status === "SUSPENDED") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onCancelService(service)}
+                className="gap-1.5 text-xs font-semibold text-[var(--color-danger)] border-[var(--color-danger-line)] hover:bg-[var(--color-danger-fill)]/40"
+              >
+                <Ban className="h-3.5 w-3.5" aria-hidden />
+                <span>Cancelar servicio</span>
+              </Button>
+            )}
           {!canStartService && (
             <span className="text-xs font-medium text-[var(--color-text-secondary)]">
               Solo consulta

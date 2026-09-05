@@ -602,6 +602,39 @@ describe("services adapter", () => {
         }),
       ).rejects.toBeInstanceOf(ServiceContractError);
     });
+
+    it("cancels a service via servicesAdapter.cancel with a required reason", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/cancel", async ({ params, request }) => {
+          const body = (await request.json()) as any;
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "CANCELLED",
+            statusReason: body.reason,
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [{ label: "Cancelado", at: "2026-09-05 08:00", done: true }],
+          });
+        }),
+      );
+
+      const cancelled = await servicesAdapter.cancel("SVC-1050", {
+        reason: "Solicitud del cliente",
+      });
+
+      expect(cancelled.status).toBe("CANCELLED");
+      expect(cancelled.statusReason).toBe("Solicitud del cliente");
+    });
+
+    it("rejects invalid cancel input (missing reason) with ServiceContractError before sending request", async () => {
+      await expect(
+        servicesAdapter.cancel("SVC-1050", { reason: "" }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+    });
   });
 
   describe("checkServiceWindowTiming", () => {

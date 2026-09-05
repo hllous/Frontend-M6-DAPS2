@@ -239,6 +239,11 @@ export const rescheduleServiceInputSchema = z.object({
 });
 export type RescheduleServiceInput = z.infer<typeof rescheduleServiceInputSchema>;
 
+export const cancelServiceInputSchema = z.object({
+  reason: z.string().min(1, "El motivo es obligatorio para cancelar el servicio"),
+});
+export type CancelServiceInput = z.infer<typeof cancelServiceInputSchema>;
+
 export const confirmRescheduleInputSchema = z.object({
   scheduledDate: z
     .string()
@@ -830,6 +835,63 @@ export const servicesAdapter = {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
       throw new ServiceContractError(
         "La respuesta de reprogramación de servicio no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async cancel(serviceId: string, input: CancelServiceInput): Promise<Service> {
+    const parsedInput = cancelServiceInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para cancelar el servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/services/${serviceId}/cancel`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de cancelación de servicio no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const raw =
+      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+        ? (payload as { data: unknown }).data
+        : payload;
+
+    const parsed = serviceSchema.safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de cancelación de servicio no respeta el contrato esperado.",
         { cause: parsed.error },
       );
     }
