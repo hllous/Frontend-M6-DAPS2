@@ -40,6 +40,7 @@ import type { Capability, OperationalScenario } from "@/lib/scenarios";
 import styles from "./app-shell.module.css";
 
 type Destination = "work" | "services" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
+type LogoutAction = (formData: FormData) => void | Promise<void>;
 
 type NavigationItem = {
   id: Destination;
@@ -71,7 +72,7 @@ function actorLabel(scenario: OperationalScenario) {
     : "Integrante de cuadrilla";
 }
 
-export function AppShell({ scenario }: { scenario: OperationalScenario }) {
+export function AppShell({ scenario, logoutAction }: { scenario: OperationalScenario; logoutAction?: LogoutAction }) {
   const [destination, setDestination] = useState<Destination>("work");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const availableItems = navigation.filter((item) => isAllowed(item, scenario));
@@ -116,9 +117,16 @@ export function AppShell({ scenario }: { scenario: OperationalScenario }) {
           <p className={styles.contextLabel}>{actorLabel(scenario)}</p>
           <p className={styles.actorName}>{scenario.actor.name}</p>
         </div>
-        <div className={styles.sessionState} aria-label="Estado de sesión">
-          <span aria-hidden="true" />
-          Sesión operativa
+        <div className={styles.topbarActions}>
+          <div className={styles.sessionState} aria-label="Estado de sesión">
+            <span aria-hidden="true" />
+            Sesión operativa
+          </div>
+          {logoutAction ? (
+            <form action={logoutAction}>
+              <Button type="submit" variant="outline">Cerrar sesión</Button>
+            </form>
+          ) : null}
         </div>
       </header>
 

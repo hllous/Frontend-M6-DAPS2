@@ -1,0 +1,14 @@
+.page { min-height: 100dvh; display: grid; place-items: center; padding: var(--space-24); background: var(--color-canvas); color: var(--color-text); }
+.panel { width: min(100%, 520px); padding: var(--space-32); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; }
+.mark { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: var(--space-20); border-radius: 12px; background: var(--color-institutional); color: var(--color-on-institutional); font-weight: 700; letter-spacing: .03em; }
+.kicker { margin: 0 0 var(--space-8); color: var(--color-text-secondary); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.panel h1 { max-width: 16ch; margin: 0; font-size: 28px; line-height: 34px; }
+.intro { max-width: 48ch; margin: var(--space-12) 0 var(--space-24); color: var(--color-text-secondary); font-size: 16px; line-height: 24px; }
+.form { display: flex; flex-direction: column; gap: var(--space-20); }
+.field { display: flex; flex-direction: column; gap: var(--space-6); }
+.field label { font-size: 14px; font-weight: 600; }
+.field select { min-height: 40px; padding: 0 var(--space-12); border: 1px solid var(--color-border-strong); border-radius: 12px; background: var(--color-surface); color: var(--color-text); font: inherit; }
+.field span { color: var(--color-text-secondary); font-size: 12px; line-height: 16px; }
+.form button { min-height: 40px; }
+.error, .unavailable { margin: 0; padding: var(--space-12); border: 1px solid var(--color-danger-line); border-radius: 12px; background: var(--color-danger-fill); color: var(--color-danger); font-size: 14px; line-height: 20px; }
+@media (max-width: 760px) { .page { padding: var(--space-16); } .panel { padding: var(--space-24) var(--space-16); } .field select, .form button { min-height: 48px; } }

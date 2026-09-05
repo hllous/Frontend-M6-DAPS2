@@ -112,3 +112,7 @@ const scenariosById = Object.values(scenarios).reduce(
 export function getScenario(id: ScenarioId): OperationalScenario {
   return scenariosById[id];
 }
+
+export function isScenarioId(value: unknown): value is ScenarioId {
+  return typeof value === "string" && value in scenariosById;
+}
