@@ -639,3 +639,101 @@ test.describe("Office two-step Service reschedule flow @smoke", () => {
     await expect(page.getByRole("button", { name: "Confirmar nueva fecha" })).toHaveCount(0);
   });
 });
+
+test.describe("Office cancels a Service @smoke", () => {
+  test("Office cancels a SCHEDULED service with a required reason", async ({ page }) => {
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await openServices(page);
+
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = table.getByRole("row", { name: /SVC-1090/ });
+    await row.click();
+    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+
+    const detailRegion = page.getByRole("region", { name: /Detalle completo de SVC-1090/i });
+    await expect(detailRegion).toBeVisible();
+
+    await detailRegion.getByRole("button", { name: "Cancelar servicio" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Cancelar SVC-1090" })).toBeVisible();
+
+    // Empty reason is rejected client-side
+    await dialog.getByRole("button", { name: "Cancelar servicio" }).click();
+    await expect(dialog.getByText(/motivo de la cancelación/i)).toBeVisible();
+
+    await dialog.getByLabel(/^Motivo/i).fill("El vecino desistió del reclamo.");
+    await dialog.getByRole("button", { name: "Cancelar servicio" }).click();
+    await expect(dialog).not.toBeVisible();
+
+    await expect(detailRegion.getByText("Cancelado").first()).toBeVisible();
+    await expect(detailRegion.getByText(/el vecino desistió del reclamo/i)).toBeVisible();
+  });
+
+  test("Office cancels a RESCHEDULED service directly, without a replacement date", async ({ page }) => {
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await openServices(page);
+
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = table.getByRole("row", { name: /SVC-1091/ });
+    await row.click();
+    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+
+    const detailRegion = page.getByRole("region", { name: /Detalle completo de SVC-1091/i });
+    await expect(detailRegion).toBeVisible();
+    await expect(detailRegion.getByText("A reprogramar").first()).toBeVisible();
+
+    await detailRegion.getByRole("button", { name: "Cancelar servicio" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    // No date/window input is ever offered for a RESCHEDULED cancellation
+    await expect(dialog.locator("input[type='date']")).toHaveCount(0);
+
+    await dialog.getByLabel(/^Motivo/i).fill("Ya no se requiere el servicio.");
+    await dialog.getByRole("button", { name: "Cancelar servicio" }).click();
+    await expect(dialog).not.toBeVisible();
+
+    await expect(detailRegion.getByText("Cancelado").first()).toBeVisible();
+    // scheduledDate snapshot is left untouched by cancellation
+    await expect(detailRegion.getByText("2026-09-06")).toBeVisible();
+  });
+
+  test("Office cancels a SUSPENDED service", async ({ page }) => {
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await openServices(page);
+
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = table.getByRole("row", { name: /SVC-1092/ });
+    await row.click();
+    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+
+    const detailRegion = page.getByRole("region", { name: /Detalle completo de SVC-1092/i });
+    await expect(detailRegion).toBeVisible();
+    await expect(detailRegion.getByText("Suspendido").first()).toBeVisible();
+
+    await detailRegion.getByRole("button", { name: "Cancelar servicio" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel(/^Motivo/i).fill("Contenedor reemplazado por otra vía.");
+    await dialog.getByRole("button", { name: "Cancelar servicio" }).click();
+    await expect(dialog).not.toBeVisible();
+
+    await expect(detailRegion.getByText("Cancelado").first()).toBeVisible();
+  });
+
+  test("Direct cancellation is unavailable while a Service is IN_PROGRESS", async ({ page }) => {
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await openServices(page);
+
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = table.getByRole("row", { name: /SVC-1093/ });
+    await row.click();
+    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+
+    const detailRegion = page.getByRole("region", { name: /Detalle completo de SVC-1093/i });
+    await expect(detailRegion).toBeVisible();
+    await expect(detailRegion.getByText("En curso").first()).toBeVisible();
+
+    // No cancel action while IN_PROGRESS — suspension is the required preceding step
+    await expect(detailRegion.getByRole("button", { name: "Cancelar servicio" })).toHaveCount(0);
+  });
+});
