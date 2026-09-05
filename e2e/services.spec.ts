@@ -129,4 +129,68 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(preview).toBeVisible();
     await expect(preview.getByText("SVC-1043")).toBeVisible();
   });
+
+  test("generic create flow schedules an unassigned ROUTE service that appears immediately in the workspace", async ({ page }) => {
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await openServices(page);
+
+    // Open scheduling dialog
+    await page.getByRole("button", { name: "Programar nuevo servicio" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Programar nuevo servicio" })).toBeVisible();
+
+    // Verify derived mode indication is present
+    await expect(dialog.getByText(/Recorrido \(ROUTE\)/i)).toBeVisible();
+
+    // Enter notes
+    const notesInput = dialog.getByLabel(/Notas e instrucciones operativas/i);
+    await notesInput.fill("Prueba E2E servicio no asignado");
+
+    // Submit the form
+    await dialog.getByRole("button", { name: "Programar servicio" }).click();
+
+    // Dialog closes
+    await expect(dialog).not.toBeVisible();
+
+    // The newly scheduled service preview is visible and shows unassigned status
+    const preview = page.locator("aside[aria-labelledby='preview-title']");
+    await expect(preview).toBeVisible();
+    await expect(preview.getByText("Sin asignar")).toBeVisible();
+    await expect(preview.getByText("Programado").first()).toBeVisible();
+  });
+
+  test("linked-create entry prefills origin and reference ID and schedules successfully", async ({ page }) => {
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await loginViaApi(page, "office-duty-queue");
+
+    // Navigate with linked-create query params
+    await page.goto("/app?destination=services&action=schedule&origin=TICKET&referenceId=TK-9921");
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Programar servicio vinculado" })).toBeVisible();
+    await expect(dialog.getByText("Origen vinculado preservado")).toBeVisible();
+    await expect(dialog.getByText("TK-9921")).toBeVisible();
+
+    // Select a POINT service type
+    await dialog.getByLabel(/Tipo de servicio/i).selectOption({ label: "Mantenimiento de contenedores (Punto)" });
+    await expect(dialog.getByText(/Punto fijo \(POINT\)/i)).toBeVisible();
+
+    // Enter target ref
+    await dialog.getByLabel(/Identificador de objetivo/i).fill("CT-0442");
+
+    // Submit
+    await dialog.getByRole("button", { name: "Programar servicio" }).click();
+
+    // Dialog closes
+    await expect(dialog).not.toBeVisible();
+
+    // Service appears in workspace preview
+    const preview = page.locator("aside[aria-labelledby='preview-title']");
+    await expect(preview).toBeVisible();
+    await expect(preview.getByText("Sin asignar")).toBeVisible();
+    await expect(preview.getByText("CT-0442")).toBeVisible();
+  });
 });
