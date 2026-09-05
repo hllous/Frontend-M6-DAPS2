@@ -737,3 +737,106 @@ test.describe("Office cancels a Service @smoke", () => {
     await expect(detailRegion.getByRole("button", { name: "Cancelar servicio" })).toHaveCount(0);
   });
 });
+
+test.describe("Field local drafts and Conflict resolution for offline actions @smoke", () => {
+  test("a suspend draft survives a reload and an out-of-band server change surfaces an explicit conflict, never applied silently", async ({
+    page,
+    browser,
+  }) => {
+    await loginViaApi(page, "field-crew-leader-route");
+    await page.goto("/app");
+
+    const card = page.locator("li").filter({ hasText: "SVC-1094" });
+    await card.getByRole("button", { name: "Ver detalle" }).click();
+    const detailRegion = page.getByRole("region", { name: /Detalle completo de SVC-1094/i });
+    await expect(detailRegion).toBeVisible();
+
+    await detailRegion.getByRole("button", { name: "Suspender servicio" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel(/Motivo de suspensión/i).selectOption("VEHICLE_BREAKDOWN");
+    await dialog.getByLabel(/^Nota/i).fill("El camión no arranca, se solicitó grúa.");
+
+    // Simulate connectivity loss on the suspend submission
+    await page.route("**/api/services/*/suspend", (route) => route.abort("failed"));
+    await dialog.getByRole("button", { name: "Suspender servicio" }).click();
+
+    await expect(dialog.getByRole("status")).toContainText(/borrador local pendiente/i);
+    await expect(dialog.getByRole("button", { name: "Reintentar envío" })).toBeVisible();
+
+    // Close and reload: the draft is kept on-device (localStorage), not in memory only
+    await dialog.getByRole("button", { name: "Cancelar" }).click();
+    await page.unroute("**/api/services/*/suspend");
+    await page.reload();
+
+    const cardAfterReload = page.locator("li").filter({ hasText: "SVC-1094" });
+    await cardAfterReload.getByRole("button", { name: "Ver detalle" }).click();
+    await detailRegion.getByRole("button", { name: "Suspender servicio" }).click();
+    const reopenedDialog = page.getByRole("dialog");
+    await expect(reopenedDialog).toBeVisible();
+    await expect(reopenedDialog.getByLabel(/Motivo de suspensión/i)).toHaveValue("VEHICLE_BREAKDOWN");
+    await expect(reopenedDialog.getByLabel(/^Nota/i)).toHaveValue(
+      "El camión no arranca, se solicitó grúa.",
+    );
+    await expect(reopenedDialog.getByRole("status")).toContainText(/borrador local pendiente/i);
+
+    // Out-of-band server-side change while the draft was pending: a second device (its own
+    // browser context — separate localStorage from the first tab's pending draft) successfully
+    // suspends the Service online in the meantime.
+    const secondDeviceContext = await browser.newContext();
+    const secondTab = await secondDeviceContext.newPage();
+    await loginViaApi(secondTab, "field-crew-leader-route");
+    await secondTab.goto("/app");
+    const secondCard = secondTab.locator("li").filter({ hasText: "SVC-1094" });
+    await secondCard.getByRole("button", { name: "Ver detalle" }).click();
+    const secondDetailRegion = secondTab.getByRole("region", { name: /Detalle completo de SVC-1094/i });
+    await secondDetailRegion.getByRole("button", { name: "Suspender servicio" }).click();
+    const secondDialog = secondTab.getByRole("dialog");
+    await secondDialog.getByLabel(/Motivo de suspensión/i).selectOption("CREW_UNAVAILABLE");
+    await secondDialog.getByLabel(/^Nota/i).fill("Cuadrilla reasignada a otro servicio urgente.");
+    await secondDialog.getByRole("button", { name: "Suspender servicio" }).click();
+    await expect(secondDialog).not.toBeVisible();
+    await expect(secondDetailRegion.getByText("Suspendido").first()).toBeVisible();
+    await secondDeviceContext.close();
+
+    // Manual resubmission fetches current state first — a mismatch is an explicit conflict,
+    // comparing the stale "En curso" the draft was composed against with the current "Suspendido"
+    await reopenedDialog.getByRole("button", { name: "Reintentar envío" }).click();
+    await expect(reopenedDialog.getByText(/cambió mientras/i)).toBeVisible();
+    const comparisonTable = reopenedDialog.getByRole("table", { name: /comparación de versiones/i });
+    await expect(comparisonTable.getByText("En curso")).toBeVisible();
+    await expect(comparisonTable.getByText("Suspendido")).toBeVisible();
+
+    // Preserving keeps the draft pending on-device for a later retry — the dialog returns
+    // to the form view (still showing the pending-draft banner), never applying the draft
+    await reopenedDialog.getByRole("button", { name: "Conservar borrador" }).click();
+    await expect(reopenedDialog.getByRole("status")).toContainText(/borrador local pendiente/i);
+    await expect(reopenedDialog.getByLabel(/^Nota/i)).toHaveValue(
+      "El camión no arranca, se solicitó grúa.",
+    );
+  });
+
+  test("a draft that matches current server state resubmits normally and clears once accepted", async ({
+    page,
+  }) => {
+    await loginViaApi(page, "field-crew-leader-route");
+    await page.goto("/app");
+
+    const card = page.locator("li").filter({ hasText: "SVC-1095" });
+    await expect(card).toBeVisible();
+
+    await page.route("**/api/services/*/start", (route) => route.abort("failed"));
+    await card.getByRole("button", { name: "Iniciar servicio" }).click();
+
+    await expect(card.getByText(/Borrador local pendiente de envío/i)).toBeVisible();
+    const retryButton = card.getByRole("button", { name: "Reintentar envío" });
+    await expect(retryButton).toBeVisible();
+
+    // Reconnects: the Service did not change server-side, so the draft resubmits normally
+    await page.unroute("**/api/services/*/start");
+    await retryButton.click();
+
+    await expect(card.getByText("En curso")).toBeVisible();
+    await expect(card.getByText(/Borrador local pendiente de envío/i)).toHaveCount(0);
+  });
+});
