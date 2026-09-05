@@ -153,8 +153,9 @@ describe("FieldWorkPanel component", () => {
     });
 
     // Window for SVC-1050 is 08:00 - 12:00. If current time is outside, warning appears
-    const warning = screen.queryByText(/Inicio fuera de ventana horaria/i);
-    // Warning exists and start button remains enabled
+    const warnings = screen.queryAllByText(/Inicio fuera de ventana horaria/i);
+    expect(warnings.length).toBeGreaterThan(0);
+    // Start button remains enabled
     const startButtons = screen.getAllByRole("button", { name: "Iniciar servicio" });
     expect(startButtons[0]).toBeEnabled();
 

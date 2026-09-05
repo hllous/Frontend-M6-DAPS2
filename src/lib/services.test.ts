@@ -517,4 +517,105 @@ describe("services adapter", () => {
       expect(result.timing).toBe("late");
     });
   });
+
+  describe("servicesAdapter zone results and completion", () => {
+    it("fetches recorded zone results via servicesAdapter.getZoneResults", async () => {
+      server.use(
+        http.get("*/api/services/:serviceId/zone-results", () => {
+          return HttpResponse.json([
+            {
+              id: "ZR-1",
+              serviceId: "SVC-1050",
+              zoneId: "zone-3",
+              status: "SERVICED",
+              reason: null,
+              notes: "Ok",
+              attachments: [],
+              recordedAt: "2026-09-05 10:00",
+            },
+          ]);
+        }),
+      );
+
+      const results = await servicesAdapter.getZoneResults("SVC-1050");
+      expect(results).toHaveLength(1);
+      expect(results[0].zoneId).toBe("zone-3");
+      expect(results[0].status).toBe("SERVICED");
+    });
+
+    it("records a zone result via servicesAdapter.recordZoneResult", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/zone-results", async ({ request }) => {
+          const body = (await request.json()) as any;
+          return HttpResponse.json({
+            id: "ZR-NEW",
+            serviceId: "SVC-1050",
+            zoneId: body.zoneId,
+            status: body.status,
+            reason: body.reason ?? null,
+            notes: body.notes ?? null,
+            attachments: [],
+            recordedAt: "2026-09-05 10:30",
+          });
+        }),
+      );
+
+      const result = await servicesAdapter.recordZoneResult("SVC-1050", {
+        zoneId: "zone-3",
+        status: "SERVICED",
+        notes: "Completado sin problemas",
+      });
+
+      expect(result.id).toBe("ZR-NEW");
+      expect(result.status).toBe("SERVICED");
+      expect(result.notes).toBe("Completado sin problemas");
+    });
+
+    it("uploads evidence via servicesAdapter.uploadEvidence", async () => {
+      server.use(
+        http.post("*/api/evidence", () => {
+          return HttpResponse.json({
+            id: "att-999",
+            url: "/mock/evidence/foto_calle.jpg",
+            filename: "foto_calle.jpg",
+            contentType: "image/jpeg",
+            uploadedAt: "2026-09-05 10:35",
+          });
+        }),
+      );
+
+      const file = new File(["dummy"], "foto calle.jpg", { type: "image/jpeg" });
+      const attachment = await servicesAdapter.uploadEvidence({
+        file,
+        ownerType: "ZONE_RESULT",
+        ownerId: "ZR-NEW",
+        idempotencyKey: "test-key-123",
+      });
+
+      expect(attachment.id).toBe("att-999");
+      expect(attachment.filename).toBe("foto_calle.jpg");
+    });
+
+    it("completes a service via servicesAdapter.complete with no body and returns updated service", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/complete", () => {
+          return HttpResponse.json({
+            id: "SVC-1050",
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "COMPLETED",
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [{ label: "Completado", at: "2026-09-05 11:00", done: true }],
+          });
+        }),
+      );
+
+      const completed = await servicesAdapter.complete("SVC-1050");
+      expect(completed.id).toBe("SVC-1050");
+      expect(completed.status).toBe("COMPLETED");
+    });
+  });
 });

@@ -203,6 +203,94 @@ export const assignCrewInputSchema = z.object({
 
 export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
 
+export const zoneResultStatusSchema = z.enum(["SERVICED", "PARTIAL", "NOT_SERVICED"]);
+export type ZoneResultStatus = z.infer<typeof zoneResultStatusSchema>;
+
+export const notServicedReasonSchema = z.enum([
+  "VEHICLE_BREAKDOWN",
+  "CREW_UNAVAILABLE",
+  "BLOCKED_ACCESS",
+  "STREET_CLOSURE",
+  "WEATHER",
+  "EXCESS_VOLUME",
+  "SECURITY_INCIDENT",
+  "OTHER",
+]);
+export type NotServicedReason = z.infer<typeof notServicedReasonSchema>;
+
+export const attachmentSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  filename: z.string(),
+  contentType: z.string(),
+  uploadedAt: z.string(),
+});
+export type Attachment = z.infer<typeof attachmentSchema>;
+
+export const zoneResultSchema = z.object({
+  id: z.string(),
+  serviceId: z.string(),
+  zoneId: z.string(),
+  status: zoneResultStatusSchema,
+  reason: notServicedReasonSchema.nullable().optional(),
+  notes: z.string().nullable().optional(),
+  proposedDate: z.string().nullable().optional(),
+  attachments: z.array(attachmentSchema).optional().default([]),
+  recordedAt: z.string(),
+});
+export type ZoneResult = z.infer<typeof zoneResultSchema>;
+
+export const recordZoneResultInputSchema = z
+  .object({
+    zoneId: z.string().min(1, "Debe seleccionar una zona"),
+    status: zoneResultStatusSchema,
+    reason: notServicedReasonSchema.nullable().optional(),
+    notes: z.string().nullable().optional(),
+    proposedDate: z.string().nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.status !== "SERVICED" && !data.reason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reason"],
+        message: "El motivo es obligatorio para resultados parciales o no atendidos",
+      });
+    }
+    if (data.status === "SERVICED" && data.reason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reason"],
+        message: "No debe especificarse motivo para zonas atendidas",
+      });
+    }
+  });
+export type RecordZoneResultInput = z.infer<typeof recordZoneResultInputSchema>;
+
+export const evidenceOwnerTypeSchema = z.enum([
+  "ZONE_RESULT",
+  "SERVICE",
+  "INSPECTION",
+  "CONTAINER",
+]);
+export type EvidenceOwnerType = z.infer<typeof evidenceOwnerTypeSchema>;
+
+export const ZONE_RESULT_STATUS_LABEL: Record<ZoneResultStatus, string> = {
+  SERVICED: "Atendida",
+  PARTIAL: "Parcial",
+  NOT_SERVICED: "No atendida",
+};
+
+export const NOT_SERVICED_REASON_LABEL: Record<NotServicedReason, string> = {
+  VEHICLE_BREAKDOWN: "Desperfecto vehicular",
+  CREW_UNAVAILABLE: "Cuadrilla no disponible",
+  BLOCKED_ACCESS: "Acceso bloqueado",
+  STREET_CLOSURE: "Corte de calle / Obra",
+  WEATHER: "Condición meteorológica",
+  EXCESS_VOLUME: "Exceso de volumen",
+  SECURITY_INCIDENT: "Incidente de seguridad",
+  OTHER: "Otro motivo",
+};
+
 export type ServiceQuery = {
   status?: ServiceStatus | ServiceStatus[];
   mode?: ServiceMode;
@@ -558,6 +646,212 @@ export const servicesAdapter = {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
       throw new ServiceContractError(
         "La respuesta de inicio de servicio no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async getZoneResults(serviceId: string): Promise<ZoneResult[]> {
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/services/${serviceId}/zone-results`);
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de resultados de zona no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const parsed = z.array(zoneResultSchema).safeParse(payload);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de resultados de zona no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async recordZoneResult(serviceId: string, input: RecordZoneResultInput): Promise<ZoneResult> {
+    const parsedInput = recordZoneResultInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para registrar el resultado de zona son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/services/${serviceId}/zone-results`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de registro de zona no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const raw =
+      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+        ? (payload as { data: unknown }).data
+        : payload;
+
+    const parsed = zoneResultSchema.safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de registro de zona no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async uploadEvidence(params: {
+    file: File;
+    ownerType: EvidenceOwnerType;
+    ownerId: string;
+    idempotencyKey?: string;
+  }): Promise<Attachment> {
+    const key =
+      params.idempotencyKey ||
+      (typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idemp-${Date.now()}`);
+    const formData = new FormData();
+    formData.append("file", params.file);
+    formData.append("fileName", params.file.name);
+    formData.append("fileSize", String(params.file.size));
+    formData.append("ownerType", params.ownerType);
+    formData.append("ownerId", params.ownerId);
+
+    let response: Response;
+    try {
+      response = await authenticatedFetch("/api/evidence", {
+        method: "POST",
+        headers: {
+          "Idempotency-Key": key,
+        },
+        body: formData,
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de carga de evidencia no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const parsed = attachmentSchema.safeParse(payload);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de carga de evidencia no respeta el contrato esperado.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async complete(serviceId: string): Promise<Service> {
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/services/${serviceId}/complete`, {
+        method: "POST",
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError(
+          "La respuesta de error de finalización de servicio no respeta el contrato documentado.",
+          { cause: parsedError.error },
+        );
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ")
+        : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+
+    const raw =
+      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+        ? (payload as { data: unknown }).data
+        : payload;
+
+    const parsed = serviceSchema.safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "La respuesta de finalización de servicio no respeta el contrato esperado.",
         { cause: parsed.error },
       );
     }

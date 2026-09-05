@@ -1,4 +1,4 @@
-import type { Service, ServiceQuery } from "./services";
+import type { Attachment, Service, ServiceQuery, ZoneResult } from "./services";
 
 const INITIAL_SERVICE_FIXTURES: Service[] = [
   {
@@ -96,8 +96,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     status: "SCHEDULED",
     statusReason: null,
     origin: "PLANNED",
-    zoneIds: ["zone-3"],
-    zoneNames: ["Zona Centro"],
+    zoneIds: ["zone-3", "zone-1"],
+    zoneNames: ["Zona Centro", "Zona Norte"],
     routeId: "route-1",
     routeName: "Recorrido 1 Centro",
     scheduledDate: "2026-09-05",
@@ -141,6 +141,34 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
       { label: "Programado", at: "2026-09-05 07:00", done: true },
       { label: "Asignado", at: "2026-09-05 07:20", done: true },
     ],
+  },
+  {
+    id: "SVC-1055",
+    serviceTypeId: "st-street-cleaning",
+    serviceTypeName: "Barrido mecánico",
+    title: "Barrido mecánico — Bulevar Norte",
+    mode: "ROUTE",
+    status: "SCHEDULED",
+    statusReason: null,
+    origin: "PLANNED",
+    zoneIds: ["zone-3", "zone-1"],
+    zoneNames: ["Zona Centro", "Zona Norte"],
+    routeId: "route-1",
+    routeName: "Recorrido 1 Centro",
+    scheduledDate: "2026-09-05",
+    windowFrom: "09:00",
+    windowTo: "13:00",
+    crewId: "crew-b",
+    crewName: "Cuadrilla B · Fernández",
+    vehicleId: "veh-103",
+    vehiclePlate: "AG 789 HI",
+    coordinates: { x: 53, y: 45 },
+    flag: null,
+    history: [
+      { label: "Programado", at: "2026-09-05 07:00", done: true },
+      { label: "Asignado", at: "2026-09-05 07:30", done: true },
+    ],
+    notes: "Turno mañana. Recorrido adicional norte.",
   },
   {
     id: "SVC-1052",
@@ -395,6 +423,88 @@ export function updateServiceFixture(id: string, updates: Partial<Service>): Ser
 
 export function resetServiceFixtures(): void {
   serviceFixtures.splice(0, serviceFixtures.length, ...INITIAL_SERVICE_FIXTURES);
+  zoneResultFixtures.splice(0, zoneResultFixtures.length, ...INITIAL_ZONE_RESULT_FIXTURES);
+  evidenceCache.clear();
+}
+
+const INITIAL_ZONE_RESULT_FIXTURES: ZoneResult[] = [
+  {
+    id: "ZR-1052-1",
+    serviceId: "SVC-1052",
+    zoneId: "zone-3",
+    status: "SERVICED",
+    reason: null,
+    notes: "Inspección ambiental completada",
+    attachments: [],
+    recordedAt: "2026-09-05 08:45",
+  },
+  {
+    id: "ZR-1061-1",
+    serviceId: "SVC-1061",
+    zoneId: "zone-2",
+    status: "PARTIAL",
+    reason: "BLOCKED_ACCESS",
+    notes: "Zona inaccesible por rotura de calzada",
+    attachments: [
+      {
+        id: "att-1061-1",
+        url: "/mock/evidence/calzada_bloqueada.jpg",
+        filename: "calzada_bloqueada.jpg",
+        contentType: "image/jpeg",
+        uploadedAt: "2026-09-05 09:48",
+      },
+    ],
+    recordedAt: "2026-09-05 09:50",
+  },
+];
+
+export const zoneResultFixtures: ZoneResult[] = [...INITIAL_ZONE_RESULT_FIXTURES];
+
+export const evidenceCache = new Map<string, Attachment>();
+
+export function sanitizeFilename(originalName: string, mimeType: string): string {
+  const baseName = originalName.replace(/^.*[\\/]/, "");
+  const strippedDots = baseName.replace(/^\.+/, "");
+  const extMap: Record<string, string> = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "application/pdf": ".pdf",
+  };
+  const expectedExt = extMap[mimeType] ?? "";
+  const nameWithoutExt = strippedDots.replace(/\.[^/.]+$/, "");
+  const cleanName = nameWithoutExt
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 60);
+
+  return `${cleanName || "archivo"}${expectedExt}`;
+}
+
+export function addZoneResultFixture(result: ZoneResult): void {
+  zoneResultFixtures.push(result);
+}
+
+export function getZoneResultsByServiceId(serviceId: string): ZoneResult[] {
+  return zoneResultFixtures.filter((r) => r.serviceId === serviceId);
+}
+
+export function addAttachmentToZoneResult(zoneResultId: string, attachment: Attachment): boolean {
+  const index = zoneResultFixtures.findIndex((r) => r.id === zoneResultId);
+  if (index === -1) return false;
+  zoneResultFixtures[index] = {
+    ...zoneResultFixtures[index],
+    attachments: [...zoneResultFixtures[index].attachments, attachment],
+  };
+  return true;
+}
+
+export function resetZoneResultFixtures(): void {
+  zoneResultFixtures.splice(0, zoneResultFixtures.length, ...INITIAL_ZONE_RESULT_FIXTURES);
+  evidenceCache.clear();
 }
 
 export const EMPTY_SERVICES_QUERY: ServiceQuery = { search: "zzz-sin-servicios" };

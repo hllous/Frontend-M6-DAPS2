@@ -68,6 +68,10 @@ export function FieldWorkPanel({
     }
   };
 
+  const handleServiceUpdated = (updated: Service) => {
+    setServices((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+  };
+
   const selectedService = selectedDetailId
     ? services.find((s) => s.id === selectedDetailId) ?? null
     : null;
@@ -78,6 +82,7 @@ export function FieldWorkPanel({
         service={selectedService}
         onBack={() => setSelectedDetailId(null)}
         onStartService={mayExecuteService ? handleStartService : undefined}
+        onServiceUpdated={handleServiceUpdated}
         canStartService={mayExecuteService}
         isStarting={startingId === selectedService.id}
         startError={startErrors[selectedService.id] ?? null}

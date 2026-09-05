@@ -2,23 +2,33 @@ import { HttpResponse, http } from "msw";
 
 import { getScenario, scenarios, type ScenarioId } from "@/lib/scenarios";
 import {
+  addAttachmentToZoneResult,
   addServiceFixture,
+  addZoneResultFixture,
+  evidenceCache,
   filterServiceFixtures,
+  getZoneResultsByServiceId,
   paginateServiceFixtures,
+  sanitizeFilename,
   serviceFixtures,
   updateServiceFixture,
+  zoneResultFixtures,
 } from "@/lib/services-fixtures";
 import {
   assignCrewInputSchema,
   createServiceInputSchema,
   CREW_CATALOG,
+  evidenceOwnerTypeSchema,
+  recordZoneResultInputSchema,
   ROUTE_CATALOG,
   SERVICE_TYPE_CATALOG,
+  type Attachment,
   type Service,
   type ServiceMode,
   type ServiceOrigin,
   type ServiceQuery,
   type ServiceStatus,
+  type ZoneResult,
   VEHICLE_CATALOG,
 } from "@/lib/services";
 import { filterZoneFixtures, paginateZoneFixtures, zoneFixtures } from "@/lib/zones-fixtures";
@@ -316,6 +326,345 @@ export const handlers = [
     });
 
     return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.get("*/api/services/:serviceId/zone-results", ({ params }) => {
+    const results = getZoneResultsByServiceId(params.serviceId as string);
+    return HttpResponse.json(results);
+  }),
+  http.post("*/api/services/:serviceId/zone-results", async ({ params, request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El cuerpo de la solicitud no es un JSON válido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/zone-results`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const parsed = recordZoneResultInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: parsed.error.issues.map((i) => i.message).join(" "),
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/zone-results`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const service = serviceFixtures.find((s) => s.id === params.serviceId);
+    if (!service) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Servicio no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/zone-results`,
+        },
+        { status: 404 },
+      );
+    }
+
+    if (service.status !== "IN_PROGRESS") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se pueden registrar resultados en servicios en curso (IN_PROGRESS) (estado actual: ${service.status}).`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/zone-results`,
+        },
+        { status: 409 },
+      );
+    }
+
+    if (!service.zoneIds.includes(parsed.data.zoneId)) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: `La zona ${parsed.data.zoneId} no pertenece al alcance delimitado de este servicio.`,
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/zone-results`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const existingResults = getZoneResultsByServiceId(params.serviceId as string);
+    if (existingResults.some((r) => r.zoneId === parsed.data.zoneId)) {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `El resultado para la zona ${parsed.data.zoneId} ya fue registrado previamente.`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/zone-results`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const newResult: ZoneResult = {
+      id: `ZR-${params.serviceId}-${Math.floor(100 + Math.random() * 900)}`,
+      serviceId: params.serviceId as string,
+      zoneId: parsed.data.zoneId,
+      status: parsed.data.status,
+      reason: parsed.data.status === "SERVICED" ? null : (parsed.data.reason ?? null),
+      notes: parsed.data.notes ?? null,
+      proposedDate: parsed.data.proposedDate ?? null,
+      attachments: [],
+      recordedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+    };
+
+    addZoneResultFixture(newResult);
+    return HttpResponse.json(newResult, { status: 201 });
+  }),
+  http.post("*/api/services/:serviceId/complete", ({ params }) => {
+    const service = serviceFixtures.find((s) => s.id === params.serviceId);
+    if (!service) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Servicio no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/complete`,
+        },
+        { status: 404 },
+      );
+    }
+
+    if (service.status !== "IN_PROGRESS") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se pueden completar servicios en curso (IN_PROGRESS) (estado actual: ${service.status}).`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/complete`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const results = getZoneResultsByServiceId(params.serviceId as string);
+    const missingZones = service.zoneIds.filter((zid) => !results.some((r) => r.zoneId === zid));
+    if (missingZones.length > 0) {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Falta registrar el resultado de ${missingZones.length} zona(s) del servicio antes de completar.`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/complete`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const allServiced = results.every((r) => r.status === "SERVICED");
+    const computedStatus: ServiceStatus = allServiced ? "COMPLETED" : "PARTIALLY_COMPLETED";
+    const historyLabel = computedStatus === "COMPLETED" ? "Completado" : "Parcial";
+
+    const nonServicedNotes = results
+      .filter((r) => r.status !== "SERVICED" && r.notes)
+      .map((r) => r.notes)
+      .join(" · ");
+
+    const updated = updateServiceFixture(service.id, {
+      status: computedStatus,
+      statusReason: computedStatus === "PARTIALLY_COMPLETED"
+        ? (nonServicedNotes || "Cierre parcial con zonas no atendidas o parciales")
+        : null,
+      history: [
+        ...service.history,
+        {
+          label: historyLabel,
+          at: new Date().toISOString().slice(0, 16).replace("T", " "),
+          done: true,
+        },
+      ],
+    });
+
+    return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.post("*/api/evidence", async ({ request }) => {
+    const idempotencyKey = request.headers.get("Idempotency-Key") || request.headers.get("idempotency-key");
+    if (!idempotencyKey || !idempotencyKey.trim()) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "La cabecera Idempotency-Key es obligatoria para la carga de evidencia.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/evidence",
+        },
+        { status: 400 },
+      );
+    }
+
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El cuerpo de la solicitud debe ser multipart/form-data válido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/evidence",
+        },
+        { status: 400 },
+      );
+    }
+
+    const file = formData.get("file");
+    const rawOwnerType = formData.get("ownerType");
+    const ownerId = formData.get("ownerId");
+
+    if (!file || typeof file === "string" || !(file instanceof Blob)) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "Debe incluir un archivo válido en el campo 'file'.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/evidence",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!rawOwnerType || typeof rawOwnerType !== "string") {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El campo 'ownerType' es obligatorio.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/evidence",
+        },
+        { status: 400 },
+      );
+    }
+
+    const parsedOwnerType = evidenceOwnerTypeSchema.safeParse(rawOwnerType);
+    if (!parsedOwnerType.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "Tipo de propietario de evidencia inválido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/evidence",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!ownerId || typeof ownerId !== "string" || !ownerId.trim()) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El campo 'ownerId' es obligatorio.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/evidence",
+        },
+        { status: 400 },
+      );
+    }
+
+    const rawFileSize = formData.get("fileSize");
+    const declaredSize = rawFileSize ? Number(rawFileSize) : NaN;
+    const fileSize = !isNaN(declaredSize) ? declaredSize : file.size;
+
+    const maxSizeBytes = 10 * 1024 * 1024;
+    if (fileSize > maxSizeBytes) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El archivo supera el tamaño máximo permitido de 10 MB.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/evidence",
+        },
+        { status: 400 },
+      );
+    }
+
+    const allowedMime = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
+    const mimeType = file.type || "application/octet-stream";
+    if (!allowedMime.has(mimeType)) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "Tipo de archivo no permitido. Solo se aceptan JPEG, PNG, WebP o PDF.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/evidence",
+        },
+        { status: 400 },
+      );
+    }
+
+    const cacheKey = `${parsedOwnerType.data}:${ownerId}:${idempotencyKey}`;
+    if (evidenceCache.has(cacheKey)) {
+      return HttpResponse.json(evidenceCache.get(cacheKey)!, { status: 200 });
+    }
+
+    if (parsedOwnerType.data === "ZONE_RESULT") {
+      const zoneResult = zoneResultFixtures.find((zr) => zr.id === ownerId);
+      if (!zoneResult) {
+        return HttpResponse.json(
+          {
+            statusCode: 404,
+            message: `El resultado de zona ${ownerId} no existe.`,
+            error: "Not Found",
+            timestamp: new Date().toISOString(),
+            path: "/api/evidence",
+          },
+          { status: 404 },
+        );
+      }
+    }
+
+    const rawNameFromForm = formData.get("fileName");
+    const fileObjName = (file as { name?: string }).name;
+    const fileName =
+      (typeof rawNameFromForm === "string" && rawNameFromForm.trim() ? rawNameFromForm : null) ||
+      (fileObjName && fileObjName !== "blob" ? fileObjName : null) ||
+      "archivo";
+    const sanitizedFilename = sanitizeFilename(fileName, mimeType);
+
+    const attachment: Attachment = {
+      id: `att-${Math.floor(1000 + Math.random() * 9000)}`,
+      url: `/mock/evidence/${sanitizedFilename}`,
+      filename: sanitizedFilename,
+      contentType: mimeType,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    if (parsedOwnerType.data === "ZONE_RESULT") {
+      addAttachmentToZoneResult(ownerId, attachment);
+    }
+
+    evidenceCache.set(cacheKey, attachment);
+
+    return HttpResponse.json(attachment, { status: 201 });
   }),
   http.post("*/api/session/logout", () => new HttpResponse(null, { status: 200 })),
 ];

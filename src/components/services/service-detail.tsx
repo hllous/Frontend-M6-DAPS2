@@ -17,12 +17,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { checkServiceWindowTiming, type Service } from "@/lib/services";
 import { FlagBadge, StatusBadge } from "./status-badge";
+import { ZoneExecutionPanel } from "./zone-execution-panel";
 
 export function ServiceDetail({
   service,
   onBack,
   onAssignCrew,
   onStartService,
+  onServiceUpdated,
   canStartService = false,
   isStarting = false,
   startError = null,
@@ -32,6 +34,7 @@ export function ServiceDetail({
   onBack: () => void;
   onAssignCrew?: (service: Service) => void;
   onStartService?: (service: Service) => void | Promise<void>;
+  onServiceUpdated?: (service: Service) => void;
   canStartService?: boolean;
   isStarting?: boolean;
   startError?: string | null;
@@ -260,6 +263,17 @@ export function ServiceDetail({
                 {service.notes}
               </p>
             </div>
+          )}
+
+          {/* Zone Execution Workflow (Available for IN_PROGRESS and closed services) */}
+          {(service.status === "IN_PROGRESS" ||
+            service.status === "COMPLETED" ||
+            service.status === "PARTIALLY_COMPLETED") && (
+            <ZoneExecutionPanel
+              service={service}
+              canExecute={canStartService}
+              onServiceUpdated={onServiceUpdated}
+            />
           )}
         </main>
 
