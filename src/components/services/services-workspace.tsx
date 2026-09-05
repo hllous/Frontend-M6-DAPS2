@@ -14,6 +14,7 @@ import {
   FilterX,
   LayoutList,
   Map as MapIcon,
+  Plus,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -32,10 +33,12 @@ import {
   ServiceRequestError,
   servicesAdapter,
   type Service,
+  type ServiceOrigin,
   type ServiceStatus,
 } from "@/lib/services";
 import { cn } from "@/lib/utils";
 import { MapView } from "./map-view";
+import { ScheduleServiceDialog } from "./schedule-service-dialog";
 import { ServiceDetail } from "./service-detail";
 import { ServicePreview } from "./service-preview";
 import {
@@ -119,6 +122,26 @@ export function ServicesWorkspace({
   const [selectedId, setSelectedId] = useState<string | null>(() => getParam("selected"));
   const [detailId, setDetailId] = useState<string | null>(() => getParam("detail"));
 
+  // Scheduling modal state
+  const [isScheduleOpen, setIsScheduleOpen] = useState<boolean>(() => {
+    return getParam("action") === "schedule";
+  });
+  const [scheduleOrigin, setScheduleOrigin] = useState<ServiceOrigin | undefined>(() => {
+    const orig = getParam("origin");
+    return orig && ["PLANNED", "TICKET", "WEATHER_ALERT", "INSPECTION", "MANUAL"].includes(orig)
+      ? (orig as ServiceOrigin)
+      : undefined;
+  });
+  const [scheduleReferenceId, setScheduleReferenceId] = useState<string | undefined>(() => {
+    return (
+      getParam("referenceId") ??
+      getParam("ticketId") ??
+      getParam("inspectionId") ??
+      getParam("weatherAlertId") ??
+      undefined
+    );
+  });
+
   // Layout presentation
   const [mapSide, setMapSide] = useState<"left" | "right">(() => {
     return getParam("mapSide") === "left" ? "left" : "right";
@@ -199,6 +222,12 @@ export function ServicesWorkspace({
     if (columnFilters.timeFrom) newParams.set("timeFrom", columnFilters.timeFrom);
     if (columnFilters.timeTo) newParams.set("timeTo", columnFilters.timeTo);
 
+    if (isScheduleOpen) {
+      newParams.set("action", "schedule");
+      if (scheduleOrigin) newParams.set("origin", scheduleOrigin);
+      if (scheduleReferenceId) newParams.set("referenceId", scheduleReferenceId);
+    }
+
     const newQuery = newParams.toString();
     const newUrl = `${url.pathname}${newQuery ? `?${newQuery}` : ""}`;
     window.history.replaceState(null, "", newUrl);
@@ -211,6 +240,9 @@ export function ServicesWorkspace({
     mapSide,
     mobileTab,
     columnFilters,
+    isScheduleOpen,
+    scheduleOrigin,
+    scheduleReferenceId,
   ]);
 
   // Client-side filtering of loaded services
@@ -300,6 +332,29 @@ export function ServicesWorkspace({
     });
   }, []);
 
+  const handleScheduleOpenChange = useCallback((open: boolean) => {
+    setIsScheduleOpen(open);
+    if (!open) {
+      setScheduleOrigin(undefined);
+      setScheduleReferenceId(undefined);
+    }
+  }, []);
+
+  const handleServiceCreated = useCallback((newService: Service) => {
+    setLoadState((prev) => {
+      if (prev.status !== "ready") return prev;
+      return {
+        ...prev,
+        services: [newService, ...prev.services],
+      };
+    });
+    setSearch("");
+    setSelectedId(newService.id);
+    setIsScheduleOpen(false);
+    setScheduleOrigin(undefined);
+    setScheduleReferenceId(undefined);
+  }, []);
+
   const hasActiveFilters =
     Boolean(search.trim()) ||
     columnFilters.zones.size > 0 ||
@@ -362,6 +417,21 @@ export function ServicesWorkspace({
                 <span>Limpiar filtros</span>
               </Button>
             )}
+
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                setScheduleOrigin(undefined);
+                setScheduleReferenceId(undefined);
+                setIsScheduleOpen(true);
+              }}
+              className="text-xs font-semibold gap-1.5 shrink-0"
+              aria-label="Programar nuevo servicio"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden />
+              <span>Programar servicio</span>
+            </Button>
           </div>
         </div>
       </header>
@@ -585,6 +655,15 @@ export function ServicesWorkspace({
           )}
         </div>
       )}
+
+      {/* Schedule Service Dialog (Generic & Linked-create) */}
+      <ScheduleServiceDialog
+        open={isScheduleOpen}
+        onOpenChange={handleScheduleOpenChange}
+        onCreated={handleServiceCreated}
+        initialOrigin={scheduleOrigin}
+        initialReferenceId={scheduleReferenceId}
+      />
     </div>
   );
 }

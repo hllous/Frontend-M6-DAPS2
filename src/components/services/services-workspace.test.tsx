@@ -190,4 +190,46 @@ describe("ServicesWorkspace component", () => {
 
     expect(screen.getByRole("button", { name: /Intercambiar paneles: colocar mapa a la derecha/ })).toBeInTheDocument();
   });
+
+  it("opens scheduling dialog, creates a new service, and appears immediately in the table without reload", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+
+    // Click "Programar servicio" button
+    const openBtn = screen.getByRole("button", { name: "Programar nuevo servicio" });
+    await user.click(openBtn);
+
+    // Dialog opens
+    expect(await screen.findByRole("heading", { name: "Programar nuevo servicio" })).toBeInTheDocument();
+
+    // Select Route 1
+    const routeSelect = screen.getByLabelText(/Recorrido asignado/);
+    await user.selectOptions(routeSelect, "route-1");
+
+    // Submit form
+    const submitBtn = screen.getByRole("button", { name: "Programar servicio" });
+    await user.click(submitBtn);
+
+    // Dialog closes and new service appears in table
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Programar nuevo servicio" })).not.toBeInTheDocument();
+    });
+
+    const table = screen.getByRole("region", { name: "Tabla operativa de Servicios" });
+    expect(table).toBeInTheDocument();
+    // Preview opens for the newly scheduled service
+    expect(await screen.findByRole("complementary")).toBeInTheDocument();
+    expect(screen.getByRole("complementary")).toHaveTextContent("Sin asignar");
+  });
+
+  it("opens scheduling dialog via linked URL parameters prefilling origin and reference ID", async () => {
+    window.history.replaceState(null, "", "/app?destination=services&action=schedule&origin=TICKET&referenceId=TK-9921");
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByRole("heading", { name: "Programar servicio vinculado" })).toBeInTheDocument();
+    expect(screen.getByText("Origen vinculado preservado")).toBeInTheDocument();
+    expect(screen.getByText("TK-9921")).toBeInTheDocument();
+  });
 });
