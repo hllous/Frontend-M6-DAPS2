@@ -145,9 +145,8 @@ function AssignCrewForm({
   const selectedVehicle = VEHICLE_CATALOG.find((v) => v.id === vehicleId);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-[var(--color-border)] bg-[var(--color-surface)] sm:max-w-2xl">
-        <DialogHeader className="border-b border-[var(--color-border)] p-6 pb-4 bg-[var(--color-canvas)]">
+    <>
+      <DialogHeader className="border-b border-[var(--color-border)] p-6 pb-4 bg-[var(--color-canvas)]">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
             <Users className="h-4 w-4 text-[var(--color-action)]" aria-hidden />
             <span>Despacho y asignación operativa</span>
@@ -220,7 +219,7 @@ function AssignCrewForm({
           </div>
         </div>
 
-        <form id={formId} onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form id={formId} noValidate onSubmit={handleSubmit} className="p-6 space-y-6">
           {errorMessage && (
             <div className="flex items-start gap-2.5 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-xs text-[var(--color-danger)]" role="alert">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
@@ -369,7 +368,6 @@ function AssignCrewForm({
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </>
   );
 }
