@@ -38,6 +38,7 @@ import {
 import type { Capability, OperationalScenario } from "@/lib/scenarios";
 
 import styles from "./app-shell.module.css";
+import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ZonesPanel } from "./zones-panel";
 
 type Destination = "work" | "services" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
@@ -74,12 +75,25 @@ function actorLabel(scenario: OperationalScenario) {
 }
 
 export function AppShell({ scenario, logoutAction }: { scenario: OperationalScenario; logoutAction?: LogoutAction }) {
-  const [destination, setDestination] = useState<Destination>("work");
+  const [destination, setDestination] = useState<Destination>(() => {
+    if (typeof window !== "undefined") {
+      const urlDest = new URLSearchParams(window.location.search).get("destination") as Destination | null;
+      if (urlDest && navigation.some((item) => item.id === urlDest)) {
+        return urlDest;
+      }
+    }
+    return "work";
+  });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const availableItems = navigation.filter((item) => isAllowed(item, scenario));
 
   const selectDestination = (next: Destination) => {
     setDestination(next);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("destination", next);
+      window.history.replaceState(null, "", url.toString());
+    }
   };
 
   return (
@@ -134,6 +148,8 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
       <main className={styles.main} id="contenido-principal" tabIndex={-1}>
         {destination === "work" ? (
           <WorkPanel scenario={scenario} />
+        ) : destination === "services" ? (
+          <ServicesWorkspace scenario={scenario} />
         ) : destination === "catalog" ? (
           <ZonesPanel />
         ) : (

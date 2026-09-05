@@ -1,0 +1,193 @@
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { setupServer } from "msw/node";
+
+import { handlers } from "@/mocks/handlers";
+import { scenarios } from "@/lib/scenarios";
+import { ServicesWorkspace } from "./services-workspace";
+
+const server = setupServer(...handlers);
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+  window.history.replaceState(null, "", "/app");
+});
+afterAll(() => server.close());
+
+describe("ServicesWorkspace component", () => {
+  it("renders the services workspace with heading, search, table and map", async () => {
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    expect(screen.getByRole("heading", { name: "Servicios Urbanos" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Buscar servicio, zona o cuadrilla…")).toBeInTheDocument();
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    expect(table).toBeInTheDocument();
+    expect(within(table).getByText("Recolección de residuos — Recorrido 4")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Mapa territorial de Servicios" })).toBeInTheDocument();
+  });
+
+  it("synchronizes table selection with map marker and opens live preview", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = within(table).getByText("Recolección de residuos — Recorrido 4").closest("tr")!;
+    await user.click(row);
+
+    // Live preview opens
+    await waitFor(() => {
+      expect(screen.getByRole("complementary")).toBeInTheDocument();
+    });
+    const preview = screen.getByRole("complementary");
+    expect(within(preview).getByText("Recolección de residuos — Recorrido 4")).toBeInTheDocument();
+    expect(within(preview).getByRole("button", { name: /Ver detalle completo/ })).toBeInTheDocument();
+
+    // Map marker is highlighted
+    const marker = screen.getByRole("button", { name: /Parada 1: SVC-1042/ });
+    expect(marker).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("synchronizes map marker selection with table and opens preview", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const marker = screen.getByRole("button", { name: /SVC-1043/ });
+    await user.click(marker);
+
+    // Preview opened
+    await waitFor(() => {
+      expect(screen.getByRole("complementary")).toBeInTheDocument();
+    });
+    const preview = screen.getByRole("complementary");
+    expect(within(preview).getByText("Poda de árbol — Av. Rivadavia 2200")).toBeInTheDocument();
+
+    // Corresponding table row is selected
+    const table = screen.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = within(table).getByText("Poda de árbol — Av. Rivadavia 2200").closest("tr")!;
+    expect(row).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("navigates to full detail only on explicit action, never automatically", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = within(table).getByText("Recolección de residuos — Recorrido 4").closest("tr")!;
+    await user.click(row);
+
+    // Live preview is visible, but NOT full detail yet
+    expect(screen.queryByRole("region", { name: /Detalle completo de SVC-1042/ })).not.toBeInTheDocument();
+
+    // Click explicit button "Ver detalle completo"
+    const detailBtn = screen.getByRole("button", { name: /Ver detalle completo/ });
+    await user.click(detailBtn);
+
+    // Now full detail is rendered
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "Detalle completo de SVC-1042" })).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Volver a Servicios" })).toBeInTheDocument();
+    expect(screen.getByText("ID: crew-a")).toBeInTheDocument();
+
+    // Go back to workspace
+    await user.click(screen.getByRole("button", { name: "Volver a Servicios" }));
+    expect(screen.getByRole("region", { name: "Tabla operativa de Servicios" })).toBeInTheDocument();
+  });
+
+  it("operates map markers using keyboard Enter and Space", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const marker = screen.getByRole("button", { name: /Parada 1: SVC-1042/ });
+    marker.focus();
+    expect(marker).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    await waitFor(() => {
+      expect(screen.getByRole("complementary")).toBeInTheDocument();
+    });
+    expect(marker).toHaveAttribute("aria-pressed", "true");
+
+    const marker2 = screen.getByRole("button", { name: /SVC-1043/ });
+    marker2.focus();
+    await user.keyboard(" ");
+    await waitFor(() => {
+      const preview = screen.getByRole("complementary");
+      expect(within(preview).getByText("Poda de árbol — Av. Rivadavia 2200")).toBeInTheDocument();
+    });
+    expect(marker2).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("filters services by global search query", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    expect(within(table).getByText("Recolección de residuos — Recorrido 4")).toBeInTheDocument();
+
+    const searchInput = screen.getByPlaceholderText("Buscar servicio, zona o cuadrilla…");
+    fireEvent.change(searchInput, { target: { value: "microbasural" } });
+
+    await waitFor(() => {
+      expect(within(table).getByText("Denuncia — acumulación de residuos en microbasural")).toBeInTheDocument();
+      expect(within(table).queryByText("Recolección de residuos — Recorrido 4")).not.toBeInTheDocument();
+    });
+
+    // Clear search with the clear button
+    const clearBtn = screen.getByRole("button", { name: "Borrar búsqueda" });
+    await user.click(clearBtn);
+
+    await waitFor(() => {
+      expect(within(table).getByText("Recolección de residuos — Recorrido 4")).toBeInTheDocument();
+    });
+  });
+
+  it("sorts by lifecycle-aware status and service columns", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    expect(within(table).getByText("Recolección de residuos — Recorrido 4")).toBeInTheDocument();
+
+    // Status sort button
+    const statusSortBtn = within(table).getByRole("button", { name: /Ordenar por Estado/ });
+    await user.click(statusSortBtn); // toggles to desc
+
+    const rowsDesc = within(table).getAllByRole("row");
+    expect(rowsDesc.length).toBeGreaterThan(1);
+
+    // Sort by service name
+    const serviceSortBtn = within(table).getByRole("button", { name: /Ordenar por Servicio/ });
+    await user.click(serviceSortBtn);
+    expect(serviceSortBtn).toHaveAttribute("aria-label", expect.stringContaining("ascending"));
+  });
+
+  it("remains fully usable and functional when the map encounters an outage", async () => {
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} initialMapError={true} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    expect(within(table).getByText("Recolección de residuos — Recorrido 4")).toBeInTheDocument();
+
+    // Map shows error fallback
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("No se pudo cargar el mapa")).toBeInTheDocument();
+    expect(screen.getByText(/La tabla de servicios permanece completamente disponible/)).toBeInTheDocument();
+  });
+
+  it("swaps sides between map and table in wide split-pane mode", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const swapBtn = screen.getByRole("button", { name: /Intercambiar paneles: colocar mapa a la izquierda/ });
+    await user.click(swapBtn);
+
+    expect(screen.getByRole("button", { name: /Intercambiar paneles: colocar mapa a la derecha/ })).toBeInTheDocument();
+  });
+});
