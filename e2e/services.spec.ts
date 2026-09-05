@@ -384,4 +384,129 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     // Preview reflects "En curso"
     await expect(preview.getByText("En curso").first()).toBeVisible();
   });
+
+  test("Crew Leader records zone results out-of-order, uploads evidence with canonical reflection, completes service with backend rollup, and verifies mobile disclosure", async ({ page }) => {
+    // 1. Crew Leader logs in to Field view and starts SVC-1055
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await loginViaApi(page, "field-crew-leader-route");
+    await page.goto("/app");
+
+    const card1055 = page.locator("li").filter({ hasText: "SVC-1055" });
+    await expect(card1055).toBeVisible();
+    await card1055.getByRole("button", { name: "Iniciar servicio" }).click();
+    await expect(card1055.getByText("En curso")).toBeVisible();
+
+    // 2. Open detail view
+    await card1055.getByRole("button", { name: "Ver detalle" }).click();
+    const detailRegion = page.getByRole("region", { name: /Detalle completo de SVC-1055/i });
+    await expect(detailRegion).toBeVisible();
+
+    // Zone execution panel is rendered
+    const zonePanel = page.getByRole("region", { name: "Registro de ejecución de zonas" });
+    await expect(zonePanel).toBeVisible();
+
+    // Completion button is initially disabled because 0/2 zones are recorded
+    const completeButton = zonePanel.getByRole("button", { name: "Completar servicio" });
+    await expect(completeButton).toBeDisabled();
+    await expect(zonePanel.getByText("Pendiente: 2 de 2 zona(s)")).toBeVisible();
+
+    // 3. Desktop multi-zone navigation: record ROUTE zones in ANY order (record Zona Norte first!)
+    const navAside = zonePanel.locator("aside[aria-label='Navegación de zonas del servicio']");
+    await expect(navAside).toBeVisible();
+
+    // Click Zona Norte in sidebar
+    await navAside.getByRole("button", { name: /Zona Norte/i }).click();
+
+    // Fill notes and record clean SERVICED result
+    const notesInput = zonePanel.locator("#zone-notes");
+    await notesInput.fill("Barrido completado en calzada norte sin novedades.");
+
+    // Submit zone result
+    await zonePanel.getByRole("button", { name: "Guardar resultado de zona" }).click();
+
+    // Zona Norte is recorded as Atendida
+    await expect(navAside.locator("li").filter({ hasText: "Zona Norte" }).getByText("Atendida")).toBeVisible();
+    // Completion button is still disabled (1/2 zones recorded)
+    await expect(completeButton).toBeDisabled();
+    await expect(zonePanel.getByText("Pendiente: 1 de 2 zona(s)")).toBeVisible();
+
+    // 4. Record Zona Centro as PARTIAL with required exception reason and evidence upload
+    await navAside.getByRole("button", { name: /Zona Centro/i }).click();
+
+    // Select Parcial via label
+    await zonePanel.locator("label", { hasText: "Parcial" }).click();
+
+    // Select required exception reason
+    const reasonSelect = zonePanel.locator("#zone-reason-select");
+    await expect(reasonSelect).toBeVisible();
+    await reasonSelect.selectOption("BLOCKED_ACCESS");
+
+    // Add operational notes
+    await notesInput.fill("Corte total por obras de repavimentación en Bulevar.");
+
+    // Upload evidence file with raw un-sanitized local filename
+    const fileInput = page.locator("#evidence-input");
+    await fileInput.setInputFiles({
+      name: "Foto Corte Repavimentacion (Obra).jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("fake-evidence-image-data"),
+    });
+
+    // Local filename is visible before submission
+    await expect(zonePanel.getByText("Foto Corte Repavimentacion (Obra).jpg")).toBeVisible();
+
+    // Submit zone result
+    await zonePanel.getByRole("button", { name: "Guardar resultado de zona" }).click();
+
+    // Evidence file switches to Backend's sanitized canonical filename
+    await expect(zonePanel.getByText("foto_corte_repavimentacion_obra.jpg")).toBeVisible();
+
+    // Both zones are now recorded
+    await expect(zonePanel.getByText("Todas las zonas registradas. Listo para finalizar.")).toBeVisible();
+    await expect(completeButton).toBeEnabled();
+
+    // 5. Invoke completion action (sent with no body) and verify Backend-computed PARTIALLY_COMPLETED
+    await completeButton.click();
+
+    // Backend-computed status is rendered as-is (Parcial)
+    await expect(zonePanel.getByText(/Servicio finalizado con estado: Parcial \(PARTIALLY_COMPLETED\)/i)).toBeVisible();
+    // Header badge updates to Parcial
+    await expect(detailRegion.getByText("Parcial").first()).toBeVisible();
+
+    // 6. Test mobile disclosure and focus restoration on narrow viewport
+    await page.setViewportSize(NARROW_VIEWPORT);
+    const mobileToggle = page.locator("button[aria-controls='mobile-zone-nav']");
+    await expect(mobileToggle).toBeVisible();
+    await expect(mobileToggle).toHaveAttribute("aria-expanded", "false");
+
+    // Click to open mobile navigation
+    await mobileToggle.click();
+    await expect(mobileToggle).toHaveAttribute("aria-expanded", "true");
+    const mobileNavList = page.locator("#mobile-zone-nav");
+    await expect(mobileNavList).toBeVisible();
+
+    // Click again to close and verify focus returns to mobileToggle
+    await mobileToggle.click();
+    await expect(mobileToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(mobileNavList).not.toBeVisible();
+    await expect(mobileToggle).toBeFocused();
+
+    // 7. Verify cross-view reflection in Office workspace
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=services");
+
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const serviceRow = table.getByRole("row", { name: /SVC-1055/ });
+    await expect(serviceRow).toBeVisible();
+    // Table row reflects Backend-computed "Parcial"
+    await expect(serviceRow.getByText("Parcial")).toBeVisible();
+
+    // Click row to open preview
+    await serviceRow.click();
+    const preview = page.locator("aside[aria-labelledby='preview-title']");
+    await expect(preview).toBeVisible();
+    await expect(preview.getByText("SVC-1055")).toBeVisible();
+    await expect(preview.getByText("Parcial").first()).toBeVisible();
+  });
 });
