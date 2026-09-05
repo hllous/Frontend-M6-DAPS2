@@ -1,6 +1,6 @@
 import type { Service, ServiceQuery } from "./services";
 
-export const serviceFixtures: Service[] = [
+const INITIAL_SERVICE_FIXTURES: Service[] = [
   {
     id: "SVC-1042",
     serviceTypeId: "st-waste-route",
@@ -316,6 +316,16 @@ export const serviceFixtures: Service[] = [
     ],
   },
 ];
+
+export const serviceFixtures: Service[] = [...INITIAL_SERVICE_FIXTURES];
+
+export function addServiceFixture(service: Service): void {
+  serviceFixtures.unshift(service);
+}
+
+export function resetServiceFixtures(): void {
+  serviceFixtures.splice(0, serviceFixtures.length, ...INITIAL_SERVICE_FIXTURES);
+}
 
 export const EMPTY_SERVICES_QUERY: ServiceQuery = { search: "zzz-sin-servicios" };
 

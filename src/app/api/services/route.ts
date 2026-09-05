@@ -1,12 +1,27 @@
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
-import { filterServiceFixtures, paginateServiceFixtures } from "@/lib/services-fixtures";
-import type { ServiceMode, ServiceOrigin, ServiceQuery, ServiceStatus } from "@/lib/services";
+import {
+  addServiceFixture,
+  filterServiceFixtures,
+  paginateServiceFixtures,
+} from "@/lib/services-fixtures";
+import {
+  createServiceInputSchema,
+  ROUTE_CATALOG,
+  SERVICE_TYPE_CATALOG,
+  type Service,
+  type ServiceMode,
+  type ServiceOrigin,
+  type ServiceQuery,
+  type ServiceStatus,
+} from "@/lib/services";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { zoneFixtures } from "@/lib/zones-fixtures";
 
 const ERROR_LABELS: Record<number, string> = {
+  400: "Bad Request",
   401: "Unauthorized",
   403: "Forbidden",
   503: "Service Unavailable",
@@ -99,5 +114,93 @@ export async function GET(request: Request) {
       return errorResponse(503, error.message, path);
     }
     return errorResponse(500, "No se pudieron cargar los servicios.", path);
+  }
+}
+
+export async function POST(request: Request) {
+  const path = new URL(request.url).pathname;
+
+  try {
+    const session = getRequiredSession(request);
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
+    }
+
+    const parsed = createServiceInputSchema.safeParse(body);
+    if (!parsed.success) {
+      const message = parsed.error.issues.map((issue) => issue.message).join(" ");
+      return errorResponse(400, message, path);
+    }
+
+    const input = parsed.data;
+
+    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+      const backendResponse = await fetchBackend(request, "/services", undefined, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const bodyText = await backendResponse.text();
+      return new NextResponse(bodyText, {
+        status: backendResponse.status,
+        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
+      });
+    }
+
+    const serviceType = SERVICE_TYPE_CATALOG.find((t) => t.id === input.serviceTypeId);
+    const mode = serviceType ? serviceType.mode : (input.routeId ? "ROUTE" : "POINT");
+    const route = input.routeId ? ROUTE_CATALOG.find((r) => r.id === input.routeId) : null;
+    const zoneNames = input.zoneIds.map((zid) => {
+      const z = zoneFixtures.find((zone) => zone.id === zid);
+      return z ? z.name : zid;
+    });
+
+    const newService: Service = {
+      id: `SVC-${Math.floor(1000 + Math.random() * 9000)}`,
+      serviceTypeId: input.serviceTypeId,
+      serviceTypeName: serviceType?.name ?? "Servicio urbano",
+      title: input.title || `${serviceType?.name ?? "Servicio"} — ${route?.name ?? input.targetRef ?? "Programado"}`,
+      mode,
+      status: "SCHEDULED",
+      statusReason: null,
+      origin: input.origin,
+      zoneIds: [...input.zoneIds],
+      zoneNames,
+      routeId: input.routeId ?? null,
+      routeName: route?.name ?? null,
+      targetType: input.targetType ?? null,
+      targetId: input.targetId ?? null,
+      targetRef: input.targetRef ?? null,
+      scheduledDate: input.scheduledDate,
+      windowFrom: input.timeWindow.start,
+      windowTo: input.timeWindow.end,
+      crewId: null,
+      crewName: null,
+      vehicleId: null,
+      vehiclePlate: null,
+      ticketId: input.origin === "TICKET" ? (input.ticketId ?? null) : null,
+      notes: input.notes ?? null,
+      flag: null,
+      coordinates: { x: 50, y: 50 },
+      history: [{ label: "Programado", at: new Date().toISOString().slice(0, 16).replace("T", " "), done: true }],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    addServiceFixture(newService);
+    return NextResponse.json(newService, { status: 201 });
+  } catch (error) {
+    if (error instanceof InvalidSessionError) {
+      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
+      return errorResponse(401, "La sesión no está activa.", path);
+    }
+    if (error instanceof AuthUnavailableError) {
+      return errorResponse(503, error.message, path);
+    }
+    return errorResponse(500, "No se pudo programar el servicio.", path);
   }
 }

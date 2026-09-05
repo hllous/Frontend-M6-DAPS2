@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
 import { ServiceRequestError, servicesAdapter } from "@/lib/services";
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -88,5 +88,120 @@ describe("authenticated services BFF route", () => {
     );
     const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
     expect(new Headers(requestInit.headers).get("Authorization")).toMatch(/^Bearer /);
+  });
+
+  it("POST requires an active session", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/services", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          serviceTypeId: "st-waste-route",
+          origin: "PLANNED",
+          zoneIds: ["zone-1"],
+          scheduledDate: "2026-09-10",
+          timeWindow: { start: "08:00", end: "12:00" },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it("POST rejects malformed or invalid input with 400", async () => {
+    const cookie = await authenticatedCookie("office-duty-queue");
+    const response = await POST(
+      new Request("http://localhost/api/services", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          serviceTypeId: "st-waste-route",
+          origin: "PLANNED",
+          zoneIds: [], // invalid: min 1
+          scheduledDate: "invalid-date",
+          timeWindow: { start: "08:00", end: "12:00" },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("Bad Request");
+  });
+
+  it("POST schedules a new unassigned service in mock mode and returns 201", async () => {
+    const cookie = await authenticatedCookie("office-duty-queue");
+    const response = await POST(
+      new Request("http://localhost/api/services", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          serviceTypeId: "st-waste-route",
+          origin: "PLANNED",
+          routeId: "route-4",
+          zoneIds: ["zone-1"],
+          scheduledDate: "2026-09-12",
+          timeWindow: { start: "09:00", end: "13:00" },
+          notes: "Recolección matutina",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    const created = await response.json();
+    expect(created.id).toMatch(/^SVC-/);
+    expect(created.status).toBe("SCHEDULED");
+    expect(created.mode).toBe("ROUTE");
+    expect(created.crewId).toBeNull();
+    expect(created.vehicleId).toBeNull();
+    expect(created.zoneIds).toEqual(["zone-1"]);
+    expect(created.notes).toBe("Recolección matutina");
+  });
+
+  it("POST forwards to backend in backend-development mode", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "SVC-8888",
+          serviceTypeId: "st-waste-route",
+          serviceTypeName: "Recolección",
+          title: "Recolección",
+          mode: "ROUTE",
+          status: "SCHEDULED",
+          origin: "PLANNED",
+          zoneIds: ["zone-1"],
+          scheduledDate: "2026-09-12",
+          windowFrom: "08:00",
+          windowTo: "12:00",
+          crewId: null,
+          vehicleId: null,
+        }),
+        { status: 201, headers: { "content-type": "application/json" } },
+      ),
+    );
+    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const response = await POST(
+      new Request("http://localhost/api/services", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          serviceTypeId: "st-waste-route",
+          origin: "PLANNED",
+          zoneIds: ["zone-1"],
+          scheduledDate: "2026-09-12",
+          timeWindow: { start: "08:00", end: "12:00" },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(backendFetch).toHaveBeenCalledWith(
+      new URL("/services", "https://backend.internal"),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.any(Headers),
+      }),
+    );
   });
 });

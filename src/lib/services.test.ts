@@ -96,4 +96,144 @@ describe("services adapter", () => {
       { name: "request_network_failure", resource: "services" },
     );
   });
+
+  it("creates a new unassigned ROUTE service and validates the response through the contract", async () => {
+    server.use(
+      http.post("*/api/services", async ({ request }) => {
+        const body = (await request.json()) as any;
+        return HttpResponse.json(
+          {
+            id: "SVC-9999",
+            serviceTypeId: body.serviceTypeId,
+            serviceTypeName: "Recolección de residuos",
+            title: "Recolección de residuos — Recorrido 4",
+            mode: "ROUTE",
+            status: "SCHEDULED",
+            origin: body.origin,
+            zoneIds: body.zoneIds,
+            zoneNames: ["Zona Norte"],
+            routeId: body.routeId,
+            routeName: "Recorrido 4 Norte",
+            scheduledDate: body.scheduledDate,
+            windowFrom: body.timeWindow.start,
+            windowTo: body.timeWindow.end,
+            crewId: null,
+            crewName: null,
+            vehicleId: null,
+            vehiclePlate: null,
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const created = await servicesAdapter.create({
+      serviceTypeId: "st-waste-route",
+      origin: "PLANNED",
+      routeId: "route-4",
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-10",
+      timeWindow: { start: "08:00", end: "12:00" },
+      notes: "Turno mañana",
+    });
+
+    expect(created.id).toBe("SVC-9999");
+    expect(created.status).toBe("SCHEDULED");
+    expect(created.mode).toBe("ROUTE");
+    expect(created.crewId).toBeNull();
+    expect(created.vehicleId).toBeNull();
+    expect(created.zoneIds).toEqual(["zone-1"]);
+  });
+
+  it("creates a new unassigned POINT service linked to a ticket", async () => {
+    server.use(
+      http.post("*/api/services", async ({ request }) => {
+        const body = (await request.json()) as any;
+        return HttpResponse.json(
+          {
+            id: "SVC-9998",
+            serviceTypeId: body.serviceTypeId,
+            serviceTypeName: "Mantenimiento de contenedores",
+            title: "Reparación de contenedor CT-0442",
+            mode: "POINT",
+            status: "SCHEDULED",
+            origin: body.origin,
+            ticketId: body.ticketId,
+            zoneIds: body.zoneIds,
+            zoneNames: ["Zona Norte"],
+            targetType: body.targetType,
+            targetRef: body.targetRef,
+            scheduledDate: body.scheduledDate,
+            windowFrom: body.timeWindow.start,
+            windowTo: body.timeWindow.end,
+            crewId: null,
+            crewName: null,
+            vehicleId: null,
+            vehiclePlate: null,
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const created = await servicesAdapter.create({
+      serviceTypeId: "st-container-repair",
+      origin: "TICKET",
+      ticketId: "TK-9921",
+      targetType: "CONTAINER",
+      targetRef: "CT-0442",
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-11",
+      timeWindow: { start: "14:00", end: "18:00" },
+    });
+
+    expect(created.id).toBe("SVC-9998");
+    expect(created.mode).toBe("POINT");
+    expect(created.origin).toBe("TICKET");
+    expect(created.ticketId).toBe("TK-9921");
+    expect(created.crewId).toBeNull();
+    expect(created.zoneIds).toEqual(["zone-1"]);
+  });
+
+  it("rejects invalid create input with ServiceContractError before sending request", async () => {
+    // Missing zoneIds
+    await expect(
+      servicesAdapter.create({
+        serviceTypeId: "st-waste-route",
+        origin: "PLANNED",
+        zoneIds: [] as unknown as [string, ...string[]],
+        scheduledDate: "2026-09-10",
+        timeWindow: { start: "08:00", end: "12:00" },
+      }),
+    ).rejects.toBeInstanceOf(ServiceContractError);
+
+    // Origin TICKET without ticketId
+    await expect(
+      servicesAdapter.create({
+        serviceTypeId: "st-waste-route",
+        origin: "TICKET",
+        zoneIds: ["zone-1"],
+        scheduledDate: "2026-09-10",
+        timeWindow: { start: "08:00", end: "12:00" },
+      }),
+    ).rejects.toBeInstanceOf(ServiceContractError);
+  });
+
+  it("fails explicitly when the server response for create is malformed", async () => {
+    server.use(
+      http.post("*/api/services", () =>
+        HttpResponse.json({ broken: true }, { status: 201 }),
+      ),
+    );
+
+    await expect(
+      servicesAdapter.create({
+        serviceTypeId: "st-waste-route",
+        origin: "PLANNED",
+        zoneIds: ["zone-1"],
+        scheduledDate: "2026-09-10",
+        timeWindow: { start: "08:00", end: "12:00" },
+      }),
+    ).rejects.toBeInstanceOf(ServiceContractError);
+  });
 });
