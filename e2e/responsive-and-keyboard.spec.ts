@@ -54,7 +54,7 @@ test.describe("keyboard-only shell operation @smoke", () => {
     await expect(page.locator(":focus")).not.toHaveAttribute("aria-current", "page");
 
     await page.keyboard.press("Enter");
-    await expect(page.getByText("Este destino estará disponible")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
     await expect(page.locator(":focus")).toHaveAttribute("aria-current", "page");
   });
 });

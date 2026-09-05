@@ -38,6 +38,8 @@ import {
 import type { Capability, OperationalScenario } from "@/lib/scenarios";
 
 import styles from "./app-shell.module.css";
+import { FieldWorkPanel } from "@/components/services/field-work-panel";
+import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ZonesPanel } from "./zones-panel";
 
 type Destination = "work" | "services" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
@@ -74,12 +76,25 @@ function actorLabel(scenario: OperationalScenario) {
 }
 
 export function AppShell({ scenario, logoutAction }: { scenario: OperationalScenario; logoutAction?: LogoutAction }) {
-  const [destination, setDestination] = useState<Destination>("work");
+  const [destination, setDestination] = useState<Destination>(() => {
+    if (typeof window !== "undefined") {
+      const urlDest = new URLSearchParams(window.location.search).get("destination") as Destination | null;
+      if (urlDest && navigation.some((item) => item.id === urlDest)) {
+        return urlDest;
+      }
+    }
+    return "work";
+  });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const availableItems = navigation.filter((item) => isAllowed(item, scenario));
 
   const selectDestination = (next: Destination) => {
     setDestination(next);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("destination", next);
+      window.history.replaceState(null, "", url.toString());
+    }
   };
 
   return (
@@ -134,6 +149,8 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
       <main className={styles.main} id="contenido-principal" tabIndex={-1}>
         {destination === "work" ? (
           <WorkPanel scenario={scenario} />
+        ) : destination === "services" ? (
+          <ServicesWorkspace scenario={scenario} />
         ) : destination === "catalog" ? (
           <ZonesPanel />
         ) : (
@@ -223,12 +240,16 @@ function NavigationButton({
 }
 
 function WorkPanel({ scenario }: { scenario: OperationalScenario }) {
+  if (scenario.actor.kind === "FIELD") {
+    return <FieldWorkPanel scenario={scenario} />;
+  }
+
   const mayExecuteService = scenario.capabilities.includes("service:execute");
 
   return (
     <section aria-labelledby="work-title" className={styles.workPanel}>
       <div className={styles.pageHeading}>
-        <p>{scenario.actor.kind === "OFFICE" ? "Priorice y coordine" : "Turno en curso"}</p>
+        <p>Priorice y coordine</p>
         <h1 id="work-title">{scenario.work.title}</h1>
         <span>{scenario.work.summary}</span>
       </div>
@@ -246,17 +267,12 @@ function WorkPanel({ scenario }: { scenario: OperationalScenario }) {
               </Button>
             ) : (
               <span className={styles.workState}>
-                {scenario.actor.kind === "OFFICE" ? "Requiere revisión" : "Solo consulta"}
+                Requiere revisión
               </span>
             )}
           </li>
         ))}
       </ol>
-      {scenario.actor.kind === "FIELD" && !mayExecuteService ? (
-        <p className={styles.permissionNote}>
-          La persona responsable de la cuadrilla registra los cambios de estado del servicio.
-        </p>
-      ) : null}
     </section>
   );
 }
