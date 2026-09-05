@@ -1,37 +1,10 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import "@fontsource-variable/archivo";
 import "./globals.css";
-import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
+export const metadata: Metadata = { title: "M6 — Ambiente e Higiene", description: "Frontend del Módulo 6 — Ambiente, Higiene y Servicios Urbanos. Municipalidad UADE." };
 
-export const metadata: Metadata = {
-  title: "M6 — Ambiente e Higiene",
-  description:
-    "Frontend del Módulo 6 — Ambiente, Higiene y Servicios Urbanos. Municipalidad UADE.",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="es" className={cn("font-sans", geistSans.variable)}>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
-    </html>
-  );
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <html lang="es"><body className="antialiased"><TooltipProvider>{children}</TooltipProvider></body></html>;
 }
