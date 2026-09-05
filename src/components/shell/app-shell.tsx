@@ -38,6 +38,7 @@ import {
 import type { Capability, OperationalScenario } from "@/lib/scenarios";
 
 import styles from "./app-shell.module.css";
+import { FieldWorkPanel } from "@/components/services/field-work-panel";
 import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ZonesPanel } from "./zones-panel";
 
@@ -239,12 +240,16 @@ function NavigationButton({
 }
 
 function WorkPanel({ scenario }: { scenario: OperationalScenario }) {
+  if (scenario.actor.kind === "FIELD") {
+    return <FieldWorkPanel scenario={scenario} />;
+  }
+
   const mayExecuteService = scenario.capabilities.includes("service:execute");
 
   return (
     <section aria-labelledby="work-title" className={styles.workPanel}>
       <div className={styles.pageHeading}>
-        <p>{scenario.actor.kind === "OFFICE" ? "Priorice y coordine" : "Turno en curso"}</p>
+        <p>Priorice y coordine</p>
         <h1 id="work-title">{scenario.work.title}</h1>
         <span>{scenario.work.summary}</span>
       </div>
@@ -262,17 +267,12 @@ function WorkPanel({ scenario }: { scenario: OperationalScenario }) {
               </Button>
             ) : (
               <span className={styles.workState}>
-                {scenario.actor.kind === "OFFICE" ? "Requiere revisión" : "Solo consulta"}
+                Requiere revisión
               </span>
             )}
           </li>
         ))}
       </ol>
-      {scenario.actor.kind === "FIELD" && !mayExecuteService ? (
-        <p className={styles.permissionNote}>
-          La persona responsable de la cuadrilla registra los cambios de estado del servicio.
-        </p>
-      ) : null}
     </section>
   );
 }

@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  AlertTriangle,
   ArrowLeft,
   Calendar,
   Clock,
   FileText,
   MapPin,
+  Play,
   Route,
   ShieldCheck,
   Truck,
@@ -13,18 +15,30 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { Service } from "@/lib/services";
+import { checkServiceWindowTiming, type Service } from "@/lib/services";
 import { FlagBadge, StatusBadge } from "./status-badge";
 
 export function ServiceDetail({
   service,
   onBack,
   onAssignCrew,
+  onStartService,
+  canStartService = false,
+  isStarting = false,
+  startError = null,
+  backLabel = "Volver a Servicios",
 }: {
   service: Service;
   onBack: () => void;
   onAssignCrew?: (service: Service) => void;
+  onStartService?: (service: Service) => void | Promise<void>;
+  canStartService?: boolean;
+  isStarting?: boolean;
+  startError?: string | null;
+  backLabel?: string;
 }) {
+  const windowTiming = checkServiceWindowTiming(service);
+
   return (
     <div className="flex h-full flex-col bg-[var(--color-surface)] overflow-hidden" role="region" aria-label={`Detalle completo de ${service.id}`}>
       <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-3 bg-[var(--color-canvas)]">
@@ -35,9 +49,21 @@ export function ServiceDetail({
           className="gap-1.5 text-xs font-semibold"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
-          Volver a Servicios
+          {backLabel}
         </Button>
         <div className="flex items-center gap-3">
+          {canStartService && onStartService && service.status === "SCHEDULED" && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => onStartService(service)}
+              disabled={isStarting}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <Play className="h-3.5 w-3.5" aria-hidden />
+              <span>{isStarting ? "Iniciando..." : "Iniciar servicio"}</span>
+            </Button>
+          )}
           {onAssignCrew && (service.status === "SCHEDULED" || service.status === "RESCHEDULED") && (
             <Button
               variant="default"
@@ -48,6 +74,11 @@ export function ServiceDetail({
               <Users className="h-3.5 w-3.5" aria-hidden />
               <span>{service.crewId ? "Reasignar cuadrilla" : "Asignar cuadrilla"}</span>
             </Button>
+          )}
+          {!canStartService && (
+            <span className="text-xs font-medium text-[var(--color-text-secondary)]">
+              Solo consulta
+            </span>
           )}
           <span className="text-xs font-medium text-[var(--color-text-secondary)]">
             {service.id} · Detalle operativo
@@ -96,6 +127,36 @@ export function ServiceDetail({
               </h3>
               <p className="mt-1 text-sm text-[var(--color-warning)]">
                 {service.statusReason}
+              </p>
+            </div>
+          )}
+
+          {service.status === "SCHEDULED" && canStartService && windowTiming.isOutside && (
+            <div
+              role="status"
+              className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-warning)] uppercase tracking-wide">
+                <AlertTriangle className="h-4 w-4" aria-hidden />
+                Aviso: Inicio fuera de ventana horaria
+              </div>
+              <p className="mt-1 text-sm text-[var(--color-warning)]">
+                {windowTiming.message}
+              </p>
+            </div>
+          )}
+
+          {startError && (
+            <div
+              role="alert"
+              className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/50 p-4"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-danger)] uppercase tracking-wide">
+                <AlertTriangle className="h-4 w-4" aria-hidden />
+                Error al iniciar servicio
+              </div>
+              <p className="mt-1 text-sm text-[var(--color-danger)]">
+                {startError}
               </p>
             </div>
           )}

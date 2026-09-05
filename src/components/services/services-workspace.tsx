@@ -34,6 +34,7 @@ import {
   servicesAdapter,
   type Service,
   type ServiceOrigin,
+  type ServiceQuery,
   type ServiceStatus,
 } from "@/lib/services";
 import { cn } from "@/lib/utils";
@@ -176,7 +177,11 @@ export function ServicesWorkspace({
     async function load() {
       setLoadState({ status: "loading" });
       try {
-        const page = await servicesAdapter.list({ pageSize: 100 });
+        const query: ServiceQuery = { pageSize: 100 };
+        if (scenario?.actor.kind === "FIELD" && scenario.actor.crewId) {
+          query.crewId = scenario.actor.crewId;
+        }
+        const page = await servicesAdapter.list(query);
         if (isCurrent) setLoadState({ status: "ready", services: page.services });
       } catch (cause) {
         if (!isCurrent) return;
@@ -191,7 +196,7 @@ export function ServicesWorkspace({
     return () => {
       isCurrent = false;
     };
-  }, [reloadVersion]);
+  }, [reloadVersion, scenario]);
 
   // Compute filter fingerprint to trigger map bounds fit only when filters change
   const filterFingerprint = useMemo(() => {
@@ -383,6 +388,26 @@ export function ServicesWorkspace({
     setAssigningServiceId(null);
   }, []);
 
+  const isField = scenario?.actor.kind === "FIELD";
+  const canAssignCrew = !isField;
+  const canSchedule = !isField;
+  const canExecuteService = Boolean(scenario?.capabilities.includes("service:execute"));
+
+  const handleStartService = useCallback(async (service: Service) => {
+    try {
+      const updated = await servicesAdapter.start(service.id);
+      setLoadState((prev) => {
+        if (prev.status !== "ready") return prev;
+        return {
+          ...prev,
+          services: prev.services.map((s) => (s.id === updated.id ? updated : s)),
+        };
+      });
+    } catch {
+      // Handled in dialog or caller
+    }
+  }, []);
+
   const hasActiveFilters =
     Boolean(search.trim()) ||
     columnFilters.zones.size > 0 ||
@@ -397,17 +422,21 @@ export function ServicesWorkspace({
         <ServiceDetail
           service={detailService}
           onBack={() => setDetailId(null)}
-          onAssignCrew={(s) => setAssigningServiceId(s.id)}
+          onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
+          onStartService={canExecuteService ? handleStartService : undefined}
+          canStartService={canExecuteService}
         />
-        <AssignCrewDialog
-          open={Boolean(assigningService)}
-          onOpenChange={(open) => {
-            if (!open) setAssigningServiceId(null);
-          }}
-          service={assigningService}
-          allServices={loadState.status === "ready" ? loadState.services : []}
-          onAssigned={handleServiceAssigned}
-        />
+        {canAssignCrew && (
+          <AssignCrewDialog
+            open={Boolean(assigningService)}
+            onOpenChange={(open) => {
+              if (!open) setAssigningServiceId(null);
+            }}
+            service={assigningService}
+            allServices={loadState.status === "ready" ? loadState.services : []}
+            onAssigned={handleServiceAssigned}
+          />
+        )}
       </>
     );
   }
@@ -463,20 +492,22 @@ export function ServicesWorkspace({
               </Button>
             )}
 
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => {
-                setScheduleOrigin(undefined);
-                setScheduleReferenceId(undefined);
-                setIsScheduleOpen(true);
-              }}
-              className="text-xs font-semibold gap-1.5 shrink-0"
-              aria-label="Programar nuevo servicio"
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden />
-              <span>Programar servicio</span>
-            </Button>
+            {canSchedule && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  setScheduleOrigin(undefined);
+                  setScheduleReferenceId(undefined);
+                  setIsScheduleOpen(true);
+                }}
+                className="text-xs font-semibold gap-1.5 shrink-0"
+                aria-label="Programar nuevo servicio"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden />
+                <span>Programar servicio</span>
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -582,7 +613,7 @@ export function ServicesWorkspace({
                     <ServicePreview
                       service={selectedService}
                       onOpenDetail={(id) => setDetailId(id)}
-                      onAssignCrew={(s) => setAssigningServiceId(s.id)}
+                      onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
                       onClose={() => setSelectedId(null)}
                     />
                   </div>
@@ -692,7 +723,7 @@ export function ServicesWorkspace({
                     <ServicePreview
                       service={selectedService}
                       onOpenDetail={(id) => setDetailId(id)}
-                      onAssignCrew={(s) => setAssigningServiceId(s.id)}
+                      onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
                       onClose={() => setSelectedId(null)}
                     />
                   </div>
