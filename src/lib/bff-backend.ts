@@ -8,11 +8,11 @@ import type { Capability } from "./scenarios";
 export async function fetchBackend(
   request: Request,
   resourcePath: string,
-  capability: Capability,
+  capability?: Capability,
   init: RequestInit = {},
 ): Promise<Response> {
   const session = getRequiredSession(request);
-  requireCapability(session, capability);
+  if (capability) requireCapability(session, capability);
 
   if (session.mode === "mock") {
     throw new AuthUnavailableError("El modo mock no realiza llamadas al backend.");

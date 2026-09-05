@@ -38,6 +38,7 @@ import {
 import type { Capability, OperationalScenario } from "@/lib/scenarios";
 
 import styles from "./app-shell.module.css";
+import { ZonesPanel } from "./zones-panel";
 
 type Destination = "work" | "services" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
 type LogoutAction = (formData: FormData) => void | Promise<void>;
@@ -133,6 +134,8 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
       <main className={styles.main} id="contenido-principal" tabIndex={-1}>
         {destination === "work" ? (
           <WorkPanel scenario={scenario} />
+        ) : destination === "catalog" ? (
+          <ZonesPanel />
         ) : (
           <FoundationPlaceholder
             item={navigation.find((item) => item.id === destination)!}
