@@ -7,6 +7,7 @@ import {
   Calendar,
   CalendarClock,
   Clock,
+  CloudOff,
   FileText,
   MapPin,
   Pause,
@@ -37,8 +38,10 @@ export function ServiceDetail({
   canStartService = false,
   isStarting = false,
   startError = null,
+  startDraftPending = false,
   isResuming = false,
   resumeError = null,
+  resumeDraftPending = false,
   backLabel = "Volver a Servicios",
 }: {
   service: Service;
@@ -54,8 +57,11 @@ export function ServiceDetail({
   canStartService?: boolean;
   isStarting?: boolean;
   startError?: string | null;
+  /** A local draft exists (composed while offline) awaiting manual resubmission. */
+  startDraftPending?: boolean;
   isResuming?: boolean;
   resumeError?: string | null;
+  resumeDraftPending?: boolean;
   backLabel?: string;
 }) {
   const windowTiming = checkServiceWindowTiming(service);
@@ -82,7 +88,9 @@ export function ServiceDetail({
               className="gap-1.5 text-xs font-semibold"
             >
               <Play className="h-3.5 w-3.5" aria-hidden />
-              <span>{isStarting ? "Iniciando..." : "Iniciar servicio"}</span>
+              <span>
+                {isStarting ? "Iniciando..." : startDraftPending ? "Reintentar envío" : "Iniciar servicio"}
+              </span>
             </Button>
           )}
           {canStartService && onSuspendService && service.status === "IN_PROGRESS" && (
@@ -105,7 +113,9 @@ export function ServiceDetail({
               className="gap-1.5 text-xs font-semibold"
             >
               <PlayCircle className="h-3.5 w-3.5" aria-hidden />
-              <span>{isResuming ? "Reanudando..." : "Reanudar servicio"}</span>
+              <span>
+                {isResuming ? "Reanudando..." : resumeDraftPending ? "Reintentar envío" : "Reanudar servicio"}
+              </span>
             </Button>
           )}
           {onAssignCrew && (service.status === "SCHEDULED" || service.status === "RESCHEDULED") && (
@@ -226,6 +236,22 @@ export function ServiceDetail({
             </div>
           )}
 
+          {startDraftPending && (
+            <div
+              role="status"
+              className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-warning)] uppercase tracking-wide">
+                <CloudOff className="h-4 w-4" aria-hidden />
+                Borrador local pendiente
+              </div>
+              <p className="mt-1 text-sm text-[var(--color-warning)]">
+                No se pudo conectar con el servidor al iniciar el servicio. La acción se conservó en
+                este dispositivo; reenvíela manualmente cuando recupere la conexión.
+              </p>
+            </div>
+          )}
+
           {startError && (
             <div
               role="alert"
@@ -237,6 +263,22 @@ export function ServiceDetail({
               </div>
               <p className="mt-1 text-sm text-[var(--color-danger)]">
                 {startError}
+              </p>
+            </div>
+          )}
+
+          {resumeDraftPending && (
+            <div
+              role="status"
+              className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-warning)] uppercase tracking-wide">
+                <CloudOff className="h-4 w-4" aria-hidden />
+                Borrador local pendiente
+              </div>
+              <p className="mt-1 text-sm text-[var(--color-warning)]">
+                No se pudo conectar con el servidor al reanudar el servicio. La acción se conservó en
+                este dispositivo; reenvíela manualmente cuando recupere la conexión.
               </p>
             </div>
           )}

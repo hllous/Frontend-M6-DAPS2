@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -173,7 +173,10 @@ const server = setupServer(
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => resetServiceFixtures());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  localStorage.clear();
+});
 afterAll(() => server.close());
 
 describe("FieldWorkPanel component", () => {
@@ -240,6 +243,82 @@ describe("FieldWorkPanel component", () => {
     });
   });
 
+  it("saves a start draft on a network failure, then resolves a drift as an explicit conflict rather than applying it", async () => {
+    let startAttempts = 0;
+    server.use(
+      http.post("*/api/services/:serviceId/start", ({ params }) => {
+        if (params.serviceId !== "SVC-1050") {
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Test",
+            mode: "ROUTE",
+            status: "IN_PROGRESS",
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [],
+          });
+        }
+        startAttempts += 1;
+        return HttpResponse.error();
+      }),
+      http.get("*/api/services/:serviceId", ({ params }) => {
+        // Service was reassigned server-side while offline.
+        return HttpResponse.json({
+          id: params.serviceId,
+          serviceTypeId: "st-street-cleaning",
+          serviceTypeName: "Barrido mecánico",
+          title: "Barrido mecánico — Bulevar Costero",
+          mode: "ROUTE",
+          status: "SCHEDULED",
+          origin: "PLANNED",
+          zoneIds: ["zone-3"],
+          zoneNames: ["Zona Centro"],
+          scheduledDate: "2026-09-05",
+          windowFrom: "08:00",
+          windowTo: "12:00",
+          crewId: "crew-c",
+          crewName: "Cuadrilla C · Ibáñez",
+          history: [],
+          updatedAt: "2026-09-05T12:00:00.000Z",
+        });
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible();
+    });
+
+    const startButtons = screen.getAllByRole("button", { name: "Iniciar servicio" });
+    await user.click(startButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Borrador local pendiente de envío/i)).toBeVisible();
+    });
+    const retryButton = await screen.findByRole("button", { name: "Reintentar envío" });
+
+    await user.click(retryButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeVisible();
+    });
+    const conflictDialog = screen.getByRole("dialog");
+    expect(within(conflictDialog).getByText(/cambió mientras/i)).toBeVisible();
+    expect(within(conflictDialog).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
+    expect(startAttempts).toBe(1);
+
+    await user.click(within(conflictDialog).getByRole("button", { name: "Descartar borrador" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Borrador local pendiente de envío/i)).not.toBeInTheDocument();
+    });
+    expect(screen.getAllByRole("button", { name: "Iniciar servicio" })[0]).toBeVisible();
+  });
+
   it("surfaces Backend error when starting a service missing a required vehicle", async () => {
     const user = userEvent.setup();
     render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
@@ -294,6 +373,111 @@ describe("FieldWorkPanel component", () => {
       expect(screen.getByText("En curso")).toBeVisible();
     });
     expect(screen.queryByText(/desperfecto vehicular/i)).not.toBeInTheDocument();
+  });
+
+  it("preserves a suspend draft across dialog reopen, then shows an explicit conflict on drift instead of silently applying it", async () => {
+    let suspendAttempts = 0;
+    server.use(
+      http.post("*/api/services/:serviceId/suspend", async ({ request }) => {
+        suspendAttempts += 1;
+        if (suspendAttempts === 1) {
+          return HttpResponse.error();
+        }
+        const body = (await request.json()) as { reason: string; note: string };
+        return HttpResponse.json({
+          id: "SVC-1060",
+          serviceTypeId: "st-street-cleaning",
+          serviceTypeName: "Barrido mecánico",
+          title: "Barrido mecánico — Recorrido en curso",
+          mode: "ROUTE",
+          status: "SUSPENDED",
+          statusReason: `Desperfecto vehicular: ${body.note}`,
+          origin: "PLANNED",
+          zoneIds: ["zone-3"],
+          zoneNames: ["Zona Centro"],
+          scheduledDate: "2026-09-05",
+          windowFrom: "08:00",
+          windowTo: "12:00",
+          crewId: "crew-b",
+          crewName: "Cuadrilla B · Fernández",
+          history: [],
+        });
+      }),
+      http.get("*/api/services/:serviceId", () =>
+        // Service was reassigned server-side while the crew leader was offline.
+        HttpResponse.json({
+          id: "SVC-1060",
+          serviceTypeId: "st-street-cleaning",
+          serviceTypeName: "Barrido mecánico",
+          title: "Barrido mecánico — Recorrido en curso",
+          mode: "ROUTE",
+          status: "IN_PROGRESS",
+          origin: "PLANNED",
+          zoneIds: ["zone-3"],
+          zoneNames: ["Zona Centro"],
+          scheduledDate: "2026-09-05",
+          windowFrom: "08:00",
+          windowTo: "12:00",
+          crewId: "crew-c",
+          crewName: "Cuadrilla C · Ibáñez",
+          history: [],
+          updatedAt: "2026-09-05T12:00:00.000Z",
+        }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Barrido mecánico — Recorrido en curso")).toBeVisible();
+    });
+
+    const detailButtons = screen.getAllByRole("button", { name: "Ver detalle" });
+    await user.click(detailButtons[2]);
+
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.selectOptions(
+      within(dialog).getByLabelText(/Motivo de suspensión/i),
+      "VEHICLE_BREAKDOWN",
+    );
+    await user.type(within(dialog).getByLabelText(/^Nota/i), "El camión no arranca.");
+    await user.click(within(dialog).getByRole("button", { name: "Suspender servicio" }));
+
+    // Real network failure: draft saved locally, dialog stays open with a pending-draft banner
+    await waitFor(() => {
+      expect(within(dialog).getByRole("status")).toHaveTextContent(/borrador local pendiente/i);
+    });
+    expect(within(dialog).getByRole("button", { name: "Reintentar envío" })).toBeVisible();
+
+    // Close and reopen: the draft's fields are restored from the on-device copy
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+    const reopenedDialog = await screen.findByRole("dialog");
+    expect(within(reopenedDialog).getByLabelText(/Motivo de suspensión/i)).toHaveValue(
+      "VEHICLE_BREAKDOWN",
+    );
+    expect(within(reopenedDialog).getByLabelText(/^Nota/i)).toHaveValue("El camión no arranca.");
+    expect(within(reopenedDialog).getByRole("status")).toHaveTextContent(/borrador local pendiente/i);
+
+    // Manual resubmit: the Service drifted server-side (reassigned) -> explicit conflict, never silently applied
+    await user.click(within(reopenedDialog).getByRole("button", { name: "Reintentar envío" }));
+
+    await waitFor(() => {
+      expect(within(reopenedDialog).getByText(/cambió mientras/i)).toBeVisible();
+    });
+    expect(within(reopenedDialog).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
+    expect(suspendAttempts).toBe(1);
+
+    // Discard clears the on-device draft and resets the form
+    await user.click(within(reopenedDialog).getByRole("button", { name: "Descartar borrador" }));
+    await waitFor(() => {
+      expect(within(reopenedDialog).queryByRole("status")).not.toBeInTheDocument();
+    });
+    expect(within(reopenedDialog).getByLabelText(/Motivo de suspensión/i)).toHaveValue("");
   });
 
   it("does not offer suspend/resume actions to a Crew Member", async () => {

@@ -1,7 +1,16 @@
 "use client";
 
 import { useId, useState } from "react";
-import { AlertCircle, CheckCircle2, Pause, Paperclip, RefreshCw, Upload, X } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  CloudOff,
+  Pause,
+  Paperclip,
+  RefreshCw,
+  Upload,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +29,19 @@ import {
   ServiceRequestError,
   servicesAdapter,
 } from "@/lib/services";
+import {
+  clearFieldDraft,
+  getFieldDraft,
+  resubmitFieldAction,
+  submitFieldAction,
+  type FieldDraftServiceSnapshot,
+} from "@/lib/field-drafts";
+import { DraftConflictView } from "./draft-conflict-view";
+
+interface SuspendDraftPayload {
+  reason: NotServicedReason;
+  note: string;
+}
 
 interface QueuedEvidenceFile {
   id: string;
@@ -71,8 +93,18 @@ function SuspendServiceForm({
 }) {
   const formId = useId();
 
-  const [reason, setReason] = useState<NotServicedReason | "">("");
-  const [note, setNote] = useState("");
+  const existingDraft = getFieldDraft<SuspendDraftPayload>(service.id, "suspend");
+
+  const [reason, setReason] = useState<NotServicedReason | "">(existingDraft?.payload.reason ?? "");
+  const [note, setNote] = useState(existingDraft?.payload.note ?? "");
+  const [composedAgainst, setComposedAgainst] = useState<FieldDraftServiceSnapshot | null>(
+    existingDraft?.composedAgainst ?? null,
+  );
+  const [conflict, setConflict] = useState<{
+    current: Service;
+    composedAgainst: FieldDraftServiceSnapshot;
+  } | null>(null);
+  const [draftPending, setDraftPending] = useState(Boolean(existingDraft));
   const [queuedFiles, setQueuedFiles] = useState<QueuedEvidenceFile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -130,6 +162,16 @@ function SuspendServiceForm({
     await uploadSingleFile(item);
   };
 
+  async function afterSuspended(updated: Service) {
+    if (queuedFiles.length > 0) {
+      for (const queued of queuedFiles) {
+        await uploadSingleFile(queued);
+      }
+    }
+    onSuspended(updated);
+    onOpenChange(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrorMessage(null);
@@ -143,30 +185,78 @@ function SuspendServiceForm({
       return;
     }
 
+    const payload: SuspendDraftPayload = { reason: reason as NotServicedReason, note: note.trim() };
     setIsSubmitting(true);
-    try {
-      const updated = await servicesAdapter.suspend(service.id, {
-        reason: reason as NotServicedReason,
-        note: note.trim(),
+
+    // A composedAgainst anchor already exists (this is a manual resubmission of a
+    // local draft): re-check the Service before applying it, per ADR-0001.
+    if (composedAgainst) {
+      const outcome = await resubmitFieldAction({
+        serviceId: service.id,
+        actionType: "suspend",
+        composedAgainst,
+        payload,
+        submit: (p) => servicesAdapter.suspend(service.id, p),
       });
 
-      if (queuedFiles.length > 0) {
-        for (const queued of queuedFiles) {
-          await uploadSingleFile(queued);
-        }
+      if (outcome.kind === "success") {
+        await afterSuspended(outcome.result);
+        return;
       }
-
-      onSuspended(updated);
-      onOpenChange(false);
-    } catch (cause) {
-      const msg =
-        cause instanceof Error
-          ? cause.message
-          : "Ocurrió un error al suspender el servicio.";
-      setErrorMessage(msg);
-    } finally {
+      if (outcome.kind === "conflict") {
+        setConflict({ current: outcome.current, composedAgainst: outcome.composedAgainst });
+        setIsSubmitting(false);
+        return;
+      }
+      if (outcome.kind === "still-offline") {
+        setDraftPending(true);
+        setErrorMessage(
+          "Seguimos sin conexión. El borrador se conserva en este dispositivo para reintentar el envío más tarde.",
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      setErrorMessage(outcome.message);
       setIsSubmitting(false);
+      return;
     }
+
+    const outcome = await submitFieldAction({
+      service,
+      actionType: "suspend",
+      payload,
+      submit: (p) => servicesAdapter.suspend(service.id, p),
+    });
+
+    if (outcome.kind === "success") {
+      await afterSuspended(outcome.result);
+      return;
+    }
+    if (outcome.kind === "draft-saved") {
+      setComposedAgainst(outcome.draft.composedAgainst);
+      setDraftPending(true);
+      setErrorMessage(
+        "No se pudo conectar con el servidor. La suspensión quedó guardada como borrador local: puede reintentar el envío cuando recupere la conexión.",
+      );
+      setIsSubmitting(false);
+      return;
+    }
+    setErrorMessage(outcome.message);
+    setIsSubmitting(false);
+  }
+
+  function handlePreserveDraft() {
+    setConflict(null);
+  }
+
+  function handleDiscardDraft() {
+    clearFieldDraft(service.id, "suspend");
+    setComposedAgainst(null);
+    setDraftPending(false);
+    setConflict(null);
+    setReason("");
+    setNote("");
+    setErrorMessage(null);
   }
 
   return (
@@ -185,7 +275,32 @@ function SuspendServiceForm({
         </DialogDescription>
       </DialogHeader>
 
+      {conflict ? (
+        <div className="p-6">
+          <DraftConflictView
+            serviceId={service.id}
+            actionLabel="suspensión"
+            composedAgainst={conflict.composedAgainst}
+            current={conflict.current}
+            onPreserve={handlePreserveDraft}
+            onDiscard={handleDiscardDraft}
+          />
+        </div>
+      ) : (
       <form id={formId} noValidate onSubmit={handleSubmit} className="p-6 space-y-5">
+        {draftPending && (
+          <div
+            role="status"
+            className="flex items-start gap-2.5 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-3 text-xs text-[var(--color-warning)]"
+          >
+            <CloudOff className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+            <div className="font-semibold">
+              Borrador local pendiente de envío. Los datos se conservaron en este dispositivo;
+              reenvíelos manualmente cuando recupere la conexión.
+            </div>
+          </div>
+        )}
+
         {errorMessage && (
           <div
             role="alert"
@@ -358,10 +473,17 @@ function SuspendServiceForm({
             className="text-xs font-semibold gap-1.5"
           >
             <Pause className="h-3.5 w-3.5" aria-hidden />
-            <span>{isSubmitting ? "Suspendiendo..." : "Suspender servicio"}</span>
+            <span>
+              {isSubmitting
+                ? "Suspendiendo..."
+                : draftPending
+                ? "Reintentar envío"
+                : "Suspender servicio"}
+            </span>
           </Button>
         </DialogFooter>
       </form>
+      )}
     </>
   );
 }

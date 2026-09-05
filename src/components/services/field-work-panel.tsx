@@ -1,18 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Play } from "lucide-react";
+import { AlertTriangle, CloudOff, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   checkServiceWindowTiming,
-  ServiceRequestError,
   servicesAdapter,
   type Service,
 } from "@/lib/services";
 import { filterServiceFixtures } from "@/lib/services-fixtures";
+import {
+  getFieldDraft,
+  clearFieldDraft,
+  retryFieldDraft,
+  submitFieldAction,
+  type FieldDraftActionType,
+  type FieldDraftServiceSnapshot,
+} from "@/lib/field-drafts";
 import styles from "@/components/shell/app-shell.module.css";
+import { DraftConflictDialog } from "./draft-conflict-view";
 import { ServiceDetail } from "./service-detail";
 import { StatusBadge } from "./status-badge";
 import { SuspendServiceDialog } from "./suspend-service-dialog";
@@ -35,6 +43,12 @@ export function FieldWorkPanel({
   const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
   const [resumingId, setResumingId] = useState<string | null>(null);
   const [resumeErrors, setResumeErrors] = useState<Record<string, string>>({});
+  const [conflict, setConflict] = useState<{
+    serviceId: string;
+    actionType: Extract<FieldDraftActionType, "start" | "resume">;
+    current: Service;
+    composedAgainst: FieldDraftServiceSnapshot;
+  } | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -53,42 +67,71 @@ export function FieldWorkPanel({
     };
   }, [crewId]);
 
+  async function runFieldAction({
+    service,
+    actionType,
+    submit,
+    onError,
+  }: {
+    service: Service;
+    actionType: Extract<FieldDraftActionType, "start" | "resume">;
+    submit: () => Promise<Service>;
+    onError: (message: string) => void;
+  }) {
+    const existingDraft = getFieldDraft<null>(service.id, actionType);
+    const outcome = existingDraft
+      ? await retryFieldDraft({ draft: existingDraft, submit })
+      : await submitFieldAction({ service, actionType, payload: null, submit });
+
+    if (outcome.kind === "success") {
+      setServices((prev) => prev.map((s) => (s.id === outcome.result.id ? outcome.result : s)));
+    } else if (outcome.kind === "conflict") {
+      setConflict({
+        serviceId: service.id,
+        actionType,
+        current: outcome.current,
+        composedAgainst: outcome.composedAgainst,
+      });
+    } else if (outcome.kind === "error") {
+      onError(outcome.message);
+    }
+    // "draft-saved" / "still-offline": no error surfaced — the pending-draft
+    // indicator (read from storage on the next render) takes over instead.
+  }
+
   const handleStartService = async (service: Service) => {
     setStartingId(service.id);
     setStartErrors((prev) => ({ ...prev, [service.id]: "" }));
-    try {
-      const updated = await servicesAdapter.start(service.id);
-      setServices((prev) =>
-        prev.map((s) => (s.id === updated.id ? updated : s)),
-      );
-    } catch (cause) {
-      const msg =
-        cause instanceof ServiceRequestError
-          ? cause.message
-          : "No se pudo registrar el inicio del servicio.";
-      setStartErrors((prev) => ({ ...prev, [service.id]: msg }));
-    } finally {
-      setStartingId(null);
-    }
+    await runFieldAction({
+      service,
+      actionType: "start",
+      submit: () => servicesAdapter.start(service.id),
+      onError: (msg) => setStartErrors((prev) => ({ ...prev, [service.id]: msg })),
+    });
+    setStartingId(null);
   };
 
   const handleResumeService = async (service: Service) => {
     setResumingId(service.id);
     setResumeErrors((prev) => ({ ...prev, [service.id]: "" }));
-    try {
-      const updated = await servicesAdapter.resume(service.id);
-      setServices((prev) =>
-        prev.map((s) => (s.id === updated.id ? updated : s)),
-      );
-    } catch (cause) {
-      const msg =
-        cause instanceof ServiceRequestError
-          ? cause.message
-          : "No se pudo registrar la reanudación del servicio.";
-      setResumeErrors((prev) => ({ ...prev, [service.id]: msg }));
-    } finally {
-      setResumingId(null);
+    await runFieldAction({
+      service,
+      actionType: "resume",
+      submit: () => servicesAdapter.resume(service.id),
+      onError: (msg) => setResumeErrors((prev) => ({ ...prev, [service.id]: msg })),
+    });
+    setResumingId(null);
+  };
+
+  const handlePreserveConflict = () => {
+    setConflict(null);
+  };
+
+  const handleDiscardConflict = () => {
+    if (conflict) {
+      clearFieldDraft(conflict.serviceId, conflict.actionType);
     }
+    setConflict(null);
   };
 
   const handleServiceUpdated = (updated: Service) => {
@@ -121,8 +164,10 @@ export function FieldWorkPanel({
           canStartService={mayExecuteService}
           isStarting={startingId === selectedService.id}
           startError={startErrors[selectedService.id] ?? null}
+          startDraftPending={Boolean(getFieldDraft(selectedService.id, "start"))}
           isResuming={resumingId === selectedService.id}
           resumeError={resumeErrors[selectedService.id] ?? null}
+          resumeDraftPending={Boolean(getFieldDraft(selectedService.id, "resume"))}
           backLabel="Volver a Servicios asignados"
         />
         {mayExecuteService && (
@@ -133,6 +178,20 @@ export function FieldWorkPanel({
             }}
             service={suspendingService}
             onSuspended={handleServiceSuspended}
+          />
+        )}
+        {mayExecuteService && (
+          <DraftConflictDialog
+            open={Boolean(conflict)}
+            onOpenChange={(open) => {
+              if (!open) setConflict(null);
+            }}
+            serviceId={conflict?.serviceId ?? ""}
+            actionLabel={conflict?.actionType === "resume" ? "reanudación" : "inicio"}
+            composedAgainst={conflict?.composedAgainst ?? null}
+            current={conflict?.current ?? null}
+            onPreserve={handlePreserveConflict}
+            onDiscard={handleDiscardConflict}
           />
         )}
       </>
@@ -161,6 +220,7 @@ export function FieldWorkPanel({
             const isOutside =
               service.status === "SCHEDULED" && windowTiming.isOutside;
             const error = startErrors[service.id];
+            const draftPending = Boolean(getFieldDraft(service.id, "start"));
 
             return (
               <li
@@ -210,6 +270,16 @@ export function FieldWorkPanel({
                     </div>
                   )}
 
+                  {draftPending && (
+                    <div
+                      role="status"
+                      className="ml-8 flex items-center gap-1.5 rounded-lg border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 px-2.5 py-1 text-xs font-medium text-[var(--color-warning)]"
+                    >
+                      <CloudOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span>Borrador local pendiente de envío (sin conexión)</span>
+                    </div>
+                  )}
+
                   {error && (
                     <div
                       role="alert"
@@ -239,7 +309,13 @@ export function FieldWorkPanel({
                       className="gap-1.5 text-xs font-semibold"
                     >
                       <Play className="h-3.5 w-3.5" data-icon="inline-start" aria-hidden />
-                      <span>{startingId === service.id ? "Iniciando..." : "Iniciar servicio"}</span>
+                      <span>
+                        {startingId === service.id
+                          ? "Iniciando..."
+                          : draftPending
+                          ? "Reintentar envío"
+                          : "Iniciar servicio"}
+                      </span>
                     </Button>
                   ) : !mayExecuteService ? (
                     <span className={styles.workState}>Solo consulta</span>
@@ -255,6 +331,21 @@ export function FieldWorkPanel({
         <p className={styles.permissionNote}>
           La persona responsable de la cuadrilla registra los cambios de estado del servicio.
         </p>
+      )}
+
+      {mayExecuteService && (
+        <DraftConflictDialog
+          open={Boolean(conflict)}
+          onOpenChange={(open) => {
+            if (!open) setConflict(null);
+          }}
+          serviceId={conflict?.serviceId ?? ""}
+          actionLabel={conflict?.actionType === "resume" ? "reanudación" : "inicio"}
+          composedAgainst={conflict?.composedAgainst ?? null}
+          current={conflict?.current ?? null}
+          onPreserve={handlePreserveConflict}
+          onDiscard={handleDiscardConflict}
+        />
       )}
     </section>
   );

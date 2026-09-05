@@ -24,6 +24,7 @@ beforeEach(() => {
 afterEach(() => {
   server.resetHandlers();
   vi.restoreAllMocks();
+  localStorage.clear();
 });
 afterAll(() => server.close());
 
@@ -396,6 +397,56 @@ describe("ZoneExecutionPanel component", () => {
     expect(screen.getByText(/Servicio puntual: registre el resultado de la zona/i)).toBeVisible();
     // Only single zone is listed
     expect(screen.getAllByText("Zona Centro").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("button", { name: /guardar resultado de zona/i })).toBeVisible();
+  });
+
+  it("saves a ZoneResult draft on a network failure, then resolves a drift as an explicit conflict rather than applying it", async () => {
+    const user = userEvent.setup();
+
+    let submitAttempts = 0;
+    server.use(
+      http.post("*/api/services/:serviceId/zone-results", () => {
+        submitAttempts += 1;
+        return HttpResponse.error();
+      }),
+      http.get("*/api/services/:serviceId", () =>
+        // Service was reassigned server-side while the crew leader was offline.
+        HttpResponse.json({
+          ...mockRouteService,
+          crewId: "crew-c",
+          crewName: "Cuadrilla C · Ibáñez",
+          updatedAt: "2026-09-05T12:00:00.000Z",
+        }),
+      ),
+    );
+
+    render(<ZoneExecutionPanel service={mockRouteService} canExecute={true} />);
+
+    const notesInput = screen.getByPlaceholderText(/detalles sobre el estado/i);
+    await user.type(notesInput, "Zona Centro completada normalmente");
+
+    await user.click(screen.getByRole("button", { name: /guardar resultado de zona/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent(/borrador local pendiente/i);
+    });
+    expect(submitAttempts).toBe(1);
+
+    const retryButton = await screen.findByRole("button", { name: "Reintentar envío" });
+    await user.click(retryButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/cambió mientras/i)).toBeVisible();
+    });
+    expect(screen.getByText("Cuadrilla C · Ibáñez")).toBeVisible();
+    // The draft was never silently applied: no second POST attempt was made
+    expect(submitAttempts).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: "Descartar borrador" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
     expect(screen.getByRole("button", { name: /guardar resultado de zona/i })).toBeVisible();
   });
 

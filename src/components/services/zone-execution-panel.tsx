@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
+  CloudOff,
   FileCheck,
   FileText,
   Paperclip,
@@ -27,6 +28,14 @@ import {
   ZoneResultStatus,
 } from "@/lib/services";
 import { getZoneResultsByServiceId } from "@/lib/services-fixtures";
+import {
+  clearFieldDraft,
+  getFieldDraft,
+  resubmitFieldAction,
+  submitFieldAction,
+  type FieldDraftServiceSnapshot,
+} from "@/lib/field-drafts";
+import { DraftConflictView } from "./draft-conflict-view";
 
 interface QueuedEvidenceFile {
   id: string; // client id
@@ -36,6 +45,13 @@ interface QueuedEvidenceFile {
   status: "pending" | "uploading" | "success" | "error";
   canonicalFilename?: string;
   error?: string;
+}
+
+interface ZoneResultDraftPayload {
+  zoneId: string;
+  status: ZoneResultStatus;
+  reason: NotServicedReason | null;
+  notes: string | null;
 }
 
 export function ZoneExecutionPanel({
@@ -50,20 +66,36 @@ export function ZoneExecutionPanel({
   const [zoneResults, setZoneResults] = useState<ZoneResult[]>(() =>
     getZoneResultsByServiceId(service.id),
   );
-  const [selectedZoneId, setSelectedZoneId] = useState<string>(() => {
+
+  function computeInitialZoneId(): string {
     const existing = getZoneResultsByServiceId(service.id);
     const unrecorded = service.zoneIds.find((zid) => !existing.some((r) => r.zoneId === zid));
     return unrecorded ?? service.zoneIds[0];
-  });
+  }
+
+  const [selectedZoneId, setSelectedZoneId] = useState<string>(() => computeInitialZoneId());
 
   // Mobile disclosure state
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const mobileToggleRef = useRef<HTMLButtonElement | null>(null);
 
-  // Form state for current zone
-  const [status, setStatus] = useState<ZoneResultStatus>("SERVICED");
-  const [reason, setReason] = useState<NotServicedReason | "">("");
-  const [notes, setNotes] = useState("");
+  // Form state for current zone — restored from a local draft when one exists for this zone
+  const [status, setStatus] = useState<ZoneResultStatus>(
+    () => getFieldDraft<ZoneResultDraftPayload>(service.id, "zoneResult", computeInitialZoneId())?.payload.status ?? "SERVICED",
+  );
+  const [reason, setReason] = useState<NotServicedReason | "">(
+    () => getFieldDraft<ZoneResultDraftPayload>(service.id, "zoneResult", computeInitialZoneId())?.payload.reason ?? "",
+  );
+  const [notes, setNotes] = useState(
+    () => getFieldDraft<ZoneResultDraftPayload>(service.id, "zoneResult", computeInitialZoneId())?.payload.notes ?? "",
+  );
+  const [composedAgainst, setComposedAgainst] = useState<FieldDraftServiceSnapshot | null>(
+    () => getFieldDraft<ZoneResultDraftPayload>(service.id, "zoneResult", computeInitialZoneId())?.composedAgainst ?? null,
+  );
+  const [conflict, setConflict] = useState<{
+    current: Service;
+    composedAgainst: FieldDraftServiceSnapshot;
+  } | null>(null);
   const [queuedFiles, setQueuedFiles] = useState<QueuedEvidenceFile[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,12 +124,15 @@ export function ZoneExecutionPanel({
     };
   }, [service.id]);
 
-  // Reset form when changing zones
+  // Reset form when changing zones — restoring any local draft for the newly selected zone
   const handleSelectZone = (zoneId: string) => {
     setSelectedZoneId(zoneId);
-    setStatus("SERVICED");
-    setReason("");
-    setNotes("");
+    const draft = getFieldDraft<ZoneResultDraftPayload>(service.id, "zoneResult", zoneId);
+    setStatus(draft?.payload.status ?? "SERVICED");
+    setReason(draft?.payload.reason ?? "");
+    setNotes(draft?.payload.notes ?? "");
+    setComposedAgainst(draft?.composedAgainst ?? null);
+    setConflict(null);
     setQueuedFiles([]);
     setFormError(null);
   };
@@ -182,6 +217,31 @@ export function ZoneExecutionPanel({
     }
   };
 
+  async function afterZoneResultRecorded(createdResult: ZoneResult) {
+    // Upload any queued evidence files with individual progress/retry capability.
+    // Evidence-upload retry is idempotent and exempt from draft handling (ticket 5).
+    let hasUploadErrors = false;
+    if (queuedFiles.length > 0) {
+      for (const queued of queuedFiles) {
+        const ok = await uploadSingleFile(queued, createdResult.id);
+        if (!ok) {
+          hasUploadErrors = true;
+        }
+      }
+    }
+
+    const refreshed = await servicesAdapter.getZoneResults(service.id);
+    setZoneResults(refreshed);
+
+    // Auto-advance to next unrecorded zone only if all uploads succeeded
+    if (!hasUploadErrors) {
+      const nextUnrecorded = service.zoneIds.find((zid) => !refreshed.some((r) => r.zoneId === zid));
+      if (nextUnrecorded) {
+        handleSelectZone(nextUnrecorded);
+      }
+    }
+  }
+
   const handleSubmitZoneResult = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -199,48 +259,86 @@ export function ZoneExecutionPanel({
       return;
     }
 
+    const payload: ZoneResultDraftPayload = {
+      zoneId: selectedZoneId,
+      status,
+      reason: status === "SERVICED" ? null : (reason as NotServicedReason),
+      notes: notes.trim() || null,
+    };
+    const submitZoneResult = (p: ZoneResultDraftPayload) =>
+      servicesAdapter.recordZoneResult(service.id, p);
+
     setIsSubmitting(true);
     try {
-      // 1. Record ZoneResult
-      const createdResult = await servicesAdapter.recordZoneResult(service.id, {
-        zoneId: selectedZoneId,
-        status,
-        reason: status === "SERVICED" ? null : (reason as NotServicedReason),
-        notes: notes.trim() || null,
+      // A composedAgainst anchor already exists (manual resubmission of a local
+      // draft): re-check the Service before applying it, per ADR-0001.
+      if (composedAgainst) {
+        const outcome = await resubmitFieldAction({
+          serviceId: service.id,
+          actionType: "zoneResult",
+          scope: selectedZoneId,
+          composedAgainst,
+          payload,
+          submit: submitZoneResult,
+        });
+
+        if (outcome.kind === "success") {
+          setComposedAgainst(null);
+          await afterZoneResultRecorded(outcome.result);
+          return;
+        }
+        if (outcome.kind === "conflict") {
+          setConflict({ current: outcome.current, composedAgainst: outcome.composedAgainst });
+          return;
+        }
+        if (outcome.kind === "still-offline") {
+          setFormError(
+            "Seguimos sin conexión. El borrador se conserva en este dispositivo para reintentar el envío más tarde.",
+          );
+          return;
+        }
+        setFormError(outcome.message);
+        return;
+      }
+
+      const outcome = await submitFieldAction({
+        service,
+        actionType: "zoneResult",
+        scope: selectedZoneId,
+        payload,
+        submit: submitZoneResult,
       });
 
-      // 2. Upload any queued evidence files with individual progress/retry capability
-      let hasUploadErrors = false;
-      if (queuedFiles.length > 0) {
-        for (const queued of queuedFiles) {
-          const ok = await uploadSingleFile(queued, createdResult.id);
-          if (!ok) {
-            hasUploadErrors = true;
-          }
-        }
+      if (outcome.kind === "success") {
+        await afterZoneResultRecorded(outcome.result);
+        return;
       }
-
-      // 3. Refresh results
-      const refreshed = await servicesAdapter.getZoneResults(service.id);
-      setZoneResults(refreshed);
-
-      // 4. Auto-advance to next unrecorded zone only if all uploads succeeded
-      if (!hasUploadErrors) {
-        const nextUnrecorded = service.zoneIds.find((zid) => !refreshed.some((r) => r.zoneId === zid));
-        if (nextUnrecorded) {
-          handleSelectZone(nextUnrecorded);
-        }
+      if (outcome.kind === "draft-saved") {
+        setComposedAgainst(outcome.draft.composedAgainst);
+        setFormError(
+          "No se pudo conectar con el servidor. El resultado quedó guardado como borrador local: puede reintentar el envío cuando recupere la conexión.",
+        );
+        return;
       }
-    } catch (err) {
-      const msg =
-        err instanceof ServiceRequestError
-          ? err.message
-          : "Ocurrió un error al registrar el resultado de la zona.";
-      setFormError(msg);
+      setFormError(outcome.message);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  function handlePreserveDraft() {
+    setConflict(null);
+  }
+
+  function handleDiscardDraft() {
+    clearFieldDraft(service.id, "zoneResult", selectedZoneId);
+    setComposedAgainst(null);
+    setConflict(null);
+    setStatus("SERVICED");
+    setReason("");
+    setNotes("");
+    setFormError(null);
+  }
 
   // Completion handling
   const allZonesRecorded =
@@ -667,9 +765,31 @@ export function ZoneExecutionPanel({
               <p className="font-semibold text-[var(--color-text)]">Servicio finalizado</p>
               <p className="mt-1">No se pueden registrar nuevos resultados en este servicio.</p>
             </div>
+          ) : conflict ? (
+            <DraftConflictView
+              serviceId={service.id}
+              actionLabel="resultado de zona"
+              composedAgainst={conflict.composedAgainst}
+              current={conflict.current}
+              onPreserve={handlePreserveDraft}
+              onDiscard={handleDiscardDraft}
+            />
           ) : (
             /* Crew Leader uninterrupted Form to record result */
             <form noValidate onSubmit={handleSubmitZoneResult} className="space-y-4 text-xs">
+              {composedAgainst && (
+                <div
+                  role="status"
+                  className="flex items-start gap-2 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 p-3 text-xs font-semibold text-[var(--color-warning)]"
+                >
+                  <CloudOff className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+                  <span>
+                    Borrador local pendiente de envío. Los datos se conservaron en este
+                    dispositivo; reenvíelos manualmente cuando recupere la conexión.
+                  </span>
+                </div>
+              )}
+
               {formError && (
                 <div
                   role="alert"
@@ -892,7 +1012,13 @@ export function ZoneExecutionPanel({
                   className="w-full sm:w-auto font-bold text-xs gap-1.5"
                 >
                   <FileCheck className="h-3.5 w-3.5" aria-hidden />
-                  <span>{isSubmitting ? "Guardando resultado..." : "Guardar resultado de zona"}</span>
+                  <span>
+                    {isSubmitting
+                      ? "Guardando resultado..."
+                      : composedAgainst
+                      ? "Reintentar envío"
+                      : "Guardar resultado de zona"}
+                  </span>
                 </Button>
               </div>
             </form>
