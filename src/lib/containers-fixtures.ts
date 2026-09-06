@@ -81,6 +81,17 @@ const INITIAL_CONTAINER_FIXTURES: Container[] = [
     capacityLiters: 2400,
     status: "ACTIVE",
   },
+  {
+    id: "cont-8",
+    code: "CONT-008",
+    containerType: "HOUSEHOLD",
+    zoneId: "zone-2",
+    address: "Av. Directorio 2100",
+    lat: -34.638,
+    lng: -58.451,
+    capacityLiters: 1100,
+    status: "ACTIVE",
+  },
 ];
 
 export let containerFixtures: Container[] = INITIAL_CONTAINER_FIXTURES.map((item) => ({ ...item }));

@@ -10,7 +10,9 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
 
     await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
 
-    const row = page.locator("tr", { hasText: "CONT-001" });
+    // CONT-008 is a dedicated ACTIVE fixture for this test — CONT-001 is relied on by
+    // containers-catalog.spec.ts to stay un-overflowed across the same CI run.
+    const row = page.locator("tr", { hasText: "CONT-008" });
     await expect(row).toBeVisible();
 
     // Report buttons are available directly from catalog without an assigned Service
@@ -22,13 +24,13 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(
-      dialog.getByRole("heading", { name: "Reportar desborde de contenedor CONT-001" }),
+      dialog.getByRole("heading", { name: "Reportar desborde de contenedor CONT-008" }),
     ).toBeVisible();
 
     await dialog.getByRole("button", { name: "Confirmar desborde" }).click();
 
     await expect(
-      page.getByText("Desborde reportado con éxito para el contenedor CONT-001."),
+      page.getByText("Desborde reportado con éxito para el contenedor CONT-008."),
     ).toBeVisible();
     await expect(dialog).not.toBeVisible();
 
