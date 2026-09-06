@@ -94,6 +94,21 @@ import {
   updateGreenSpaceInputSchema,
   type GreenSpaceQuery,
 } from "@/lib/green-spaces";
+import {
+  addRepairRequestFixture,
+  createRepairRequestFixture,
+  filterRepairRequestFixtures,
+  getRepairRequestFixture,
+  paginateRepairRequestFixtures,
+  transitionRepairRequestFixture,
+} from "@/lib/repair-request-fixtures";
+import {
+  createRepairRequestInputSchema,
+  repairDamageTypeSchema,
+  repairRequestRecoveryInputSchema,
+  repairRequestStatusSchema,
+  repairSeveritySchema,
+} from "@/lib/repair-requests";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -1663,6 +1678,52 @@ export const handlers = [
     evidenceCache.set(cacheKey, attachment);
 
     return HttpResponse.json(attachment, { status: 201 });
+  }),
+  // ── RepairRequest / M3 (issue #113) ─────────────────────────────────────
+  http.get("*/api/repair-requests", ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const query = {
+      status: repairRequestStatusSchema.safeParse(params.get("status")).data,
+      damageType: repairDamageTypeSchema.safeParse(params.get("damageType")).data,
+      severity: repairSeveritySchema.safeParse(params.get("severity")).data,
+      detectedInId: params.get("detectedInId") ?? undefined,
+      page: params.has("page") ? Number(params.get("page")) : undefined,
+      pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+    };
+    return HttpResponse.json(paginateRepairRequestFixtures(filterRepairRequestFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/repair-requests/:requestId", ({ params }) => {
+    const request = getRepairRequestFixture(params.requestId as string);
+    return request
+      ? HttpResponse.json(request)
+      : HttpResponse.json({ statusCode: 404, message: "Derivación no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/repair-requests/${params.requestId}` }, { status: 404 });
+  }),
+  http.post("*/api/repair-requests", async ({ request }) => {
+    let body: unknown;
+    try { body = await request.json(); } catch { return HttpResponse.json({ statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/repair-requests" }, { status: 400 }); }
+    const parsed = createRepairRequestInputSchema.safeParse(body);
+    if (!parsed.success || parsed.data.detectedInType !== "SERVICE") return HttpResponse.json({ statusCode: 400, message: "La derivación debe originarse en un Servicio.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/repair-requests" }, { status: 400 });
+    const service = serviceFixtures.find((item) => item.id === parsed.data.detectedInId);
+    if (!service) return HttpResponse.json({ statusCode: 404, message: "Servicio no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/repair-requests" }, { status: 404 });
+    const created = createRepairRequestFixture(parsed.data, service);
+    addRepairRequestFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.post("*/api/repair-requests/:requestId/start", async ({ params, request }) => {
+    const current = getRepairRequestFixture(params.requestId as string);
+    if (!current) return HttpResponse.json({ statusCode: 404, message: "Derivación no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/repair-requests/${params.requestId}/start` }, { status: 404 });
+    const parsed = repairRequestRecoveryInputSchema.safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de recuperación inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/repair-requests/${params.requestId}/start` }, { status: 400 });
+    if (current.status !== "REQUESTED") return HttpResponse.json({ statusCode: 409, message: "La derivación no está pendiente.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/repair-requests/${params.requestId}/start` }, { status: 409 });
+    return HttpResponse.json(transitionRepairRequestFixture(params.requestId as string, "IN_PROGRESS", parsed.data));
+  }),
+  http.post("*/api/repair-requests/:requestId/close", async ({ params, request }) => {
+    const current = getRepairRequestFixture(params.requestId as string);
+    if (!current) return HttpResponse.json({ statusCode: 404, message: "Derivación no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/repair-requests/${params.requestId}/close` }, { status: 404 });
+    const parsed = repairRequestRecoveryInputSchema.safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de recuperación inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/repair-requests/${params.requestId}/close` }, { status: 400 });
+    if (current.status !== "IN_PROGRESS") return HttpResponse.json({ statusCode: 409, message: "La derivación no está en curso.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/repair-requests/${params.requestId}/close` }, { status: 409 });
+    return HttpResponse.json(transitionRepairRequestFixture(params.requestId as string, "CLOSED", parsed.data));
   }),
   http.post("*/api/session/logout", () => new HttpResponse(null, { status: 200 })),
 ];

@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Truck,
   Users,
+  Wrench,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export function ServiceDetail({
   onReschedule,
   onConfirmReschedule,
   onCancelService,
+  onCreateRepairRequest,
   onServiceUpdated,
   canStartService = false,
   isStarting = false,
@@ -53,6 +55,7 @@ export function ServiceDetail({
   onReschedule?: (service: Service) => void;
   onConfirmReschedule?: (service: Service) => void;
   onCancelService?: (service: Service) => void;
+  onCreateRepairRequest?: (service: Service) => void;
   onServiceUpdated?: (service: Service) => void;
   canStartService?: boolean;
   isStarting?: boolean;
@@ -127,6 +130,17 @@ export function ServiceDetail({
             >
               <Users className="h-3.5 w-3.5" aria-hidden />
               <span>{service.crewId ? "Reasignar cuadrilla" : "Asignar cuadrilla"}</span>
+            </Button>
+          )}
+          {onCreateRepairRequest && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onCreateRepairRequest(service)}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <Wrench className="h-3.5 w-3.5" aria-hidden />
+              <span>Crear derivación de reparación</span>
             </Button>
           )}
           {onReschedule && service.status === "SCHEDULED" && (
