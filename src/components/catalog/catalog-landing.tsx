@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Boxes, CalendarClock, MapPin, Route as RouteIcon, Truck, UsersRound } from "lucide-react";
+import { ArrowRight, Boxes, CalendarClock, MapPin, Route as RouteIcon, Truck, Trees, UsersRound } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -55,6 +55,13 @@ const catalogCards = [
     description: "Equipos operativos y sus turnos de trabajo.",
     icon: UsersRound,
     tone: "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-400",
+  },
+  {
+    href: "/app/catalog/green-spaces",
+    title: "Espacios verdes",
+    description: "Plazas, parques y otros espacios verdes administrados por la municipalidad.",
+    icon: Trees,
+    tone: "bg-lime-50 text-lime-700 dark:bg-lime-950/50 dark:text-lime-400",
   },
 ];
 

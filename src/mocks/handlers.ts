@@ -82,6 +82,18 @@ import { createVehicleInputSchema, updateVehicleInputSchema, type VehicleQuery }
 import { addVehicleFixture, filterVehicleFixtures, paginateVehicleFixtures, vehicleFixtures } from "@/lib/vehicles-fixtures";
 import { addCrewFixture, filterCrewFixtures, paginateCrewFixtures, crewFixtures } from "@/lib/crew-fixtures";
 import { addCrewMembersInputSchema, createCrewInputSchema, updateCrewInputSchema, type CrewQuery } from "@/lib/crews";
+import {
+  addGreenSpaceFixture,
+  filterGreenSpaceFixtures,
+  greenSpaceFixtures,
+  paginateGreenSpaceFixtures,
+} from "@/lib/green-space-fixtures";
+import {
+  createGreenSpaceInputSchema,
+  greenSpaceTypeSchema,
+  updateGreenSpaceInputSchema,
+  type GreenSpaceQuery,
+} from "@/lib/green-spaces";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -180,6 +192,19 @@ function serviceFrequencyQueryFromUrl(url: string): ServiceFrequencyQuery {
     shift: shift.success ? shift.data : undefined,
     weekday: Number.isInteger(weekday) && weekday >= 1 && weekday <= 7 ? weekday : undefined,
     validOn: params.get("validOn") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
+function greenSpaceQueryFromUrl(url: string): GreenSpaceQuery {
+  const params = new URL(url).searchParams;
+  return {
+    active: params.has("active") ? params.get("active") === "true" : undefined,
+    spaceType: greenSpaceTypeSchema.safeParse(params.get("spaceType")).success
+      ? (params.get("spaceType") as GreenSpaceQuery["spaceType"])
+      : undefined,
+    zoneId: params.get("zoneId") ?? undefined,
     page: params.has("page") ? Number(params.get("page")) : undefined,
     pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
   };
@@ -610,6 +635,90 @@ export const handlers = [
     if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}/members/${params.userId}` }, { status: 404 });
     crew.memberUserIds = crew.memberUserIds.filter((memberUserId) => memberUserId !== params.userId);
     return HttpResponse.json(crew);
+  }),
+  http.get("*/api/green-spaces", ({ request }) => {
+    const query = greenSpaceQueryFromUrl(request.url);
+    return HttpResponse.json(paginateGreenSpaceFixtures(filterGreenSpaceFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/green-spaces/:greenSpaceId", ({ params }) => {
+    const greenSpace = greenSpaceFixtures.find((item) => item.id === params.greenSpaceId);
+    return greenSpace
+      ? HttpResponse.json(greenSpace)
+      : HttpResponse.json(
+          {
+            statusCode: 404,
+            message: "Espacio verde no encontrado.",
+            error: "Not Found",
+            timestamp: new Date().toISOString(),
+            path: `/api/green-spaces/${params.greenSpaceId}`,
+          },
+          { status: 404 },
+        );
+  }),
+  http.post("*/api/green-spaces", async ({ request }) => {
+    const parsed = createGreenSpaceInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "Datos de espacio verde inválidos.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/green-spaces",
+        },
+        { status: 400 },
+      );
+    }
+    const greenSpace = { id: `green-space-108-${greenSpaceFixtures.length + 1}`, ...parsed.data, active: true };
+    addGreenSpaceFixture(greenSpace);
+    return HttpResponse.json(greenSpace, { status: 201 });
+  }),
+  http.patch("*/api/green-spaces/:greenSpaceId", async ({ params, request }) => {
+    const greenSpace = greenSpaceFixtures.find((item) => item.id === params.greenSpaceId);
+    const parsed = updateGreenSpaceInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!greenSpace) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Espacio verde no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/green-spaces/${params.greenSpaceId}`,
+        },
+        { status: 404 },
+      );
+    }
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "Datos de espacio verde inválidos.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/green-spaces/${params.greenSpaceId}`,
+        },
+        { status: 400 },
+      );
+    }
+    Object.assign(greenSpace, parsed.data);
+    return HttpResponse.json(greenSpace);
+  }),
+  http.delete("*/api/green-spaces/:greenSpaceId", ({ params }) => {
+    const greenSpace = greenSpaceFixtures.find((item) => item.id === params.greenSpaceId);
+    if (!greenSpace) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Espacio verde no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/green-spaces/${params.greenSpaceId}`,
+        },
+        { status: 404 },
+      );
+    }
+    greenSpace.active = false;
+    return HttpResponse.json(greenSpace);
   }),
   http.get("*/api/services", ({ request }) => {
     const query = serviceQueryFromUrl(request.url);

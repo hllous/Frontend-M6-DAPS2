@@ -51,4 +51,3 @@ test.describe("Green Spaces catalog management @smoke", () => {
     await expect(panel.getByRole("button", { name: "Dar de baja" })).toHaveCount(0);
   });
 });
-
