@@ -51,6 +51,7 @@ test.describe("Referral workspace", () => {
     await page.unroute("**/api/referrals");
     await page.route("**/api/referrals", async (route) => route.abort());
     await page.reload();
-    await expect(page.getByRole("alert")).toContainText("No se pudieron cargar las derivaciones");
+    const alert = page.getByRole("alert").filter({ hasText: "No se pudieron cargar las derivaciones" });
+    await expect(alert).toBeVisible();
   });
 });
