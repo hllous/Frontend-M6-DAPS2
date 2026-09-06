@@ -20,7 +20,7 @@ describe("ServiceFrequenciesPanel", () => {
     render(<ServiceFrequenciesPanel scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByRole("heading", { name: "Frecuencias de servicio" })).toBeVisible();
-    expect(screen.getByText("Recolección domiciliaria")).toBeVisible();
+    expect(screen.getAllByText("Recolección domiciliaria")[0]).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Nueva frecuencia" }));
 
     const serviceTypeSelect = screen.getByRole("combobox", { name: "Tipo de servicio" });

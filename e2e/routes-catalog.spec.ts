@@ -104,5 +104,16 @@ test.describe("Route catalog management #107", () => {
 
     await expect(dialog).not.toBeVisible();
     await expect(row.getByText("Inactivo")).toBeVisible();
+
+    await page.evaluate(async () => {
+      const res = await fetch("/api/routes/route-1", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: true }),
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to reactivate route: ${res.status}`);
+      }
+    });
   });
 });

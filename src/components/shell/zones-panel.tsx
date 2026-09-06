@@ -49,7 +49,7 @@ export function ZonesPanel() {
 
   if (state.status === "loading") {
     return (
-      <div aria-label="Cargando zonas operativas" className="flex max-w-2xl flex-col gap-3">
+      <div role="status" aria-label="Cargando zonas operativas" className="flex max-w-2xl flex-col gap-3">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-16 w-full" />
         <Skeleton className="h-16 w-full" />

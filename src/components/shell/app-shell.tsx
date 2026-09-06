@@ -42,7 +42,6 @@ import { FieldWorkPanel } from "@/components/services/field-work-panel";
 import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { CatalogLanding } from "@/components/catalog/catalog-landing";
 import { ZonesPanel } from "./zones-panel";
-import { RoutesPanel } from "./routes-panel";
 
 type Destination = "work" | "services" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
 type LogoutAction = (formData: FormData) => void | Promise<void>;
@@ -157,7 +156,6 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
           <div className="flex flex-col gap-8">
             <CatalogLanding scenario={scenario} />
             <ZonesPanel />
-            <RoutesPanel />
           </div>
         ) : (
           <FoundationPlaceholder

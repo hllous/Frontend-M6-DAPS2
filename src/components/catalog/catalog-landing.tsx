@@ -3,24 +3,10 @@
 import Link from "next/link";
 import { ArrowRight, Boxes, CalendarClock, MapPin, Route as RouteIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import type { OperationalScenario } from "@/lib/scenarios";
 
 const catalogCards = [
-  {
-    href: "/app/catalog/zones",
-    title: "Zonas operativas",
-    description: "Áreas operativas municipales para asignación de cuadrillas y coberturas.",
-    icon: MapPin,
-    tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
-  },
-  {
-    href: "/app/catalog/routes",
-    title: "Recorridos",
-    description: "Trazados y secuencias de paradas para servicios de recolección y barrido.",
-    icon: RouteIcon,
-    tone: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400",
-  },
   {
     href: "/app/catalog/service-types",
     title: "Tipos de servicio",
@@ -34,6 +20,20 @@ const catalogCards = [
     description: "Destinos de los residuos registrados en los servicios.",
     icon: MapPin,
     tone: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
+  },
+  {
+    href: "/app/catalog/zones",
+    title: "Zonas operativas",
+    description: "Áreas operativas municipales para asignación de cuadrillas y coberturas.",
+    icon: MapPin,
+    tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
+  },
+  {
+    href: "/app/catalog/routes",
+    title: "Recorridos",
+    description: "Trazados y secuencias de paradas para servicios de recolección y barrido.",
+    icon: RouteIcon,
+    tone: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400",
   },
   {
     href: "/app/catalog/service-frequencies",
@@ -63,16 +63,14 @@ export function CatalogLanding({ scenario }: { scenario: OperationalScenario }) 
             <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-lg ${tone}`}>
               <Icon className="h-5 w-5" aria-hidden="true" />
             </div>
-            <h2 className="font-semibold text-foreground">{title}</h2>
+            <p className="font-semibold text-foreground">{title}</p>
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-            <Button
-              nativeButton={false}
-              render={<Link href={href} />}
-              className="mt-4 gap-1.5"
-              size="sm"
+            <Link
+              href={href}
+              className={buttonVariants({ size: "sm", className: "mt-4 gap-1.5" })}
             >
               Abrir catálogo <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
+            </Link>
           </li>
         ))}
       </ul>
