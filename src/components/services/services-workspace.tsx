@@ -47,6 +47,7 @@ import { SuspendServiceDialog } from "./suspend-service-dialog";
 import { RescheduleReasonDialog } from "./reschedule-reason-dialog";
 import { ConfirmRescheduleDialog } from "./confirm-reschedule-dialog";
 import { CancelServiceDialog } from "./cancel-service-dialog";
+import { CreateRepairRequestDialog } from "./create-repair-request-dialog";
 import { CreateStreetClosureRequestDialog } from "./create-street-closure-request-dialog";
 import {
   ServicesTable,
@@ -166,6 +167,8 @@ export function ServicesWorkspace({
   // Cancel modal state (Office action)
   const [cancelingServiceId, setCancelingServiceId] = useState<string | null>(null);
 
+  // RepairRequest creation is an Office-only Service entry point in Phase 3.
+  const [repairRequestServiceId, setRepairRequestServiceId] = useState<string | null>(null);
   // Office-only outbound referral from the canonical Service context.
   const [streetClosureServiceId, setStreetClosureServiceId] = useState<string | null>(null);
 
@@ -348,6 +351,11 @@ export function ServicesWorkspace({
     return loadState.services.find((s) => s.id === assigningServiceId) ?? null;
   }, [assigningServiceId, loadState]);
 
+  const repairRequestService = useMemo(() => {
+    if (!repairRequestServiceId || loadState.status !== "ready") return null;
+    return loadState.services.find((service) => service.id === repairRequestServiceId) ?? null;
+  }, [repairRequestServiceId, loadState]);
+
   const streetClosureService = useMemo(() => {
     if (!streetClosureServiceId || loadState.status !== "ready") return null;
     return loadState.services.find((s) => s.id === streetClosureServiceId) ?? null;
@@ -418,6 +426,7 @@ export function ServicesWorkspace({
   const canSchedule = !isField;
   const canReschedule = !isField;
   const canExecuteService = Boolean(scenario?.capabilities.includes("service:execute"));
+  const canCreateRepairRequest = scenario?.actor.kind === "OFFICE";
   const canCreateStreetClosureRequest = scenario?.actor.kind === "OFFICE";
 
   const handleStartService = useCallback(async (service: Service) => {
@@ -523,6 +532,7 @@ export function ServicesWorkspace({
           onReschedule={canReschedule ? (s) => setReschedulingServiceId(s.id) : undefined}
           onConfirmReschedule={canReschedule ? (s) => setConfirmingRescheduleServiceId(s.id) : undefined}
           onCancelService={canReschedule ? (s) => setCancelingServiceId(s.id) : undefined}
+          onCreateRepairRequest={canCreateRepairRequest ? (s) => setRepairRequestServiceId(s.id) : undefined}
           onCreateStreetClosureRequest={canCreateStreetClosureRequest ? (s) => setStreetClosureServiceId(s.id) : undefined}
           canStartService={canExecuteService}
           isResuming={resumingId === detailService.id}
@@ -537,6 +547,16 @@ export function ServicesWorkspace({
             service={assigningService}
             allServices={loadState.status === "ready" ? loadState.services : []}
             onAssigned={handleServiceAssigned}
+          />
+        )}
+        {canCreateRepairRequest && repairRequestService && (
+          <CreateRepairRequestDialog
+            open={repairRequestServiceId === repairRequestService.id}
+            service={repairRequestService}
+            onOpenChange={(open) => {
+              if (!open) setRepairRequestServiceId(null);
+            }}
+            onCreated={() => undefined}
           />
         )}
         {canExecuteService && (
