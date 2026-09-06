@@ -3,8 +3,8 @@ export type TelemetryEvent =
   | { name: "auth_session_expired"; status: 401 }
   | { name: "auth_forbidden"; status: 403 }
   | { name: "auth_logout_broadcast" }
-  | { name: "request_malformed_response"; resource: "zones" | "routes" | "scenario" | "services" | "service-frequencies" | "vehicles" | "crews" | "green-spaces" | "containers" }
-  | { name: "request_network_failure"; resource: "zones" | "routes" | "scenario" | "services" | "service-frequencies" | "vehicles" | "crews" | "green-spaces" | "containers" };
+  | { name: "request_malformed_response"; resource: "zones" | "routes" | "scenario" | "services" | "service-frequencies" | "vehicles" | "crews" | "green-spaces" | "containers" | "street-closure-requests" }
+  | { name: "request_network_failure"; resource: "zones" | "routes" | "scenario" | "services" | "service-frequencies" | "vehicles" | "crews" | "green-spaces" | "containers" | "street-closure-requests" };
 
 const ALLOWED_FIELDS = new Set(["name", "status", "resource"]);
 

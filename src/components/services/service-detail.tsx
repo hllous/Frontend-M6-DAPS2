@@ -15,6 +15,7 @@ import {
   PlayCircle,
   Route,
   ShieldCheck,
+  Siren,
   Truck,
   Users,
 } from "lucide-react";
@@ -34,6 +35,7 @@ export function ServiceDetail({
   onReschedule,
   onConfirmReschedule,
   onCancelService,
+  onCreateStreetClosureRequest,
   onServiceUpdated,
   canStartService = false,
   isStarting = false,
@@ -53,6 +55,7 @@ export function ServiceDetail({
   onReschedule?: (service: Service) => void;
   onConfirmReschedule?: (service: Service) => void;
   onCancelService?: (service: Service) => void;
+  onCreateStreetClosureRequest?: (service: Service) => void;
   onServiceUpdated?: (service: Service) => void;
   canStartService?: boolean;
   isStarting?: boolean;
@@ -163,6 +166,18 @@ export function ServiceDetail({
               >
                 <Ban className="h-3.5 w-3.5" aria-hidden />
                 <span>Cancelar servicio</span>
+              </Button>
+            )}
+          {onCreateStreetClosureRequest &&
+            (service.status === "SCHEDULED" || service.status === "RESCHEDULED") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onCreateStreetClosureRequest(service)}
+                className="gap-1.5 text-xs font-semibold text-[var(--color-action)]"
+              >
+                <Siren className="h-3.5 w-3.5" aria-hidden />
+                <span>Solicitar corte de calle</span>
               </Button>
             )}
           {!canStartService && (
