@@ -16,7 +16,8 @@ export type Capability =
   | "serviceFrequency:manage"
   // Frontend hypotheses for Phase 2 resource management; M1 capability claims remain unconfirmed.
   | "vehicle:manage"
-  | "crew:manage";
+  | "crew:manage"
+  | "greenSpace:manage";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -60,6 +61,7 @@ export const scenarios: Record<
       "disposalSite:manage",
       "vehicle:manage",
       "crew:manage",
+      "greenSpace:manage",
       "indicator:view",
       "zone:manage",
       "route:manage",
