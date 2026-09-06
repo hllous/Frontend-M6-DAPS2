@@ -73,7 +73,7 @@ export function CatalogLanding({ scenario }: { scenario: OperationalScenario }) 
 
       <ul className="grid gap-4 md:grid-cols-2">
         {catalogCards.map(({ href, title, description, icon: Icon, tone }) => (
-          <li key={href} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+          <li key={href} className="rounded-xl border border-border bg-card p-5">
             <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-lg ${tone}`}>
               <Icon className="h-5 w-5" aria-hidden="true" />
             </div>

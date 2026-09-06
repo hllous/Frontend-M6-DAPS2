@@ -26,7 +26,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { neighborhoodsAdapter, type Neighborhood } from "@/lib/neighborhoods";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -38,9 +39,6 @@ import {
   ZoneRequestError,
   zonesAdapter,
 } from "@/lib/zones";
-
-const controlClass =
-  "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 
 type LoadState =
   | { status: "loading" }
@@ -351,7 +349,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
             <input
               aria-label="Buscar zonas operativas"
-              className={`${controlClass} w-full pl-9`}
+              className={`${formControlClass} w-full pl-9`}
               placeholder="Buscar por código o nombre..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -363,7 +361,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           Estado
           <select
             aria-label="Filtrar por estado"
-            className={controlClass}
+            className={formControlClass}
             value={activeFilter}
             onChange={(e) => setActiveFilter(e.target.value as "all" | "true" | "false")}
           >
@@ -379,7 +377,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
         <form
           onSubmit={handleCreateSubmit}
           aria-label="Formulario de nueva zona"
-          className="rounded-xl border border-border bg-card p-5 shadow-sm"
+          className="rounded-xl border border-border bg-card p-5"
         >
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
@@ -411,11 +409,14 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               <input
                 id="create-zone-code"
                 required
-                className={controlClass}
+                className={formControlClass}
                 placeholder="Ej. Z-04"
                 value={createDraft.code}
+                aria-invalid={Boolean(createError)}
+                aria-describedby={createError ? "create-zone-code-error" : undefined}
                 onChange={(e) => setCreateDraft({ ...createDraft, code: e.target.value })}
               />
+              <FieldError id="create-zone-code-error" role="none">{createError}</FieldError>
             </Field>
 
             <Field>
@@ -423,7 +424,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               <input
                 id="create-zone-name"
                 required
-                className={controlClass}
+                className={formControlClass}
                 placeholder="Ej. Zona Centro Este"
                 value={createDraft.name}
                 onChange={(e) => setCreateDraft({ ...createDraft, name: e.target.value })}
@@ -452,7 +453,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
         <form
           onSubmit={handleEditSubmit}
           aria-label="Formulario de edición de zona"
-          className="rounded-xl border border-border bg-card p-5 shadow-sm"
+          className="rounded-xl border border-border bg-card p-5"
         >
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
@@ -485,7 +486,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 id="edit-zone-code"
                 readOnly
                 aria-readonly="true"
-                className={`${controlClass} bg-muted/50 cursor-not-allowed`}
+                className={`${formControlClass} bg-muted/50 cursor-not-allowed`}
                 value={editingZone.code}
               />
             </Field>
@@ -495,10 +496,13 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               <input
                 id="edit-zone-name"
                 required
-                className={controlClass}
+                className={formControlClass}
                 value={editDraft.name}
+                aria-invalid={Boolean(editError)}
+                aria-describedby={editError ? "edit-zone-name-error" : undefined}
                 onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
               />
+              <FieldError id="edit-zone-name-error" role="none">{editError}</FieldError>
             </Field>
 
             <div className="sm:col-span-2 flex items-center gap-2 pt-2">
@@ -715,7 +719,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="h-9 shrink-0 gap-1 text-xs text-destructive hover:text-destructive"
+                        className="h-10 max-[760px]:h-12 shrink-0 gap-1 text-xs text-destructive hover:text-destructive"
                         onClick={() => void handleRemoveNeighborhood(neighborhood.id)}
                         disabled={removingNeighborhoodId !== null || isSubmittingNeighborhoods}
                         aria-label={`Quitar ${neighborhood.name}`}
@@ -749,7 +753,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   <input
                     id="neighborhood-search"
-                    className={`${controlClass} w-full pl-9`}
+                    className={`${formControlClass} w-full pl-9`}
                     placeholder="Buscar por nombre o identificador"
                     value={neighborhoodSearch}
                     onChange={(event) => setNeighborhoodSearch(event.target.value)}

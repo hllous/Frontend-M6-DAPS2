@@ -19,7 +19,7 @@ function FieldDescription({ className, ...props }: ComponentProps<"span">) {
 }
 
 function FieldError({ className, ...props }: ComponentProps<"p">) {
-  return <p data-slot="field-error" role="alert" className={cn(className)} {...props} />;
+  return <p data-slot="field-error" role="alert" className={cn("text-sm text-destructive", className)} {...props} />;
 }
 
 export { Field, FieldDescription, FieldError, FieldGroup, FieldLabel };

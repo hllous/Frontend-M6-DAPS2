@@ -31,7 +31,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
@@ -43,9 +44,6 @@ import {
   routesAdapter,
 } from "@/lib/routes";
 import { type Zone, zonesAdapter } from "@/lib/zones";
-
-const controlClass =
-  "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 
 type LoadState =
   | { status: "loading" }
@@ -475,7 +473,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       {/* Detail View of Selected Route (Lands here after creation or clicking Ver Detalle) */}
       {selectedRoute && (
         <section
-          className="rounded-lg border bg-card p-6 shadow-xs space-y-5"
+          className="rounded-lg border bg-card p-6 space-y-5"
           data-testid="route-detail-view"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
@@ -635,7 +633,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
             ) : (
               /* Stop Sequence Builder (#111) */
               <div
-                className="rounded-lg border bg-card p-4 space-y-4 shadow-xs"
+                className="rounded-lg border bg-card p-4 space-y-4"
                 data-testid="stop-sequence-builder"
               >
                 <div className="flex items-center justify-between border-b pb-3">
@@ -782,7 +780,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                       <select
                         value={newStopZoneId}
                         onChange={(e) => setNewStopZoneId(e.target.value)}
-                        className={`${controlClass} w-full text-xs`}
+                        className={`${formControlClass} w-full text-xs`}
                         data-testid="stop-zone-select"
                       >
                         <option value="">Seleccione una zona operativa activa...</option>
@@ -812,7 +810,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                         max={1440}
                         value={newStopDuration}
                         onChange={(e) => setNewStopDuration(Number(e.target.value))}
-                        className="h-9 w-20 rounded-md border border-input bg-transparent px-2 text-xs text-right"
+                        className="h-10 max-[760px]:h-12 w-20 rounded-md border border-input bg-transparent px-2 text-xs text-right"
                         data-testid="stop-duration-input"
                       />
                       <span className="text-xs text-muted-foreground">min</span>
@@ -870,7 +868,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       )}
 
       {/* Filters band */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border bg-card p-4 shadow-xs">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border bg-card p-4">
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           {/* Search */}
           <div className="relative flex-1 max-w-sm">
@@ -880,7 +878,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               placeholder="Buscar por código o nombre..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={`${controlClass} pl-9 w-full`}
+              className={`${formControlClass} pl-9 w-full`}
               data-testid="search-routes-input"
             />
           </div>
@@ -894,7 +892,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               id="route-active-filter"
               value={activeFilter}
               onChange={(e) => setActiveFilter(e.target.value as "all" | "true" | "false")}
-              className={controlClass}
+              className={formControlClass}
               data-testid="active-filter-select"
             >
               <option value="all">Todos</option>
@@ -912,7 +910,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               id="route-zone-filter"
               value={zoneFilter}
               onChange={(e) => setZoneFilter(e.target.value)}
-              className={controlClass}
+              className={formControlClass}
               data-testid="zone-filter-select"
             >
               <option value="all">Todas las zonas</option>
@@ -938,7 +936,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       </div>
 
       {/* Routes list table / content */}
-      <div className="rounded-lg border bg-card shadow-xs overflow-hidden">
+      <div className="rounded-lg border bg-card overflow-hidden">
         {state.status === "loading" && (
           <div className="p-6 space-y-4" data-testid="routes-loading">
             <Skeleton className="h-8 w-full" />
@@ -1117,10 +1115,13 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   placeholder="Ej: REC-004"
                   value={createDraft.code}
                   onChange={(e) => setCreateDraft((d) => ({ ...d, code: e.target.value }))}
-                  className={`${controlClass} w-full`}
+                  className={`${formControlClass} w-full`}
                   disabled={isSubmittingCreate}
                   data-testid="create-route-code-input"
+                  aria-invalid={Boolean(createError)}
+                  aria-describedby={createError ? "create-route-code-error" : undefined}
                 />
+                <FieldError id="create-route-code-error">{createError}</FieldError>
                 <FieldDescription>
                   Identificador único (inmutable tras la creación).
                 </FieldDescription>
@@ -1134,7 +1135,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   placeholder="Ej: Recorrido Nocturno San Telmo"
                   value={createDraft.name}
                   onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))}
-                  className={`${controlClass} w-full`}
+                  className={`${formControlClass} w-full`}
                   disabled={isSubmittingCreate}
                   data-testid="create-route-name-input"
                 />
@@ -1195,7 +1196,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   value={editingRoute?.code ?? ""}
                   readOnly
                   disabled
-                  className={`${controlClass} w-full bg-muted font-mono cursor-not-allowed`}
+                  className={`${formControlClass} w-full bg-muted font-mono cursor-not-allowed`}
                   data-testid="edit-route-code-readonly"
                 />
                 <FieldDescription>
@@ -1210,10 +1211,13 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   type="text"
                   value={editDraft.name}
                   onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
-                  className={`${controlClass} w-full`}
+                  className={`${formControlClass} w-full`}
                   disabled={isSubmittingEdit}
                   data-testid="edit-route-name-input"
+                  aria-invalid={Boolean(editError)}
+                  aria-describedby={editError ? "edit-route-name-error" : undefined}
                 />
+                <FieldError id="edit-route-name-error">{editError}</FieldError>
               </Field>
 
               <div className="flex items-center gap-2 pt-1">
