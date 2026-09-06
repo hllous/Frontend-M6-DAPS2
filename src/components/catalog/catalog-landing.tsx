@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Boxes, MapPin, Route as RouteIcon } from "lucide-react";
+import { ArrowRight, Boxes, CalendarClock, MapPin, Route as RouteIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -34,6 +34,13 @@ const catalogCards = [
     description: "Destinos de los residuos registrados en los servicios.",
     icon: MapPin,
     tone: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
+  },
+  {
+    href: "/app/catalog/service-frequencies",
+    title: "Frecuencias de servicio",
+    description: "Reglas de recorrido por días, turnos y ventanas de vigencia.",
+    icon: CalendarClock,
+    tone: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400",
   },
 ];
 

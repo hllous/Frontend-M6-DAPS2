@@ -76,6 +76,8 @@ import { addDisposalSiteFixture, disposalSiteFixtures, filterDisposalSiteFixture
 import { disposalSiteCreateInputSchema, disposalSiteTypeSchema, disposalSiteUpdateInputSchema, type DisposalSiteQuery } from "@/lib/disposal-sites";
 import { addServiceTypeFixture, filterServiceTypeFixtures, paginateServiceTypeFixtures, serviceTypeFixtures, updateServiceTypeFixture } from "@/lib/service-type-fixtures";
 import { serviceTypeCategorySchema, serviceTypeCreateInputSchema, serviceTypeModeSchema, serviceTypeUpdateInputSchema, type ServiceTypeQuery } from "@/lib/service-types";
+import { addServiceFrequencyFixture, closeServiceFrequencyFixture, filterServiceFrequencyFixtures, paginateServiceFrequencyFixtures, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
+import { serviceFrequencyCreateInputSchema, serviceFrequencyShiftSchema, serviceFrequencyUpdateInputSchema, type ServiceFrequencyQuery } from "@/lib/service-frequencies";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -138,6 +140,21 @@ function serviceTypeQueryFromUrl(url: string): ServiceTypeQuery {
     category: category.success ? category.data : undefined,
     mode: mode.success ? mode.data : undefined,
     search: params.get("search") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
+function serviceFrequencyQueryFromUrl(url: string): ServiceFrequencyQuery {
+  const params = new URL(url).searchParams;
+  const shift = serviceFrequencyShiftSchema.safeParse(params.get("shift"));
+  const weekday = Number(params.get("weekday"));
+  return {
+    serviceTypeId: params.get("serviceTypeId") ?? undefined,
+    routeId: params.get("routeId") ?? undefined,
+    shift: shift.success ? shift.data : undefined,
+    weekday: Number.isInteger(weekday) && weekday >= 1 && weekday <= 7 ? weekday : undefined,
+    validOn: params.get("validOn") ?? undefined,
     page: params.has("page") ? Number(params.get("page")) : undefined,
     pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
   };
@@ -475,6 +492,33 @@ export const handlers = [
   http.delete("*/api/service-types/:serviceTypeId", ({ params }) => {
     const updated = updateServiceTypeFixture(params.serviceTypeId as string, { active: false });
     return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-types" }, { status: 404 });
+  }),
+  http.get("*/api/service-frequencies", ({ request }) => {
+    const query = serviceFrequencyQueryFromUrl(request.url);
+    return HttpResponse.json(paginateServiceFrequencyFixtures(filterServiceFrequencyFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/service-frequencies/:serviceFrequencyId", ({ params }) => {
+    const item = serviceFrequencyFixtures.find((candidate) => candidate.id === params.serviceFrequencyId);
+    return item ? HttpResponse.json(item) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
+  }),
+  http.post("*/api/service-frequencies", async ({ request }) => {
+    const parsed = serviceFrequencyCreateInputSchema.safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
+    const serviceType = serviceTypeFixtures.find((item) => item.id === parsed.data.serviceTypeId);
+    if (!serviceType || serviceType.mode !== "ROUTE") return HttpResponse.json({ statusCode: 400, message: "El tipo de servicio debe ser de modo ROUTE.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
+    const created = { id: `freq-${Date.now()}`, ...parsed.data, validTo: parsed.data.validTo ?? null };
+    addServiceFrequencyFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.patch("*/api/service-frequencies/:serviceFrequencyId", async ({ params, request }) => {
+    const parsed = serviceFrequencyUpdateInputSchema.safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
+    const updated = updateServiceFrequencyFixture(params.serviceFrequencyId as string, parsed.data);
+    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
+  }),
+  http.delete("*/api/service-frequencies/:serviceFrequencyId", ({ params }) => {
+    const updated = closeServiceFrequencyFixture(params.serviceFrequencyId as string, "2026-09-06");
+    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
   }),
   http.get("*/api/services", ({ request }) => {
     const query = serviceQueryFromUrl(request.url);

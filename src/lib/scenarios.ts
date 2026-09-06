@@ -11,7 +11,9 @@ export type Capability =
   | "indicator:view"
   // Frontend hypotheses for Phase 2c catalogs
   | "zone:manage"
-  | "route:manage";
+  | "route:manage"
+  // Frontend hypothesis: #8 defines Office catalog configuration, but not per-resource names.
+  | "serviceFrequency:manage";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -56,6 +58,7 @@ export const scenarios: Record<
       "indicator:view",
       "zone:manage",
       "route:manage",
+      "serviceFrequency:manage",
     ],
     work: {
       title: "Acciones de la jornada",
