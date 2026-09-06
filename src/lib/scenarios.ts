@@ -1,6 +1,9 @@
 export type Capability =
   | "service:view"
   | "service:execute"
+  // Frontend hypothesis: #8 defines Office catalog configuration, but not per-resource names.
+  | "serviceType:manage"
+  | "disposalSite:manage"
   | "inventory:view"
   | "environmentalReport:view"
   | "map:view"
@@ -45,6 +48,8 @@ export const scenarios: Record<
       "environmentalReport:view",
       "map:view",
       "catalog:view",
+      "serviceType:manage",
+      "disposalSite:manage",
       "indicator:view",
     ],
     work: {
