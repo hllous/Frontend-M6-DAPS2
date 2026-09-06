@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Boxes, CalendarClock, MapPin, Route as RouteIcon } from "lucide-react";
+import { ArrowRight, Boxes, CalendarClock, MapPin, Route as RouteIcon, Truck, UsersRound } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -41,6 +41,20 @@ const catalogCards = [
     description: "Reglas de recorrido por días, turnos y ventanas de vigencia.",
     icon: CalendarClock,
     tone: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400",
+  },
+  {
+    href: "/app/catalog/vehicles",
+    title: "Vehículos",
+    description: "Recursos móviles disponibles para asignar a los servicios.",
+    icon: Truck,
+    tone: "bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-400",
+  },
+  {
+    href: "/app/catalog/crews",
+    title: "Cuadrillas",
+    description: "Equipos operativos y sus turnos de trabajo.",
+    icon: UsersRound,
+    tone: "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-400",
   },
 ];
 
