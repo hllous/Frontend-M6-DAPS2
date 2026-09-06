@@ -52,4 +52,14 @@ describe("repair request BFF detail and recovery routes", () => {
     const missing = await GET(new Request("http://localhost/api/repair-requests/RR-404", { headers: { cookie: officeCookie } }), { params: Promise.resolve({ id: "RR-404" }) });
     expect(missing.status).toBe(404);
   });
+
+  it("lets Field inspect only referrals attached to its assigned Services", async () => {
+    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+    const assigned = await GET(new Request("http://localhost/api/repair-requests/RR-1001", { headers: { cookie: fieldCookie } }), { params: Promise.resolve({ id: "RR-1001" }) });
+    expect(assigned.status).toBe(200);
+    expect((await assigned.json()).detectedInId).toBe("SVC-1050");
+
+    const foreign = await GET(new Request("http://localhost/api/repair-requests/RR-404", { headers: { cookie: fieldCookie } }), { params: Promise.resolve({ id: "RR-404" }) });
+    expect(foreign.status).toBe(403);
+  });
 });

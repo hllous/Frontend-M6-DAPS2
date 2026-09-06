@@ -34,10 +34,39 @@ describe("repair request BFF collection routes", () => {
     expect(response.status).toBe(401);
   });
 
-  it("keeps list and create Office-only", async () => {
+  it("scopes Field list and create to the actor's assigned crew", async () => {
     const fieldCookie = await authenticatedCookie("field-crew-leader-route");
-    expect((await GET(new Request("http://localhost/api/repair-requests", { headers: { cookie: fieldCookie } }))).status).toBe(403);
-    expect((await POST(createRequest(fieldCookie, {}))).status).toBe(403);
+    const assigned = await GET(new Request("http://localhost/api/repair-requests?detectedInId=SVC-1050", { headers: { cookie: fieldCookie } }));
+    expect(assigned.status).toBe(200);
+    expect((await assigned.json()).data).toEqual([
+      expect.objectContaining({ detectedInId: "SVC-1050" }),
+    ]);
+
+    const otherCrew = await GET(new Request("http://localhost/api/repair-requests?detectedInId=SVC-1042", { headers: { cookie: fieldCookie } }));
+    expect(otherCrew.status).toBe(403);
+
+    const unscoped = await GET(new Request("http://localhost/api/repair-requests", { headers: { cookie: fieldCookie } }));
+    expect(unscoped.status).toBe(403);
+
+    const created = await POST(createRequest(fieldCookie, {
+      damageType: "BROKEN_SIDEWALK",
+      address: "Av. Rivadavia 2200",
+      severity: "LOW",
+      publicSafetyRisk: true,
+      detectedInType: "SERVICE",
+      detectedInId: "SVC-1050",
+    }));
+    expect(created.status).toBe(201);
+
+    const forbiddenCreate = await POST(createRequest(fieldCookie, {
+      damageType: "BROKEN_SIDEWALK",
+      address: "Calle 1",
+      severity: "LOW",
+      publicSafetyRisk: false,
+      detectedInType: "SERVICE",
+      detectedInId: "SVC-1042",
+    }));
+    expect(forbiddenCreate.status).toBe(403);
   });
 
   it("lists fixtures and creates a pending Service-sourced referral", async () => {

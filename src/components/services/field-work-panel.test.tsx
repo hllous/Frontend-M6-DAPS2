@@ -86,6 +86,48 @@ const server = setupServer(
   http.get("*/api/street-closure-requests", () =>
     HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 } }),
   ),
+  http.get("*/api/repair-requests", ({ request }) => {
+    const serviceId = new URL(request.url).searchParams.get("detectedInId");
+    return HttpResponse.json({
+      data: serviceId === "SVC-1050"
+        ? [{
+            id: "RR-1001",
+            damageType: "BROKEN_PAVEMENT",
+            address: "Bulevar Costero y Calle 12",
+            severity: "HIGH",
+            publicSafetyRisk: true,
+            detectedInType: "SERVICE",
+            detectedInId: "SVC-1050",
+            sourceContext: {
+              type: "SERVICE",
+              id: "SVC-1050",
+              label: "Barrido mecÃ¡nico â€” Bulevar Costero",
+              href: "/app?destination=services&detail=SVC-1050",
+            },
+            status: "REQUESTED",
+            workOrderId: null,
+            requestedAt: "2026-09-05T10:15:00.000Z",
+          }]
+        : [],
+      meta: { total: serviceId === "SVC-1050" ? 1 : 0, page: 1, pageSize: 50, totalPages: 1 },
+    });
+  }),
+  http.post("*/api/repair-requests", async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json({
+      id: "RR-2001",
+      ...body,
+      status: "REQUESTED",
+      sourceContext: {
+        type: "SERVICE",
+        id: "SVC-1050",
+        label: "Barrido mecÃ¡nico â€” Bulevar Costero",
+        href: "/app?destination=services&detail=SVC-1050",
+      },
+      workOrderId: null,
+      requestedAt: "2026-09-06T10:15:00.000Z",
+    }, { status: 201 });
+  }),
   http.post("*/api/services/:serviceId/start", ({ params }) => {
     if (params.serviceId === "SVC-1054") {
       return HttpResponse.json(
@@ -183,6 +225,26 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("FieldWorkPanel component", () => {
+  it("lets Field create and view referrals only from an assigned Service", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    const detailButtons = await screen.findAllByRole("button", { name: "Ver detalle" });
+    await user.click(detailButtons[0]);
+
+    expect(await screen.findByRole("heading", { name: "Derivaciones de reparación" })).toBeVisible();
+    expect(screen.getByText("RR-1001")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Crear derivación de reparación" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Crear derivación de reparación" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText(/^Ubicación del daño/), "Calle 12 y Bulevar Costero");
+    await user.click(within(dialog).getByRole("button", { name: /Crear derivación a M3/ }));
+
+    await waitFor(() => expect(within(dialog).getByText(/pendiente de respuesta de M3/i)).toBeVisible());
+    expect(dialog).toHaveTextContent("SVC-1050");
+  });
+
   it("scopes list to actor's own crew and excludes other crews' services", async () => {
     render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
 
@@ -216,6 +278,8 @@ describe("FieldWorkPanel component", () => {
     expect(screen.getByText("Solo consulta")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /asignar cuadrilla/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Crear derivación de reparación" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /corte de calle/i })).not.toBeInTheDocument();
 
     // Return back to assigned list
     await user.click(screen.getByRole("button", { name: "Volver a Servicios asignados" }));
