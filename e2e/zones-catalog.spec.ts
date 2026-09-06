@@ -87,4 +87,23 @@ test.describe("Zone catalog management #106", () => {
     await expect(dialog).not.toBeVisible();
     await expect(row.getByText("Inactiva")).toBeVisible();
   });
+
+  test("Office actor assigns and removes neighborhoods from a zone", async ({ page }) => {
+    await openZonesCatalog(page);
+
+    const row = page.locator("tr", { hasText: "Z-01" });
+    await row.getByRole("button", { name: "Gestionar barrios" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Gestionar barrios" })).toBeVisible();
+    await dialog.getByLabel("Buscar barrios").fill("Industrial");
+    await dialog.getByLabel("Barrio Industrial").check();
+    await dialog.getByRole("button", { name: "Asignar seleccionados" }).click();
+
+    await expect(dialog.getByText("Barrios asignados correctamente.")).toBeVisible();
+    await expect(dialog.getByRole("list", { name: "Barrios asignados" }).getByText("Barrio Industrial")).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Quitar Barrio Industrial" }).click();
+    await expect(dialog.getByText("Barrio quitado de la zona.")).toBeVisible();
+  });
 });

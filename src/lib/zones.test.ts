@@ -162,6 +162,66 @@ describe("zones adapter", () => {
     expect(result.active).toBe(false);
   });
 
+  it("assigns neighborhoods and silently keeps an already assigned id", async () => {
+    const requests: unknown[] = [];
+    server.use(
+      http.post("*/api/zones/zone-1/neighborhoods", async ({ request }) => {
+        requests.push(await request.json());
+        return HttpResponse.json({
+          id: "zone-1",
+          code: "Z-01",
+          name: "Zona Norte",
+          active: true,
+          neighborhoodIds: ["barrio-1", "barrio-2", "barrio-4"],
+        });
+      }),
+    );
+
+    const result = await zonesAdapter.assignNeighborhoods("zone-1", {
+      neighborhoodIds: ["barrio-1", "barrio-4"],
+    });
+
+    expect(requests).toEqual([{ neighborhoodIds: ["barrio-1", "barrio-4"] }]);
+    expect(result.neighborhoodIds).toEqual(["barrio-1", "barrio-2", "barrio-4"]);
+  });
+
+  it("removes a neighborhood and preserves a typed 404 when it is not assigned", async () => {
+    server.use(
+      http.delete("*/api/zones/zone-1/neighborhoods/barrio-2", () =>
+        HttpResponse.json({
+          id: "zone-1",
+          code: "Z-01",
+          name: "Zona Norte",
+          active: true,
+          neighborhoodIds: ["barrio-1"],
+        }),
+      ),
+    );
+
+    const result = await zonesAdapter.removeNeighborhood("zone-1", "barrio-2");
+    expect(result.neighborhoodIds).toEqual(["barrio-1"]);
+
+    server.use(
+      http.delete("*/api/zones/zone-1/neighborhoods/barrio-9", () =>
+        HttpResponse.json(
+          {
+            statusCode: 404,
+            message: "El barrio no está asignado a la zona operativa.",
+            error: "Not Found",
+            timestamp: new Date().toISOString(),
+            path: "/api/zones/zone-1/neighborhoods/barrio-9",
+          },
+          { status: 404 },
+        ),
+      ),
+    );
+
+    await expect(zonesAdapter.removeNeighborhood("zone-1", "barrio-9")).rejects.toMatchObject({
+      name: "ZoneRequestError",
+      status: 404,
+    });
+  });
+
   it("checks references before deactivation and returns reference counts", async () => {
     server.use(
       http.get("*/api/zones/zone-1/references", () =>

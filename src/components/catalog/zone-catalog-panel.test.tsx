@@ -186,6 +186,38 @@ describe("ZoneCatalogPanel component", () => {
     });
   });
 
+  it("searches, assigns, and removes neighborhoods from a Zone", async () => {
+    const user = userEvent.setup();
+    render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Z-01")).toBeInTheDocument();
+    });
+
+    const row = screen.getByText("Z-01").closest("tr")!;
+    await user.click(within(row).getByRole("button", { name: /gestionar barrios/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: "Gestionar barrios" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("list", { name: "Barrios asignados" })).toHaveTextContent("Barrio Centro");
+
+    const searchInput = within(dialog).getByLabelText("Buscar barrios");
+    await user.type(searchInput, "Industrial");
+    const industrialOption = within(dialog).getByLabelText(/Barrio Industrial/i);
+    await user.click(industrialOption);
+    await user.click(within(dialog).getByRole("button", { name: "Asignar seleccionados" }));
+
+    await waitFor(() => {
+      expect(within(dialog).getByText("Barrios asignados correctamente.")).toBeInTheDocument();
+      expect(within(dialog).getByRole("list", { name: "Barrios asignados" })).toHaveTextContent("Barrio Industrial");
+    });
+
+    await user.click(within(dialog).getByRole("button", { name: "Quitar Barrio Industrial" }));
+    await waitFor(() => {
+      expect(within(dialog).getByText("Barrio quitado de la zona.")).toBeInTheDocument();
+    });
+  });
+
   it("renders a read-only presentation without mutation actions for Field actors", async () => {
     render(<ZoneCatalogPanel scenario={scenarios.fieldCrewMember} />);
 
