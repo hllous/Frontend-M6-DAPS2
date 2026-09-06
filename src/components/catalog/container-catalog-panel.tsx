@@ -196,6 +196,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       containerType: typeFilter === "all" ? undefined : typeFilter,
       zoneId: zoneFilter === "all" ? undefined : zoneFilter,
       search: search.trim() || undefined,
+      pageSize: 100,
     }),
     [statusFilter, typeFilter, zoneFilter, search],
   );
