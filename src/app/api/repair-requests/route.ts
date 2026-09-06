@@ -33,10 +33,20 @@ function errorResponse(status: number, message: string, path: string) {
   return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status });
 }
 
-function officeOnly(request: Request) {
+function sessionAndScenario(request: Request) {
   const session = getRequiredSession(request);
   const scenario = getScenario(session.scenarioId);
   return { session, scenario };
+}
+
+function fieldCanAccessService(scenario: ReturnType<typeof getScenario>, serviceId: string) {
+  return (
+    scenario.actor.kind === "FIELD" &&
+    Boolean(scenario.actor.crewId) &&
+    serviceFixtures.some(
+      (service) => service.id === serviceId && service.crewId === scenario.actor.crewId,
+    )
+  );
 }
 
 function queryFromUrl(url: URL): RepairRequestQuery {
@@ -53,8 +63,16 @@ function queryFromUrl(url: URL): RepairRequestQuery {
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
-    const { session, scenario } = officeOnly(request);
-    if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede consultar derivaciones.", path);
+    const { session, scenario } = sessionAndScenario(request);
+    const query = queryFromUrl(new URL(request.url));
+
+    if (scenario.actor.kind === "FIELD") {
+      if (!query.detectedInId || !fieldCanAccessService(scenario, query.detectedInId)) {
+        return errorResponse(403, "Solo puede consultar derivaciones de Servicios de su cuadrilla.", path);
+      }
+    } else if (scenario.actor.kind !== "OFFICE") {
+      return errorResponse(403, "Solo Oficina o Campo puede consultar derivaciones.", path);
+    }
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
       const backendResponse = await fetchBackend(request, `/repair-requests${new URL(request.url).search}`);
@@ -64,7 +82,6 @@ export async function GET(request: Request) {
       });
     }
 
-    const query = queryFromUrl(new URL(request.url));
     return NextResponse.json(paginateRepairRequestFixtures(filterRepairRequestFixtures(query), query.page, query.pageSize));
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
@@ -76,14 +93,19 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
   try {
-    const { session, scenario } = officeOnly(request);
-    if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede crear derivaciones.", path);
+    const { session, scenario } = sessionAndScenario(request);
+    if (scenario.actor.kind !== "OFFICE" && scenario.actor.kind !== "FIELD") {
+      return errorResponse(403, "Solo Oficina o Campo puede crear derivaciones.", path);
+    }
 
     let body: unknown;
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = createRepairRequestInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (parsed.data.detectedInType !== "SERVICE") return errorResponse(400, "En esta fase la derivación debe originarse en un Servicio.", path);
+    if (scenario.actor.kind === "FIELD" && !fieldCanAccessService(scenario, parsed.data.detectedInId)) {
+      return errorResponse(403, "Solo puede crear derivaciones desde Servicios de su cuadrilla.", path);
+    }
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
       const backendResponse = await fetchBackend(request, "/repair-requests", undefined, {

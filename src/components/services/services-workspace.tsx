@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/resizable";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OperationalScenario } from "@/lib/scenarios";
+import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
 import {
   ServiceRequestError,
   servicesAdapter,
@@ -37,6 +38,10 @@ import {
   type ServiceQuery,
   type ServiceStatus,
 } from "@/lib/services";
+import {
+  streetClosureRequestsAdapter,
+  type StreetClosureDependency,
+} from "@/lib/street-closure-requests";
 import { cn } from "@/lib/utils";
 import { MapView } from "./map-view";
 import { AssignCrewDialog } from "./assign-crew-dialog";
@@ -167,8 +172,10 @@ export function ServicesWorkspace({
   // Cancel modal state (Office action)
   const [cancelingServiceId, setCancelingServiceId] = useState<string | null>(null);
 
-  // RepairRequest creation is an Office-only Service entry point in Phase 3.
+  // RepairRequest entry point is Office-wide or Field-only from the actor's assigned Service.
   const [repairRequestServiceId, setRepairRequestServiceId] = useState<string | null>(null);
+  const [repairRequests, setRepairRequests] = useState<Record<string, RepairRequest[]>>({});
+  const [repairRequestsErrors, setRepairRequestsErrors] = useState<Record<string, string>>({});
   // Office-only outbound referral from the canonical Service context.
   const [streetClosureServiceId, setStreetClosureServiceId] = useState<string | null>(null);
 
@@ -346,6 +353,29 @@ export function ServicesWorkspace({
     return loadState.services.find((s) => s.id === detailId) ?? null;
   }, [detailId, loadState]);
 
+  const fieldCanViewRepairRequests = Boolean(
+    scenario?.actor.kind === "FIELD" &&
+      scenario.actor.crewId &&
+      detailService?.crewId === scenario.actor.crewId,
+  );
+
+  useEffect(() => {
+    if (!fieldCanViewRepairRequests || !detailService) return;
+
+    let isCurrent = true;
+    void repairRequestsAdapter.list({ detectedInId: detailService.id, pageSize: 50 })
+      .then((page) => {
+        if (isCurrent) setRepairRequests((current) => ({ ...current, [detailService.id]: page.repairRequests }));
+      })
+      .catch(() => {
+        if (isCurrent) setRepairRequestsErrors((current) => ({ ...current, [detailService.id]: "No se pudieron cargar las derivaciones de este Servicio." }));
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [detailService, fieldCanViewRepairRequests]);
+
   const assigningService = useMemo(() => {
     if (!assigningServiceId || loadState.status !== "ready") return null;
     return loadState.services.find((s) => s.id === assigningServiceId) ?? null;
@@ -426,8 +456,43 @@ export function ServicesWorkspace({
   const canSchedule = !isField;
   const canReschedule = !isField;
   const canExecuteService = Boolean(scenario?.capabilities.includes("service:execute"));
-  const canCreateRepairRequest = scenario?.actor.kind === "OFFICE";
+  const canCreateRepairRequest = scenario?.actor.kind === "OFFICE" || fieldCanViewRepairRequests;
   const canCreateStreetClosureRequest = scenario?.actor.kind === "OFFICE";
+
+  const [streetClosureDependencyState, setStreetClosureDependencyState] = useState<{
+    serviceId: string | null;
+    dependency: StreetClosureDependency | null;
+    error: string | null;
+  }>({ serviceId: null, dependency: null, error: null });
+
+  useEffect(() => {
+    if (!canCreateStreetClosureRequest || !detailId) return;
+
+    let isCurrent = true;
+    void streetClosureRequestsAdapter
+      .getForService(detailId)
+      .then((dependency) => {
+        if (!isCurrent) return;
+        setStreetClosureDependencyState({ serviceId: detailId, dependency, error: null });
+      })
+      .catch((cause) => {
+        if (!isCurrent) return;
+        setStreetClosureDependencyState({
+          serviceId: detailId,
+          dependency: null,
+          error: cause instanceof Error ? cause.message : "No se pudo consultar la respuesta de M7.",
+        });
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [canCreateStreetClosureRequest, detailId]);
+
+  const displayedStreetClosureState =
+    canCreateStreetClosureRequest && detailId && streetClosureDependencyState.serviceId === detailId
+      ? streetClosureDependencyState
+      : { serviceId: null, dependency: null, error: null };
 
   const handleStartService = useCallback(async (service: Service) => {
     try {
@@ -537,6 +602,18 @@ export function ServicesWorkspace({
           canStartService={canExecuteService}
           isResuming={resumingId === detailService.id}
           resumeError={resumeErrors[detailService.id] ?? null}
+          streetClosureDependency={displayedStreetClosureState.dependency}
+          streetClosureDependencyLoading={Boolean(
+            canCreateStreetClosureRequest &&
+              detailId &&
+              displayedStreetClosureState.serviceId !== detailId,
+          )}
+          streetClosureDependencyError={displayedStreetClosureState.error}
+          onRejectedClosureReschedule={(service) => setReschedulingServiceId(service.id)}
+          onRejectedClosureCancel={(service) => setCancelingServiceId(service.id)}
+          repairRequests={fieldCanViewRepairRequests ? repairRequests[detailService.id] ?? [] : undefined}
+          repairRequestsLoading={fieldCanViewRepairRequests && !Object.prototype.hasOwnProperty.call(repairRequests, detailService.id) && !repairRequestsErrors[detailService.id]}
+          repairRequestsError={repairRequestsErrors[detailService.id] ?? null}
         />
         {canAssignCrew && (
           <AssignCrewDialog
@@ -556,7 +633,15 @@ export function ServicesWorkspace({
             onOpenChange={(open) => {
               if (!open) setRepairRequestServiceId(null);
             }}
-            onCreated={() => undefined}
+            onCreated={(request) => {
+              setRepairRequests((current) => ({
+                ...current,
+                [request.detectedInId]: [
+                  request,
+                  ...(current[request.detectedInId] ?? []).filter((item) => item.id !== request.id),
+                ],
+              }));
+            }}
           />
         )}
         {canExecuteService && (
@@ -604,6 +689,13 @@ export function ServicesWorkspace({
                   if (!open) setStreetClosureServiceId(null);
                 }}
                 service={streetClosureService}
+                onCreated={(request) =>
+                  setStreetClosureDependencyState({
+                    serviceId: detailService.id,
+                    dependency: { request, outcome: "blocked" },
+                    error: null,
+                  })
+                }
               />
             )}
           </>

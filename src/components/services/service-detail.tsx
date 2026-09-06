@@ -22,7 +22,14 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  REPAIR_DAMAGE_TYPE_LABEL,
+  REPAIR_REQUEST_STATUS_LABEL,
+  REPAIR_SEVERITY_LABEL,
+  type RepairRequest,
+} from "@/lib/repair-requests";
 import { checkServiceWindowTiming, type Service } from "@/lib/services";
+import type { StreetClosureDependency } from "@/lib/street-closure-requests";
 import { StatusBadge } from "./status-badge";
 import { ZoneExecutionPanel } from "./zone-execution-panel";
 
@@ -39,6 +46,9 @@ export function ServiceDetail({
   onCreateRepairRequest,
   onCreateStreetClosureRequest,
   onServiceUpdated,
+  repairRequests,
+  repairRequestsLoading = false,
+  repairRequestsError = null,
   canStartService = false,
   isStarting = false,
   startError = null,
@@ -46,6 +56,11 @@ export function ServiceDetail({
   isResuming = false,
   resumeError = null,
   resumeDraftPending = false,
+  streetClosureDependency = null,
+  streetClosureDependencyLoading = false,
+  streetClosureDependencyError = null,
+  onRejectedClosureReschedule,
+  onRejectedClosureCancel,
   backLabel = "Volver a Servicios",
 }: {
   service: Service;
@@ -60,6 +75,9 @@ export function ServiceDetail({
   onCreateRepairRequest?: (service: Service) => void;
   onCreateStreetClosureRequest?: (service: Service) => void;
   onServiceUpdated?: (service: Service) => void;
+  repairRequests?: RepairRequest[];
+  repairRequestsLoading?: boolean;
+  repairRequestsError?: string | null;
   canStartService?: boolean;
   isStarting?: boolean;
   startError?: string | null;
@@ -68,6 +86,11 @@ export function ServiceDetail({
   isResuming?: boolean;
   resumeError?: string | null;
   resumeDraftPending?: boolean;
+  streetClosureDependency?: StreetClosureDependency | null;
+  streetClosureDependencyLoading?: boolean;
+  streetClosureDependencyError?: string | null;
+  onRejectedClosureReschedule?: (service: Service) => void;
+  onRejectedClosureCancel?: (service: Service) => void;
   backLabel?: string;
 }) {
   const windowTiming = checkServiceWindowTiming(service);
@@ -249,6 +272,94 @@ export function ServiceDetail({
             </div>
           )}
 
+          {streetClosureDependencyLoading && (
+            <div
+              role="status"
+              aria-label="Verificando dependencia de corte de calle"
+              className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4 text-sm text-[var(--color-text-secondary)]"
+            >
+              Verificando la respuesta de M7 antes de habilitar la ejecución…
+            </div>
+          )}
+
+          {streetClosureDependencyError && (
+            <div
+              role="alert"
+              className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/50 p-4 text-sm text-[var(--color-danger)]"
+            >
+              No se pudo consultar la dependencia de corte de calle: {streetClosureDependencyError}
+            </div>
+          )}
+
+          {streetClosureDependency?.outcome === "blocked" && (
+            <div
+              role="status"
+              aria-label="Corte de calle pendiente"
+              className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-warning)]">
+                <Siren className="h-4 w-4" aria-hidden />
+                Corte de calle pendiente
+              </div>
+              <p className="mt-1 text-sm text-[var(--color-warning)]">
+                El inicio de todo el Servicio está bloqueado hasta recibir la respuesta de M7; un
+                Servicio en Recorrido no puede ejecutarse parcialmente.
+              </p>
+            </div>
+          )}
+
+          {streetClosureDependency?.outcome === "allowed" && (
+            <div
+              role="status"
+              aria-label="Corte de calle aprobado"
+              className="rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)]/40 p-4 text-sm text-[var(--color-success)]"
+            >
+              <p className="font-bold">Corte de calle aprobado por M7</p>
+              <p className="mt-1">El Servicio puede iniciar. Su estado permanece sin cambios hasta ejecutar la acción.</p>
+            </div>
+          )}
+
+          {streetClosureDependency?.outcome === "released" && (
+            <div
+              role="status"
+              aria-label="Corte de calle finalizado"
+              className="rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)]/40 p-4 text-sm text-[var(--color-success)]"
+            >
+              <p className="font-bold">Corte de calle finalizado</p>
+              <p className="mt-1">La dependencia quedó liberada; el estado del Servicio no se reabre ni se modifica.</p>
+            </div>
+          )}
+
+          {streetClosureDependency?.outcome === "rejected" && (
+            <div
+              role="status"
+              aria-label="Corte de calle rechazado"
+              className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/50 p-4"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-danger)]">
+                <Siren className="h-4 w-4" aria-hidden />
+                Corte de calle rechazado
+              </div>
+              <p className="mt-1 text-sm text-[var(--color-danger)]">
+                M7 rechazó la solicitud. Oficina debe decidir explícitamente si reprogramar o cancelar el Servicio.
+              </p>
+              {(onRejectedClosureReschedule || onRejectedClosureCancel) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {onRejectedClosureReschedule && (
+                    <Button variant="outline" size="sm" onClick={() => onRejectedClosureReschedule(service)}>
+                      Reprogramar servicio por rechazo de corte
+                    </Button>
+                  )}
+                  {onRejectedClosureCancel && (
+                    <Button variant="outline" size="sm" onClick={() => onRejectedClosureCancel(service)}>
+                      Cancelar servicio por rechazo de corte
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {service.status === "SCHEDULED" && canStartService && windowTiming.isOutside && (
             <div
               role="status"
@@ -425,6 +536,50 @@ export function ServiceDetail({
                 {service.notes}
               </p>
             </div>
+          )}
+
+          {repairRequests !== undefined && (
+            <section
+              aria-labelledby="service-repair-requests-title"
+              className="rounded-xl border border-[var(--color-border)] p-5 space-y-4"
+            >
+              <div>
+                <h2 id="service-repair-requests-title" className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-text)]">
+                  <Wrench className="h-4 w-4 text-[var(--color-action)]" aria-hidden />
+                  Derivaciones de reparación
+                </h2>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  Seguimiento de daños referidos a M3 desde este Servicio.
+                </p>
+              </div>
+
+              {repairRequestsLoading ? (
+                <p role="status" className="text-sm text-[var(--color-text-secondary)]">Cargando derivaciones…</p>
+              ) : repairRequestsError ? (
+                <p role="alert" className="text-sm text-[var(--color-danger)]">{repairRequestsError}</p>
+              ) : repairRequests.length === 0 ? (
+                <p className="text-sm text-[var(--color-text-secondary)]">Este Servicio todavía no tiene derivaciones de reparación.</p>
+              ) : (
+                <ul className="space-y-3" aria-label="Derivaciones de reparación del Servicio">
+                  {repairRequests.map((request) => (
+                    <li key={request.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="font-bold text-[var(--color-text)]">{request.id}</span>
+                        <span className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 font-semibold text-[var(--color-text)]">
+                          {REPAIR_REQUEST_STATUS_LABEL[request.status]}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid gap-1 text-xs text-[var(--color-text-secondary)] sm:grid-cols-2">
+                        <span>Daño: <strong className="text-[var(--color-text)]">{REPAIR_DAMAGE_TYPE_LABEL[request.damageType]}</strong></span>
+                        <span>Severidad: <strong className="text-[var(--color-text)]">{REPAIR_SEVERITY_LABEL[request.severity]}</strong></span>
+                        <span>Ubicación: <strong className="text-[var(--color-text)]">{request.address}</strong></span>
+                        <span>Riesgo público: <strong className="text-[var(--color-text)]">{request.publicSafetyRisk ? "Sí" : "No"}</strong></span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           )}
 
           {/* Zone Execution Workflow (Available for IN_PROGRESS and closed services) */}

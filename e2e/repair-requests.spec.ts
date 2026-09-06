@@ -35,9 +35,16 @@ test.describe("RepairRequest Service-sourced workflow", () => {
     await expect(dialog.getByRole("link", { name: /Ver Servicio fuente/ })).toHaveAttribute("href", /detail=SVC-1043/);
   });
 
-  test("Field has no RepairRequest creation entry point", async ({ page }) => {
+  test("Field can create a referral from assigned work", async ({ page }) => {
     await openServiceDetail(page, "field-crew-leader-route", "SVC-1051");
-    await expect(page.getByRole("button", { name: "Crear derivación de reparación" })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: "Crear derivación de reparación" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /corte de calle/i })).not.toBeVisible();
+    await expect(page.getByRole("button", { name: /iniciar derivación|cerrar derivación/i })).not.toBeVisible();
+    await page.getByRole("button", { name: "Crear derivación de reparación" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Ubicación del daño").fill("Calle 12 y Bulevar Costero");
+    await dialog.getByRole("button", { name: "Crear derivación a M3" }).click();
+    await expect(dialog.getByRole("status")).toContainText("pendiente de respuesta de M3");
     await expect(page.getByText("EnvironmentalInspection")).not.toBeVisible();
   });
 

@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import {
+  streetClosureRequestsAdapter,
+  type StreetClosureRequest,
+} from "./street-closure-requests";
 import { recordTelemetryEvent } from "./telemetry";
 
 export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
@@ -355,6 +359,16 @@ export class ServiceRequestError extends Error {
   }
 }
 
+export class ServiceStartBlockedError extends ServiceRequestError {
+  readonly streetClosureRequest: StreetClosureRequest;
+
+  constructor(message: string, streetClosureRequest: StreetClosureRequest) {
+    super(message, 409);
+    this.name = "ServiceStartBlockedError";
+    this.streetClosureRequest = streetClosureRequest;
+  }
+}
+
 export const STATUS_LABEL: Record<ServiceStatus, string> = {
   SCHEDULED: "Programado",
   RESCHEDULED: "A reprogramar",
@@ -630,6 +644,20 @@ export const servicesAdapter = {
   },
 
   async start(serviceId: string): Promise<Service> {
+    const dependency = await streetClosureRequestsAdapter.getForService(serviceId);
+    if (dependency.outcome === "blocked") {
+      throw new ServiceStartBlockedError(
+        "No se puede iniciar el Servicio: la solicitud de corte de calle sigue pendiente de respuesta de M7.",
+        dependency.request!,
+      );
+    }
+    if (dependency.outcome === "rejected") {
+      throw new ServiceStartBlockedError(
+        "M7 rechazó el corte de calle. Oficina debe elegir explícitamente entre reprogramar o cancelar el Servicio.",
+        dependency.request!,
+      );
+    }
+
     let response: Response;
     try {
       response = await authenticatedFetch(`/api/services/${serviceId}/start`, {
