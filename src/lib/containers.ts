@@ -347,6 +347,27 @@ export const containersAdapter = {
     );
   },
 
+  async startRepair(id: string): Promise<Container> {
+    return parseContainer(
+      await send(`/api/containers/${id}/start-repair`, { method: "POST" }),
+      "La respuesta de inicio de reparación no respeta el contrato esperado.",
+    );
+  },
+
+  async completeRepair(id: string): Promise<Container> {
+    return parseContainer(
+      await send(`/api/containers/${id}/complete-repair`, { method: "POST" }),
+      "La respuesta de finalización de reparación no respeta el contrato esperado.",
+    );
+  },
+
+  async remove(id: string): Promise<Container> {
+    return parseContainer(
+      await send(`/api/containers/${id}/remove`, { method: "POST" }),
+      "La respuesta de retiro de contenedor no respeta el contrato esperado.",
+    );
+  },
+
   async uploadEvidence(params: {
     file: File;
     containerId: string;

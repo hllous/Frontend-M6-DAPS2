@@ -115,8 +115,116 @@ describe("ContainerCatalogPanel", () => {
     expect(await screen.findByText("CONT-001")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Registrar contenedor" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /reparación independiente/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retirar contenedor" })).not.toBeInTheDocument();
     // Detail button remains accessible to Field
     expect(screen.getAllByRole("button", { name: "Ver detalle" }).length).toBeGreaterThan(0);
+  });
+
+  it("lets Office dispatch standalone repair and removal transitions", { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByText("CONT-003")).toBeVisible();
+    const damagedRow = screen.getByRole("row", { name: /CONT-003/ });
+
+    await user.click(within(damagedRow).getByRole("button", { name: "Iniciar reparación independiente" }));
+    const startDialog = screen.getByRole("dialog");
+    expect(within(startDialog).getByText(/acción independiente de Oficina/i)).toBeVisible();
+    await user.click(within(startDialog).getByRole("button", { name: "Iniciar reparación" }));
+
+    const repairRow = screen.getByRole("row", { name: /CONT-003/ });
+    expect(within(repairRow).getByText("En reparación")).toBeVisible();
+    await user.click(within(repairRow).getByRole("button", { name: "Completar reparación independiente" }));
+    const completeDialog = screen.getByRole("dialog");
+    expect(within(completeDialog).getByText(/no corresponde al completado de un Servicio/i)).toBeVisible();
+    await user.click(within(completeDialog).getByRole("button", { name: "Confirmar reparación completa" }));
+
+    const activeRow = screen.getByRole("row", { name: /CONT-003/ });
+    expect(within(activeRow).getByText("Activo")).toBeVisible();
+
+    // A fresh damaged fixture is used by the next test; this confirms no removal
+    // action was rendered for the active state.
+    expect(within(activeRow).queryByRole("button", { name: "Retirar contenedor" })).not.toBeInTheDocument();
+  });
+
+  it("allows Office to remove a damaged container and hides lifecycle actions after removal", { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByText("CONT-003")).toBeVisible();
+    const row = screen.getByRole("row", { name: /CONT-003/ });
+    await user.click(within(row).getByRole("button", { name: "Retirar contenedor" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: /Retirar contenedor CONT-003/ })).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar retiro" }));
+
+    const removedRow = screen.getByRole("row", { name: /CONT-003/ });
+    expect(within(removedRow).getByText("Retirado")).toBeVisible();
+    expect(within(removedRow).queryByRole("button", { name: /reparación|retirar/i })).not.toBeInTheDocument();
+  });
+
+  it("uploads repair evidence as flat Container evidence", { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    const evidenceOwners: string[] = [];
+    server.use(
+      http.post("*/api/evidence", async ({ request }) => {
+        const formData = await request.formData();
+        evidenceOwners.push(String(formData.get("ownerType")));
+        return HttpResponse.json({
+          id: "att-repair-1",
+          url: "/files/repair.png",
+          filename: "repair.png",
+          contentType: "image/png",
+          uploadedAt: new Date().toISOString(),
+        });
+      }),
+    );
+
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByText("CONT-004")).toBeVisible();
+    const row = screen.getByRole("row", { name: /CONT-004/ });
+    await user.click(within(row).getByRole("button", { name: "Completar reparación independiente" }));
+    const dialog = screen.getByRole("dialog");
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(fileInput, new File(["image-bytes"], "repair.png", { type: "image/png" }));
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar reparación completa" }));
+
+    expect(await screen.findByText("Reparación completada con éxito para el contenedor CONT-004.")).toBeVisible();
+    expect(evidenceOwners).toEqual(["CONTAINER"]);
+  });
+
+  it("uploads removal evidence as flat Container evidence", { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    const evidenceOwners: string[] = [];
+    server.use(
+      http.post("*/api/evidence", async ({ request }) => {
+        const formData = await request.formData();
+        evidenceOwners.push(String(formData.get("ownerType")));
+        return HttpResponse.json({
+          id: "att-removal-1",
+          url: "/files/removal.pdf",
+          filename: "removal.pdf",
+          contentType: "application/pdf",
+          uploadedAt: new Date().toISOString(),
+        });
+      }),
+    );
+
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByText("CONT-003")).toBeVisible();
+    const row = screen.getByRole("row", { name: /CONT-003/ });
+    await user.click(within(row).getByRole("button", { name: "Retirar contenedor" }));
+    const dialog = screen.getByRole("dialog");
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(fileInput, new File(["pdf-bytes"], "removal.pdf", { type: "application/pdf" }));
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar retiro" }));
+
+    expect(await screen.findByText("Contenedor CONT-003 retirado con éxito.")).toBeVisible();
+    expect(evidenceOwners).toEqual(["CONTAINER"]);
   });
 
   it("renders a retryable error state on load failure", async () => {
