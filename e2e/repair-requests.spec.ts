@@ -3,14 +3,18 @@ import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
 import type { ScenarioId } from "../src/lib/scenarios";
 
-async function openServiceDetail(page: import("@playwright/test").Page, scenario: ScenarioId = "office-duty-queue") {
+async function openServiceDetail(
+  page: import("@playwright/test").Page,
+  scenario: ScenarioId = "office-duty-queue",
+  serviceId = "SVC-1043",
+) {
   await loginViaApi(page, scenario);
   await page.goto("/app?destination=services");
   const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
   await expect(table).toBeVisible();
-  await table.getByRole("row", { name: /SVC-1043/ }).click();
+  await table.getByRole("row", { name: new RegExp(serviceId) }).click();
   await page.getByRole("button", { name: "Ver detalle completo" }).click();
-  await expect(page.getByRole("region", { name: /Detalle completo de SVC-1043/i })).toBeVisible();
+  await expect(page.getByRole("region", { name: new RegExp(`Detalle completo de ${serviceId}`, "i") })).toBeVisible();
 }
 
 test.describe("RepairRequest Service-sourced workflow", () => {
@@ -32,7 +36,7 @@ test.describe("RepairRequest Service-sourced workflow", () => {
   });
 
   test("Field has no RepairRequest creation entry point", async ({ page }) => {
-    await openServiceDetail(page, "field-crew-leader-route");
+    await openServiceDetail(page, "field-crew-leader-route", "SVC-1051");
     await expect(page.getByRole("button", { name: "Crear derivación de reparación" })).not.toBeVisible();
     await expect(page.getByText("EnvironmentalInspection")).not.toBeVisible();
   });

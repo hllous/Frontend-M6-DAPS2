@@ -109,6 +109,33 @@ import {
   repairRequestStatusSchema,
   repairSeveritySchema,
 } from "@/lib/repair-requests";
+import {
+  addContainerFixture,
+  filterContainerFixtures,
+  containerFixtures,
+  paginateContainerFixtures,
+  updateContainerFixture,
+} from "@/lib/containers-fixtures";
+import {
+  createContainerInputSchema,
+  updateContainerInputSchema,
+  containerStatusSchema,
+  containerTypeSchema,
+  type ContainerQuery,
+} from "@/lib/containers";
+import {
+  addStreetClosureRequestFixture,
+  createStreetClosureRequestFixture,
+  filterStreetClosureRequestFixtures,
+  getStreetClosureRequestFixture,
+  paginateStreetClosureRequestFixtures,
+  updateStreetClosureRequestFixture,
+} from "@/lib/street-closure-request-fixtures";
+import {
+  approveStreetClosureRequestInputSchema,
+  createStreetClosureRequestInputSchema,
+  streetClosureRequestQuerySchema,
+} from "@/lib/street-closure-requests";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -225,6 +252,34 @@ function greenSpaceQueryFromUrl(url: string): GreenSpaceQuery {
   };
 }
 
+function containerQueryFromUrl(url: string): ContainerQuery {
+  const params = new URL(url).searchParams;
+  const rawStatus = params.get("status");
+  const rawType = params.get("containerType");
+  return {
+    status: containerStatusSchema.safeParse(rawStatus).success
+      ? (rawStatus as ContainerQuery["status"])
+      : undefined,
+    containerType: containerTypeSchema.safeParse(rawType).success
+      ? (rawType as ContainerQuery["containerType"])
+      : undefined,
+    zoneId: params.get("zoneId") ?? undefined,
+    search: params.get("search") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
+function streetClosureRequestQueryFromUrl(url: string) {
+  const params = new URL(url).searchParams;
+  return streetClosureRequestQuerySchema.parse({
+    status: params.get("status") ?? undefined,
+    sourceId: params.get("sourceId") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  });
+}
+
 export const handlers = [
   http.get("*/api/mock/scenarios", () => HttpResponse.json(Object.values(scenarios))),
   http.get("*/api/mock/scenarios/:scenarioId", ({ params }) => {
@@ -235,6 +290,87 @@ export const handlers = [
     }
 
     return HttpResponse.json(getScenario(scenarioId as ScenarioId));
+  }),
+  // StreetClosureRequest adapter contract and deterministic scenario handlers.
+  http.get("*/api/street-closure-requests", ({ request }) => {
+    const query = streetClosureRequestQueryFromUrl(request.url);
+    return HttpResponse.json(
+      paginateStreetClosureRequestFixtures(
+        filterStreetClosureRequestFixtures(query),
+        query.page,
+        query.pageSize,
+      ),
+    );
+  }),
+  http.post("*/api/street-closure-requests", async ({ request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "El cuerpo de la solicitud no es un JSON válido.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
+        { status: 400 },
+      );
+    }
+    const parsed = createStreetClosureRequestInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
+        { status: 400 },
+      );
+    }
+    const service = serviceFixtures.find((candidate) => candidate.id === parsed.data.sourceId);
+    if (!service) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Servicio de origen no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
+        { status: 404 },
+      );
+    }
+    const created = createStreetClosureRequestFixture(parsed.data, service);
+    addStreetClosureRequestFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.get("*/api/street-closure-requests/:requestId", ({ params }) => {
+    const item = getStreetClosureRequestFixture(params.requestId as string);
+    if (!item) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Solicitud de corte de calle no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(item);
+  }),
+  http.post("*/api/street-closure-requests/:requestId/approve", async ({ params, request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "El cuerpo de la aprobación no es un JSON válido.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/approve` },
+        { status: 400 },
+      );
+    }
+    const parsed = approveStreetClosureRequestInputSchema.safeParse(body);
+    const item = getStreetClosureRequestFixture(params.requestId as string);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/approve` },
+        { status: 400 },
+      );
+    }
+    if (!item) return HttpResponse.json({ statusCode: 404, message: "Solicitud no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/approve` }, { status: 404 });
+    const updated = updateStreetClosureRequestFixture(item.id, { status: "APPROVED", closureId: parsed.data.closureId, updatedAt: new Date().toISOString() });
+    return HttpResponse.json(updated);
+  }),
+  http.post("*/api/street-closure-requests/:requestId/reject", ({ params }) => {
+    const item = getStreetClosureRequestFixture(params.requestId as string);
+    if (!item) return HttpResponse.json({ statusCode: 404, message: "Solicitud no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/reject` }, { status: 404 });
+    return HttpResponse.json(updateStreetClosureRequestFixture(item.id, { status: "REJECTED", updatedAt: new Date().toISOString() }));
+  }),
+  http.post("*/api/street-closure-requests/:requestId/end", ({ params }) => {
+    const item = getStreetClosureRequestFixture(params.requestId as string);
+    if (!item) return HttpResponse.json({ statusCode: 404, message: "Solicitud no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/end` }, { status: 404 });
+    return HttpResponse.json(updateStreetClosureRequestFixture(item.id, { status: "ENDED", updatedAt: new Date().toISOString() }));
   }),
   http.get("*/api/zones", ({ request }) => {
     const query = zoneQueryFromUrl(request.url);
@@ -734,6 +870,78 @@ export const handlers = [
     }
     greenSpace.active = false;
     return HttpResponse.json(greenSpace);
+  }),
+  // --- Containers catalog (#120) ---
+  http.get("*/api/containers", ({ request }) => {
+    const query = containerQueryFromUrl(request.url);
+    return HttpResponse.json(paginateContainerFixtures(filterContainerFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/containers/:containerId", ({ params }) => {
+    const container = containerFixtures.find((item) => item.id === params.containerId);
+    return container
+      ? HttpResponse.json(container)
+      : HttpResponse.json(
+          {
+            statusCode: 404,
+            message: "Contenedor no encontrado.",
+            error: "Not Found",
+            timestamp: new Date().toISOString(),
+            path: `/api/containers/${params.containerId}`,
+          },
+          { status: 404 },
+        );
+  }),
+  http.post("*/api/containers", async ({ request }) => {
+    const parsed = createContainerInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "Datos de contenedor inválidos.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/containers",
+        },
+        { status: 400 },
+      );
+    }
+    const newContainer = {
+      id: `cont-${Date.now()}`,
+      ...parsed.data,
+      status: "ACTIVE" as const,
+    };
+    addContainerFixture(newContainer);
+    return HttpResponse.json(newContainer, { status: 201 });
+  }),
+  http.patch("*/api/containers/:containerId", async ({ params, request }) => {
+    const container = containerFixtures.find((item) => item.id === params.containerId);
+    const parsed = updateContainerInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!container) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Contenedor no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}`,
+        },
+        { status: 404 },
+      );
+    }
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "Datos de contenedor inválidos.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}`,
+        },
+        { status: 400 },
+      );
+    }
+    const updated = updateContainerFixture(params.containerId as string, parsed.data);
+    return HttpResponse.json(updated);
   }),
   http.get("*/api/services", ({ request }) => {
     const query = serviceQueryFromUrl(request.url);
