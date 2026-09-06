@@ -81,7 +81,7 @@ import { serviceFrequencyCreateInputSchema, serviceFrequencyShiftSchema, service
 import { createVehicleInputSchema, updateVehicleInputSchema, type VehicleQuery } from "@/lib/vehicles";
 import { addVehicleFixture, filterVehicleFixtures, paginateVehicleFixtures, vehicleFixtures } from "@/lib/vehicles-fixtures";
 import { addCrewFixture, filterCrewFixtures, paginateCrewFixtures, crewFixtures } from "@/lib/crew-fixtures";
-import { createCrewInputSchema, updateCrewInputSchema, type CrewQuery } from "@/lib/crews";
+import { addCrewMembersInputSchema, createCrewInputSchema, updateCrewInputSchema, type CrewQuery } from "@/lib/crews";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -595,6 +595,20 @@ export const handlers = [
     const crew = crewFixtures.find((item) => item.id === params.crewId);
     if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 404 });
     crew.active = false;
+    return HttpResponse.json(crew);
+  }),
+  http.post("*/api/crews/:crewId/members", async ({ params, request }) => {
+    const crew = crewFixtures.find((item) => item.id === params.crewId);
+    const parsed = addCrewMembersInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}/members` }, { status: 404 });
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Los integrantes de la cuadrilla son inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}/members` }, { status: 400 });
+    crew.memberUserIds = [...new Set([...crew.memberUserIds, ...parsed.data.memberUserIds])];
+    return HttpResponse.json(crew);
+  }),
+  http.delete("*/api/crews/:crewId/members/:userId", ({ params }) => {
+    const crew = crewFixtures.find((item) => item.id === params.crewId);
+    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}/members/${params.userId}` }, { status: 404 });
+    crew.memberUserIds = crew.memberUserIds.filter((memberUserId) => memberUserId !== params.userId);
     return HttpResponse.json(crew);
   }),
   http.get("*/api/services", ({ request }) => {

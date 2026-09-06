@@ -21,6 +21,8 @@ export const createCrewInputSchema = z.object({
 export type CreateCrewInput = z.infer<typeof createCrewInputSchema>;
 export const updateCrewInputSchema = createCrewInputSchema.extend({ active: z.boolean() }).strict();
 export type UpdateCrewInput = z.infer<typeof updateCrewInputSchema>;
+export const addCrewMembersInputSchema = z.object({ memberUserIds: z.array(z.string().min(1)).min(1) }).strict();
+export type AddCrewMembersInput = z.infer<typeof addCrewMembersInputSchema>;
 
 export class CrewContractError extends Error { constructor(message: string, options?: { cause?: unknown }) { super(message, options); this.name = "CrewContractError"; } }
 export class CrewRequestError extends Error { readonly status: number; constructor(message: string, status: number, options?: { cause?: unknown }) { super(message, options); this.name = "CrewRequestError"; this.status = status; } }
@@ -56,4 +58,6 @@ export const crewsAdapter = {
   async create(input: CreateCrewInput) { const parsed = createCrewInputSchema.safeParse(input); if (!parsed.success) throw new CrewContractError("Los datos de la cuadrilla son inválidos.", { cause: parsed.error }); return resource(await requestJson("/api/crews", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }), "La respuesta de creación de cuadrilla no respeta el contrato esperado."); },
   async update(id: string, input: UpdateCrewInput) { const parsed = updateCrewInputSchema.safeParse(input); if (!parsed.success) throw new CrewContractError("Los datos editables de la cuadrilla son inválidos.", { cause: parsed.error }); return resource(await requestJson(`/api/crews/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }), "La respuesta de actualización de cuadrilla no respeta el contrato esperado."); },
   async remove(id: string) { return resource(await requestJson(`/api/crews/${id}`, { method: "DELETE" }), "La respuesta de baja de cuadrilla no respeta el contrato esperado."); },
+  async addMembers(id: string, memberUserIds: string[]) { const parsed = addCrewMembersInputSchema.safeParse({ memberUserIds }); if (!parsed.success) throw new CrewContractError("Los integrantes de la cuadrilla son inválidos.", { cause: parsed.error }); return resource(await requestJson(`/api/crews/${id}/members`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }), "La respuesta de alta de integrantes no respeta el contrato esperado."); },
+  async removeMember(id: string, userId: string) { return resource(await requestJson(`/api/crews/${id}/members/${encodeURIComponent(userId)}`, { method: "DELETE" }), "La respuesta de baja del integrante no respeta el contrato esperado."); },
 };

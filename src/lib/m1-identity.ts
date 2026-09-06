@@ -6,6 +6,8 @@ const users: M1IdentityReference[] = [
   { id: "user-carlos", displayName: "Carlos López", kind: "USER" },
   { id: "user-jorge", displayName: "Jorge Ibáñez", kind: "USER" },
   { id: "user-lucia", displayName: "Lucía Gómez", kind: "USER" },
+  { id: "user-ana", displayName: "Ana Morales", kind: "USER" },
+  { id: "user-pedro", displayName: "Pedro Ruiz", kind: "USER" },
 ];
 const organizations: M1IdentityReference[] = [
   { id: "org-municipal", displayName: "Municipalidad", kind: "ORGANIZATION" },
