@@ -22,6 +22,12 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  REPAIR_DAMAGE_TYPE_LABEL,
+  REPAIR_REQUEST_STATUS_LABEL,
+  REPAIR_SEVERITY_LABEL,
+  type RepairRequest,
+} from "@/lib/repair-requests";
 import { checkServiceWindowTiming, type Service } from "@/lib/services";
 import { StatusBadge } from "./status-badge";
 import { ZoneExecutionPanel } from "./zone-execution-panel";
@@ -39,6 +45,9 @@ export function ServiceDetail({
   onCreateRepairRequest,
   onCreateStreetClosureRequest,
   onServiceUpdated,
+  repairRequests,
+  repairRequestsLoading = false,
+  repairRequestsError = null,
   canStartService = false,
   isStarting = false,
   startError = null,
@@ -60,6 +69,9 @@ export function ServiceDetail({
   onCreateRepairRequest?: (service: Service) => void;
   onCreateStreetClosureRequest?: (service: Service) => void;
   onServiceUpdated?: (service: Service) => void;
+  repairRequests?: RepairRequest[];
+  repairRequestsLoading?: boolean;
+  repairRequestsError?: string | null;
   canStartService?: boolean;
   isStarting?: boolean;
   startError?: string | null;
@@ -425,6 +437,50 @@ export function ServiceDetail({
                 {service.notes}
               </p>
             </div>
+          )}
+
+          {repairRequests !== undefined && (
+            <section
+              aria-labelledby="service-repair-requests-title"
+              className="rounded-xl border border-[var(--color-border)] p-5 space-y-4"
+            >
+              <div>
+                <h2 id="service-repair-requests-title" className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-text)]">
+                  <Wrench className="h-4 w-4 text-[var(--color-action)]" aria-hidden />
+                  Derivaciones de reparación
+                </h2>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  Seguimiento de daños referidos a M3 desde este Servicio.
+                </p>
+              </div>
+
+              {repairRequestsLoading ? (
+                <p role="status" className="text-sm text-[var(--color-text-secondary)]">Cargando derivaciones…</p>
+              ) : repairRequestsError ? (
+                <p role="alert" className="text-sm text-[var(--color-danger)]">{repairRequestsError}</p>
+              ) : repairRequests.length === 0 ? (
+                <p className="text-sm text-[var(--color-text-secondary)]">Este Servicio todavía no tiene derivaciones de reparación.</p>
+              ) : (
+                <ul className="space-y-3" aria-label="Derivaciones de reparación del Servicio">
+                  {repairRequests.map((request) => (
+                    <li key={request.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="font-bold text-[var(--color-text)]">{request.id}</span>
+                        <span className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 font-semibold text-[var(--color-text)]">
+                          {REPAIR_REQUEST_STATUS_LABEL[request.status]}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid gap-1 text-xs text-[var(--color-text-secondary)] sm:grid-cols-2">
+                        <span>Daño: <strong className="text-[var(--color-text)]">{REPAIR_DAMAGE_TYPE_LABEL[request.damageType]}</strong></span>
+                        <span>Severidad: <strong className="text-[var(--color-text)]">{REPAIR_SEVERITY_LABEL[request.severity]}</strong></span>
+                        <span>Ubicación: <strong className="text-[var(--color-text)]">{request.address}</strong></span>
+                        <span>Riesgo público: <strong className="text-[var(--color-text)]">{request.publicSafetyRisk ? "Sí" : "No"}</strong></span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           )}
 
           {/* Zone Execution Workflow (Available for IN_PROGRESS and closed services) */}
