@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
-import { containerFixtures, updateContainerFixture } from "@/lib/containers-fixtures";
-import { updateContainerInputSchema } from "@/lib/containers";
+import { getContainerFixture, reportDamageFixture } from "@/lib/containers-fixtures";
+import { reportDamageInputSchema } from "@/lib/containers";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -12,6 +12,7 @@ const ERROR_LABELS: Record<number, string> = {
   401: "Unauthorized",
   403: "Forbidden",
   404: "Not Found",
+  409: "Conflict",
   503: "Service Unavailable",
   500: "Internal Server Error",
 };
@@ -33,42 +34,7 @@ async function targetId(context: { params: Promise<{ id: string }> }) {
   return (await context.params).id;
 }
 
-export async function GET(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
-  const id = await targetId(context);
-  const path = new URL(request.url).pathname;
-
-  try {
-    const session = getRequiredSession(request);
-
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/containers/${id}`);
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
-    }
-
-    const container = containerFixtures.find((c) => c.id === id);
-    if (!container) {
-      return errorResponse(404, `Contenedor ${id} no encontrado.`, path);
-    }
-
-    return NextResponse.json(container);
-  } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo cargar el contenedor.", path);
-  }
-}
-
-export async function PATCH(
+export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -79,9 +45,8 @@ export async function PATCH(
     const session = getRequiredSession(request);
     const scenario = getScenario(session.scenarioId);
 
-    // Permission check: mirror cancel/route.ts inline actor-kind check
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo el rol de Oficina puede gestionar contenedores.", path);
+    if (!scenario.capabilities.includes("container:report")) {
+      return errorResponse(403, "No tiene permisos para reportar daños de contenedores.", path);
     }
 
     let body: unknown;
@@ -91,14 +56,14 @@ export async function PATCH(
       return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
     }
 
-    const parsed = updateContainerInputSchema.safeParse(body);
+    const parsed = reportDamageInputSchema.safeParse(body);
     if (!parsed.success) {
       return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
     }
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/containers/${id}`, "container:manage", {
-        method: "PATCH",
+      const backendResponse = await fetchBackend(request, `/containers/${id}/report-damage`, "container:report", {
+        method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
@@ -109,20 +74,27 @@ export async function PATCH(
       });
     }
 
-    const existing = containerFixtures.find((c) => c.id === id);
-    if (!existing) {
+    const container = getContainerFixture(id);
+    if (!container) {
       return errorResponse(404, `Contenedor ${id} no encontrado.`, path);
     }
 
-    // Code and containerType are strictly immutable.
-    const updated = updateContainerFixture(id, parsed.data);
-    return NextResponse.json(updated);
+    if (container.status !== "ACTIVE") {
+      return errorResponse(
+        409,
+        `Solo se puede reportar daño en contenedores activos. Estado actual: ${container.status}`,
+        path,
+      );
+    }
+
+    const updated = reportDamageFixture(id, parsed.data);
+    return NextResponse.json(updated, { status: 200 });
   } catch (error) {
     if (error instanceof InvalidSessionError) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo actualizar el contenedor.", path);
+    return errorResponse(500, "No se pudo reportar el daño del contenedor.", path);
   }
 }

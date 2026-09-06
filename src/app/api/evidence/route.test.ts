@@ -8,11 +8,14 @@ import {
   resetZoneResultFixtures,
   zoneResultFixtures,
 } from "@/lib/services-fixtures";
-import { POST } from "./route";
+import { resetContainerFixtures } from "@/lib/containers-fixtures";
+import { GET, POST } from "./route";
 
 beforeEach(() => {
   resetServiceFixtures();
   resetZoneResultFixtures();
+  resetContainerFixtures();
+  evidenceCache.clear();
 });
 
 afterEach(() => {
@@ -20,6 +23,10 @@ afterEach(() => {
   delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
+  resetServiceFixtures();
+  resetZoneResultFixtures();
+  resetContainerFixtures();
+  evidenceCache.clear();
 });
 
 async function authenticatedCookie(scenarioId: string, mode = "mock") {
@@ -281,5 +288,128 @@ describe("POST /api/evidence BFF route", () => {
     const body2 = await response2.json();
     expect(body2.id).toBe(body1.id);
     expect(body2.filename).toBe(body1.filename);
+  });
+
+  describe("ownerType=CONTAINER evidence flow", () => {
+    it("allows Field crew member to upload evidence for a container without service assignment", async () => {
+      const cookie = await authenticatedCookie("field-crew-member-route");
+      const formData = new FormData();
+      const file = new File(["img-data"], "desborde.jpg", { type: "image/jpeg" });
+      formData.append("file", file);
+      formData.append("fileName", "desborde.jpg");
+      formData.append("ownerType", "CONTAINER");
+      formData.append("ownerId", "cont-1");
+
+      const response = await POST(
+        new Request("http://localhost/api/evidence", {
+          method: "POST",
+          headers: { cookie, "Idempotency-Key": "cont-key-1" },
+          body: formData,
+        }),
+      );
+
+      expect(response.status).toBe(201);
+      const body = await response.json();
+      expect(body).toMatchObject({
+        filename: "desborde.jpg",
+        contentType: "image/jpeg",
+      });
+    });
+
+    it("allows Office to upload evidence for a container", async () => {
+      const cookie = await authenticatedCookie("office-duty-queue");
+      const formData = new FormData();
+      const file = new File(["img-data"], "dano.webp", { type: "image/webp" });
+      formData.append("file", file);
+      formData.append("fileName", "dano.webp");
+      formData.append("ownerType", "CONTAINER");
+      formData.append("ownerId", "cont-1");
+
+      const response = await POST(
+        new Request("http://localhost/api/evidence", {
+          method: "POST",
+          headers: { cookie, "Idempotency-Key": "cont-key-2" },
+          body: formData,
+        }),
+      );
+
+      expect(response.status).toBe(201);
+      const body = await response.json();
+      expect(body.filename).toBe("dano.webp");
+    });
+
+    it("blocks actors without container:report from uploading container evidence", async () => {
+      const cookie = await authenticatedCookie("office-limited-intake");
+      const formData = new FormData();
+      const file = new File(["img-data"], "test.jpg", { type: "image/jpeg" });
+      formData.append("file", file);
+      formData.append("fileName", "test.jpg");
+      formData.append("ownerType", "CONTAINER");
+      formData.append("ownerId", "cont-1");
+
+      const response = await POST(
+        new Request("http://localhost/api/evidence", {
+          method: "POST",
+          headers: { cookie, "Idempotency-Key": "cont-key-3" },
+          body: formData,
+        }),
+      );
+
+      expect(response.status).toBe(403);
+      const body = await response.json();
+      expect(body.message).toMatch(/contenedores/i);
+    });
+
+    it("returns 404 if container ownerId does not exist", async () => {
+      const cookie = await authenticatedCookie("field-crew-leader-route");
+      const formData = new FormData();
+      const file = new File(["img-data"], "test.jpg", { type: "image/jpeg" });
+      formData.append("file", file);
+      formData.append("fileName", "test.jpg");
+      formData.append("ownerType", "CONTAINER");
+      formData.append("ownerId", "cont-non-existent");
+
+      const response = await POST(
+        new Request("http://localhost/api/evidence", {
+          method: "POST",
+          headers: { cookie, "Idempotency-Key": "cont-key-4" },
+          body: formData,
+        }),
+      );
+
+      expect(response.status).toBe(404);
+    });
+
+    it("retrieves flat list of container attachments via GET /api/evidence", async () => {
+      const cookie = await authenticatedCookie("office-duty-queue");
+      // First upload an attachment
+      const formData = new FormData();
+      const file = new File(["img-data"], "vista.jpg", { type: "image/jpeg" });
+      formData.append("file", file);
+      formData.append("fileName", "vista.jpg");
+      formData.append("ownerType", "CONTAINER");
+      formData.append("ownerId", "cont-1");
+
+      await POST(
+        new Request("http://localhost/api/evidence", {
+          method: "POST",
+          headers: { cookie, "Idempotency-Key": "cont-key-5" },
+          body: formData,
+        }),
+      );
+
+      // Now GET attachments
+      const getRes = await GET(
+        new Request("http://localhost/api/evidence?ownerType=CONTAINER&ownerId=cont-1", {
+          headers: { cookie },
+        }),
+      );
+
+      expect(getRes.status).toBe(200);
+      const list = await getRes.json();
+      expect(Array.isArray(list)).toBe(true);
+      expect(list.length).toBeGreaterThan(0);
+      expect(list[0].filename).toBe("vista.jpg");
+    });
   });
 });

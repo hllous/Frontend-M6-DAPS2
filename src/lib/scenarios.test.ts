@@ -10,6 +10,10 @@ describe("operational scenarios", () => {
     expect(scenarios.fieldCrewLeader.actor.fieldRole).toBe("CREW_LEADER");
     expect(scenarios.fieldCrewMember.actor.fieldRole).toBe("CREW_MEMBER");
     expect(scenarios.officeLimited.capabilities).not.toContain("inventory:view");
+    expect(scenarios.officeDutyQueue.capabilities).toContain("container:report");
+    expect(scenarios.fieldCrewLeader.capabilities).toContain("container:report");
+    expect(scenarios.fieldCrewMember.capabilities).toContain("container:report");
+    expect(scenarios.officeLimited.capabilities).not.toContain("container:report");
   });
 
   it("returns operational scenarios by their stable name", () => {

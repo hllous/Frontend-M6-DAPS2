@@ -171,4 +171,196 @@ describe("containers adapter", () => {
 
     await expect(containersAdapter.list()).rejects.toBeInstanceOf(NetworkFailureError);
   });
+
+  describe("reportOverflow", () => {
+    it("reports overflow sending no body and transitions ACTIVE -> OVERFLOWED", async () => {
+      let capturedBody: unknown = "uninitialized";
+      server.use(
+        http.post("*/api/containers/:id/report-overflow", async ({ params, request }) => {
+          capturedBody = await request.text();
+          return HttpResponse.json({
+            id: params.id,
+            code: "CONT-001",
+            containerType: "HOUSEHOLD",
+            zoneId: "zone-1",
+            address: "Av. Rivadavia 1200",
+            lat: -34.6083,
+            lng: -58.3712,
+            capacityLiters: 1100,
+            status: "OVERFLOWED",
+          });
+        }),
+      );
+
+      const result = await containersAdapter.reportOverflow("cont-1");
+      expect(result.status).toBe("OVERFLOWED");
+      expect(result.id).toBe("cont-1");
+      // No invented payload sent
+      expect(capturedBody).toBe("");
+    });
+
+    it("surfaces 409 conflict when attempting transition on a non-ACTIVE container", async () => {
+      server.use(
+        http.post("*/api/containers/:id/report-overflow", () =>
+          HttpResponse.json(
+            {
+              statusCode: 409,
+              message: "Solo se puede reportar desborde en contenedores activos.",
+              error: "Conflict",
+              timestamp: new Date().toISOString(),
+              path: "/api/containers/cont-2/report-overflow",
+            },
+            { status: 409 },
+          ),
+        ),
+      );
+
+      await expect(containersAdapter.reportOverflow("cont-2")).rejects.toMatchObject({
+        name: "ContainerRequestError",
+        status: 409,
+        message: "Solo se puede reportar desborde en contenedores activos.",
+      });
+    });
+  });
+
+  describe("reportDamage", () => {
+    it("reports damage capturing damageType, severity, and requiresPublicWorks", async () => {
+      let capturedPayload: unknown = null;
+      server.use(
+        http.post("*/api/containers/:id/report-damage", async ({ params, request }) => {
+          capturedPayload = await request.json();
+          return HttpResponse.json({
+            id: params.id,
+            code: "CONT-001",
+            containerType: "HOUSEHOLD",
+            zoneId: "zone-1",
+            address: "Av. Rivadavia 1200",
+            lat: -34.6083,
+            lng: -58.3712,
+            capacityLiters: 1100,
+            status: "DAMAGED",
+            damageType: "VANDALIZED",
+            severity: "HIGH",
+            requiresPublicWorks: true,
+          });
+        }),
+      );
+
+      const result = await containersAdapter.reportDamage("cont-1", {
+        damageType: "VANDALIZED",
+        severity: "HIGH",
+        requiresPublicWorks: true,
+      });
+
+      expect(result.status).toBe("DAMAGED");
+      expect(result.damageType).toBe("VANDALIZED");
+      expect(result.severity).toBe("HIGH");
+      expect(result.requiresPublicWorks).toBe(true);
+      expect(capturedPayload).toEqual({
+        damageType: "VANDALIZED",
+        severity: "HIGH",
+        requiresPublicWorks: true,
+      });
+    });
+
+    it("defaults requiresPublicWorks to false", async () => {
+      let capturedPayload: unknown = null;
+      server.use(
+        http.post("*/api/containers/:id/report-damage", async ({ params, request }) => {
+          capturedPayload = await request.json();
+          return HttpResponse.json({
+            id: params.id,
+            code: "CONT-001",
+            containerType: "HOUSEHOLD",
+            zoneId: "zone-1",
+            address: "Av. Rivadavia 1200",
+            lat: -34.6083,
+            lng: -58.3712,
+            capacityLiters: 1100,
+            status: "DAMAGED",
+            damageType: "LID_BROKEN",
+            severity: "LOW",
+            requiresPublicWorks: false,
+          });
+        }),
+      );
+
+      const result = await containersAdapter.reportDamage("cont-1", {
+        damageType: "LID_BROKEN",
+        severity: "LOW",
+      });
+
+      expect(result.status).toBe("DAMAGED");
+      expect(result.requiresPublicWorks).toBe(false);
+      expect(capturedPayload).toEqual({
+        damageType: "LID_BROKEN",
+        severity: "LOW",
+        requiresPublicWorks: false,
+      });
+    });
+
+    it("rejects invalid damage payload with ContainerContractError before network request", async () => {
+      // @ts-expect-error testing invalid damageType
+      await expect(containersAdapter.reportDamage("cont-1", { damageType: "EXPLODED", severity: "LOW" }))
+        .rejects.toBeInstanceOf(ContainerContractError);
+    });
+  });
+
+  describe("uploadEvidence and getEvidence", () => {
+    it("uploads evidence with ownerType=CONTAINER and returns Attachment", async () => {
+      let capturedHeaders: Headers | null = null;
+      server.use(
+        http.post("*/api/evidence", async ({ request }) => {
+          capturedHeaders = request.headers;
+          const formData = await request.formData();
+          expect(formData.get("ownerType")).toBe("CONTAINER");
+          expect(formData.get("ownerId")).toBe("cont-1");
+          return HttpResponse.json({
+            id: "att-cont-1",
+            url: "/mock/evidence/foto-desborde.jpg",
+            filename: "foto-desborde.jpg",
+            contentType: "image/jpeg",
+            uploadedAt: "2026-09-06T12:00:00.000Z",
+          });
+        }),
+      );
+
+      const file = new File(["dummy"], "foto-desborde.jpg", { type: "image/jpeg" });
+      const att = await containersAdapter.uploadEvidence({
+        file,
+        containerId: "cont-1",
+        idempotencyKey: "test-key-uuid-1",
+      });
+
+      expect(att).toMatchObject({
+        id: "att-cont-1",
+        filename: "foto-desborde.jpg",
+        contentType: "image/jpeg",
+      });
+      expect(capturedHeaders!.get("Idempotency-Key")).toBe("test-key-uuid-1");
+    });
+
+    it("retrieves flat list of container evidence via getEvidence", async () => {
+      server.use(
+        http.get("*/api/evidence", ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("ownerType")).toBe("CONTAINER");
+          expect(url.searchParams.get("ownerId")).toBe("cont-1");
+          return HttpResponse.json([
+            {
+              id: "att-cont-1",
+              url: "/mock/evidence/foto-desborde.jpg",
+              filename: "foto-desborde.jpg",
+              contentType: "image/jpeg",
+              uploadedAt: "2026-09-06T12:00:00.000Z",
+            },
+          ]);
+        }),
+      );
+
+      const list = await containersAdapter.getEvidence("cont-1");
+      expect(list).toHaveLength(1);
+      expect(list[0].id).toBe("att-cont-1");
+    });
+  });
 });

@@ -19,7 +19,9 @@ export type Capability =
   | "crew:manage"
   | "greenSpace:manage"
   // Frontend hypothesis for Phase 4 Container management
-  | "container:manage";
+  | "container:manage"
+  // Frontend hypothesis for Phase 4 Container reporting
+  | "container:report";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -69,6 +71,7 @@ export const scenarios: Record<
       "zone:manage",
       "route:manage",
       "serviceFrequency:manage",
+      "container:report",
     ],
     work: {
       title: "Acciones de la jornada",
@@ -90,7 +93,7 @@ export const scenarios: Record<
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
     },
-    capabilities: ["service:view", "service:execute", "map:view"],
+    capabilities: ["service:view", "service:execute", "map:view", "container:report"],
     work: {
       title: "Servicios asignados",
       summary: "Recorrido de higiene urbana para el turno actual.",
@@ -110,7 +113,7 @@ export const scenarios: Record<
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
     },
-    capabilities: ["service:view", "map:view"],
+    capabilities: ["service:view", "map:view", "container:report"],
     work: {
       title: "Servicios asignados",
       summary: "Tareas del recorrido que integran su turno.",
