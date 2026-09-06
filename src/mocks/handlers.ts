@@ -142,6 +142,12 @@ import {
   createStreetClosureRequestInputSchema,
   streetClosureRequestQuerySchema,
 } from "@/lib/street-closure-requests";
+import {
+  referralFromRepairRequest,
+  referralFromStreetClosureRequest,
+} from "@/lib/referrals";
+import { repairRequestFixtures } from "@/lib/repair-request-fixtures";
+import { streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -297,6 +303,13 @@ export const handlers = [
 
     return HttpResponse.json(getScenario(scenarioId as ScenarioId));
   }),
+  http.get("*/api/referrals", () => HttpResponse.json({
+    data: [
+      ...repairRequestFixtures.map(referralFromRepairRequest),
+      ...streetClosureRequestFixtures.map(referralFromStreetClosureRequest),
+    ],
+    meta: { total: repairRequestFixtures.length + streetClosureRequestFixtures.length },
+  })),
   // StreetClosureRequest adapter contract and deterministic scenario handlers.
   http.get("*/api/street-closure-requests", ({ request }) => {
     const query = streetClosureRequestQueryFromUrl(request.url);
