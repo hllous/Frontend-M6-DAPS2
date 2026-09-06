@@ -5,12 +5,15 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ArrowLeft,
+  Check,
   Loader2,
+  MapPin,
   Pencil,
   Plus,
   RefreshCw,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +28,7 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
+import { neighborhoodsAdapter, type Neighborhood } from "@/lib/neighborhoods";
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   type CreateZoneInput,
@@ -74,6 +78,18 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const [referencesReport, setReferencesReport] = useState<ZoneReferenceReport | null>(null);
   const [isLoadingReferences, setIsLoadingReferences] = useState(false);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
+
+  // Neighborhood assignment state
+  const [neighborhoodZone, setNeighborhoodZone] = useState<Zone | null>(null);
+  const [neighborhoodSearch, setNeighborhoodSearch] = useState("");
+  const [neighborhoodOptions, setNeighborhoodOptions] = useState<Neighborhood[]>([]);
+  const [assignedNeighborhoods, setAssignedNeighborhoods] = useState<Neighborhood[]>([]);
+  const [selectedNeighborhoodIds, setSelectedNeighborhoodIds] = useState<string[]>([]);
+  const [neighborhoodError, setNeighborhoodError] = useState<string | null>(null);
+  const [neighborhoodNotice, setNeighborhoodNotice] = useState<string | null>(null);
+  const [isLoadingNeighborhoods, setIsLoadingNeighborhoods] = useState(false);
+  const [isSubmittingNeighborhoods, setIsSubmittingNeighborhoods] = useState(false);
+  const [removingNeighborhoodId, setRemovingNeighborhoodId] = useState<string | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -190,6 +206,101 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     } finally {
       setIsSubmittingDeactivate(false);
     }
+  };
+
+  const updateZoneInState = (updated: Zone) => {
+    setState((current) =>
+      current.status === "ready"
+        ? { ...current, items: current.items.map((zone) => (zone.id === updated.id ? updated : zone)) }
+        : current,
+    );
+  };
+
+  const handleStartNeighborhoods = async (zone: Zone) => {
+    setNeighborhoodZone(zone);
+    setNeighborhoodSearch("");
+    setSelectedNeighborhoodIds([]);
+    setNeighborhoodError(null);
+    setNeighborhoodNotice(null);
+    setIsLoadingNeighborhoods(true);
+
+    try {
+      const [options, assigned] = await Promise.all([
+        neighborhoodsAdapter.search(),
+        neighborhoodsAdapter.resolveIds(zone.neighborhoodIds),
+      ]);
+      setNeighborhoodOptions(options);
+      setAssignedNeighborhoods(assigned);
+    } catch {
+      setNeighborhoodError("No se pudieron cargar los barrios disponibles.");
+    } finally {
+      setIsLoadingNeighborhoods(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!neighborhoodZone) return;
+
+    let isCurrent = true;
+    void neighborhoodsAdapter.search({ search: neighborhoodSearch }).then((options) => {
+      if (isCurrent) setNeighborhoodOptions(options);
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [neighborhoodSearch, neighborhoodZone]);
+
+  const handleAssignNeighborhoods = async () => {
+    if (!neighborhoodZone || selectedNeighborhoodIds.length === 0) return;
+    setNeighborhoodError(null);
+    setNeighborhoodNotice(null);
+    setIsSubmittingNeighborhoods(true);
+
+    try {
+      const updated = await zonesAdapter.assignNeighborhoods(neighborhoodZone.id, {
+        neighborhoodIds: selectedNeighborhoodIds,
+      });
+      updateZoneInState(updated);
+      setNeighborhoodZone(updated);
+      setAssignedNeighborhoods(await neighborhoodsAdapter.resolveIds(updated.neighborhoodIds));
+      setSelectedNeighborhoodIds([]);
+      setNeighborhoodNotice("Barrios asignados correctamente.");
+    } catch (caught) {
+      setNeighborhoodError(
+        caught instanceof ZoneRequestError ? caught.message : "No se pudieron asignar los barrios.",
+      );
+    } finally {
+      setIsSubmittingNeighborhoods(false);
+    }
+  };
+
+  const handleRemoveNeighborhood = async (neighborhoodId: string) => {
+    if (!neighborhoodZone) return;
+    setNeighborhoodError(null);
+    setNeighborhoodNotice(null);
+    setRemovingNeighborhoodId(neighborhoodId);
+
+    try {
+      const updated = await zonesAdapter.removeNeighborhood(neighborhoodZone.id, neighborhoodId);
+      updateZoneInState(updated);
+      setNeighborhoodZone(updated);
+      setAssignedNeighborhoods(await neighborhoodsAdapter.resolveIds(updated.neighborhoodIds));
+      setNeighborhoodNotice("Barrio quitado de la zona.");
+    } catch (caught) {
+      setNeighborhoodError(
+        caught instanceof ZoneRequestError ? caught.message : "No se pudo quitar el barrio de la zona.",
+      );
+    } finally {
+      setRemovingNeighborhoodId(null);
+    }
+  };
+
+  const closeNeighborhoodDialog = () => {
+    setNeighborhoodZone(null);
+    setNeighborhoodError(null);
+    setNeighborhoodNotice(null);
+    setSelectedNeighborhoodIds([]);
   };
 
   return (
@@ -461,6 +572,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               <tr>
                 <th className="px-4 py-3">Código</th>
                 <th className="px-4 py-3">Nombre</th>
+                <th className="px-4 py-3">Barrios</th>
                 <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3 text-right">
                   <span className="sr-only">Acciones</span>
@@ -476,6 +588,11 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   <td className="px-4 py-3 font-medium text-foreground">
                     {zone.name}
                   </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {zone.neighborhoodIds.length > 0
+                      ? `${zone.neighborhoodIds.length} ${zone.neighborhoodIds.length === 1 ? "barrio" : "barrios"}`
+                      : "Sin barrios"}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -490,6 +607,16 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   <td className="px-4 py-3 text-right">
                     {canManage ? (
                       <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void handleStartNeighborhoods(zone)}
+                          className="h-8 gap-1 text-xs"
+                        >
+                          <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                          Gestionar barrios
+                        </Button>
                         <Button
                           type="button"
                           size="sm"
@@ -523,6 +650,173 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           </table>
         </div>
       )}
+
+      <Dialog
+        open={Boolean(neighborhoodZone)}
+        onOpenChange={(open) => {
+          if (!open) closeNeighborhoodDialog();
+        }}
+      >
+        <DialogContent className="max-w-2xl" aria-labelledby="manage-neighborhoods-title">
+          <DialogHeader>
+            <DialogTitle id="manage-neighborhoods-title" className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" aria-hidden="true" />
+              Gestionar barrios
+            </DialogTitle>
+            <DialogDescription>
+              {neighborhoodZone && (
+                <span>
+                  Zona: <strong>{neighborhoodZone.code}</strong> — {neighborhoodZone.name}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {neighborhoodError && (
+            <div role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              {neighborhoodError}
+            </div>
+          )}
+          {neighborhoodNotice && (
+            <div role="status" className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
+              {neighborhoodNotice}
+            </div>
+          )}
+
+          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section aria-labelledby="assigned-neighborhoods-heading" className="space-y-3">
+              <div>
+                <h3 id="assigned-neighborhoods-heading" className="text-sm font-semibold">
+                  Barrios asignados
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Quite un barrio para eliminarlo de esta zona.
+                </p>
+              </div>
+
+              {isLoadingNeighborhoods ? (
+                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Cargando barrios...
+                </div>
+              ) : assignedNeighborhoods.length === 0 ? (
+                <p className="rounded-md border border-dashed border-[var(--color-border-strong)] p-3 text-sm text-muted-foreground">
+                  Esta zona todavía no tiene barrios asignados.
+                </p>
+              ) : (
+                <ul className="divide-y rounded-md border border-border" aria-label="Barrios asignados">
+                  {assignedNeighborhoods.map((neighborhood) => (
+                    <li key={neighborhood.id} className="flex items-center justify-between gap-3 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{neighborhood.name}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{neighborhood.id}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-9 shrink-0 gap-1 text-xs text-destructive hover:text-destructive"
+                        onClick={() => void handleRemoveNeighborhood(neighborhood.id)}
+                        disabled={removingNeighborhoodId !== null || isSubmittingNeighborhoods}
+                        aria-label={`Quitar ${neighborhood.name}`}
+                      >
+                        {removingNeighborhoodId === neighborhood.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" aria-hidden="true" />
+                        )}
+                        Quitar
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section aria-labelledby="available-neighborhoods-heading" className="space-y-3">
+              <div>
+                <h3 id="available-neighborhoods-heading" className="text-sm font-semibold">
+                  Agregar barrios
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Busque y seleccione uno o más barrios.
+                </p>
+              </div>
+
+              <Field>
+                <FieldLabel htmlFor="neighborhood-search">Buscar barrios</FieldLabel>
+                <div className="relative flex items-center">
+                  <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <input
+                    id="neighborhood-search"
+                    className={`${controlClass} w-full pl-9`}
+                    placeholder="Buscar por nombre o identificador"
+                    value={neighborhoodSearch}
+                    onChange={(event) => setNeighborhoodSearch(event.target.value)}
+                    disabled={isLoadingNeighborhoods}
+                  />
+                </div>
+              </Field>
+
+              {neighborhoodOptions.length === 0 ? (
+                <p className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
+                  No se encontraron barrios para esta búsqueda.
+                </p>
+              ) : (
+                <div className="max-h-56 overflow-y-auto rounded-md border border-border" role="group" aria-label="Barrios disponibles">
+                  {neighborhoodOptions.map((neighborhood) => {
+                    const isAssigned = neighborhoodZone?.neighborhoodIds.includes(neighborhood.id) ?? false;
+                    const isSelected = selectedNeighborhoodIds.includes(neighborhood.id);
+                    return (
+                      <label
+                        key={neighborhood.id}
+                        className={`flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-3 py-2 last:border-0 ${
+                          isAssigned ? "cursor-not-allowed bg-muted/50" : "hover:bg-muted/40"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isAssigned || isSelected}
+                          disabled={isAssigned || isSubmittingNeighborhoods}
+                          onChange={(event) => {
+                            setSelectedNeighborhoodIds((current) =>
+                              event.target.checked
+                                ? [...current, neighborhood.id]
+                                : current.filter((id) => id !== neighborhood.id),
+                            );
+                          }}
+                          className="h-4 w-4 rounded border-[var(--color-border-strong)] text-primary focus:ring-primary"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{neighborhood.name}</span>
+                          <span className="block font-mono text-xs text-muted-foreground">{neighborhood.id}</span>
+                        </span>
+                        {isAssigned && <Check className="h-4 w-4 text-primary" aria-label="Ya asignado" />}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              <Button
+                type="button"
+                className="w-full gap-1.5"
+                onClick={() => void handleAssignNeighborhoods()}
+                disabled={selectedNeighborhoodIds.length === 0 || isSubmittingNeighborhoods || isLoadingNeighborhoods}
+              >
+                {isSubmittingNeighborhoods && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                {isSubmittingNeighborhoods ? "Asignando..." : "Asignar seleccionados"}
+              </Button>
+            </section>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeNeighborhoodDialog}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Deactivate confirmation dialog */}
       <Dialog

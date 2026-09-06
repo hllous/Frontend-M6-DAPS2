@@ -59,6 +59,12 @@ export const updateZoneInputSchema = z.object({
 
 export type UpdateZoneInput = z.infer<typeof updateZoneInputSchema>;
 
+export const assignNeighborhoodsInputSchema = z.object({
+  neighborhoodIds: z.array(z.string().trim().min(1, "El ID del barrio es obligatorio")).min(1),
+});
+
+export type AssignNeighborhoodsInput = z.infer<typeof assignNeighborhoodsInputSchema>;
+
 export const zoneReferenceReportSchema = z.object({
   zoneId: z.string(),
   activeRoutes: z.array(
@@ -241,6 +247,40 @@ export const zonesAdapter = {
       throw cause;
     }
     return handleSingleZoneResponse(response);
+  },
+
+  async assignNeighborhoods(id: string, input: AssignNeighborhoodsInput): Promise<Zone> {
+    const validated = assignNeighborhoodsInputSchema.parse(input);
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/zones/${id}/neighborhoods`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(validated),
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "zones" });
+      }
+      throw cause;
+    }
+    return handleSingleZoneResponse(response, "zones");
+  },
+
+  async removeNeighborhood(id: string, neighborhoodId: string): Promise<Zone> {
+    let response: Response;
+    try {
+      response = await authenticatedFetch(
+        `/api/zones/${id}/neighborhoods/${encodeURIComponent(neighborhoodId)}`,
+        { method: "DELETE" },
+      );
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "zones" });
+      }
+      throw cause;
+    }
+    return handleSingleZoneResponse(response, "zones");
   },
 
   async checkReferences(id: string): Promise<ZoneReferenceReport> {

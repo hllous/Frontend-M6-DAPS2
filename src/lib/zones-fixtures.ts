@@ -35,6 +35,24 @@ export function getZoneFixture(id: string): Zone | null {
   return zoneFixtures.find((candidate) => candidate.id === id) ?? null;
 }
 
+export function assignNeighborhoodsFixture(id: string, neighborhoodIds: string[]): Zone | null {
+  const zone = getZoneFixture(id);
+  if (!zone) return null;
+
+  return updateZoneFixture(id, {
+    neighborhoodIds: [...new Set([...zone.neighborhoodIds, ...neighborhoodIds])],
+  });
+}
+
+export function removeNeighborhoodFixture(id: string, neighborhoodId: string): Zone | null {
+  const zone = getZoneFixture(id);
+  if (!zone || !zone.neighborhoodIds.includes(neighborhoodId)) return null;
+
+  return updateZoneFixture(id, {
+    neighborhoodIds: zone.neighborhoodIds.filter((candidate) => candidate !== neighborhoodId),
+  });
+}
+
 export const EMPTY_ZONES_QUERY: ZoneQuery = { search: "zzz-sin-resultados" };
 
 export function filterZoneFixtures(query: ZoneQuery): Zone[] {

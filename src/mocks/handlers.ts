@@ -39,14 +39,17 @@ import {
 } from "@/lib/services";
 import {
   addZoneFixture,
+  assignNeighborhoodsFixture,
   filterZoneFixtures,
   getZoneFixture,
   getZoneReferences,
   paginateZoneFixtures,
+  removeNeighborhoodFixture,
   updateZoneFixture,
   zoneFixtures,
 } from "@/lib/zones-fixtures";
 import {
+  assignNeighborhoodsInputSchema,
   createZoneInputSchema,
   updateZoneInputSchema,
   type Zone,
@@ -218,6 +221,48 @@ export const handlers = [
       );
     }
     return HttpResponse.json(updated);
+  }),
+  http.post("*/api/zones/:zoneId/neighborhoods", async ({ params, request }) => {
+    const zoneId = params.zoneId as string;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "JSON invÃ¡lido", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods` },
+        { status: 400 },
+      );
+    }
+
+    const parsed = assignNeighborhoodsInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods` },
+        { status: 400 },
+      );
+    }
+
+    const updated = assignNeighborhoodsFixture(zoneId, parsed.data.neighborhoodIds);
+    if (!updated) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Zona no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(updated);
+  }),
+  http.delete("*/api/zones/:zoneId/neighborhoods/:neighborhoodId", ({ params }) => {
+    const zoneId = params.zoneId as string;
+    const neighborhoodId = params.neighborhoodId as string;
+    const zone = getZoneFixture(zoneId);
+    if (!zone || !zone.neighborhoodIds.includes(neighborhoodId)) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "El barrio no esta asignado a la zona operativa.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods/${neighborhoodId}` },
+        { status: 404 },
+      );
+    }
+
+    return HttpResponse.json(removeNeighborhoodFixture(zoneId, neighborhoodId));
   }),
   http.get("*/api/zones/:zoneId/references", ({ params }) => {
     const zoneId = params.zoneId as string;
