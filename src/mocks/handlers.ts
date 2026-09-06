@@ -120,11 +120,15 @@ import {
   reportDamageFixture,
   reportOverflowFixture,
   updateContainerFixture,
+  emptyContainerFixture,
+  startRelocationFixture,
+  confirmRelocationFixture,
 } from "@/lib/containers-fixtures";
 import {
   createContainerInputSchema,
   reportDamageInputSchema,
   updateContainerInputSchema,
+  confirmRelocationInputSchema,
   containerStatusSchema,
   containerTypeSchema,
   type ContainerQuery,
@@ -2049,6 +2053,122 @@ export const handlers = [
       return HttpResponse.json(getContainerAttachments(ownerId));
     }
     return HttpResponse.json([]);
+  }),
+  // ── Containers: Emptying and Relocation (#123) ────────────────────────────
+  http.post("*/api/containers/:containerId/empty", async ({ params }) => {
+    const container = getContainerFixture(params.containerId as string);
+    if (!container) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Contenedor no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/empty`,
+        },
+        { status: 404 },
+      );
+    }
+    if (container.status !== "OVERFLOWED") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se puede vaciar un contenedor en estado desbordado. Estado actual: ${container.status}`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/empty`,
+        },
+        { status: 409 },
+      );
+    }
+    const updated = emptyContainerFixture(params.containerId as string);
+    return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.post("*/api/containers/:containerId/relocate", async ({ params }) => {
+    const container = getContainerFixture(params.containerId as string);
+    if (!container) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Contenedor no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/relocate`,
+        },
+        { status: 404 },
+      );
+    }
+    if (container.status !== "ACTIVE") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se puede iniciar la reubicación en contenedores activos. Estado actual: ${container.status}`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/relocate`,
+        },
+        { status: 409 },
+      );
+    }
+    const updated = startRelocationFixture(params.containerId as string);
+    return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.post("*/api/containers/:containerId/confirm-relocation", async ({ params, request }) => {
+    const container = getContainerFixture(params.containerId as string);
+    if (!container) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Contenedor no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/confirm-relocation`,
+        },
+        { status: 404 },
+      );
+    }
+    if (container.status !== "RELOCATING") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se puede confirmar la reubicación en contenedores en estado de reubicación. Estado actual: ${container.status}`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/confirm-relocation`,
+        },
+        { status: 409 },
+      );
+    }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El cuerpo de la solicitud debe ser un JSON válido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/confirm-relocation`,
+        },
+        { status: 400 },
+      );
+    }
+    const parsed = confirmRelocationInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: parsed.error.issues.map((i) => i.message).join(" "),
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/confirm-relocation`,
+        },
+        { status: 400 },
+      );
+    }
+    const updated = confirmRelocationFixture(params.containerId as string, parsed.data);
+    return HttpResponse.json(updated, { status: 200 });
   }),
   http.post("*/api/session/logout", () => new HttpResponse(null, { status: 200 })),
 ];

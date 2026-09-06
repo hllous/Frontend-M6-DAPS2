@@ -1,4 +1,4 @@
-import type { Attachment, Container, ContainerQuery, ReportDamageInput, UpdateContainerInput } from "./containers";
+import type { Attachment, ConfirmRelocationInput, Container, ContainerQuery, ReportDamageInput, UpdateContainerInput } from "./containers";
 
 const INITIAL_CONTAINER_FIXTURES: Container[] = [
   {
@@ -137,6 +137,48 @@ export function reportDamageFixture(id: string, input: ReportDamageInput): Conta
   container.damageType = input.damageType;
   container.severity = input.severity;
   container.requiresPublicWorks = input.requiresPublicWorks ?? false;
+  return container;
+}
+
+export function emptyContainerFixture(id: string): Container {
+  const container = getContainerFixture(id);
+  if (!container) {
+    throw new Error(`Contenedor ${id} no encontrado.`);
+  }
+  if (container.status !== "OVERFLOWED") {
+    throw new Error(`INVALID_STATE_TRANSITION: Solo se puede vaciar un contenedor en estado desbordado. Estado actual: ${container.status}`);
+  }
+  container.status = "ACTIVE";
+  return container;
+}
+
+export function startRelocationFixture(id: string): Container {
+  const container = getContainerFixture(id);
+  if (!container) {
+    throw new Error(`Contenedor ${id} no encontrado.`);
+  }
+  if (container.status !== "ACTIVE") {
+    throw new Error(`INVALID_STATE_TRANSITION: Solo se puede iniciar la reubicación en contenedores activos. Estado actual: ${container.status}`);
+  }
+  container.status = "RELOCATING";
+  return container;
+}
+
+export function confirmRelocationFixture(id: string, input: ConfirmRelocationInput): Container {
+  const container = getContainerFixture(id);
+  if (!container) {
+    throw new Error(`Contenedor ${id} no encontrado.`);
+  }
+  if (container.status !== "RELOCATING") {
+    throw new Error(`INVALID_STATE_TRANSITION: Solo se puede confirmar la reubicación en contenedores en estado de reubicación. Estado actual: ${container.status}`);
+  }
+  container.status = "ACTIVE";
+  container.address = input.address;
+  container.lat = input.lat;
+  container.lng = input.lng;
+  if (input.zoneId) {
+    container.zoneId = input.zoneId;
+  }
   return container;
 }
 
