@@ -5,7 +5,10 @@ export type Capability =
   | "environmentalReport:view"
   | "map:view"
   | "catalog:view"
-  | "indicator:view";
+  | "indicator:view"
+  // Frontend hypotheses for Phase 2c catalogs
+  | "zone:manage"
+  | "route:manage";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -46,6 +49,8 @@ export const scenarios: Record<
       "map:view",
       "catalog:view",
       "indicator:view",
+      "zone:manage",
+      "route:manage",
     ],
     work: {
       title: "Acciones de la jornada",

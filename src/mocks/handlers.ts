@@ -37,8 +37,21 @@ import {
   type ZoneResult,
   VEHICLE_CATALOG,
 } from "@/lib/services";
-import { filterZoneFixtures, paginateZoneFixtures, zoneFixtures } from "@/lib/zones-fixtures";
-import type { ZoneQuery } from "@/lib/zones";
+import {
+  addZoneFixture,
+  filterZoneFixtures,
+  getZoneFixture,
+  getZoneReferences,
+  paginateZoneFixtures,
+  updateZoneFixture,
+  zoneFixtures,
+} from "@/lib/zones-fixtures";
+import {
+  createZoneInputSchema,
+  updateZoneInputSchema,
+  type Zone,
+  type ZoneQuery,
+} from "@/lib/zones";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -89,6 +102,105 @@ export const handlers = [
   http.get("*/api/zones", ({ request }) => {
     const query = zoneQueryFromUrl(request.url);
     return HttpResponse.json(paginateZoneFixtures(filterZoneFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/zones/:zoneId", ({ params }) => {
+    const zone = getZoneFixture(params.zoneId as string);
+    if (!zone) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Zona no encontrada.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/zones/${params.zoneId}`,
+        },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(zone);
+  }),
+  http.post("*/api/zones", async ({ request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/zones" },
+        { status: 400 },
+      );
+    }
+    const parsed = createZoneInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((i) => i.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/zones" },
+        { status: 400 },
+      );
+    }
+    const existing = zoneFixtures.find((z) => z.code.toLowerCase() === parsed.data.code.toLowerCase());
+    if (existing) {
+      return HttpResponse.json(
+        { statusCode: 409, message: `Ya existe una zona operativa con el código ${parsed.data.code}.`, error: "Conflict", timestamp: new Date().toISOString(), path: "/api/zones" },
+        { status: 409 },
+      );
+    }
+    const created: Zone = {
+      id: `zone-${Date.now()}`,
+      code: parsed.data.code,
+      name: parsed.data.name,
+      active: true,
+      neighborhoodIds: [],
+    };
+    addZoneFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.patch("*/api/zones/:zoneId", async ({ params, request }) => {
+    const zoneId = params.zoneId as string;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}` },
+        { status: 400 },
+      );
+    }
+    const parsed = updateZoneInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((i) => i.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}` },
+        { status: 400 },
+      );
+    }
+    const updated = updateZoneFixture(zoneId, parsed.data);
+    if (!updated) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Zona no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(updated);
+  }),
+  http.delete("*/api/zones/:zoneId", ({ params }) => {
+    const zoneId = params.zoneId as string;
+    const updated = updateZoneFixture(zoneId, { active: false });
+    if (!updated) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Zona no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(updated);
+  }),
+  http.get("*/api/zones/:zoneId/references", ({ params }) => {
+    const zoneId = params.zoneId as string;
+    const zone = getZoneFixture(zoneId);
+    if (!zone) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Zona no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/references` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(getZoneReferences(zoneId));
   }),
   http.get("*/api/services", ({ request }) => {
     const query = serviceQueryFromUrl(request.url);

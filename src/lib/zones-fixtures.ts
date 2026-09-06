@@ -1,10 +1,39 @@
-import type { Zone, ZoneQuery } from "./zones";
+import type { Zone, ZoneQuery, ZoneReferenceReport } from "./zones";
 
-export const zoneFixtures: Zone[] = [
+const INITIAL_ZONE_FIXTURES: Zone[] = [
   { id: "zone-1", code: "Z-01", name: "Zona Norte", active: true, neighborhoodIds: ["barrio-1", "barrio-2"] },
   { id: "zone-2", code: "Z-02", name: "Zona Sur", active: true, neighborhoodIds: ["barrio-3"] },
   { id: "zone-3", code: "Z-03", name: "Zona Oeste", active: false, neighborhoodIds: [] },
 ];
+
+export let zoneFixtures: Zone[] = INITIAL_ZONE_FIXTURES.map((item) => ({ ...item }));
+
+export function resetZoneFixtures() {
+  zoneFixtures = INITIAL_ZONE_FIXTURES.map((item) => ({ ...item }));
+}
+
+export function addZoneFixture(zone: Zone) {
+  zoneFixtures.push(zone);
+}
+
+export function updateZoneFixture(id: string, patch: Partial<Zone>): Zone | null {
+  const index = zoneFixtures.findIndex((candidate) => candidate.id === id);
+  if (index === -1) return null;
+  // Code is immutable per contract
+  const { code: _ignored, ...allowedPatch } = patch;
+  const current = zoneFixtures[index];
+  if (!current) return null;
+  const updated: Zone = {
+    ...current,
+    ...allowedPatch,
+  };
+  zoneFixtures[index] = updated;
+  return updated;
+}
+
+export function getZoneFixture(id: string): Zone | null {
+  return zoneFixtures.find((candidate) => candidate.id === id) ?? null;
+}
 
 export const EMPTY_ZONES_QUERY: ZoneQuery = { search: "zzz-sin-resultados" };
 
@@ -27,5 +56,48 @@ export function paginateZoneFixtures(zones: Zone[], page = 1, pageSize = 20) {
       pageSize,
       totalPages: Math.max(1, Math.ceil(zones.length / pageSize)),
     },
+  };
+}
+
+/**
+ * References check fixture data:
+ * Simulates active routes, containers, trees, and green spaces referencing a zone.
+ * Backend performs no referential integrity check on DELETE, so the frontend
+ * uses this to warn the operator before deactivating.
+ */
+export function getZoneReferences(zoneId: string): ZoneReferenceReport {
+  if (zoneId === "zone-1") {
+    return {
+      zoneId,
+      activeRoutes: [
+        { id: "route-1", code: "R-01", name: "Recorrido Norte Residencial" },
+      ],
+      containersCount: 3,
+      treesCount: 12,
+      greenSpacesCount: 2,
+      totalReferences: 1 + 3 + 12 + 2,
+    };
+  }
+
+  if (zoneId === "zone-2") {
+    return {
+      zoneId,
+      activeRoutes: [
+        { id: "route-2", code: "R-02", name: "Recorrido Sur Comercial" },
+      ],
+      containersCount: 1,
+      treesCount: 4,
+      greenSpacesCount: 1,
+      totalReferences: 1 + 1 + 4 + 1,
+    };
+  }
+
+  return {
+    zoneId,
+    activeRoutes: [],
+    containersCount: 0,
+    treesCount: 0,
+    greenSpacesCount: 0,
+    totalReferences: 0,
   };
 }
