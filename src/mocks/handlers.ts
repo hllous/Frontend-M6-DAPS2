@@ -78,6 +78,10 @@ import { addServiceTypeFixture, filterServiceTypeFixtures, paginateServiceTypeFi
 import { serviceTypeCategorySchema, serviceTypeCreateInputSchema, serviceTypeModeSchema, serviceTypeUpdateInputSchema, type ServiceTypeQuery } from "@/lib/service-types";
 import { addServiceFrequencyFixture, closeServiceFrequencyFixture, filterServiceFrequencyFixtures, paginateServiceFrequencyFixtures, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
 import { serviceFrequencyCreateInputSchema, serviceFrequencyShiftSchema, serviceFrequencyUpdateInputSchema, type ServiceFrequencyQuery } from "@/lib/service-frequencies";
+import { createVehicleInputSchema, updateVehicleInputSchema, type VehicleQuery } from "@/lib/vehicles";
+import { addVehicleFixture, filterVehicleFixtures, paginateVehicleFixtures, vehicleFixtures } from "@/lib/vehicles-fixtures";
+import { addCrewFixture, filterCrewFixtures, paginateCrewFixtures, crewFixtures } from "@/lib/crew-fixtures";
+import { addCrewMembersInputSchema, createCrewInputSchema, updateCrewInputSchema, type CrewQuery } from "@/lib/crews";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -97,6 +101,27 @@ function routeQueryFromUrl(url: string): RouteQuery {
     active: params.has("active") ? params.get("active") === "true" : undefined,
     zoneId: params.get("zoneId") ?? undefined,
     search: params.get("search") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
+function vehicleQueryFromUrl(url: string): VehicleQuery {
+  const params = new URL(url).searchParams;
+  return {
+    active: params.has("active") ? params.get("active") === "true" : undefined,
+    vehicleType: (params.get("vehicleType") as VehicleQuery["vehicleType"]) ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
+function crewQueryFromUrl(url: string): CrewQuery {
+  const params = new URL(url).searchParams;
+  return {
+    active: params.has("active") ? params.get("active") === "true" : undefined,
+    crewType: (params.get("crewType") as CrewQuery["crewType"]) ?? undefined,
+    defaultShift: (params.get("defaultShift") as CrewQuery["defaultShift"]) ?? undefined,
     page: params.has("page") ? Number(params.get("page")) : undefined,
     pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
   };
@@ -519,6 +544,72 @@ export const handlers = [
   http.delete("*/api/service-frequencies/:serviceFrequencyId", ({ params }) => {
     const updated = closeServiceFrequencyFixture(params.serviceFrequencyId as string, "2026-09-06");
     return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
+  }),
+  http.get("*/api/vehicles", ({ request }) => HttpResponse.json(paginateVehicleFixtures(filterVehicleFixtures(vehicleQueryFromUrl(request.url))))),
+  http.get("*/api/vehicles/:vehicleId", ({ params }) => {
+    const vehicle = vehicleFixtures.find((item) => item.id === params.vehicleId);
+    return vehicle ? HttpResponse.json(vehicle) : HttpResponse.json({ statusCode: 404, message: "Vehículo no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/vehicles/${params.vehicleId}` }, { status: 404 });
+  }),
+  http.post("*/api/vehicles", async ({ request }) => {
+    const parsed = createVehicleInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de vehículo inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/vehicles" }, { status: 400 });
+    const vehicle = { id: `vehicle-${vehicleFixtures.length + 1}`, ...parsed.data, active: true };
+    addVehicleFixture(vehicle);
+    return HttpResponse.json(vehicle, { status: 201 });
+  }),
+  http.patch("*/api/vehicles/:vehicleId", async ({ params, request }) => {
+    const vehicle = vehicleFixtures.find((item) => item.id === params.vehicleId);
+    const parsed = updateVehicleInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!vehicle) return HttpResponse.json({ statusCode: 404, message: "Vehículo no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/vehicles/${params.vehicleId}` }, { status: 404 });
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de vehículo inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/vehicles/${params.vehicleId}` }, { status: 400 });
+    Object.assign(vehicle, parsed.data);
+    return HttpResponse.json(vehicle);
+  }),
+  http.delete("*/api/vehicles/:vehicleId", ({ params }) => {
+    const vehicle = vehicleFixtures.find((item) => item.id === params.vehicleId);
+    if (!vehicle) return HttpResponse.json({ statusCode: 404, message: "Vehículo no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/vehicles/${params.vehicleId}` }, { status: 404 });
+    vehicle.active = false;
+    return HttpResponse.json(vehicle);
+  }),
+  http.get("*/api/crews", ({ request }) => HttpResponse.json(paginateCrewFixtures(filterCrewFixtures(crewQueryFromUrl(request.url))))),
+  http.get("*/api/crews/:crewId", ({ params }) => {
+    const crew = crewFixtures.find((item) => item.id === params.crewId);
+    return crew ? HttpResponse.json(crew) : HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 404 });
+  }),
+  http.post("*/api/crews", async ({ request }) => {
+    const parsed = createCrewInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de cuadrilla inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/crews" }, { status: 400 });
+    const crew = { id: `crew-${crewFixtures.length + 1}`, ...parsed.data, memberUserIds: [parsed.data.leaderUserId], active: true };
+    addCrewFixture(crew);
+    return HttpResponse.json(crew, { status: 201 });
+  }),
+  http.patch("*/api/crews/:crewId", async ({ params, request }) => {
+    const crew = crewFixtures.find((item) => item.id === params.crewId);
+    const parsed = updateCrewInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 404 });
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de cuadrilla inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 400 });
+    Object.assign(crew, parsed.data);
+    return HttpResponse.json(crew);
+  }),
+  http.delete("*/api/crews/:crewId", ({ params }) => {
+    const crew = crewFixtures.find((item) => item.id === params.crewId);
+    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 404 });
+    crew.active = false;
+    return HttpResponse.json(crew);
+  }),
+  http.post("*/api/crews/:crewId/members", async ({ params, request }) => {
+    const crew = crewFixtures.find((item) => item.id === params.crewId);
+    const parsed = addCrewMembersInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}/members` }, { status: 404 });
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Los integrantes de la cuadrilla son inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}/members` }, { status: 400 });
+    crew.memberUserIds = [...new Set([...crew.memberUserIds, ...parsed.data.memberUserIds])];
+    return HttpResponse.json(crew);
+  }),
+  http.delete("*/api/crews/:crewId/members/:userId", ({ params }) => {
+    const crew = crewFixtures.find((item) => item.id === params.crewId);
+    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}/members/${params.userId}` }, { status: 404 });
+    crew.memberUserIds = crew.memberUserIds.filter((memberUserId) => memberUserId !== params.userId);
+    return HttpResponse.json(crew);
   }),
   http.get("*/api/services", ({ request }) => {
     const query = serviceQueryFromUrl(request.url);

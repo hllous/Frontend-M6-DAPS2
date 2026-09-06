@@ -13,7 +13,10 @@ export type Capability =
   | "zone:manage"
   | "route:manage"
   // Frontend hypothesis: #8 defines Office catalog configuration, but not per-resource names.
-  | "serviceFrequency:manage";
+  | "serviceFrequency:manage"
+  // Frontend hypotheses for Phase 2 resource management; M1 capability claims remain unconfirmed.
+  | "vehicle:manage"
+  | "crew:manage";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -55,6 +58,8 @@ export const scenarios: Record<
       "catalog:view",
       "serviceType:manage",
       "disposalSite:manage",
+      "vehicle:manage",
+      "crew:manage",
       "indicator:view",
       "zone:manage",
       "route:manage",
