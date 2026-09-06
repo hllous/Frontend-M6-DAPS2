@@ -225,8 +225,216 @@ describe("RouteCatalogPanel component", () => {
     // Field actors cannot create, edit, or deactivate
     expect(screen.queryByTestId("create-route-button")).not.toBeInTheDocument();
     expect(screen.queryByTestId("edit-route-route-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("edit-stops-button")).not.toBeInTheDocument();
     expect(screen.queryByTestId("deactivate-route-route-1")).not.toBeInTheDocument();
     // But can view details
     expect(screen.getByTestId("view-route-route-1")).toBeInTheDocument();
+  });
+
+  describe("Stop Sequence Builder #111", () => {
+    it("opens stop sequence builder from empty-stops CTA, adds zones, and saves atomically", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("REC-003")).toBeInTheDocument();
+      });
+
+      // View details for REC-003 (which has 0 stops)
+      await user.click(screen.getByTestId("view-route-route-3"));
+
+      const detailView = screen.getByTestId("route-detail-view");
+      expect(detailView).toBeInTheDocument();
+      expect(within(detailView).getByTestId("empty-stops-section")).toBeInTheDocument();
+
+      // Click "Agregar paradas" CTA
+      const addStopsCta = within(detailView).getByTestId("add-stops-cta");
+      await user.click(addStopsCta);
+
+      // Verify sequence builder opened
+      expect(screen.getByTestId("stop-sequence-builder")).toBeInTheDocument();
+      expect(screen.getByTestId("builder-empty-stops")).toBeInTheDocument();
+
+      // Select zone-1 and add
+      const zoneSelect = screen.getByTestId("stop-zone-select");
+      await user.selectOptions(zoneSelect, "zone-1");
+      const durationInput = screen.getByTestId("stop-duration-input");
+      await user.clear(durationInput);
+      await user.type(durationInput, "45");
+      await user.click(screen.getByTestId("add-stop-button"));
+
+      // First stop is added
+      expect(screen.getByTestId("stop-item-0")).toBeInTheDocument();
+      expect(screen.getByText("Zona Norte")).toBeInTheDocument();
+
+      // Select zone-2 and add
+      await user.selectOptions(zoneSelect, "zone-2");
+      await user.clear(durationInput);
+      await user.type(durationInput, "60");
+      await user.click(screen.getByTestId("add-stop-button"));
+
+      // Second stop is added
+      expect(screen.getByTestId("stop-item-1")).toBeInTheDocument();
+      expect(screen.getByText("Zona Sur")).toBeInTheDocument();
+
+      // Click "Guardar secuencia" (single atomic PUT)
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      // Builder closes and detail view shows updated stops list
+      await waitFor(() => {
+        expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
+        expect(screen.getByTestId("stops-list")).toBeInTheDocument();
+      });
+
+      const stopsList = screen.getByTestId("stops-list");
+      expect(within(stopsList).getByText("Zona Norte")).toBeInTheDocument();
+      expect(within(stopsList).getByText("Zona Sur")).toBeInTheDocument();
+      expect(within(stopsList).getByText("45 min")).toBeInTheDocument();
+      expect(within(stopsList).getByText("60 min")).toBeInTheDocument();
+    });
+
+    it("rejects duplicate zones client-side before submit matching 400-on-repeat rule", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("REC-001")).toBeInTheDocument();
+      });
+
+      // View details for REC-001 (has zone-1 and zone-2 already)
+      await user.click(screen.getByTestId("view-route-route-1"));
+
+      // Click "Editar secuencia"
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      expect(screen.getByTestId("stop-sequence-builder")).toBeInTheDocument();
+      expect(screen.getByTestId("stop-item-0")).toBeInTheDocument();
+      expect(screen.getByTestId("stop-item-1")).toBeInTheDocument();
+
+      // Try adding zone-1 again
+      const zoneSelect = screen.getByTestId("stop-zone-select");
+      await user.selectOptions(zoneSelect, "zone-1");
+      await user.click(screen.getByTestId("add-stop-button"));
+
+      // Client-side error is displayed immediately
+      expect(screen.getByTestId("stop-editor-error")).toBeInTheDocument();
+      expect(screen.getByTestId("stop-editor-error")).toHaveTextContent(
+        /Una zona no puede repetirse en el mismo recorrido/i,
+      );
+
+      // Still only 2 stops
+      expect(screen.queryByTestId("stop-item-2")).not.toBeInTheDocument();
+    });
+
+    it("allows reordering and removing stops, then saves atomically", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("REC-001")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("view-route-route-1"));
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      // Initially stop 0 is Zona Norte, stop 1 is Zona Sur
+      const stop0 = screen.getByTestId("stop-item-0");
+      expect(within(stop0).getByText("Zona Norte")).toBeInTheDocument();
+
+      // Move stop 0 down
+      await user.click(screen.getByTestId("stop-move-down-0"));
+
+      // Now stop 0 is Zona Sur, stop 1 is Zona Norte
+      const newStop0 = screen.getByTestId("stop-item-0");
+      expect(within(newStop0).getByText("Zona Sur")).toBeInTheDocument();
+
+      // Remove stop 1 (Zona Norte)
+      await user.click(screen.getByTestId("stop-remove-1"));
+
+      // Now only 1 stop remains
+      expect(screen.queryByTestId("stop-item-1")).not.toBeInTheDocument();
+
+      // Save sequence
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
+        expect(screen.getByTestId("stops-list")).toBeInTheDocument();
+      });
+
+      const stopsList = screen.getByTestId("stops-list");
+      expect(within(stopsList).getByText("Zona Sur")).toBeInTheDocument();
+      expect(within(stopsList).queryByText("Zona Norte")).not.toBeInTheDocument();
+    });
+
+    it("allows saving an empty stop sequence", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("REC-002")).toBeInTheDocument();
+      });
+
+      // REC-002 has 1 stop
+      await user.click(screen.getByTestId("view-route-route-2"));
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      expect(screen.getByTestId("stop-item-0")).toBeInTheDocument();
+
+      // Remove the stop
+      await user.click(screen.getByTestId("stop-remove-0"));
+
+      expect(screen.getByTestId("builder-empty-stops")).toBeInTheDocument();
+
+      // Save empty sequence
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
+        expect(screen.getByTestId("empty-stops-section")).toBeInTheDocument();
+      });
+    });
+
+    it("warns with advisory-only precheck when Route updatedAt changed since opening editor, but does not block save", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("REC-001")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("view-route-route-1"));
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      // Simulate external drift of route-1's updatedAt in backend
+      const fixture = routeFixtures.find((r) => r.id === "route-1");
+      if (fixture) {
+        fixture.updatedAt = "2026-09-05T15:30:00.000Z";
+      }
+
+      // User tries to save
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      // Advisory warning dialog is triggered
+      await waitFor(() => {
+        expect(screen.getByTestId("staleness-warning-dialog")).toBeInTheDocument();
+      });
+
+      // Copy makes clear this is advisory and not authoritative
+      expect(
+        screen.getByText(/Aviso informativo \(no autoritativo\): El backend no posee control de concurrencia/i),
+      ).toBeInTheDocument();
+
+      // User can proceed anyway
+      const confirmButton = screen.getByTestId("confirm-staleness-save-button");
+      await user.click(confirmButton);
+
+      // Save completes despite the staleness
+      await waitFor(() => {
+        expect(screen.queryByTestId("staleness-warning-dialog")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
+        expect(screen.getByTestId("stops-list")).toBeInTheDocument();
+      });
+    });
   });
 });

@@ -156,4 +156,122 @@ describe("routes adapter", () => {
       },
     ]);
   });
+
+  describe("setStops full-replace PUT", () => {
+    it("asserts full-replace PUT semantics: whole array sent atomically in order", async () => {
+      let capturedMethod = "";
+      let capturedUrl = "";
+      let capturedBody: unknown = null;
+
+      server.use(
+        http.put("*/api/routes/:id/stops", async ({ request, params }) => {
+          capturedMethod = request.method;
+          capturedUrl = request.url;
+          capturedBody = await request.json();
+          return HttpResponse.json({
+            id: params.id,
+            code: "REC-001",
+            name: "Recorrido Casco Histórico",
+            active: true,
+            stops: [
+              {
+                id: "stop-new-1",
+                routeId: params.id,
+                sequence: 1,
+                zoneId: "zone-2",
+                estimatedDurationMin: 35,
+              },
+              {
+                id: "stop-new-2",
+                routeId: params.id,
+                sequence: 2,
+                zoneId: "zone-1",
+                estimatedDurationMin: 55,
+              },
+            ],
+            updatedAt: "2026-09-05T11:00:00.000Z",
+          });
+        }),
+      );
+
+      const result = await routesAdapter.setStops("route-1", {
+        stops: [
+          { zoneId: "zone-2", estimatedDurationMin: 35 },
+          { zoneId: "zone-1", estimatedDurationMin: 55 },
+        ],
+      });
+
+      expect(capturedMethod).toBe("PUT");
+      expect(capturedUrl).toContain("/api/routes/route-1/stops");
+      expect(capturedBody).toEqual({
+        stops: [
+          { zoneId: "zone-2", estimatedDurationMin: 35 },
+          { zoneId: "zone-1", estimatedDurationMin: 55 },
+        ],
+      });
+      expect(result.stops).toHaveLength(2);
+      expect(result.stops[0]?.zoneId).toBe("zone-2");
+      expect(result.stops[1]?.zoneId).toBe("zone-1");
+    });
+
+    it("allows replacing with an empty sequence", async () => {
+      let capturedBody: unknown = null;
+      server.use(
+        http.put("*/api/routes/:id/stops", async ({ request, params }) => {
+          capturedBody = await request.json();
+          return HttpResponse.json({
+            id: params.id,
+            code: "REC-001",
+            name: "Recorrido Casco Histórico",
+            active: true,
+            stops: [],
+            updatedAt: "2026-09-05T11:00:00.000Z",
+          });
+        }),
+      );
+
+      const result = await routesAdapter.setStops("route-1", { stops: [] });
+
+      expect(capturedBody).toEqual({ stops: [] });
+      expect(result.stops).toEqual([]);
+    });
+
+    it("rejects client-side before submit when duplicate zones are in the sequence", async () => {
+      const call = routesAdapter.setStops("route-1", {
+        stops: [
+          { zoneId: "zone-1", estimatedDurationMin: 30 },
+          { zoneId: "zone-1", estimatedDurationMin: 45 },
+        ],
+      });
+
+      await expect(call).rejects.toThrow(/Una zona no puede repetirse en el mismo recorrido/i);
+    });
+
+    it("surfaces server 400 Bad Request error as typed RouteRequestError", async () => {
+      server.use(
+        http.put("*/api/routes/:id/stops", () =>
+          HttpResponse.json(
+            {
+              statusCode: 400,
+              message: "Una zona no puede repetirse en el mismo recorrido: zone-1",
+              error: "Bad Request",
+              timestamp: new Date().toISOString(),
+              path: "/api/routes/route-1/stops",
+            },
+            { status: 400 },
+          ),
+        ),
+      );
+
+      const error = await routesAdapter
+        .setStops("route-1", {
+          stops: [{ zoneId: "zone-1", estimatedDurationMin: 30 }],
+        })
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(RouteRequestError);
+      expect((error as RouteRequestError).status).toBe(400);
+      expect((error as RouteRequestError).message).toContain("Una zona no puede repetirse");
+    });
+  });
 });
