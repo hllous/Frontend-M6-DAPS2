@@ -112,6 +112,7 @@ import {
 import {
   addAttachmentToContainer,
   addContainerFixture,
+  completeRepairFixture,
   filterContainerFixtures,
   containerFixtures,
   getContainerAttachments,
@@ -119,6 +120,8 @@ import {
   paginateContainerFixtures,
   reportDamageFixture,
   reportOverflowFixture,
+  removeContainerFixture,
+  startRepairFixture,
   updateContainerFixture,
 } from "@/lib/containers-fixtures";
 import {
@@ -2041,6 +2044,55 @@ export const handlers = [
     }
     const updated = reportDamageFixture(params.containerId as string, parsed.data);
     return HttpResponse.json(updated, { status: 200 });
+  }),
+  // ── Containers: Office repair/removal dispatch (#122) ───────────────────
+  http.post("*/api/containers/:containerId/start-repair", ({ params }) => {
+    const container = getContainerFixture(params.containerId as string);
+    if (!container) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Contenedor no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/start-repair` },
+        { status: 404 },
+      );
+    }
+    if (container.status !== "DAMAGED") {
+      return HttpResponse.json(
+        { statusCode: 409, message: `Solo se puede iniciar la reparación de contenedores dañados. Estado actual: ${container.status}`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/start-repair` },
+        { status: 409 },
+      );
+    }
+    return HttpResponse.json(startRepairFixture(params.containerId as string), { status: 200 });
+  }),
+  http.post("*/api/containers/:containerId/complete-repair", ({ params }) => {
+    const container = getContainerFixture(params.containerId as string);
+    if (!container) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Contenedor no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/complete-repair` },
+        { status: 404 },
+      );
+    }
+    if (container.status !== "UNDER_REPAIR") {
+      return HttpResponse.json(
+        { statusCode: 409, message: `Solo se puede completar la reparación de contenedores en reparación. Estado actual: ${container.status}`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/complete-repair` },
+        { status: 409 },
+      );
+    }
+    return HttpResponse.json(completeRepairFixture(params.containerId as string), { status: 200 });
+  }),
+  http.post("*/api/containers/:containerId/remove", ({ params }) => {
+    const container = getContainerFixture(params.containerId as string);
+    if (!container) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Contenedor no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/remove` },
+        { status: 404 },
+      );
+    }
+    if (container.status !== "DAMAGED") {
+      return HttpResponse.json(
+        { statusCode: 409, message: `Solo se pueden retirar contenedores dañados. Estado actual: ${container.status}`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/remove` },
+        { status: 409 },
+      );
+    }
+    return HttpResponse.json(removeContainerFixture(params.containerId as string), { status: 200 });
   }),
   http.get("*/api/evidence", ({ request }) => {
     const url = new URL(request.url);

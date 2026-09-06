@@ -52,6 +52,11 @@ test.describe("Container catalog management #120", () => {
 
     await expect(dialog).not.toBeVisible();
     await expect(page.getByText("Contenedor registrado con éxito.")).toBeVisible();
+
+    // The catalog's default page only shows the first page of results, and other
+    // e2e specs permanently add containers of their own — search to make sure the
+    // new row is found regardless of how many containers now precede it.
+    await page.getByLabel("Buscar contenedor").fill("CONT-E2E-99");
     await expect(page.getByText("CONT-E2E-99")).toBeVisible();
     await expect(page.getByText("Av. Belgrano 1200")).toBeVisible();
   });
