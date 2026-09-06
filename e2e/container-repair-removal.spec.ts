@@ -21,6 +21,10 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await createDialog.locator("#container-lng").fill("-58.382");
     await createDialog.getByRole("button", { name: "Guardar contenedor" }).click();
 
+    // The catalog's default page only shows the first page of results, and other
+    // e2e specs permanently add containers of their own — search to make sure the
+    // new row is found regardless of how many containers now precede it.
+    await page.getByLabel("Buscar contenedor").fill("CONT-E2E-REPAIR");
     const row = page.locator("tr", { hasText: "CONT-E2E-REPAIR" });
     await expect(row).toBeVisible();
     await row.getByRole("button", { name: "Reportar daño" }).click();

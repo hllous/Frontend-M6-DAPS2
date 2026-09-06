@@ -8,9 +8,15 @@ import {
   ContainerContractError,
   ContainerRequestError,
   containersAdapter,
+  empty,
+  startRelocation,
+  confirmRelocation,
+  findInFlightServiceForContainer,
+  type ConfirmRelocationInput,
   type CreateContainerInput,
   type UpdateContainerInput,
 } from "./containers";
+import type { Service } from "./services";
 
 const server = setupServer(...handlers);
 
@@ -361,6 +367,258 @@ describe("containers adapter", () => {
       const list = await containersAdapter.getEvidence("cont-1");
       expect(list).toHaveLength(1);
       expect(list[0].id).toBe("att-cont-1");
+    });
+  });
+
+  describe("empty (#123)", () => {
+    it("transitions OVERFLOWED -> ACTIVE via containersAdapter.empty and standalone export", async () => {
+      server.use(
+        http.post("*/api/containers/:id/empty", ({ params }) => {
+          return HttpResponse.json({
+            id: params.id,
+            code: "CONT-002",
+            containerType: "RECYCLABLE",
+            zoneId: "zone-2",
+            address: "Av. Santa Fe 3400",
+            lat: -34.588,
+            lng: -58.411,
+            capacityLiters: 2400,
+            status: "ACTIVE",
+          });
+        }),
+      );
+
+      const resultAdapter = await containersAdapter.empty("cont-2");
+      expect(resultAdapter.status).toBe("ACTIVE");
+      expect(resultAdapter.id).toBe("cont-2");
+
+      const resultFn = await empty("cont-2");
+      expect(resultFn.status).toBe("ACTIVE");
+    });
+
+    it("surfaces 409 conflict when attempting to empty a non-OVERFLOWED container", async () => {
+      server.use(
+        http.post("*/api/containers/:id/empty", () =>
+          HttpResponse.json(
+            {
+              statusCode: 409,
+              message: "Solo se puede vaciar un contenedor en estado desbordado.",
+              error: "Conflict",
+              timestamp: new Date().toISOString(),
+              path: "/api/containers/cont-1/empty",
+            },
+            { status: 409 },
+          ),
+        ),
+      );
+
+      await expect(containersAdapter.empty("cont-1")).rejects.toMatchObject({
+        name: "ContainerRequestError",
+        status: 409,
+        message: "Solo se puede vaciar un contenedor en estado desbordado.",
+      });
+    });
+  });
+
+  describe("relocate and confirmRelocation (#123)", () => {
+    it("transitions ACTIVE -> RELOCATING via containersAdapter.relocate and startRelocation", async () => {
+      server.use(
+        http.post("*/api/containers/:id/relocate", ({ params }) => {
+          return HttpResponse.json({
+            id: params.id,
+            code: "CONT-001",
+            containerType: "HOUSEHOLD",
+            zoneId: "zone-1",
+            address: "Av. Rivadavia 1200",
+            lat: -34.6083,
+            lng: -58.3712,
+            capacityLiters: 1100,
+            status: "RELOCATING",
+          });
+        }),
+      );
+
+      const resultAdapter = await containersAdapter.relocate("cont-1");
+      expect(resultAdapter.status).toBe("RELOCATING");
+
+      const resultFn = await startRelocation("cont-1");
+      expect(resultFn.status).toBe("RELOCATING");
+    });
+
+    it("surfaces 409 conflict when attempting to relocate a non-ACTIVE container", async () => {
+      server.use(
+        http.post("*/api/containers/:id/relocate", () =>
+          HttpResponse.json(
+            {
+              statusCode: 409,
+              message: "Solo se puede iniciar la reubicación en contenedores activos.",
+              error: "Conflict",
+              timestamp: new Date().toISOString(),
+              path: "/api/containers/cont-2/relocate",
+            },
+            { status: 409 },
+          ),
+        ),
+      );
+
+      await expect(containersAdapter.relocate("cont-2")).rejects.toMatchObject({
+        name: "ContainerRequestError",
+        status: 409,
+        message: "Solo se puede iniciar la reubicación en contenedores activos.",
+      });
+    });
+
+    it("transitions RELOCATING -> ACTIVE with new address and coordinates via confirmRelocation", async () => {
+      let capturedPayload: unknown = null;
+      server.use(
+        http.post("*/api/containers/:id/confirm-relocation", async ({ params, request }) => {
+          capturedPayload = await request.json();
+          return HttpResponse.json({
+            id: params.id,
+            code: "CONT-005",
+            containerType: "HOUSEHOLD",
+            zoneId: "zone-1",
+            address: "Av. La Plata 1250",
+            lat: -34.625,
+            lng: -58.43,
+            capacityLiters: 1100,
+            status: "ACTIVE",
+          });
+        }),
+      );
+
+      const input: ConfirmRelocationInput = {
+        address: "Av. La Plata 1250",
+        lat: -34.625,
+        lng: -58.43,
+      };
+
+      const resultAdapter = await containersAdapter.confirmRelocation("cont-5", input);
+      expect(resultAdapter.status).toBe("ACTIVE");
+      expect(resultAdapter.address).toBe("Av. La Plata 1250");
+      expect(resultAdapter.lat).toBe(-34.625);
+      expect(resultAdapter.lng).toBe(-58.43);
+      expect(capturedPayload).toEqual(input);
+
+      const resultFn = await confirmRelocation("cont-5", input);
+      expect(resultFn.status).toBe("ACTIVE");
+    });
+
+    it("rejects invalid confirmRelocation input client-side before network call", async () => {
+      // @ts-expect-error testing invalid input
+      await expect(containersAdapter.confirmRelocation("cont-5", { address: "", lat: "invalid", lng: -58.4 }))
+        .rejects.toBeInstanceOf(ContainerContractError);
+    });
+
+    it("surfaces 409 conflict when confirming relocation on a non-RELOCATING container", async () => {
+      server.use(
+        http.post("*/api/containers/:id/confirm-relocation", () =>
+          HttpResponse.json(
+            {
+              statusCode: 409,
+              message: "Solo se puede confirmar la reubicación en contenedores en estado de reubicación.",
+              error: "Conflict",
+              timestamp: new Date().toISOString(),
+              path: "/api/containers/cont-1/confirm-relocation",
+            },
+            { status: 409 },
+          ),
+        ),
+      );
+
+      await expect(
+        containersAdapter.confirmRelocation("cont-1", {
+          address: "Nueva Dirección 123",
+          lat: -34.6,
+          lng: -58.4,
+        }),
+      ).rejects.toMatchObject({
+        name: "ContainerRequestError",
+        status: 409,
+      });
+    });
+  });
+
+  describe("findInFlightServiceForContainer (#123)", () => {
+    const dummyContainer = {
+      id: "cont-10",
+      code: "CONT-010",
+      containerType: "HOUSEHOLD" as const,
+      zoneId: "zone-1",
+      address: "Calle Falsa 123",
+      lat: -34.6,
+      lng: -58.4,
+      capacityLiters: 1100,
+      status: "OVERFLOWED" as const,
+    };
+
+    it("returns in-flight service when a matching service is SCHEDULED, RESCHEDULED, IN_PROGRESS, or SUSPENDED", () => {
+      const mockServices: Partial<Service>[] = [
+        {
+          id: "SVC-2001",
+          targetType: "CONTAINER",
+          targetId: "cont-10",
+          status: "SCHEDULED",
+        },
+        {
+          id: "SVC-2002",
+          targetType: "CONTAINER",
+          targetId: "other-cont",
+          status: "IN_PROGRESS",
+        },
+      ];
+
+      const found = findInFlightServiceForContainer(dummyContainer, mockServices as Service[]);
+      expect(found).toBeDefined();
+      expect(found?.id).toBe("SVC-2001");
+    });
+
+    it("matches by targetRef (container code) if targetId is not set", () => {
+      const mockServices: Partial<Service>[] = [
+        {
+          id: "SVC-2003",
+          targetType: "CONTAINER",
+          targetRef: "CONT-010",
+          status: "IN_PROGRESS",
+        },
+      ];
+
+      const found = findInFlightServiceForContainer(dummyContainer, mockServices as Service[]);
+      expect(found?.id).toBe("SVC-2003");
+    });
+
+    it("ignores services with terminal statuses COMPLETED or CANCELLED", () => {
+      const mockServices: Partial<Service>[] = [
+        {
+          id: "SVC-2004",
+          targetType: "CONTAINER",
+          targetId: "cont-10",
+          status: "COMPLETED",
+        },
+        {
+          id: "SVC-2005",
+          targetType: "CONTAINER",
+          targetId: "cont-10",
+          status: "CANCELLED",
+        },
+      ];
+
+      const found = findInFlightServiceForContainer(dummyContainer, mockServices as Service[]);
+      expect(found).toBeUndefined();
+    });
+
+    it("returns undefined if no service targets the container", () => {
+      const mockServices: Partial<Service>[] = [
+        {
+          id: "SVC-2006",
+          targetType: "TREE",
+          targetId: "cont-10",
+          status: "IN_PROGRESS",
+        },
+      ];
+
+      const found = findInFlightServiceForContainer(dummyContainer, mockServices as Service[]);
+      expect(found).toBeUndefined();
     });
   });
 });

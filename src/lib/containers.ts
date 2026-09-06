@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
-import { attachmentSchema, type Attachment } from "./services";
+import { attachmentSchema, type Attachment, type Service, type ServiceStatus } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
 
 export { attachmentSchema, type Attachment };
@@ -98,6 +98,32 @@ export const reportDamageInputSchema = z.object({
   requiresPublicWorks: z.boolean().optional().default(false),
 });
 export type ReportDamageInput = z.input<typeof reportDamageInputSchema>;
+
+export const confirmRelocationInputSchema = z.object({
+  address: z.string().trim().min(1, "La dirección es obligatoria."),
+  lat: z.number({ message: "La latitud debe ser un número válido." }),
+  lng: z.number({ message: "La longitud debe ser un número válido." }),
+  zoneId: z.string().trim().min(1).optional(),
+});
+export type ConfirmRelocationInput = z.infer<typeof confirmRelocationInputSchema>;
+
+export function findInFlightServiceForContainer(
+  container: Container,
+  services: Service[],
+): Service | undefined {
+  const inFlightStatuses: ServiceStatus[] = [
+    "SCHEDULED",
+    "RESCHEDULED",
+    "IN_PROGRESS",
+    "SUSPENDED",
+  ];
+  return services.find(
+    (s) =>
+      s.targetType === "CONTAINER" &&
+      (s.targetId === container.id || s.targetRef === container.code) &&
+      inFlightStatuses.includes(s.status),
+  );
+}
 
 export class ContainerContractError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -404,4 +430,54 @@ export const containersAdapter = {
     }
     return parsed.data;
   },
+
+  async empty(id: string): Promise<Container> {
+    return parseContainer(
+      await send(`/api/containers/${id}/empty`, {
+        method: "POST",
+      }),
+      "La respuesta de vaciado de contenedor no respeta el contrato esperado.",
+    );
+  },
+
+  async relocate(id: string): Promise<Container> {
+    return parseContainer(
+      await send(`/api/containers/${id}/relocate`, {
+        method: "POST",
+      }),
+      "La respuesta de inicio de reubicación no respeta el contrato esperado.",
+    );
+  },
+
+  async confirmRelocation(id: string, input: ConfirmRelocationInput): Promise<Container> {
+    const parsedInput = confirmRelocationInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ContainerContractError("Los datos para confirmar la reubicación son inválidos.", {
+        cause: parsedInput.error,
+      });
+    }
+    return parseContainer(
+      await send(`/api/containers/${id}/confirm-relocation`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }),
+      "La respuesta de confirmación de reubicación no respeta el contrato esperado.",
+    );
+  },
 };
+
+export async function empty(id: string): Promise<Container> {
+  return containersAdapter.empty(id);
+}
+
+export async function startRelocation(id: string): Promise<Container> {
+  return containersAdapter.relocate(id);
+}
+
+export async function confirmRelocation(
+  id: string,
+  input: ConfirmRelocationInput,
+): Promise<Container> {
+  return containersAdapter.confirmRelocation(id, input);
+}
