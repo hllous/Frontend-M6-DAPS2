@@ -4,7 +4,8 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   serviceTypeCategorySchema,
@@ -31,7 +32,6 @@ const modes: Array<{ value: ServiceTypeMode; label: string }> = [
   { value: "POINT", label: "Punto" },
 ];
 
-const controlClass = "min-h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 const initialCreate = { code: "", name: "", category: "WASTE_COLLECTION" as ServiceTypeCategory, mode: "ROUTE" as ServiceTypeMode, requiresVehicle: true };
 
 type LoadState = { status: "loading" } | { status: "ready"; items: ServiceType[] } | { status: "error"; message: string };
@@ -47,6 +47,8 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
   const [createDraft, setCreateDraft] = useState(initialCreate);
   const [editing, setEditing] = useState<ServiceType | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
   const submitCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage(null);
+    setCreateError(null);
     try {
       await serviceTypesAdapter.create(createDraft);
       setCreateDraft(initialCreate);
@@ -79,7 +82,9 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
       setMessage("Tipo de servicio creado.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No se pudo crear el tipo de servicio.");
+      const errorMessage = error instanceof Error ? error.message : "No se pudo crear el tipo de servicio.";
+      setCreateError(errorMessage);
+      setMessage(errorMessage);
     }
   };
 
@@ -87,13 +92,16 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
     event.preventDefault();
     if (!editing) return;
     setMessage(null);
+    setEditError(null);
     try {
       await serviceTypesAdapter.update(editing.id, { name: editing.name, requiresVehicle: editing.requiresVehicle, active: editing.active });
       setEditing(null);
       setMessage("Tipo de servicio actualizado.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No se pudo actualizar el tipo de servicio.");
+      const errorMessage = error instanceof Error ? error.message : "No se pudo actualizar el tipo de servicio.";
+      setEditError(errorMessage);
+      setMessage(errorMessage);
     }
   };
 
@@ -123,25 +131,25 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
       {message ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{message}</p> : null}
 
       {showCreate && canManage ? (
-        <form onSubmit={submitCreate} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <form onSubmit={submitCreate} className="rounded-xl border border-border bg-card p-5">
           <h2 className="text-lg font-semibold">Alta de tipo de servicio</h2>
           <p className="mt-1 text-sm text-muted-foreground">Código, categoría y modo quedan fijos al crear el tipo.</p>
           <FieldGroup className="mt-5 grid gap-4 md:grid-cols-2">
-            <Field><FieldLabel htmlFor="service-type-code">Código</FieldLabel><input id="service-type-code" className={controlClass} required value={createDraft.code} onChange={(event) => setCreateDraft({ ...createDraft, code: event.target.value })} /></Field>
-            <Field><FieldLabel htmlFor="service-type-name">Nombre</FieldLabel><input id="service-type-name" className={controlClass} required value={createDraft.name} onChange={(event) => setCreateDraft({ ...createDraft, name: event.target.value })} /></Field>
-            <Field><FieldLabel htmlFor="service-type-category">Categoría</FieldLabel><select id="service-type-category" className={controlClass} value={createDraft.category} onChange={(event) => { const parsed = serviceTypeCategorySchema.safeParse(event.target.value); if (parsed.success) setCreateDraft({ ...createDraft, category: parsed.data }); }}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
-            <Field><FieldLabel htmlFor="service-type-mode">Modo</FieldLabel><select id="service-type-mode" className={controlClass} value={createDraft.mode} onChange={(event) => { const parsed = serviceTypeModeSchema.safeParse(event.target.value); if (parsed.success) setCreateDraft({ ...createDraft, mode: parsed.data }); }}>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
-            <label className="flex min-h-9 items-center gap-2 text-sm md:col-span-2"><input type="checkbox" checked={createDraft.requiresVehicle} onChange={(event) => setCreateDraft({ ...createDraft, requiresVehicle: event.target.checked })} /> Requiere vehículo</label>
+            <Field><FieldLabel htmlFor="service-type-code">Código</FieldLabel><input id="service-type-code" className={formControlClass} required value={createDraft.code} aria-invalid={Boolean(createError)} aria-describedby={createError ? "service-type-code-error" : undefined} onChange={(event) => setCreateDraft({ ...createDraft, code: event.target.value })} /><FieldError id="service-type-code-error">{createError}</FieldError></Field>
+            <Field><FieldLabel htmlFor="service-type-name">Nombre</FieldLabel><input id="service-type-name" className={formControlClass} required value={createDraft.name} onChange={(event) => setCreateDraft({ ...createDraft, name: event.target.value })} /></Field>
+            <Field><FieldLabel htmlFor="service-type-category">Categoría</FieldLabel><select id="service-type-category" className={formControlClass} value={createDraft.category} onChange={(event) => { const parsed = serviceTypeCategorySchema.safeParse(event.target.value); if (parsed.success) setCreateDraft({ ...createDraft, category: parsed.data }); }}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
+            <Field><FieldLabel htmlFor="service-type-mode">Modo</FieldLabel><select id="service-type-mode" className={formControlClass} value={createDraft.mode} onChange={(event) => { const parsed = serviceTypeModeSchema.safeParse(event.target.value); if (parsed.success) setCreateDraft({ ...createDraft, mode: parsed.data }); }}>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
+            <label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm md:col-span-2"><input type="checkbox" checked={createDraft.requiresVehicle} onChange={(event) => setCreateDraft({ ...createDraft, requiresVehicle: event.target.checked })} /> Requiere vehículo</label>
           </FieldGroup>
           <div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button><Button type="submit">Crear tipo</Button></div>
         </form>
       ) : null}
 
       <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[minmax(220px,1fr)_160px_190px_150px]">
-        <label className="flex flex-col gap-1 text-sm font-semibold">Buscar<input aria-label="Buscar tipos de servicio" className={controlClass} placeholder="Código o nombre" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">Estado<select aria-label="Filtrar por estado" className={controlClass} value={active} onChange={(event) => setActive(event.target.value)}><option value="all">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select></label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">Categoría<select aria-label="Filtrar por categoría" className={controlClass} value={category} onChange={(event) => setCategory(event.target.value as ServiceTypeCategory | "")}><option value="">Todas</option>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">Modo<select aria-label="Filtrar por modo" className={controlClass} value={mode} onChange={(event) => setMode(event.target.value as ServiceTypeMode | "")}><option value="">Todos</option>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">Buscar<input aria-label="Buscar tipos de servicio" className={formControlClass} placeholder="Código o nombre" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">Estado<select aria-label="Filtrar por estado" className={formControlClass} value={active} onChange={(event) => setActive(event.target.value)}><option value="all">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select></label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">Categoría<select aria-label="Filtrar por categoría" className={formControlClass} value={category} onChange={(event) => setCategory(event.target.value as ServiceTypeCategory | "")}><option value="">Todas</option>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">Modo<select aria-label="Filtrar por modo" className={formControlClass} value={mode} onChange={(event) => setMode(event.target.value as ServiceTypeMode | "")}><option value="">Todos</option>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       </div>
 
       {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio" className="flex flex-col gap-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : null}
@@ -149,7 +157,7 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
       {state.status === "ready" && state.items.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin tipos de servicio</EmptyTitle><EmptyDescription>No hay resultados para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty> : null}
       {state.status === "ready" && state.items.length > 0 ? <div className="overflow-x-auto rounded-xl border border-border bg-card"><table className="w-full min-w-[760px] text-left text-sm"><caption className="sr-only">Tipos de servicio</caption><thead className="border-b border-border bg-muted text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Código</th><th className="px-4 py-3">Nombre</th><th className="px-4 py-3">Categoría</th><th className="px-4 py-3">Modo</th><th className="px-4 py-3">Vehículo</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3"><span className="sr-only">Acciones</span></th></tr></thead><tbody>{state.items.map((item) => <tr key={item.id} className="border-b border-border last:border-0"><td className="px-4 py-3 font-mono text-xs">{item.code}</td><td className="px-4 py-3 font-medium">{item.name}</td><td className="px-4 py-3">{categories.find((option) => option.value === item.category)?.label ?? item.category}</td><td className="px-4 py-3">{item.mode === "ROUTE" ? "Recorrido" : "Punto"}</td><td className="px-4 py-3">{item.requiresVehicle ? "Sí" : "No"}</td><td className="px-4 py-3">{item.active ? "Activo" : "Inactivo"}</td><td className="px-4 py-3"><div className="flex justify-end gap-2">{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => { setEditing(item); setShowCreate(false); }}>Editar</Button>{item.active ? <Button type="button" size="sm" variant="destructive" onClick={() => void deactivate(item)}>Dar de baja</Button> : null}</> : null}</div></td></tr>)}</tbody></table></div> : null}
 
-      {editing && canManage ? <form onSubmit={submitEdit} className="rounded-xl border border-border bg-card p-5 shadow-sm"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">Editar tipo de servicio</h2><FieldDescription>El código, la categoría y el modo son de solo lectura porque ya pueden estar copiados en servicios programados.</FieldDescription></div><Button type="button" variant="ghost" onClick={() => setEditing(null)}>Cerrar</Button></div><FieldGroup className="mt-5 grid gap-4 md:grid-cols-2"><Field><FieldLabel htmlFor="edit-service-type-code">Código</FieldLabel><input id="edit-service-type-code" className={controlClass} value={editing.code} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-service-type-name">Nombre</FieldLabel><input id="edit-service-type-name" className={controlClass} required value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /></Field><Field><FieldLabel htmlFor="edit-service-type-category">Categoría</FieldLabel><input id="edit-service-type-category" className={controlClass} value={categories.find((item) => item.value === editing.category)?.label ?? editing.category} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-service-type-mode">Modo</FieldLabel><input id="edit-service-type-mode" className={controlClass} value={editing.mode === "ROUTE" ? "Recorrido" : "Punto"} readOnly aria-readonly="true" /></Field><label className="flex min-h-9 items-center gap-2 text-sm"><input type="checkbox" checked={editing.requiresVehicle} onChange={(event) => setEditing({ ...editing, requiresVehicle: event.target.checked })} /> Requiere vehículo</label><label className="flex min-h-9 items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(event) => setEditing({ ...editing, active: event.target.checked })} /> Activo</label></FieldGroup><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancelar</Button><Button type="submit">Guardar cambios</Button></div></form> : null}
+      {editing && canManage ? <form onSubmit={submitEdit} className="rounded-xl border border-border bg-card p-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">Editar tipo de servicio</h2><FieldDescription>El código, la categoría y el modo son de solo lectura porque ya pueden estar copiados en servicios programados.</FieldDescription></div><Button type="button" variant="ghost" onClick={() => setEditing(null)}>Cerrar</Button></div><FieldGroup className="mt-5 grid gap-4 md:grid-cols-2"><Field><FieldLabel htmlFor="edit-service-type-code">Código</FieldLabel><input id="edit-service-type-code" className={formControlClass} value={editing.code} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-service-type-name">Nombre</FieldLabel><input id="edit-service-type-name" className={formControlClass} required value={editing.name} aria-invalid={Boolean(editError)} aria-describedby={editError ? "edit-service-type-name-error" : undefined} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /><FieldError id="edit-service-type-name-error">{editError}</FieldError></Field><Field><FieldLabel htmlFor="edit-service-type-category">Categoría</FieldLabel><input id="edit-service-type-category" className={formControlClass} value={categories.find((item) => item.value === editing.category)?.label ?? editing.category} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-service-type-mode">Modo</FieldLabel><input id="edit-service-type-mode" className={formControlClass} value={editing.mode === "ROUTE" ? "Recorrido" : "Punto"} readOnly aria-readonly="true" /></Field><label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm"><input type="checkbox" checked={editing.requiresVehicle} onChange={(event) => setEditing({ ...editing, requiresVehicle: event.target.checked })} /> Requiere vehículo</label><label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(event) => setEditing({ ...editing, active: event.target.checked })} /> Activo</label></FieldGroup><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancelar</Button><Button type="submit">Guardar cambios</Button></div></form> : null}
     </section>
   );
 }
