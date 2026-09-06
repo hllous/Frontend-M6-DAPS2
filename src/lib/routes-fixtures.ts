@@ -1,4 +1,5 @@
-import type { Route, RouteQuery, RouteReferenceReport } from "./routes";
+import type { Route, RouteQuery, RouteReferenceReport, RouteStop } from "./routes";
+import { zoneFixtures } from "./zones-fixtures";
 
 const INITIAL_ROUTE_FIXTURES: Route[] = [
   {
@@ -24,6 +25,7 @@ const INITIAL_ROUTE_FIXTURES: Route[] = [
         zone: { id: "zone-2", code: "Z-02", name: "Zona Sur" },
       },
     ],
+    updatedAt: "2026-09-05T10:00:00.000Z",
   },
   {
     id: "route-2",
@@ -40,6 +42,7 @@ const INITIAL_ROUTE_FIXTURES: Route[] = [
         zone: { id: "zone-2", code: "Z-02", name: "Zona Sur" },
       },
     ],
+    updatedAt: "2026-09-05T10:00:00.000Z",
   },
   {
     id: "route-3",
@@ -47,6 +50,24 @@ const INITIAL_ROUTE_FIXTURES: Route[] = [
     name: "Recorrido Sin Frecuencia",
     active: false,
     stops: [],
+    updatedAt: "2026-09-05T10:00:00.000Z",
+  },
+  {
+    id: "route-4",
+    code: "REC-004",
+    name: "Recorrido Parque Industrial",
+    active: true,
+    stops: [
+      {
+        id: "stop-4",
+        routeId: "route-4",
+        sequence: 1,
+        zoneId: "zone-2",
+        estimatedDurationMin: 50,
+        zone: { id: "zone-2", code: "Z-02", name: "Zona Sur" },
+      },
+    ],
+    updatedAt: "2026-09-05T10:00:00.000Z",
   },
 ];
 
@@ -76,6 +97,39 @@ export function updateRouteFixture(id: string, patch: Partial<Route>): Route | n
   const updated: Route = {
     ...current,
     ...allowedPatch,
+    updatedAt: new Date().toISOString(),
+  };
+  routeFixtures[index] = updated;
+  return updated;
+}
+
+export function setRouteStopsFixture(
+  routeId: string,
+  stopsInput: { zoneId: string; estimatedDurationMin: number }[],
+): Route | null {
+  const index = routeFixtures.findIndex((candidate) => candidate.id === routeId);
+  if (index === -1) return null;
+  const current = routeFixtures[index];
+  if (!current) return null;
+
+  const stops: RouteStop[] = stopsInput.map((input, idx) => {
+    const zone = zoneFixtures.find((z) => z.id === input.zoneId);
+    return {
+      id: `stop-${routeId}-${idx + 1}-${Date.now()}`,
+      routeId,
+      sequence: idx + 1,
+      zoneId: input.zoneId,
+      estimatedDurationMin: input.estimatedDurationMin,
+      zone: zone
+        ? { id: zone.id, code: zone.code, name: zone.name }
+        : { id: input.zoneId, code: input.zoneId, name: `Zona ${input.zoneId}` },
+    };
+  });
+
+  const updated: Route = {
+    ...current,
+    stops,
+    updatedAt: new Date().toISOString(),
   };
   routeFixtures[index] = updated;
   return updated;

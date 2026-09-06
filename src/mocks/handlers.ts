@@ -58,11 +58,13 @@ import {
   getRouteFixture,
   getRouteReferences,
   paginateRouteFixtures,
+  setRouteStopsFixture,
   updateRouteFixture,
   routeFixtures,
 } from "@/lib/routes-fixtures";
 import {
   createRouteInputSchema,
+  setRouteStopsInputSchema,
   updateRouteInputSchema,
   type Route,
   type RouteQuery,
@@ -330,6 +332,50 @@ export const handlers = [
       );
     }
     return HttpResponse.json(getRouteReferences(routeId));
+  }),
+  http.put("*/api/routes/:routeId/stops", async ({ params, request }) => {
+    const routeId = params.routeId as string;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/stops` },
+        { status: 400 },
+      );
+    }
+    const parsed = setRouteStopsInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((i) => i.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/stops` },
+        { status: 400 },
+      );
+    }
+    const route = getRouteFixture(routeId);
+    if (!route) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Recorrido no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/stops` },
+        { status: 404 },
+      );
+    }
+    const zoneIds = parsed.data.stops.map((s) => s.zoneId);
+    if (zoneIds.length > 0) {
+      const missingZones = zoneIds.filter((zid) => !zoneFixtures.some((z) => z.id === zid));
+      if (missingZones.length > 0) {
+        return HttpResponse.json(
+          { statusCode: 404, message: `Zonas no encontradas: ${missingZones.join(", ")}`, error: "Not Found", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/stops` },
+          { status: 404 },
+        );
+      }
+    }
+    const updated = setRouteStopsFixture(routeId, parsed.data.stops);
+    if (!updated) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Recorrido no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/stops` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(updated);
   }),
   http.get("*/api/services", ({ request }) => {
     const query = serviceQueryFromUrl(request.url);

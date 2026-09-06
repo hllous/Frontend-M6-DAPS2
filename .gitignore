@@ -45,6 +45,6 @@ next-env.d.ts
 .github/skills
 .github/agents
 .github/hooks
-.codex
+.codex*
 skills-lock.json
 .impeccable/

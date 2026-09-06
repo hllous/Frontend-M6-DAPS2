@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   CheckCircle2,
   Clock,
   Eye,
@@ -36,6 +38,7 @@ import {
   type CreateRouteInput,
   type Route,
   type RouteReferenceReport,
+  type RouteStopInput,
   RouteRequestError,
   routesAdapter,
 } from "@/lib/routes";
@@ -87,6 +90,23 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   const [referencesReport, setReferencesReport] = useState<RouteReferenceReport | null>(null);
   const [isLoadingReferences, setIsLoadingReferences] = useState(false);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
+
+  // Stop sequence editor state (#111)
+  type StopDraftItem = {
+    tempId: string;
+    zoneId: string;
+    estimatedDurationMin: number;
+    zoneName: string;
+    zoneCode?: string;
+  };
+  const [isEditingStops, setIsEditingStops] = useState(false);
+  const [initialUpdatedAt, setInitialUpdatedAt] = useState<string | null>(null);
+  const [draftStops, setDraftStops] = useState<StopDraftItem[]>([]);
+  const [newStopZoneId, setNewStopZoneId] = useState("");
+  const [newStopDuration, setNewStopDuration] = useState(30);
+  const [stopEditorError, setStopEditorError] = useState<string | null>(null);
+  const [isSavingStops, setIsSavingStops] = useState(false);
+  const [showStalenessWarning, setShowStalenessWarning] = useState(false);
 
   // Load available zones once
   useEffect(() => {
@@ -252,6 +272,170 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     }
   }
 
+  function handleOpenStopEditor() {
+    if (!selectedRoute) return;
+    setInitialUpdatedAt(selectedRoute.updatedAt ?? null);
+    setDraftStops(
+      selectedRoute.stops.map((s, idx) => ({
+        tempId: s.id || `stop-draft-${idx}-${Date.now()}`,
+        zoneId: s.zoneId,
+        estimatedDurationMin: s.estimatedDurationMin ?? 30,
+        zoneName:
+          s.zone?.name ??
+          (availableZones.find((z) => z.id === s.zoneId)?.name || `Zona ${s.zoneId}`),
+        zoneCode: s.zone?.code ?? availableZones.find((z) => z.id === s.zoneId)?.code,
+      })),
+    );
+    setNewStopZoneId("");
+    setNewStopDuration(30);
+    setStopEditorError(null);
+    setShowStalenessWarning(false);
+    setIsEditingStops(true);
+  }
+
+  function handleAddStop() {
+    setStopEditorError(null);
+    if (!newStopZoneId) {
+      setStopEditorError("Debe seleccionar una zona para la parada.");
+      return;
+    }
+    const zone = availableZones.find((z) => z.id === newStopZoneId);
+    if (!zone) {
+      setStopEditorError("La zona seleccionada no es válida.");
+      return;
+    }
+    // Client-side duplicate check (acceptance criterion 2)
+    if (draftStops.some((s) => s.zoneId === newStopZoneId)) {
+      setStopEditorError(`Una zona no puede repetirse en el mismo recorrido: ${zone.name}.`);
+      return;
+    }
+    const duration = Number(newStopDuration);
+    if (isNaN(duration) || duration < 1 || duration > 1440) {
+      setStopEditorError("La duración estimada debe ser un número entero entre 1 y 1440 minutos.");
+      return;
+    }
+
+    setDraftStops((prev) => [
+      ...prev,
+      {
+        tempId: `stop-draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        zoneId: zone.id,
+        estimatedDurationMin: Math.round(duration),
+        zoneName: zone.name,
+        zoneCode: zone.code,
+      },
+    ]);
+    setNewStopZoneId("");
+    setNewStopDuration(30);
+  }
+
+  function handleRemoveStop(index: number) {
+    setStopEditorError(null);
+    setDraftStops((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleMoveStop(index: number, direction: "up" | "down") {
+    setStopEditorError(null);
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= draftStops.length) return;
+    setDraftStops((prev) => {
+      const next = [...prev];
+      const item = next[index];
+      if (!item) return prev;
+      next.splice(index, 1);
+      next.splice(targetIndex, 0, item);
+      return next;
+    });
+  }
+
+  function handleDurationChange(index: number, value: number) {
+    setDraftStops((prev) => {
+      const next = [...prev];
+      if (next[index]) {
+        next[index] = { ...next[index], estimatedDurationMin: value };
+      }
+      return next;
+    });
+  }
+
+  async function handleSaveStopsInitiate() {
+    if (!selectedRoute) return;
+    setStopEditorError(null);
+
+    // Validate stops durations
+    for (let i = 0; i < draftStops.length; i++) {
+      const stop = draftStops[i];
+      if (
+        !stop ||
+        isNaN(stop.estimatedDurationMin) ||
+        stop.estimatedDurationMin < 1 ||
+        stop.estimatedDurationMin > 1440
+      ) {
+        setStopEditorError(
+          "Cada parada debe tener una duración estimada válida entre 1 y 1440 minutos.",
+        );
+        return;
+      }
+    }
+    const zoneIds = draftStops.map((s) => s.zoneId);
+    const duplicates = zoneIds.filter((z, i) => zoneIds.indexOf(z) !== i);
+    if (duplicates.length > 0) {
+      setStopEditorError("Una zona no puede repetirse en el mismo recorrido.");
+      return;
+    }
+
+    setIsSavingStops(true);
+    // Advisory staleness check (criterion 4)
+    try {
+      const fresh = await routesAdapter.get(selectedRoute.id);
+      if (initialUpdatedAt && fresh.updatedAt && fresh.updatedAt !== initialUpdatedAt) {
+        // Staleness detected! Advisory warning
+        setShowStalenessWarning(true);
+        setIsSavingStops(false);
+        return;
+      }
+    } catch {
+      // Non-blocking precheck
+    }
+
+    await executeSaveStops();
+  }
+
+  async function executeSaveStops() {
+    if (!selectedRoute) return;
+    setIsSavingStops(true);
+    setStopEditorError(null);
+    setShowStalenessWarning(false);
+
+    try {
+      const updated = await routesAdapter.setStops(selectedRoute.id, {
+        stops: draftStops.map((s) => ({
+          zoneId: s.zoneId,
+          estimatedDurationMin: s.estimatedDurationMin,
+        })),
+      });
+      setSelectedRoute(updated);
+      setIsEditingStops(false);
+      setRequestVersion((v) => v + 1);
+    } catch (caught) {
+      const message =
+        caught instanceof RouteRequestError
+          ? caught.message
+          : caught instanceof Error
+            ? caught.message
+            : "No se pudo guardar la secuencia de paradas.";
+      setStopEditorError(message);
+    } finally {
+      setIsSavingStops(false);
+    }
+  }
+
+  function handleCancelStopEditor() {
+    setIsEditingStops(false);
+    setStopEditorError(null);
+    setShowStalenessWarning(false);
+  }
+
   return (
     <div className="space-y-6">
       {/* Header & Back navigation */}
@@ -345,7 +529,10 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSelectedRoute(null)}
+                onClick={() => {
+                  setSelectedRoute(null);
+                  setIsEditingStops(false);
+                }}
                 className="text-xs"
               >
                 Cerrar detalle
@@ -355,72 +542,327 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
           {/* Stops Section */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <RouteIcon className="h-4 w-4 text-muted-foreground" />
-                Paradas del recorrido ({selectedRoute.stops.length})
-              </h3>
-            </div>
+            {!isEditingStops ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <RouteIcon className="h-4 w-4 text-muted-foreground" />
+                    Paradas del recorrido ({selectedRoute.stops.length})
+                  </h3>
+                  {canManage && selectedRoute.stops.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleOpenStopEditor}
+                      className="inline-flex items-center gap-1 text-xs"
+                      data-testid="edit-stops-button"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Editar secuencia
+                    </Button>
+                  )}
+                </div>
 
-            {selectedRoute.stops.length === 0 ? (
-              /* Acceptance Criteria #2: Empty stops section with obvious call-to-action */
-              <div
-                className="rounded-lg border border-dashed p-6 text-center space-y-3 bg-muted/20"
-                data-testid="empty-stops-section"
-              >
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                  <MapPin className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-medium text-foreground">
-                    Este recorrido no tiene paradas configuradas
-                  </h4>
-                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                    Los recorridos nuevos nacen sin paradas. Para diagramar y ordenar la secuencia de paradas operativas, utilice el generador de secuencias.
-                  </p>
-                </div>
-                <div>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="inline-flex items-center gap-1.5"
-                    data-testid="add-stops-cta"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Agregar paradas
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="divide-y rounded-md border bg-background" data-testid="stops-list">
-                {selectedRoute.stops.map((stop) => (
+                {selectedRoute.stops.length === 0 ? (
+                  /* Acceptance Criteria #2: Empty stops section with obvious call-to-action */
                   <div
-                    key={stop.id}
-                    className="flex items-center justify-between px-4 py-2.5 text-sm"
+                    className="rounded-lg border border-dashed p-6 text-center space-y-3 bg-muted/20"
+                    data-testid="empty-stops-section"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
-                        {stop.sequence}
-                      </span>
-                      <div>
-                        <div className="font-medium text-foreground">
-                          {stop.zone?.name ?? `Zona ${stop.zoneId}`}
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                      <MapPin className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-medium text-foreground">
+                        Este recorrido no tiene paradas configuradas
+                      </h4>
+                      <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                        Los recorridos nuevos nacen sin paradas. Para diagramar y ordenar la secuencia de paradas operativas, utilice el generador de secuencias.
+                      </p>
+                    </div>
+                    <div>
+                      {canManage ? (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="inline-flex items-center gap-1.5"
+                          onClick={handleOpenStopEditor}
+                          data-testid="add-stops-cta"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Agregar paradas
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Modo lectura: se requieren permisos de oficina para configurar paradas.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="divide-y rounded-md border bg-background" data-testid="stops-list">
+                    {selectedRoute.stops.map((stop) => (
+                      <div
+                        key={stop.id}
+                        className="flex items-center justify-between px-4 py-2.5 text-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
+                            {stop.sequence}
+                          </span>
+                          <div>
+                            <div className="font-medium text-foreground">
+                              {stop.zone?.name ?? `Zona ${stop.zoneId}`}
+                            </div>
+                            {stop.zone?.code && (
+                              <div className="text-xs text-muted-foreground font-mono">
+                                {stop.zone.code}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        {stop.zone?.code && (
-                          <div className="text-xs text-muted-foreground font-mono">
-                            {stop.zone.code}
+                        {stop.estimatedDurationMin !== undefined && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>{stop.estimatedDurationMin} min</span>
                           </div>
                         )}
                       </div>
-                    </div>
-                    {stop.estimatedDurationMin !== undefined && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" />
-                        <span>{stop.estimatedDurationMin} min</span>
-                      </div>
-                    )}
+                    ))}
                   </div>
-                ))}
+                )}
+              </>
+            ) : (
+              /* Stop Sequence Builder (#111) */
+              <div
+                className="rounded-lg border bg-card p-4 space-y-4 shadow-xs"
+                data-testid="stop-sequence-builder"
+              >
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <RouteIcon className="h-4 w-4 text-primary" />
+                      Editor de secuencia de paradas
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Configure el orden y la duración de cada parada. Al guardar, se reemplazará la secuencia de forma atómica.
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelStopEditor}
+                    disabled={isSavingStops}
+                    className="text-xs"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+
+                {stopEditorError && (
+                  <div
+                    className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2"
+                    data-testid="stop-editor-error"
+                  >
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>{stopEditorError}</span>
+                  </div>
+                )}
+
+                {/* Ordered sequence list */}
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-foreground">
+                    Secuencia ordenada ({draftStops.length} {draftStops.length === 1 ? "parada" : "paradas"})
+                  </div>
+
+                  {draftStops.length === 0 ? (
+                    <div
+                      className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground bg-muted/10"
+                      data-testid="builder-empty-stops"
+                    >
+                      No hay paradas en la secuencia. Puede guardar el recorrido sin paradas o agregar zonas debajo.
+                    </div>
+                  ) : (
+                    <div className="divide-y rounded-md border bg-background" data-testid="builder-stops-list">
+                      {draftStops.map((stop, idx) => (
+                        <div
+                          key={stop.tempId}
+                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 py-2.5 gap-3 text-sm"
+                          data-testid={`stop-item-${idx}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                              {idx + 1}
+                            </span>
+                            <div>
+                              <div className="font-medium text-foreground">
+                                {stop.zoneName}
+                              </div>
+                              {stop.zoneCode && (
+                                <div className="text-xs text-muted-foreground font-mono">
+                                  {stop.zoneCode}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 self-end sm:self-auto">
+                            <div className="flex items-center gap-1.5">
+                              <label
+                                htmlFor={`duration-${idx}`}
+                                className="text-xs text-muted-foreground whitespace-nowrap"
+                              >
+                                Duración:
+                              </label>
+                              <input
+                                id={`duration-${idx}`}
+                                type="number"
+                                min={1}
+                                max={1440}
+                                value={stop.estimatedDurationMin}
+                                onChange={(e) => handleDurationChange(idx, Number(e.target.value))}
+                                className="h-8 w-20 rounded-md border border-input bg-transparent px-2 text-xs text-right"
+                                data-testid={`stop-duration-input-${idx}`}
+                              />
+                              <span className="text-xs text-muted-foreground">min</span>
+                            </div>
+                            <div className="flex items-center gap-1 ml-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleMoveStop(idx, "up")}
+                                disabled={idx === 0}
+                                className="h-7 w-7 p-0"
+                                title="Mover arriba"
+                                aria-label="Mover arriba"
+                                data-testid={`stop-move-up-${idx}`}
+                              >
+                                <ArrowUp className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleMoveStop(idx, "down")}
+                                disabled={idx === draftStops.length - 1}
+                                className="h-7 w-7 p-0"
+                                title="Mover abajo"
+                                aria-label="Mover abajo"
+                                data-testid={`stop-move-down-${idx}`}
+                              >
+                                <ArrowDown className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveStop(idx)}
+                                className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                                title="Quitar parada"
+                                aria-label="Quitar parada"
+                                data-testid={`stop-remove-${idx}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Add stop form */}
+                <div className="rounded-md border p-3 bg-muted/20 space-y-2">
+                  <div className="text-xs font-medium text-foreground">
+                    Agregar parada operativa al recorrido
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="flex-1">
+                      <select
+                        value={newStopZoneId}
+                        onChange={(e) => setNewStopZoneId(e.target.value)}
+                        className={`${controlClass} w-full text-xs`}
+                        data-testid="stop-zone-select"
+                      >
+                        <option value="">Seleccione una zona operativa activa...</option>
+                        {availableZones
+                          .filter((z) => z.active)
+                          .map((z) => {
+                            const isAlreadyAdded = draftStops.some((s) => s.zoneId === z.id);
+                            return (
+                              <option key={z.id} value={z.id}>
+                                {z.code} — {z.name} {isAlreadyAdded ? "(Ya en recorrido)" : ""}
+                              </option>
+                            );
+                          })}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <label
+                        htmlFor="new-stop-duration"
+                        className="text-xs text-muted-foreground whitespace-nowrap"
+                      >
+                        Duración est.:
+                      </label>
+                      <input
+                        id="new-stop-duration"
+                        type="number"
+                        min={1}
+                        max={1440}
+                        value={newStopDuration}
+                        onChange={(e) => setNewStopDuration(Number(e.target.value))}
+                        className="h-9 w-20 rounded-md border border-input bg-transparent px-2 text-xs text-right"
+                        data-testid="stop-duration-input"
+                      />
+                      <span className="text-xs text-muted-foreground">min</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleAddStop}
+                      className="inline-flex items-center gap-1 text-xs"
+                      data-testid="add-stop-button"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Agregar parada
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Builder footer actions */}
+                <div className="flex items-center justify-between pt-3 border-t">
+                  <div className="text-xs text-muted-foreground">
+                    {draftStops.length === 0
+                      ? "Guardar dejará el recorrido sin paradas."
+                      : `${draftStops.length} ${draftStops.length === 1 ? "parada lista" : "paradas listas"} para guardar.`}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelStopEditor}
+                      disabled={isSavingStops}
+                      data-testid="cancel-sequence-button"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={() => void handleSaveStopsInitiate()}
+                      disabled={isSavingStops}
+                      className="inline-flex items-center gap-1.5"
+                      data-testid="save-sequence-button"
+                    >
+                      {isSavingStops && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      Guardar secuencia
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -899,6 +1341,47 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               )}
               Confirmar desactivación
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Staleness Advisory Warning Dialog (#111) */}
+      <Dialog open={showStalenessWarning} onOpenChange={setShowStalenessWarning}>
+        <DialogContent data-testid="staleness-warning-dialog" className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 mb-2">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-center">Aviso de concurrencia en el recorrido</DialogTitle>
+            <DialogDescription className="text-center space-y-2 text-xs">
+              <span className="block text-foreground text-sm font-medium">
+                El recorrido fue modificado en el servidor después de que abrió este editor.
+              </span>
+              <span className="block text-amber-800 dark:text-amber-300 font-medium bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-md text-left">
+                Aviso informativo (no autoritativo): El backend no posee control de concurrencia ni bloqueo optimista para paradas. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowStalenessWarning(false)}
+              disabled={isSavingStops}
+              data-testid="cancel-staleness-button"
+            >
+              Cancelar y revisar
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => void executeSaveStops()}
+              disabled={isSavingStops}
+              data-testid="confirm-staleness-save-button"
+            >
+              {isSavingStops && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Continuar y guardar
             </Button>
           </DialogFooter>
         </DialogContent>

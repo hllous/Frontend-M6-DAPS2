@@ -51,6 +51,7 @@ export const routeSchema = z.object({
   name: z.string(),
   active: z.boolean(),
   stops: z.array(routeStopSchema).default([]),
+  updatedAt: z.string().optional(),
 });
 
 export type Route = z.infer<typeof routeSchema>;
@@ -76,6 +77,35 @@ export const updateRouteInputSchema = z.object({
 });
 
 export type UpdateRouteInput = z.infer<typeof updateRouteInputSchema>;
+
+export const routeStopInputSchema = z.object({
+  zoneId: z.string().trim().min(1, "El ID de la zona es obligatorio"),
+  estimatedDurationMin: z
+    .number({ message: "La duración estimada debe ser un número" })
+    .int("La duración estimada debe ser un número entero")
+    .min(1, "La duración mínima es de 1 minuto")
+    .max(1440, "La duración máxima es de 1440 minutos"),
+});
+
+export type RouteStopInput = z.infer<typeof routeStopInputSchema>;
+
+export const setRouteStopsInputSchema = z
+  .object({
+    stops: z.array(routeStopInputSchema).max(100, "Un recorrido no puede tener más de 100 paradas"),
+  })
+  .superRefine((data, ctx) => {
+    const zoneIds = data.stops.map((s) => s.zoneId);
+    const duplicates = zoneIds.filter((z, i) => zoneIds.indexOf(z) !== i);
+    if (duplicates.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Una zona no puede repetirse en el mismo recorrido: ${[...new Set(duplicates)].join(", ")}`,
+        path: ["stops"],
+      });
+    }
+  });
+
+export type SetRouteStopsInput = z.infer<typeof setRouteStopsInputSchema>;
 
 export const routeReferenceReportSchema = z.object({
   routeId: z.string(),
@@ -286,5 +316,23 @@ export const routesAdapter = {
       );
     }
     return parsed.data;
+  },
+
+  async setStops(id: string, input: SetRouteStopsInput): Promise<Route> {
+    const validated = setRouteStopsInputSchema.parse(input);
+    let response: Response;
+    try {
+      response = await authenticatedFetch(`/api/routes/${id}/stops`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(validated),
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "routes" });
+      }
+      throw cause;
+    }
+    return handleSingleRouteResponse(response);
   },
 };
