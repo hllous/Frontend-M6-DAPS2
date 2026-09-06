@@ -94,6 +94,19 @@ import {
   updateGreenSpaceInputSchema,
   type GreenSpaceQuery,
 } from "@/lib/green-spaces";
+import {
+  addStreetClosureRequestFixture,
+  createStreetClosureRequestFixture,
+  filterStreetClosureRequestFixtures,
+  getStreetClosureRequestFixture,
+  paginateStreetClosureRequestFixtures,
+  updateStreetClosureRequestFixture,
+} from "@/lib/street-closure-request-fixtures";
+import {
+  approveStreetClosureRequestInputSchema,
+  createStreetClosureRequestInputSchema,
+  streetClosureRequestQuerySchema,
+} from "@/lib/street-closure-requests";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -210,6 +223,16 @@ function greenSpaceQueryFromUrl(url: string): GreenSpaceQuery {
   };
 }
 
+function streetClosureRequestQueryFromUrl(url: string) {
+  const params = new URL(url).searchParams;
+  return streetClosureRequestQuerySchema.parse({
+    status: params.get("status") ?? undefined,
+    sourceId: params.get("sourceId") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  });
+}
+
 export const handlers = [
   http.get("*/api/mock/scenarios", () => HttpResponse.json(Object.values(scenarios))),
   http.get("*/api/mock/scenarios/:scenarioId", ({ params }) => {
@@ -220,6 +243,87 @@ export const handlers = [
     }
 
     return HttpResponse.json(getScenario(scenarioId as ScenarioId));
+  }),
+  // StreetClosureRequest adapter contract and deterministic scenario handlers.
+  http.get("*/api/street-closure-requests", ({ request }) => {
+    const query = streetClosureRequestQueryFromUrl(request.url);
+    return HttpResponse.json(
+      paginateStreetClosureRequestFixtures(
+        filterStreetClosureRequestFixtures(query),
+        query.page,
+        query.pageSize,
+      ),
+    );
+  }),
+  http.post("*/api/street-closure-requests", async ({ request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "El cuerpo de la solicitud no es un JSON válido.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
+        { status: 400 },
+      );
+    }
+    const parsed = createStreetClosureRequestInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
+        { status: 400 },
+      );
+    }
+    const service = serviceFixtures.find((candidate) => candidate.id === parsed.data.sourceId);
+    if (!service) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Servicio de origen no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
+        { status: 404 },
+      );
+    }
+    const created = createStreetClosureRequestFixture(parsed.data, service);
+    addStreetClosureRequestFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.get("*/api/street-closure-requests/:requestId", ({ params }) => {
+    const item = getStreetClosureRequestFixture(params.requestId as string);
+    if (!item) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Solicitud de corte de calle no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(item);
+  }),
+  http.post("*/api/street-closure-requests/:requestId/approve", async ({ params, request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "El cuerpo de la aprobación no es un JSON válido.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/approve` },
+        { status: 400 },
+      );
+    }
+    const parsed = approveStreetClosureRequestInputSchema.safeParse(body);
+    const item = getStreetClosureRequestFixture(params.requestId as string);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/approve` },
+        { status: 400 },
+      );
+    }
+    if (!item) return HttpResponse.json({ statusCode: 404, message: "Solicitud no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/approve` }, { status: 404 });
+    const updated = updateStreetClosureRequestFixture(item.id, { status: "APPROVED", closureId: parsed.data.closureId, updatedAt: new Date().toISOString() });
+    return HttpResponse.json(updated);
+  }),
+  http.post("*/api/street-closure-requests/:requestId/reject", ({ params }) => {
+    const item = getStreetClosureRequestFixture(params.requestId as string);
+    if (!item) return HttpResponse.json({ statusCode: 404, message: "Solicitud no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/reject` }, { status: 404 });
+    return HttpResponse.json(updateStreetClosureRequestFixture(item.id, { status: "REJECTED", updatedAt: new Date().toISOString() }));
+  }),
+  http.post("*/api/street-closure-requests/:requestId/end", ({ params }) => {
+    const item = getStreetClosureRequestFixture(params.requestId as string);
+    if (!item) return HttpResponse.json({ statusCode: 404, message: "Solicitud no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/end` }, { status: 404 });
+    return HttpResponse.json(updateStreetClosureRequestFixture(item.id, { status: "ENDED", updatedAt: new Date().toISOString() }));
   }),
   http.get("*/api/zones", ({ request }) => {
     const query = zoneQueryFromUrl(request.url);
