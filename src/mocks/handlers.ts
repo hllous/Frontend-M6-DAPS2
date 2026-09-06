@@ -94,6 +94,20 @@ import {
   updateGreenSpaceInputSchema,
   type GreenSpaceQuery,
 } from "@/lib/green-spaces";
+import {
+  addContainerFixture,
+  filterContainerFixtures,
+  containerFixtures,
+  paginateContainerFixtures,
+  updateContainerFixture,
+} from "@/lib/containers-fixtures";
+import {
+  createContainerInputSchema,
+  updateContainerInputSchema,
+  containerStatusSchema,
+  containerTypeSchema,
+  type ContainerQuery,
+} from "@/lib/containers";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -205,6 +219,24 @@ function greenSpaceQueryFromUrl(url: string): GreenSpaceQuery {
       ? (params.get("spaceType") as GreenSpaceQuery["spaceType"])
       : undefined,
     zoneId: params.get("zoneId") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
+function containerQueryFromUrl(url: string): ContainerQuery {
+  const params = new URL(url).searchParams;
+  const rawStatus = params.get("status");
+  const rawType = params.get("containerType");
+  return {
+    status: containerStatusSchema.safeParse(rawStatus).success
+      ? (rawStatus as ContainerQuery["status"])
+      : undefined,
+    containerType: containerTypeSchema.safeParse(rawType).success
+      ? (rawType as ContainerQuery["containerType"])
+      : undefined,
+    zoneId: params.get("zoneId") ?? undefined,
+    search: params.get("search") ?? undefined,
     page: params.has("page") ? Number(params.get("page")) : undefined,
     pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
   };
@@ -719,6 +751,78 @@ export const handlers = [
     }
     greenSpace.active = false;
     return HttpResponse.json(greenSpace);
+  }),
+  // --- Containers catalog (#120) ---
+  http.get("*/api/containers", ({ request }) => {
+    const query = containerQueryFromUrl(request.url);
+    return HttpResponse.json(paginateContainerFixtures(filterContainerFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/containers/:containerId", ({ params }) => {
+    const container = containerFixtures.find((item) => item.id === params.containerId);
+    return container
+      ? HttpResponse.json(container)
+      : HttpResponse.json(
+          {
+            statusCode: 404,
+            message: "Contenedor no encontrado.",
+            error: "Not Found",
+            timestamp: new Date().toISOString(),
+            path: `/api/containers/${params.containerId}`,
+          },
+          { status: 404 },
+        );
+  }),
+  http.post("*/api/containers", async ({ request }) => {
+    const parsed = createContainerInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "Datos de contenedor inválidos.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/containers",
+        },
+        { status: 400 },
+      );
+    }
+    const newContainer = {
+      id: `cont-${Date.now()}`,
+      ...parsed.data,
+      status: "ACTIVE" as const,
+    };
+    addContainerFixture(newContainer);
+    return HttpResponse.json(newContainer, { status: 201 });
+  }),
+  http.patch("*/api/containers/:containerId", async ({ params, request }) => {
+    const container = containerFixtures.find((item) => item.id === params.containerId);
+    const parsed = updateContainerInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!container) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Contenedor no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}`,
+        },
+        { status: 404 },
+      );
+    }
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "Datos de contenedor inválidos.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}`,
+        },
+        { status: 400 },
+      );
+    }
+    const updated = updateContainerFixture(params.containerId as string, parsed.data);
+    return HttpResponse.json(updated);
   }),
   http.get("*/api/services", ({ request }) => {
     const query = serviceQueryFromUrl(request.url);

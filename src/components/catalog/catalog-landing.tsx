@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Boxes, CalendarClock, MapPin, Route as RouteIcon, Truck, Trees, UsersRound } from "lucide-react";
+import { ArrowRight, Boxes, CalendarClock, MapPin, Route as RouteIcon, Trash2, Truck, Trees, UsersRound } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -62,6 +62,13 @@ const catalogCards = [
     description: "Plazas, parques y otros espacios verdes administrados por la municipalidad.",
     icon: Trees,
     tone: "bg-lime-50 text-lime-700 dark:bg-lime-950/50 dark:text-lime-400",
+  },
+  {
+    href: "/app/catalog/containers",
+    title: "Contenedores",
+    description: "Inventario de contenedores en vía pública, estados operativos y asignación a zonas.",
+    icon: Trash2,
+    tone: "bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-400",
   },
 ];
 
