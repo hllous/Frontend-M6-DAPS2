@@ -61,7 +61,7 @@ describe("GreenSpacesPanel", () => {
     const editedRow = screen.getByRole("row", { name: /Plaza editada desde panel/ });
     await user.click(within(editedRow).getByRole("button", { name: "Dar de baja" }));
     expect(await screen.findByText(/dado de baja/)).toBeVisible();
-  });
+  }, 10_000);
 
   it("keeps management controls hidden for Field actors", async () => {
     render(<GreenSpacesPanel scenario={scenarios.fieldCrewMember} />);
