@@ -1,0 +1,81 @@
+import { NextResponse } from "next/server";
+
+import { fetchBackend } from "@/lib/bff-backend";
+import { completeRepairFixture, getContainerFixture } from "@/lib/containers-fixtures";
+import { getScenario } from "@/lib/scenarios";
+import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { recordTelemetryEvent } from "@/lib/telemetry";
+
+const ERROR_LABELS: Record<number, string> = {
+  401: "Unauthorized",
+  403: "Forbidden",
+  404: "Not Found",
+  409: "Conflict",
+  503: "Service Unavailable",
+  500: "Internal Server Error",
+};
+
+function errorResponse(status: number, message: string, path: string) {
+  return NextResponse.json(
+    {
+      statusCode: status,
+      message,
+      error: ERROR_LABELS[status] ?? "Error",
+      timestamp: new Date().toISOString(),
+      path,
+    },
+    { status },
+  );
+}
+
+async function targetId(context: { params: Promise<{ id: string }> }) {
+  return (await context.params).id;
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const id = await targetId(context);
+  const path = new URL(request.url).pathname;
+
+  try {
+    const session = getRequiredSession(request);
+    const scenario = getScenario(session.scenarioId);
+
+    if (scenario.actor.kind !== "OFFICE" || !scenario.capabilities.includes("container:manage")) {
+      return errorResponse(403, "No tiene permisos para completar reparaciones de contenedores.", path);
+    }
+
+    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+      const backendResponse = await fetchBackend(request, `/containers/${id}/complete-repair`, "container:manage", {
+        method: "POST",
+      });
+      const bodyText = await backendResponse.text();
+      return new NextResponse(bodyText, {
+        status: backendResponse.status,
+        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
+      });
+    }
+
+    const container = getContainerFixture(id);
+    if (!container) return errorResponse(404, `Contenedor ${id} no encontrado.`, path);
+
+    if (container.status !== "UNDER_REPAIR") {
+      return errorResponse(
+        409,
+        `Solo se puede completar la reparación de contenedores en reparación. Estado actual: ${container.status}`,
+        path,
+      );
+    }
+
+    return NextResponse.json(completeRepairFixture(id), { status: 200 });
+  } catch (error) {
+    if (error instanceof InvalidSessionError) {
+      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
+      return errorResponse(401, "La sesión no está activa.", path);
+    }
+    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
+    return errorResponse(500, "No se pudo completar la reparación del contenedor.", path);
+  }
+}

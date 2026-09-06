@@ -140,6 +140,48 @@ export function reportDamageFixture(id: string, input: ReportDamageInput): Conta
   return container;
 }
 
+export function startRepairFixture(id: string): Container {
+  const container = getContainerFixture(id);
+  if (!container) {
+    throw new Error(`Contenedor ${id} no encontrado.`);
+  }
+  if (container.status !== "DAMAGED") {
+    throw new Error(
+      `INVALID_STATE_TRANSITION: Solo se puede iniciar la reparación de contenedores dañados. Estado actual: ${container.status}`,
+    );
+  }
+  container.status = "UNDER_REPAIR";
+  return container;
+}
+
+export function completeRepairFixture(id: string): Container {
+  const container = getContainerFixture(id);
+  if (!container) {
+    throw new Error(`Contenedor ${id} no encontrado.`);
+  }
+  if (container.status !== "UNDER_REPAIR") {
+    throw new Error(
+      `INVALID_STATE_TRANSITION: Solo se puede completar la reparación de contenedores en reparación. Estado actual: ${container.status}`,
+    );
+  }
+  container.status = "ACTIVE";
+  return container;
+}
+
+export function removeContainerFixture(id: string): Container {
+  const container = getContainerFixture(id);
+  if (!container) {
+    throw new Error(`Contenedor ${id} no encontrado.`);
+  }
+  if (container.status !== "DAMAGED") {
+    throw new Error(
+      `INVALID_STATE_TRANSITION: Solo se pueden retirar contenedores dañados. Estado actual: ${container.status}`,
+    );
+  }
+  container.status = "REMOVED";
+  return container;
+}
+
 export function addContainerFixture(container: Container) {
   containerFixtures.push(container);
 }
