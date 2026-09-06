@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CloudOff, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CreateRepairRequestDialog } from "./create-repair-request-dialog";
 import type { OperationalScenario } from "@/lib/scenarios";
+import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
 import {
   checkServiceWindowTiming,
   servicesAdapter,
@@ -43,6 +45,9 @@ export function FieldWorkPanel({
   const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
   const [resumingId, setResumingId] = useState<string | null>(null);
   const [resumeErrors, setResumeErrors] = useState<Record<string, string>>({});
+  const [repairRequestServiceId, setRepairRequestServiceId] = useState<string | null>(null);
+  const [repairRequests, setRepairRequests] = useState<Record<string, RepairRequest[]>>({});
+  const [repairRequestsErrors, setRepairRequestsErrors] = useState<Record<string, string>>({});
   const [conflict, setConflict] = useState<{
     serviceId: string;
     actionType: Extract<FieldDraftActionType, "start" | "resume">;
@@ -147,9 +152,36 @@ export function FieldWorkPanel({
     ? services.find((s) => s.id === selectedDetailId) ?? null
     : null;
 
+  useEffect(() => {
+    if (!selectedService || !crewId || selectedService.crewId !== crewId) return;
+
+    let isCurrent = true;
+    void repairRequestsAdapter.list({ detectedInId: selectedService.id, pageSize: 50 })
+      .then((page) => {
+        if (isCurrent) setRepairRequests((current) => ({ ...current, [selectedService.id]: page.repairRequests }));
+      })
+      .catch(() => {
+        if (isCurrent) setRepairRequestsErrors((current) => ({ ...current, [selectedService.id]: "No se pudieron cargar las derivaciones de este Servicio." }));
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [crewId, selectedService]);
+
   const suspendingService = suspendingServiceId
     ? services.find((s) => s.id === suspendingServiceId) ?? null
     : null;
+
+  const repairRequestService = repairRequestServiceId
+    ? services.find((s) => s.id === repairRequestServiceId) ?? null
+    : null;
+  const canCreateRepairRequest = Boolean(
+    selectedService &&
+      scenario.actor.kind === "FIELD" &&
+      scenario.actor.crewId &&
+      selectedService.crewId === scenario.actor.crewId,
+  );
 
   if (selectedService) {
     return (
@@ -160,7 +192,11 @@ export function FieldWorkPanel({
           onStartService={mayExecuteService ? handleStartService : undefined}
           onSuspendService={mayExecuteService ? (s) => setSuspendingServiceId(s.id) : undefined}
           onResumeService={mayExecuteService ? handleResumeService : undefined}
+          onCreateRepairRequest={canCreateRepairRequest ? (service) => setRepairRequestServiceId(service.id) : undefined}
           onServiceUpdated={handleServiceUpdated}
+          repairRequests={repairRequests[selectedService.id] ?? []}
+          repairRequestsLoading={!Object.prototype.hasOwnProperty.call(repairRequests, selectedService.id) && !repairRequestsErrors[selectedService.id]}
+          repairRequestsError={repairRequestsErrors[selectedService.id] ?? null}
           canStartService={mayExecuteService}
           isStarting={startingId === selectedService.id}
           startError={startErrors[selectedService.id] ?? null}
@@ -178,6 +214,24 @@ export function FieldWorkPanel({
             }}
             service={suspendingService}
             onSuspended={handleServiceSuspended}
+          />
+        )}
+        {canCreateRepairRequest && repairRequestService && (
+          <CreateRepairRequestDialog
+            open={repairRequestServiceId === repairRequestService.id}
+            service={repairRequestService}
+            onOpenChange={(open) => {
+              if (!open) setRepairRequestServiceId(null);
+            }}
+            onCreated={(request) => {
+              setRepairRequests((current) => ({
+                ...current,
+                [request.detectedInId]: [
+                  request,
+                  ...(current[request.detectedInId] ?? []).filter((item) => item.id !== request.id),
+                ],
+              }));
+            }}
           />
         )}
         {mayExecuteService && (
