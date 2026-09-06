@@ -72,6 +72,10 @@ import {
   type Route,
   type RouteQuery,
 } from "@/lib/routes";
+import { addDisposalSiteFixture, disposalSiteFixtures, filterDisposalSiteFixtures, paginateDisposalSiteFixtures, updateDisposalSiteFixture } from "@/lib/disposal-site-fixtures";
+import { disposalSiteCreateInputSchema, disposalSiteTypeSchema, disposalSiteUpdateInputSchema, type DisposalSiteQuery } from "@/lib/disposal-sites";
+import { addServiceTypeFixture, filterServiceTypeFixtures, paginateServiceTypeFixtures, serviceTypeFixtures, updateServiceTypeFixture } from "@/lib/service-type-fixtures";
+import { serviceTypeCategorySchema, serviceTypeCreateInputSchema, serviceTypeModeSchema, serviceTypeUpdateInputSchema, type ServiceTypeQuery } from "@/lib/service-types";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -114,6 +118,26 @@ function serviceQueryFromUrl(url: string): ServiceQuery {
     timeTo: params.get("timeTo") ?? undefined,
     scheduledFrom: params.get("scheduledFrom") ?? undefined,
     scheduledTo: params.get("scheduledTo") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
+function disposalSiteQueryFromUrl(url: string): DisposalSiteQuery {
+  const params = new URL(url).searchParams;
+  const siteType = disposalSiteTypeSchema.safeParse(params.get("siteType"));
+  return { active: params.has("active") ? params.get("active") === "true" : undefined, siteType: siteType.success ? siteType.data : undefined, search: params.get("search") ?? undefined, page: params.has("page") ? Number(params.get("page")) : undefined, pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined };
+}
+
+function serviceTypeQueryFromUrl(url: string): ServiceTypeQuery {
+  const params = new URL(url).searchParams;
+  const category = serviceTypeCategorySchema.safeParse(params.get("category"));
+  const mode = serviceTypeModeSchema.safeParse(params.get("mode"));
+  return {
+    active: params.has("active") ? params.get("active") === "true" : undefined,
+    category: category.success ? category.data : undefined,
+    mode: mode.success ? mode.data : undefined,
+    search: params.get("search") ?? undefined,
     page: params.has("page") ? Number(params.get("page")) : undefined,
     pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
   };
@@ -421,6 +445,36 @@ export const handlers = [
       );
     }
     return HttpResponse.json(updated);
+  }),
+  http.get("*/api/disposal-sites", ({ request }) => { const query = disposalSiteQueryFromUrl(request.url); return HttpResponse.json(paginateDisposalSiteFixtures(filterDisposalSiteFixtures(query), query.page, query.pageSize)); }),
+  http.get("*/api/disposal-sites/:disposalSiteId", ({ params }) => { const item = disposalSiteFixtures.find((candidate) => candidate.id === params.disposalSiteId); return item ? HttpResponse.json(item) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 404 }); }),
+  http.post("*/api/disposal-sites", async ({ request }) => { const parsed = disposalSiteCreateInputSchema.safeParse(await request.json()); if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 400 }); const created = { id: `ds-${Date.now()}`, ...parsed.data, active: true }; addDisposalSiteFixture(created); return HttpResponse.json(created, { status: 201 }); }),
+  http.patch("*/api/disposal-sites/:disposalSiteId", async ({ params, request }) => { const parsed = disposalSiteUpdateInputSchema.safeParse(await request.json()); if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 400 }); const updated = updateDisposalSiteFixture(params.disposalSiteId as string, parsed.data); return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 404 }); }),
+  http.delete("*/api/disposal-sites/:disposalSiteId", ({ params }) => { const updated = updateDisposalSiteFixture(params.disposalSiteId as string, { active: false }); return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 404 }); }),
+  http.get("*/api/service-types", ({ request }) => {
+    const query = serviceTypeQueryFromUrl(request.url);
+    return HttpResponse.json(paginateServiceTypeFixtures(filterServiceTypeFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/service-types/:serviceTypeId", ({ params }) => {
+    const item = serviceTypeFixtures.find((candidate) => candidate.id === params.serviceTypeId);
+    return item ? HttpResponse.json(item) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-types" }, { status: 404 });
+  }),
+  http.post("*/api/service-types", async ({ request }) => {
+    const parsed = serviceTypeCreateInputSchema.safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-types" }, { status: 400 });
+    const created = { id: `st-${Date.now()}`, ...parsed.data, active: true };
+    addServiceTypeFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.patch("*/api/service-types/:serviceTypeId", async ({ params, request }) => {
+    const parsed = serviceTypeUpdateInputSchema.safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-types" }, { status: 400 });
+    const updated = updateServiceTypeFixture(params.serviceTypeId as string, parsed.data);
+    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-types" }, { status: 404 });
+  }),
+  http.delete("*/api/service-types/:serviceTypeId", ({ params }) => {
+    const updated = updateServiceTypeFixture(params.serviceTypeId as string, { active: false });
+    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-types" }, { status: 404 });
   }),
   http.get("*/api/services", ({ request }) => {
     const query = serviceQueryFromUrl(request.url);
