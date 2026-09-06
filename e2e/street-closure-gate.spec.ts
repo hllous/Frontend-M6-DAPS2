@@ -37,11 +37,11 @@ async function createClosure(page: import("@playwright/test").Page, sourceId: st
 
 test.describe("StreetClosure dependency gate", () => {
   test("blocks a Field start for the entire linked ROUTE while the request is pending", async ({ page }) => {
-    await createClosure(page, "SVC-1051");
+    await createClosure(page, "SVC-1097");
     await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app?destination=work");
 
-    const card = page.locator("li").filter({ hasText: "SVC-1051" });
+    const card = page.locator("li").filter({ hasText: "SVC-1097" });
     await expect(card).toBeVisible();
     await card.getByRole("button", { name: "Iniciar servicio" }).click();
 
