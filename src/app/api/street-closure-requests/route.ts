@@ -38,10 +38,20 @@ function errorResponse(status: number, message: string, path: string) {
   );
 }
 
-function requireOffice(request: Request, path: string) {
+function requireReadAccess(request: Request, path: string, sourceId?: string) {
   const session = getRequiredSession(request);
   const scenario = getScenario(session.scenarioId);
-  if (scenario.actor.kind !== "OFFICE") {
+  if (scenario.actor.kind === "OFFICE") return { session, scenario };
+
+  // Field may read only the dependency context for a Service assigned to its crew.
+  // Backend remains authoritative for this scope when the BFF is forwarding.
+  if (sourceId && session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    return { session, scenario };
+  }
+  const service = sourceId
+    ? serviceFixtures.find((candidate) => candidate.id === sourceId)
+    : undefined;
+  if (!sourceId || !service || service.crewId !== scenario.actor.crewId) {
     return { response: errorResponse(403, "Solo Oficina puede consultar solicitudes de corte de calle.", path) };
   }
   return { session, scenario };
@@ -60,7 +70,8 @@ function backendQueryString(query: ReturnType<typeof streetClosureRequestQuerySc
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
-    const access = requireOffice(request, path);
+    const sourceId = new URL(request.url).searchParams.get("sourceId") ?? undefined;
+    const access = requireReadAccess(request, path, sourceId);
     if (access.response) return access.response;
     const queryResult = streetClosureRequestQuerySchema.safeParse({
       status: new URL(request.url).searchParams.get("status") ?? undefined,

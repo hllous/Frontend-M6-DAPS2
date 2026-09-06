@@ -96,4 +96,18 @@ describe("street closure request BFF routes", () => {
     expect(list.status).toBe(200);
     expect((await list.json()).data).toHaveLength(1);
   });
+
+  it("allows Field to read only the closure context for its assigned Service", async () => {
+    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+    const response = await GET(
+      new Request("http://localhost/api/street-closure-requests?sourceId=SVC-1050", {
+        headers: { cookie: fieldCookie },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toEqual([
+      expect.objectContaining({ sourceId: "SVC-1050", status: "REQUESTED" }),
+    ]);
+  });
 });

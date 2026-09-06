@@ -5,9 +5,11 @@ import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
+import { streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import {
   SERVICE_TYPE_CATALOG,
 } from "@/lib/services";
+import { resolveStreetClosureDependency } from "@/lib/street-closure-requests";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -75,6 +77,27 @@ export async function POST(
     const service = serviceFixtures.find((s) => s.id === serviceId);
     if (!service) {
       return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
+    }
+
+    const closureDependency = resolveStreetClosureDependency(
+      streetClosureRequestFixtures.filter(
+        (closureRequest) =>
+          closureRequest.sourceType === "SERVICE" && closureRequest.sourceId === serviceId,
+      ),
+    );
+    if (closureDependency.outcome === "blocked") {
+      return errorResponse(
+        409,
+        "No se puede iniciar el Servicio: la solicitud de corte de calle sigue pendiente de respuesta de M7.",
+        path,
+      );
+    }
+    if (closureDependency.outcome === "rejected") {
+      return errorResponse(
+        409,
+        "M7 rechazó el corte de calle. Oficina debe elegir explícitamente entre reprogramar o cancelar el Servicio.",
+        path,
+      );
     }
 
     // Backend state machine rules:
