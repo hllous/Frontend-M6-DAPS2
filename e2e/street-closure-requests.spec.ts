@@ -4,26 +4,33 @@ import { loginViaApi } from "./support/auth";
 
 const WIDE_VIEWPORT = { width: 1280, height: 900 };
 
-async function openServiceDetail(page: import("@playwright/test").Page, scenarioId: "office-duty-queue" | "field-crew-leader-route") {
+async function openServiceDetail(
+  page: import("@playwright/test").Page,
+  scenarioId: "office-duty-queue" | "field-crew-leader-route",
+  serviceId = "SVC-1050",
+) {
   await loginViaApi(page, scenarioId);
   await page.goto("/app?destination=services");
   await page.setViewportSize(WIDE_VIEWPORT);
   const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
-  await expect(table.getByRole("row", { name: /SVC-1050/ })).toBeVisible();
-  await table.getByRole("row", { name: /SVC-1050/ }).click();
+  await expect(table.getByRole("row", { name: new RegExp(serviceId) })).toBeVisible();
+  await table.getByRole("row", { name: new RegExp(serviceId) }).click();
   await page.getByRole("button", { name: "Ver detalle completo" }).click();
-  await expect(page.getByRole("region", { name: /Detalle completo de SVC-1050/i })).toBeVisible();
+  await expect(page.getByRole("region", { name: new RegExp(`Detalle completo de ${serviceId}`, "i") })).toBeVisible();
 }
 
 test.describe("StreetClosureRequest from Service context", () => {
   test("Office creates a pending request with one and multiple sections and can edit the prefilled window", async ({ page }) => {
-    await openServiceDetail(page, "office-duty-queue");
+    // SVC-1050 is started (mutated to IN_PROGRESS) by services.spec.ts elsewhere in the
+    // suite; SVC-1072 is SCHEDULED and untouched by every other e2e spec, so this test's
+    // outcome doesn't depend on file execution order (CI runs e2e serially, workers: 1).
+    await openServiceDetail(page, "office-duty-queue", "SVC-1072");
 
     await page.getByRole("button", { name: "Solicitar corte de calle" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText("SVC-1050")).toBeVisible();
-    await expect(dialog.getByLabel("Inicio solicitado *")).toHaveValue("2026-09-05T08:00");
+    await expect(dialog.getByText("SVC-1072")).toBeVisible();
+    await expect(dialog.getByLabel("Inicio solicitado *")).toHaveValue("2026-09-05T13:00");
 
     // The scheduled window is an editable review value, not an immutable copy.
     await dialog.getByLabel("Inicio solicitado *").fill("2026-09-05T09:00");
