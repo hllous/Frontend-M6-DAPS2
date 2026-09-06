@@ -1,19 +1,13 @@
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { CrewCatalogPanel } from "@/components/catalog/crew-catalog-panel";
+import { getScenario } from "@/lib/scenarios";
 import { getSession } from "@/lib/session";
 
-export default async function CrewsPlaceholderPage() {
+export default async function CrewsPage() {
   await connection();
   const session = await getSession();
   if (!session) redirect("/login");
-  return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyTitle>Cuadrillas</EmptyTitle>
-        <EmptyDescription>La administración de cuadrillas estará disponible en la próxima entrega.</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
+  return <CrewCatalogPanel scenario={getScenario(session.scenarioId)} />;
 }

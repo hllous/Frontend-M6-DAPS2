@@ -80,6 +80,8 @@ import { addServiceFrequencyFixture, closeServiceFrequencyFixture, filterService
 import { serviceFrequencyCreateInputSchema, serviceFrequencyShiftSchema, serviceFrequencyUpdateInputSchema, type ServiceFrequencyQuery } from "@/lib/service-frequencies";
 import { createVehicleInputSchema, updateVehicleInputSchema, type VehicleQuery } from "@/lib/vehicles";
 import { addVehicleFixture, filterVehicleFixtures, paginateVehicleFixtures, vehicleFixtures } from "@/lib/vehicles-fixtures";
+import { addCrewFixture, filterCrewFixtures, paginateCrewFixtures, crewFixtures } from "@/lib/crew-fixtures";
+import { createCrewInputSchema, updateCrewInputSchema, type CrewQuery } from "@/lib/crews";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -109,6 +111,17 @@ function vehicleQueryFromUrl(url: string): VehicleQuery {
   return {
     active: params.has("active") ? params.get("active") === "true" : undefined,
     vehicleType: (params.get("vehicleType") as VehicleQuery["vehicleType"]) ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
+function crewQueryFromUrl(url: string): CrewQuery {
+  const params = new URL(url).searchParams;
+  return {
+    active: params.has("active") ? params.get("active") === "true" : undefined,
+    crewType: (params.get("crewType") as CrewQuery["crewType"]) ?? undefined,
+    defaultShift: (params.get("defaultShift") as CrewQuery["defaultShift"]) ?? undefined,
     page: params.has("page") ? Number(params.get("page")) : undefined,
     pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
   };
@@ -557,6 +570,32 @@ export const handlers = [
     if (!vehicle) return HttpResponse.json({ statusCode: 404, message: "Vehículo no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/vehicles/${params.vehicleId}` }, { status: 404 });
     vehicle.active = false;
     return HttpResponse.json(vehicle);
+  }),
+  http.get("*/api/crews", ({ request }) => HttpResponse.json(paginateCrewFixtures(filterCrewFixtures(crewQueryFromUrl(request.url))))),
+  http.get("*/api/crews/:crewId", ({ params }) => {
+    const crew = crewFixtures.find((item) => item.id === params.crewId);
+    return crew ? HttpResponse.json(crew) : HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 404 });
+  }),
+  http.post("*/api/crews", async ({ request }) => {
+    const parsed = createCrewInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de cuadrilla inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/crews" }, { status: 400 });
+    const crew = { id: `crew-${crewFixtures.length + 1}`, ...parsed.data, memberUserIds: [parsed.data.leaderUserId], active: true };
+    addCrewFixture(crew);
+    return HttpResponse.json(crew, { status: 201 });
+  }),
+  http.patch("*/api/crews/:crewId", async ({ params, request }) => {
+    const crew = crewFixtures.find((item) => item.id === params.crewId);
+    const parsed = updateCrewInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 404 });
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de cuadrilla inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 400 });
+    Object.assign(crew, parsed.data);
+    return HttpResponse.json(crew);
+  }),
+  http.delete("*/api/crews/:crewId", ({ params }) => {
+    const crew = crewFixtures.find((item) => item.id === params.crewId);
+    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 404 });
+    crew.active = false;
+    return HttpResponse.json(crew);
   }),
   http.get("*/api/services", ({ request }) => {
     const query = serviceQueryFromUrl(request.url);

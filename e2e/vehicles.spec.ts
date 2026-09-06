@@ -5,8 +5,9 @@ import { loginViaApi } from "./support/auth";
 test.describe("Vehicle catalog @smoke", () => {
   test("lists vehicles from the catalog landing", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
-    await page.goto("/app/catalog");
-    await page.getByRole("link", { name: "Abrir catálogo" }).nth(2).click();
+    await page.goto("/app");
+    await page.getByRole("button", { name: "Catálogo" }).click();
+    await page.locator('a[href="/app/catalog/vehicles"]').click();
 
     await expect(page).toHaveURL(/\/app\/catalog\/vehicles$/);
     await expect(page.getByRole("heading", { name: "Vehículos" })).toBeVisible();
