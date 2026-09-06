@@ -15,13 +15,24 @@ const closureInput = (sourceId: string) => ({
   ],
 });
 
+// The session cookie is Secure; page.request is a Node-side client that (unlike the
+// actual Chromium engine) does not apply the browser's localhost/127.0.0.1
+// "potentially trustworthy origin" exception, so it silently drops the cookie over
+// plain http and every call below would 401. Issuing the fetch from inside the page
+// itself uses the real browser network stack, which does apply that exception.
 async function createClosure(page: import("@playwright/test").Page, sourceId: string) {
   await loginViaApi(page, "office-duty-queue");
-  const response = await page.request.post("/api/street-closure-requests", {
-    data: closureInput(sourceId),
-  });
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as { id: string };
+  await page.goto("/app");
+  const result = await page.evaluate(async (input) => {
+    const res = await fetch("/api/street-closure-requests", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    return { ok: res.ok, status: res.status, body: await res.json() };
+  }, closureInput(sourceId));
+  expect(result.ok).toBeTruthy();
+  return result.body as { id: string };
 }
 
 test.describe("StreetClosure dependency gate", () => {
@@ -40,8 +51,11 @@ test.describe("StreetClosure dependency gate", () => {
 
   test("does not choose an outcome automatically after M7 rejects the request", async ({ page }) => {
     const request = await createClosure(page, "SVC-1054");
-    const rejection = await page.request.post(`/api/street-closure-requests/${request.id}/reject`);
-    expect(rejection.ok()).toBeTruthy();
+    const rejectionOk = await page.evaluate(async (id) => {
+      const res = await fetch(`/api/street-closure-requests/${id}/reject`, { method: "POST" });
+      return res.ok;
+    }, request.id);
+    expect(rejectionOk).toBeTruthy();
 
     await page.goto("/app?destination=services");
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });

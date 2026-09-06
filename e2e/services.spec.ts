@@ -824,7 +824,7 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app");
 
-    const card = page.locator("li").filter({ hasText: "SVC-1096" });
+    const card = page.locator("li").filter({ hasText: "SVC-1095" });
     await expect(card).toBeVisible();
 
     await page.route("**/api/services/*/start", (route) => route.abort("failed"));
