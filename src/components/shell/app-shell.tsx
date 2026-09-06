@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   CircleHelp,
   ClipboardList,
+  GitPullRequest,
   Leaf,
   Map,
   PackageSearch,
@@ -40,22 +41,25 @@ import type { Capability, OperationalScenario } from "@/lib/scenarios";
 import styles from "./app-shell.module.css";
 import { FieldWorkPanel } from "@/components/services/field-work-panel";
 import { ServicesWorkspace } from "@/components/services/services-workspace";
+import { ReferralsWorkspace } from "@/components/referrals/referrals-workspace";
 import { CatalogLanding } from "@/components/catalog/catalog-landing";
 import { ZonesPanel } from "./zones-panel";
 
-type Destination = "work" | "services" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
+type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
 type LogoutAction = (formData: FormData) => void | Promise<void>;
 
 type NavigationItem = {
   id: Destination;
   label: string;
   capability?: Capability;
+  actorKinds?: OperationalScenario["actor"]["kind"][];
   icon: ComponentType<{ "aria-hidden"?: boolean }>;
 };
 
 const navigation: NavigationItem[] = [
   { id: "work", label: "Mi trabajo", icon: ClipboardList },
   { id: "services", label: "Servicios", capability: "service:view", icon: BriefcaseBusiness },
+  { id: "referrals", label: "Derivaciones", actorKinds: ["OFFICE", "FIELD"], icon: GitPullRequest },
   { id: "inventory", label: "Inventario", capability: "inventory:view", icon: PackageSearch },
   { id: "environment", label: "Control Ambiental", capability: "environmentalReport:view", icon: Leaf },
   { id: "map", label: "Mapa", capability: "map:view", icon: Map },
@@ -66,7 +70,9 @@ const navigation: NavigationItem[] = [
 const mobileDestinations: Destination[] = ["work", "services", "map"];
 
 function isAllowed(item: NavigationItem, scenario: OperationalScenario) {
-  return !item.capability || scenario.capabilities.includes(item.capability);
+  const capabilityAllowed = !item.capability || scenario.capabilities.includes(item.capability);
+  const actorAllowed = !item.actorKinds || item.actorKinds.includes(scenario.actor.kind);
+  return capabilityAllowed && actorAllowed;
 }
 
 function actorLabel(scenario: OperationalScenario) {
@@ -152,6 +158,8 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
           <WorkPanel scenario={scenario} />
         ) : destination === "services" ? (
           <ServicesWorkspace scenario={scenario} />
+        ) : destination === "referrals" ? (
+          <ReferralsWorkspace scenario={scenario} />
         ) : destination === "catalog" ? (
           <div className="flex flex-col gap-8">
             <CatalogLanding scenario={scenario} />
