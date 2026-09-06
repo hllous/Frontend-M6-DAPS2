@@ -5,7 +5,8 @@ import { Check, Leaf, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { formControlClass } from "@/components/ui/form-control";
 import { greenSpacesAdapter, greenSpaceTypeSchema, type GreenSpace, type GreenSpaceQuery, type GreenSpaceType } from "@/lib/green-spaces";
 import { zonesAdapter, type Zone } from "@/lib/zones";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -139,20 +140,20 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
       <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-3" aria-label="Filtros de espacios verdes">
         <Field>
           <FieldLabel htmlFor="green-space-active-filter">Estado</FieldLabel>
-          <select id="green-space-active-filter" value={activeFilter} onChange={(event) => setActiveFilter(event.target.value as typeof activeFilter)} className="h-9 rounded-lg border border-input bg-background px-3 text-sm">
+          <select id="green-space-active-filter" value={activeFilter} onChange={(event) => setActiveFilter(event.target.value as typeof activeFilter)} className={formControlClass}>
             <option value="all">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option>
           </select>
         </Field>
         <Field>
           <FieldLabel htmlFor="green-space-type-filter">Tipo de espacio</FieldLabel>
-          <select id="green-space-type-filter" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as GreenSpaceType | "all")} className="h-9 rounded-lg border border-input bg-background px-3 text-sm">
+          <select id="green-space-type-filter" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as GreenSpaceType | "all")} className={formControlClass}>
             <option value="all">Todos los tipos</option>
             {spaceTypes.map((type) => <option key={type} value={type}>{spaceTypeLabels[type]}</option>)}
           </select>
         </Field>
         <Field>
           <FieldLabel htmlFor="green-space-zone-filter">Zona</FieldLabel>
-          <select id="green-space-zone-filter" value={zoneFilter} onChange={(event) => setZoneFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-background px-3 text-sm">
+          <select id="green-space-zone-filter" value={zoneFilter} onChange={(event) => setZoneFilter(event.target.value)} className={formControlClass}>
             <option value="all">Todas las zonas</option>
             {zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}
           </select>
@@ -188,10 +189,10 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
           {formError ? <p role="alert" className="text-sm text-destructive">{formError}</p> : null}
           <form id="green-space-form" onSubmit={(event) => void save(event)}>
             <FieldGroup>
-              <Field><FieldLabel htmlFor="green-space-name">Nombre</FieldLabel><input id="green-space-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="h-9 rounded-lg border border-input bg-background px-3 text-sm" required /></Field>
-              <Field><FieldLabel htmlFor="green-space-type-form">Tipo de espacio en el formulario</FieldLabel><select id="green-space-type-form" value={form.spaceType} onChange={(event) => setForm({ ...form, spaceType: event.target.value as GreenSpaceType })} className="h-9 rounded-lg border border-input bg-background px-3 text-sm">{spaceTypes.map((type) => <option key={type} value={type}>{spaceTypeLabels[type]}</option>)}</select></Field>
-              <Field><FieldLabel htmlFor="green-space-area">Superficie (m²)</FieldLabel><input id="green-space-area" type="number" min="0.01" step="0.01" value={form.areaM2} onChange={(event) => setForm({ ...form, areaM2: event.target.value })} className="h-9 rounded-lg border border-input bg-background px-3 text-sm" required /><FieldDescription>Superficie declarada en metros cuadrados.</FieldDescription></Field>
-              <Field><FieldLabel htmlFor="green-space-zone-form">Zona en el formulario</FieldLabel><select id="green-space-zone-form" value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })} className="h-9 rounded-lg border border-input bg-background px-3 text-sm" required>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}</select></Field>
+              <Field><FieldLabel htmlFor="green-space-name">Nombre</FieldLabel><input id="green-space-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={formControlClass} required aria-invalid={Boolean(formError)} aria-describedby={formError ? "green-space-name-error" : undefined} /><FieldError id="green-space-name-error" role="none">{formError}</FieldError></Field>
+              <Field><FieldLabel htmlFor="green-space-type-form">Tipo de espacio en el formulario</FieldLabel><select id="green-space-type-form" value={form.spaceType} onChange={(event) => setForm({ ...form, spaceType: event.target.value as GreenSpaceType })} className={formControlClass}>{spaceTypes.map((type) => <option key={type} value={type}>{spaceTypeLabels[type]}</option>)}</select></Field>
+              <Field><FieldLabel htmlFor="green-space-area">Superficie (m²)</FieldLabel><input id="green-space-area" type="number" min="0.01" step="0.01" value={form.areaM2} onChange={(event) => setForm({ ...form, areaM2: event.target.value })} className={formControlClass} required /><FieldDescription>Superficie declarada en metros cuadrados.</FieldDescription></Field>
+              <Field><FieldLabel htmlFor="green-space-zone-form">Zona en el formulario</FieldLabel><select id="green-space-zone-form" value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })} className={formControlClass} required>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}</select></Field>
             </FieldGroup>
           </form>
           <DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)}>Cancelar</Button><Button type="submit" form="green-space-form">Guardar espacio verde</Button></DialogFooter>
