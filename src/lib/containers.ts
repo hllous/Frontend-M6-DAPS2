@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import { attachmentSchema, type Attachment } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
+
+export { attachmentSchema, type Attachment };
 
 export const containerTypeSchema = z.enum(["HOUSEHOLD", "RECYCLABLE", "BULKY", "GREEN"]);
 export type ContainerType = z.infer<typeof containerTypeSchema>;
@@ -88,6 +91,13 @@ export const updateContainerInputSchema = z.object({
     .optional(),
 });
 export type UpdateContainerInput = z.infer<typeof updateContainerInputSchema>;
+
+export const reportDamageInputSchema = z.object({
+  damageType: damageTypeSchema,
+  severity: severitySchema,
+  requiresPublicWorks: z.boolean().optional().default(false),
+});
+export type ReportDamageInput = z.input<typeof reportDamageInputSchema>;
 
 export class ContainerContractError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -283,5 +293,94 @@ export const containersAdapter = {
       }),
       "La respuesta de actualización de contenedor no respeta el contrato esperado.",
     );
+  },
+
+  async reportOverflow(id: string): Promise<Container> {
+    return parseContainer(
+      await send(`/api/containers/${id}/report-overflow`, {
+        method: "POST",
+      }),
+      "La respuesta de reporte de desborde no respeta el contrato esperado.",
+    );
+  },
+
+  async reportDamage(id: string, input: ReportDamageInput): Promise<Container> {
+    const parsedInput = reportDamageInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ContainerContractError("Los datos para reportar daño son inválidos.", {
+        cause: parsedInput.error,
+      });
+    }
+    return parseContainer(
+      await send(`/api/containers/${id}/report-damage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }),
+      "La respuesta de reporte de daño no respeta el contrato esperado.",
+    );
+  },
+
+  async uploadEvidence(params: {
+    file: File;
+    containerId: string;
+    idempotencyKey?: string;
+  }): Promise<Attachment> {
+    const key =
+      params.idempotencyKey ||
+      (typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idemp-${Date.now()}`);
+    const formData = new FormData();
+    formData.append("file", params.file);
+    formData.append("fileName", params.file.name);
+    formData.append("fileSize", String(params.file.size));
+    formData.append("ownerType", "CONTAINER");
+    formData.append("ownerId", params.containerId);
+
+    let response: Response;
+    try {
+      response = await authenticatedFetch("/api/evidence", {
+        method: "POST",
+        headers: {
+          "Idempotency-Key": key,
+        },
+        body: formData,
+      });
+    } catch (cause) {
+      if (cause instanceof NetworkFailureError) {
+        recordTelemetryEvent({ name: "request_network_failure", resource: "containers" });
+      }
+      throw cause;
+    }
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) {
+      throw requestError(payload);
+    }
+
+    const parsedAttachment = attachmentSchema.safeParse(payload);
+    if (!parsedAttachment.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "containers" });
+      throw new ContainerContractError(
+        "La respuesta de subida de evidencia no respeta el esquema de Attachment.",
+        { cause: parsedAttachment.error },
+      );
+    }
+
+    return parsedAttachment.data;
+  },
+
+  async getEvidence(containerId: string): Promise<Attachment[]> {
+    const payload = await send(`/api/evidence?ownerType=CONTAINER&ownerId=${encodeURIComponent(containerId)}`);
+    const parsed = z.array(attachmentSchema).safeParse(payload);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "containers" });
+      throw new ContainerContractError("La lista de evidencia de contenedores no respeta el contrato.", {
+        cause: parsed.error,
+      });
+    }
+    return parsed.data;
   },
 };

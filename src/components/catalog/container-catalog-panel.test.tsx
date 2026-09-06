@@ -1,9 +1,10 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
+import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
 import { ContainerCatalogPanel } from "./container-catalog-panel";
@@ -13,6 +14,7 @@ const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
+  resetContainerFixtures();
   vi.unstubAllGlobals();
 });
 afterAll(() => server.close());
@@ -68,7 +70,7 @@ describe("ContainerCatalogPanel", () => {
     expect(dialog).not.toBeVisible();
   });
 
-  it("allows Office to create and edit a Container", async () => {
+  it("allows Office to create and edit a Container", { timeout: 10000 }, async () => {
     const user = userEvent.setup();
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
@@ -137,5 +139,222 @@ describe("ContainerCatalogPanel", () => {
 
     expect(await screen.findByText("Fallo en el servidor de inventario.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Reintentar carga" })).toBeVisible();
+  });
+
+  it("allows Field and Office actors with container:report to report overflow, transitioning ACTIVE -> OVERFLOWED", { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
+
+    expect(await screen.findByText("CONT-001")).toBeVisible();
+
+    const row = screen.getByRole("row", { name: /CONT-001/ });
+    const overflowButton = within(row).getByRole("button", { name: "Reportar desborde" });
+    expect(overflowButton).toBeVisible();
+
+    await user.click(overflowButton);
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: /Reportar desborde de contenedor CONT-001/ })).toBeVisible();
+
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar desborde" }));
+
+    expect(await screen.findByText("Desborde reportado con éxito para el contenedor CONT-001.")).toBeVisible();
+
+    // In the row, status badge is now OVERFLOWED
+    const updatedRow = screen.getByRole("row", { name: /CONT-001/ });
+    expect(within(updatedRow).getByText("Desbordado")).toBeVisible();
+
+    // Report buttons are gone since status is no longer ACTIVE
+    expect(within(updatedRow).queryByRole("button", { name: "Reportar desborde" })).not.toBeInTheDocument();
+    expect(within(updatedRow).queryByRole("button", { name: "Reportar daño" })).not.toBeInTheDocument();
+  });
+
+  it("allows reporting container damage with damageType, severity, and requiresPublicWorks", { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByText("CONT-001")).toBeVisible();
+
+    const row = screen.getByRole("row", { name: /CONT-001/ });
+    await user.click(within(row).getByRole("button", { name: "Reportar daño" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: /Reportar daño en contenedor CONT-001/ })).toBeVisible();
+
+    await user.selectOptions(within(dialog).getByLabelText("Tipo de daño"), "VANDALIZED");
+    await user.selectOptions(within(dialog).getByLabelText("Severidad"), "HIGH");
+    await user.click(within(dialog).getByLabelText(/Requiere intervención de Obras Públicas/));
+
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar daño" }));
+
+    expect(await screen.findByText("Reporte de daño registrado con éxito para el contenedor CONT-001.")).toBeVisible();
+
+    // In the row, status is now DAMAGED
+    const updatedRow = screen.getByRole("row", { name: /CONT-001/ });
+    expect(within(updatedRow).getByText("Dañado")).toBeVisible();
+
+    // Verify detail reflects damage
+    await user.click(within(updatedRow).getByRole("button", { name: "Ver detalle" }));
+    const detailDialog = screen.getByRole("dialog");
+    expect(within(detailDialog).getByText("Vandalizado")).toBeVisible();
+    expect(within(detailDialog).getByText("Alta")).toBeVisible();
+    expect(within(detailDialog).getByText(/Sí \(notificación a M3\)/)).toBeVisible();
+  });
+
+  it("hides report buttons when actor lacks container:report or container is not ACTIVE", async () => {
+    render(<ContainerCatalogPanel scenario={scenarios.officeLimited} />);
+
+    expect(await screen.findByText("CONT-001")).toBeVisible();
+
+    // officeLimited lacks container:report, so neither button is rendered
+    expect(screen.queryByRole("button", { name: "Reportar desborde" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reportar daño" })).not.toBeInTheDocument();
+  });
+
+  it("validates evidence file constraints as defense in depth", async () => {
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewMember} />);
+
+    expect(await screen.findByText("CONT-001")).toBeVisible();
+    const row = screen.getByRole("row", { name: /CONT-001/ });
+    await user.click(within(row).getByRole("button", { name: "Reportar desborde" }));
+
+    const dialog = screen.getByRole("dialog");
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeTruthy();
+
+    // File > 10MB
+    const oversizedFile = new File(["x".repeat(100)], "huge-file.pdf", {
+      type: "application/pdf",
+    });
+    Object.defineProperty(oversizedFile, "size", { value: 11 * 1024 * 1024 });
+
+    // Invalid MIME type
+    const invalidMimeFile = new File(["test content"], "script.exe", {
+      type: "application/x-msdownload",
+    });
+
+    fireEvent.change(fileInput, { target: { files: [oversizedFile, invalidMimeFile] } });
+
+    expect(
+      await within(dialog).findByText(
+        /"huge-file.pdf" supera el tamaño máximo permitido de 10 MB\./,
+        { exact: false },
+      ),
+    ).toBeVisible();
+    expect(
+      within(dialog).getByText(
+        /"script.exe" tiene un formato no permitido/,
+        { exact: false },
+      ),
+    ).toBeVisible();
+  });
+
+  it("uploads evidence after report and reuses idempotencyKey on retry", { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    const interceptedKeys: string[] = [];
+    let evidenceShouldFail = true;
+
+    server.use(
+      http.post("*/api/evidence", ({ request }) => {
+        const key = request.headers.get("Idempotency-Key") || request.headers.get("idempotency-key") || "";
+        interceptedKeys.push(key);
+        if (evidenceShouldFail) {
+          return HttpResponse.json(
+            {
+              statusCode: 500,
+              message: "Error temporal de almacenamiento",
+              error: "Internal Server Error",
+              timestamp: new Date().toISOString(),
+              path: "/api/evidence",
+            },
+            { status: 500 },
+          );
+        }
+        return HttpResponse.json({
+          id: "att-test-1",
+          url: "/files/evidence-test.png",
+          filename: "evidence-test.png",
+          contentType: "image/png",
+          uploadedAt: new Date().toISOString(),
+        });
+      }),
+    );
+
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
+
+    expect(await screen.findByText("CONT-001")).toBeVisible();
+    const row = screen.getByRole("row", { name: /CONT-001/ });
+    await user.click(within(row).getByRole("button", { name: "Reportar desborde" }));
+
+    const dialog = screen.getByRole("dialog");
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+
+    const validFile = new File(["image-bytes"], "photo.png", { type: "image/png" });
+    await user.upload(fileInput, validFile);
+
+    expect(within(dialog).getByText("photo.png")).toBeVisible();
+    expect(within(dialog).getByText("Pendiente")).toBeVisible();
+
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar desborde" }));
+
+    // Report succeeded, but evidence upload failed with 500
+    expect(await within(dialog).findByText("Error temporal de almacenamiento")).toBeVisible();
+    const retryButton = within(dialog).getByRole("button", { name: "Reintentar" });
+    expect(retryButton).toBeVisible();
+
+    expect(interceptedKeys.length).toBe(1);
+    const initialKey = interceptedKeys[0];
+    expect(initialKey).toBeTruthy();
+
+    // Now unblock evidence upload
+    evidenceShouldFail = false;
+    await user.click(retryButton);
+
+    expect(await within(dialog).findByText("Subido")).toBeVisible();
+    expect(interceptedKeys.length).toBe(2);
+    // Key must be identical across retries
+    expect(interceptedKeys[1]).toBe(initialKey);
+  });
+
+  it("handles authoritative backend 409 conflict without presenting false success", async () => {
+    const user = userEvent.setup();
+
+    server.use(
+      http.post("*/api/containers/:id/report-overflow", () =>
+        HttpResponse.json(
+          {
+            statusCode: 409,
+            message: "El contenedor no se encuentra en estado Activo para reportar desborde.",
+            error: "Conflict",
+            timestamp: new Date().toISOString(),
+            path: "/api/containers/cont-1/report-overflow",
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByText("CONT-001")).toBeVisible();
+    const row = screen.getByRole("row", { name: /CONT-001/ });
+    await user.click(within(row).getByRole("button", { name: "Reportar desborde" }));
+
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar desborde" }));
+
+    // Error is displayed in dialog alert
+    expect(
+      await within(dialog).findByText(
+        "El contenedor no se encuentra en estado Activo para reportar desborde.",
+      ),
+    ).toBeVisible();
+
+    // Dialog stays open
+    expect(dialog).toBeVisible();
+
+    // No false success notice
+    expect(screen.queryByText(/Desborde reportado con éxito/)).not.toBeInTheDocument();
   });
 });

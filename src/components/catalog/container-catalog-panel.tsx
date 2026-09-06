@@ -7,10 +7,12 @@ import {
   Check,
   Clock,
   Eye,
+  FileText,
   MapPin,
   Pencil,
   Plus,
   RotateCcw,
+  Upload,
   X,
 } from "lucide-react";
 
@@ -34,6 +36,7 @@ import {
   containersAdapter,
   DAMAGE_TYPE_LABELS,
   SEVERITY_LABELS,
+  type Attachment,
   type Container,
   type ContainerQuery,
   type ContainerStatus,
@@ -41,6 +44,8 @@ import {
 } from "@/lib/containers";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { zonesAdapter, type Zone } from "@/lib/zones";
+import { ReportDamageDialog } from "./report-damage-dialog";
+import { ReportOverflowDialog } from "./report-overflow-dialog";
 
 type LoadState =
   | { status: "loading" }
@@ -106,6 +111,7 @@ function StatusBadge({ status }: { status: ContainerStatus }) {
 export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScenario }) {
   const canManage =
     scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("container:manage");
+  const canReport = scenario.capabilities.includes("container:report");
 
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [zones, setZones] = useState<Zone[]>([]);
@@ -125,7 +131,31 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [detailContainer, setDetailContainer] = useState<Container | null>(null);
+  const [detailEvidence, setDetailEvidence] = useState<Attachment[]>([]);
+  const [isLoadingEvidence, setIsLoadingEvidence] = useState(false);
+
+  const [reportingOverflowContainer, setReportingOverflowContainer] = useState<Container | null>(null);
+  const [reportingDamageContainer, setReportingDamageContainer] = useState<Container | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!detailContainer) return;
+    let isCurrent = true;
+    containersAdapter
+      .getEvidence(detailContainer.id)
+      .then((attachments) => {
+        if (isCurrent) setDetailEvidence(attachments);
+      })
+      .catch(() => {
+        if (isCurrent) setDetailEvidence([]);
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingEvidence(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [detailContainer]);
 
   const query = useMemo<ContainerQuery>(
     () => ({
@@ -196,7 +226,15 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
   }
 
   function openDetail(container: Container) {
+    setDetailEvidence([]);
+    setIsLoadingEvidence(true);
     setDetailContainer(container);
+  }
+
+  function closeDetail() {
+    setDetailContainer(null);
+    setDetailEvidence([]);
+    setIsLoadingEvidence(false);
   }
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
@@ -424,7 +462,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                     <td className="px-4 py-3">
                       <StatusBadge status={container.status} />
                     </td>
-                    <td className="flex gap-2 px-4 py-3">
+                    <td className="flex flex-wrap gap-2 px-4 py-3">
                       <Button
                         variant="outline"
                         size="sm"
@@ -442,6 +480,28 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                           <Pencil data-icon="inline-start" aria-hidden />
                           Editar
                         </Button>
+                      )}
+                      {canReport && container.status === "ACTIVE" && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setReportingOverflowContainer(container)}
+                            className="text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
+                          >
+                            <AlertTriangle data-icon="inline-start" aria-hidden />
+                            Reportar desborde
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setReportingDamageContainer(container)}
+                            className="text-destructive hover:bg-destructive/10"
+                          >
+                            <AlertTriangle data-icon="inline-start" aria-hidden />
+                            Reportar daño
+                          </Button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -644,7 +704,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       </Dialog>
 
       {/* Detail Dialog */}
-      <Dialog open={Boolean(detailContainer)} onOpenChange={(open) => !open && setDetailContainer(null)}>
+      <Dialog open={Boolean(detailContainer)} onOpenChange={(open) => !open && closeDetail()}>
         {detailContainer && (
           <DialogContent>
             <DialogHeader>
@@ -730,16 +790,131 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   </div>
                 </div>
               )}
+              <div className="col-span-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Evidencias adjuntas
+                </dt>
+                <dd className="mt-1">
+                  {isLoadingEvidence ? (
+                    <p className="text-xs text-muted-foreground">Cargando evidencias…</p>
+                  ) : detailEvidence.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No registra evidencias adjuntas.</p>
+                  ) : (
+                    <ul className="space-y-1.5" role="list">
+                      {detailEvidence.map((att) => (
+                        <li
+                          key={att.id}
+                          className="flex items-center justify-between rounded-lg border border-border bg-card p-2 text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                            <div className="truncate">
+                              <span className="font-medium text-foreground">{att.filename}</span>
+                              <span className="ml-2 text-[11px] text-muted-foreground">
+                                ({att.contentType})
+                              </span>
+                            </div>
+                          </div>
+                          <a
+                            href={att.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-primary hover:underline shrink-0"
+                          >
+                            Ver archivo
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </dd>
+              </div>
             </dl>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDetailContainer(null)}>
+            <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
+              {canReport && detailContainer.status === "ACTIVE" ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const target = detailContainer;
+                      closeDetail();
+                      setReportingOverflowContainer(target);
+                    }}
+                    className="text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
+                  >
+                    <AlertTriangle data-icon="inline-start" aria-hidden />
+                    Reportar desborde
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const target = detailContainer;
+                      closeDetail();
+                      setReportingDamageContainer(target);
+                    }}
+                    className="text-destructive hover:bg-destructive/10"
+                  >
+                    <AlertTriangle data-icon="inline-start" aria-hidden />
+                    Reportar daño
+                  </Button>
+                </div>
+              ) : (
+                <div />
+              )}
+              <Button type="button" variant="outline" onClick={closeDetail}>
                 Cerrar detalle
               </Button>
             </DialogFooter>
           </DialogContent>
         )}
       </Dialog>
+
+      {/* Report Overflow Dialog */}
+      <ReportOverflowDialog
+        open={Boolean(reportingOverflowContainer)}
+        onOpenChange={(open) => !open && setReportingOverflowContainer(null)}
+        container={reportingOverflowContainer}
+        onSuccess={(updated) => {
+          setState((prev) =>
+            prev.status === "ready"
+              ? {
+                  ...prev,
+                  containers: prev.containers.map((c) => (c.id === updated.id ? updated : c)),
+                }
+              : prev,
+          );
+          if (detailContainer?.id === updated.id) {
+            setDetailContainer(updated);
+          }
+          setNotice(`Desborde reportado con éxito para el contenedor ${updated.code}.`);
+        }}
+      />
+
+      {/* Report Damage Dialog */}
+      <ReportDamageDialog
+        open={Boolean(reportingDamageContainer)}
+        onOpenChange={(open) => !open && setReportingDamageContainer(null)}
+        container={reportingDamageContainer}
+        onSuccess={(updated) => {
+          setState((prev) =>
+            prev.status === "ready"
+              ? {
+                  ...prev,
+                  containers: prev.containers.map((c) => (c.id === updated.id ? updated : c)),
+                }
+              : prev,
+          );
+          if (detailContainer?.id === updated.id) {
+            setDetailContainer(updated);
+          }
+          setNotice(`Reporte de daño registrado con éxito para el contenedor ${updated.code}.`);
+        }}
+      />
     </section>
   );
 }

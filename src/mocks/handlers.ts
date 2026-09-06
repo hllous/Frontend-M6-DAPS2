@@ -110,14 +110,20 @@ import {
   repairSeveritySchema,
 } from "@/lib/repair-requests";
 import {
+  addAttachmentToContainer,
   addContainerFixture,
   filterContainerFixtures,
   containerFixtures,
+  getContainerAttachments,
+  getContainerFixture,
   paginateContainerFixtures,
+  reportDamageFixture,
+  reportOverflowFixture,
   updateContainerFixture,
 } from "@/lib/containers-fixtures";
 import {
   createContainerInputSchema,
+  reportDamageInputSchema,
   updateContainerInputSchema,
   containerStatusSchema,
   containerTypeSchema,
@@ -1882,6 +1888,9 @@ export const handlers = [
     if (parsedOwnerType.data === "SERVICE") {
       addAttachmentToService(ownerId, attachment);
     }
+    if (parsedOwnerType.data === "CONTAINER") {
+      addAttachmentToContainer(ownerId, attachment);
+    }
 
     evidenceCache.set(cacheKey, attachment);
 
@@ -1932,6 +1941,114 @@ export const handlers = [
     if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de recuperación inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/repair-requests/${params.requestId}/close` }, { status: 400 });
     if (current.status !== "IN_PROGRESS") return HttpResponse.json({ statusCode: 409, message: "La derivación no está en curso.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/repair-requests/${params.requestId}/close` }, { status: 409 });
     return HttpResponse.json(transitionRepairRequestFixture(params.requestId as string, "CLOSED", parsed.data));
+  }),
+  // ── Containers: Overflow and Damage (#121) ────────────────────────────────
+  http.post("*/api/containers/:containerId/report-overflow", async ({ params }) => {
+    const container = getContainerFixture(params.containerId as string);
+    if (!container) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Contenedor no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/report-overflow`,
+        },
+        { status: 404 },
+      );
+    }
+    if (container.status !== "ACTIVE") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se puede reportar desborde en contenedores activos. Estado actual: ${container.status}`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/report-overflow`,
+        },
+        { status: 409 },
+      );
+    }
+    const updated = reportOverflowFixture(params.containerId as string);
+    return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.post("*/api/containers/:containerId/report-damage", async ({ params, request }) => {
+    const container = getContainerFixture(params.containerId as string);
+    if (!container) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Contenedor no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/report-damage`,
+        },
+        { status: 404 },
+      );
+    }
+    if (container.status !== "ACTIVE") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: `Solo se puede reportar daño en contenedores activos. Estado actual: ${container.status}`,
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/report-damage`,
+        },
+        { status: 409 },
+      );
+    }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El cuerpo de la solicitud debe ser un JSON válido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/report-damage`,
+        },
+        { status: 400 },
+      );
+    }
+    const parsed = reportDamageInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: parsed.error.issues.map((i) => i.message).join(" "),
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/containers/${params.containerId}/report-damage`,
+        },
+        { status: 400 },
+      );
+    }
+    const updated = reportDamageFixture(params.containerId as string, parsed.data);
+    return HttpResponse.json(updated, { status: 200 });
+  }),
+  http.get("*/api/evidence", ({ request }) => {
+    const url = new URL(request.url);
+    const ownerType = url.searchParams.get("ownerType");
+    const ownerId = url.searchParams.get("ownerId");
+    if (!ownerType || !ownerId) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "Los parámetros ownerType y ownerId son obligatorios.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: "/api/evidence",
+        },
+        { status: 400 },
+      );
+    }
+    if (ownerType === "CONTAINER") {
+      return HttpResponse.json(getContainerAttachments(ownerId));
+    }
+    return HttpResponse.json([]);
   }),
   http.post("*/api/session/logout", () => new HttpResponse(null, { status: 200 })),
 ];

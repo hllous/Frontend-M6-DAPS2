@@ -1,4 +1,4 @@
-import type { Container, ContainerQuery, UpdateContainerInput } from "./containers";
+import type { Attachment, Container, ContainerQuery, ReportDamageInput, UpdateContainerInput } from "./containers";
 
 const INITIAL_CONTAINER_FIXTURES: Container[] = [
   {
@@ -70,12 +70,74 @@ const INITIAL_CONTAINER_FIXTURES: Container[] = [
     capacityLiters: 1100,
     status: "REMOVED",
   },
+  {
+    id: "cont-7",
+    code: "CONT-007",
+    containerType: "RECYCLABLE",
+    zoneId: "zone-1",
+    address: "Defensa 800",
+    lat: -34.618,
+    lng: -58.371,
+    capacityLiters: 2400,
+    status: "ACTIVE",
+  },
+  {
+    id: "cont-8",
+    code: "CONT-008",
+    containerType: "HOUSEHOLD",
+    zoneId: "zone-2",
+    address: "Av. Directorio 2100",
+    lat: -34.638,
+    lng: -58.451,
+    capacityLiters: 1100,
+    status: "ACTIVE",
+  },
 ];
 
 export let containerFixtures: Container[] = INITIAL_CONTAINER_FIXTURES.map((item) => ({ ...item }));
+export let containerAttachmentFixtures: Record<string, Attachment[]> = {};
 
 export function resetContainerFixtures() {
   containerFixtures = INITIAL_CONTAINER_FIXTURES.map((item) => ({ ...item }));
+  containerAttachmentFixtures = {};
+}
+
+export function addAttachmentToContainer(containerId: string, attachment: Attachment) {
+  if (!containerAttachmentFixtures[containerId]) {
+    containerAttachmentFixtures[containerId] = [];
+  }
+  containerAttachmentFixtures[containerId].push(attachment);
+}
+
+export function getContainerAttachments(containerId: string): Attachment[] {
+  return containerAttachmentFixtures[containerId] ?? [];
+}
+
+export function reportOverflowFixture(id: string): Container {
+  const container = getContainerFixture(id);
+  if (!container) {
+    throw new Error(`Contenedor ${id} no encontrado.`);
+  }
+  if (container.status !== "ACTIVE") {
+    throw new Error(`INVALID_STATE_TRANSITION: Solo se puede reportar desborde en contenedores activos. Estado actual: ${container.status}`);
+  }
+  container.status = "OVERFLOWED";
+  return container;
+}
+
+export function reportDamageFixture(id: string, input: ReportDamageInput): Container {
+  const container = getContainerFixture(id);
+  if (!container) {
+    throw new Error(`Contenedor ${id} no encontrado.`);
+  }
+  if (container.status !== "ACTIVE") {
+    throw new Error(`INVALID_STATE_TRANSITION: Solo se puede reportar daño en contenedores activos. Estado actual: ${container.status}`);
+  }
+  container.status = "DAMAGED";
+  container.damageType = input.damageType;
+  container.severity = input.severity;
+  container.requiresPublicWorks = input.requiresPublicWorks ?? false;
+  return container;
 }
 
 export function addContainerFixture(container: Container) {

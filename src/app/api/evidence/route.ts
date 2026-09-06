@@ -10,6 +10,11 @@ import {
   zoneResultFixtures,
 } from "@/lib/services-fixtures";
 import {
+  addAttachmentToContainer,
+  getContainerAttachments,
+  getContainerFixture,
+} from "@/lib/containers-fixtures";
+import {
   evidenceOwnerTypeSchema,
   type Attachment,
 } from "@/lib/services";
@@ -55,15 +60,6 @@ export async function POST(request: Request) {
     const session = getRequiredSession(request);
     const scenario = getScenario(session.scenarioId);
 
-    // Permission check: only the assigned Crew Leader uploads Evidence, not Office or a Crew Member.
-    if (!scenario.capabilities.includes("service:execute")) {
-      return errorResponse(
-        403,
-        "No tiene permisos para subir evidencia. Solo la persona responsable de la cuadrilla puede hacerlo.",
-        path,
-      );
-    }
-
     const idempotencyKey = request.headers.get("Idempotency-Key") || request.headers.get("idempotency-key");
     if (!idempotencyKey || !idempotencyKey.trim()) {
       return errorResponse(
@@ -97,6 +93,34 @@ export async function POST(request: Request) {
       return errorResponse(400, "Tipo de propietario de evidencia inválido.", path);
     }
     const ownerType = parsedOwnerType.data;
+
+    // Permission check by ownerType
+    if (ownerType === "CONTAINER") {
+      if (!scenario.capabilities.includes("container:report")) {
+        return errorResponse(
+          403,
+          "No tiene permisos para subir evidencia de contenedores.",
+          path,
+        );
+      }
+    } else if (ownerType === "INSPECTION") {
+      if (!scenario.capabilities.includes("environmentalReport:view")) {
+        return errorResponse(
+          403,
+          "No tiene permisos para subir evidencia de inspección.",
+          path,
+        );
+      }
+    } else {
+      // SERVICE or ZONE_RESULT
+      if (!scenario.capabilities.includes("service:execute")) {
+        return errorResponse(
+          403,
+          "No tiene permisos para subir evidencia. Solo la persona responsable de la cuadrilla puede hacerlo.",
+          path,
+        );
+      }
+    }
 
     if (!ownerId || typeof ownerId !== "string" || !ownerId.trim()) {
       return errorResponse(400, "El campo 'ownerId' es obligatorio.", path);
@@ -160,6 +184,13 @@ export async function POST(request: Request) {
       }
     }
 
+    if (ownerType === "CONTAINER") {
+      const container = getContainerFixture(ownerId);
+      if (!container) {
+        return errorResponse(404, `El contenedor ${ownerId} no existe.`, path);
+      }
+    }
+
     if (
       owningService &&
       scenario.actor.kind === "FIELD" &&
@@ -191,6 +222,9 @@ export async function POST(request: Request) {
     if (ownerType === "SERVICE") {
       addAttachmentToService(ownerId, attachment);
     }
+    if (ownerType === "CONTAINER") {
+      addAttachmentToContainer(ownerId, attachment);
+    }
 
     evidenceCache.set(cacheKey, attachment);
 
@@ -203,3 +237,56 @@ export async function POST(request: Request) {
     return errorResponse(500, "Error interno del servidor.", path);
   }
 }
+
+export async function GET(request: Request) {
+  const path = new URL(request.url).pathname;
+  const url = new URL(request.url);
+  const ownerType = url.searchParams.get("ownerType");
+  const ownerId = url.searchParams.get("ownerId");
+
+  try {
+    getRequiredSession(request);
+
+    if (!ownerType || !ownerId) {
+      return errorResponse(400, "Los parámetros ownerType y ownerId son obligatorios.", path);
+    }
+
+    const parsedOwnerType = evidenceOwnerTypeSchema.safeParse(ownerType);
+    if (!parsedOwnerType.success) {
+      return errorResponse(400, "Tipo de propietario de evidencia inválido.", path);
+    }
+
+    if (parsedOwnerType.data === "CONTAINER") {
+      const container = getContainerFixture(ownerId);
+      if (!container) {
+        return errorResponse(404, `El contenedor ${ownerId} no existe.`, path);
+      }
+      return NextResponse.json(getContainerAttachments(ownerId));
+    }
+
+    if (parsedOwnerType.data === "SERVICE") {
+      const service = serviceFixtures.find((s) => s.id === ownerId);
+      if (!service) {
+        return errorResponse(404, `El servicio ${ownerId} no existe.`, path);
+      }
+      return NextResponse.json(service.attachments ?? []);
+    }
+
+    if (parsedOwnerType.data === "ZONE_RESULT") {
+      const zr = zoneResultFixtures.find((r) => r.id === ownerId);
+      if (!zr) {
+        return errorResponse(404, `El resultado de zona ${ownerId} no existe.`, path);
+      }
+      return NextResponse.json(zr.attachments ?? []);
+    }
+
+    return NextResponse.json([]);
+  } catch (caught: unknown) {
+    if (caught instanceof AuthUnavailableError || caught instanceof InvalidSessionError) {
+      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
+      return errorResponse(401, "La sesión no está activa o es inválida.", path);
+    }
+    return errorResponse(500, "Error interno del servidor.", path);
+  }
+}
+
