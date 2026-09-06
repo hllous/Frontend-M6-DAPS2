@@ -83,6 +83,9 @@ const server = setupServer(
     }
     return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 0 } });
   }),
+  http.get("*/api/street-closure-requests", () =>
+    HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 } }),
+  ),
   http.get("*/api/repair-requests", ({ request }) => {
     const serviceId = new URL(request.url).searchParams.get("detectedInId");
     return HttpResponse.json({

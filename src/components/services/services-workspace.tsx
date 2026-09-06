@@ -38,6 +38,10 @@ import {
   type ServiceQuery,
   type ServiceStatus,
 } from "@/lib/services";
+import {
+  streetClosureRequestsAdapter,
+  type StreetClosureDependency,
+} from "@/lib/street-closure-requests";
 import { cn } from "@/lib/utils";
 import { MapView } from "./map-view";
 import { AssignCrewDialog } from "./assign-crew-dialog";
@@ -455,6 +459,41 @@ export function ServicesWorkspace({
   const canCreateRepairRequest = scenario?.actor.kind === "OFFICE" || fieldCanViewRepairRequests;
   const canCreateStreetClosureRequest = scenario?.actor.kind === "OFFICE";
 
+  const [streetClosureDependencyState, setStreetClosureDependencyState] = useState<{
+    serviceId: string | null;
+    dependency: StreetClosureDependency | null;
+    error: string | null;
+  }>({ serviceId: null, dependency: null, error: null });
+
+  useEffect(() => {
+    if (!canCreateStreetClosureRequest || !detailId) return;
+
+    let isCurrent = true;
+    void streetClosureRequestsAdapter
+      .getForService(detailId)
+      .then((dependency) => {
+        if (!isCurrent) return;
+        setStreetClosureDependencyState({ serviceId: detailId, dependency, error: null });
+      })
+      .catch((cause) => {
+        if (!isCurrent) return;
+        setStreetClosureDependencyState({
+          serviceId: detailId,
+          dependency: null,
+          error: cause instanceof Error ? cause.message : "No se pudo consultar la respuesta de M7.",
+        });
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [canCreateStreetClosureRequest, detailId]);
+
+  const displayedStreetClosureState =
+    canCreateStreetClosureRequest && detailId && streetClosureDependencyState.serviceId === detailId
+      ? streetClosureDependencyState
+      : { serviceId: null, dependency: null, error: null };
+
   const handleStartService = useCallback(async (service: Service) => {
     try {
       const updated = await servicesAdapter.start(service.id);
@@ -563,6 +602,15 @@ export function ServicesWorkspace({
           canStartService={canExecuteService}
           isResuming={resumingId === detailService.id}
           resumeError={resumeErrors[detailService.id] ?? null}
+          streetClosureDependency={displayedStreetClosureState.dependency}
+          streetClosureDependencyLoading={Boolean(
+            canCreateStreetClosureRequest &&
+              detailId &&
+              displayedStreetClosureState.serviceId !== detailId,
+          )}
+          streetClosureDependencyError={displayedStreetClosureState.error}
+          onRejectedClosureReschedule={(service) => setReschedulingServiceId(service.id)}
+          onRejectedClosureCancel={(service) => setCancelingServiceId(service.id)}
           repairRequests={fieldCanViewRepairRequests ? repairRequests[detailService.id] ?? [] : undefined}
           repairRequestsLoading={fieldCanViewRepairRequests && !Object.prototype.hasOwnProperty.call(repairRequests, detailService.id) && !repairRequestsErrors[detailService.id]}
           repairRequestsError={repairRequestsErrors[detailService.id] ?? null}
@@ -641,6 +689,13 @@ export function ServicesWorkspace({
                   if (!open) setStreetClosureServiceId(null);
                 }}
                 service={streetClosureService}
+                onCreated={(request) =>
+                  setStreetClosureDependencyState({
+                    serviceId: detailService.id,
+                    dependency: { request, outcome: "blocked" },
+                    error: null,
+                  })
+                }
               />
             )}
           </>

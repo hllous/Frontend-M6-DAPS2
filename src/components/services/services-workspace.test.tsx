@@ -5,6 +5,10 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
+import {
+  resetStreetClosureRequestFixtures,
+  updateStreetClosureRequestFixture,
+} from "@/lib/street-closure-request-fixtures";
 import { ServicesWorkspace } from "./services-workspace";
 
 const server = setupServer(...handlers);
@@ -12,6 +16,7 @@ const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
+  resetStreetClosureRequestFixtures();
   vi.restoreAllMocks();
   window.history.replaceState(null, "", "/app");
 });
@@ -402,5 +407,35 @@ describe("ServicesWorkspace component", () => {
     });
 
     expect(screen.queryByRole("button", { name: "Cancelar servicio" })).not.toBeInTheDocument();
+  });
+
+  it("shows a pending closure gate for the whole linked ROUTE Service", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    await user.click(within(table).getByRole("row", { name: /SVC-1050/ }));
+    await user.click(await screen.findByRole("button", { name: /Ver detalle completo/ }));
+
+    expect(await screen.findByRole("status", { name: /corte de calle pendiente/i })).toHaveTextContent(
+      /todo el Servicio/i,
+    );
+    expect(screen.getByText(/el inicio.*bloqueado/i)).toBeInTheDocument();
+  });
+
+  it("offers Office an explicit reschedule-or-cancel branch after rejection", async () => {
+    updateStreetClosureRequestFixture("SCR-1001", { status: "REJECTED" });
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    await user.click(within(table).getByRole("row", { name: /SVC-1050/ }));
+    await user.click(await screen.findByRole("button", { name: /Ver detalle completo/ }));
+
+    expect(await screen.findByRole("status", { name: /corte de calle rechazado/i })).toHaveTextContent(
+      /decidir.*reprogramar.*cancelar/i,
+    );
+    expect(screen.getByRole("button", { name: "Reprogramar servicio por rechazo de corte" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancelar servicio por rechazo de corte" })).toBeInTheDocument();
   });
 });

@@ -107,6 +107,32 @@ export type StreetClosureRequestPage = {
   totalPages: number;
 };
 
+export type StreetClosureDependencyOutcome =
+  | "none"
+  | "blocked"
+  | "allowed"
+  | "rejected"
+  | "released";
+
+export type StreetClosureDependency = {
+  request: StreetClosureRequest | null;
+  outcome: StreetClosureDependencyOutcome;
+};
+
+export function resolveStreetClosureDependency(
+  requests: StreetClosureRequest[],
+): StreetClosureDependency {
+  const request = [...requests].sort(
+    (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
+  )[0] ?? null;
+
+  if (!request) return { request: null, outcome: "none" };
+  if (request.status === "REQUESTED") return { request, outcome: "blocked" };
+  if (request.status === "REJECTED") return { request, outcome: "rejected" };
+  if (request.status === "ENDED") return { request, outcome: "released" };
+  return { request, outcome: "allowed" };
+}
+
 export class StreetClosureRequestContractError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
@@ -219,6 +245,11 @@ export const streetClosureRequestsAdapter = {
       requests: parsed.data.data,
       ...parsed.data.meta,
     };
+  },
+
+  async getForService(serviceId: string): Promise<StreetClosureDependency> {
+    const page = await this.list({ sourceId: serviceId, pageSize: 100 });
+    return resolveStreetClosureDependency(page.requests);
   },
 
   async get(id: string): Promise<StreetClosureRequest> {

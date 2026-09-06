@@ -4,7 +4,10 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { NetworkFailureError } from "./authenticated-fetch";
-import { resetStreetClosureRequestFixtures } from "./street-closure-request-fixtures";
+import {
+  resetStreetClosureRequestFixtures,
+  updateStreetClosureRequestFixture,
+} from "./street-closure-request-fixtures";
 import {
   StreetClosureRequestContractError,
   streetClosureRequestsAdapter,
@@ -79,6 +82,27 @@ describe("street closure request adapter", () => {
 
     const ended = await streetClosureRequestsAdapter.end(created.id);
     expect(ended.status).toBe("ENDED");
+  });
+
+  it.each([
+    ["REQUESTED", "blocked"],
+    ["APPROVED", "allowed"],
+    ["REJECTED", "rejected"],
+    ["ENDED", "released"],
+  ] as const)("resolves a Service dependency from the linked request: %s is %s", async (status, outcome) => {
+    updateStreetClosureRequestFixture("SCR-1001", { status });
+
+    await expect(streetClosureRequestsAdapter.getForService("SVC-1050")).resolves.toMatchObject({
+      request: expect.objectContaining({ status }),
+      outcome,
+    });
+  });
+
+  it("returns no dependency when a Service has no closure request", async () => {
+    await expect(streetClosureRequestsAdapter.getForService("SVC-1051")).resolves.toEqual({
+      request: null,
+      outcome: "none",
+    });
   });
 
   it("fails explicitly on malformed success payloads", async () => {

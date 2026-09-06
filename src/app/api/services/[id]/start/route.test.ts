@@ -2,10 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
 import { resetServiceFixtures, serviceFixtures } from "@/lib/services-fixtures";
+import {
+  resetStreetClosureRequestFixtures,
+  updateStreetClosureRequestFixture,
+} from "@/lib/street-closure-request-fixtures";
 import { POST } from "./route";
 
 beforeEach(() => {
   resetServiceFixtures();
+  resetStreetClosureRequestFixtures();
 });
 
 afterEach(() => {
@@ -146,6 +151,8 @@ describe("POST /api/services/[id]/start BFF route", () => {
   });
 
   it("successfully starts a scheduled service and transitions status to IN_PROGRESS", async () => {
+    // SVC-1050 has the baseline pending request; an approved response permits execution.
+    updateStreetClosureRequestFixture("SCR-1001", { status: "APPROVED" });
     const cookie = await authenticatedCookie("field-crew-leader-route");
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/start", {
@@ -166,5 +173,57 @@ describe("POST /api/services/[id]/start BFF route", () => {
     // Verify fixture update
     const updatedFixture = serviceFixtures.find((s) => s.id === "SVC-1050");
     expect(updatedFixture?.status).toBe("IN_PROGRESS");
+  });
+
+  it("blocks the entire linked ROUTE while its closure request is pending", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/start", {
+        method: "POST",
+        headers: { cookie },
+      }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      message: expect.stringMatching(/corte.*pendiente|pendiente.*corte/i),
+    });
+    expect(serviceFixtures.find((service) => service.id === "SVC-1050")?.status).toBe("SCHEDULED");
+  });
+
+  it.each(["APPROVED", "ENDED"] as const)("allows a linked Service to start after closure status %s", async (status) => {
+    updateStreetClosureRequestFixture("SCR-1001", { status });
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/start", {
+        method: "POST",
+        headers: { cookie },
+      }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).status).toBe("IN_PROGRESS");
+  });
+
+  it("leaves a rejected closure for Office's explicit reschedule-or-cancel decision", async () => {
+    updateStreetClosureRequestFixture("SCR-1001", { status: "REJECTED" });
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/start", {
+        method: "POST",
+        headers: { cookie },
+      }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      message: expect.stringMatching(/rechaz|reprogramar.*cancelar|cancelar.*reprogramar/i),
+    });
+    expect(serviceFixtures.find((service) => service.id === "SVC-1050")?.status).toBe("SCHEDULED");
   });
 });

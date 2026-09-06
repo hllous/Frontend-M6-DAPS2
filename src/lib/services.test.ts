@@ -10,6 +10,7 @@ import {
   checkServiceWindowTiming,
   ServiceContractError,
   ServiceRequestError,
+  ServiceStartBlockedError,
   servicesAdapter,
 } from "./services";
 
@@ -428,12 +429,25 @@ describe("services adapter", () => {
       }),
     );
 
-    const started = await servicesAdapter.start("SVC-1050");
-    expect(started.id).toBe("SVC-1050");
+    const started = await servicesAdapter.start("SVC-1051");
+    expect(started.id).toBe("SVC-1051");
     expect(started.status).toBe("IN_PROGRESS");
     expect(started.history).toEqual(
       expect.arrayContaining([expect.objectContaining({ label: "En curso", done: true })]),
     );
+  });
+
+  it("does not call the Service start endpoint while a linked closure is pending", async () => {
+    const startAttempt = vi.fn();
+    server.use(
+      http.post("*/api/services/:serviceId/start", () => {
+        startAttempt();
+        return HttpResponse.json({});
+      }),
+    );
+
+    await expect(servicesAdapter.start("SVC-1050")).rejects.toBeInstanceOf(ServiceStartBlockedError);
+    expect(startAttempt).not.toHaveBeenCalled();
   });
 
   it("surfaces a 409 error response from the backend during start as a ServiceRequestError", async () => {
@@ -464,7 +478,7 @@ describe("services adapter", () => {
       ),
     );
 
-    await expect(servicesAdapter.start("SVC-1050")).rejects.toBeInstanceOf(
+    await expect(servicesAdapter.start("SVC-1051")).rejects.toBeInstanceOf(
       ServiceContractError,
     );
   });

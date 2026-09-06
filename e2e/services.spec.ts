@@ -347,19 +347,21 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(alert).toBeVisible();
     await expect(alert).toHaveText(/El tipo de servicio requiere un vehículo operativo asignado para iniciar/i);
 
-    // 3. Crew Leader successfully starts scheduled service with vehicle (SVC-1050)
-    const card1050 = page.locator("li").filter({ hasText: "SVC-1050" });
-    await card1050.getByRole("button", { name: "Iniciar servicio" }).click();
+    // 3. Crew Leader successfully starts scheduled service with vehicle (SVC-1096 —
+    // SVC-1050 now carries #117's baseline pending StreetClosureRequest and is used
+    // elsewhere to exercise that gate, so it is no longer a "starts cleanly" fixture)
+    const card1096 = page.locator("li").filter({ hasText: "SVC-1096" });
+    await card1096.getByRole("button", { name: "Iniciar servicio" }).click();
 
     // Status transitions to IN_PROGRESS ("En curso") in My Work list
-    await expect(card1050.getByText("En curso")).toBeVisible();
+    await expect(card1096.getByText("En curso")).toBeVisible();
 
     // 4. Open detail view and verify IN_PROGRESS reflection
-    await card1050.getByRole("button", { name: "Ver detalle" }).click();
+    await card1096.getByRole("button", { name: "Ver detalle" }).click();
 
-    await expect(page.getByRole("region", { name: /Detalle completo de SVC-1050/i })).toBeVisible();
+    await expect(page.getByRole("region", { name: /Detalle completo de SVC-1096/i })).toBeVisible();
     // In detail view, StatusBadge shows "En curso"
-    await expect(page.getByRole("region", { name: /Detalle completo de SVC-1050/i }).getByText("En curso")).toBeVisible();
+    await expect(page.getByRole("region", { name: /Detalle completo de SVC-1096/i }).getByText("En curso")).toBeVisible();
     // In progress service cannot be started again
     await expect(page.getByRole("button", { name: "Iniciar servicio" })).toHaveCount(0);
 
@@ -370,8 +372,8 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
 
-    // Select row for SVC-1050 in table
-    const serviceRow = table.getByRole("row", { name: /SVC-1050/ });
+    // Select row for SVC-1096 in table
+    const serviceRow = table.getByRole("row", { name: /SVC-1096/ });
     await expect(serviceRow).toBeVisible();
     // Table row reflects "En curso"
     await expect(serviceRow.getByText("En curso")).toBeVisible();
@@ -380,7 +382,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await serviceRow.click();
     const preview = page.locator("aside[aria-labelledby='preview-title']");
     await expect(preview).toBeVisible();
-    await expect(preview.getByText("SVC-1050")).toBeVisible();
+    await expect(preview.getByText("SVC-1096")).toBeVisible();
     // Preview reflects "En curso"
     await expect(preview.getByText("En curso").first()).toBeVisible();
   });
