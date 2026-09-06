@@ -11,12 +11,12 @@ import {
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import {
-  addZoneFixture,
-  filterZoneFixtures,
-  paginateZoneFixtures,
-  zoneFixtures,
-} from "@/lib/zones-fixtures";
-import { createZoneInputSchema, type Zone, type ZoneQuery } from "@/lib/zones";
+  addRouteFixture,
+  filterRouteFixtures,
+  paginateRouteFixtures,
+  routeFixtures,
+} from "@/lib/routes-fixtures";
+import { createRouteInputSchema, type Route, type RouteQuery } from "@/lib/routes";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -41,18 +41,20 @@ function errorResponse(status: number, message: string, path: string) {
   );
 }
 
-function parseZoneQuery(url: URL): ZoneQuery {
+function parseRouteQuery(url: URL): RouteQuery {
   return {
     active: url.searchParams.has("active") ? url.searchParams.get("active") === "true" : undefined,
+    zoneId: url.searchParams.get("zoneId") ?? undefined,
     search: url.searchParams.get("search") ?? undefined,
     page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
     pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
   };
 }
 
-function backendQueryString(query: ZoneQuery): string {
+function backendQueryString(query: RouteQuery): string {
   const params = new URLSearchParams();
   if (query.active !== undefined) params.set("active", String(query.active));
+  if (query.zoneId) params.set("zoneId", query.zoneId);
   if (query.search) params.set("search", query.search);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
@@ -66,10 +68,10 @@ export async function GET(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const query = parseZoneQuery(new URL(request.url));
+    const query = parseRouteQuery(new URL(request.url));
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/zones${backendQueryString(query)}`);
+      const backendResponse = await fetchBackend(request, `/routes${backendQueryString(query)}`);
       const body = await backendResponse.text();
       return new NextResponse(body, {
         status: backendResponse.status,
@@ -77,7 +79,7 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json(paginateZoneFixtures(filterZoneFixtures(query), query.page, query.pageSize));
+    return NextResponse.json(paginateRouteFixtures(filterRouteFixtures(query), query.page, query.pageSize));
   } catch (error) {
     if (error instanceof InvalidSessionError) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
@@ -86,7 +88,7 @@ export async function GET(request: Request) {
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudieron cargar las zonas.", path);
+    return errorResponse(500, "No se pudieron cargar los recorridos.", path);
   }
 }
 
@@ -98,9 +100,9 @@ export async function POST(request: Request) {
     const scenario = getScenario(session.scenarioId);
 
     if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede crear zonas operativas.");
+      throw new ForbiddenSessionError("Solo el rol de Oficina puede crear recorridos.");
     }
-    requireCapability(session, "zone:manage");
+    requireCapability(session, "route:manage");
 
     let body: unknown;
     try {
@@ -109,45 +111,41 @@ export async function POST(request: Request) {
       return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
     }
 
-    const parsed = createZoneInputSchema.safeParse(body);
+    const parsed = createRouteInputSchema.safeParse(body);
     if (!parsed.success) {
       return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
     }
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, "/zones", "zone:manage", {
+      const backendResponse = await fetchBackend(request, "/routes", "route:manage", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const text = await backendResponse.text();
-      return new NextResponse(text, {
+      const responseBody = await backendResponse.text();
+      return new NextResponse(responseBody, {
         status: backendResponse.status,
         headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
       });
     }
 
-    const existing = zoneFixtures.find(
+    const existing = routeFixtures.find(
       (candidate) => candidate.code.toLowerCase() === parsed.data.code.toLowerCase(),
     );
     if (existing) {
-      return errorResponse(
-        409,
-        `Ya existe una zona operativa con el código ${parsed.data.code}.`,
-        path,
-      );
+      return errorResponse(409, `Ya existe un recorrido con el código ${parsed.data.code}.`, path);
     }
 
-    const newZone: Zone = {
-      id: `zone-${Date.now()}`,
+    const created: Route = {
+      id: `route-${Date.now()}`,
       code: parsed.data.code,
       name: parsed.data.name,
       active: true,
-      neighborhoodIds: [],
+      stops: [], // Nace sin paradas
     };
-    addZoneFixture(newZone);
 
-    return NextResponse.json(newZone, { status: 201 });
+    addRouteFixture(created);
+    return NextResponse.json(created, { status: 201 });
   } catch (error) {
     if (error instanceof InvalidSessionError) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
@@ -160,7 +158,6 @@ export async function POST(request: Request) {
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo crear la zona operativa.", path);
+    return errorResponse(500, "No se pudo crear el recorrido.", path);
   }
 }
-

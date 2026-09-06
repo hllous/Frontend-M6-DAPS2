@@ -37,12 +37,47 @@ import {
   type ZoneResult,
   VEHICLE_CATALOG,
 } from "@/lib/services";
-import { filterZoneFixtures, paginateZoneFixtures, zoneFixtures } from "@/lib/zones-fixtures";
-import type { ZoneQuery } from "@/lib/zones";
+import {
+  addZoneFixture,
+  assignNeighborhoodsFixture,
+  filterZoneFixtures,
+  getZoneFixture,
+  getZoneReferences,
+  paginateZoneFixtures,
+  removeNeighborhoodFixture,
+  updateZoneFixture,
+  zoneFixtures,
+} from "@/lib/zones-fixtures";
+import {
+  assignNeighborhoodsInputSchema,
+  createZoneInputSchema,
+  updateZoneInputSchema,
+  type Zone,
+  type ZoneQuery,
+} from "@/lib/zones";
+import {
+  addRouteFixture,
+  filterRouteFixtures,
+  getRouteFixture,
+  getRouteReferences,
+  paginateRouteFixtures,
+  setRouteStopsFixture,
+  updateRouteFixture,
+  routeFixtures,
+} from "@/lib/routes-fixtures";
+import {
+  createRouteInputSchema,
+  setRouteStopsInputSchema,
+  updateRouteInputSchema,
+  type Route,
+  type RouteQuery,
+} from "@/lib/routes";
 import { addDisposalSiteFixture, disposalSiteFixtures, filterDisposalSiteFixtures, paginateDisposalSiteFixtures, updateDisposalSiteFixture } from "@/lib/disposal-site-fixtures";
 import { disposalSiteCreateInputSchema, disposalSiteTypeSchema, disposalSiteUpdateInputSchema, type DisposalSiteQuery } from "@/lib/disposal-sites";
 import { addServiceTypeFixture, filterServiceTypeFixtures, paginateServiceTypeFixtures, serviceTypeFixtures, updateServiceTypeFixture } from "@/lib/service-type-fixtures";
 import { serviceTypeCategorySchema, serviceTypeCreateInputSchema, serviceTypeModeSchema, serviceTypeUpdateInputSchema, type ServiceTypeQuery } from "@/lib/service-types";
+import { addServiceFrequencyFixture, closeServiceFrequencyFixture, filterServiceFrequencyFixtures, paginateServiceFrequencyFixtures, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
+import { serviceFrequencyCreateInputSchema, serviceFrequencyShiftSchema, serviceFrequencyUpdateInputSchema, type ServiceFrequencyQuery } from "@/lib/service-frequencies";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -50,6 +85,17 @@ function zoneQueryFromUrl(url: string): ZoneQuery {
   const params = new URL(url).searchParams;
   return {
     active: params.has("active") ? params.get("active") === "true" : undefined,
+    search: params.get("search") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
+function routeQueryFromUrl(url: string): RouteQuery {
+  const params = new URL(url).searchParams;
+  return {
+    active: params.has("active") ? params.get("active") === "true" : undefined,
+    zoneId: params.get("zoneId") ?? undefined,
     search: params.get("search") ?? undefined,
     page: params.has("page") ? Number(params.get("page")) : undefined,
     pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
@@ -99,6 +145,21 @@ function serviceTypeQueryFromUrl(url: string): ServiceTypeQuery {
   };
 }
 
+function serviceFrequencyQueryFromUrl(url: string): ServiceFrequencyQuery {
+  const params = new URL(url).searchParams;
+  const shift = serviceFrequencyShiftSchema.safeParse(params.get("shift"));
+  const weekday = Number(params.get("weekday"));
+  return {
+    serviceTypeId: params.get("serviceTypeId") ?? undefined,
+    routeId: params.get("routeId") ?? undefined,
+    shift: shift.success ? shift.data : undefined,
+    weekday: Number.isInteger(weekday) && weekday >= 1 && weekday <= 7 ? weekday : undefined,
+    validOn: params.get("validOn") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
 export const handlers = [
   http.get("*/api/mock/scenarios", () => HttpResponse.json(Object.values(scenarios))),
   http.get("*/api/mock/scenarios/:scenarioId", ({ params }) => {
@@ -113,6 +174,294 @@ export const handlers = [
   http.get("*/api/zones", ({ request }) => {
     const query = zoneQueryFromUrl(request.url);
     return HttpResponse.json(paginateZoneFixtures(filterZoneFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/zones/:zoneId", ({ params }) => {
+    const zone = getZoneFixture(params.zoneId as string);
+    if (!zone) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Zona no encontrada.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/zones/${params.zoneId}`,
+        },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(zone);
+  }),
+  http.post("*/api/zones", async ({ request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/zones" },
+        { status: 400 },
+      );
+    }
+    const parsed = createZoneInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((i) => i.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/zones" },
+        { status: 400 },
+      );
+    }
+    const existing = zoneFixtures.find((z) => z.code.toLowerCase() === parsed.data.code.toLowerCase());
+    if (existing) {
+      return HttpResponse.json(
+        { statusCode: 409, message: `Ya existe una zona operativa con el código ${parsed.data.code}.`, error: "Conflict", timestamp: new Date().toISOString(), path: "/api/zones" },
+        { status: 409 },
+      );
+    }
+    const created: Zone = {
+      id: `zone-${Date.now()}`,
+      code: parsed.data.code,
+      name: parsed.data.name,
+      active: true,
+      neighborhoodIds: [],
+    };
+    addZoneFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.patch("*/api/zones/:zoneId", async ({ params, request }) => {
+    const zoneId = params.zoneId as string;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}` },
+        { status: 400 },
+      );
+    }
+    const parsed = updateZoneInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((i) => i.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}` },
+        { status: 400 },
+      );
+    }
+    const updated = updateZoneFixture(zoneId, parsed.data);
+    if (!updated) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Zona no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(updated);
+  }),
+  http.delete("*/api/zones/:zoneId", ({ params }) => {
+    const zoneId = params.zoneId as string;
+    const updated = updateZoneFixture(zoneId, { active: false });
+    if (!updated) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Zona no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(updated);
+  }),
+  http.post("*/api/zones/:zoneId/neighborhoods", async ({ params, request }) => {
+    const zoneId = params.zoneId as string;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "JSON invÃ¡lido", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods` },
+        { status: 400 },
+      );
+    }
+
+    const parsed = assignNeighborhoodsInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods` },
+        { status: 400 },
+      );
+    }
+
+    const updated = assignNeighborhoodsFixture(zoneId, parsed.data.neighborhoodIds);
+    if (!updated) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Zona no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(updated);
+  }),
+  http.delete("*/api/zones/:zoneId/neighborhoods/:neighborhoodId", ({ params }) => {
+    const zoneId = params.zoneId as string;
+    const neighborhoodId = params.neighborhoodId as string;
+    const zone = getZoneFixture(zoneId);
+    if (!zone || !zone.neighborhoodIds.includes(neighborhoodId)) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "El barrio no esta asignado a la zona operativa.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods/${neighborhoodId}` },
+        { status: 404 },
+      );
+    }
+
+    return HttpResponse.json(removeNeighborhoodFixture(zoneId, neighborhoodId));
+  }),
+  http.get("*/api/zones/:zoneId/references", ({ params }) => {
+    const zoneId = params.zoneId as string;
+    const zone = getZoneFixture(zoneId);
+    if (!zone) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Zona no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/references` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(getZoneReferences(zoneId));
+  }),
+  http.get("*/api/routes", ({ request }) => {
+    const query = routeQueryFromUrl(request.url);
+    return HttpResponse.json(paginateRouteFixtures(filterRouteFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/routes/:routeId", ({ params }) => {
+    const route = getRouteFixture(params.routeId as string);
+    if (!route) {
+      return HttpResponse.json(
+        {
+          statusCode: 404,
+          message: "Recorrido no encontrado.",
+          error: "Not Found",
+          timestamp: new Date().toISOString(),
+          path: `/api/routes/${params.routeId}`,
+        },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(route);
+  }),
+  http.post("*/api/routes", async ({ request }) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/routes" },
+        { status: 400 },
+      );
+    }
+    const parsed = createRouteInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((i) => i.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/routes" },
+        { status: 400 },
+      );
+    }
+    const existing = routeFixtures.find((r) => r.code.toLowerCase() === parsed.data.code.toLowerCase());
+    if (existing) {
+      return HttpResponse.json(
+        { statusCode: 409, message: `Ya existe un recorrido con el código ${parsed.data.code}.`, error: "Conflict", timestamp: new Date().toISOString(), path: "/api/routes" },
+        { status: 409 },
+      );
+    }
+    const created: Route = {
+      id: `route-${Date.now()}`,
+      code: parsed.data.code,
+      name: parsed.data.name,
+      active: true,
+      stops: [],
+    };
+    addRouteFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.patch("*/api/routes/:routeId", async ({ params, request }) => {
+    const routeId = params.routeId as string;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}` },
+        { status: 400 },
+      );
+    }
+    const parsed = updateRouteInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((i) => i.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}` },
+        { status: 400 },
+      );
+    }
+    const updated = updateRouteFixture(routeId, parsed.data);
+    if (!updated) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Recorrido no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(updated);
+  }),
+  http.delete("*/api/routes/:routeId", ({ params }) => {
+    const routeId = params.routeId as string;
+    const updated = updateRouteFixture(routeId, { active: false });
+    if (!updated) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Recorrido no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(updated);
+  }),
+  http.get("*/api/routes/:routeId/references", ({ params }) => {
+    const routeId = params.routeId as string;
+    const route = getRouteFixture(routeId);
+    if (!route) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Recorrido no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/references` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(getRouteReferences(routeId));
+  }),
+  http.put("*/api/routes/:routeId/stops", async ({ params, request }) => {
+    const routeId = params.routeId as string;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return HttpResponse.json(
+        { statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/stops` },
+        { status: 400 },
+      );
+    }
+    const parsed = setRouteStopsInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return HttpResponse.json(
+        { statusCode: 400, message: parsed.error.issues.map((i) => i.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/stops` },
+        { status: 400 },
+      );
+    }
+    const route = getRouteFixture(routeId);
+    if (!route) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Recorrido no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/stops` },
+        { status: 404 },
+      );
+    }
+    const zoneIds = parsed.data.stops.map((s) => s.zoneId);
+    if (zoneIds.length > 0) {
+      const missingZones = zoneIds.filter((zid) => !zoneFixtures.some((z) => z.id === zid));
+      if (missingZones.length > 0) {
+        return HttpResponse.json(
+          { statusCode: 404, message: `Zonas no encontradas: ${missingZones.join(", ")}`, error: "Not Found", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/stops` },
+          { status: 404 },
+        );
+      }
+    }
+    const updated = setRouteStopsFixture(routeId, parsed.data.stops);
+    if (!updated) {
+      return HttpResponse.json(
+        { statusCode: 404, message: "Recorrido no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/routes/${routeId}/stops` },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(updated);
   }),
   http.get("*/api/disposal-sites", ({ request }) => { const query = disposalSiteQueryFromUrl(request.url); return HttpResponse.json(paginateDisposalSiteFixtures(filterDisposalSiteFixtures(query), query.page, query.pageSize)); }),
   http.get("*/api/disposal-sites/:disposalSiteId", ({ params }) => { const item = disposalSiteFixtures.find((candidate) => candidate.id === params.disposalSiteId); return item ? HttpResponse.json(item) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 404 }); }),
@@ -143,6 +492,33 @@ export const handlers = [
   http.delete("*/api/service-types/:serviceTypeId", ({ params }) => {
     const updated = updateServiceTypeFixture(params.serviceTypeId as string, { active: false });
     return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-types" }, { status: 404 });
+  }),
+  http.get("*/api/service-frequencies", ({ request }) => {
+    const query = serviceFrequencyQueryFromUrl(request.url);
+    return HttpResponse.json(paginateServiceFrequencyFixtures(filterServiceFrequencyFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/service-frequencies/:serviceFrequencyId", ({ params }) => {
+    const item = serviceFrequencyFixtures.find((candidate) => candidate.id === params.serviceFrequencyId);
+    return item ? HttpResponse.json(item) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
+  }),
+  http.post("*/api/service-frequencies", async ({ request }) => {
+    const parsed = serviceFrequencyCreateInputSchema.safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
+    const serviceType = serviceTypeFixtures.find((item) => item.id === parsed.data.serviceTypeId);
+    if (!serviceType || serviceType.mode !== "ROUTE") return HttpResponse.json({ statusCode: 400, message: "El tipo de servicio debe ser de modo ROUTE.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
+    const created = { id: `freq-${Date.now()}`, ...parsed.data, validTo: parsed.data.validTo ?? null };
+    addServiceFrequencyFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.patch("*/api/service-frequencies/:serviceFrequencyId", async ({ params, request }) => {
+    const parsed = serviceFrequencyUpdateInputSchema.safeParse(await request.json());
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
+    const updated = updateServiceFrequencyFixture(params.serviceFrequencyId as string, parsed.data);
+    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
+  }),
+  http.delete("*/api/service-frequencies/:serviceFrequencyId", ({ params }) => {
+    const updated = closeServiceFrequencyFixture(params.serviceFrequencyId as string, "2026-09-06");
+    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
   }),
   http.get("*/api/services", ({ request }) => {
     const query = serviceQueryFromUrl(request.url);

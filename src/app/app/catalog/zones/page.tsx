@@ -1,17 +1,18 @@
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 
-import { CatalogLanding } from "@/components/catalog/catalog-landing";
+import { ZoneCatalogPanel } from "@/components/catalog/zone-catalog-panel";
 import { getScenario } from "@/lib/scenarios";
 import { getSession } from "@/lib/session";
 
-export default async function CatalogPage() {
+export default async function ZonesCatalogPage() {
   await connection();
   const session = await getSession();
   if (!session) redirect("/login");
+
   return (
     <main className="p-6">
-      <CatalogLanding scenario={getScenario(session.scenarioId)} />
+      <ZoneCatalogPanel scenario={getScenario(session.scenarioId)} />
     </main>
   );
 }

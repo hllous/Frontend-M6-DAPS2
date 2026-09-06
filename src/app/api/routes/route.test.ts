@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
-import { resetZoneFixtures } from "@/lib/zones-fixtures";
-import { ZoneRequestError, zonesAdapter } from "@/lib/zones";
+import { resetRouteFixtures } from "@/lib/routes-fixtures";
+import { RouteRequestError, routesAdapter } from "@/lib/routes";
 import { GET, POST } from "./route";
 
 afterEach(() => {
-  resetZoneFixtures();
+  resetRouteFixtures();
   delete process.env.M6_AUTH_MODE;
   delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
@@ -26,9 +26,9 @@ async function authenticatedCookie(scenarioId: string, mode = "mock") {
   return response.headers.get("set-cookie") ?? "";
 }
 
-describe("authenticated zones BFF route", () => {
+describe("authenticated routes BFF route", () => {
   it("requires an active session and returns the documented error envelope", async () => {
-    const response = await GET(new Request("http://localhost/api/zones"));
+    const response = await GET(new Request("http://localhost/api/routes"));
 
     expect(response.status).toBe(401);
     const body = await response.json();
@@ -37,24 +37,24 @@ describe("authenticated zones BFF route", () => {
       message: expect.any(String),
       error: "Unauthorized",
       timestamp: expect.any(String),
-      path: "/api/zones",
+      path: "/api/routes",
     });
   });
 
-  it("returns a 401 body the zones adapter parses as a typed request error, not a contract violation", async () => {
-    const response = await GET(new Request("http://localhost/api/zones"));
+  it("returns a 401 body the routes adapter parses as a typed request error, not a contract violation", async () => {
+    const response = await GET(new Request("http://localhost/api/routes"));
     const body = await response.json();
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(body), { status: 401 }));
 
-    const error = await zonesAdapter.list().catch((caught: unknown) => caught);
+    const error = await routesAdapter.list().catch((caught: unknown) => caught);
 
-    expect(error).toBeInstanceOf(ZoneRequestError);
-    expect((error as ZoneRequestError).status).toBe(401);
+    expect(error).toBeInstanceOf(RouteRequestError);
+    expect((error as RouteRequestError).status).toBe(401);
   });
 
   it("serves deterministic fixtures in mock mode without any capability requirement", async () => {
     const cookie = await authenticatedCookie("field-crew-member-route");
-    const response = await GET(new Request("http://localhost/api/zones", { headers: { cookie } }));
+    const response = await GET(new Request("http://localhost/api/routes", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -62,9 +62,21 @@ describe("authenticated zones BFF route", () => {
     expect(body.meta).toMatchObject({ total: expect.any(Number), page: 1 });
   });
 
+  it("filters fixtures by zoneId", async () => {
+    const cookie = await authenticatedCookie("office-duty-queue");
+    const response = await GET(new Request("http://localhost/api/routes?zoneId=zone-1", { headers: { cookie } }));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.length).toBeGreaterThan(0);
+    for (const route of body.data) {
+      expect(route.stops.some((s: { zoneId: string }) => s.zoneId === "zone-1")).toBe(true);
+    }
+  });
+
   it("filters fixtures down to the named empty-results scenario", async () => {
     const cookie = await authenticatedCookie("office-duty-queue");
-    const response = await GET(new Request("http://localhost/api/zones?search=zzz-sin-resultados", { headers: { cookie } }));
+    const response = await GET(new Request("http://localhost/api/routes?search=zzz-sin-resultados", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -81,11 +93,11 @@ describe("authenticated zones BFF route", () => {
       }),
     );
     const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
-    const response = await GET(new Request("http://localhost/api/zones?active=true", { headers: { cookie } }));
+    const response = await GET(new Request("http://localhost/api/routes?active=true", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
     expect(backendFetch).toHaveBeenCalledWith(
-      new URL("/zones?active=true", "https://backend.internal"),
+      new URL("/routes?active=true", "https://backend.internal"),
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
     const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
@@ -94,10 +106,10 @@ describe("authenticated zones BFF route", () => {
 
   it("POST requires an active session and returns 401", async () => {
     const response = await POST(
-      new Request("http://localhost/api/zones", {
+      new Request("http://localhost/api/routes", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code: "Z-10", name: "Zona Test" }),
+        body: JSON.stringify({ code: "REC-10", name: "Recorrido Test" }),
       }),
     );
 
@@ -107,10 +119,10 @@ describe("authenticated zones BFF route", () => {
   it("POST blocks Field actors with 403 Forbidden (Office-only gate)", async () => {
     const cookie = await authenticatedCookie("field-crew-member-route");
     const response = await POST(
-      new Request("http://localhost/api/zones", {
+      new Request("http://localhost/api/routes", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ code: "Z-10", name: "Zona Test" }),
+        body: JSON.stringify({ code: "REC-10", name: "Recorrido Test" }),
       }),
     );
 
@@ -123,7 +135,7 @@ describe("authenticated zones BFF route", () => {
   it("POST validates request body and returns 400 on invalid input", async () => {
     const cookie = await authenticatedCookie("office-duty-queue");
     const response = await POST(
-      new Request("http://localhost/api/zones", {
+      new Request("http://localhost/api/routes", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
         body: JSON.stringify({ code: "", name: "" }),
@@ -136,37 +148,36 @@ describe("authenticated zones BFF route", () => {
   it("POST rejects duplicate code with 409 Conflict", async () => {
     const cookie = await authenticatedCookie("office-duty-queue");
     const response = await POST(
-      new Request("http://localhost/api/zones", {
+      new Request("http://localhost/api/routes", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ code: "Z-01", name: "Zona Duplicada" }),
+        body: JSON.stringify({ code: "REC-001", name: "Recorrido Duplicado" }),
       }),
     );
 
     expect(response.status).toBe(409);
     const body = await response.json();
     expect(body.statusCode).toBe(409);
-    expect(body.message).toContain("Z-01");
+    expect(body.message).toContain("REC-001");
   });
 
-  it("POST creates a new zone and returns 201 for Office actor", async () => {
+  it("POST creates a new route born without stops and returns 201 for Office actor", async () => {
     const cookie = await authenticatedCookie("office-duty-queue");
     const response = await POST(
-      new Request("http://localhost/api/zones", {
+      new Request("http://localhost/api/routes", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ code: "Z-55", name: "Zona Centro Nueva" }),
+        body: JSON.stringify({ code: "REC-99", name: "Recorrido Nuevo 99" }),
       }),
     );
 
     expect(response.status).toBe(201);
     const body = await response.json();
     expect(body).toMatchObject({
-      code: "Z-55",
-      name: "Zona Centro Nueva",
+      code: "REC-99",
+      name: "Recorrido Nuevo 99",
       active: true,
-      neighborhoodIds: [],
+      stops: [],
     });
   });
 });
-
