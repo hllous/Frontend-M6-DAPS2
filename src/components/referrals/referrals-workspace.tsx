@@ -9,16 +9,29 @@ import {
   Clock3,
   Construction,
   ExternalLink,
+  History,
+  Loader2,
   RefreshCw,
   Route,
   ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { referralsAdapter, isReferralVisibleToScenario, type Referral } from "@/lib/referrals";
+import { referralsAdapter, isReferralVisibleToScenario, referralFromRepairRequest, referralFromStreetClosureRequest, type Referral } from "@/lib/referrals";
+import { repairRequestsAdapter } from "@/lib/repair-requests";
 import type { OperationalScenario } from "@/lib/scenarios";
+import { streetClosureRequestsAdapter } from "@/lib/street-closure-requests";
 
 type LoadState =
   | { status: "loading" }
@@ -62,6 +75,85 @@ const severityLabel: Record<string, string> = {
   HIGH: "Alta",
   CRITICAL: "Crítica",
 };
+
+type RecoveryAction =
+  | {
+      kind: "REPAIR_REQUEST";
+      transition: "start" | "close";
+      buttonLabel: string;
+      targetLabel: string;
+      description: string;
+      externalLabel: string;
+      externalHelp: string;
+    }
+  | {
+      kind: "STREET_CLOSURE_REQUEST";
+      transition: "approve" | "reject" | "end";
+      buttonLabel: string;
+      targetLabel: string;
+      description: string;
+      externalLabel?: string;
+      externalHelp?: string;
+    };
+
+function recoveryActionsFor(referral: Referral): RecoveryAction[] {
+  if (referral.kind === "REPAIR_REQUEST") {
+    if (referral.status === "REQUESTED") {
+      return [{
+        kind: "REPAIR_REQUEST",
+        transition: "start",
+        buttonLabel: "Registrar inicio de reparación",
+        targetLabel: "En curso",
+        description: "Confirme que M3 ya asignó la orden de trabajo y registre su identificador.",
+        externalLabel: "Identificador externo de M3 (workOrderId)",
+        externalHelp: "Debe coincidir con la orden de trabajo que M3 ya informó.",
+      }];
+    }
+    if (referral.status === "IN_PROGRESS") {
+      return [{
+        kind: "REPAIR_REQUEST",
+        transition: "close",
+        buttonLabel: "Registrar cierre de reparación",
+        targetLabel: "Cerrada",
+        description: "Confirme que M3 ya informó la finalización de la orden de trabajo.",
+        externalLabel: "Identificador externo de M3 (workOrderId)",
+        externalHelp: "Vuelva a indicar el identificador de la orden confirmada por M3.",
+      }];
+    }
+    return [];
+  }
+
+  if (referral.status === "REQUESTED") {
+    return [
+      {
+        kind: "STREET_CLOSURE_REQUEST",
+        transition: "approve",
+        buttonLabel: "Registrar aprobación de M7",
+        targetLabel: "Aprobada",
+        description: "Confirme que M7 ya aprobó el corte y registre el identificador de cierre.",
+        externalLabel: "Identificador externo de M7 (closureId)",
+        externalHelp: "Debe coincidir con el identificador de cierre que M7 ya informó.",
+      },
+      {
+        kind: "STREET_CLOSURE_REQUEST",
+        transition: "reject",
+        buttonLabel: "Registrar rechazo de M7",
+        targetLabel: "Rechazada",
+        description: "Confirme que M7 ya rechazó el corte. Luego Oficina deberá decidir si reprograma o cancela el Servicio.",
+      },
+    ];
+  }
+  if (referral.status === "APPROVED") {
+    return [{
+      kind: "STREET_CLOSURE_REQUEST",
+      transition: "end",
+      buttonLabel: "Registrar finalización de M7",
+      targetLabel: "Finalizada",
+      description: "Confirme que M7 ya informó que el corte terminó y que puede liberarse esta dependencia.",
+    }];
+  }
+  return [];
+}
 
 function statusLabel(referral: Referral): string {
   return referral.kind === "REPAIR_REQUEST"
@@ -127,8 +219,24 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
     return loadState.referrals.find((referral) => referral.id === selectedId) ?? null;
   }, [loadState, selectedId]);
 
+  const handleReferralRecovered = useCallback((updatedReferral: Referral) => {
+    setLoadState((current) => current.status === "ready"
+      ? {
+          ...current,
+          referrals: current.referrals.map((referral) => referral.id === updatedReferral.id ? updatedReferral : referral),
+        }
+      : current);
+  }, []);
+
   if (selectedReferral) {
-    return <ReferralDetail referral={selectedReferral} onBack={() => setSelectedId(null)} />;
+    return (
+      <ReferralDetail
+        referral={selectedReferral}
+        onBack={() => setSelectedId(null)}
+        canRecover={scenario.actor.kind === "OFFICE"}
+        onRecovered={handleReferralRecovered}
+      />
+    );
   }
 
   return (
@@ -214,7 +322,17 @@ function ReferralRow({ referral, onOpen }: { referral: Referral; onOpen: () => v
   );
 }
 
-function ReferralDetail({ referral, onBack }: { referral: Referral; onBack: () => void }) {
+function ReferralDetail({
+  referral,
+  onBack,
+  canRecover,
+  onRecovered,
+}: {
+  referral: Referral;
+  onBack: () => void;
+  canRecover: boolean;
+  onRecovered: (updatedReferral: Referral) => void;
+}) {
   return (
     <div className="flex min-h-full flex-col bg-[var(--color-surface)]" role="region" aria-label={`Detalle de ${referral.id}`}>
       <header className="border-b border-[var(--color-border)] bg-[var(--color-canvas)] px-4 py-3 sm:px-6 lg:px-8">
@@ -253,6 +371,8 @@ function ReferralDetail({ referral, onBack }: { referral: Referral; onBack: () =
           </div>
         </section>
 
+        {canRecover && <ReferralRecoveryPanel referral={referral} onRecovered={onRecovered} />}
+
         {referral.kind === "REPAIR_REQUEST" ? <RepairDetail referral={referral} /> : <ClosureDetail referral={referral} />}
 
         <section className="rounded-2xl border border-[var(--color-border)] p-4 sm:p-5" aria-labelledby="referral-history-title">
@@ -264,6 +384,226 @@ function ReferralDetail({ referral, onBack }: { referral: Referral; onBack: () =
         </section>
       </main>
     </div>
+  );
+}
+
+function ReferralRecoveryPanel({
+  referral,
+  onRecovered,
+}: {
+  referral: Referral;
+  onRecovered: (updatedReferral: Referral) => void;
+}) {
+  const actions = recoveryActionsFor(referral);
+  const [activeAction, setActiveAction] = useState<RecoveryAction | null>(null);
+
+  if (actions.length === 0) return null;
+
+  return (
+    <section
+      className="rounded-2xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/45 p-4 sm:p-5"
+      aria-labelledby="referral-recovery-title"
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
+          <History className="h-4 w-4" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 id="referral-recovery-title" className="text-sm font-bold text-[var(--color-text)]">Recuperación manual</h2>
+          <p className="mt-1 text-sm text-[var(--color-text)]">
+            Esta acción es excepcional: úsela solo después de verificar la respuesta de {referral.destination} fuera de M6.
+          </p>
+          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+            No cambia una decisión externa ni reemplaza la reconciliación automática por eventos.
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {actions.map((action) => (
+          <Button
+            key={`${action.kind}-${action.transition}`}
+            type="button"
+            variant="outline"
+            className="min-h-10 border-[var(--color-border-strong)] bg-[var(--color-surface)] font-semibold text-[var(--color-action)] hover:bg-[var(--color-surface)]"
+            onClick={() => setActiveAction(action)}
+          >
+            <ShieldCheck className="h-4 w-4" aria-hidden />
+            {action.buttonLabel}
+          </Button>
+        ))}
+      </div>
+
+      {activeAction && (
+        <ReferralRecoveryDialog
+          key={`${referral.id}-${activeAction.transition}`}
+          open
+          referral={referral}
+          action={activeAction}
+          onOpenChange={(open) => {
+            if (!open) setActiveAction(null);
+          }}
+          onRecovered={(updatedReferral) => {
+            onRecovered(updatedReferral);
+            setActiveAction(null);
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function ReferralRecoveryDialog({
+  open,
+  referral,
+  action,
+  onOpenChange,
+  onRecovered,
+}: {
+  open: boolean;
+  referral: Referral;
+  action: RecoveryAction;
+  onOpenChange: (open: boolean) => void;
+  onRecovered: (updatedReferral: Referral) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg border-[var(--color-border)] bg-[var(--color-surface)]">
+        <ReferralRecoveryForm
+          referral={referral}
+          action={action}
+          onOpenChange={onOpenChange}
+          onRecovered={onRecovered}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReferralRecoveryForm({
+  referral,
+  action,
+  onOpenChange,
+  onRecovered,
+}: {
+  referral: Referral;
+  action: RecoveryAction;
+  onOpenChange: (open: boolean) => void;
+  onRecovered: (updatedReferral: Referral) => void;
+}) {
+  const formId = useMemo(() => `referral-recovery-${referral.id}-${action.transition}`, [referral.id, action.transition]);
+  const [externalId, setExternalId] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedExternalId = externalId.trim();
+    if (action.externalLabel && !trimmedExternalId) {
+      setErrorMessage(`Debe indicar el ${action.externalLabel.toLowerCase()}.`);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      let updatedReferral: Referral;
+      if (action.kind === "REPAIR_REQUEST") {
+        const updated = action.transition === "start"
+          ? await repairRequestsAdapter.start(referral.id, { workOrderId: trimmedExternalId })
+          : await repairRequestsAdapter.close(referral.id, { workOrderId: trimmedExternalId });
+        updatedReferral = referralFromRepairRequest(updated);
+      } else if (action.transition === "approve") {
+        const updated = await streetClosureRequestsAdapter.approve(referral.id, { closureId: trimmedExternalId });
+        updatedReferral = referralFromStreetClosureRequest(updated);
+      } else if (action.transition === "reject") {
+        const updated = await streetClosureRequestsAdapter.reject(referral.id);
+        updatedReferral = referralFromStreetClosureRequest(updated);
+      } else {
+        const updated = await streetClosureRequestsAdapter.end(referral.id);
+        updatedReferral = referralFromStreetClosureRequest(updated);
+      }
+      onRecovered(updatedReferral);
+      onOpenChange(false);
+    } catch (cause) {
+      setErrorMessage(cause instanceof Error ? cause.message : "No se pudo registrar la recuperación manual.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const currentStatus = statusLabel(referral);
+
+  return (
+    <>
+      <DialogHeader>
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-warning)]">
+          <History className="h-4 w-4" aria-hidden />
+          <span>Revisión excepcional · {referral.destination}</span>
+        </div>
+        <DialogTitle>{action.buttonLabel}</DialogTitle>
+        <DialogDescription>{action.description} Esta acción solo registra un hecho externo ya confirmado.</DialogDescription>
+      </DialogHeader>
+
+      <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4 py-2">
+        {errorMessage && (
+          <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-xs text-[var(--color-danger)]">
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-sm">
+          <dl className="grid gap-2 sm:grid-cols-2">
+            <DataField label="Derivación" value={referral.id} />
+            <DataField label="Estado actual" value={currentStatus} />
+            <DataField label="Nuevo estado" value={action.targetLabel} />
+            <DataField label="Destino externo" value={referral.destination} />
+          </dl>
+        </div>
+
+        {action.externalLabel && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${formId}-external-id`} className="text-sm font-semibold text-[var(--color-text)]">
+              {action.externalLabel} <span className="text-[var(--color-danger)]" aria-hidden>*</span>
+            </label>
+            <input
+              id={`${formId}-external-id`}
+              value={externalId}
+              onChange={(event) => {
+                setExternalId(event.target.value);
+                setErrorMessage(null);
+              }}
+              required
+              aria-invalid={Boolean(errorMessage)}
+              placeholder={referral.destination === "M3" ? "Ej. M3-OT-2048" : "Ej. M7-C-882"}
+              className="min-h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+            />
+            <span className="text-xs leading-4 text-[var(--color-text-secondary)]">{action.externalHelp}</span>
+          </div>
+        )}
+
+        <div className="flex items-start gap-2 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-xs text-[var(--color-warning)]">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span>Verifique el identificador y la respuesta de {referral.destination} antes de confirmar. M6 no puede crear esa decisión.</span>
+        </div>
+      </form>
+
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+          Volver
+        </Button>
+        <Button type="submit" form={formId} disabled={isSubmitting} className="min-h-10 font-semibold">
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              <span>Registrando…</span>
+            </>
+          ) : (
+            <span>Confirmar recuperación</span>
+          )}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }
 
