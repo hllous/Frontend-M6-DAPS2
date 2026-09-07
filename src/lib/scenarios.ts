@@ -26,7 +26,9 @@ export type Capability =
   // Frontend hypothesis for Phase 4 Container management
   | "container:manage"
   // Frontend hypothesis for Phase 4 Container reporting
-  | "container:report";
+  | "container:report"
+  // Frontend hypothesis for Phase 5 Tree management
+  | "tree:manage";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -77,6 +79,7 @@ export const scenarios: Record<
       "greenPoint:manage",
       "container:manage",
       "indicator:view",
+      "tree:manage",
       "zone:manage",
       "route:manage",
       "serviceFrequency:manage",

@@ -77,6 +77,13 @@ const catalogCards = [
     icon: Recycle,
     tone: "bg-green-50 text-green-700 dark:bg-green-950/50 dark:text-green-400",
   },
+  {
+    href: "/app/catalog/trees",
+    title: "Árboles",
+    description: "Censo de arbolado urbano, ubicación y medidas registradas.",
+    icon: Trees,
+    tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
+  },
 ];
 
 export function CatalogLanding({ scenario }: { scenario: OperationalScenario }) {
