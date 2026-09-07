@@ -14,7 +14,7 @@ const service: Service = {
   id: "SVC-INS-1",
   serviceTypeId: "st-env-inspection",
   serviceTypeName: "Control ambiental",
-  title: "InspecciÃ³n ambiental â€” Establecimiento de prueba",
+  title: "Inspección ambiental â€” Establecimiento de prueba",
   mode: "POINT",
   status: "IN_PROGRESS",
   statusReason: null,
@@ -26,7 +26,7 @@ const service: Service = {
   windowFrom: "09:00",
   windowTo: "11:00",
   crewId: "crew-b",
-  crewName: "Cuadrilla B Â· FernÃ¡ndez",
+  crewName: "Cuadrilla B · Fernández",
   vehicleId: null,
   vehiclePlate: null,
   coordinates: { x: 10, y: 20 },
@@ -85,11 +85,11 @@ describe("InspectionExecutionPanel", () => {
 
     render(<InspectionExecutionPanel service={service} canExecute />);
 
-    expect(await screen.findByRole("heading", { name: "EjecuciÃ³n de inspecciÃ³n ambiental" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Ejecución de inspección ambiental" })).toBeVisible();
     await user.click(screen.getByRole("checkbox", { name: /Verificar la fuente observada/ }));
     await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto visible/ }));
-    await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "No se constatÃ³ infracciÃ³n durante la visita.");
-    await user.click(screen.getByRole("button", { name: "Completar inspecciÃ³n" }));
+    await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "No se constató infracción durante la visita.");
+    await user.click(screen.getByRole("button", { name: "Completar inspección" }));
 
     await screen.findByText(/Resultado registrado/);
     expect(screen.getAllByText(/Siguiente paso:.*Cierre del expediente/).length).toBeGreaterThan(0);
@@ -99,7 +99,7 @@ describe("InspectionExecutionPanel", () => {
         { id: "source", completed: true },
         { id: "impact", completed: true },
       ],
-      conclusion: "No se constatÃ³ infracciÃ³n durante la visita.",
+      conclusion: "No se constató infracción durante la visita.",
     });
   });
 
@@ -108,8 +108,8 @@ describe("InspectionExecutionPanel", () => {
 
     render(<InspectionExecutionPanel service={service} />);
 
-    expect(await screen.findByText("Esta inspecciÃ³n se encuentra en modo de solo consulta para integrantes de la cuadrilla.")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Completar inspecciÃ³n" })).not.toBeInTheDocument();
+    expect(await screen.findByText("Esta inspección se encuentra en modo de solo consulta para integrantes de la cuadrilla.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Completar inspección" })).not.toBeInTheDocument();
     expect(screen.getByText("Verificar la fuente observada")).toBeVisible();
   });
 

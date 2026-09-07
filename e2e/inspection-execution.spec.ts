@@ -45,6 +45,6 @@ test.describe.serial("Environmental inspection execution #134", () => {
     await inspection.getByRole("button", { name: /Completar inspecci/ }).click();
 
     await expect(inspection.getByText(/Resultado registrado/)).toBeVisible();
-    await expect(inspection.getByText(/Aviso a emitir por Oficina/)).toBeVisible();
+    await expect(inspection.getByText(/Aviso a emitir por Oficina/).first()).toBeVisible();
   });
 });

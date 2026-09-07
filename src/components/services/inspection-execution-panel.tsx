@@ -55,14 +55,14 @@ const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "ap
 const ACCEPTED_FILE_TYPES = "image/jpeg,image/png,image/webp,application/pdf";
 
 const OUTCOME_LABELS: Record<EnvironmentalInspectionCompleteInput["outcome"], string> = {
-  NO_VIOLATION: "Sin infracciÃ³n",
-  VIOLATION_FOUND: "InfracciÃ³n constatada",
+  NO_VIOLATION: "Sin infracción",
+  VIOLATION_FOUND: "Infracción constatada",
   INCONCLUSIVE: "Inconclusa",
 };
 
 const NEXT_STEP_LABELS: Record<NonNullable<EnvironmentalInspection["nextStep"]>, string> = {
   NOTICE_TO_BE_ISSUED: "Aviso a emitir por Oficina",
-  REINSPECTION: "ReinspecciÃ³n",
+  REINSPECTION: "Reinspección",
   CASE_CLOSED: "Cierre del expediente",
 };
 
@@ -71,16 +71,16 @@ const VIOLATION_TYPE_LABELS: Record<EnvironmentalInspectionCompleteInput["violat
   ILLEGAL_DUMPING: "Vertido ilegal",
   UNTREATED_DISCHARGE: "Descarga sin tratamiento",
   HAZARDOUS_WASTE: "Residuos peligrosos",
-  AIR_EMISSION: "EmisiÃ³n al aire",
-  NO_WASTE_MANAGEMENT: "Falta de gestiÃ³n de residuos",
-  INSPECTION_OBSTRUCTION: "ObstrucciÃ³n de la inspecciÃ³n",
+  AIR_EMISSION: "Emisión al aire",
+  NO_WASTE_MANAGEMENT: "Falta de gestión de residuos",
+  INSPECTION_OBSTRUCTION: "Obstrucción de la inspección",
 };
 
 const SEVERITY_LABELS: Record<EnvironmentalInspectionCompleteInput["severity"] & string, string> = {
   LOW: "Baja",
   MEDIUM: "Media",
   HIGH: "Alta",
-  CRITICAL: "CrÃ­tica",
+  CRITICAL: "Crítica",
 };
 
 const SUGGESTED_ACTION_LABELS: Record<EnvironmentalInspectionCompleteInput["suggestedAction"] & string, string> = {
@@ -172,7 +172,7 @@ export function InspectionExecutionPanel({
         }
       })
       .catch((error: unknown) => {
-        if (current) setLoadError(error instanceof Error ? error.message : "No se pudo cargar la inspecciÃ³n ambiental.");
+        if (current) setLoadError(error instanceof Error ? error.message : "No se pudo cargar la inspección ambiental.");
       });
 
     return () => {
@@ -187,7 +187,7 @@ export function InspectionExecutionPanel({
     const accepted: QueuedEvidenceFile[] = [];
     for (const file of Array.from(files)) {
       if (file.size > MAX_FILE_SIZE) {
-        errors.push(`\"${file.name}\" supera el tamaÃ±o mÃ¡ximo permitido de 10 MB.`);
+        errors.push(`\"${file.name}\" supera el tamaño máximo permitido de 10 MB.`);
         continue;
       }
       if (!ALLOWED_MIME_TYPES.has(file.type)) {
@@ -257,16 +257,16 @@ export function InspectionExecutionPanel({
       if (action.kind === "success") {
         setInspection(action.result);
         setComposedAgainst(null);
-        setSuccessMessage(`InspecciÃ³n registrada: ${OUTCOME_LABELS[action.result.outcome ?? "INCONCLUSIVE"]}. Siguiente paso: ${action.result.nextStep ? NEXT_STEP_LABELS[action.result.nextStep] : "pendiente de confirmaciÃ³n"}.`);
+        setSuccessMessage(`Inspección registrada: ${OUTCOME_LABELS[action.result.outcome ?? "INCONCLUSIVE"]}. Siguiente paso: ${action.result.nextStep ? NEXT_STEP_LABELS[action.result.nextStep] : "pendiente de confirmación"}.`);
         const updatedService = await servicesAdapter.get(service.id).catch(() => null);
         if (updatedService) onServiceUpdated?.(updatedService);
       } else if (action.kind === "draft-saved") {
         setComposedAgainst(action.draft.composedAgainst);
-        setFormError("No se pudo conectar con el servidor. El resultado quedÃ³ guardado como borrador local; reintente el envÃ­o cuando recupere la conexiÃ³n.");
+        setFormError("No se pudo conectar con el servidor. El resultado quedó guardado como borrador local; reintente el envío cuando recupere la conexión.");
       } else if (action.kind === "conflict") {
         setConflict({ current: action.current, composedAgainst: action.composedAgainst });
       } else if (action.kind === "still-offline") {
-        setFormError("Seguimos sin conexiÃ³n. El borrador se conserva en este dispositivo para reintentar el envÃ­o mÃ¡s tarde.");
+        setFormError("Seguimos sin conexión. El borrador se conserva en este dispositivo para reintentar el envío más tarde.");
       } else {
         setFormError(action.message);
       }
@@ -290,11 +290,11 @@ export function InspectionExecutionPanel({
   };
 
   if (loadError || !inspectionId) {
-    return <Alert variant="destructive" className="mt-6" role="alert"><AlertTriangle aria-hidden /><AlertTitle>No se pudo cargar la inspecciÃ³n</AlertTitle><AlertDescription>{loadError ?? "El servicio no tiene una inspecciÃ³n ambiental vinculada."}</AlertDescription></Alert>;
+    return <Alert variant="destructive" className="mt-6" role="alert"><AlertTriangle aria-hidden /><AlertTitle>No se pudo cargar la inspección</AlertTitle><AlertDescription>{loadError ?? "El servicio no tiene una inspección ambiental vinculada."}</AlertDescription></Alert>;
   }
 
   if (!inspection) {
-    return <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-sm text-[var(--color-text-secondary)]" role="status">Cargando inspecciÃ³n ambiental…</div>;
+    return <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-sm text-[var(--color-text-secondary)]" role="status">Cargando inspección ambiental…</div>;
   }
 
   const completed = Boolean(inspection.outcome);
@@ -306,14 +306,14 @@ export function InspectionExecutionPanel({
       <div className="flex flex-col gap-3 border-b border-[var(--color-border)] pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-action)]"><FileCheck aria-hidden />Control ambiental</div>
-          <h2 id={`inspection-execution-heading-${inputId}`} className="mt-1 text-lg font-bold text-[var(--color-text)]">EjecuciÃ³n de inspecciÃ³n ambiental</h2>
+          <h2 id={`inspection-execution-heading-${inputId}`} className="mt-1 text-lg font-bold text-[var(--color-text)]">Ejecución de inspección ambiental</h2>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · Checklist {inspection.checklistVersion} · {inspection.scheduledDate}</p>
         </div>
         <span className="rounded-lg bg-[var(--color-info-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-info)]">Punto asignado</span>
       </div>
 
       {!canExecute && !completed && (
-        <Alert className="mt-4" role="status"><CloudOff aria-hidden /><AlertTitle>Modo de solo consulta</AlertTitle><AlertDescription>Esta inspecciÃ³n se encuentra en modo de solo consulta para integrantes de la cuadrilla.</AlertDescription></Alert>
+        <Alert className="mt-4" role="status"><CloudOff aria-hidden /><AlertTitle>Modo de solo consulta</AlertTitle><AlertDescription>Esta inspección se encuentra en modo de solo consulta para integrantes de la cuadrilla.</AlertDescription></Alert>
       )}
 
       {!canExecute && !completed ? (
@@ -322,11 +322,11 @@ export function InspectionExecutionPanel({
         <InspectionResult inspection={inspection} />
       ) : (
         <form className="mt-5 flex flex-col gap-5" onSubmit={handleSubmit}>
-          {hasDraft && <Alert role="status"><CloudOff aria-hidden /><AlertTitle>Borrador local pendiente</AlertTitle><AlertDescription>El resultado se conserva en este dispositivo y requiere un reenvÃ­o manual cuando vuelva la conexiÃ³n.</AlertDescription></Alert>}
+          {hasDraft && <Alert role="status"><CloudOff aria-hidden /><AlertTitle>Borrador local pendiente</AlertTitle><AlertDescription>El resultado se conserva en este dispositivo y requiere un reenvío manual cuando vuelva la conexión.</AlertDescription></Alert>}
 
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor={`${inputId}-outcome`}>Resultado de la inspecciÃ³n <span aria-hidden="true">*</span></FieldLabel>
+              <FieldLabel htmlFor={`${inputId}-outcome`}>Resultado de la inspección <span aria-hidden="true">*</span></FieldLabel>
               <select id={`${inputId}-outcome`} value={outcome} onChange={(event) => setOutcome(environmentalInspectionOutcomeSchema.parse(event.target.value))} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-describedby={`${inputId}-outcome-help`}>
                 {environmentalInspectionOutcomeSchema.options.map((value) => <option key={value} value={value}>{OUTCOME_LABELS[value]}</option>)}
               </select>
@@ -334,7 +334,7 @@ export function InspectionExecutionPanel({
             </Field>
 
             <fieldset className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] p-4">
-              <legend className="px-1 text-sm font-semibold text-[var(--color-text)]">Checklist de inspecciÃ³n <span aria-hidden="true">*</span></legend>
+              <legend className="px-1 text-sm font-semibold text-[var(--color-text)]">Checklist de inspección <span aria-hidden="true">*</span></legend>
               <p className="text-xs text-[var(--color-text-secondary)]">Marque cada control realizado antes de registrar el resultado.</p>
               {inspection.checklist.map((item) => {
                 const checkboxId = `${inputId}-check-${item.id}`;
@@ -343,28 +343,28 @@ export function InspectionExecutionPanel({
               {!checklistComplete && canExecute && <p className="text-xs text-[var(--color-warning)]">Faltan controles por completar.</p>}
             </fieldset>
 
-            {(outcome === "NO_VIOLATION" || outcome === "INCONCLUSIVE") && <Field><FieldLabel htmlFor={`${inputId}-conclusion`}>{outcome === "NO_VIOLATION" ? "ConclusiÃ³n" : "ExplicaciÃ³n de la inspecciÃ³n inconclusa"} <span aria-hidden="true">*</span></FieldLabel><textarea id={`${inputId}-conclusion`} value={conclusion} onChange={(event) => setConclusion(event.target.value)} disabled={!canExecute || isSubmitting} className="min-h-28 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-describedby={`${inputId}-conclusion-help`} /><FieldDescription id={`${inputId}-conclusion-help`}>{outcome === "NO_VIOLATION" ? "Describa brevemente la conclusiÃ³n de la visita." : "Explique quÃ© impidiÃ³ confirmar el resultado."}</FieldDescription></Field>}
+            {(outcome === "NO_VIOLATION" || outcome === "INCONCLUSIVE") && <Field><FieldLabel htmlFor={`${inputId}-conclusion`}>{outcome === "NO_VIOLATION" ? "Conclusión" : "Explicación de la inspección inconclusa"} <span aria-hidden="true">*</span></FieldLabel><textarea id={`${inputId}-conclusion`} value={conclusion} onChange={(event) => setConclusion(event.target.value)} disabled={!canExecute || isSubmitting} className="min-h-28 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-describedby={`${inputId}-conclusion-help`} /><FieldDescription id={`${inputId}-conclusion-help`}>{outcome === "NO_VIOLATION" ? "Describa brevemente la conclusión de la visita." : "Explique qué impidió confirmar el resultado."}</FieldDescription></Field>}
 
             {outcome === "VIOLATION_FOUND" && <>
               <Field><FieldLabel htmlFor={`${inputId}-findings`}>Hallazgos <span aria-hidden="true">*</span></FieldLabel><textarea id={`${inputId}-findings`} value={findings} onChange={(event) => setFindings(event.target.value)} disabled={!canExecute || isSubmitting} className="min-h-28 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field>
-              <div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor={`${inputId}-violation-type`}>Tipo de infracciÃ³n <span aria-hidden="true">*</span></FieldLabel><select id={`${inputId}-violation-type`} value={violationType ?? ""} onChange={(event) => setViolationType(event.target.value ? environmentalInspectionViolationTypeSchema.parse(event.target.value) : undefined)} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione un tipo</option>{environmentalInspectionViolationTypeSchema.options.map((value) => <option key={value} value={value}>{VIOLATION_TYPE_LABELS[value]}</option>)}</select></Field><Field><FieldLabel htmlFor={`${inputId}-severity`}>Gravedad <span aria-hidden="true">*</span></FieldLabel><select id={`${inputId}-severity`} value={severity ?? ""} onChange={(event) => setSeverity(event.target.value ? environmentalInspectionSeveritySchema.parse(event.target.value) : undefined)} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione una gravedad</option>{environmentalInspectionSeveritySchema.options.map((value) => <option key={value} value={value}>{SEVERITY_LABELS[value]}</option>)}</select></Field></div>
-              <Field><FieldLabel htmlFor={`${inputId}-suggested-action`}>AcciÃ³n sugerida <span aria-hidden="true">*</span></FieldLabel><select id={`${inputId}-suggested-action`} value={suggestedAction ?? ""} onChange={(event) => setSuggestedAction(event.target.value ? environmentalInspectionSuggestedActionSchema.parse(event.target.value) : undefined)} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione una acciÃ³n</option>{environmentalInspectionSuggestedActionSchema.options.map((value) => <option key={value} value={value}>{SUGGESTED_ACTION_LABELS[value]}</option>)}</select><FieldDescription>La decisiÃ³n final corresponde a Oficina y no se determina en este formulario.</FieldDescription></Field>
+              <div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor={`${inputId}-violation-type`}>Tipo de infracción <span aria-hidden="true">*</span></FieldLabel><select id={`${inputId}-violation-type`} value={violationType ?? ""} onChange={(event) => setViolationType(event.target.value ? environmentalInspectionViolationTypeSchema.parse(event.target.value) : undefined)} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione un tipo</option>{environmentalInspectionViolationTypeSchema.options.map((value) => <option key={value} value={value}>{VIOLATION_TYPE_LABELS[value]}</option>)}</select></Field><Field><FieldLabel htmlFor={`${inputId}-severity`}>Gravedad <span aria-hidden="true">*</span></FieldLabel><select id={`${inputId}-severity`} value={severity ?? ""} onChange={(event) => setSeverity(event.target.value ? environmentalInspectionSeveritySchema.parse(event.target.value) : undefined)} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione una gravedad</option>{environmentalInspectionSeveritySchema.options.map((value) => <option key={value} value={value}>{SEVERITY_LABELS[value]}</option>)}</select></Field></div>
+              <Field><FieldLabel htmlFor={`${inputId}-suggested-action`}>Acción sugerida <span aria-hidden="true">*</span></FieldLabel><select id={`${inputId}-suggested-action`} value={suggestedAction ?? ""} onChange={(event) => setSuggestedAction(event.target.value ? environmentalInspectionSuggestedActionSchema.parse(event.target.value) : undefined)} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione una acción</option>{environmentalInspectionSuggestedActionSchema.options.map((value) => <option key={value} value={value}>{SUGGESTED_ACTION_LABELS[value]}</option>)}</select><FieldDescription>La decisión final corresponde a Oficina y no se determina en este formulario.</FieldDescription></Field>
             </>}
           </FieldGroup>
 
           <EvidenceQueue queuedFiles={queuedFiles} fileValidationError={fileValidationError} onFileSelect={handleFileSelect} onRemoveFile={(id) => setQueuedFiles((current) => current.filter((file) => file.id !== id))} onRetryFile={(file) => void uploadSingleFile(file)} disabled={!canExecute || isSubmitting} existingCount={inspection.attachments?.length ?? 0} />
 
           {formError && <FieldError id={`${inputId}-form-error`}>{formError}</FieldError>}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end"><Button type="submit" disabled={!canExecute || isSubmitting} className="min-h-12 gap-2 sm:min-h-10"><FileCheck data-icon="inline-start" aria-hidden />{isSubmitting ? "Registrando inspecciÃ³n…" : hasDraft ? "Reintentar envÃ­o" : "Completar inspecciÃ³n"}</Button></div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end"><Button type="submit" disabled={!canExecute || isSubmitting} className="min-h-12 gap-2 sm:min-h-10"><FileCheck data-icon="inline-start" aria-hidden />{isSubmitting ? "Registrando inspección…" : hasDraft ? "Reintentar envío" : "Completar inspección"}</Button></div>
         </form>
       )}
 
-      {successMessage && <Alert className="mt-4" role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>InspecciÃ³n completada</AlertTitle><AlertDescription>{successMessage}</AlertDescription></Alert>}
+      {successMessage && <Alert className="mt-4" role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Inspección completada</AlertTitle><AlertDescription>{successMessage}</AlertDescription></Alert>}
 
       <Dialog open={Boolean(conflict)} onOpenChange={(open) => { if (!open) setConflict(null); }}>
         <DialogContent className="max-w-lg border-[var(--color-border)] bg-[var(--color-surface)]">
-          <DialogHeader><DialogTitle>Conflicto de sincronizaciÃ³n</DialogTitle><DialogDescription>No se aplicÃ³ el borrador local automÃ¡ticamente.</DialogDescription></DialogHeader>
-          {conflict && <DraftConflictView serviceId={service.id} actionLabel="completado de inspecciÃ³n" composedAgainst={conflict.composedAgainst} current={conflict.current} onPreserve={() => { setConflict(null); }} onDiscard={() => { discardDraft(); }} />}
+          <DialogHeader><DialogTitle>Conflicto de sincronización</DialogTitle><DialogDescription>No se aplicó el borrador local automáticamente.</DialogDescription></DialogHeader>
+          {conflict && <DraftConflictView serviceId={service.id} actionLabel="completado de inspección" composedAgainst={conflict.composedAgainst} current={conflict.current} onPreserve={() => { setConflict(null); }} onDiscard={() => { discardDraft(); }} />}
         </DialogContent>
       </Dialog>
     </section>
@@ -373,14 +373,14 @@ export function InspectionExecutionPanel({
 
 function InspectionResult({ inspection }: { inspection: EnvironmentalInspection }) {
   const outcome = inspection.outcome ?? "INCONCLUSIVE";
-  return <div className="mt-5 flex flex-col gap-4"><Alert role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Resultado registrado: {OUTCOME_LABELS[outcome]}</AlertTitle><AlertDescription>El servidor registrÃ³ la inspecciÃ³n. Siguiente paso: {inspection.nextStep ? NEXT_STEP_LABELS[inspection.nextStep] : "pendiente de confirmaciÃ³n"}.</AlertDescription></Alert><dl className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Checklist</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.checklist.length} controles registrados</dd></div>{inspection.findings && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Hallazgos registrados</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.findings}</dd></div>}{inspection.attachments && inspection.attachments.length > 0 && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Evidencia</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.attachments.length} archivo(s) asociado(s)</dd></div>}</dl></div>;
+  return <div className="mt-5 flex flex-col gap-4"><Alert role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Resultado registrado: {OUTCOME_LABELS[outcome]}</AlertTitle><AlertDescription>El servidor registró la inspección. Siguiente paso: {inspection.nextStep ? NEXT_STEP_LABELS[inspection.nextStep] : "pendiente de confirmación"}.</AlertDescription></Alert><dl className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Checklist</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.checklist.length} controles registrados</dd></div>{inspection.findings && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Hallazgos registrados</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.findings}</dd></div>}{inspection.attachments && inspection.attachments.length > 0 && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Evidencia</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.attachments.length} archivo(s) asociado(s)</dd></div>}</dl></div>;
 }
 
 function ReadOnlyInspection({ inspection }: { inspection: EnvironmentalInspection }) {
-  return <div className="mt-5 flex flex-col gap-4"><h3 className="text-sm font-bold text-[var(--color-text)]">Checklist asignado</h3><ul className="flex flex-col gap-2" aria-label="Checklist de inspecciÃ³n en solo consulta">{inspection.checklist.map((item) => <li key={item.id} className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 text-sm text-[var(--color-text)]"><span aria-hidden="true" className="size-3 rounded-full border border-[var(--color-border-strong)]" />{item.label}{item.required ? <span className="text-xs text-[var(--color-text-secondary)]">(obligatorio)</span> : null}</li>)}</ul><p className="text-xs text-[var(--color-text-secondary)]">La persona responsable de la cuadrilla registra el resultado y la evidencia de esta inspecciÃ³n.</p></div>;
+  return <div className="mt-5 flex flex-col gap-4"><h3 className="text-sm font-bold text-[var(--color-text)]">Checklist asignado</h3><ul className="flex flex-col gap-2" aria-label="Checklist de inspección en solo consulta">{inspection.checklist.map((item) => <li key={item.id} className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 text-sm text-[var(--color-text)]"><span aria-hidden="true" className="size-3 rounded-full border border-[var(--color-border-strong)]" />{item.label}{item.required ? <span className="text-xs text-[var(--color-text-secondary)]">(obligatorio)</span> : null}</li>)}</ul><p className="text-xs text-[var(--color-text-secondary)]">La persona responsable de la cuadrilla registra el resultado y la evidencia de esta inspección.</p></div>;
 }
 
 function EvidenceQueue({ queuedFiles, fileValidationError, onFileSelect, onRemoveFile, onRetryFile, disabled, existingCount }: { queuedFiles: QueuedEvidenceFile[]; fileValidationError: string | null; onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void; onRemoveFile: (id: string) => void; onRetryFile: (file: QueuedEvidenceFile) => void; disabled: boolean; existingCount: number }) {
   const inputId = useId();
-  return <Card className="rounded-2xl border-[var(--color-border)] bg-[var(--color-surface)] ring-0"><CardHeader className="border-b border-[var(--color-border)]"><CardTitle className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)]"><Paperclip aria-hidden />Evidencia de la inspecciÃ³n</CardTitle><CardDescription>{existingCount > 0 ? `${existingCount} archivo(s) ya asociado(s). ` : ""}Puede agregar fotografÃ­as o documentos. Se admiten JPEG, PNG, WebP y PDF hasta 10 MB por archivo.</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 pt-4"><div className="flex flex-wrap items-center gap-3"><label htmlFor={inputId} className={`inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-[var(--color-border-strong)] px-3 text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)] ${disabled ? "pointer-events-none opacity-50" : ""}`}><Upload data-icon="inline-start" aria-hidden />Seleccionar archivos</label><input id={inputId} type="file" multiple accept={ACCEPTED_FILE_TYPES} onChange={onFileSelect} disabled={disabled} className="sr-only" /><span className="text-xs text-[var(--color-text-secondary)]">La carga se realiza archivo por archivo.</span></div>{fileValidationError && <div role="alert" className="flex items-start gap-2 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]"><AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />{fileValidationError}</div>}{queuedFiles.length > 0 && <ul className="flex flex-col gap-2" aria-label="Archivos de evidencia seleccionados">{queuedFiles.map((file) => <li key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-3 text-sm"><span className="flex min-w-0 items-center gap-2"><Paperclip className="size-4 shrink-0 text-[var(--color-text-secondary)]" aria-hidden /><span className="truncate text-[var(--color-text)]">{file.status === "success" && file.canonicalFilename ? file.canonicalFilename : file.localFilename}</span></span><span className="flex items-center gap-2 text-xs">{file.status === "pending" && <span className="text-[var(--color-text-secondary)]">Pendiente</span>}{file.status === "uploading" && <span className="text-[var(--color-info)]">Subiendo…</span>}{file.status === "success" && <span className="inline-flex items-center gap-1 font-semibold text-[var(--color-success)]"><CheckCircle2 className="size-3" aria-hidden />Subido</span>}{file.status === "error" && <><span className="text-[var(--color-danger)]">{file.error}</span><Button type="button" variant="outline" size="sm" onClick={() => onRetryFile(file)} className="min-h-10 gap-1"><RefreshCw data-icon="inline-start" aria-hidden />Reintentar carga</Button></>}{file.status !== "uploading" && file.status !== "success" && <Button type="button" variant="ghost" size="icon-sm" onClick={() => onRemoveFile(file.id)} aria-label={`Quitar ${file.localFilename}`}><X aria-hidden /></Button>}</span></li>)}</ul>}</CardContent></Card>;
+  return <Card className="rounded-2xl border-[var(--color-border)] bg-[var(--color-surface)] ring-0"><CardHeader className="border-b border-[var(--color-border)]"><CardTitle className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)]"><Paperclip aria-hidden />Evidencia de la inspección</CardTitle><CardDescription>{existingCount > 0 ? `${existingCount} archivo(s) ya asociado(s). ` : ""}Puede agregar fotografías o documentos. Se admiten JPEG, PNG, WebP y PDF hasta 10 MB por archivo.</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 pt-4"><div className="flex flex-wrap items-center gap-3"><label htmlFor={inputId} className={`inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-[var(--color-border-strong)] px-3 text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)] ${disabled ? "pointer-events-none opacity-50" : ""}`}><Upload data-icon="inline-start" aria-hidden />Seleccionar archivos</label><input id={inputId} type="file" multiple accept={ACCEPTED_FILE_TYPES} onChange={onFileSelect} disabled={disabled} className="sr-only" /><span className="text-xs text-[var(--color-text-secondary)]">La carga se realiza archivo por archivo.</span></div>{fileValidationError && <div role="alert" className="flex items-start gap-2 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]"><AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />{fileValidationError}</div>}{queuedFiles.length > 0 && <ul className="flex flex-col gap-2" aria-label="Archivos de evidencia seleccionados">{queuedFiles.map((file) => <li key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-3 text-sm"><span className="flex min-w-0 items-center gap-2"><Paperclip className="size-4 shrink-0 text-[var(--color-text-secondary)]" aria-hidden /><span className="truncate text-[var(--color-text)]">{file.status === "success" && file.canonicalFilename ? file.canonicalFilename : file.localFilename}</span></span><span className="flex items-center gap-2 text-xs">{file.status === "pending" && <span className="text-[var(--color-text-secondary)]">Pendiente</span>}{file.status === "uploading" && <span className="text-[var(--color-info)]">Subiendo…</span>}{file.status === "success" && <span className="inline-flex items-center gap-1 font-semibold text-[var(--color-success)]"><CheckCircle2 className="size-3" aria-hidden />Subido</span>}{file.status === "error" && <><span className="text-[var(--color-danger)]">{file.error}</span><Button type="button" variant="outline" size="sm" onClick={() => onRetryFile(file)} className="min-h-10 gap-1"><RefreshCw data-icon="inline-start" aria-hidden />Reintentar carga</Button></>}{file.status !== "uploading" && file.status !== "success" && <Button type="button" variant="ghost" size="icon-sm" onClick={() => onRemoveFile(file.id)} aria-label={`Quitar ${file.localFilename}`}><X aria-hidden /></Button>}</span></li>)}</ul>}</CardContent></Card>;
 }

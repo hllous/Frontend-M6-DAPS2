@@ -125,7 +125,7 @@ export type EnvironmentalInspectionChecklistResult = z.infer<typeof environmenta
 export const environmentalInspectionCompleteInputSchema = z
   .object({
     outcome: environmentalInspectionOutcomeSchema,
-    checklist: z.array(environmentalInspectionChecklistResultSchema).min(1, "Debe completar el checklist de inspecciÃ³n."),
+    checklist: z.array(environmentalInspectionChecklistResultSchema).min(1, "Debe completar el checklist de inspección."),
     conclusion: z.string().trim().optional(),
     findings: z.string().trim().optional(),
     violationType: environmentalInspectionViolationTypeSchema.optional(),
@@ -137,16 +137,16 @@ export const environmentalInspectionCompleteInputSchema = z
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["checklist"], message: "Debe completar todos los controles del checklist." });
     }
     if (data.outcome === "NO_VIOLATION" && !data.conclusion) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["conclusion"], message: "La conclusiÃ³n es obligatoria para un resultado sin infracciÃ³n." });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["conclusion"], message: "La conclusión es obligatoria para un resultado sin infracción." });
     }
     if (data.outcome === "VIOLATION_FOUND") {
-      if (!data.findings) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["findings"], message: "Los hallazgos son obligatorios cuando se constata una infracciÃ³n." });
-      if (!data.violationType) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["violationType"], message: "Debe indicar el tipo de infracciÃ³n constatada." });
-      if (!data.severity) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["severity"], message: "Debe indicar la gravedad de la infracciÃ³n constatada." });
-      if (!data.suggestedAction) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["suggestedAction"], message: "Debe indicar la acciÃ³n sugerida." });
+      if (!data.findings) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["findings"], message: "Los hallazgos son obligatorios cuando se constata una infracción." });
+      if (!data.violationType) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["violationType"], message: "Debe indicar el tipo de infracción constatada." });
+      if (!data.severity) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["severity"], message: "Debe indicar la gravedad de la infracción constatada." });
+      if (!data.suggestedAction) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["suggestedAction"], message: "Debe indicar la acción sugerida." });
     }
     if (data.outcome === "INCONCLUSIVE" && !data.conclusion) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["conclusion"], message: "Debe explicar por quÃ© la inspecciÃ³n resulta inconclusa." });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["conclusion"], message: "Debe explicar por qué la inspección resulta inconclusa." });
     }
   });
 export type EnvironmentalInspectionCompleteInput = z.infer<typeof environmentalInspectionCompleteInputSchema>;
