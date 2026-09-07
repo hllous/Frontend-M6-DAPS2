@@ -19,7 +19,7 @@ test.describe("operational indicator dashboard #138", () => {
     await page.getByRole("button", { name: "Actualizar" }).click();
     await expect(detail.getByText("Costera").first()).toBeVisible();
 
-    await page.getByRole("button", { name: "Tabla" }).click();
+    await page.getByRole("button", { name: "Tabla", exact: true }).click();
     await expect(page.getByRole("table").first()).toBeVisible();
     await expect(page.getByText("Valores exactos de cobertura por zona")).toBeVisible();
   });
@@ -45,7 +45,7 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(coverageTable.getByText("146 objetivos").first()).toBeVisible();
 
     await page.getByRole("button", { name: /Cumplimiento/ }).click();
-    await expect(page.getByText("Falta de cuadrilla")).toBeVisible();
+    await expect(page.getByText("Falta de cuadrilla").first()).toBeVisible();
     await expect(page.getByText(/ZoneResult\.recordedAt/)).toBeVisible();
   });
 
