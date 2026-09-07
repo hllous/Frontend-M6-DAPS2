@@ -27,7 +27,7 @@ const zoneOptions = [{ id: "zone-1", label: "Centro" }, { id: "zone-2", label: "
 const serviceTypeOptions = [{ id: "service-collection", label: "Recolección" }, { id: "service-sweeping", label: "Barrido" }, { id: "service-green", label: "Espacios verdes" }];
 
 function formatNumber(value: number, unit: string) {
-  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: unit === "%" || unit === "h" ? 1 : 0 }).format(value);
+  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: unit === "%" || unit === "h" || unit === "m³" ? 1 : 0 }).format(value);
 }
 
 function formatDate(value: string) {
@@ -125,6 +125,12 @@ function detailContext(data: IndicatorData) {
   if (data.family === "compliance") {
     return <p className={styles.detailContext}>El estado <strong>en fecha</strong> compara el último <code>ZoneResult.recordedAt</code> con <code>Service.scheduledDate</code>. Las zonas sin atención se ordenan con el motivo registrado.</p>;
   }
+  if (data.family === "incidents") {
+    return <p className={styles.detailContext}>Los contenedores y arbolado son instantáneas actuales; los reportes consideran el período y la resolución media usa solo reportes cerrados.</p>;
+  }
+  if (data.family === "waste") {
+    return <p className={styles.detailContext}>Los volúmenes se informan en kilogramos y metros cúbicos por tipo y destino. El desvío expresa el porcentaje del período que no fue enviado al relleno sanitario.</p>;
+  }
   return null;
 }
 
@@ -163,5 +169,11 @@ function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoi
 
 function TableView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
   const detailLabels = points.find((point) => point.details?.length)?.details?.map((detail) => detail.label) ?? [];
-  return <div className={styles.tableWrap}><table className={styles.table}><caption>Valores exactos de {title.toLowerCase()}</caption><thead><tr><th scope="col">Categoría</th>{detailLabels.map((label) => <th key={label} scope="col">{label}</th>)}<th scope="col">{detailLabels.length ? "Cobertura" : "Valor"}</th></tr></thead><tbody>{points.map((point) => <tr key={point.id}><td><button type="button" className={styles.rowButton} data-selected={selectedId === point.id} aria-pressed={selectedId === point.id} onClick={() => onSelect(point.id)}>{point.label}{point.note ? <span className={styles.note}>{point.note}</span> : null}</button></td>{detailLabels.map((label) => { const detail = point.details?.find((item) => item.label === label); return <td key={label} className={styles.value}>{detail ? metricText(detail) : "—"}</td>; })}<td className={styles.value}>{metricText(point)}</td></tr>)}</tbody></table></div>;
+  const valueHeading = tableValueHeading(points[0]?.unit);
+  return <div className={styles.tableWrap}><table className={styles.table}><caption>Valores exactos de {title.toLowerCase()}</caption><thead><tr><th scope="col">Categoría</th>{detailLabels.map((label) => <th key={label} scope="col">{label}</th>)}<th scope="col">{valueHeading}</th></tr></thead><tbody>{points.map((point) => <tr key={point.id}><td><button type="button" className={styles.rowButton} data-selected={selectedId === point.id} aria-pressed={selectedId === point.id} onClick={() => onSelect(point.id)}>{point.label}{point.note ? <span className={styles.note}>{point.note}</span> : null}</button></td>{detailLabels.map((label) => { const detail = point.details?.find((item) => item.label === label); return <td key={label} className={styles.value}>{detail ? metricText(detail) : "—"}</td>; })}<td className={styles.value}>{metricText(point)}</td></tr>)}</tbody></table></div>;
+}
+
+function tableValueHeading(unit?: string) {
+  const labels: Record<string, string> = { "%": "Porcentaje", "kg": "Kilogramos", "h": "Horas", "incidentes": "Incidentes", "árboles": "Árboles", "reportes": "Reportes", "objetivos": "Objetivos", "servicios": "Servicios" };
+  return labels[unit ?? ""] ?? "Valor";
 }

@@ -49,6 +49,29 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(page.getByText(/ZoneResult\.recordedAt/)).toBeVisible();
   });
 
+  test("Office can inspect exact Incidencias and Residuos details", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=dashboards");
+
+    await page.getByRole("button", { name: /Incidencias/ }).click();
+    await expect(page.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
+    await expect(page.getByText(/contenedores y arbolado son instantáneas actuales/i)).toBeVisible();
+    await expect(page.getByText(/reportes consideran el período y la resolución media usa solo reportes cerrados/i)).toBeVisible();
+
+    await page.getByRole("button", { name: "Ver tabla de datos", exact: true }).click();
+    const incidentsTable = page.getByRole("region", { name: "Tabla de datos de Incidencias" });
+    await expect(incidentsTable.getByRole("columnheader", { name: "Desbordes" })).toBeVisible();
+    await expect(incidentsTable.getByRole("columnheader", { name: "Daños" })).toBeVisible();
+    await expect(incidentsTable.getByText("Cerrados")).toBeVisible();
+
+    await page.getByRole("button", { name: /Residuos/ }).click();
+    await page.getByRole("button", { name: "Ver tabla de datos", exact: true }).click();
+    const wasteTable = page.getByRole("region", { name: "Tabla de datos de Residuos" });
+    await expect(wasteTable.getByRole("columnheader", { name: "Kilogramos" }).first()).toBeVisible();
+    await expect(wasteTable.getByRole("columnheader", { name: "Metros cúbicos" }).first()).toBeVisible();
+    await expect(wasteTable.getByText("62,8 m³").first()).toBeVisible();
+  });
+
   test("an Office actor without indicator:view cannot open the destination", async ({ page }) => {
     await loginViaApi(page, "office-limited-intake");
     await page.goto("/app?destination=dashboards");
