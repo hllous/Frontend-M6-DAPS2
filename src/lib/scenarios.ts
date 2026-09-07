@@ -28,7 +28,8 @@ export type Capability =
   // Frontend hypothesis for Phase 4 Container reporting
   | "container:report"
   // Frontend hypothesis for Phase 5 Tree management
-  | "tree:manage";
+  | "tree:manage"
+  | "tree:survey";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -80,6 +81,7 @@ export const scenarios: Record<
       "container:manage",
       "indicator:view",
       "tree:manage",
+      "tree:survey",
       "zone:manage",
       "route:manage",
       "serviceFrequency:manage",
@@ -105,7 +107,7 @@ export const scenarios: Record<
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
     },
-    capabilities: ["service:view", "service:execute", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view"],
+    capabilities: ["service:view", "service:execute", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view", "tree:survey"],
     work: {
       title: "Servicios asignados",
       summary: "Recorrido de higiene urbana para el turno actual.",
@@ -125,7 +127,7 @@ export const scenarios: Record<
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
     },
-    capabilities: ["service:view", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view"],
+    capabilities: ["service:view", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view", "tree:survey"],
     work: {
       title: "Servicios asignados",
       summary: "Tareas del recorrido que integran su turno.",

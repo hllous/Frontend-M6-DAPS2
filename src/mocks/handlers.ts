@@ -100,6 +100,8 @@ import { greenPointCreateInputSchema, greenPointUpdateInputSchema, wasteTypeSche
 import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "@/lib/indicator-fixtures";
 import { addTreeFixture, filterTreeFixtures, paginateTreeFixtures, treeFixtures, updateTreeFixture } from "@/lib/tree-fixtures";
 import { treeCreateInputSchema, treeUpdateInputSchema, type TreeQuery } from "@/lib/trees";
+import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures, getTreeSurveyFixture, paginateTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
+import { treeHealthStatusSchema, treeSurveyCreateInputSchema, riskLevelSchema } from "@/lib/tree-surveys";
 import {
   addRepairRequestFixture,
   createRepairRequestFixture,
@@ -1029,6 +1031,23 @@ export const handlers = [
   http.delete("*/api/trees/:treeId", ({ params }) => {
     const updated = updateTreeFixture(params.treeId as string, { active: false });
     return updated ? new HttpResponse(null, { status: 204 }) : HttpResponse.json({ statusCode: 404, message: "Árbol no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 404 });
+  }),
+  // --- Tree surveys (#127) ---
+  http.get("*/api/trees/:treeId/surveys", ({ request, params }) => {
+    const url = new URL(request.url);
+    const query = { healthStatus: treeHealthStatusSchema.safeParse(url.searchParams.get("healthStatus")).data, riskLevel: riskLevelSchema.safeParse(url.searchParams.get("riskLevel")).data, page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined, pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined };
+    return HttpResponse.json(paginateTreeSurveyFixtures(filterTreeSurveyFixtures(params.treeId as string, query), query.page, query.pageSize));
+  }),
+  http.get("*/api/trees/:treeId/surveys/:surveyId", ({ params }) => {
+    const survey = getTreeSurveyFixture(params.treeId as string, params.surveyId as string);
+    return survey ? HttpResponse.json(survey) : HttpResponse.json({ statusCode: 404, message: "Relevamiento no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/trees/${params.treeId}/surveys/${params.surveyId}` }, { status: 404 });
+  }),
+  http.post("*/api/trees/:treeId/surveys", async ({ request, params }) => {
+    const parsed = treeSurveyCreateInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/trees/${params.treeId}/surveys` }, { status: 400 });
+    const created = createTreeSurveyFixture(params.treeId as string, parsed.data, "field-user-1");
+    addTreeSurveyFixture(created);
+    return HttpResponse.json(created, { status: 201 });
   }),
   // --- Containers catalog (#120) ---
   http.get("*/api/containers", ({ request }) => {
