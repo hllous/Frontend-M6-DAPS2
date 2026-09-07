@@ -6,6 +6,9 @@ export type Capability =
   | "disposalSite:manage"
   | "inventory:view"
   | "environmentalReport:view"
+  | "environmentalReport:create"
+  | "environmentalReport:review"
+  | "environmentalReport:close"
   | "map:view"
   | "catalog:view"
   | "indicator:view"
@@ -63,6 +66,9 @@ export const scenarios: Record<
       "service:view",
       "inventory:view",
       "environmentalReport:view",
+      "environmentalReport:create",
+      "environmentalReport:review",
+      "environmentalReport:close",
       "map:view",
       "catalog:view",
       "serviceType:manage",
@@ -99,7 +105,7 @@ export const scenarios: Record<
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
     },
-    capabilities: ["service:view", "service:execute", "map:view", "container:report"],
+    capabilities: ["service:view", "service:execute", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view"],
     work: {
       title: "Servicios asignados",
       summary: "Recorrido de higiene urbana para el turno actual.",
@@ -119,7 +125,7 @@ export const scenarios: Record<
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
     },
-    capabilities: ["service:view", "map:view", "container:report"],
+    capabilities: ["service:view", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view"],
     work: {
       title: "Servicios asignados",
       summary: "Tareas del recorrido que integran su turno.",
