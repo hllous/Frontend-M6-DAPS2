@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
+import { linkEnvironmentalInspectionService } from "@/lib/environmental-report-fixtures";
 import {
   addServiceFixture,
   filterServiceFixtures,
@@ -205,6 +206,9 @@ export async function POST(request: Request) {
     };
 
     addServiceFixture(newService);
+    if (input.origin === "INSPECTION" && input.inspectionId) {
+      linkEnvironmentalInspectionService(input.inspectionId, newService.id);
+    }
     return NextResponse.json(newService, { status: 201 });
   } catch (error) {
     if (error instanceof InvalidSessionError) {

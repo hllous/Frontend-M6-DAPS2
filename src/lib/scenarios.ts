@@ -9,6 +9,9 @@ export type Capability =
   | "environmentalReport:create"
   | "environmentalReport:review"
   | "environmentalReport:close"
+  // Frontend hypothesis: backend capability names for inspection scheduling await confirmation.
+  | "environmentalInspection:view"
+  | "environmentalInspection:schedule"
   | "map:view"
   | "catalog:view"
   | "indicator:view"
@@ -69,6 +72,8 @@ export const scenarios: Record<
       "environmentalReport:create",
       "environmentalReport:review",
       "environmentalReport:close",
+      "environmentalInspection:view",
+      "environmentalInspection:schedule",
       "map:view",
       "catalog:view",
       "serviceType:manage",

@@ -4,7 +4,9 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowUpRight,
+  CalendarDays,
   Check,
+  ClipboardCheck,
   CircleAlert,
   CircleCheck,
   Clock3,
@@ -29,9 +31,12 @@ import {
   environmentalReportTypeSchema,
   environmentalReportsAdapter,
   EnvironmentalReportRequestError,
+  type EnvironmentalInspection,
+  type EnvironmentalInspectionScheduleInput,
   type EnvironmentalReport,
   type EnvironmentalReportType,
 } from "@/lib/environmental-reports";
+import { CREW_CATALOG, SERVICE_TYPE_CATALOG, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
 
 type LoadState =
@@ -42,6 +47,16 @@ type LoadState =
 type Action = "start-review" | "forward" | "dismiss" | "close";
 
 const reportTypes = environmentalReportTypeSchema.options;
+const inspectionServiceType = SERVICE_TYPE_CATALOG.find((type) => type.id === "st-env-inspection")!;
+const inspectionChecklistVersions = [
+  { value: "ambiental-v1", label: "Checklist ambiental v1" },
+  { value: "ambiental-v2", label: "Checklist ambiental v2 (actualizado)" },
+];
+const inspectionChecklist = [
+  { id: "location", label: "Verificar ubicación y contexto del hallazgo", required: true },
+  { id: "source", label: "Identificar la fuente del impacto", required: true },
+  { id: "evidence", label: "Registrar observaciones para el acta", required: true },
+];
 const reportStatuses = Object.keys(ENVIRONMENTAL_REPORT_STATUS_LABELS) as EnvironmentalReport["status"][];
 
 const statusGroups = [
@@ -186,7 +201,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
     }
   }, [refreshAfterConflict, replaceReport]);
 
-  if (selectedReport) return <ReportDetail report={selectedReport} scenario={scenario} onBack={() => setSelectedId(null)} onAction={handleAction} />;
+  if (selectedReport) return <ReportDetail report={selectedReport} scenario={scenario} onBack={() => setSelectedId(null)} onAction={handleAction} onReportUpdated={replaceReport} />;
 
   return (
     <div className="flex min-h-full flex-col bg-[var(--color-canvas)]">
@@ -222,10 +237,131 @@ function ReportRow({ report, onOpen }: { report: EnvironmentalReport; onOpen: ()
   return <li><button type="button" onClick={onOpen} className="flex min-h-12 w-full items-start gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition-colors hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-subtle)] focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] sm:items-center" aria-label={`${report.id}, ${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}, ${ENVIRONMENTAL_REPORT_STATUS_LABELS[report.status]}`}><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-info-fill)] text-[var(--color-action)]"><MapPin className="h-4 w-4" aria-hidden /></span><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="font-bold tabular-nums text-[var(--color-text)]">{report.id}</span><span className="text-xs font-semibold text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}</span></span><span className="mt-1 block truncate text-sm text-[var(--color-text)]">{reportAddress(report)}</span><span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">Actualizado {formatDate(report.updatedAt)}{report.escalated ? " · Escalado" : ""}</span></span><StatusBadge status={report.status} /><ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-secondary)] sm:mt-0" aria-hidden /></button></li>;
 }
 
-function ReportDetail({ report, scenario, onBack, onAction }: { report: EnvironmentalReport; scenario: OperationalScenario; onBack: () => void; onAction: (action: Action, report: EnvironmentalReport) => Promise<void> }) {
+function ReportDetail({ report, scenario, onBack, onAction, onReportUpdated }: { report: EnvironmentalReport; scenario: OperationalScenario; onBack: () => void; onAction: (action: Action, report: EnvironmentalReport) => Promise<void>; onReportUpdated: (report: EnvironmentalReport) => void }) {
   const isOffice = scenario.actor.kind === "OFFICE";
-  const actions: { action: Action; label: string; icon: typeof Check; tone?: string }[] = report.status === "RECEIVED" ? [{ action: "start-review", label: "Iniciar revisión", icon: Search }] : report.status === "UNDER_REVIEW" ? [{ action: "forward", label: "Derivar expediente", icon: Forward }, { action: "dismiss", label: "Desestimar expediente", icon: X, tone: "text-[var(--color-danger)]" }] : ["FORWARDED", "DISMISSED", "NO_VIOLATION", "SANCTIONED"].includes(report.status) ? [{ action: "close", label: "Cerrar expediente", icon: Check, tone: "text-[var(--color-danger)]" }] : [];
-  return <div className="flex min-h-full flex-col bg-[var(--color-surface)]" role="region" aria-label={`Detalle de ${report.id}`}><header className="border-b border-[var(--color-border)] bg-[var(--color-canvas)] px-4 py-3 sm:px-6 lg:px-8"><div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3"><Button variant="outline" size="sm" onClick={onBack} className="min-h-10 gap-1.5 sm:min-h-8"><ArrowLeft className="h-4 w-4" aria-hidden />Volver a expedientes</Button><span className="text-xs font-semibold tabular-nums text-[var(--color-text-secondary)]">{report.id}</span></div></header><main className="mx-auto w-full max-w-6xl flex-1 space-y-5 p-4 sm:p-6 lg:p-8"><div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Expediente {report.id}</h1><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · actualización de {formatDate(report.updatedAt)}</p></div><StatusBadge status={report.status} /></div>{isOffice && actions.length > 0 && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><div className="flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface)] text-[var(--color-action)]"><ArrowUpRight className="h-4 w-4" aria-hidden /></span><div className="min-w-0 flex-1"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Siguiente decisión de Oficina</h2><p className="mt-1 text-sm text-[var(--color-text-secondary)]">Las acciones disponibles respetan el estado actual del expediente.</p><div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`min-h-10 gap-2 ${tone ?? ""}`} onClick={() => void onAction(action, report)}><Icon className="h-4 w-4" aria-hidden />{label}</Button>)}</div></div></div></section>}{report.status === "CLOSED" && <div className="flex items-start gap-3 rounded-2xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-4" role="note"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-warning)]" aria-hidden /><p className="text-sm text-[var(--color-text)]">Este expediente está cerrado. Una reapertura informada por una lectura posterior se mostrará como <strong>Reabierto · en revisión</strong>; no se genera una acción desde esta pantalla.</p></div>}{report.status === "SANCTIONED" && <div className="flex items-start gap-3 rounded-2xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-4" role="note"><ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-danger)]" aria-hidden /><p className="text-sm text-[var(--color-text)]">La sanción es terminal y este expediente no puede reabrirse desde M6.</p></div>}<section className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]"><div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Contexto operativo</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2"><DataField label="Ubicación" value={reportAddress(report)} /><DataField label="Detalle del hallazgo" value={reportDetails(report)} wide /><DataField label="Prioridad" value={ENVIRONMENTAL_REPORT_PRIORITY_LABELS[report.priority]} /><DataField label="Creado" value={formatDate(report.createdAt)} /><DataField label="Última actualización" value={formatDate(report.updatedAt)} />{report.deadlineAt && <DataField label="Plazo de resolución" value={formatDate(report.deadlineAt)} />}</dl></div><div className="rounded-2xl border border-[var(--color-border)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Vigencia del registro</h2><p className="mt-2 text-sm text-[var(--color-text-secondary)]">La prioridad y los cambios tardíos de M2 se muestran como información de lectura.</p>{report.escalated && <p className="mt-4 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-sm font-semibold text-[var(--color-warning)]">Escalado por M2</p>}{report.citizenResponse && isOffice && <div className="mt-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Información aportada por M2</p><p className="mt-1 text-sm text-[var(--color-text)]">{report.citizenResponse}</p></div>}{report.ticketId && isOffice && <p className="mt-4 text-sm text-[var(--color-text-secondary)]">Ticket de origen: <span className="font-semibold tabular-nums text-[var(--color-text)]">{report.ticketId}</span></p>}</div></section></main></div>;
+  const [inspections, setInspections] = useState<EnvironmentalInspection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleMode, setScheduleMode] = useState<"schedule" | "reinspection">("schedule");
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [scheduledService, setScheduledService] = useState<Service | null>(null);
+
+  const loadInspections = useCallback(async () => {
+    const items = await environmentalReportsAdapter.listInspections(report.id);
+    setInspections(items);
+    return items;
+  }, [report.id]);
+
+  useEffect(() => {
+    let current = true;
+    void environmentalReportsAdapter.listInspections(report.id)
+      .then((items) => { if (current) { setInspections(items); setLoading(false); } })
+      .catch((error: unknown) => { if (current) { setHistoryError(error instanceof Error ? error.message : "No se pudo cargar la historia de inspecciones."); setLoading(false); } });
+    return () => { current = false; };
+  }, [report.id]);
+
+  const activeInspection = inspections.find((inspection) => !inspection.outcome) ?? null;
+  const canSchedule = isOffice && report.status === "UNDER_REVIEW" && !activeInspection;
+  const canReprogram = isOffice && report.status === "INSPECTION_SCHEDULED" && Boolean(activeInspection);
+  const canReinspect = isOffice && report.status === "INSPECTED" && inspections.some((inspection) => inspection.outcome === "INCONCLUSIVE");
+  const actions: { action: Action; label: string; icon: typeof Check; tone?: string }[] = report.status === "RECEIVED"
+    ? [{ action: "start-review", label: "Iniciar revisión", icon: Search }]
+    : report.status === "UNDER_REVIEW"
+      ? [{ action: "forward", label: "Derivar expediente", icon: Forward }, { action: "dismiss", label: "Desestimar expediente", icon: X, tone: "text-[var(--color-danger)]" }]
+      : ["FORWARDED", "DISMISSED", "NO_VIOLATION", "SANCTIONED"].includes(report.status)
+        ? [{ action: "close", label: "Cerrar expediente", icon: Check, tone: "text-[var(--color-danger)]" }]
+        : [];
+
+  async function handleSchedule(input: EnvironmentalInspectionScheduleInput, crewId: string) {
+    setScheduleError(null);
+    try {
+      const inspection = await environmentalReportsAdapter.schedule(report.id, input);
+      if (inspection.serviceId) {
+        setScheduledService(await servicesAdapter.get(inspection.serviceId).catch(() => null));
+      } else {
+        let service: Service;
+        try {
+          service = await servicesAdapter.create({
+            title: `Inspección ambiental · ${report.id}`,
+            serviceTypeId: inspectionServiceType.id,
+            origin: "INSPECTION",
+            inspectionId: inspection.id,
+            zoneIds: ["zone-1"],
+            targetType: "ENVIRONMENTAL_REPORT",
+            targetId: report.id,
+            targetRef: reportAddress(report),
+            scheduledDate: input.scheduledDate,
+            timeWindow: input.timeWindow,
+            notes: input.notes,
+          });
+        } catch {
+          throw new Error("La inspección quedó programada, pero no se pudo crear el Servicio POINT. Revise la agenda antes de continuar.");
+        }
+        try {
+          setScheduledService(await servicesAdapter.assignCrew(service.id, { crewId, vehicleId: null }));
+        } catch {
+          setScheduledService(service);
+          throw new Error("El Servicio POINT quedó creado, pero la asignación de la cuadrilla no se completó.");
+        }
+      }
+      onReportUpdated(await environmentalReportsAdapter.get(report.id));
+      await loadInspections();
+      setScheduleOpen(false);
+    } catch (error) {
+      setScheduleError(error instanceof Error ? error.message : "No se pudo completar la programación. Revise el estado del expediente.");
+    }
+  }
+
+  return (
+    <div className="flex min-h-full flex-col bg-[var(--color-surface)]" role="region" aria-label={`Detalle de ${report.id}`}>
+      <header className="border-b border-[var(--color-border)] bg-[var(--color-canvas)] px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
+          <Button variant="outline" size="sm" onClick={onBack} className="min-h-10 gap-1.5 sm:min-h-8"><ArrowLeft data-icon="inline-start" aria-hidden />Volver a expedientes</Button>
+          <span className="text-xs font-semibold tabular-nums text-[var(--color-text-secondary)]">{report.id}</span>
+        </div>
+      </header>
+      <main className="mx-auto w-full max-w-6xl flex-1 space-y-5 p-4 sm:p-6 lg:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div><h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Expediente {report.id}</h1><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · actualización de {formatDate(report.updatedAt)}</p></div>
+          <StatusBadge status={report.status} />
+        </div>
+        {isOffice && actions.length > 0 && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Siguiente decisión de Oficina</h2><p className="mt-1 text-sm text-[var(--color-text-secondary)]">Las acciones disponibles respetan el estado actual del expediente.</p><div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`min-h-10 gap-2 ${tone ?? ""}`} onClick={() => void onAction(action, report)}><Icon data-icon="inline-start" aria-hidden />{label}</Button>)}</div></section>}
+        {isOffice && (canSchedule || canReprogram || canReinspect) && <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="inspection-scheduling-title"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><CalendarDays aria-hidden /><div><h2 id="inspection-scheduling-title" className="text-sm font-bold text-[var(--color-text)]">Programación de inspección</h2><p className="mt-1 max-w-2xl text-sm text-[var(--color-text-secondary)]">{canReinspect ? "La inspección anterior fue inconclusa. Registre una nueva inspección y un nuevo Servicio POINT." : "Defina la fecha y la cuadrilla. El tipo de Servicio POINT se determina automáticamente."}</p></div></div><div className="flex flex-wrap gap-2">{(canSchedule || canReinspect) && <Button className="min-h-10 gap-2" onClick={() => { setScheduleMode(canReinspect ? "reinspection" : "schedule"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />{canReinspect ? "Programar reinspección" : "Programar inspección"}</Button>}{canReprogram && <Button variant="outline" className="min-h-10 gap-2" onClick={() => { setScheduleMode("schedule"); setScheduleOpen(true); }}><RefreshCw data-icon="inline-start" aria-hidden />Reprogramar inspección</Button>}</div></div></section>}
+        {scheduleError && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{scheduleError}</div>}
+        <section className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]"><div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Contexto operativo</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2"><DataField label="Ubicación" value={reportAddress(report)} /><DataField label="Detalle del hallazgo" value={reportDetails(report)} wide /><DataField label="Prioridad" value={ENVIRONMENTAL_REPORT_PRIORITY_LABELS[report.priority]} /><DataField label="Creado" value={formatDate(report.createdAt)} /><DataField label="Última actualización" value={formatDate(report.updatedAt)} /></dl></div><div className="rounded-2xl border border-[var(--color-border)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Vigencia del registro</h2><p className="mt-2 text-sm text-[var(--color-text-secondary)]">La prioridad y los cambios tardíos de M2 se muestran como información de lectura.</p>{report.escalated && <p className="mt-4 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-sm font-semibold text-[var(--color-warning)]">Escalado por M2</p>}{report.citizenResponse && isOffice && <p className="mt-4 text-sm text-[var(--color-text)]">{report.citizenResponse}</p>}{report.ticketId && isOffice && <p className="mt-4 text-sm text-[var(--color-text-secondary)]">Ticket de origen: <span className="font-semibold tabular-nums text-[var(--color-text)]">{report.ticketId}</span></p>}</div></section>
+        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="inspection-history-title"><div className="flex items-center gap-2"><ClipboardCheck aria-hidden /><h2 id="inspection-history-title" className="text-sm font-bold text-[var(--color-text)]">Historia de inspecciones</h2></div>{loading && <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Cargando historia de inspecciones…</p>}{historyError && <p className="mt-3 text-sm text-[var(--color-danger)]" role="alert">{historyError}</p>}{!loading && !historyError && inspections.length === 0 && <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No hay inspecciones registradas.</p>}{!loading && !historyError && inspections.length > 0 && <ol className="mt-4 space-y-3">{inspections.map((inspection) => <li key={inspection.id} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-[var(--color-text)]">{inspection.id}</span><span className="text-sm text-[var(--color-text-secondary)]">{inspection.outcome ? `Resultado: ${inspection.outcome}` : "Inspección programada"}</span></div><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{inspection.scheduledDate} · {inspection.timeWindow.start}–{inspection.timeWindow.end} · {inspection.checklistVersion}</p>{inspection.serviceId && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Servicio POINT: <span className="font-semibold text-[var(--color-text)]">{inspection.serviceId}</span></p>}{scheduledService && inspection.id === inspections[inspections.length - 1]?.id && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Cuadrilla asignada: <span className="font-semibold text-[var(--color-text)]">{scheduledService.crewName ?? scheduledService.crewId ?? "Pendiente"}</span></p>}</li>)}</ol>}</section>
+      </main>
+      <InspectionSchedulingDialog open={scheduleOpen} mode={scheduleMode} activeInspection={activeInspection} onOpenChange={setScheduleOpen} onSubmit={handleSchedule} />
+    </div>
+  );
+}
+
+function InspectionSchedulingDialog({ open, mode, activeInspection, onOpenChange, onSubmit }: { open: boolean; mode: "schedule" | "reinspection"; activeInspection: EnvironmentalInspection | null; onOpenChange: (open: boolean) => void; onSubmit: (input: EnvironmentalInspectionScheduleInput, crewId: string) => Promise<void> }) {
+  const [date, setDate] = useState("");
+  const [start, setStart] = useState("09:00");
+  const [end, setEnd] = useState("11:00");
+  const [crewId, setCrewId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!date || !crewId) { setError("Indique la fecha y la cuadrilla para continuar."); return; }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSubmit({ scheduledDate: date, timeWindow: { start, end }, checklistVersion: activeInspection?.checklistVersion ?? inspectionChecklistVersions[1].value, checklist: activeInspection?.checklist ?? inspectionChecklist }, crewId);
+      setDate("");
+      setCrewId("");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "No se pudo completar la programación.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-lg"><DialogHeader><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-action)]"><CalendarDays aria-hidden />Programación operativa</div><DialogTitle>{mode === "reinspection" ? "Programar reinspección" : activeInspection ? "Reprogramar inspección" : "Programar inspección"}</DialogTitle><DialogDescription>{mode === "reinspection" ? "La inspección anterior fue inconclusa. Se creará una nueva inspección con su propio Servicio POINT." : "Defina fecha y cuadrilla. El checklist se captura en la inspección y el modo POINT se asigna automáticamente."}</DialogDescription></DialogHeader>{error && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{error}</div>}<form id="inspection-scheduling-form" onSubmit={submit}><FieldGroup><Field><FieldLabel htmlFor="inspection-scheduled-date">Fecha de inspección</FieldLabel><input id="inspection-scheduled-date" aria-required="true" type="date" value={date} onChange={(event) => setDate(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="inspection-time-start">Inicio</FieldLabel><input id="inspection-time-start" type="time" value={start} onChange={(event) => setStart(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field><Field><FieldLabel htmlFor="inspection-time-end">Fin</FieldLabel><input id="inspection-time-end" type="time" value={end} onChange={(event) => setEnd(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field></div><Field><FieldLabel htmlFor="inspection-checklist-version">Versión del checklist</FieldLabel><select id="inspection-checklist-version" value={activeInspection?.checklistVersion ?? inspectionChecklistVersions[1].value} disabled className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface-subtle)] px-3 text-base text-[var(--color-text)]">{inspectionChecklistVersions.map((version) => <option key={version.value} value={version.value}>{version.label}</option>)}</select><FieldDescription>La versión queda capturada en la inspección y no se elige para el Servicio POINT.</FieldDescription></Field><Field><FieldLabel htmlFor="inspection-crew">Cuadrilla</FieldLabel><select id="inspection-crew" value={crewId} onChange={(event) => setCrewId(event.target.value)} disabled={submitting} aria-required="true" className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)]"><option value="">Seleccione una cuadrilla</option>{CREW_CATALOG.map((crew) => <option key={crew.id} value={crew.id}>{crew.name}</option>)}</select></Field></FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button><Button type="submit" form="inspection-scheduling-form" disabled={submitting} className="min-h-10 gap-2">{submitting && <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden />}{submitting ? "Guardando programación…" : mode === "reinspection" ? "Programar reinspección" : activeInspection ? "Guardar reprogramación" : "Programar inspección"}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function DataField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) { return <div className={wide ? "sm:col-span-2" : ""}><dt className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">{label}</dt><dd className="mt-1 text-sm text-[var(--color-text)]">{value}</dd></div>; }

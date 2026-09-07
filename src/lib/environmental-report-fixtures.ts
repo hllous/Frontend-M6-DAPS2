@@ -1,5 +1,7 @@
 import type {
   CreateEnvironmentalReportInput,
+  EnvironmentalInspection,
+  EnvironmentalInspectionScheduleInput,
   EnvironmentalReport,
   EnvironmentalReportQuery,
   EnvironmentalReportStatus,
@@ -22,8 +24,97 @@ const reports: EnvironmentalReport[] = [
 export let environmentalReportFixtures: EnvironmentalReport[] = reports.map((report) => ({ ...report }));
 const initialReports = reports.map((report) => ({ ...report }));
 
+const inspections: EnvironmentalInspection[] = [
+  {
+    id: "INS-1005",
+    reportId: "ER-1005",
+    serviceId: "SVC-1072",
+    inspectedAt: null,
+    scheduledDate: "2026-09-05",
+    timeWindow: { start: "13:00", end: "16:00" },
+    checklistVersion: "ambiental-v1",
+    checklist: [
+      { id: "emission-source", label: "Identificar la fuente de emisión", required: true },
+      { id: "visible-impact", label: "Registrar el impacto visible", required: true },
+    ],
+    findings: null,
+    outcome: null,
+    nextStep: null,
+    notes: null,
+    createdAt: "2026-09-05T08:30:00.000Z",
+    updatedAt: "2026-09-05T08:30:00.000Z",
+  },
+];
+
+export let environmentalInspectionFixtures: EnvironmentalInspection[] = inspections.map((inspection) => ({
+  ...inspection,
+  checklist: inspection.checklist.map((item) => ({ ...item })),
+}));
+const initialInspections = environmentalInspectionFixtures.map((inspection) => ({
+  ...inspection,
+  checklist: inspection.checklist.map((item) => ({ ...item })),
+}));
+
 export function resetEnvironmentalReportFixtures() {
   environmentalReportFixtures = initialReports.map((report) => ({ ...report }));
+  resetEnvironmentalInspectionFixtures();
+}
+
+export function resetEnvironmentalInspectionFixtures() {
+  environmentalInspectionFixtures = initialInspections.map((inspection) => ({
+    ...inspection,
+    checklist: inspection.checklist.map((item) => ({ ...item })),
+  }));
+}
+
+export function getEnvironmentalInspectionFixture(id: string): EnvironmentalInspection | null {
+  return environmentalInspectionFixtures.find((inspection) => inspection.id === id) ?? null;
+}
+
+export function listEnvironmentalInspectionFixtures(reportId: string): EnvironmentalInspection[] {
+  return environmentalInspectionFixtures.filter((inspection) => inspection.reportId === reportId);
+}
+
+export function updateEnvironmentalInspectionFixture(id: string, updates: Partial<EnvironmentalInspection>): EnvironmentalInspection | null {
+  const index = environmentalInspectionFixtures.findIndex((inspection) => inspection.id === id);
+  if (index === -1) return null;
+  const existing = environmentalInspectionFixtures[index];
+  const updated = {
+    ...existing,
+    ...updates,
+    checklist: updates.checklist ?? existing.checklist,
+    updatedAt: new Date().toISOString(),
+  };
+  environmentalInspectionFixtures[index] = updated;
+  return updated;
+}
+
+export function linkEnvironmentalInspectionService(inspectionId: string, serviceId: string): EnvironmentalInspection | null {
+  return updateEnvironmentalInspectionFixture(inspectionId, { serviceId });
+}
+
+export function createEnvironmentalInspectionFixture(reportId: string, input: EnvironmentalInspectionScheduleInput): EnvironmentalInspection {
+  const now = new Date().toISOString();
+  return {
+    id: `INS-${Date.now()}`,
+    reportId,
+    serviceId: null,
+    inspectedAt: null,
+    scheduledDate: input.scheduledDate,
+    timeWindow: { ...input.timeWindow },
+    checklistVersion: input.checklistVersion,
+    checklist: input.checklist.map((item) => ({ ...item })),
+    findings: null,
+    outcome: null,
+    nextStep: null,
+    notes: input.notes ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export function addEnvironmentalInspectionFixture(inspection: EnvironmentalInspection) {
+  environmentalInspectionFixtures.unshift(inspection);
 }
 
 export function getEnvironmentalReportFixture(id: string): EnvironmentalReport | null {
