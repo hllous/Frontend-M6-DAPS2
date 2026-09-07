@@ -8,13 +8,6 @@ import type { OperationalScenario } from "@/lib/scenarios";
 
 const catalogCards = [
   {
-    href: "/app/catalog/tree-interventions",
-    title: "Intervenciones de arbolado",
-    description: "Solicitudes de poda, extracción, plantación y tratamiento.",
-    icon: Scissors,
-    tone: "bg-[var(--color-info-fill)] text-[var(--color-info)]",
-  },
-  {
     href: "/app/catalog/service-types",
     title: "Tipos de servicio",
     description: "Categorías, modo de ejecución y necesidad de vehículo.",
@@ -90,6 +83,13 @@ const catalogCards = [
     description: "Censo de arbolado urbano, ubicación y medidas registradas.",
     icon: Trees,
     tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
+  },
+  {
+    href: "/app/catalog/tree-interventions",
+    title: "Intervenciones de arbolado",
+    description: "Solicitudes de poda, extracción, plantación y tratamiento.",
+    icon: Scissors,
+    tone: "bg-[var(--color-info-fill)] text-[var(--color-info)]",
   },
 ];
 

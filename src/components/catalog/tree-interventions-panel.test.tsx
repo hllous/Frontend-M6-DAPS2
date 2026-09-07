@@ -23,11 +23,11 @@ describe("TreeInterventionsPanel", () => {
     expect(await screen.findByRole("heading", { name: "Intervenciones de arbolado" })).toBeVisible();
     const request = await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i });
     expect(within(request).getByText("Solicitada")).toBeVisible();
-    await within(request).getByRole("button", { name: "Ver detalle" }).click();
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
 
     const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
-    expect(within(detail).getByText(/ARB-00443/)).toBeVisible();
-    expect(within(detail).getByText(/ARB-00445/)).toBeVisible();
+    expect(await within(detail).findByText(/ARB-00443/)).toBeVisible();
+    expect(await within(detail).findByText(/ARB-00445/)).toBeVisible();
     expect(within(detail).queryByRole("button", { name: /autorizar|rechazar|programar/i })).not.toBeInTheDocument();
 
     await within(detail).getByRole("button", { name: "Cerrar detalle" }).click();
