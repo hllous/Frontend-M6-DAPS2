@@ -53,4 +53,49 @@ describe("environmental reports adapter", () => {
       outcome: null,
     });
   });
+
+  it("completes an inspection with its checklist and outcome details", async () => {
+    let requestBody: unknown;
+    server.use(http.post("*/api/environmental-inspections/INS-1005/complete", async ({ request }) => {
+      requestBody = await request.json();
+      return HttpResponse.json({
+        id: "INS-1005",
+        reportId: "ER-1005",
+        serviceId: "SVC-1072",
+        inspectedAt: "2026-09-07T12:00:00.000Z",
+        scheduledDate: "2026-09-05",
+        timeWindow: { start: "13:00", end: "16:00" },
+        checklistVersion: "ambiental-v1",
+        checklist: [
+          { id: "emission-source", label: "Identificar la fuente de emisión", required: true },
+          { id: "visible-impact", label: "Registrar el impacto visible", required: true },
+        ],
+        findings: null,
+        outcome: "NO_VIOLATION",
+        nextStep: "CASE_CLOSED",
+        notes: null,
+        createdAt: "2026-09-05T08:30:00.000Z",
+        updatedAt: "2026-09-07T12:00:00.000Z",
+      });
+    }));
+
+    const inspection = await environmentalReportsAdapter.completeInspection("INS-1005", {
+      outcome: "NO_VIOLATION",
+      checklist: [
+        { id: "emission-source", completed: true },
+        { id: "visible-impact", completed: true },
+      ],
+      conclusion: "No se constató infracción durante la visita.",
+    });
+
+    expect(requestBody).toEqual({
+      outcome: "NO_VIOLATION",
+      checklist: [
+        { id: "emission-source", completed: true },
+        { id: "visible-impact", completed: true },
+      ],
+      conclusion: "No se constató infracción durante la visita.",
+    });
+    expect(inspection).toMatchObject({ outcome: "NO_VIOLATION", nextStep: "CASE_CLOSED" });
+  });
 });

@@ -365,6 +365,7 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     origin: "INSPECTION",
     zoneIds: ["zone-2"],
     zoneNames: ["Zona Sur"],
+    inspectionId: "INS-1005",
     scheduledDate: "2026-09-05",
     windowFrom: "13:00",
     windowTo: "16:00",
@@ -649,6 +650,31 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     notes: "Reservado para pruebas de bloqueo de inicio por corte de calle pendiente (#117) — SVC-1051 es reasignado a otra cuadrilla por services.spec.ts, por lo que ya no sirve para este caso.",
   },
 ];
+
+INITIAL_SERVICE_FIXTURES.push({
+  id: "SVC-1112",
+  serviceTypeId: "st-env-inspection",
+  serviceTypeName: "Control ambiental",
+  title: "Inspección ambiental — Establecimiento Brasil",
+  mode: "POINT",
+  status: "SCHEDULED",
+  statusReason: null,
+  origin: "INSPECTION",
+  zoneIds: ["zone-2"],
+  zoneNames: ["Zona Sur"],
+  inspectionId: "INS-1012",
+  scheduledDate: "2026-09-07",
+  windowFrom: "10:00",
+  windowTo: "13:00",
+  crewId: "crew-b",
+  crewName: "Cuadrilla B · Fernández",
+  vehicleId: null,
+  vehiclePlate: null,
+  coordinates: { x: 62, y: 54 },
+  attachments: [],
+  history: [{ label: "Programado", at: "2026-09-06 08:30", done: true }],
+  notes: "Fixture de ejecución para control ambiental (#134).",
+});
 
 export const serviceFixtures: Service[] = [...INITIAL_SERVICE_FIXTURES];
 

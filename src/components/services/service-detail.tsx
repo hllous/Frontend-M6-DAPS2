@@ -32,6 +32,7 @@ import { checkServiceWindowTiming, type Service } from "@/lib/services";
 import type { StreetClosureDependency } from "@/lib/street-closure-requests";
 import { StatusBadge } from "./status-badge";
 import { ZoneExecutionPanel } from "./zone-execution-panel";
+import { InspectionExecutionPanel } from "./inspection-execution-panel";
 
 export function ServiceDetail({
   service,
@@ -94,6 +95,7 @@ export function ServiceDetail({
   backLabel?: string;
 }) {
   const windowTiming = checkServiceWindowTiming(service);
+  const isEnvironmentalInspectionService = service.origin === "INSPECTION" && service.serviceTypeId === "st-env-inspection";
 
   return (
     <div className="flex h-full flex-col bg-[var(--color-surface)] overflow-hidden" role="region" aria-label={`Detalle completo de ${service.id}`}>
@@ -583,14 +585,23 @@ export function ServiceDetail({
           )}
 
           {/* Zone Execution Workflow (Available for IN_PROGRESS and closed services) */}
-          {(service.status === "IN_PROGRESS" ||
+          {((isEnvironmentalInspectionService && (service.status === "SCHEDULED" || service.status === "RESCHEDULED")) ||
+            service.status === "IN_PROGRESS" ||
             service.status === "COMPLETED" ||
             service.status === "PARTIALLY_COMPLETED") && (
-            <ZoneExecutionPanel
-              service={service}
-              canExecute={canStartService}
-              onServiceUpdated={onServiceUpdated}
-            />
+            isEnvironmentalInspectionService ? (
+              <InspectionExecutionPanel
+                service={service}
+                canExecute={canStartService && service.status === "IN_PROGRESS"}
+                onServiceUpdated={onServiceUpdated}
+              />
+            ) : (
+              <ZoneExecutionPanel
+                service={service}
+                canExecute={canStartService}
+                onServiceUpdated={onServiceUpdated}
+              />
+            )
           )}
         </main>
 

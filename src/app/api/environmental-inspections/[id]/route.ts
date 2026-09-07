@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { getEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
+import { serviceFixtures } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
@@ -16,13 +17,21 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const session = getRequiredSession(request);
     requireCapability(session, "environmentalInspection:view");
     const scenario = getScenario(session.scenarioId);
-    if (scenario.actor.kind === "FIELD") return response(404, "Inspección no encontrada.", path);
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
       const backendResponse = await fetchBackend(request, "/environmental-inspections/" + encodeURIComponent(id), "environmentalInspection:view");
       return new NextResponse(await backendResponse.text(), { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
     }
     const inspection = getEnvironmentalInspectionFixture(id);
     if (!inspection) return response(404, "Inspección no encontrada.", path);
+    if (scenario.actor.kind === "FIELD") {
+      const service = inspection.serviceId ? serviceFixtures.find((candidate) => candidate.id === inspection.serviceId) : null;
+      if (!service || service.crewId !== scenario.actor.crewId) return response(404, "Inspección no encontrada.", path);
+      const fieldInspection = { ...inspection } as Record<string, unknown>;
+      delete fieldInspection.inspectorId;
+      delete fieldInspection.reporterSnapshot;
+      delete fieldInspection.violationNotice;
+      return NextResponse.json(fieldInspection);
+    }
     return NextResponse.json(inspection);
   } catch (error) {
     if (error instanceof InvalidSessionError) return response(401, "La sesión no está activa.", path);

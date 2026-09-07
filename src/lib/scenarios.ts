@@ -12,6 +12,7 @@ export type Capability =
   // Frontend hypothesis: backend capability names for inspection scheduling await confirmation.
   | "environmentalInspection:view"
   | "environmentalInspection:schedule"
+  | "environmentalInspection:execute"
   | "map:view"
   | "catalog:view"
   | "indicator:view"
@@ -112,7 +113,7 @@ export const scenarios: Record<
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
     },
-    capabilities: ["service:view", "service:execute", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view", "tree:survey"],
+    capabilities: ["service:view", "service:execute", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view", "environmentalInspection:view", "environmentalInspection:execute", "tree:survey"],
     work: {
       title: "Servicios asignados",
       summary: "Recorrido de higiene urbana para el turno actual.",
@@ -132,7 +133,7 @@ export const scenarios: Record<
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
     },
-    capabilities: ["service:view", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view", "tree:survey"],
+    capabilities: ["service:view", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view", "environmentalInspection:view", "tree:survey"],
     work: {
       title: "Servicios asignados",
       summary: "Tareas del recorrido que integran su turno.",

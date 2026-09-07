@@ -68,6 +68,7 @@ export const serviceSchema = z.object({
   targetType: z.string().nullable().optional(),
   targetId: z.string().nullable().optional(),
   targetRef: z.string().nullable().optional(),
+  inspectionId: z.string().nullable().optional(),
   scheduledDate: z.string(),
   windowFrom: z.string().nullable().optional(),
   windowTo: z.string().nullable().optional(),

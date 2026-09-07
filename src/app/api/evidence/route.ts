@@ -15,6 +15,11 @@ import {
   getContainerFixture,
 } from "@/lib/containers-fixtures";
 import {
+  addAttachmentToInspection,
+  getEnvironmentalInspectionFixture,
+  getInspectionAttachments,
+} from "@/lib/environmental-report-fixtures";
+import {
   evidenceOwnerTypeSchema,
   type Attachment,
 } from "@/lib/services";
@@ -104,7 +109,7 @@ export async function POST(request: Request) {
         );
       }
     } else if (ownerType === "INSPECTION") {
-      if (!scenario.capabilities.includes("environmentalReport:view")) {
+      if (!scenario.capabilities.includes("environmentalInspection:execute")) {
         return errorResponse(
           403,
           "No tiene permisos para subir evidencia de inspección.",
@@ -191,6 +196,17 @@ export async function POST(request: Request) {
       }
     }
 
+    if (ownerType === "INSPECTION") {
+      const inspection = getEnvironmentalInspectionFixture(ownerId);
+      const owningInspectionService = inspection?.serviceId
+        ? serviceFixtures.find((candidate) => candidate.id === inspection.serviceId) ?? null
+        : null;
+      if (!inspection) return errorResponse(404, `La inspección ${ownerId} no existe.`, path);
+      if (scenario.actor.kind === "FIELD" && (!owningInspectionService || owningInspectionService.crewId !== scenario.actor.crewId)) {
+        return errorResponse(403, "Solo la cuadrilla asignada puede subir evidencia de esta inspección.", path);
+      }
+    }
+
     if (
       owningService &&
       scenario.actor.kind === "FIELD" &&
@@ -224,6 +240,9 @@ export async function POST(request: Request) {
     }
     if (ownerType === "CONTAINER") {
       addAttachmentToContainer(ownerId, attachment);
+    }
+    if (ownerType === "INSPECTION") {
+      addAttachmentToInspection(ownerId, attachment);
     }
 
     evidenceCache.set(cacheKey, attachment);
@@ -278,6 +297,12 @@ export async function GET(request: Request) {
         return errorResponse(404, `El resultado de zona ${ownerId} no existe.`, path);
       }
       return NextResponse.json(zr.attachments ?? []);
+    }
+
+    if (parsedOwnerType.data === "INSPECTION") {
+      const inspection = getEnvironmentalInspectionFixture(ownerId);
+      if (!inspection) return errorResponse(404, `La inspección ${ownerId} no existe.`, path);
+      return NextResponse.json(getInspectionAttachments(ownerId) ?? []);
     }
 
     return NextResponse.json([]);
