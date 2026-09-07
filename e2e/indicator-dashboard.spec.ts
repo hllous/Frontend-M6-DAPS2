@@ -14,9 +14,10 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(page.getByRole("button", { name: /Residuos/ })).toBeVisible();
     await expect(page.getByText("Actualizado")).toBeVisible();
 
+    const detail = page.locator("section[aria-labelledby='indicator-detail-title']");
     await page.getByLabel("Zona operativa").selectOption("zone-2");
     await page.getByRole("button", { name: "Actualizar" }).click();
-    await expect(page.getByText("Costera").first()).toBeVisible();
+    await expect(detail.getByText("Costera").first()).toBeVisible();
 
     await page.getByRole("button", { name: "Tabla" }).click();
     await expect(page.getByRole("table").first()).toBeVisible();
@@ -33,7 +34,7 @@ test.describe("operational indicator dashboard #138", () => {
   test("an Office actor without indicator:view cannot open the destination", async ({ page }) => {
     await loginViaApi(page, "office-limited-intake");
     await page.goto("/app?destination=dashboards");
-    await expect(page.getByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Indicadores no disponibles" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Tableros" })).toHaveCount(0);
   });
 });

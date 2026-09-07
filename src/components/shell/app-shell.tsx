@@ -87,7 +87,7 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
   const [destination, setDestination] = useState<Destination>(() => {
     if (typeof window !== "undefined") {
       const urlDest = new URLSearchParams(window.location.search).get("destination") as Destination | null;
-      if (urlDest && navigation.some((item) => item.id === urlDest && isAllowed(item, scenario))) {
+      if (urlDest && navigation.some((item) => item.id === urlDest)) {
         return urlDest;
       }
     }
