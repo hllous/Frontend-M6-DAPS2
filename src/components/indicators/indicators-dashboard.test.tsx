@@ -42,4 +42,31 @@ describe("IndicatorsDashboard", () => {
     expect(screen.getByText("Falta de cuadrilla")).toBeVisible();
     expect(screen.getByText(/ZoneResult\.recordedAt/i).closest("p")).toHaveTextContent("último ZoneResult.recordedAt");
   });
+
+  it("lets Office inspect exact Incidencias and Residuos details with their data semantics", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+
+    expect(screen.getAllByText(/Resolución media de reportes/)[0]).toBeVisible();
+    expect(screen.getByText(/contenedores y arbolado son instantáneas actuales/i)).toBeVisible();
+    expect(screen.getByText(/reportes consideran el período y la resolución media usa solo reportes cerrados/i)).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: /^Ver tabla de datos$/ }));
+    const incidentsTable = screen.getByRole("region", { name: "Tabla de datos de Incidencias" });
+    expect(within(incidentsTable).getByRole("columnheader", { name: "Desbordes" })).toBeVisible();
+    expect(within(incidentsTable).getByRole("columnheader", { name: "Daños" })).toBeVisible();
+    expect(within(incidentsTable).getByText("Cerrados")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: /Residuos/ }));
+    expect(screen.getAllByText(/Desvío de relleno sanitario/)[0]).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /^Ver tabla de datos$/ }));
+    const wasteTable = screen.getByRole("region", { name: "Tabla de datos de Residuos" });
+    expect(within(wasteTable).getAllByRole("columnheader", { name: "Kilogramos" })[0]).toBeVisible();
+    expect(within(wasteTable).getAllByRole("columnheader", { name: "Metros cúbicos" })[0]).toBeVisible();
+    expect(within(wasteTable).getAllByText("62,8 m³")[0]).toBeVisible();
+  });
 });

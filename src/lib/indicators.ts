@@ -208,9 +208,10 @@ function normalizeIncidents(wire: IncidentsWire): IncidentsIndicator {
     family: "incidents", period: wire.period, freshness: wire.freshness,
     primary: { value: wire.reports.meanResolutionHours, label: "Resolución media de reportes", unit: "h" },
     breakdowns: [
-      { id: "containers", title: "Contenedores por zona", description: "Incidentes actuales de desborde y daño.", points: wire.containers.byZone.map((item) => ({ id: item.id, label: item.label, value: item.overflow + item.damage, unit: "incidentes", note: `${item.overflow} desbordes · ${item.damage} daños`, tone: item.overflow + item.damage > 4 ? "danger" : "primary" })) },
-      { id: "tree-risk", title: "Riesgo de arbolado", description: "Inventario actual por nivel de riesgo.", points: wire.treeRisk.byLevel.map((item) => ({ id: item.id, label: item.label, value: item.count, unit: "árboles", tone: item.label.toLowerCase().includes("alto") ? "danger" : "warning" })) },
-      { id: "reports", title: "Reportes por tipo", description: "Reportes recibidos en el período.", points: wire.reports.byType.map((item) => ({ id: item.id, label: item.label, value: item.count, unit: "reportes" })) },
+      { id: "containers", title: "Contenedores por zona", description: "Instantánea actual de incidentes por desborde y daño; valores en incidentes.", points: wire.containers.byZone.map((item) => ({ id: item.id, label: item.label, value: item.overflow + item.damage, unit: "incidentes", note: `${item.overflow} desbordes · ${item.damage} daños`, details: [{ label: "Desbordes", value: item.overflow, unit: "incidentes" }, { label: "Daños", value: item.damage, unit: "incidentes" }], tone: item.overflow + item.damage > 4 ? "danger" : "primary" })) },
+      { id: "tree-risk", title: "Riesgo de arbolado", description: "Inventario actual por nivel de riesgo; valores en árboles.", points: wire.treeRisk.byLevel.map((item) => ({ id: item.id, label: item.label, value: item.count, unit: "árboles", tone: item.label.toLowerCase().includes("alto") ? "danger" : "warning" })) },
+      { id: "reports", title: "Reportes por tipo", description: "Reportes recibidos en el período; valores en reportes.", points: wire.reports.byType.map((item) => ({ id: item.id, label: item.label, value: item.count, unit: "reportes" })) },
+      { id: "report-status", title: "Reportes por estado", description: "Reportes recibidos en el período, distribuidos por estado.", points: wire.reports.byStatus.map((item) => ({ id: item.id, label: item.label, value: item.count, unit: "reportes", tone: item.id === "closed" ? "success" : item.id === "open" ? "danger" : "warning" })) },
     ],
   };
 }
@@ -220,8 +221,8 @@ function normalizeWaste(wire: WasteWire): WasteIndicator {
     family: "waste", period: wire.period, freshness: wire.freshness,
     primary: { value: wire.summary.divertedRate, label: "Desvío de relleno sanitario", unit: "%" },
     breakdowns: [
-      { id: "types", title: "Residuos por tipo", description: "Volumen registrado por corriente de residuo.", points: wire.byType.map((item) => ({ id: item.id, label: item.label, value: item.kilograms, unit: "kg", note: `${item.cubicMeters.toLocaleString("es-AR")} m³` })) },
-      { id: "destinations", title: "Residuos por destino", description: "Kilogramos enviados a cada destino.", points: wire.byDestination.map((item) => ({ id: item.id, label: item.label, value: item.kilograms, unit: "kg", note: `${item.cubicMeters.toLocaleString("es-AR")} m³` })) },
+      { id: "types", title: "Residuos por tipo", description: "Kilogramos y metros cúbicos registrados por corriente de residuo.", points: wire.byType.map((item) => ({ id: item.id, label: item.label, value: item.kilograms, unit: "kg", note: `${item.cubicMeters.toLocaleString("es-AR")} m³`, details: [{ label: "Metros cúbicos", value: item.cubicMeters, unit: "m³" }] })) },
+      { id: "destinations", title: "Residuos por destino", description: "Kilogramos y metros cúbicos enviados a cada destino.", points: wire.byDestination.map((item) => ({ id: item.id, label: item.label, value: item.kilograms, unit: "kg", note: `${item.cubicMeters.toLocaleString("es-AR")} m³`, details: [{ label: "Metros cúbicos", value: item.cubicMeters, unit: "m³" }] })) },
     ],
   };
 }
