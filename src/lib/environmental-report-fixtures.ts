@@ -6,6 +6,7 @@ import type {
   EnvironmentalReportQuery,
   EnvironmentalReportStatus,
 } from "./environmental-reports";
+import type { Attachment } from "./services";
 
 const reports: EnvironmentalReport[] = [
   { id: "ER-1001", reportType: "ILLEGAL_DUMPSITE", address: "Av. Warnes 1840", lat: -34.598, lng: -58.452, description: "Acumulación de residuos y escombros en la esquina.", status: "RECEIVED", priority: "HIGH", ticketId: null, deadlineAt: null, escalated: false, assignedCrewId: "crew-b", createdAt: "2026-09-06T11:20:00.000Z", updatedAt: "2026-09-06T11:20:00.000Z" },
@@ -20,6 +21,8 @@ const reports: EnvironmentalReport[] = [
   { id: "ER-1010", reportType: "WATER_DISCHARGE", address: "Arias 360", lat: -34.555, lng: -58.465, description: "Descarga constatada con sanción comunicada.", status: "SANCTIONED", priority: "CRITICAL", ticketId: null, deadlineAt: null, escalated: false, assignedCrewId: null, createdAt: "2026-08-29T08:00:00.000Z", updatedAt: "2026-09-01T10:00:00.000Z" },
   { id: "ER-1011", reportType: "OTHER", address: "Gavilán 1550", lat: -34.602, lng: -58.474, description: "Registro cerrado luego de completar el circuito.", status: "CLOSED", priority: "LOW", ticketId: null, deadlineAt: null, escalated: false, assignedCrewId: null, createdAt: "2026-08-28T08:00:00.000Z", updatedAt: "2026-08-31T16:00:00.000Z" },
 ];
+
+reports.push({ id: "ER-1012", reportType: "AIR_EMISSION", address: "Av. Brasil 2450", lat: -34.636, lng: -58.405, description: "Emisión visible informada en un establecimiento industrial.", status: "INSPECTION_SCHEDULED", priority: "HIGH", ticketId: null, deadlineAt: "2026-09-14T12:00:00.000Z", escalated: false, assignedCrewId: "crew-b", createdAt: "2026-09-06T08:00:00.000Z", updatedAt: "2026-09-06T08:00:00.000Z" });
 
 export let environmentalReportFixtures: EnvironmentalReport[] = reports.map((report) => ({ ...report }));
 const initialReports = reports.map((report) => ({ ...report }));
@@ -43,6 +46,26 @@ const inspections: EnvironmentalInspection[] = [
     notes: null,
     createdAt: "2026-09-05T08:30:00.000Z",
     updatedAt: "2026-09-05T08:30:00.000Z",
+  },
+  {
+    id: "INS-1012",
+    reportId: "ER-1012",
+    serviceId: "SVC-1112",
+    inspectedAt: null,
+    scheduledDate: "2026-09-07",
+    timeWindow: { start: "10:00", end: "13:00" },
+    checklistVersion: "ambiental-v1",
+    checklist: [
+      { id: "emission-source-1012", label: "Identificar la fuente de emisión", required: true },
+      { id: "visible-impact-1012", label: "Registrar el impacto visible", required: true },
+    ],
+    attachments: [],
+    findings: null,
+    outcome: null,
+    nextStep: null,
+    notes: null,
+    createdAt: "2026-09-06T08:30:00.000Z",
+    updatedAt: "2026-09-06T08:30:00.000Z",
   },
 ];
 
@@ -89,6 +112,20 @@ export function updateEnvironmentalInspectionFixture(id: string, updates: Partia
   return updated;
 }
 
+export function getInspectionAttachments(inspectionId: string): Attachment[] | null {
+  const inspection = getEnvironmentalInspectionFixture(inspectionId);
+  return inspection ? [...(inspection.attachments ?? [])] : null;
+}
+
+export function addAttachmentToInspection(inspectionId: string, attachment: Attachment): boolean {
+  const inspection = getEnvironmentalInspectionFixture(inspectionId);
+  if (!inspection) return false;
+  updateEnvironmentalInspectionFixture(inspectionId, {
+    attachments: [...(inspection.attachments ?? []), attachment],
+  });
+  return true;
+}
+
 export function linkEnvironmentalInspectionService(inspectionId: string, serviceId: string): EnvironmentalInspection | null {
   return updateEnvironmentalInspectionFixture(inspectionId, { serviceId });
 }
@@ -104,6 +141,7 @@ export function createEnvironmentalInspectionFixture(reportId: string, input: En
     timeWindow: { ...input.timeWindow },
     checklistVersion: input.checklistVersion,
     checklist: input.checklist.map((item) => ({ ...item })),
+    attachments: [],
     findings: null,
     outcome: null,
     nextStep: null,

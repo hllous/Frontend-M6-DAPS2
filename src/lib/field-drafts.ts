@@ -9,7 +9,7 @@ import { servicesAdapter, type Service } from "./services";
  * applying it. Evidence-upload retry is idempotent and exempt from this —
  * it keeps its existing automatic-retry-on-click behavior from ticket 5.
  */
-export type FieldDraftActionType = "start" | "suspend" | "resume" | "zoneResult" | "repairRequest" | "streetClosureRequest";
+export type FieldDraftActionType = "start" | "suspend" | "resume" | "zoneResult" | "repairRequest" | "streetClosureRequest" | "inspectionCompletion";
 
 export type FieldDraftServiceSnapshot = Pick<
   Service,

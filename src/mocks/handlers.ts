@@ -164,12 +164,14 @@ import {
 import { repairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import {
+  addAttachmentToInspection,
   addEnvironmentalInspectionFixture,
   addEnvironmentalReportFixture,
   createEnvironmentalInspectionFixture,
   createEnvironmentalReportFixture,
   filterEnvironmentalReportFixtures,
   getEnvironmentalInspectionFixture,
+  getInspectionAttachments,
   getEnvironmentalReportFixture,
   listEnvironmentalInspectionFixtures,
   paginateEnvironmentalReportFixtures,
@@ -178,6 +180,7 @@ import {
 } from "@/lib/environmental-report-fixtures";
 import {
   createEnvironmentalReportInputSchema,
+  environmentalInspectionCompleteInputSchema,
   environmentalInspectionScheduleInputSchema,
   environmentalReportPrioritySchema,
   environmentalReportStatusSchema,
@@ -436,6 +439,37 @@ export const handlers = [
     addEnvironmentalInspectionFixture(created);
     transitionEnvironmentalReportFixture(reportId, "INSPECTION_SCHEDULED");
     return HttpResponse.json(created, { status: 201 });
+  }),
+  // ── EnvironmentalInspection execution / M6 issue #134 ────────────────────
+  http.get("*/api/environmental-inspections/:inspectionId", ({ params }) => {
+    const inspection = getEnvironmentalInspectionFixture(params.inspectionId as string);
+    return inspection
+      ? HttpResponse.json(inspection)
+      : HttpResponse.json({ statusCode: 404, message: "Inspección no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${params.inspectionId}` }, { status: 404 });
+  }),
+  http.post("*/api/environmental-inspections/:inspectionId/complete", async ({ params, request }) => {
+    const inspectionId = params.inspectionId as string;
+    const inspection = getEnvironmentalInspectionFixture(inspectionId);
+    if (!inspection) return HttpResponse.json({ statusCode: 404, message: "Inspección no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 404 });
+    const parsed = environmentalInspectionCompleteInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
+    if (parsed.data.outcome !== "NO_VIOLATION" && !(inspection.attachments?.length ?? 0)) return HttpResponse.json({ statusCode: 400, message: "Debe adjuntar al menos una evidencia para este resultado.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
+    const nextStep = parsed.data.outcome === "NO_VIOLATION" ? "CASE_CLOSED" : parsed.data.outcome === "VIOLATION_FOUND" ? "NOTICE_TO_BE_ISSUED" : "REINSPECTION";
+    const expectedChecklistIds = new Set(inspection.checklist.map((item) => item.id));
+    if (parsed.data.checklist.length !== expectedChecklistIds.size || parsed.data.checklist.some((item) => !expectedChecklistIds.has(item.id))) return HttpResponse.json({ statusCode: 400, message: "El checklist enviado no coincide con el checklist asignado.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
+    const updated = updateEnvironmentalInspectionFixture(inspectionId, {
+      inspectedAt: new Date().toISOString(),
+      outcome: parsed.data.outcome,
+      nextStep,
+      findings: parsed.data.findings ?? null,
+      violationType: parsed.data.violationType ?? null,
+      severity: parsed.data.severity ?? null,
+      suggestedAction: parsed.data.suggestedAction ?? null,
+      notes: parsed.data.conclusion ?? inspection.notes,
+    });
+    if (updated?.serviceId) updateServiceFixture(updated.serviceId, { status: "COMPLETED" });
+    transitionEnvironmentalReportFixture(inspection.reportId, parsed.data.outcome === "NO_VIOLATION" ? "NO_VIOLATION" : parsed.data.outcome === "VIOLATION_FOUND" ? "VIOLATION_FOUND" : "INSPECTED");
+    return HttpResponse.json(updated);
   }),
   http.post("*/api/environmental-reports/:reportId/start-review", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "RECEIVED", "UNDER_REVIEW")),
   http.post("*/api/environmental-reports/:reportId/forward", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "UNDER_REVIEW", "FORWARDED")),
@@ -1233,6 +1267,7 @@ export const handlers = [
       targetType: input.targetType ?? null,
       targetId: input.targetId ?? null,
       targetRef: input.targetRef ?? null,
+      inspectionId: input.origin === "INSPECTION" ? (input.inspectionId ?? null) : null,
       scheduledDate: input.scheduledDate,
       windowFrom: input.timeWindow.start,
       windowTo: input.timeWindow.end,
@@ -2135,6 +2170,12 @@ export const handlers = [
         );
       }
     }
+    // #134: evidence belongs to an existing inspection and is uploaded one file at a time.
+    if (parsedOwnerType.data === "INSPECTION") {
+      if (!getEnvironmentalInspectionFixture(ownerId)) {
+        return HttpResponse.json({ statusCode: 404, message: `La inspección ${ownerId} no existe.`, error: "Not Found", timestamp: new Date().toISOString(), path: "/api/evidence" }, { status: 404 });
+      }
+    }
 
     const rawNameFromForm = formData.get("fileName");
     const fileObjName = (file as { name?: string }).name;
@@ -2160,6 +2201,9 @@ export const handlers = [
     }
     if (parsedOwnerType.data === "CONTAINER") {
       addAttachmentToContainer(ownerId, attachment);
+    }
+    if (parsedOwnerType.data === "INSPECTION") {
+      addAttachmentToInspection(ownerId, attachment);
     }
 
     evidenceCache.set(cacheKey, attachment);
@@ -2366,6 +2410,16 @@ export const handlers = [
     }
     if (ownerType === "CONTAINER") {
       return HttpResponse.json(getContainerAttachments(ownerId));
+    }
+    if (ownerType === "INSPECTION") {
+      const attachments = getInspectionAttachments(ownerId);
+      if (!attachments) {
+        return HttpResponse.json(
+          { statusCode: 404, message: "Inspección no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/evidence" },
+          { status: 404 },
+        );
+      }
+      return HttpResponse.json(attachments);
     }
     return HttpResponse.json([]);
   }),

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import { attachmentSchema } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
 
 export const environmentalReportTypeSchema = z.enum([
@@ -85,6 +86,28 @@ export const environmentalInspectionNextStepSchema = z.enum([
 ]);
 export type EnvironmentalInspectionNextStep = z.infer<typeof environmentalInspectionNextStepSchema>;
 
+export const environmentalInspectionViolationTypeSchema = z.enum([
+  "NOISE_LIMIT",
+  "ILLEGAL_DUMPING",
+  "UNTREATED_DISCHARGE",
+  "HAZARDOUS_WASTE",
+  "AIR_EMISSION",
+  "NO_WASTE_MANAGEMENT",
+  "INSPECTION_OBSTRUCTION",
+]);
+export type EnvironmentalInspectionViolationType = z.infer<typeof environmentalInspectionViolationTypeSchema>;
+
+export const environmentalInspectionSeveritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
+export type EnvironmentalInspectionSeverity = z.infer<typeof environmentalInspectionSeveritySchema>;
+
+export const environmentalInspectionSuggestedActionSchema = z.enum([
+  "WARNING",
+  "FORMAL_NOTICE",
+  "FINE",
+  "CLOSURE",
+]);
+export type EnvironmentalInspectionSuggestedAction = z.infer<typeof environmentalInspectionSuggestedActionSchema>;
+
 // Hypothesis: the backend has not published the exact checklist DTO yet.
 export const environmentalInspectionChecklistItemSchema = z.object({
   id: z.string().min(1),
@@ -92,6 +115,41 @@ export const environmentalInspectionChecklistItemSchema = z.object({
   required: z.boolean().default(true),
 }).passthrough();
 export type EnvironmentalInspectionChecklistItem = z.infer<typeof environmentalInspectionChecklistItemSchema>;
+
+export const environmentalInspectionChecklistResultSchema = z.object({
+  id: z.string().min(1),
+  completed: z.boolean(),
+});
+export type EnvironmentalInspectionChecklistResult = z.infer<typeof environmentalInspectionChecklistResultSchema>;
+
+export const environmentalInspectionCompleteInputSchema = z
+  .object({
+    outcome: environmentalInspectionOutcomeSchema,
+    checklist: z.array(environmentalInspectionChecklistResultSchema).min(1, "Debe completar el checklist de inspección."),
+    conclusion: z.string().trim().optional(),
+    findings: z.string().trim().optional(),
+    violationType: environmentalInspectionViolationTypeSchema.optional(),
+    severity: environmentalInspectionSeveritySchema.optional(),
+    suggestedAction: environmentalInspectionSuggestedActionSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.checklist.some((item) => !item.completed)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["checklist"], message: "Debe completar todos los controles del checklist." });
+    }
+    if (data.outcome === "NO_VIOLATION" && !data.conclusion) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["conclusion"], message: "La conclusión es obligatoria para un resultado sin infracción." });
+    }
+    if (data.outcome === "VIOLATION_FOUND") {
+      if (!data.findings) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["findings"], message: "Los hallazgos son obligatorios cuando se constata una infracción." });
+      if (!data.violationType) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["violationType"], message: "Debe indicar el tipo de infracción constatada." });
+      if (!data.severity) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["severity"], message: "Debe indicar la gravedad de la infracción constatada." });
+      if (!data.suggestedAction) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["suggestedAction"], message: "Debe indicar la acción sugerida." });
+    }
+    if (data.outcome === "INCONCLUSIVE" && !data.conclusion) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["conclusion"], message: "Debe explicar por qué la inspección resulta inconclusa." });
+    }
+  });
+export type EnvironmentalInspectionCompleteInput = z.infer<typeof environmentalInspectionCompleteInputSchema>;
 
 // Hypothesis: schedule fields are kept explicit at this adapter seam until OpenAPI
 // exposes the authoritative request and response nesting.
@@ -117,7 +175,11 @@ export const environmentalInspectionSchema = z.object({
   timeWindow: z.object({ start: z.string(), end: z.string() }),
   checklistVersion: z.string(),
   checklist: z.array(environmentalInspectionChecklistItemSchema),
+  attachments: z.array(attachmentSchema).optional(),
   findings: z.string().nullable().optional(),
+  violationType: environmentalInspectionViolationTypeSchema.nullable().optional(),
+  severity: environmentalInspectionSeveritySchema.nullable().optional(),
+  suggestedAction: environmentalInspectionSuggestedActionSchema.nullable().optional(),
   outcome: environmentalInspectionOutcomeSchema.nullable().optional(),
   nextStep: environmentalInspectionNextStepSchema.nullable().optional(),
   notes: z.string().nullable().optional(),
@@ -335,6 +397,18 @@ export const environmentalReportsAdapter = {
       throw new EnvironmentalReportContractError("La historia de inspecciones no respeta el contrato esperado.", { cause: parsed.error });
     }
     return parsed.data;
+  },
+
+  async completeInspection(id: string, input: EnvironmentalInspectionCompleteInput): Promise<EnvironmentalInspection> {
+    const parsedInput = environmentalInspectionCompleteInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new EnvironmentalReportContractError("Los datos para completar la inspecci\u00f3n son inv\u00e1lidos.", { cause: parsedInput.error });
+    }
+    return parseInspection(await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsedInput.data),
+    }), "La respuesta de finalizaci\u00f3n de inspecci\u00f3n no respeta el contrato esperado.");
   },
 
   async getInspection(id: string): Promise<EnvironmentalInspection> {
