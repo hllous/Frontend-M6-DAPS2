@@ -33,7 +33,7 @@ describe("/api/trees", () => {
     const response = await POST(new Request("http://localhost/api/trees", { method: "POST", headers: { cookie: officeCookie, "content-type": "application/json" }, body: JSON.stringify(input) }));
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ surveyCode: "ARB-NEW", active: true });
-    expect(treeFixtures).toHaveLength(4);
+    expect(treeFixtures).toHaveLength(5);
     const duplicate = await POST(new Request("http://localhost/api/trees", { method: "POST", headers: { cookie: officeCookie, "content-type": "application/json" }, body: JSON.stringify({ ...input, surveyCode: "arb-new" }) }));
     expect(duplicate.status).toBe(409);
   });

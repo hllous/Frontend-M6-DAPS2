@@ -33,7 +33,8 @@ export type Capability =
   | "container:report"
   // Frontend hypothesis for Phase 5 Tree management
   | "tree:manage"
-  | "tree:survey";
+  | "tree:survey"
+  | "treeIntervention:request";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -88,6 +89,7 @@ export const scenarios: Record<
       "indicator:view",
       "tree:manage",
       "tree:survey",
+      "treeIntervention:request",
       "zone:manage",
       "route:manage",
       "serviceFrequency:manage",

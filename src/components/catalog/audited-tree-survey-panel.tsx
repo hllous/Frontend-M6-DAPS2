@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Eye, HeartPulse, Plus, ShieldAlert, Skull, TriangleAlert } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Eye, HeartPulse, Info, Plus, ShieldAlert, Skull, TriangleAlert } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import type { OperationalScenario } from "@/lib/scenarios";
 import type { Tree } from "@/lib/trees";
 import { cn } from "@/lib/utils";
 import { treeSurveyCreateInputSchema, treeSurveysAdapter, type RiskLevel, type TreeHealthStatus, type TreeSurvey, type TreeSurveyCreateInput, type TreeSurveyQuery } from "@/lib/tree-surveys";
+import { TreeInterventionRequestDialog } from "./tree-interventions-panel";
 
 type LoadState = { status: "loading" } | { status: "ready"; page: { surveys: TreeSurvey[]; page: number; pageSize: number; total: number; totalPages: number } } | { status: "error"; message: string };
 type FormState = { surveyedAt: string; healthStatus: TreeHealthStatus | ""; riskLevel: RiskLevel | ""; riskType: string; suggestedIntervention: string; requiresStreetClosure: boolean; requiresPublicWorks: boolean; notes: string };
@@ -61,6 +62,7 @@ function RiskBadge({ level }: { level: RiskLevel }) {
 
 export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree; scenario: OperationalScenario; onClose: () => void }) {
   const canSurvey = scenario.capabilities.includes("tree:survey");
+  const canRequestIntervention = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("treeIntervention:request");
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [healthStatus, setHealthStatus] = useState<TreeHealthStatus | "">("");
   const [riskLevel, setRiskLevel] = useState<RiskLevel | "">("");
@@ -75,6 +77,8 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [interventionOpen, setInterventionOpen] = useState(false);
+  const [interventionSurvey, setInterventionSurvey] = useState<TreeSurvey | null>(null);
   const query = useMemo<TreeSurveyQuery>(() => ({ healthStatus: healthStatus || undefined, riskLevel: riskLevel || undefined, page, pageSize: 10 }), [healthStatus, page, riskLevel]);
 
   useEffect(() => {
@@ -114,8 +118,11 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
     finally { setIsSubmitting(false); }
   };
   const fieldHasError = (field: FormErrorField) => formErrorField === field;
+  const guidedSurvey = state.status === "ready" ? state.page.surveys.find((survey) => ["HIGH", "CRITICAL"].includes(survey.riskLevel) && survey.suggestedIntervention) ?? null : null;
 
   return <section aria-labelledby="tree-surveys-title" className="flex max-w-5xl flex-col gap-5">
+    {canRequestIntervention && guidedSurvey ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>El relevamiento de {dateLabel(guidedSurvey.surveyedAt)} indica una intervención sugerida.</span><Button type="button" onClick={() => { setInterventionSurvey(guidedSurvey); setInterventionOpen(true); }}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención sugerida</Button></AlertDescription></Alert> : null}
+    {canRequestIntervention ? <TreeInterventionRequestDialog key={`${interventionOpen}-${interventionSurvey?.id ?? ""}`} open={interventionOpen} onOpenChange={setInterventionOpen} trees={[tree]} initialTreeIds={interventionSurvey ? [tree.id] : []} initialType={interventionSurvey?.suggestedIntervention} initialAddress={tree.address ?? ""} initialRequiresStreetClosure={interventionSurvey?.requiresStreetClosure} initialJustification={interventionSurvey ? `Relevamiento ${dateLabel(interventionSurvey.surveyedAt)} (${interventionSurvey.id}).` : undefined} onCreated={() => setNotice("Solicitud de intervención creada. Estado inicial: solicitada.")} /> : null}
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div><Button type="button" variant="ghost" size="sm" className="mb-2 -ml-3 gap-1" onClick={onClose}><ArrowLeft data-icon="inline-start" aria-hidden />Volver al censo</Button><h2 id="tree-surveys-title" className="text-2xl font-semibold tracking-tight">Historial de relevamientos · {tree.surveyCode}</h2><p className="mt-1 text-sm text-muted-foreground">{tree.species} · {tree.address ?? "Sin dirección registrada"}</p></div>
       {canSurvey ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar relevamiento</Button> : null}

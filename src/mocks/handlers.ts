@@ -102,6 +102,8 @@ import { addTreeFixture, filterTreeFixtures, paginateTreeFixtures, treeFixtures,
 import { treeCreateInputSchema, treeUpdateInputSchema, type TreeQuery } from "@/lib/trees";
 import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures, getTreeSurveyFixture, paginateTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { treeHealthStatusSchema, treeSurveyCreateInputSchema, riskLevelSchema } from "@/lib/tree-surveys";
+import { addTreeInterventionFixture, createTreeInterventionFixture, filterTreeInterventionFixtures, getTreeInterventionFixture, paginateTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
+import { treeInterventionCreateInputSchema, treeInterventionStatusSchema, treeInterventionTypeSchema } from "@/lib/tree-interventions";
 import {
   addRepairRequestFixture,
   createRepairRequestFixture,
@@ -1117,6 +1119,28 @@ export const handlers = [
     if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/trees/${params.treeId}/surveys` }, { status: 400 });
     const created = createTreeSurveyFixture(params.treeId as string, parsed.data, "field-user-1");
     addTreeSurveyFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  // --- Tree interventions (#128) ---
+  http.get("*/api/tree-interventions", ({ request }) => {
+    const url = new URL(request.url);
+    const query = {
+      interventionType: treeInterventionTypeSchema.safeParse(url.searchParams.get("interventionType")).data,
+      status: treeInterventionStatusSchema.safeParse(url.searchParams.get("status")).data,
+      page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
+      pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    };
+    return HttpResponse.json(paginateTreeInterventionFixtures(filterTreeInterventionFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/tree-interventions/:interventionId", ({ params }) => {
+    const intervention = getTreeInterventionFixture(params.interventionId as string);
+    return intervention ? HttpResponse.json(intervention) : HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}` }, { status: 404 });
+  }),
+  http.post("*/api/tree-interventions", async ({ request }) => {
+    const parsed = treeInterventionCreateInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/tree-interventions" }, { status: 400 });
+    const created = createTreeInterventionFixture(parsed.data);
+    addTreeInterventionFixture(created);
     return HttpResponse.json(created, { status: 201 });
   }),
   // --- Containers catalog (#120) ---
