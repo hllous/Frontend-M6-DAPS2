@@ -8,11 +8,13 @@ import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
+import { getContainerFixture, resetContainerFixtures } from "@/lib/containers-fixtures";
 import { POST } from "./route";
 
 beforeEach(() => {
   resetServiceFixtures();
   resetZoneResultFixtures();
+  resetContainerFixtures();
 });
 
 afterEach(() => {
@@ -194,5 +196,84 @@ describe("POST /api/services/[id]/complete BFF route", () => {
     expect(body.history).toEqual(
       expect.arrayContaining([expect.objectContaining({ label: "Parcial", done: true })]),
     );
+    expect(getContainerFixture("cont-2")?.status).toBe("OVERFLOWED");
+  });
+
+  it("transitions an overflowed linked Container when the Service is COMPLETED", async () => {
+    updateServiceFixture("SVC-1050", {
+      status: "IN_PROGRESS",
+      crewId: "crew-b",
+      mode: "POINT",
+      zoneIds: ["zone-2"],
+      targetType: "CONTAINER",
+      targetId: "cont-2",
+      targetRef: "CONT-002",
+    });
+    addZoneResultFixture({
+      id: "ZR-CONTAINER-EMPTY",
+      serviceId: "SVC-1050",
+      zoneId: "zone-2",
+      status: "SERVICED",
+      reason: null,
+      notes: null,
+      attachments: [],
+      recordedAt: "2026-09-05 11:00",
+    });
+
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/complete", {
+        method: "POST",
+        headers: { cookie },
+      }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).status).toBe("COMPLETED");
+    expect(getContainerFixture("cont-2")?.status).toBe("ACTIVE");
+  });
+
+  it("takes relocation coordinates from the Service completion body", async () => {
+    updateServiceFixture("SVC-1050", {
+      status: "IN_PROGRESS",
+      crewId: "crew-b",
+      mode: "POINT",
+      zoneIds: ["zone-1"],
+      targetType: "CONTAINER",
+      targetId: "cont-5",
+      targetRef: "CONT-005",
+    });
+    addZoneResultFixture({
+      id: "ZR-CONTAINER-RELOCATE",
+      serviceId: "SVC-1050",
+      zoneId: "zone-1",
+      status: "SERVICED",
+      reason: null,
+      notes: null,
+      attachments: [],
+      recordedAt: "2026-09-05 11:00",
+    });
+
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/complete", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          containerLocation: { address: "Av. Callao 1500", lat: -34.595, lng: -58.39 },
+        }),
+      }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).status).toBe("COMPLETED");
+    expect(getContainerFixture("cont-5")).toMatchObject({
+      status: "ACTIVE",
+      address: "Av. Callao 1500",
+      lat: -34.595,
+      lng: -58.39,
+    });
   });
 });

@@ -6,7 +6,14 @@ import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
-import type { ServiceStatus } from "@/lib/services";
+import { completeServiceInputSchema, type CompleteServiceInput, type ServiceStatus } from "@/lib/services";
+import {
+  completeRepairFixture,
+  confirmRelocationFixture,
+  containerFixtures,
+  emptyContainerFixture,
+  getContainerFixture,
+} from "@/lib/containers-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -33,6 +40,40 @@ function errorResponse(status: number, message: string, path: string) {
   );
 }
 
+function findTargetContainer(service: (typeof serviceFixtures)[number]) {
+  if (service.mode !== "POINT" || service.targetType !== "CONTAINER") return null;
+
+  return (
+    (service.targetId ? getContainerFixture(service.targetId) : null) ??
+    (service.targetRef ? containerFixtures.find((container) => container.code === service.targetRef) ?? null : null)
+  );
+}
+
+function transitionTargetContainer(
+  service: (typeof serviceFixtures)[number],
+  input: CompleteServiceInput,
+) {
+  const container = findTargetContainer(service);
+  if (!container) return;
+
+  switch (container.status) {
+    case "OVERFLOWED":
+      emptyContainerFixture(container.id);
+      break;
+    case "UNDER_REPAIR":
+      completeRepairFixture(container.id);
+      break;
+    case "RELOCATING":
+      if (!input.containerLocation) {
+        throw new Error("CONTAINER_LOCATION_REQUIRED");
+      }
+      confirmRelocationFixture(container.id, input.containerLocation);
+      break;
+    default:
+      break;
+  }
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> | { id: string } },
@@ -53,14 +94,33 @@ export async function POST(
       );
     }
 
+    let completionInput: CompleteServiceInput = {};
+    const requestBody = await request.text();
+    if (requestBody.trim()) {
+      let parsedBody: unknown;
+      try {
+        parsedBody = JSON.parse(requestBody);
+      } catch {
+        return errorResponse(400, "El cuerpo de la solicitud debe ser un JSON válido.", path);
+      }
+      const parsedInput = completeServiceInputSchema.safeParse(parsedBody);
+      if (!parsedInput.success) {
+        return errorResponse(400, parsedInput.error.issues.map((issue) => issue.message).join(" "), path);
+      }
+      completionInput = parsedInput.data;
+    }
+
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+      const backendInit: RequestInit = { method: "POST" };
+      if (requestBody.trim()) {
+        backendInit.headers = { "content-type": "application/json" };
+        backendInit.body = JSON.stringify(completionInput);
+      }
       const backendResponse = await fetchBackend(
         request,
         `/services/${serviceId}/complete`,
         undefined,
-        {
-          method: "POST",
-        },
+        backendInit,
       );
       const bodyText = await backendResponse.text();
       return new NextResponse(bodyText, {
@@ -107,6 +167,17 @@ export async function POST(
       .filter((r) => r.status !== "SERVICED" && r.notes)
       .map((r) => r.notes)
       .join(" · ");
+
+    if (computedStatus === "COMPLETED") {
+      try {
+        transitionTargetContainer(service, completionInput);
+      } catch (error) {
+        if (error instanceof Error && error.message === "CONTAINER_LOCATION_REQUIRED") {
+          return errorResponse(400, "La nueva ubicación del contenedor es obligatoria para completar la reubicación.", path);
+        }
+        throw error;
+      }
+    }
 
     const updated = updateServiceFixture(service.id, {
       status: computedStatus,

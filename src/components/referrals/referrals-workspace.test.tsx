@@ -6,7 +6,9 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { fixtureReferrals } from "@/app/api/referrals/route";
+import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { scenarios } from "@/lib/scenarios";
+import { resetStreetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import { ReferralsWorkspace } from "./referrals-workspace";
 
 const server = setupServer(...handlers);
@@ -14,6 +16,8 @@ const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
+  resetRepairRequestFixtures();
+  resetStreetClosureRequestFixtures();
   window.history.replaceState(null, "", "/app?destination=referrals");
 });
 afterAll(() => server.close());
@@ -69,6 +73,88 @@ describe("ReferralsWorkspace", () => {
 
     await user.click(screen.getByRole("button", { name: "Volver a derivaciones" }));
     await waitFor(() => expect(screen.getByRole("region", { name: "Lista de derivaciones" })).toBeVisible());
+  });
+
+  it("lets Office manually reconcile a repair with the external work order", async () => {
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(list).getByRole("button", { name: /RR-1001/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
+    await user.click(within(detail).getByRole("button", { name: "Registrar inicio de reparación" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/acción solo registra un hecho externo ya confirmado/i)).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/identificador externo de m3/i);
+
+    await user.type(within(dialog).getByLabelText(/Identificador externo de M3/), "M3-OT-2048");
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(detail).getByText("En curso")).toBeVisible();
+    expect(within(detail).getByText("M3-OT-2048")).toBeVisible();
+
+    await user.click(within(detail).getByRole("button", { name: "Registrar cierre de reparación" }));
+    const closeDialog = screen.getByRole("dialog");
+    await user.type(within(closeDialog).getByLabelText(/Identificador externo de M3/), "M3-OT-2048");
+    await user.click(within(closeDialog).getByRole("button", { name: "Confirmar recuperación" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(detail).getByText("Cerrada")).toBeVisible();
+  });
+
+  it("keeps manual recovery unavailable to Field", async () => {
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.fieldCrewLeader} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(list).getByRole("button", { name: /RR-1001/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
+    expect(within(detail).queryByText("Recuperación manual")).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("button", { name: /Registrar/ })).not.toBeInTheDocument();
+  });
+
+  it("requires the M7 identifier and updates the closure detail after approval", async () => {
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de SCR-1001" });
+    await user.click(within(detail).getByRole("button", { name: "Registrar aprobación de M7" }));
+
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/identificador externo de m7/i);
+
+    await user.type(within(dialog).getByLabelText(/Identificador externo de M7/), "M7-C-882");
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(detail).getByText("Aprobada")).toBeVisible();
+    expect(within(detail).getByText("M7-C-882")).toBeVisible();
+
+    await user.click(within(detail).getByRole("button", { name: "Registrar finalización de M7" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Confirmar recuperación" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(detail).getByText("Finalizada")).toBeVisible();
+  });
+
+  it("lets Office record a confirmed M7 rejection without inventing a closure id", async () => {
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de SCR-1001" });
+    await user.click(within(detail).getByRole("button", { name: "Registrar rechazo de M7" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).queryByLabelText(/Identificador externo de M7/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(detail).getByText("Rechazada")).toBeVisible();
   });
 
   it("announces empty and error states", async () => {

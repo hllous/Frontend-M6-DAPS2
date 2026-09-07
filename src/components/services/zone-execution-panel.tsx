@@ -21,12 +21,16 @@ import {
   NotServicedReason,
   Service,
   ServiceRequestError,
+  containerLocationSchema,
+  type ContainerLocation,
+  type CompleteServiceInput,
   servicesAdapter,
   STATUS_LABEL,
   ZONE_RESULT_STATUS_LABEL,
   ZoneResult,
   ZoneResultStatus,
 } from "@/lib/services";
+import { containersAdapter } from "@/lib/containers";
 import { getZoneResultsByServiceId } from "@/lib/services-fixtures";
 import {
   clearFieldDraft,
@@ -104,6 +108,19 @@ export function ZoneExecutionPanel({
   const [isCompleting, setIsCompleting] = useState(false);
   const [completionError, setCompletionError] = useState<string | null>(null);
   const [completionSuccessMessage, setCompletionSuccessMessage] = useState<string | null>(null);
+  const [targetContainer, setTargetContainer] = useState<{
+    id: string;
+    status: "ACTIVE" | "OVERFLOWED" | "DAMAGED" | "UNDER_REPAIR" | "RELOCATING" | "REMOVED";
+  } | null>(null);
+  const [containerLocation, setContainerLocation] = useState<ContainerLocation>({
+    address: "",
+    lat: Number.NaN,
+    lng: Number.NaN,
+  });
+
+  const isContainerTarget = service.mode === "POINT" && service.targetType === "CONTAINER";
+  const isContainerRelocating =
+    targetContainer?.id === service.targetId && targetContainer?.status === "RELOCATING";
 
   // Refresh zone results from backend/adapter
   useEffect(() => {
@@ -123,6 +140,22 @@ export function ZoneExecutionPanel({
       isCurrent = false;
     };
   }, [service.id]);
+
+  useEffect(() => {
+    if (!isContainerTarget || !service.targetId) return;
+
+    let isCurrent = true;
+    void containersAdapter
+      .get(service.targetId)
+      .then((container) => {
+        if (isCurrent) setTargetContainer({ id: container.id, status: container.status });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isContainerTarget, service.targetId]);
 
   // Reset form when changing zones — restoring any local draft for the newly selected zone
   const handleSelectZone = (zoneId: string) => {
@@ -348,9 +381,24 @@ export function ZoneExecutionPanel({
   const handleCompleteService = async () => {
     setCompletionError(null);
     setCompletionSuccessMessage(null);
+
+    let completionInput: CompleteServiceInput | undefined;
+    if (isContainerRelocating) {
+      const parsedLocation = containerLocationSchema.safeParse({
+        address: containerLocation.address,
+        lat: Number(containerLocation.lat),
+        lng: Number(containerLocation.lng),
+      });
+      if (!parsedLocation.success) {
+        setCompletionError(parsedLocation.error.issues.map((issue) => issue.message).join(" "));
+        return;
+      }
+      completionInput = { containerLocation: parsedLocation.data };
+    }
+
     setIsCompleting(true);
     try {
-      const updated = await servicesAdapter.complete(service.id);
+      const updated = await servicesAdapter.complete(service.id, completionInput);
       if (onServiceUpdated) {
         onServiceUpdated(updated);
       }
@@ -401,6 +449,55 @@ export function ZoneExecutionPanel({
               : "Servicio puntual: registre el resultado de la zona correspondiente."}
           </p>
         </div>
+
+        {isContainerRelocating && (
+          <fieldset className="mb-4 rounded-xl border border-[var(--color-info-line)] bg-[var(--color-info-fill)]/30 p-4">
+            <legend className="px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-info)]">
+              Nueva ubicación del contenedor
+            </legend>
+            <p className="mb-3 text-xs text-[var(--color-text-secondary)]">
+              Se enviará junto con la finalización del Servicio. No se requiere una confirmación adicional.
+            </p>
+            <div className="grid gap-3">
+              <label className="text-xs font-semibold text-[var(--color-text)]" htmlFor={`container-location-address-${service.id}`}>
+                Nueva dirección
+                <input
+                  id={`container-location-address-${service.id}`}
+                  value={containerLocation.address}
+                  onChange={(event) => setContainerLocation((current) => ({ ...current, address: event.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal"
+                  required
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-xs font-semibold text-[var(--color-text)]" htmlFor={`container-location-lat-${service.id}`}>
+                  Latitud
+                  <input
+                    id={`container-location-lat-${service.id}`}
+                    type="number"
+                    step="any"
+                    value={Number.isNaN(containerLocation.lat) ? "" : containerLocation.lat}
+                    onChange={(event) => setContainerLocation((current) => ({ ...current, lat: Number(event.target.value) }))}
+                    className="mt-1 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal"
+                    required
+                  />
+                </label>
+                <label className="text-xs font-semibold text-[var(--color-text)]" htmlFor={`container-location-lng-${service.id}`}>
+                  Longitud
+                  <input
+                    id={`container-location-lng-${service.id}`}
+                    type="number"
+                    step="any"
+                    value={Number.isNaN(containerLocation.lng) ? "" : containerLocation.lng}
+                    onChange={(event) => setContainerLocation((current) => ({ ...current, lng: Number(event.target.value) }))}
+                    className="mt-1 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal"
+                    required
+                  />
+                </label>
+              </div>
+            </div>
+          </fieldset>
+        )}
 
         {/* Completion Action Button */}
         {canExecute && service.status === "IN_PROGRESS" && (
