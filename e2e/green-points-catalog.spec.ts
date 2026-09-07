@@ -8,7 +8,7 @@ test.describe("Green Point catalog management #124", () => {
     await page.goto("/app/catalog/green-points");
 
     await expect(page.getByRole("heading", { name: "Puntos verdes" })).toBeVisible();
-    await expect(page.getByText("GP-001")).toBeVisible();
+    await expect(page.getByRole("cell", { name: "GP-001" })).toBeVisible();
 
     await page.getByRole("button", { name: "Registrar punto verde" }).click();
     const dialog = page.getByRole("dialog");
@@ -34,7 +34,7 @@ test.describe("Green Point catalog management #124", () => {
     await row.getByRole("button", { name: "Dar de baja" }).click();
     await expect(page.getByText("Punto verde dado de baja")).toBeVisible();
     await page.getByLabel("Filtrar puntos verdes por estado").selectOption("false");
-    await expect(page.getByText(code ?? "GP-E2E-")).toBeVisible();
+    await expect(page.getByRole("cell", { name: code ?? "GP-E2E-" })).toBeVisible();
   });
 
   test("Field can inspect but cannot manage Green Points", async ({ page }) => {
