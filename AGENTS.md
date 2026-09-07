@@ -16,6 +16,10 @@ Backend has finished all seven phases of its plan: 130 REST routes in 23 Swagger
 
 Rare cases (PR checklist, branch protection reference, the `hotfix/*` exception): [`docs/agents/git-flow.md`](docs/agents/git-flow.md).
 
+## Local e2e debugging
+
+Running `npm run dev` yourself against a Playwright `PLAYWRIGHT_BASE_URL` (reproducing a CI e2e failure, rather than letting Playwright start and stop its own server) needs env vars `playwright.config.ts` only sets automatically for its own server, and stopping that server doesn't reliably free the port on Windows. See [`docs/agents/e2e-local-debugging.md`](docs/agents/e2e-local-debugging.md).
+
 ## Agent skills
 
 ### Issue tracker
