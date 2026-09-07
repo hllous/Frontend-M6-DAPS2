@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { defaultIndicatorQuery, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
 import type { OperationalScenario } from "@/lib/scenarios";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 
 import styles from "./indicators-dashboard.module.css";
 
@@ -120,7 +120,7 @@ function pointText(point: IndicatorPoint) {
 
 function detailContext(data: IndicatorData) {
   if (data.family === "coverage") {
-    return <p className={styles.detailContext}><strong>Unidad de análisis:</strong> servicio + zona. Los servicios cancelados no se incluyen en el cálculo de incumplimiento.</p>;
+    return <p className={styles.detailContext}><strong>Unidad de análisis:</strong> servicio + zona. Los objetivos programados representan la meta del período; los servicios cancelados no se incluyen en el cálculo de incumplimiento.</p>;
   }
   if (data.family === "compliance") {
     return <p className={styles.detailContext}>El estado <strong>en fecha</strong> compara el último <code>ZoneResult.recordedAt</code> con <code>Service.scheduledDate</code>. Las zonas sin atención se ordenan con el motivo registrado.</p>;
@@ -136,7 +136,7 @@ function IndicatorDetail({ data, viewMode, onViewModeChange }: { data: Indicator
       <div><h2 id="indicator-detail-title">{meta.label}</h2><p>{formatDate(data.period.from)} – {formatDate(data.period.to)} · {data.primary.label}: <strong>{metricText(data.primary)}</strong></p></div>
       <div className={styles.viewActions}>
         <div className={styles.viewToggle} aria-label="Vista del detalle"><button type="button" aria-pressed={viewMode === "bars"} onClick={() => onViewModeChange("bars")}>Barras</button><button type="button" aria-pressed={viewMode === "table"} onClick={() => onViewModeChange("table")}>Tabla</button></div>
-        <button className={styles.dataTableAction} type="button" onClick={() => onViewModeChange("table")}>Ver tabla de datos</button>
+        <Button className={styles.dataTableAction} type="button" variant="outline" size="lg" onClick={() => onViewModeChange("table")}>Ver tabla de datos</Button>
       </div>
     </div>
     {hasSummaryMetrics ? <div className={styles.summaryMetrics} aria-label={`Resumen exacto de ${meta.label}`}>{data.summaryMetrics.map((metric) => <div className={styles.summaryMetric} key={metric.label}><strong>{metricText(metric)}</strong><span>{metric.label}</span></div>)}</div> : null}
@@ -154,7 +154,7 @@ function BreakdownView({ breakdown, viewMode }: { breakdown: IndicatorBreakdown;
 function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
   const data = points.map((point) => ({ ...point, valueLabel: metricText(point) }));
   return <div className={styles.chartView}>
-    <ChartContainer className={styles.chart} config={chartConfig} initialDimension={{ width: 480, height: Math.max(220, points.length * 56 + 40) }}><BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 8, right: 24, top: 12, bottom: 8 }} onClick={(entry) => { const point = (entry as { activePayload?: Array<{ payload?: IndicatorPoint }> })?.activePayload?.[0]?.payload; if (point?.id) onSelect(point.id); }}><CartesianGrid horizontal={false} stroke="var(--color-border)" /><XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => formatNumber(Number(value), points[0]?.unit ?? "")} /><YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={104} /><ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => <span>{formatNumber(Number(value), points[0]?.unit ?? "")} {points[0]?.unit}</span>} />} /><Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--color-action)" isAnimationActive={false} /></BarChart></ChartContainer>
+    <ChartContainer className={styles.chart} config={chartConfig} initialDimension={{ width: 480, height: Math.max(220, points.length * 56 + 40) }}><BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 8, right: 24, top: 12, bottom: 8 }} onClick={(entry) => { const point = (entry as { activePayload?: Array<{ payload?: IndicatorPoint }> })?.activePayload?.[0]?.payload; if (point?.id) onSelect(point.id); }}><CartesianGrid horizontal={false} stroke="var(--color-border)" /><XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => formatNumber(Number(value), points[0]?.unit ?? "")} /><YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={104} /><ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => <span>{formatNumber(Number(value), points[0]?.unit ?? "")} {points[0]?.unit}</span>} />} /><Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--color-action)" isAnimationActive={false}>{points.map((point) => <Cell key={point.id} fill={point.tone === "success" ? "var(--color-success)" : point.tone === "warning" ? "var(--color-warning)" : "var(--color-action)"} />)}</Bar></BarChart></ChartContainer>
     <div className={styles.chartDetails} role="list" aria-label={`Valores exactos de ${title.toLowerCase()}`}>
       {points.map((point) => <div key={point.id} role="listitem"><button className={styles.chartDetailButton} type="button" aria-pressed={selectedId === point.id} onClick={() => onSelect(point.id)}><span>{point.label}</span><span>{pointText(point)}</span></button></div>)}
     </div>
