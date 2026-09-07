@@ -18,6 +18,7 @@ import {
 import {
   assignCrewInputSchema,
   cancelServiceInputSchema,
+  completeServiceInputSchema,
   confirmRescheduleInputSchema,
   createServiceInputSchema,
   CREW_CATALOG,
@@ -1660,7 +1661,39 @@ export const handlers = [
     addZoneResultFixture(newResult);
     return HttpResponse.json(newResult, { status: 201 });
   }),
-  http.post("*/api/services/:serviceId/complete", ({ params }) => {
+  // #125 — a completed Container-targeted Service owns the Container transition.
+  http.post("*/api/services/:serviceId/complete", async ({ params, request }) => {
+    let body: unknown = {};
+    try {
+      const rawBody = await request.text();
+      if (rawBody.trim()) body = JSON.parse(rawBody);
+    } catch {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: "El cuerpo de la solicitud debe ser un JSON válido.",
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/complete`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const parsedInput = completeServiceInputSchema.safeParse(body);
+    if (!parsedInput.success) {
+      return HttpResponse.json(
+        {
+          statusCode: 400,
+          message: parsedInput.error.issues.map((issue) => issue.message).join(" "),
+          error: "Bad Request",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/complete`,
+        },
+        { status: 400 },
+      );
+    }
+
     const service = serviceFixtures.find((s) => s.id === params.serviceId);
     if (!service) {
       return HttpResponse.json(
@@ -1711,6 +1744,33 @@ export const handlers = [
       .filter((r) => r.status !== "SERVICED" && r.notes)
       .map((r) => r.notes)
       .join(" · ");
+
+    if (computedStatus === "COMPLETED" && service.mode === "POINT" && service.targetType === "CONTAINER") {
+      const container =
+        (service.targetId ? getContainerFixture(service.targetId) : null) ??
+        (service.targetRef
+          ? containerFixtures.find((candidate) => candidate.code === service.targetRef) ?? null
+          : null);
+
+      if (container?.status === "RELOCATING" && !parsedInput.data.containerLocation) {
+        return HttpResponse.json(
+          {
+            statusCode: 400,
+            message: "La nueva ubicación del contenedor es obligatoria para completar la reubicación.",
+            error: "Bad Request",
+            timestamp: new Date().toISOString(),
+            path: `/api/services/${params.serviceId}/complete`,
+          },
+          { status: 400 },
+        );
+      }
+
+      if (container?.status === "OVERFLOWED") emptyContainerFixture(container.id);
+      if (container?.status === "UNDER_REPAIR") completeRepairFixture(container.id);
+      if (container?.status === "RELOCATING" && parsedInput.data.containerLocation) {
+        confirmRelocationFixture(container.id, parsedInput.data.containerLocation);
+      }
+    }
 
     const updated = updateServiceFixture(service.id, {
       status: computedStatus,

@@ -119,6 +119,7 @@ export function findInFlightServiceForContainer(
   ];
   return services.find(
     (s) =>
+      s.mode !== "ROUTE" &&
       s.targetType === "CONTAINER" &&
       (s.targetId === container.id || s.targetRef === container.code) &&
       inFlightStatuses.includes(s.status),

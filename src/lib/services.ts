@@ -141,6 +141,19 @@ export const createServiceInputSchema = z
 
 export type CreateServiceInput = z.infer<typeof createServiceInputSchema>;
 
+export const containerLocationSchema = z.object({
+  address: z.string().trim().min(1, "La nueva dirección es obligatoria."),
+  lat: z.number({ message: "La latitud debe ser un número válido." }),
+  lng: z.number({ message: "La longitud debe ser un número válido." }),
+  zoneId: z.string().trim().min(1).optional(),
+});
+export type ContainerLocation = z.infer<typeof containerLocationSchema>;
+
+export const completeServiceInputSchema = z.object({
+  containerLocation: containerLocationSchema.optional(),
+});
+export type CompleteServiceInput = z.infer<typeof completeServiceInputSchema>;
+
 export type ServiceTypeCatalogItem = {
   id: string;
   code: string;
@@ -1139,12 +1152,24 @@ export const servicesAdapter = {
     return parsed.data;
   },
 
-  async complete(serviceId: string): Promise<Service> {
+  async complete(serviceId: string, input?: CompleteServiceInput): Promise<Service> {
+    const parsedInput = completeServiceInputSchema.safeParse(input ?? {});
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para completar el servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    const requestInit: RequestInit = { method: "POST" };
+    if (parsedInput.data.containerLocation) {
+      requestInit.headers = { "content-type": "application/json" };
+      requestInit.body = JSON.stringify(parsedInput.data);
+    }
+
     let response: Response;
     try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/complete`, {
-        method: "POST",
-      });
+      response = await authenticatedFetch(`/api/services/${serviceId}/complete`, requestInit);
     } catch (cause) {
       if (cause instanceof NetworkFailureError) {
         recordTelemetryEvent({ name: "request_network_failure", resource: "services" });

@@ -352,6 +352,10 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
     if (detailContainer?.id === updated.id) setDetailContainer(updated);
   }
 
+  const detailInFlight = detailContainer
+    ? findInFlightServiceForContainer(detailContainer, services)
+    : undefined;
+
   return (
     <section aria-labelledby="containers-title" className="flex max-w-5xl flex-col gap-5">
       <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
@@ -639,6 +643,16 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                         </>
                       )}
                       {canManage && container.status === "UNDER_REPAIR" && (
+                        inFlight ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2 py-1 text-xs font-medium text-[var(--color-warning)]"
+                            title={`Servicio en curso vinculado: ${inFlight.id}`}
+                            data-testid={`in-flight-badge-${container.id}`}
+                          >
+                            <Clock className="size-3.5 shrink-0" aria-hidden />
+                            <span>Servicio en curso ({inFlight.id})</span>
+                          </span>
+                        ) : (
                         <Button
                           variant="outline"
                           size="sm"
@@ -648,6 +662,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                           <CheckCircle2 data-icon="inline-start" aria-hidden />
                           Completar reparación independiente
                         </Button>
+                        )
                       )}
                     </td>
                   </tr>
@@ -1133,7 +1148,17 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                       </Button>
                     </>
                   )}
-                  {canManage && detailContainer.status === "UNDER_REPAIR" && (
+                  {canManage && detailContainer.status === "UNDER_REPAIR" && detailInFlight && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2 py-1 text-xs font-medium text-[var(--color-warning)]"
+                      title={`Servicio en curso vinculado: ${detailInFlight.id}`}
+                      data-testid={`in-flight-badge-${detailContainer.id}`}
+                    >
+                      <Clock className="size-3.5 shrink-0" aria-hidden />
+                      <span>Servicio en curso ({detailInFlight.id})</span>
+                    </span>
+                  )}
+                  {canManage && detailContainer.status === "UNDER_REPAIR" && !detailInFlight && (
                     <Button
                       type="button"
                       variant="outline"
