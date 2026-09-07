@@ -52,6 +52,16 @@ describe("TreeSurveyPanel", () => {
     expect(screen.queryByRole("button", { name: "Registrar relevamiento" })).not.toBeInTheDocument();
   });
 
+  it("offers a guided intervention request from a high-risk survey with a readable source trail", async () => {
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    await screen.findByRole("heading", { name: /Historial de relevamientos/ });
+    await screen.getByRole("button", { name: "Solicitar intervención sugerida" }).click();
+    const dialog = screen.getByRole("dialog", { name: /Solicitar intervención/ });
+    expect(within(dialog).getByLabelText(/^Tipo de intervención/)).toHaveValue("SAFETY_PRUNING");
+    expect(within(dialog).getByLabelText(/^Árboles a intervenir/)).toHaveValue(["tree-2"]);
+    expect(within(dialog).getByLabelText(/^Justificación/)).toHaveValue("Relevamiento 06/09/2026 (survey-2).");
+  });
+
   it("covers accessible empty and retryable error states", async () => {
     server.use(http.get("*/api/trees/:treeId/surveys", () => HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 10, totalPages: 1 } })));
     const { unmount } = render(<TreeSurveyPanel tree={tree} scenario={scenarios.fieldCrewLeader} onClose={vi.fn()} />);

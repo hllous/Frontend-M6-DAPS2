@@ -22,6 +22,7 @@ import {
 import type { OperationalScenario } from "@/lib/scenarios";
 import { zonesAdapter, type Zone } from "@/lib/zones";
 import { TreeSurveyPanel } from "./tree-survey-panel";
+import { TreeInterventionRequestDialog } from "./tree-interventions-panel";
 
 type LoadState =
   | { status: "loading" }
@@ -82,6 +83,7 @@ function formatMeasurement(value: number, unit: string) {
 
 export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }) {
   const canManage = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("tree:manage");
+  const canRequestIntervention = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("treeIntervention:request");
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [zones, setZones] = useState<Zone[]>([]);
   const [requestVersion, setRequestVersion] = useState(0);
@@ -98,6 +100,8 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const [detailError, setDetailError] = useState<string | null>(null);
   const [surveyTree, setSurveyTree] = useState<Tree | null>(null);
   const [surveyTreeSelection, setSurveyTreeSelection] = useState("");
+  const [interventionOpen, setInterventionOpen] = useState(false);
+  const [interventionTreeIds, setInterventionTreeIds] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
   const query = useMemo<TreeQuery>(() => ({
@@ -230,6 +234,8 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
       {state.status === "ready" && state.items.length > 0 ? <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4"><label className="flex min-w-64 flex-1 flex-col gap-1 text-sm font-semibold">Árbol para relevar<select aria-label="Árbol para relevar" className={formControlClass} value={surveyTreeSelection} onChange={(event) => setSurveyTreeSelection(event.target.value)}><option value="">Seleccione un árbol</option>{state.items.map((tree) => <option key={tree.id} value={tree.id}>{tree.surveyCode} · {tree.species}</option>)}</select></label><Button type="button" variant="outline" disabled={!surveyTreeSelection} onClick={() => setSurveyTree(state.items.find((tree) => tree.id === surveyTreeSelection) ?? null)}>Ver historial de relevamientos</Button></div> : null}
       {surveyTree ? <TreeSurveyPanel tree={surveyTree} scenario={scenario} onClose={() => setSurveyTree(null)} /> : null}
+      {canRequestIntervention ? <Button type="button" variant="outline" disabled={!surveyTreeSelection} onClick={() => { setInterventionTreeIds([surveyTreeSelection]); setInterventionOpen(true); }}>Solicitar intervención sobre el árbol seleccionado</Button> : null}
+      {canRequestIntervention ? <TreeInterventionRequestDialog key={`${interventionOpen}-${interventionTreeIds.join(",")}`} open={interventionOpen} onOpenChange={setInterventionOpen} trees={state.status === "ready" ? state.items : []} initialTreeIds={interventionTreeIds} onCreated={() => setNotice("Solicitud de intervención creada. Estado inicial: solicitada.")} /> : null}
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent><DialogHeader><DialogTitle>{editingTree ? "Editar árbol" : "Registrar árbol"}</DialogTitle><DialogDescription>{editingTree ? "Actualice los datos del ejemplar. El código de relevamiento es inmutable." : "Complete los datos del ejemplar censado."}</DialogDescription></DialogHeader>{formError ? <p role="alert" className="text-sm text-destructive">{formError}</p> : null}<form id="tree-form" onSubmit={(event) => void submitForm(event)} noValidate><FieldGroup><Field><FieldLabel htmlFor="tree-survey-code">Código de relevamiento</FieldLabel><input id="tree-survey-code" className={formControlClass} value={form.surveyCode} disabled={Boolean(editingTree)} onChange={(event) => setForm({ ...form, surveyCode: event.target.value })} required={!editingTree} aria-describedby={editingTree ? "tree-survey-code-help" : undefined} /><FieldDescription id="tree-survey-code-help">Identifica el ejemplar en el censo y no se puede cambiar.</FieldDescription></Field><Field><FieldLabel htmlFor="tree-species">Especie</FieldLabel><input id="tree-species" className={formControlClass} value={form.species} onChange={(event) => setForm({ ...form, species: event.target.value })} required /></Field><Field><FieldLabel htmlFor="tree-zone">Zona operativa</FieldLabel><select id="tree-zone" className={formControlClass} value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })} required><option value="">Seleccione una zona</option>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}</select></Field><Field><FieldLabel htmlFor="tree-address">Dirección</FieldLabel><input id="tree-address" className={formControlClass} value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /><FieldDescription>Opcional. Se utiliza junto con la especie en la búsqueda.</FieldDescription></Field><div className="grid grid-cols-2 gap-3"><Field><FieldLabel htmlFor="tree-lat">Latitud</FieldLabel><input id="tree-lat" className={formControlClass} type="number" step="any" value={form.lat} onChange={(event) => setForm({ ...form, lat: event.target.value })} /></Field><Field><FieldLabel htmlFor="tree-lng">Longitud</FieldLabel><input id="tree-lng" className={formControlClass} type="number" step="any" value={form.lng} onChange={(event) => setForm({ ...form, lng: event.target.value })} /></Field></div><div className="grid grid-cols-2 gap-3"><Field><FieldLabel htmlFor="tree-height">Altura (m)</FieldLabel><input id="tree-height" className={formControlClass} type="number" min="0" step="any" value={form.heightM} onChange={(event) => setForm({ ...form, heightM: event.target.value })} required /></Field><Field><FieldLabel htmlFor="tree-diameter">Diámetro (cm)</FieldLabel><input id="tree-diameter" className={formControlClass} type="number" min="0" step="any" value={form.diameterCm} onChange={(event) => setForm({ ...form, diameterCm: event.target.value })} required /></Field></div>{editingTree ? <label className="flex min-h-10 items-center gap-2 text-sm max-[760px]:min-h-12"><input type="checkbox" checked={form.active} onChange={(event) => setForm({ ...form, active: event.target.checked })} /> Activo</label> : null}</FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={isSubmitting}>Cancelar</Button><Button type="submit" form="tree-form" disabled={isSubmitting}>{isSubmitting ? "Guardando…" : "Guardar árbol"}</Button></DialogFooter></DialogContent></Dialog>
 

@@ -1,12 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Boxes, CalendarClock, MapPin, Recycle, Route as RouteIcon, Trash2, Truck, Trees, UsersRound } from "lucide-react";
+import { ArrowRight, Boxes, CalendarClock, MapPin, Recycle, Route as RouteIcon, Scissors, Trash2, Truck, Trees, UsersRound } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import type { OperationalScenario } from "@/lib/scenarios";
 
 const catalogCards = [
+  {
+    href: "/app/catalog/tree-interventions",
+    title: "Intervenciones de arbolado",
+    description: "Solicitudes de poda, extracción, plantación y tratamiento.",
+    icon: Scissors,
+    tone: "bg-[var(--color-info-fill)] text-[var(--color-info)]",
+  },
   {
     href: "/app/catalog/service-types",
     title: "Tipos de servicio",
