@@ -44,6 +44,7 @@ import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ReferralsWorkspace } from "@/components/referrals/referrals-workspace";
 import { CatalogLanding } from "@/components/catalog/catalog-landing";
 import { ZonesPanel } from "./zones-panel";
+import { IndicatorsDashboard } from "@/components/indicators/indicators-dashboard";
 import { EnvironmentalReportsWorkspace } from "@/components/environmental-reports/environmental-reports-workspace";
 
 type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
@@ -166,6 +167,8 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
             <CatalogLanding scenario={scenario} />
             <ZonesPanel />
           </div>
+        ) : destination === "dashboards" ? (
+          <IndicatorsDashboard scenario={scenario} />
         ) : destination === "environment" ? (
           <EnvironmentalReportsWorkspace scenario={scenario} />
         ) : (
