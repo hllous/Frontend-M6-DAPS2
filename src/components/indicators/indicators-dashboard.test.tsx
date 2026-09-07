@@ -69,4 +69,49 @@ describe("IndicatorsDashboard", () => {
     expect(within(wasteTable).getAllByRole("columnheader", { name: "Metros cúbicos" })[0]).toBeVisible();
     expect(within(wasteTable).getAllByText("62,8 m³")[0]).toBeVisible();
   });
+
+  it("traces a selected zone to services and restores the unfiltered records view", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(await screen.findByRole("button", { name: /Centro.*93,6/i }));
+
+    const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
+    expect(within(recordsRegion).getByRole("row", { name: /SVC-1042/ })).toBeVisible();
+    expect(recordsRegion).toHaveTextContent(/Filtro activo:.*Centro/i);
+    expect(recordsRegion).toHaveTextContent(/Cobertura por zona/i);
+    expect(screen.getByRole("link", { name: /Abrir Servicios/i })).toHaveAttribute("href", "/app?destination=services");
+
+    await user.click(screen.getByRole("button", { name: "Quitar filtro de señal" }));
+
+    expect(recordsRegion).toHaveTextContent(/Sin filtro de señal/);
+    expect(within(recordsRegion).getByRole("row", { name: /SVC-1042/ })).toBeVisible();
+  });
+
+  it("traces container incidents to the container catalog without adding record mutations", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+    await user.click(await screen.findByRole("button", { name: /Centro.*8 incidentes/i }));
+
+    const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
+    expect(within(recordsRegion).getByRole("row", { name: /CONT-001/ })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Abrir catálogo de contenedores/i })).toHaveAttribute("href", "/app/catalog/containers");
+    expect(screen.queryByRole("button", { name: /Editar|Eliminar|Dar de baja/i })).not.toBeInTheDocument();
+  });
+
+  it("explains when a signal has no contract-backed operational record relationship", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+    await user.click(await screen.findByRole("button", { name: /Alto.*9 árboles/i }));
+
+    expect(screen.getByText(/no se puede vincular con un registro operativo/i)).toBeVisible();
+    expect(screen.queryByRole("link", { name: /Abrir catálogo de árboles/i })).not.toBeInTheDocument();
+  });
 });
