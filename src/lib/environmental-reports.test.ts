@@ -35,4 +35,22 @@ describe("environmental reports adapter", () => {
     server.use(http.get("*/api/environmental-reports/ER-1001", () => HttpResponse.json({ broken: true })));
     await expect(environmentalReportsAdapter.get("ER-1001")).rejects.toBeInstanceOf(EnvironmentalReportContractError);
   });
+
+  it("schedules an inspection with the selected checklist version and snapshot", async () => {
+    const inspection = await environmentalReportsAdapter.schedule("ER-1002", {
+      scheduledDate: "2026-09-10",
+      timeWindow: { start: "09:00", end: "11:00" },
+      checklistVersion: "ambiental-v2",
+      checklist: [
+        { id: "noise-level", label: "Medir nivel sonoro", required: true },
+      ],
+    });
+
+    expect(inspection).toMatchObject({
+      reportId: "ER-1002",
+      checklistVersion: "ambiental-v2",
+      checklist: [{ id: "noise-level", label: "Medir nivel sonoro", required: true }],
+      outcome: null,
+    });
+  });
 });

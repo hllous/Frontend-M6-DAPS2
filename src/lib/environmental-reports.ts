@@ -71,6 +71,61 @@ export const environmentalReportSchema = z.object({
 }).passthrough();
 export type EnvironmentalReport = z.infer<typeof environmentalReportSchema>;
 
+export const environmentalInspectionOutcomeSchema = z.enum([
+  "NO_VIOLATION",
+  "VIOLATION_FOUND",
+  "INCONCLUSIVE",
+]);
+export type EnvironmentalInspectionOutcome = z.infer<typeof environmentalInspectionOutcomeSchema>;
+
+export const environmentalInspectionNextStepSchema = z.enum([
+  "NOTICE_TO_BE_ISSUED",
+  "REINSPECTION",
+  "CASE_CLOSED",
+]);
+export type EnvironmentalInspectionNextStep = z.infer<typeof environmentalInspectionNextStepSchema>;
+
+// Hypothesis: the backend has not published the exact checklist DTO yet.
+export const environmentalInspectionChecklistItemSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  required: z.boolean().default(true),
+}).passthrough();
+export type EnvironmentalInspectionChecklistItem = z.infer<typeof environmentalInspectionChecklistItemSchema>;
+
+// Hypothesis: schedule fields are kept explicit at this adapter seam until OpenAPI
+// exposes the authoritative request and response nesting.
+export const environmentalInspectionScheduleInputSchema = z.object({
+  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
+  timeWindow: z.object({
+    start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
+    end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
+  }),
+  checklistVersion: z.string().trim().min(1, "Debe seleccionar una versión de checklist"),
+  checklist: z.array(environmentalInspectionChecklistItemSchema).min(1, "El checklist debe tener al menos un control"),
+  zoneId: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
+});
+export type EnvironmentalInspectionScheduleInput = z.infer<typeof environmentalInspectionScheduleInputSchema>;
+
+export const environmentalInspectionSchema = z.object({
+  id: z.string(),
+  reportId: z.string(),
+  serviceId: z.string().nullable().optional(),
+  inspectedAt: z.string().nullable().optional(),
+  scheduledDate: z.string(),
+  timeWindow: z.object({ start: z.string(), end: z.string() }),
+  checklistVersion: z.string(),
+  checklist: z.array(environmentalInspectionChecklistItemSchema),
+  findings: z.string().nullable().optional(),
+  outcome: environmentalInspectionOutcomeSchema.nullable().optional(),
+  nextStep: environmentalInspectionNextStepSchema.nullable().optional(),
+  notes: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).passthrough();
+export type EnvironmentalInspection = z.infer<typeof environmentalInspectionSchema>;
+
 export type EnvironmentalReportQuery = {
   status?: EnvironmentalReportStatus;
   reportType?: EnvironmentalReportType;
@@ -204,6 +259,15 @@ function parseResource(payload: unknown, message: string): EnvironmentalReport {
   return parsed.data;
 }
 
+function parseInspection(payload: unknown, message: string): EnvironmentalInspection {
+  const parsed = environmentalInspectionSchema.safeParse(resourcePayload(payload));
+  if (!parsed.success) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
+    throw new EnvironmentalReportContractError(message, { cause: parsed.error });
+  }
+  return parsed.data;
+}
+
 export const environmentalReportsAdapter = {
   async list(query: EnvironmentalReportQuery = {}): Promise<EnvironmentalReportsPage> {
     const payload = await requestJson(`/api/environmental-reports${queryString(query)}`);
@@ -246,6 +310,35 @@ export const environmentalReportsAdapter = {
   },
   async close(id: string): Promise<EnvironmentalReport> {
     return transition(id, "close", "La respuesta de cierre no respeta el contrato esperado.");
+  },
+
+  async schedule(reportId: string, input: EnvironmentalInspectionScheduleInput): Promise<EnvironmentalInspection> {
+    const parsedInput = environmentalInspectionScheduleInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new EnvironmentalReportContractError("Los datos para programar la inspección son inválidos.", { cause: parsedInput.error });
+    }
+    return parseInspection(await requestJson(`/api/environmental-reports/${encodeURIComponent(reportId)}/inspections`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsedInput.data),
+    }), "La respuesta de programación de inspección no respeta el contrato esperado.");
+  },
+
+  async listInspections(reportId: string): Promise<EnvironmentalInspection[]> {
+    const payload = await requestJson(`/api/environmental-reports/${encodeURIComponent(reportId)}/inspections`);
+    const raw = payload && typeof payload === "object" && "data" in payload
+      ? (payload as { data: unknown }).data
+      : payload;
+    const parsed = z.array(environmentalInspectionSchema).safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
+      throw new EnvironmentalReportContractError("La historia de inspecciones no respeta el contrato esperado.", { cause: parsed.error });
+    }
+    return parsed.data;
+  },
+
+  async getInspection(id: string): Promise<EnvironmentalInspection> {
+    return parseInspection(await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}`), "El detalle de inspección no respeta el contrato esperado.");
   },
 };
 

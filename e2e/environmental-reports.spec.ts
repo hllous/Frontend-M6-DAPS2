@@ -20,6 +20,23 @@ test.describe("EnvironmentalReport case file", () => {
     await expect(detail.getByRole("button", { name: "Desestimar expediente" })).toBeVisible();
   });
 
+  test("Office schedules an inspection through the guided POINT flow", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=environment");
+    const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
+    await list.getByRole("button", { name: /ER-1002/ }).click();
+    const detail = page.getByRole("region", { name: "Detalle de ER-1002" });
+    await detail.getByRole("button", { name: "Programar inspección" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Fecha de inspección").fill("2026-09-10");
+    await dialog.getByLabel("Cuadrilla").selectOption("crew-a");
+    await dialog.getByRole("button", { name: "Programar inspección" }).click();
+    await expect(detail.getByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();
+    await expect(detail.getByText(/^SVC-/)).toBeVisible();
+    await expect(detail.getByText(/Cuadrilla A/)).toBeVisible();
+  });
+
   test("Field submits a report without exposing M2 reporter data", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginViaApi(page, "field-crew-leader-route");

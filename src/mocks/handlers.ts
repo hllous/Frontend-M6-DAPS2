@@ -162,15 +162,21 @@ import {
 import { repairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import {
+  addEnvironmentalInspectionFixture,
   addEnvironmentalReportFixture,
+  createEnvironmentalInspectionFixture,
   createEnvironmentalReportFixture,
   filterEnvironmentalReportFixtures,
+  getEnvironmentalInspectionFixture,
   getEnvironmentalReportFixture,
+  listEnvironmentalInspectionFixtures,
   paginateEnvironmentalReportFixtures,
+  updateEnvironmentalInspectionFixture,
   transitionEnvironmentalReportFixture,
 } from "@/lib/environmental-report-fixtures";
 import {
   createEnvironmentalReportInputSchema,
+  environmentalInspectionScheduleInputSchema,
   environmentalReportPrioritySchema,
   environmentalReportStatusSchema,
   environmentalReportTypeSchema,
@@ -397,6 +403,36 @@ export const handlers = [
     if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/environmental-reports" }, { status: 400 });
     const created = createEnvironmentalReportFixture(parsed.data, "crew-b");
     addEnvironmentalReportFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.get("*/api/environmental-reports/:reportId/inspections", ({ params }) => {
+    const report = getEnvironmentalReportFixture(params.reportId as string);
+    if (!report) return HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${params.reportId}/inspections` }, { status: 404 });
+    return HttpResponse.json(listEnvironmentalInspectionFixtures(params.reportId as string));
+  }),
+  http.post("*/api/environmental-reports/:reportId/inspections", async ({ params, request }) => {
+    const reportId = params.reportId as string;
+    const report = getEnvironmentalReportFixture(reportId);
+    if (!report) return HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${reportId}/inspections` }, { status: 404 });
+    const parsed = environmentalInspectionScheduleInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${reportId}/inspections` }, { status: 400 });
+
+    const active = listEnvironmentalInspectionFixtures(reportId).find((inspection) => !inspection.outcome);
+    if (active && report.status === "INSPECTION_SCHEDULED") {
+      return HttpResponse.json(updateEnvironmentalInspectionFixture(active.id, {
+        scheduledDate: parsed.data.scheduledDate,
+        timeWindow: parsed.data.timeWindow,
+        checklistVersion: parsed.data.checklistVersion,
+        checklist: parsed.data.checklist,
+        notes: parsed.data.notes ?? null,
+      }));
+    }
+    const isFirstSchedule = report.status === "UNDER_REVIEW";
+    const isReinspection = report.status === "INSPECTED" && listEnvironmentalInspectionFixtures(reportId).some((inspection) => inspection.outcome === "INCONCLUSIVE");
+    if (!isFirstSchedule && !isReinspection) return HttpResponse.json({ statusCode: 409, message: `Solo se puede programar una inspección desde el estado actual: ${report.status}.`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${reportId}/inspections` }, { status: 409 });
+    const created = createEnvironmentalInspectionFixture(reportId, parsed.data);
+    addEnvironmentalInspectionFixture(created);
+    transitionEnvironmentalReportFixture(reportId, "INSPECTION_SCHEDULED");
     return HttpResponse.json(created, { status: 201 });
   }),
   http.post("*/api/environmental-reports/:reportId/start-review", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "RECEIVED", "UNDER_REVIEW")),
@@ -1195,6 +1231,9 @@ export const handlers = [
     };
 
     addServiceFixture(newService);
+    if (input.origin === "INSPECTION" && input.inspectionId) {
+      updateEnvironmentalInspectionFixture(input.inspectionId, { serviceId: newService.id });
+    }
     return HttpResponse.json(newService, { status: 201 });
   }),
   http.post("*/api/services/:serviceId/assign-crew", async ({ params, request }) => {
