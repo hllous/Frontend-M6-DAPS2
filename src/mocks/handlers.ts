@@ -95,6 +95,8 @@ import {
   updateGreenSpaceInputSchema,
   type GreenSpaceQuery,
 } from "@/lib/green-spaces";
+import { addGreenPointFixture, filterGreenPointFixtures, greenPointFixtures, paginateGreenPointFixtures, updateGreenPointFixture } from "@/lib/green-point-fixtures";
+import { greenPointCreateInputSchema, greenPointUpdateInputSchema, wasteTypeSchema, type GreenPointQuery } from "@/lib/green-points";
 import {
   addRepairRequestFixture,
   createRepairRequestFixture,
@@ -267,6 +269,19 @@ function greenSpaceQueryFromUrl(url: string): GreenSpaceQuery {
       ? (params.get("spaceType") as GreenSpaceQuery["spaceType"])
       : undefined,
     zoneId: params.get("zoneId") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
+function greenPointQueryFromUrl(url: string): GreenPointQuery {
+  const params = new URL(url).searchParams;
+  const wasteType = wasteTypeSchema.safeParse(params.get("wasteType"));
+  return {
+    active: params.has("active") ? params.get("active") === "true" : undefined,
+    zoneId: params.get("zoneId") ?? undefined,
+    wasteType: wasteType.success ? wasteType.data : undefined,
+    search: params.get("search") ?? undefined,
     page: params.has("page") ? Number(params.get("page")) : undefined,
     pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
   };
@@ -897,6 +912,29 @@ export const handlers = [
     }
     greenSpace.active = false;
     return HttpResponse.json(greenSpace);
+  }),
+  // --- Green Point catalog (#124) ---
+  http.get("*/api/green-points", ({ request }) => { const query = greenPointQueryFromUrl(request.url); return HttpResponse.json(paginateGreenPointFixtures(filterGreenPointFixtures(query), query.page, query.pageSize)); }),
+  http.get("*/api/green-points/:greenPointId", ({ params }) => {
+    const point = greenPointFixtures.find((item) => item.id === params.greenPointId);
+    return point ? HttpResponse.json(point) : HttpResponse.json({ statusCode: 404, message: "Punto verde no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/green-points/${params.greenPointId}` }, { status: 404 });
+  }),
+  http.post("*/api/green-points", async ({ request }) => {
+    const parsed = greenPointCreateInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de punto verde inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/green-points" }, { status: 400 });
+    const created = { id: `green-point-${Date.now()}`, ...parsed.data, address: parsed.data.address ?? null, lat: parsed.data.lat ?? null, lng: parsed.data.lng ?? null, active: parsed.data.active ?? true };
+    addGreenPointFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.patch("*/api/green-points/:greenPointId", async ({ params, request }) => {
+    const parsed = greenPointUpdateInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos editables de punto verde inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/green-points" }, { status: 400 });
+    const updated = updateGreenPointFixture(params.greenPointId as string, parsed.data);
+    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "Punto verde no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/green-points" }, { status: 404 });
+  }),
+  http.delete("*/api/green-points/:greenPointId", ({ params }) => {
+    const updated = updateGreenPointFixture(params.greenPointId as string, { active: false });
+    return updated ? new HttpResponse(null, { status: 204 }) : HttpResponse.json({ statusCode: 404, message: "Punto verde no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/green-points" }, { status: 404 });
   }),
   // --- Containers catalog (#120) ---
   http.get("*/api/containers", ({ request }) => {
