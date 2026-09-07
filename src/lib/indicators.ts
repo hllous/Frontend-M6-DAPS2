@@ -67,7 +67,8 @@ export const wasteWireSchema = z.object({
 export type WasteWire = z.infer<typeof wasteWireSchema>;
 
 export type IndicatorMetric = { value: number; label: string; unit: string };
-export type IndicatorPoint = { id: string; label: string; value: number; unit: string; note?: string; tone?: "primary" | "success" | "warning" | "danger" };
+export type IndicatorPointDetail = { label: string; value: number; unit: string };
+export type IndicatorPoint = { id: string; label: string; value: number; unit: string; note?: string; details?: IndicatorPointDetail[]; tone?: "primary" | "success" | "warning" | "danger" };
 export type IndicatorBreakdown = { id: string; title: string; description: string; points: IndicatorPoint[] };
 export type IndicatorPeriod = { from: string; to: string };
 export type IndicatorFreshness = { updatedAt: string };
@@ -77,6 +78,7 @@ export type CoverageIndicator = {
   period: IndicatorPeriod;
   freshness: IndicatorFreshness;
   primary: IndicatorMetric;
+  summaryMetrics: IndicatorMetric[];
   breakdowns: IndicatorBreakdown[];
 };
 export type ComplianceIndicator = {
@@ -84,6 +86,7 @@ export type ComplianceIndicator = {
   period: IndicatorPeriod;
   freshness: IndicatorFreshness;
   primary: IndicatorMetric;
+  summaryMetrics: IndicatorMetric[];
   breakdowns: IndicatorBreakdown[];
 };
 export type IncidentsIndicator = {
@@ -173,9 +176,13 @@ function normalizeCoverage(wire: CoverageWire): CoverageIndicator {
   return {
     family: "coverage", period: wire.period, freshness: wire.freshness,
     primary: { value: wire.summary.rate, label: "Cobertura de objetivos", unit: "%" },
+    summaryMetrics: [
+      { value: wire.summary.attended, label: "Atendidos", unit: "objetivos" },
+      { value: wire.summary.scheduled, label: "Programados", unit: "objetivos" },
+    ],
     breakdowns: [
-      { id: "zones", title: "Cobertura por zona", description: "Objetivos atendidos sobre objetivos programados.", points: wire.byZone.map((item) => ({ id: item.id, label: item.label, value: item.rate, unit: "%", note: `${item.attended} de ${item.scheduled} objetivos` })) },
-      { id: "service-types", title: "Cobertura por tipo de servicio", description: "Comparación de cobertura entre servicios.", points: wire.byServiceType.map((item) => ({ id: item.id, label: item.label, value: item.rate, unit: "%", note: `${item.attended} de ${item.scheduled} objetivos` })) },
+      { id: "zones", title: "Cobertura por zona", description: "Objetivos atendidos sobre objetivos programados.", points: wire.byZone.map((item) => ({ id: item.id, label: item.label, value: item.rate, unit: "%", note: `${item.attended} de ${item.scheduled} objetivos`, details: [{ label: "Atendidos", value: item.attended, unit: "objetivos" }, { label: "Programados", value: item.scheduled, unit: "objetivos" }] })) },
+      { id: "service-types", title: "Cobertura por tipo de servicio", description: "Comparación de cobertura entre servicios.", points: wire.byServiceType.map((item) => ({ id: item.id, label: item.label, value: item.rate, unit: "%", note: `${item.attended} de ${item.scheduled} objetivos`, details: [{ label: "Atendidos", value: item.attended, unit: "objetivos" }, { label: "Programados", value: item.scheduled, unit: "objetivos" }] })) },
     ],
   };
 }
@@ -184,6 +191,11 @@ function normalizeCompliance(wire: ComplianceWire): ComplianceIndicator {
   return {
     family: "compliance", period: wire.period, freshness: wire.freshness,
     primary: { value: wire.summary.onTimeRate, label: "Cumplimiento en fecha", unit: "%" },
+    summaryMetrics: [
+      { value: wire.summary.completed, label: "Finalizados", unit: "servicios" },
+      { value: wire.summary.onTime, label: "En fecha", unit: "servicios" },
+      { value: wire.summary.delayed, label: "Demorados", unit: "servicios" },
+    ],
     breakdowns: [
       { id: "completion", title: "Finalización en fecha", description: `${wire.summary.completed} servicios finalizados en el período.`, points: [{ id: "on-time", label: "En fecha", value: wire.summary.onTime, unit: "servicios", tone: "success" }, { id: "delayed", label: "Demorados", value: wire.summary.delayed, unit: "servicios", tone: "warning" }] },
       { id: "unattended-zones", title: "Zonas sin atención", description: "Ranking de zonas pendientes y motivo registrado.", points: wire.unattendedZones.map((item) => ({ id: item.id, label: item.label, value: item.unattended, unit: "objetivos", note: item.reason, tone: "warning" })) },

@@ -108,22 +108,60 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   );
 }
 
+function metricText(metric: { value: number; unit: string }) {
+  return `${formatNumber(metric.value, metric.unit)} ${metric.unit}`;
+}
+
+function pointText(point: IndicatorPoint) {
+  const value = metricText(point);
+  const details = point.details?.map((detail) => `${formatNumber(detail.value, detail.unit)} ${detail.label.toLowerCase()}`).join(" · ");
+  return details ? `${value} · ${details}` : value;
+}
+
+function detailContext(data: IndicatorData) {
+  if (data.family === "coverage") {
+    return <p className={styles.detailContext}><strong>Unidad de análisis:</strong> servicio + zona. Los servicios cancelados no se incluyen en el cálculo de incumplimiento.</p>;
+  }
+  if (data.family === "compliance") {
+    return <p className={styles.detailContext}>El estado <strong>en fecha</strong> compara el último <code>ZoneResult.recordedAt</code> con <code>Service.scheduledDate</code>. Las zonas sin atención se ordenan con el motivo registrado.</p>;
+  }
+  return null;
+}
+
 function IndicatorDetail({ data, viewMode, onViewModeChange }: { data: IndicatorData; viewMode: ViewMode; onViewModeChange: (mode: ViewMode) => void }) {
   const meta = familyMeta[data.family];
-  return <section className={styles.detail} aria-labelledby="indicator-detail-title"><div className={styles.detailHeader}><div><h2 id="indicator-detail-title">{meta.label}</h2><p>{formatDate(data.period.from)} – {formatDate(data.period.to)} · {data.primary.label}: <strong>{formatNumber(data.primary.value, data.primary.unit)} {data.primary.unit}</strong></p></div><div className={styles.viewToggle} aria-label="Vista del detalle"><button type="button" aria-pressed={viewMode === "bars"} onClick={() => onViewModeChange("bars")}>Barras</button><button type="button" aria-pressed={viewMode === "table"} onClick={() => onViewModeChange("table")}>Tabla</button></div></div>{data.breakdowns.map((breakdown) => <BreakdownView key={breakdown.id} breakdown={breakdown} viewMode={viewMode} />)}</section>;
+  const hasSummaryMetrics = data.family === "coverage" || data.family === "compliance";
+  return <section className={styles.detail} aria-labelledby="indicator-detail-title">
+    <div className={styles.detailHeader}>
+      <div><h2 id="indicator-detail-title">{meta.label}</h2><p>{formatDate(data.period.from)} – {formatDate(data.period.to)} · {data.primary.label}: <strong>{metricText(data.primary)}</strong></p></div>
+      <div className={styles.viewActions}>
+        <div className={styles.viewToggle} aria-label="Vista del detalle"><button type="button" aria-pressed={viewMode === "bars"} onClick={() => onViewModeChange("bars")}>Barras</button><button type="button" aria-pressed={viewMode === "table"} onClick={() => onViewModeChange("table")}>Tabla</button></div>
+        <button className={styles.dataTableAction} type="button" onClick={() => onViewModeChange("table")}>Ver tabla de datos</button>
+      </div>
+    </div>
+    {hasSummaryMetrics ? <div className={styles.summaryMetrics} aria-label={`Resumen exacto de ${meta.label}`}>{data.summaryMetrics.map((metric) => <div className={styles.summaryMetric} key={metric.label}><strong>{metricText(metric)}</strong><span>{metric.label}</span></div>)}</div> : null}
+    {detailContext(data)}
+    <div className={styles.detailBody} role={viewMode === "table" ? "region" : undefined} aria-label={viewMode === "table" ? `Tabla de datos de ${meta.label}` : undefined}>{data.breakdowns.map((breakdown) => <BreakdownView key={breakdown.id} breakdown={breakdown} viewMode={viewMode} />)}</div>
+  </section>;
 }
 
 function BreakdownView({ breakdown, viewMode }: { breakdown: IndicatorBreakdown; viewMode: ViewMode }) {
   const [selectedId, setSelectedId] = useState(breakdown.points[0]?.id);
-  const selected = breakdown.points.find((point) => point.id === selectedId);
-  return <div className={styles.breakdown}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <p><strong>Seleccionado:</strong> {selected.label}{selected.note ? ` · ${selected.note}` : ""}</p> : null}</div>{viewMode === "bars" ? <BarView points={breakdown.points} selectedId={selectedId} onSelect={setSelectedId} /> : <TableView points={breakdown.points} selectedId={selectedId} onSelect={setSelectedId} title={breakdown.title} />}</div>;
+  const selected = breakdown.points.find((point) => point.id === selectedId) ?? breakdown.points[0];
+  return <div className={styles.breakdown}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <p aria-live="polite"><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</p> : null}</div>{viewMode === "bars" ? <BarView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />}</div>;
 }
 
-function BarView({ points, selectedId, onSelect }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void }) {
-  const data = points.map((point) => ({ ...point, valueLabel: `${formatNumber(point.value, point.unit)} ${point.unit}` }));
-  return <ChartContainer className={styles.chart} config={chartConfig} initialDimension={{ width: 480, height: Math.max(220, points.length * 56 + 40) }}><BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 8, right: 24, top: 12, bottom: 8 }} onClick={(entry) => { const point = (entry as { activePayload?: Array<{ payload?: IndicatorPoint }> })?.activePayload?.[0]?.payload; if (point?.id) onSelect(point.id); }}><CartesianGrid horizontal={false} stroke="var(--color-border)" /><XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => formatNumber(Number(value), points[0]?.unit ?? "")} /><YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={104} /><ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => <span>{formatNumber(Number(value), points[0]?.unit ?? "")} {points[0]?.unit}</span>} />} /><Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--color-action)" isAnimationActive={false} /></BarChart></ChartContainer>;
+function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
+  const data = points.map((point) => ({ ...point, valueLabel: metricText(point) }));
+  return <div className={styles.chartView}>
+    <ChartContainer className={styles.chart} config={chartConfig} initialDimension={{ width: 480, height: Math.max(220, points.length * 56 + 40) }}><BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 8, right: 24, top: 12, bottom: 8 }} onClick={(entry) => { const point = (entry as { activePayload?: Array<{ payload?: IndicatorPoint }> })?.activePayload?.[0]?.payload; if (point?.id) onSelect(point.id); }}><CartesianGrid horizontal={false} stroke="var(--color-border)" /><XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => formatNumber(Number(value), points[0]?.unit ?? "")} /><YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={104} /><ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => <span>{formatNumber(Number(value), points[0]?.unit ?? "")} {points[0]?.unit}</span>} />} /><Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--color-action)" isAnimationActive={false} /></BarChart></ChartContainer>
+    <div className={styles.chartDetails} role="list" aria-label={`Valores exactos de ${title.toLowerCase()}`}>
+      {points.map((point) => <div key={point.id} role="listitem"><button className={styles.chartDetailButton} type="button" aria-pressed={selectedId === point.id} onClick={() => onSelect(point.id)}><span>{point.label}</span><span>{pointText(point)}</span></button></div>)}
+    </div>
+  </div>;
 }
 
 function TableView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
-  return <div className={styles.tableWrap}><table className={styles.table}><caption>Valores exactos de {title.toLowerCase()}</caption><thead><tr><th scope="col">Categoría</th><th scope="col">Valor</th></tr></thead><tbody>{points.map((point) => <tr key={point.id}><td><button type="button" className={styles.rowButton} data-selected={selectedId === point.id} aria-pressed={selectedId === point.id} onClick={() => onSelect(point.id)}>{point.label}{point.note ? <span className={styles.note}>{point.note}</span> : null}</button></td><td className={styles.value}>{formatNumber(point.value, point.unit)} {point.unit}</td></tr>)}</tbody></table></div>;
+  const detailLabels = points.find((point) => point.details?.length)?.details?.map((detail) => detail.label) ?? [];
+  return <div className={styles.tableWrap}><table className={styles.table}><caption>Valores exactos de {title.toLowerCase()}</caption><thead><tr><th scope="col">Categoría</th>{detailLabels.map((label) => <th key={label} scope="col">{label}</th>)}<th scope="col">{detailLabels.length ? "Cobertura" : "Valor"}</th></tr></thead><tbody>{points.map((point) => <tr key={point.id}><td><button type="button" className={styles.rowButton} data-selected={selectedId === point.id} aria-pressed={selectedId === point.id} onClick={() => onSelect(point.id)}>{point.label}{point.note ? <span className={styles.note}>{point.note}</span> : null}</button></td>{detailLabels.map((label) => { const detail = point.details?.find((item) => item.label === label); return <td key={label} className={styles.value}>{detail ? metricText(detail) : "—"}</td>; })}<td className={styles.value}>{metricText(point)}</td></tr>)}</tbody></table></div>;
 }

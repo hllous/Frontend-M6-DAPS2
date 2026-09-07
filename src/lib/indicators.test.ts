@@ -52,7 +52,24 @@ describe("indicatorsAdapter", () => {
     ]);
 
     expect(coverage).toMatchObject({ family: "coverage", primary: { value: 88.6, unit: "%" } });
+    expect(coverage.summaryMetrics).toEqual([
+      { label: "Atendidos", value: 418, unit: "objetivos" },
+      { label: "Programados", value: 472, unit: "objetivos" },
+    ]);
+    expect(coverage.breakdowns[0]?.points[0]).toMatchObject({
+      label: "Centro",
+      value: 93.6,
+      details: [
+        { label: "Atendidos", value: 146, unit: "objetivos" },
+        { label: "Programados", value: 156, unit: "objetivos" },
+      ],
+    });
     expect(compliance.breakdowns[1]?.points[0]).toMatchObject({ label: "Norte", value: 12, note: "Falta de cuadrilla" });
+    expect(compliance.summaryMetrics).toEqual([
+      { label: "Finalizados", value: 390, unit: "servicios" },
+      { label: "En fecha", value: 344, unit: "servicios" },
+      { label: "Demorados", value: 46, unit: "servicios" },
+    ]);
     expect(incidents.primary).toMatchObject({ value: 21.5, unit: "h" });
     expect(waste).toMatchObject({ family: "waste", primary: { value: 42.7, unit: "%" } });
   });
