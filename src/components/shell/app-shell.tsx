@@ -45,6 +45,7 @@ import { ReferralsWorkspace } from "@/components/referrals/referrals-workspace";
 import { CatalogLanding } from "@/components/catalog/catalog-landing";
 import { ZonesPanel } from "./zones-panel";
 import { IndicatorsDashboard } from "@/components/indicators/indicators-dashboard";
+import { EnvironmentalReportsWorkspace } from "@/components/environmental-reports/environmental-reports-workspace";
 
 type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
 type LogoutAction = (formData: FormData) => void | Promise<void>;
@@ -168,6 +169,8 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
           </div>
         ) : destination === "dashboards" ? (
           <IndicatorsDashboard scenario={scenario} />
+        ) : destination === "environment" ? (
+          <EnvironmentalReportsWorkspace scenario={scenario} />
         ) : (
           <FoundationPlaceholder
             item={navigation.find((item) => item.id === destination)!}

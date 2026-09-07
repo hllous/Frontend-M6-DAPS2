@@ -98,6 +98,8 @@ import {
 import { addGreenPointFixture, filterGreenPointFixtures, greenPointFixtures, paginateGreenPointFixtures, updateGreenPointFixture } from "@/lib/green-point-fixtures";
 import { greenPointCreateInputSchema, greenPointUpdateInputSchema, wasteTypeSchema, type GreenPointQuery } from "@/lib/green-points";
 import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "@/lib/indicator-fixtures";
+import { addTreeFixture, filterTreeFixtures, paginateTreeFixtures, treeFixtures, updateTreeFixture } from "@/lib/tree-fixtures";
+import { treeCreateInputSchema, treeUpdateInputSchema, type TreeQuery } from "@/lib/trees";
 import {
   addRepairRequestFixture,
   createRepairRequestFixture,
@@ -159,6 +161,21 @@ import {
 } from "@/lib/referrals";
 import { repairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
+import {
+  addEnvironmentalReportFixture,
+  createEnvironmentalReportFixture,
+  filterEnvironmentalReportFixtures,
+  getEnvironmentalReportFixture,
+  paginateEnvironmentalReportFixtures,
+  transitionEnvironmentalReportFixture,
+} from "@/lib/environmental-report-fixtures";
+import {
+  createEnvironmentalReportInputSchema,
+  environmentalReportPrioritySchema,
+  environmentalReportStatusSchema,
+  environmentalReportTypeSchema,
+  type EnvironmentalReportStatus,
+} from "@/lib/environmental-reports";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -288,6 +305,17 @@ function greenPointQueryFromUrl(url: string): GreenPointQuery {
   };
 }
 
+function treeQueryFromUrl(url: string): TreeQuery {
+  const params = new URL(url).searchParams;
+  return {
+    active: params.has("active") ? params.get("active") === "true" : undefined,
+    zoneId: params.get("zoneId") ?? undefined,
+    search: params.get("search") ?? undefined,
+    page: params.has("page") ? Number(params.get("page")) : undefined,
+    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+  };
+}
+
 function containerQueryFromUrl(url: string): ContainerQuery {
   const params = new URL(url).searchParams;
   const rawStatus = params.get("status");
@@ -316,6 +344,18 @@ function streetClosureRequestQueryFromUrl(url: string) {
   });
 }
 
+function environmentalReportTransitionResponse(
+  id: string,
+  expected: EnvironmentalReportStatus | EnvironmentalReportStatus[],
+  next: EnvironmentalReportStatus,
+) {
+  const report = getEnvironmentalReportFixture(id);
+  if (!report) return HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${id}` }, { status: 404 });
+  const expectedStatuses = Array.isArray(expected) ? expected : [expected];
+  if (!expectedStatuses.includes(report.status)) return HttpResponse.json({ statusCode: 409, message: `La transición no es válida para el estado actual: ${report.status}.`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${id}` }, { status: 409 });
+  return HttpResponse.json(transitionEnvironmentalReportFixture(id, next));
+}
+
 export const handlers = [
   http.get("*/api/mock/scenarios", () => HttpResponse.json(Object.values(scenarios))),
   http.get("*/api/mock/scenarios/:scenarioId", ({ params }) => {
@@ -334,6 +374,35 @@ export const handlers = [
     ],
     meta: { total: repairRequestFixtures.length + streetClosureRequestFixtures.length },
   })),
+  // ── EnvironmentalReport case file (#132) ─────────────────────────────────
+  http.get("*/api/environmental-reports", ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const query = {
+      status: environmentalReportStatusSchema.safeParse(params.get("status")).data,
+      reportType: environmentalReportTypeSchema.safeParse(params.get("reportType")).data,
+      priority: environmentalReportPrioritySchema.safeParse(params.get("priority")).data,
+      ticketId: params.get("ticketId") ?? undefined,
+      search: params.get("search") ?? undefined,
+      page: params.has("page") ? Number(params.get("page")) : undefined,
+      pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+    };
+    return HttpResponse.json(paginateEnvironmentalReportFixtures(filterEnvironmentalReportFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/environmental-reports/:reportId", ({ params }) => {
+    const report = getEnvironmentalReportFixture(params.reportId as string);
+    return report ? HttpResponse.json(report) : HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${params.reportId}` }, { status: 404 });
+  }),
+  http.post("*/api/environmental-reports", async ({ request }) => {
+    const parsed = createEnvironmentalReportInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/environmental-reports" }, { status: 400 });
+    const created = createEnvironmentalReportFixture(parsed.data, "crew-b");
+    addEnvironmentalReportFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.post("*/api/environmental-reports/:reportId/start-review", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "RECEIVED", "UNDER_REVIEW")),
+  http.post("*/api/environmental-reports/:reportId/forward", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "UNDER_REVIEW", "FORWARDED")),
+  http.post("*/api/environmental-reports/:reportId/dismiss", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "UNDER_REVIEW", "DISMISSED")),
+  http.post("*/api/environmental-reports/:reportId/close", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, ["FORWARDED", "DISMISSED", "NO_VIOLATION", "SANCTIONED"], "CLOSED")),
   // StreetClosureRequest adapter contract and deterministic scenario handlers.
   http.get("*/api/street-closure-requests", ({ request }) => {
     const query = streetClosureRequestQueryFromUrl(request.url);
@@ -936,6 +1005,30 @@ export const handlers = [
   http.delete("*/api/green-points/:greenPointId", ({ params }) => {
     const updated = updateGreenPointFixture(params.greenPointId as string, { active: false });
     return updated ? new HttpResponse(null, { status: 204 }) : HttpResponse.json({ statusCode: 404, message: "Punto verde no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/green-points" }, { status: 404 });
+  }),
+  // --- Tree catalog (#126) ---
+  http.get("*/api/trees", ({ request }) => { const query = treeQueryFromUrl(request.url); return HttpResponse.json(paginateTreeFixtures(filterTreeFixtures(query), query.page, query.pageSize)); }),
+  http.get("*/api/trees/:treeId", ({ params }) => {
+    const tree = treeFixtures.find((item) => item.id === params.treeId);
+    return tree ? HttpResponse.json(tree) : HttpResponse.json({ statusCode: 404, message: "Árbol no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/trees/${params.treeId}` }, { status: 404 });
+  }),
+  http.post("*/api/trees", async ({ request }) => {
+    const parsed = treeCreateInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de árbol inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 400 });
+    if (treeFixtures.some((item) => item.surveyCode.toLowerCase() === parsed.data.surveyCode.toLowerCase())) return HttpResponse.json({ statusCode: 409, message: "Ya existe un árbol con ese código de relevamiento.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 409 });
+    const created = { id: `tree-${Date.now()}`, ...parsed.data, address: parsed.data.address ?? null, lat: parsed.data.lat ?? null, lng: parsed.data.lng ?? null, active: parsed.data.active ?? true };
+    addTreeFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.patch("*/api/trees/:treeId", async ({ params, request }) => {
+    const parsed = treeUpdateInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos editables de árbol inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 400 });
+    const updated = updateTreeFixture(params.treeId as string, parsed.data);
+    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "Árbol no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 404 });
+  }),
+  http.delete("*/api/trees/:treeId", ({ params }) => {
+    const updated = updateTreeFixture(params.treeId as string, { active: false });
+    return updated ? new HttpResponse(null, { status: 204 }) : HttpResponse.json({ statusCode: 404, message: "Árbol no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 404 });
   }),
   // --- Containers catalog (#120) ---
   http.get("*/api/containers", ({ request }) => {

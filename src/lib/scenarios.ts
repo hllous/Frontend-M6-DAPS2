@@ -6,6 +6,9 @@ export type Capability =
   | "disposalSite:manage"
   | "inventory:view"
   | "environmentalReport:view"
+  | "environmentalReport:create"
+  | "environmentalReport:review"
+  | "environmentalReport:close"
   | "map:view"
   | "catalog:view"
   | "indicator:view"
@@ -23,7 +26,9 @@ export type Capability =
   // Frontend hypothesis for Phase 4 Container management
   | "container:manage"
   // Frontend hypothesis for Phase 4 Container reporting
-  | "container:report";
+  | "container:report"
+  // Frontend hypothesis for Phase 5 Tree management
+  | "tree:manage";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -61,6 +66,9 @@ export const scenarios: Record<
       "service:view",
       "inventory:view",
       "environmentalReport:view",
+      "environmentalReport:create",
+      "environmentalReport:review",
+      "environmentalReport:close",
       "map:view",
       "catalog:view",
       "serviceType:manage",
@@ -71,6 +79,7 @@ export const scenarios: Record<
       "greenPoint:manage",
       "container:manage",
       "indicator:view",
+      "tree:manage",
       "zone:manage",
       "route:manage",
       "serviceFrequency:manage",
@@ -96,7 +105,7 @@ export const scenarios: Record<
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
     },
-    capabilities: ["service:view", "service:execute", "map:view", "container:report"],
+    capabilities: ["service:view", "service:execute", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view"],
     work: {
       title: "Servicios asignados",
       summary: "Recorrido de higiene urbana para el turno actual.",
@@ -116,7 +125,7 @@ export const scenarios: Record<
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
     },
-    capabilities: ["service:view", "map:view", "container:report"],
+    capabilities: ["service:view", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view"],
     work: {
       title: "Servicios asignados",
       summary: "Tareas del recorrido que integran su turno.",
