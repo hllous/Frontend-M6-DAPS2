@@ -44,6 +44,7 @@ import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ReferralsWorkspace } from "@/components/referrals/referrals-workspace";
 import { CatalogLanding } from "@/components/catalog/catalog-landing";
 import { ZonesPanel } from "./zones-panel";
+import { IndicatorsDashboard } from "@/components/indicators/indicators-dashboard";
 
 type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
 type LogoutAction = (formData: FormData) => void | Promise<void>;
@@ -86,7 +87,7 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
   const [destination, setDestination] = useState<Destination>(() => {
     if (typeof window !== "undefined") {
       const urlDest = new URLSearchParams(window.location.search).get("destination") as Destination | null;
-      if (urlDest && navigation.some((item) => item.id === urlDest)) {
+      if (urlDest && navigation.some((item) => item.id === urlDest && isAllowed(item, scenario))) {
         return urlDest;
       }
     }
@@ -165,6 +166,8 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
             <CatalogLanding scenario={scenario} />
             <ZonesPanel />
           </div>
+        ) : destination === "dashboards" ? (
+          <IndicatorsDashboard scenario={scenario} />
         ) : (
           <FoundationPlaceholder
             item={navigation.find((item) => item.id === destination)!}

@@ -97,6 +97,7 @@ import {
 } from "@/lib/green-spaces";
 import { addGreenPointFixture, filterGreenPointFixtures, greenPointFixtures, paginateGreenPointFixtures, updateGreenPointFixture } from "@/lib/green-point-fixtures";
 import { greenPointCreateInputSchema, greenPointUpdateInputSchema, wasteTypeSchema, type GreenPointQuery } from "@/lib/green-points";
+import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "@/lib/indicator-fixtures";
 import {
   addRepairRequestFixture,
   createRepairRequestFixture,
@@ -2332,6 +2333,35 @@ export const handlers = [
     }
     const updated = confirmRelocationFixture(params.containerId as string, parsed.data);
     return HttpResponse.json(updated, { status: 200 });
+  }),
+  // ── Indicators / #138 ─────────────────────────────────────────────────────
+  http.get("*/api/indicators/coverage", ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const zoneId = params.get("zoneId");
+    const serviceTypeId = params.get("serviceTypeId");
+    return HttpResponse.json({
+      ...coverageIndicatorFixture,
+      period: { from: params.get("from") ?? coverageIndicatorFixture.period.from, to: params.get("to") ?? coverageIndicatorFixture.period.to },
+      byZone: zoneId ? coverageIndicatorFixture.byZone.filter((item) => item.id === zoneId) : coverageIndicatorFixture.byZone,
+      byServiceType: serviceTypeId ? coverageIndicatorFixture.byServiceType.filter((item) => item.id === serviceTypeId) : coverageIndicatorFixture.byServiceType,
+    });
+  }),
+  http.get("*/api/indicators/compliance", ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const zoneId = params.get("zoneId");
+    return HttpResponse.json({
+      ...complianceIndicatorFixture,
+      period: { from: params.get("from") ?? complianceIndicatorFixture.period.from, to: params.get("to") ?? complianceIndicatorFixture.period.to },
+      unattendedZones: zoneId ? complianceIndicatorFixture.unattendedZones.filter((item) => item.id === zoneId) : complianceIndicatorFixture.unattendedZones,
+    });
+  }),
+  http.get("*/api/indicators/incidents", ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    return HttpResponse.json({ ...incidentsIndicatorFixture, period: { from: params.get("from") ?? incidentsIndicatorFixture.period.from, to: params.get("to") ?? incidentsIndicatorFixture.period.to } });
+  }),
+  http.get("*/api/indicators/waste", ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    return HttpResponse.json({ ...wasteIndicatorFixture, period: { from: params.get("from") ?? wasteIndicatorFixture.period.from, to: params.get("to") ?? wasteIndicatorFixture.period.to } });
   }),
   http.post("*/api/session/logout", () => new HttpResponse(null, { status: 200 })),
 ];
