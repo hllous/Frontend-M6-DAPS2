@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Boxes, CalendarClock, MapPin, Route as RouteIcon, Trash2, Truck, Trees, UsersRound } from "lucide-react";
+import { ArrowRight, Boxes, CalendarClock, MapPin, Recycle, Route as RouteIcon, Trash2, Truck, Trees, UsersRound } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -69,6 +69,13 @@ const catalogCards = [
     description: "Inventario de contenedores en vía pública, estados operativos y asignación a zonas.",
     icon: Trash2,
     tone: "bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-400",
+  },
+  {
+    href: "/app/catalog/green-points",
+    title: "Puntos verdes",
+    description: "Puntos de entrega voluntaria, ubicación y residuos aceptados.",
+    icon: Recycle,
+    tone: "bg-green-50 text-green-700 dark:bg-green-950/50 dark:text-green-400",
   },
 ];
 

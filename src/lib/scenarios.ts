@@ -18,6 +18,8 @@ export type Capability =
   | "vehicle:manage"
   | "crew:manage"
   | "greenSpace:manage"
+  // Frontend hypothesis for Phase 4 Green Point management
+  | "greenPoint:manage"
   // Frontend hypothesis for Phase 4 Container management
   | "container:manage"
   // Frontend hypothesis for Phase 4 Container reporting
@@ -66,6 +68,7 @@ export const scenarios: Record<
       "vehicle:manage",
       "crew:manage",
       "greenSpace:manage",
+      "greenPoint:manage",
       "container:manage",
       "indicator:view",
       "zone:manage",
