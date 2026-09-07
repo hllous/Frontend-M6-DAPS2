@@ -29,14 +29,21 @@ import {
 } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { referralsAdapter, isReferralVisibleToScenario, referralFromRepairRequest, referralFromStreetClosureRequest, type Referral } from "@/lib/referrals";
+import { getReferralAnomalies, type ReferralAnomaly } from "@/lib/referral-anomalies";
 import { repairRequestsAdapter } from "@/lib/repair-requests";
 import type { OperationalScenario } from "@/lib/scenarios";
+import { servicesAdapter, type Service } from "@/lib/services";
 import { streetClosureRequestsAdapter } from "@/lib/street-closure-requests";
+
+type SourceServiceState = {
+  sources: Map<string, Service>;
+  sourceErrors: Map<string, string>;
+};
 
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; referrals: Referral[] };
+  | ({ status: "ready"; referrals: Referral[] } & SourceServiceState);
 
 const referralKindLabel: Record<Referral["kind"], string> = {
   REPAIR_REQUEST: "M3 · Reparaciones",
@@ -176,14 +183,35 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
 
   const fetchReferrals = useCallback(async () => {
     const page = await referralsAdapter.list();
-    return page.referrals.filter((referral) => isReferralVisibleToScenario(referral, scenario));
+    const referrals = page.referrals.filter((referral) => isReferralVisibleToScenario(referral, scenario));
+    const sourceIds = [...new Set(referrals.map((referral) => referral.sourceServiceId))];
+    const sourceResults = await Promise.all(sourceIds.map(async (sourceId) => {
+      try {
+        return { kind: "success" as const, sourceId, service: await servicesAdapter.get(sourceId) };
+      } catch (error: unknown) {
+        return {
+          kind: "error" as const,
+          sourceId,
+          error: error instanceof Error ? error.message : "No se pudo verificar el Servicio de origen.",
+        };
+      }
+    }));
+
+    const sources = new Map<string, Service>();
+    const sourceErrors = new Map<string, string>();
+    for (const result of sourceResults) {
+      if (result.kind === "error") sourceErrors.set(result.sourceId, result.error);
+      else if (result.service) sources.set(result.sourceId, result.service);
+    }
+
+    return { referrals, sources, sourceErrors } satisfies SourceServiceState & { referrals: Referral[] };
   }, [scenario]);
 
   useEffect(() => {
     let isCurrent = true;
     void fetchReferrals()
-      .then((referrals) => {
-        if (isCurrent) setLoadState({ status: "ready", referrals });
+      .then((result) => {
+        if (isCurrent) setLoadState({ status: "ready", ...result });
       })
       .catch((error: unknown) => {
         if (isCurrent) setLoadState({
@@ -199,7 +227,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
   const loadReferrals = () => {
     setLoadState({ status: "loading" });
     void fetchReferrals()
-      .then((referrals) => setLoadState({ status: "ready", referrals }))
+      .then((result) => setLoadState({ status: "ready", ...result }))
       .catch((error: unknown) => setLoadState({
         status: "error",
         message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes.",
@@ -219,6 +247,13 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
     return loadState.referrals.find((referral) => referral.id === selectedId) ?? null;
   }, [loadState, selectedId]);
 
+  const anomalies = useMemo(
+    () => loadState.status === "ready"
+      ? getReferralAnomalies(loadState.referrals, loadState.sources)
+      : new Map<string, ReferralAnomaly>(),
+    [loadState],
+  );
+
   const handleReferralRecovered = useCallback((updatedReferral: Referral) => {
     setLoadState((current) => current.status === "ready"
       ? {
@@ -232,6 +267,8 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
     return (
       <ReferralDetail
         referral={selectedReferral}
+        anomaly={anomalies.get(selectedReferral.id) ?? { isStale: false, duplicateReferralIds: [], sourceChanges: [] }}
+        sourceUnavailable={loadState.status === "ready" ? loadState.sourceErrors.get(selectedReferral.sourceServiceId) : undefined}
         onBack={() => setSelectedId(null)}
         canRecover={scenario.actor.kind === "OFFICE"}
         onRecovered={handleReferralRecovered}
@@ -275,14 +312,21 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
       )}
       {loadState.status === "ready" && loadState.referrals.length === 0 && <EmptyState />}
       {loadState.status === "ready" && loadState.referrals.length > 0 && (
-        <div className="mx-auto flex w-full max-w-6xl flex-1 p-4 sm:p-6 lg:p-8">
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
+          <ReferralReconciliationSummary referrals={loadState.referrals} anomalies={anomalies} />
           <section className="w-full" aria-label="Lista de derivaciones" aria-describedby="referrals-scope-note">
             <p id="referrals-scope-note" className="sr-only">
               Seleccione una derivación para consultar su detalle. La información del Servicio se consulta mediante el enlace a su módulo de origen.
             </p>
             <ul className="grid gap-3" role="list">
               {loadState.referrals.map((referral) => (
-                <ReferralRow key={`${referral.kind}-${referral.id}`} referral={referral} onOpen={() => setSelectedId(referral.id)} />
+                <ReferralRow
+                  key={`${referral.kind}-${referral.id}`}
+                  referral={referral}
+                  anomaly={anomalies.get(referral.id)}
+                  sourceUnavailable={loadState.sourceErrors.has(referral.sourceServiceId)}
+                  onOpen={() => setSelectedId(referral.id)}
+                />
               ))}
             </ul>
           </section>
@@ -292,7 +336,109 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
   );
 }
 
-function ReferralRow({ referral, onOpen }: { referral: Referral; onOpen: () => void }) {
+function ReferralReconciliationSummary({
+  referrals,
+  anomalies,
+}: {
+  referrals: Referral[];
+  anomalies: ReadonlyMap<string, ReferralAnomaly>;
+}) {
+  const staleCount = referrals.filter((referral) => anomalies.get(referral.id)?.isStale).length;
+  const duplicateCount = referrals.filter((referral) => (anomalies.get(referral.id)?.duplicateReferralIds.length ?? 0) > 0).length;
+  const sourceChangeCount = referrals.filter((referral) => (anomalies.get(referral.id)?.sourceChanges.length ?? 0) > 0).length;
+  const total = staleCount + duplicateCount + sourceChangeCount;
+
+  return (
+    <section
+      aria-label="Resumen de conciliación"
+      className={total > 0
+        ? "rounded-2xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/55 p-4"
+        : "rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4"}
+    >
+      <div className="flex items-start gap-3">
+        <span className={total > 0
+          ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-warning-fill)] text-[var(--color-warning)]"
+          : "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-info-fill)] text-[var(--color-action)]"}
+        >
+          {total > 0 ? <CircleAlert className="h-4 w-4" aria-hidden /> : <ShieldCheck className="h-4 w-4" aria-hidden />}
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-[var(--color-text)]">
+            {total > 0 ? "Revisión de conciliación requerida" : "Seguimiento de conciliación"}
+          </h2>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            {total > 0
+              ? `${total} ${total === 1 ? "advertencia requiere" : "advertencias requieren"} revisión explícita de Oficina.`
+              : "Las respuestas externas se mantienen visibles hasta que M3 o M7 confirme una decisión."}
+          </p>
+          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+            M6 no cambia estados, fusiona duplicados, reintenta envíos ni modifica el Servicio automáticamente.
+          </p>
+          {total > 0 && (
+            <p className="mt-2 text-xs font-semibold text-[var(--color-warning)]">
+              {staleCount > 0 && `${staleCount} fuera de plazo`}
+              {staleCount > 0 && (duplicateCount > 0 || sourceChangeCount > 0) ? " · " : ""}
+              {duplicateCount > 0 && `${duplicateCount} posible${duplicateCount === 1 ? " duplicado" : "s duplicados"}`}
+              {duplicateCount > 0 && sourceChangeCount > 0 ? " · " : ""}
+              {sourceChangeCount > 0 && `${sourceChangeCount} con cambios de origen`}
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AnomalyBadges({
+  anomaly,
+  sourceUnavailable,
+}: {
+  anomaly?: ReferralAnomaly;
+  sourceUnavailable: boolean;
+}) {
+  if (!anomaly && !sourceUnavailable) return null;
+
+  return (
+    <span className="flex flex-wrap gap-1.5" aria-label="Alertas de conciliación">
+      {anomaly?.isStale && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2 py-1 text-xs font-semibold text-[var(--color-warning)]">
+          <CircleAlert className="h-3.5 w-3.5" aria-hidden />
+          Derivación externa vencida
+        </span>
+      )}
+      {anomaly && anomaly.duplicateReferralIds.length > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2 py-1 text-xs font-semibold text-[var(--color-warning)]">
+          <CircleAlert className="h-3.5 w-3.5" aria-hidden />
+          Candidata a duplicada
+        </span>
+      )}
+      {anomaly && anomaly.sourceChanges.length > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-info-line)] bg-[var(--color-info-fill)] px-2 py-1 text-xs font-semibold text-[var(--color-info)]">
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+          Origen actualizado
+        </span>
+      )}
+      {sourceUnavailable && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2 py-1 text-xs font-semibold text-[var(--color-warning)]">
+          <CircleAlert className="h-3.5 w-3.5" aria-hidden />
+          Origen sin verificar
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ReferralRow({
+  referral,
+  anomaly,
+  sourceUnavailable = false,
+  onOpen,
+}: {
+  referral: Referral;
+  anomaly?: ReferralAnomaly;
+  sourceUnavailable?: boolean;
+  onOpen: () => void;
+}) {
   return (
     <li>
       <button
@@ -305,6 +451,9 @@ function ReferralRow({ referral, onOpen }: { referral: Referral; onOpen: () => v
           {referral.kind === "REPAIR_REQUEST" ? <Construction className="h-4 w-4" aria-hidden /> : <Route className="h-4 w-4" aria-hidden />}
         </span>
         <span className="min-w-0 flex-1">
+          <span className="mb-2 block">
+            <AnomalyBadges anomaly={anomaly} sourceUnavailable={sourceUnavailable} />
+          </span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-bold tabular-nums text-[var(--color-text)]">{referral.id}</span>
             <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{referralKindLabel[referral.kind]}</span>
@@ -324,11 +473,15 @@ function ReferralRow({ referral, onOpen }: { referral: Referral; onOpen: () => v
 
 function ReferralDetail({
   referral,
+  anomaly,
+  sourceUnavailable,
   onBack,
   canRecover,
   onRecovered,
 }: {
   referral: Referral;
+  anomaly: ReferralAnomaly;
+  sourceUnavailable?: string;
   onBack: () => void;
   canRecover: boolean;
   onRecovered: (updatedReferral: Referral) => void;
@@ -371,6 +524,12 @@ function ReferralDetail({
           </div>
         </section>
 
+        <ReferralReconciliationPanel
+          referral={referral}
+          anomaly={anomaly}
+          sourceUnavailable={sourceUnavailable}
+        />
+
         {canRecover && <ReferralRecoveryPanel referral={referral} onRecovered={onRecovered} />}
 
         {referral.kind === "REPAIR_REQUEST" ? <RepairDetail referral={referral} /> : <ClosureDetail referral={referral} />}
@@ -384,6 +543,100 @@ function ReferralDetail({
         </section>
       </main>
     </div>
+  );
+}
+
+function ReferralReconciliationPanel({
+  referral,
+  anomaly,
+  sourceUnavailable,
+}: {
+  referral: Referral;
+  anomaly: ReferralAnomaly;
+  sourceUnavailable?: string;
+}) {
+  const hasWarnings = anomaly.isStale || anomaly.duplicateReferralIds.length > 0 || anomaly.sourceChanges.length > 0 || Boolean(sourceUnavailable);
+
+  return (
+    <section
+      className={hasWarnings
+        ? "rounded-2xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/45 p-4 sm:p-5"
+        : "rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5"}
+      aria-labelledby="referral-reconciliation-title"
+    >
+      <div className="flex items-start gap-3">
+        <span className={hasWarnings
+          ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-warning-fill)] text-[var(--color-warning)]"
+          : "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-info-fill)] text-[var(--color-action)]"}
+        >
+          {hasWarnings ? <CircleAlert className="h-4 w-4" aria-hidden /> : <ShieldCheck className="h-4 w-4" aria-hidden />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 id="referral-reconciliation-title" className="text-sm font-bold text-[var(--color-text)]">
+            {hasWarnings ? "Alertas de conciliación" : "Seguimiento de conciliación"}
+          </h2>
+          <p className="mt-1 text-sm text-[var(--color-text)]">
+            {hasWarnings
+              ? "Revise estas señales con la respuesta de M3 o M7 antes de decidir el próximo paso."
+              : "Las respuestas externas tardías, fuera de orden o sin correlación permanecen visibles para revisión explícita."}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {anomaly.isStale && (
+          <div className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-surface)] p-3">
+            <h3 className="text-sm font-bold text-[var(--color-warning)]">Derivación externa vencida</h3>
+            <p className="mt-1 text-sm text-[var(--color-text)]">
+              La derivación continúa como <strong>{statusLabel(referral)}</strong>, pero no recibió una actualización externa dentro del plazo esperado.
+            </p>
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">No se crea un estado nuevo, no se reintenta el envío y no se modifica el Servicio automáticamente.</p>
+          </div>
+        )}
+
+        {anomaly.duplicateReferralIds.length > 0 && (
+          <div className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-surface)] p-3">
+            <h3 className="text-sm font-bold text-[var(--color-warning)]">Candidata a derivación duplicada</h3>
+            <p className="mt-1 text-sm text-[var(--color-text)]">
+              Hay otra derivación abierta del mismo tipo para el Servicio {referral.sourceServiceId}.
+            </p>
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              Registros relacionados: <span className="font-semibold tabular-nums">{anomaly.duplicateReferralIds.join(", ")}</span>. La coincidencia requiere revisión humana; M6 no fusiona ni reintenta por un error ambiguo.
+            </p>
+          </div>
+        )}
+
+        {anomaly.sourceChanges.length > 0 && (
+          <div className="rounded-xl border border-[var(--color-info-line)] bg-[var(--color-info-fill)]/60 p-3">
+            <h3 className="text-sm font-bold text-[var(--color-info)]">El Servicio de origen cambió</h3>
+            <p className="mt-1 text-sm text-[var(--color-text)]">La derivación conserva el contexto original. Compare antes de resolver la conciliación.</p>
+            <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+              {anomaly.sourceChanges.map((change) => (
+                <div key={change.field}>
+                  <dt className="font-semibold text-[var(--color-text-secondary)]">{change.field}</dt>
+                  <dd className="mt-0.5 text-[var(--color-text)]">Antes: {change.recordedValue} · Ahora: {change.currentValue}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-2 text-xs text-[var(--color-text-secondary)]">El cambio no reabre, sobrescribe ni cancela esta derivación automáticamente.</p>
+          </div>
+        )}
+
+        {sourceUnavailable && (
+          <div role="alert" className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-surface)] p-3">
+            <h3 className="text-sm font-bold text-[var(--color-warning)]">Servicio de origen sin verificar</h3>
+            <p className="mt-1 text-sm text-[var(--color-text)]">No se pudo consultar el estado actual del Servicio. No se asume que haya cambiado.</p>
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{sourceUnavailable}</p>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-xs text-[var(--color-text-secondary)]">
+          <p className="font-semibold text-[var(--color-text)]">Límite de seguridad</p>
+          <p className="mt-1">Este registro tiene identificador M6 y, por eso, permanece en seguimiento como derivación creada. Si un envío falló antes de crear un registro, es un envío sin enviar y no una derivación pendiente.</p>
+          <p className="mt-1">M6 solo registra una decisión externa ya confirmada mediante recuperación manual; no inventa respuestas de M3/M7 ni modifica el Servicio por su cuenta.</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
