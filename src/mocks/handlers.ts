@@ -158,6 +158,21 @@ import {
 } from "@/lib/referrals";
 import { repairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
+import {
+  addEnvironmentalReportFixture,
+  createEnvironmentalReportFixture,
+  filterEnvironmentalReportFixtures,
+  getEnvironmentalReportFixture,
+  paginateEnvironmentalReportFixtures,
+  transitionEnvironmentalReportFixture,
+} from "@/lib/environmental-report-fixtures";
+import {
+  createEnvironmentalReportInputSchema,
+  environmentalReportPrioritySchema,
+  environmentalReportStatusSchema,
+  environmentalReportTypeSchema,
+  type EnvironmentalReportStatus,
+} from "@/lib/environmental-reports";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -315,6 +330,18 @@ function streetClosureRequestQueryFromUrl(url: string) {
   });
 }
 
+function environmentalReportTransitionResponse(
+  id: string,
+  expected: EnvironmentalReportStatus | EnvironmentalReportStatus[],
+  next: EnvironmentalReportStatus,
+) {
+  const report = getEnvironmentalReportFixture(id);
+  if (!report) return HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${id}` }, { status: 404 });
+  const expectedStatuses = Array.isArray(expected) ? expected : [expected];
+  if (!expectedStatuses.includes(report.status)) return HttpResponse.json({ statusCode: 409, message: `La transición no es válida para el estado actual: ${report.status}.`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${id}` }, { status: 409 });
+  return HttpResponse.json(transitionEnvironmentalReportFixture(id, next));
+}
+
 export const handlers = [
   http.get("*/api/mock/scenarios", () => HttpResponse.json(Object.values(scenarios))),
   http.get("*/api/mock/scenarios/:scenarioId", ({ params }) => {
@@ -333,6 +360,35 @@ export const handlers = [
     ],
     meta: { total: repairRequestFixtures.length + streetClosureRequestFixtures.length },
   })),
+  // ── EnvironmentalReport case file (#132) ─────────────────────────────────
+  http.get("*/api/environmental-reports", ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const query = {
+      status: environmentalReportStatusSchema.safeParse(params.get("status")).data,
+      reportType: environmentalReportTypeSchema.safeParse(params.get("reportType")).data,
+      priority: environmentalReportPrioritySchema.safeParse(params.get("priority")).data,
+      ticketId: params.get("ticketId") ?? undefined,
+      search: params.get("search") ?? undefined,
+      page: params.has("page") ? Number(params.get("page")) : undefined,
+      pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
+    };
+    return HttpResponse.json(paginateEnvironmentalReportFixtures(filterEnvironmentalReportFixtures(query), query.page, query.pageSize));
+  }),
+  http.get("*/api/environmental-reports/:reportId", ({ params }) => {
+    const report = getEnvironmentalReportFixture(params.reportId as string);
+    return report ? HttpResponse.json(report) : HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${params.reportId}` }, { status: 404 });
+  }),
+  http.post("*/api/environmental-reports", async ({ request }) => {
+    const parsed = createEnvironmentalReportInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/environmental-reports" }, { status: 400 });
+    const created = createEnvironmentalReportFixture(parsed.data, "crew-b");
+    addEnvironmentalReportFixture(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.post("*/api/environmental-reports/:reportId/start-review", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "RECEIVED", "UNDER_REVIEW")),
+  http.post("*/api/environmental-reports/:reportId/forward", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "UNDER_REVIEW", "FORWARDED")),
+  http.post("*/api/environmental-reports/:reportId/dismiss", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "UNDER_REVIEW", "DISMISSED")),
+  http.post("*/api/environmental-reports/:reportId/close", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, ["FORWARDED", "DISMISSED", "NO_VIOLATION", "SANCTIONED"], "CLOSED")),
   // StreetClosureRequest adapter contract and deterministic scenario handlers.
   http.get("*/api/street-closure-requests", ({ request }) => {
     const query = streetClosureRequestQueryFromUrl(request.url);
