@@ -12,7 +12,7 @@ test.describe("Referral workspace", () => {
     await expect(list.getByRole("button", { name: /RR-1001/ })).toBeVisible();
     await expect(list.getByRole("button", { name: /SCR-1001/ })).toBeVisible();
     await expect(list.getByText("M3 · Reparaciones")).toBeVisible();
-    await expect(list.getByText("M7 · Cortes de calle")).toBeVisible();
+    await expect(list.getByText("M7 · Cortes de calle").first()).toBeVisible();
 
     await list.getByRole("button", { name: /SCR-1001/ }).click();
     const detail = page.getByRole("region", { name: "Detalle de SCR-1001" });

@@ -3,10 +3,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { POST as login } from "@/app/api/session/login/route";
 import { resetStreetClosureRequestFixtures, streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
+import { resetTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 import { GET, POST } from "./route";
 
 beforeEach(() => {
   resetServiceFixtures();
+  resetTreeInterventionFixtures();
   resetStreetClosureRequestFixtures();
 });
 
@@ -43,6 +45,15 @@ function requestBody() {
   };
 }
 
+function treeRequestBody() {
+  return {
+    ...requestBody(),
+    reason: "La intervención autorizada requiere ordenar la circulación durante el tratamiento del arbolado.",
+    sourceType: "TREE_INTERVENTION",
+    sourceId: "intervention-2",
+  };
+}
+
 describe("street closure request BFF routes", () => {
   it("keeps creation Office-only", async () => {
     const cookie = await authenticatedCookie("field-crew-leader-route");
@@ -55,8 +66,51 @@ describe("street closure request BFF routes", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(streetClosureRequestFixtures).toHaveLength(1);
+    expect(streetClosureRequestFixtures).toHaveLength(2);
   });
+
+  it("creates a pending M6 record only from an authorized TreeIntervention", async () => {
+    const cookie = await authenticatedCookie("office-duty-queue");
+    const response = await POST(
+      new Request("http://localhost/api/street-closure-requests", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(treeRequestBody()),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      status: "REQUESTED",
+      sourceType: "TREE_INTERVENTION",
+      sourceId: "intervention-2",
+      sourceModule: "M6",
+      sourceContext: {
+        sourceType: "TREE_INTERVENTION",
+        sourceId: "intervention-2",
+        interventionType: "TREATMENT",
+        address: "Av. Mitre 1140",
+      },
+    });
+  });
+
+  it.each(["REQUESTED", "PENDING_AUTHORIZATION", "REJECTED"] as const)(
+    "does not create a TreeIntervention-sourced request while status is %s",
+    async (status) => {
+      updateTreeInterventionFixture("intervention-1", { status });
+      const cookie = await authenticatedCookie("office-duty-queue");
+      const response = await POST(
+        new Request("http://localhost/api/street-closure-requests", {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie },
+          body: JSON.stringify({ ...treeRequestBody(), sourceId: "intervention-1" }),
+        }),
+      );
+
+      expect(response.status).toBe(409);
+      expect(streetClosureRequestFixtures).toHaveLength(2);
+    },
+  );
 
   it("rejects empty sections and creates a pending Service-linked record for Office", async () => {
     const cookie = await authenticatedCookie("office-duty-queue");
@@ -94,7 +148,7 @@ describe("street closure request BFF routes", () => {
       new Request("http://localhost/api/street-closure-requests", { headers: { cookie: officeCookie } }),
     );
     expect(list.status).toBe(200);
-    expect((await list.json()).data).toHaveLength(1);
+    expect((await list.json()).data).toHaveLength(2);
   });
 
   it("allows Field to read only the closure context for its assigned Service", async () => {

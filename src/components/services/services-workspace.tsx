@@ -684,6 +684,7 @@ export function ServicesWorkspace({
             />
             {canCreateStreetClosureRequest && streetClosureService && (
               <CreateStreetClosureRequestDialog
+                key={streetClosureService.id}
                 open={Boolean(streetClosureServiceId && detailService.id === streetClosureServiceId)}
                 onOpenChange={(open) => {
                   if (!open) setStreetClosureServiceId(null);

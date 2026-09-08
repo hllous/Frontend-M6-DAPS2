@@ -4,13 +4,18 @@ import { authenticatedFetch } from "./authenticated-fetch";
 import type { RepairRequest } from "./repair-requests";
 import { serviceFixtures } from "./services-fixtures";
 import type { OperationalScenario } from "./scenarios";
-import type { StreetClosureRequest } from "./street-closure-requests";
+import {
+  streetClosureRequestSourceTypeSchema,
+  type StreetClosureRequest,
+} from "./street-closure-requests";
 
 export type Referral =
   | {
       kind: "REPAIR_REQUEST";
       destination: "M3";
       id: string;
+      sourceType: "SERVICE";
+      sourceId: string;
       sourceServiceId: string;
       sourceLabel: string;
       sourceHref: string;
@@ -23,7 +28,10 @@ export type Referral =
       kind: "STREET_CLOSURE_REQUEST";
       destination: "M7";
       id: string;
-      sourceServiceId: string;
+      sourceType: StreetClosureRequest["sourceType"];
+      sourceId: string;
+      sourceServiceId?: string;
+      sourceTreeInterventionId?: string;
       sourceLabel: string;
       sourceHref: string;
       status: StreetClosureRequest["status"];
@@ -48,6 +56,8 @@ const referralSchema = z.discriminatedUnion("kind", [
     kind: z.literal("REPAIR_REQUEST"),
     destination: z.literal("M3"),
     id: z.string(),
+    sourceType: z.literal("SERVICE"),
+    sourceId: z.string(),
     sourceServiceId: z.string(),
     sourceLabel: z.string(),
     sourceHref: z.string(),
@@ -71,7 +81,10 @@ const referralSchema = z.discriminatedUnion("kind", [
     kind: z.literal("STREET_CLOSURE_REQUEST"),
     destination: z.literal("M7"),
     id: z.string(),
-    sourceServiceId: z.string(),
+    sourceType: streetClosureRequestSourceTypeSchema,
+    sourceId: z.string(),
+    sourceServiceId: z.string().optional(),
+    sourceTreeInterventionId: z.string().optional(),
     sourceLabel: z.string(),
     sourceHref: z.string(),
     status: z.enum(["REQUESTED", "APPROVED", "REJECTED", "ENDED"]),
@@ -80,7 +93,7 @@ const referralSchema = z.discriminatedUnion("kind", [
     request: z.object({
       id: z.string(),
       reason: z.string(),
-      sourceType: z.string(),
+      sourceType: streetClosureRequestSourceTypeSchema,
       sourceId: z.string(),
       sourceModule: z.literal("M6"),
       closureType: z.enum(["TOTAL", "PARTIAL"]),
@@ -111,13 +124,21 @@ export function getReferralSourceServiceIds(scenario: OperationalScenario): stri
     .map((service) => service.id);
 }
 
-export function isReferralVisibleToScenario(referral: Pick<Referral, "sourceServiceId"> | { sourceServiceId: string }, scenario: OperationalScenario): boolean {
+export function isReferralVisibleToScenario(referral: Referral | { sourceServiceId: string }, scenario: OperationalScenario): boolean {
   const serviceIds = getReferralSourceServiceIds(scenario);
-  return serviceIds === undefined || serviceIds.includes(referral.sourceServiceId);
+  if (serviceIds === undefined) return true;
+  if ("sourceType" in referral && referral.sourceType === "TREE_INTERVENTION") return false;
+  if ("sourceTreeInterventionId" in referral && referral.sourceTreeInterventionId) return false;
+  const sourceServiceId = referral.sourceServiceId;
+  return Boolean(sourceServiceId && serviceIds.includes(sourceServiceId));
 }
 
 export function serviceSourceHref(serviceId: string): string {
   return `/app?destination=services&detail=${encodeURIComponent(serviceId)}`;
+}
+
+export function treeInterventionSourceHref(interventionId: string): string {
+  return `/app/catalog/tree-interventions?detail=${encodeURIComponent(interventionId)}`;
 }
 
 export function referralFromRepairRequest(request: RepairRequest): Referral {
@@ -126,6 +147,8 @@ export function referralFromRepairRequest(request: RepairRequest): Referral {
     kind: "REPAIR_REQUEST",
     destination: "M3",
     id: request.id,
+    sourceType: "SERVICE",
+    sourceId: request.detectedInId,
     sourceServiceId: request.detectedInId,
     sourceLabel: source?.label ?? `Servicio ${request.detectedInId}`,
     sourceHref: source?.href ?? serviceSourceHref(request.detectedInId),
@@ -141,9 +164,15 @@ export function referralFromStreetClosureRequest(request: StreetClosureRequest):
     kind: "STREET_CLOSURE_REQUEST",
     destination: "M7",
     id: request.id,
-    sourceServiceId: request.sourceId,
+    sourceType: request.sourceType,
+    sourceId: request.sourceId,
+    ...(request.sourceType === "SERVICE"
+      ? { sourceServiceId: request.sourceId }
+      : { sourceTreeInterventionId: request.sourceId }),
     sourceLabel: request.sourceContext.title,
-    sourceHref: serviceSourceHref(request.sourceId),
+    sourceHref: request.sourceType === "SERVICE"
+      ? serviceSourceHref(request.sourceId)
+      : treeInterventionSourceHref(request.sourceId),
     status: request.status,
     createdAt: request.createdAt,
     updatedAt: request.updatedAt,

@@ -15,6 +15,7 @@ import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { serviceFixtures } from "@/lib/services-fixtures";
+import { getTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -139,9 +140,26 @@ export async function POST(request: Request) {
       });
     }
 
-    const service = serviceFixtures.find((candidate) => candidate.id === parsed.data.sourceId);
-    if (!service) return errorResponse(404, `Servicio ${parsed.data.sourceId} no encontrado.`, path);
-    const created = createStreetClosureRequestFixture(parsed.data, service);
+    const source = parsed.data.sourceType === "SERVICE"
+      ? serviceFixtures.find((candidate) => candidate.id === parsed.data.sourceId)
+      : getTreeInterventionFixture(parsed.data.sourceId);
+    if (!source) {
+      return errorResponse(
+        404,
+        parsed.data.sourceType === "SERVICE"
+          ? `Servicio ${parsed.data.sourceId} no encontrado.`
+          : `Intervención de arbolado ${parsed.data.sourceId} no encontrada.`,
+        path,
+      );
+    }
+    if (parsed.data.sourceType === "TREE_INTERVENTION" && source.status !== "AUTHORIZED") {
+      return errorResponse(
+        409,
+        "Solo se puede solicitar un corte de calle desde una intervención de arbolado autorizada.",
+        path,
+      );
+    }
+    const created = createStreetClosureRequestFixture(parsed.data, source);
     addStreetClosureRequestFixture(created);
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
