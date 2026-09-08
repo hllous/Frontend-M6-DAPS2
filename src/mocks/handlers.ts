@@ -2315,11 +2315,19 @@ export const handlers = [
     let body: unknown;
     try { body = await request.json(); } catch { return HttpResponse.json({ statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/repair-requests" }, { status: 400 }); }
     const parsed = createRepairRequestInputSchema.safeParse(body);
-    if (!parsed.success || parsed.data.detectedInType !== "SERVICE") return HttpResponse.json({ statusCode: 400, message: "La derivación debe originarse en un Servicio.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/repair-requests" }, { status: 400 });
-    const service = serviceFixtures.find((item) => item.id === parsed.data.detectedInId);
-    if (!service) return HttpResponse.json({ statusCode: 404, message: "Servicio no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/repair-requests" }, { status: 404 });
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de derivación inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/repair-requests" }, { status: 400 });
+    // ── Issue #137: EnvironmentalInspection repair-request source ──
+    const service = parsed.data.detectedInType === "SERVICE"
+      ? serviceFixtures.find((item) => item.id === parsed.data.detectedInId)
+      : undefined;
+    const inspection = parsed.data.detectedInType === "INSPECTION"
+      ? getEnvironmentalInspectionFixture(parsed.data.detectedInId)
+      : undefined;
+    if (parsed.data.detectedInType === "SERVICE" && !service) return HttpResponse.json({ statusCode: 404, message: "Servicio no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/repair-requests" }, { status: 404 });
+    if (parsed.data.detectedInType === "INSPECTION" && !inspection) return HttpResponse.json({ statusCode: 404, message: "Inspección no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/repair-requests" }, { status: 404 });
     const created = createRepairRequestFixture(parsed.data, service);
     addRepairRequestFixture(created);
+    // ── End issue #137 ──
     return HttpResponse.json(created, { status: 201 });
   }),
   http.post("*/api/repair-requests/:requestId/start", async ({ params, request }) => {

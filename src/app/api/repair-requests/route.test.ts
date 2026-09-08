@@ -1,12 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
+import { resetEnvironmentalInspectionFixtures } from "@/lib/environmental-report-fixtures";
 import { resetRepairRequestFixtures, repairRequestFixtures } from "@/lib/repair-request-fixtures";
+import { resetServiceFixtures } from "@/lib/services-fixtures";
 import { GET, POST } from "./route";
 
-beforeEach(() => resetRepairRequestFixtures());
+beforeEach(() => {
+  resetRepairRequestFixtures();
+  resetEnvironmentalInspectionFixtures();
+  resetServiceFixtures();
+});
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
+  resetEnvironmentalInspectionFixtures();
+  resetServiceFixtures();
   delete process.env.M6_BACKEND_ORIGIN;
 });
 
@@ -88,16 +96,47 @@ describe("repair request BFF collection routes", () => {
     expect(repairRequestFixtures).toHaveLength(2);
   });
 
-  it("rejects an EnvironmentalInspection source in the Service-sourced phase", async () => {
+  it("lets Office create a pending referral from an EnvironmentalInspection", async () => {
     const cookie = await authenticatedCookie("office-duty-queue");
     const response = await POST(createRequest(cookie, {
       damageType: "BLOCKED_DRAIN",
-      address: "Calle 1",
-      severity: "MEDIUM",
+      address: "Av. Brasil 2450",
+      severity: "LOW",
+      publicSafetyRisk: true,
+      detectedInType: "INSPECTION",
+      detectedInId: "INS-1012",
+    }));
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      status: "REQUESTED",
+      detectedInType: "INSPECTION",
+      detectedInId: "INS-1012",
+      severity: "LOW",
+      publicSafetyRisk: true,
+      sourceContext: { type: "INSPECTION", id: "INS-1012", href: expect.stringContaining("destination=environment") },
+    });
+  });
+
+  it("scopes Field inspection referrals to the linked Service crew", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const created = await POST(createRequest(cookie, {
+      damageType: "BLOCKED_DRAIN",
+      address: "Av. Brasil 2450",
+      severity: "LOW",
       publicSafetyRisk: false,
       detectedInType: "INSPECTION",
-      detectedInId: "INS-1",
+      detectedInId: "INS-1012",
     }));
-    expect(response.status).toBe(400);
+    expect(created.status).toBe(201);
+
+    const forbidden = await POST(createRequest(cookie, {
+      damageType: "BLOCKED_DRAIN",
+      address: "Av. Costanera km 3",
+      severity: "HIGH",
+      publicSafetyRisk: true,
+      detectedInType: "INSPECTION",
+      detectedInId: "INS-1005",
+    }));
+    expect(forbidden.status).toBe(403);
   });
 });

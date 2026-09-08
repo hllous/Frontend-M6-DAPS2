@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
+import { getEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { getRepairRequestFixture } from "@/lib/repair-request-fixtures";
 import { getScenario } from "@/lib/scenarios";
@@ -21,9 +22,16 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (scenario.actor.kind === "FIELD") {
       const sourceService = item?.detectedInType === "SERVICE"
         ? serviceFixtures.find((service) => service.id === item.detectedInId)
-        : undefined;
+        : item?.detectedInType === "INSPECTION"
+          ? (() => {
+              const inspection = getEnvironmentalInspectionFixture(item.detectedInId);
+              return inspection?.serviceId
+                ? serviceFixtures.find((service) => service.id === inspection.serviceId)
+                : undefined;
+            })()
+          : undefined;
       if (!scenario.actor.crewId || !sourceService || sourceService.crewId !== scenario.actor.crewId) {
-        return errorResponse(403, "Solo puede consultar derivaciones de Servicios de su cuadrilla.", path);
+        return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
       }
     } else if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, "Solo Oficina o Campo puede consultar derivaciones.", path);

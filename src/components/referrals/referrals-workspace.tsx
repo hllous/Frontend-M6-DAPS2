@@ -55,10 +55,32 @@ const referralKindDescription: Record<Referral["kind"], string> = {
   STREET_CLOSURE_REQUEST: "Corte solicitado para un Servicio",
 };
 
+function isInspectionSourcedRepair(referral: Referral): boolean {
+  return referral.kind === "REPAIR_REQUEST" && referral.request.detectedInType === "INSPECTION";
+}
+
 function sourceKindLabel(referral: Referral): string {
-  return referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "TREE_INTERVENTION"
-    ? "Intervención de arbolado de origen"
-    : "Servicio de origen";
+  if (referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "TREE_INTERVENTION") {
+    return "Intervención de arbolado de origen";
+  }
+  if (isInspectionSourcedRepair(referral)) return "Inspección de origen";
+  return "Servicio de origen";
+}
+
+function sourceVerificationNote(referral: Referral): string {
+  if (referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "TREE_INTERVENTION") {
+    return "La intervención autorizada se consulta en su catálogo de origen.";
+  }
+  if (isInspectionSourcedRepair(referral)) return "La información de la inspección se consulta en su expediente ambiental.";
+  return "La información del Servicio se consulta en su módulo de origen.";
+}
+
+function sourceLinkLabel(referral: Referral): string {
+  if (referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "TREE_INTERVENTION") {
+    return "Ver intervención de origen";
+  }
+  if (isInspectionSourcedRepair(referral)) return "Ver inspección fuente";
+  return "Ver Servicio de origen";
 }
 
 function referralKindDescriptionFor(referral: Referral): string {
@@ -197,7 +219,11 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
   const fetchReferrals = useCallback(async () => {
     const page = await referralsAdapter.list();
     const referrals = page.referrals.filter((referral) => isReferralVisibleToScenario(referral, scenario));
-    const sourceIds = [...new Set(referrals.flatMap((referral) => referral.sourceServiceId ? [referral.sourceServiceId] : []))];
+    // Inspection-sourced repairs stash the inspection id in sourceServiceId (see referrals.ts) —
+    // it isn't a real Service id, so fetching it as one would 404 and misreport as unavailable.
+    const sourceIds = [...new Set(referrals
+      .filter((referral) => referral.sourceServiceId && !isInspectionSourcedRepair(referral))
+      .map((referral) => referral.sourceServiceId as string))];
     const sourceResults = await Promise.all(sourceIds.map(async (sourceId) => {
       try {
         return { kind: "success" as const, sourceId, service: await servicesAdapter.get(sourceId) };
@@ -528,13 +554,9 @@ function ReferralDetail({
             <div className="min-w-0">
               <h2 id="referral-source-title" className="text-sm font-bold text-[var(--color-text)]">{sourceKindLabel(referral)}</h2>
               <p className="mt-1 text-sm text-[var(--color-text)]">{referral.sourceId} · {referral.sourceLabel}</p>
-              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                {referral.sourceType === "TREE_INTERVENTION"
-                  ? "La intervención autorizada se consulta en su catálogo de origen."
-                  : "La información del Servicio se consulta en su módulo de origen."}
-              </p>
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{sourceVerificationNote(referral)}</p>
               <a className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-action)] underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" href={referral.sourceHref}>
-                Ver {referral.sourceType === "TREE_INTERVENTION" ? "intervención de origen" : "Servicio de origen"}
+                {sourceLinkLabel(referral)}
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </a>
             </div>

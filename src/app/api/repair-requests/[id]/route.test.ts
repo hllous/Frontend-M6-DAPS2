@@ -1,13 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
-import { resetRepairRequestFixtures, getRepairRequestFixture } from "@/lib/repair-request-fixtures";
+import { resetEnvironmentalInspectionFixtures } from "@/lib/environmental-report-fixtures";
+import { addRepairRequestFixture, getRepairRequestFixture, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
+import { resetServiceFixtures } from "@/lib/services-fixtures";
 import { POST as start } from "./start/route";
 import { POST as close } from "./close/route";
 import { GET } from "./route";
 
-beforeEach(() => resetRepairRequestFixtures());
-afterEach(() => { delete process.env.M6_AUTH_MODE; });
+beforeEach(() => {
+  resetRepairRequestFixtures();
+  resetEnvironmentalInspectionFixtures();
+  resetServiceFixtures();
+});
+afterEach(() => {
+  delete process.env.M6_AUTH_MODE;
+  resetEnvironmentalInspectionFixtures();
+  resetServiceFixtures();
+});
 
 async function authenticatedCookie(scenarioId: string) {
   process.env.M6_AUTH_MODE = "mock";
@@ -61,5 +71,50 @@ describe("repair request BFF detail and recovery routes", () => {
 
     const foreign = await GET(new Request("http://localhost/api/repair-requests/RR-404", { headers: { cookie: fieldCookie } }), { params: Promise.resolve({ id: "RR-404" }) });
     expect(foreign.status).toBe(403);
+  });
+
+  it("lets Field inspect an inspection referral only through its linked crew", async () => {
+    addRepairRequestFixture({
+      id: "RR-INS-1012",
+      damageType: "BLOCKED_DRAIN",
+      address: "Av. Brasil 2450",
+      severity: "LOW",
+      publicSafetyRisk: false,
+      detectedInType: "INSPECTION",
+      detectedInId: "INS-1012",
+      sourceContext: {
+        type: "INSPECTION",
+        id: "INS-1012",
+        label: "Inspección INS-1012 · ER-1012",
+        href: "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012",
+      },
+      status: "REQUESTED",
+      workOrderId: null,
+      requestedAt: "2026-09-05T08:00:00.000Z",
+    });
+    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+    const assigned = await GET(new Request("http://localhost/api/repair-requests/RR-INS-1012", { headers: { cookie: fieldCookie } }), { params: Promise.resolve({ id: "RR-INS-1012" }) });
+    expect(assigned.status).toBe(200);
+
+    addRepairRequestFixture({
+      id: "RR-INS-1005",
+      damageType: "BLOCKED_DRAIN",
+      address: "Av. Costanera km 3",
+      severity: "HIGH",
+      publicSafetyRisk: true,
+      detectedInType: "INSPECTION",
+      detectedInId: "INS-1005",
+      sourceContext: {
+        type: "INSPECTION",
+        id: "INS-1005",
+        label: "Inspección INS-1005 · ER-1005",
+        href: "/app?destination=environment&detail=ER-1005&inspectionId=INS-1005",
+      },
+      status: "REQUESTED",
+      workOrderId: null,
+      requestedAt: "2026-09-05T08:00:00.000Z",
+    });
+    const forbidden = await GET(new Request("http://localhost/api/repair-requests/RR-INS-1005", { headers: { cookie: fieldCookie } }), { params: Promise.resolve({ id: "RR-INS-1005" }) });
+    expect(forbidden.status).toBe(403);
   });
 });

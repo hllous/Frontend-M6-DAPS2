@@ -19,6 +19,7 @@ import {
   Search,
   ShieldAlert,
   X,
+  Wrench,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -42,7 +43,9 @@ import {
 } from "@/lib/environmental-reports";
 import { establishmentDirectoryAdapter, type Establishment } from "@/lib/establishment-directory";
 import { CREW_CATALOG, SERVICE_TYPE_CATALOG, servicesAdapter, type Service } from "@/lib/services";
+import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
 import type { OperationalScenario } from "@/lib/scenarios";
+import { CreateRepairRequestDialog } from "@/components/services/create-repair-request-dialog";
 
 type LoadState =
   | { status: "loading" }
@@ -153,6 +156,7 @@ function StatusBadge({ status }: { status: EnvironmentalReport["status"] }) {
 export function EnvironmentalReportsWorkspace({ scenario }: { scenario: OperationalScenario }) {
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
   const [selectedId, setSelectedId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("detail"));
+  const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("inspectionId"));
   const [createOpen, setCreateOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterType, setFilterType] = useState<string>("");
@@ -179,8 +183,9 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     if (selectedId) url.searchParams.set("detail", selectedId); else url.searchParams.delete("detail");
+    if (selectedInspectionId) url.searchParams.set("inspectionId", selectedInspectionId); else url.searchParams.delete("inspectionId");
     window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`.replace(/\?$/, ""));
-  }, [selectedId]);
+  }, [selectedId, selectedInspectionId]);
 
   const filteredReports = useMemo(() => {
     if (loadState.status !== "ready") return [];
@@ -227,7 +232,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
     }
   }, [refreshAfterConflict, replaceReport]);
 
-  if (selectedReport) return <ReportDetail report={selectedReport} scenario={scenario} onBack={() => setSelectedId(null)} onAction={handleAction} onReportUpdated={replaceReport} />;
+  if (selectedReport) return <ReportDetail report={selectedReport} scenario={scenario} focusedInspectionId={selectedInspectionId} onBack={() => { setSelectedId(null); setSelectedInspectionId(null); }} onAction={handleAction} onReportUpdated={replaceReport} />;
 
   return (
     <div className="flex min-h-full flex-col bg-[var(--color-canvas)]">
@@ -247,7 +252,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
         {loadState.status === "loading" && <LoadingState />}
         {loadState.status === "error" && <ErrorState message={loadState.message} onRetry={loadReports} />}
         {loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={Boolean(filterStatus || filterType || search)} onClear={() => { setFilterStatus(""); setFilterType(""); setSearch(""); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}
-        {loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"} aria-describedby="environmental-scope-note"><p id="environmental-scope-note" className="sr-only">Seleccione un expediente para consultar su detalle. Los estados representan el ciclo completo del expediente ambiental.</p><ul className="grid gap-3" role="list">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => setSelectedId(report.id)} />)}</ul></section>}
+        {loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"} aria-describedby="environmental-scope-note"><p id="environmental-scope-note" className="sr-only">Seleccione un expediente para consultar su detalle. Los estados representan el ciclo completo del expediente ambiental.</p><ul className="grid gap-3" role="list">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => { setSelectedId(report.id); setSelectedInspectionId(null); }} />)}</ul></section>}
       </main>
 
       <CreateReportDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={handleCreated} />
@@ -263,7 +268,7 @@ function ReportRow({ report, onOpen }: { report: EnvironmentalReport; onOpen: ()
   return <li><button type="button" onClick={onOpen} className="flex min-h-12 w-full items-start gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition-colors hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-subtle)] focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] sm:items-center" aria-label={`${report.id}, ${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}, ${ENVIRONMENTAL_REPORT_STATUS_LABELS[report.status]}`}><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-info-fill)] text-[var(--color-action)]"><MapPin className="h-4 w-4" aria-hidden /></span><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="font-bold tabular-nums text-[var(--color-text)]">{report.id}</span><span className="text-xs font-semibold text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}</span></span><span className="mt-1 block truncate text-sm text-[var(--color-text)]">{reportAddress(report)}</span><span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">Actualizado {formatDate(report.updatedAt)}{report.escalated ? " · Escalado" : ""}</span></span><StatusBadge status={report.status} /><ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-secondary)] sm:mt-0" aria-hidden /></button></li>;
 }
 
-function ReportDetail({ report, scenario, onBack, onAction, onReportUpdated }: { report: EnvironmentalReport; scenario: OperationalScenario; onBack: () => void; onAction: (action: Action, report: EnvironmentalReport) => Promise<void>; onReportUpdated: (report: EnvironmentalReport) => void }) {
+function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction, onReportUpdated }: { report: EnvironmentalReport; scenario: OperationalScenario; focusedInspectionId: string | null; onBack: () => void; onAction: (action: Action, report: EnvironmentalReport) => Promise<void>; onReportUpdated: (report: EnvironmentalReport) => void }) {
   const isOffice = scenario.actor.kind === "OFFICE";
   const [inspections, setInspections] = useState<EnvironmentalInspection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -272,6 +277,9 @@ function ReportDetail({ report, scenario, onBack, onAction, onReportUpdated }: {
   const [scheduleMode, setScheduleMode] = useState<"schedule" | "reinspection">("schedule");
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [scheduledService, setScheduledService] = useState<Service | null>(null);
+  const [inspectionServices, setInspectionServices] = useState<Record<string, Service | null>>({});
+  const [inspectionRepairRequests, setInspectionRepairRequests] = useState<Record<string, RepairRequest[]>>({});
+  const [repairRequestInspectionId, setRepairRequestInspectionId] = useState<string | null>(null);
   const [violationNotice, setViolationNotice] = useState<ViolationNotice | null>(null);
   const [noticeLoading, setNoticeLoading] = useState(false);
   const [noticeError, setNoticeError] = useState<string | null>(null);
@@ -306,20 +314,44 @@ function ReportDetail({ report, scenario, onBack, onAction, onReportUpdated }: {
     }
   }, [canViewViolationNotice]);
 
+  const loadInspectionSources = useCallback(async (items: EnvironmentalInspection[]) => {
+    const sourceResults = await Promise.all(items.map(async (inspection) => {
+      const [service, referrals] = await Promise.all([
+        inspection.serviceId ? servicesAdapter.get(inspection.serviceId).catch(() => null) : Promise.resolve(null),
+        repairRequestsAdapter.list({ detectedInId: inspection.id, pageSize: 50 }).then((page) => page.repairRequests).catch(() => []),
+      ]);
+      return { inspectionId: inspection.id, service, referrals };
+    }));
+    setInspectionServices((current) => ({
+      ...current,
+      ...Object.fromEntries(sourceResults.map(({ inspectionId, service }) => [inspectionId, service])),
+    }));
+    setInspectionRepairRequests((current) => ({
+      ...current,
+      ...Object.fromEntries(sourceResults.map(({ inspectionId, referrals }) => [inspectionId, referrals])),
+    }));
+  }, []);
+
   const loadInspections = useCallback(async () => {
     const items = await environmentalReportsAdapter.listInspections(report.id);
     setInspections(items);
+    void loadInspectionSources(items);
     await loadViolationNotice(items);
     return items;
-  }, [loadViolationNotice, report.id]);
+  }, [loadInspectionSources, loadViolationNotice, report.id]);
 
   useEffect(() => {
     let current = true;
     void environmentalReportsAdapter.listInspections(report.id)
-      .then(async (items) => { if (current) { setInspections(items); setLoading(false); await loadViolationNotice(items); } })
+      .then(async (items) => { if (current) { setInspections(items); setLoading(false); void loadInspectionSources(items); await loadViolationNotice(items); } })
       .catch((error: unknown) => { if (current) { setHistoryError(error instanceof Error ? error.message : "No se pudo cargar la historia de inspecciones."); setLoading(false); } });
     return () => { current = false; };
-  }, [loadViolationNotice, report.id]);
+  }, [loadInspectionSources, loadViolationNotice, report.id]);
+
+  useEffect(() => {
+    if (!focusedInspectionId || loading || !inspections.some((inspection) => inspection.id === focusedInspectionId)) return;
+    document.getElementById("inspection-history-title")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [focusedInspectionId, inspections, loading]);
 
   const activeInspection = inspections.find((inspection) => !inspection.outcome) ?? null;
   const completedViolationInspection = inspections.find((inspection) => inspection.outcome === "VIOLATION_FOUND") ?? null;
@@ -329,6 +361,12 @@ function ReportDetail({ report, scenario, onBack, onAction, onReportUpdated }: {
   const canSchedule = isOffice && report.status === "UNDER_REVIEW" && !activeInspection;
   const canReprogram = isOffice && report.status === "INSPECTION_SCHEDULED" && Boolean(activeInspection);
   const canReinspect = isOffice && report.status === "INSPECTED" && inspections.some((inspection) => inspection.outcome === "INCONCLUSIVE");
+  const repairRequestInspection = inspections.find((inspection) => inspection.id === repairRequestInspectionId) ?? null;
+  const canCreateRepairRequestFromInspection = (inspection: EnvironmentalInspection) => {
+    if (isOffice) return true;
+    const sourceService = inspectionServices[inspection.id];
+    return scenario.actor.kind === "FIELD" && Boolean(sourceService?.crewId && sourceService.crewId === scenario.actor.crewId);
+  };
   const actions: { action: Action; label: string; icon: typeof Check; tone?: string }[] = report.status === "RECEIVED"
     ? [{ action: "start-review", label: "Iniciar revisión", icon: Search }]
     : report.status === "UNDER_REVIEW"
@@ -423,10 +461,24 @@ function ReportDetail({ report, scenario, onBack, onAction, onReportUpdated }: {
         {scheduleError && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{scheduleError}</div>}
         {canViewViolationNotice && completedViolationInspection && <ViolationNoticePanel inspection={completedViolationInspection} notice={violationNotice} loading={noticeLoading} error={noticeError} showIssue={showNoticeIssuance} canIssue={canSubmitNotice} hasEvidence={hasInspectionEvidence} onIssue={() => setIssueNoticeOpen(true)} />}
         <section className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]"><div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Contexto operativo</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2"><DataField label="Ubicación" value={reportAddress(report)} /><DataField label="Detalle del hallazgo" value={reportDetails(report)} wide /><DataField label="Prioridad" value={ENVIRONMENTAL_REPORT_PRIORITY_LABELS[report.priority]} /><DataField label="Creado" value={formatDate(report.createdAt)} /><DataField label="Última actualización" value={formatDate(report.updatedAt)} /></dl></div><div className="rounded-2xl border border-[var(--color-border)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Vigencia del registro</h2><p className="mt-2 text-sm text-[var(--color-text-secondary)]">La prioridad y los cambios tardíos de M2 se muestran como información de lectura.</p>{report.escalated && <p className="mt-4 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-sm font-semibold text-[var(--color-warning)]">Escalado por M2</p>}{report.citizenResponse && isOffice && <p className="mt-4 text-sm text-[var(--color-text)]">{report.citizenResponse}</p>}{report.ticketId && isOffice && <p className="mt-4 text-sm text-[var(--color-text-secondary)]">Ticket de origen: <span className="font-semibold tabular-nums text-[var(--color-text)]">{report.ticketId}</span></p>}</div></section>
-        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="inspection-history-title"><div className="flex items-center gap-2"><ClipboardCheck aria-hidden /><h2 id="inspection-history-title" className="text-sm font-bold text-[var(--color-text)]">Historia de inspecciones</h2></div>{loading && <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Cargando historia de inspecciones…</p>}{historyError && <p className="mt-3 text-sm text-[var(--color-danger)]" role="alert">{historyError}</p>}{!loading && !historyError && inspections.length === 0 && <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No hay inspecciones registradas.</p>}{!loading && !historyError && inspections.length > 0 && <ol className="mt-4 space-y-3">{inspections.map((inspection) => <li key={inspection.id} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-[var(--color-text)]">{inspection.id}</span><span className="text-sm text-[var(--color-text-secondary)]">{inspection.outcome ? `Resultado: ${inspection.outcome}` : "Inspección programada"}</span></div><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{inspection.scheduledDate} · {inspection.timeWindow.start}–{inspection.timeWindow.end} · {inspection.checklistVersion}</p>{inspection.serviceId && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Servicio POINT: <span className="font-semibold text-[var(--color-text)]">{inspection.serviceId}</span></p>}{scheduledService && inspection.id === inspections[inspections.length - 1]?.id && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Cuadrilla asignada: <span className="font-semibold text-[var(--color-text)]">{scheduledService.crewName ?? scheduledService.crewId ?? "Pendiente"}</span></p>}</li>)}</ol>}</section>
+         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="inspection-history-title"><div className="flex items-center gap-2"><ClipboardCheck aria-hidden /><h2 id="inspection-history-title" className="text-sm font-bold text-[var(--color-text)]">Historia de inspecciones</h2></div>{loading && <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Cargando historia de inspecciones…</p>}{historyError && <p className="mt-3 text-sm text-[var(--color-danger)]" role="alert">{historyError}</p>}{!loading && !historyError && inspections.length === 0 && <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No hay inspecciones registradas.</p>}{!loading && !historyError && inspections.length > 0 && <ol className="mt-4 space-y-3">{inspections.map((inspection) => <li key={inspection.id} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-[var(--color-text)]">{inspection.id}</span><span className="text-sm text-[var(--color-text-secondary)]">{inspection.outcome ? `Resultado: ${inspection.outcome}` : "Inspección programada"}</span></div><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{inspection.scheduledDate} · {inspection.timeWindow.start}–{inspection.timeWindow.end} · {inspection.checklistVersion}</p>{inspection.serviceId && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Servicio POINT: <span className="font-semibold text-[var(--color-text)]">{inspection.serviceId}</span></p>}{scheduledService && inspection.id === inspections[inspections.length - 1]?.id && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Cuadrilla asignada: <span className="font-semibold text-[var(--color-text)]">{scheduledService.crewName ?? scheduledService.crewId ?? "Pendiente"}</span></p>}<div className="mt-3 flex flex-wrap items-center gap-2">{inspectionRepairRequests[inspection.id]?.map((request) => <span key={request.id} className="rounded-full border border-[var(--color-info-line)] bg-[var(--color-info-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-info)]" role="status" aria-label={`Derivación ${request.id}: ${request.status === "REQUESTED" ? "Pendiente" : request.status === "IN_PROGRESS" ? "En curso" : "Cerrada"}`}>{request.id} · {request.status === "REQUESTED" ? "Pendiente de respuesta de M3" : request.status === "IN_PROGRESS" ? "En curso" : "Cerrada"}</span>)}{canCreateRepairRequestFromInspection(inspection) && <Button type="button" variant="outline" className="min-h-12 gap-2 sm:min-h-10" onClick={() => setRepairRequestInspectionId(inspection.id)}><Wrench data-icon="inline-start" aria-hidden />Crear derivación de reparación</Button>}</div></li>)}</ol>}</section>
       </main>
-      <InspectionSchedulingDialog open={scheduleOpen} mode={scheduleMode} activeInspection={activeInspection} onOpenChange={setScheduleOpen} onSubmit={handleSchedule} />
-      <IssueViolationNoticeDialog key={`${report.id}-${issueNoticeOpen ? "open" : "closed"}`} open={issueNoticeOpen} inspection={completedViolationInspection} onOpenChange={setIssueNoticeOpen} onSubmit={handleIssueNotice} />
+       <InspectionSchedulingDialog open={scheduleOpen} mode={scheduleMode} activeInspection={activeInspection} onOpenChange={setScheduleOpen} onSubmit={handleSchedule} />
+       <IssueViolationNoticeDialog key={`${report.id}-${issueNoticeOpen ? "open" : "closed"}`} open={issueNoticeOpen} inspection={completedViolationInspection} onOpenChange={setIssueNoticeOpen} onSubmit={handleIssueNotice} />
+       <CreateRepairRequestDialog
+         key={repairRequestInspection?.id ?? "no-inspection"}
+         open={Boolean(repairRequestInspection)}
+         inspection={repairRequestInspection ?? undefined}
+         report={report}
+         service={repairRequestInspection ? inspectionServices[repairRequestInspection.id] ?? undefined : undefined}
+         onOpenChange={(open) => { if (!open) setRepairRequestInspectionId(null); }}
+         onCreated={(request) => {
+           setInspectionRepairRequests((current) => ({
+             ...current,
+             [request.detectedInId]: [request, ...(current[request.detectedInId] ?? []).filter((item) => item.id !== request.id)],
+           }));
+         }}
+       />
     </div>
   );
 }

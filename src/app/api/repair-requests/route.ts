@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
+import { getEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import {
   addRepairRequestFixture,
@@ -49,6 +50,22 @@ function fieldCanAccessService(scenario: ReturnType<typeof getScenario>, service
   );
 }
 
+function fieldCanAccessInspection(scenario: ReturnType<typeof getScenario>, inspectionId: string) {
+  const inspection = getEnvironmentalInspectionFixture(inspectionId);
+  return Boolean(
+    inspection?.serviceId &&
+      scenario.actor.kind === "FIELD" &&
+      scenario.actor.crewId &&
+      serviceFixtures.some(
+        (service) => service.id === inspection.serviceId && service.crewId === scenario.actor.crewId,
+      ),
+  );
+}
+
+function fieldCanAccessSource(scenario: ReturnType<typeof getScenario>, sourceId: string) {
+  return fieldCanAccessService(scenario, sourceId) || fieldCanAccessInspection(scenario, sourceId);
+}
+
 function queryFromUrl(url: URL): RepairRequestQuery {
   return {
     status: repairRequestStatusSchema.safeParse(url.searchParams.get("status")).data,
@@ -67,8 +84,8 @@ export async function GET(request: Request) {
     const query = queryFromUrl(new URL(request.url));
 
     if (scenario.actor.kind === "FIELD") {
-      if (!query.detectedInId || !fieldCanAccessService(scenario, query.detectedInId)) {
-        return errorResponse(403, "Solo puede consultar derivaciones de Servicios de su cuadrilla.", path);
+      if (!query.detectedInId || !fieldCanAccessSource(scenario, query.detectedInId)) {
+        return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
       }
     } else if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, "Solo Oficina o Campo puede consultar derivaciones.", path);
@@ -102,9 +119,14 @@ export async function POST(request: Request) {
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = createRepairRequestInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (parsed.data.detectedInType !== "SERVICE") return errorResponse(400, "En esta fase la derivación debe originarse en un Servicio.", path);
-    if (scenario.actor.kind === "FIELD" && !fieldCanAccessService(scenario, parsed.data.detectedInId)) {
-      return errorResponse(403, "Solo puede crear derivaciones desde Servicios de su cuadrilla.", path);
+    if (parsed.data.detectedInType === "SERVICE" && !serviceFixtures.some((service) => service.id === parsed.data.detectedInId)) {
+      return errorResponse(404, `Servicio ${parsed.data.detectedInId} no encontrado.`, path);
+    }
+    if (parsed.data.detectedInType === "INSPECTION" && !getEnvironmentalInspectionFixture(parsed.data.detectedInId)) {
+      return errorResponse(404, `Inspección ${parsed.data.detectedInId} no encontrada.`, path);
+    }
+    if (scenario.actor.kind === "FIELD" && !fieldCanAccessSource(scenario, parsed.data.detectedInId)) {
+      return errorResponse(403, "Solo puede crear derivaciones desde trabajo de su cuadrilla.", path);
     }
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
@@ -119,8 +141,9 @@ export async function POST(request: Request) {
       });
     }
 
-    const service = serviceFixtures.find((candidate) => candidate.id === parsed.data.detectedInId);
-    if (!service) return errorResponse(404, `Servicio ${parsed.data.detectedInId} no encontrado.`, path);
+    const service = parsed.data.detectedInType === "SERVICE"
+      ? serviceFixtures.find((candidate) => candidate.id === parsed.data.detectedInId)
+      : undefined;
     const created = createRepairRequestFixture(parsed.data, service);
     addRepairRequestFixture(created);
     return NextResponse.json(created, { status: 201 });
