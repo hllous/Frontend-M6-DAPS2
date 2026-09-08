@@ -1,9 +1,11 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { delay, http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 import { scenarios } from "@/lib/scenarios";
+import { coverageIndicatorFixture } from "@/lib/indicator-fixtures";
 import { handlers } from "@/mocks/handlers";
 
 import { IndicatorsDashboard } from "./indicators-dashboard";
@@ -11,10 +13,103 @@ import { IndicatorsDashboard } from "./indicators-dashboard";
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.unstubAllGlobals();
+});
 afterAll(() => server.close());
 
 describe("IndicatorsDashboard", () => {
+  it("keeps the family selector available with skeletons while indicators are loading", () => {
+    server.use(http.get("*/api/indicators/:family", async () => {
+      await delay("infinite");
+      return HttpResponse.json({});
+    }));
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const familyBand = screen.getByRole("region", { name: "Familias de indicadores" });
+    expect(familyBand).toBeVisible();
+    expect(within(familyBand).getByRole("button", { name: /Cobertura.*seleccionar/i })).toBeVisible();
+    expect(within(familyBand).getByLabelText("Cargando Cobertura")).toBeVisible();
+    expect(within(familyBand).getByLabelText("Cargando Cumplimiento")).toBeVisible();
+  });
+
+  it("keeps a ready family usable when another family errors and reports module states independently", async () => {
+    server.use(
+      http.get("*/api/indicators/coverage", () => HttpResponse.json({ ...coverageIndicatorFixture, byZone: [] })),
+      http.get("*/api/indicators/compliance", () => HttpResponse.json({ statusCode: 503, message: "Servicio no disponible" }, { status: 503 })),
+    );
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    expect(within(familyBand).getByRole("button", { name: /Reintentar Cumplimiento/i })).toBeVisible();
+
+    const trend = await screen.findByRole("region", { name: "Tendencia" });
+    expect(within(trend).getByRole("heading", { name: "Cobertura por tipo de servicio" })).toBeVisible();
+    const territory = screen.getByRole("region", { name: "Detalle territorial" });
+    expect(within(territory).getByText("Sin resultados territoriales")).toBeVisible();
+
+    await userEvent.setup().click(within(familyBand).getByRole("button", { name: /Cumplimiento.*seleccionar/i }));
+    expect(await screen.findByText("No se pudo cargar Cumplimiento")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Familias de indicadores" })).toBeVisible();
+  });
+
+  it("uses task-focused tabs on narrow screens without changing the selected family", async () => {
+    vi.stubGlobal("matchMedia", vi.fn().mockImplementation(() => ({
+      matches: true,
+      media: "(max-width: 760px)",
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    await user.click(within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i }));
+    const tabs = await screen.findByRole("tablist", { name: "Secciones del tablero" });
+    expect(tabs).toBeVisible();
+    expect(within(tabs).getByRole("tab", { name: "Resumen" })).toBeVisible();
+    expect(within(tabs).getByRole("tab", { name: "Tendencia" })).toBeVisible();
+    expect(within(tabs).getByRole("tab", { name: "Territorio" })).toBeVisible();
+    expect(within(tabs).getByRole("tab", { name: "Registros" })).toBeVisible();
+
+    await user.click(within(tabs).getByRole("tab", { name: "Territorio" }));
+    expect(within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("heading", { name: "Contenedores por zona" })).toBeVisible();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("pins chart detail from hover or keyboard focus and returns focus after Escape or outside interaction", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    const centro = await screen.findByRole("button", { name: /Centro.*93,6.*146.*156/i });
+
+    await user.hover(centro);
+    expect(screen.getByRole("status", { name: /Detalle de Centro/i })).toBeVisible();
+    await user.click(centro);
+    expect(screen.getByRole("status", { name: /Detalle fijado de Centro/i })).toBeVisible();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("status", { name: /Detalle .*Centro/i })).not.toBeInTheDocument();
+    expect(centro).toHaveFocus();
+
+    await user.click(centro);
+    expect(screen.getByRole("status", { name: /Detalle fijado de Centro/i })).toBeVisible();
+    await user.click(document.body);
+    expect(screen.queryByRole("status", { name: /Detalle .*Centro/i })).not.toBeInTheDocument();
+    expect(centro).toHaveFocus();
+  });
+
   it("lets Office explore exact coverage and compliance values through keyboard-accessible detail", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
