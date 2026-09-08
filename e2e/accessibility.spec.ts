@@ -26,6 +26,21 @@ test.describe("automated WCAG checks @smoke", () => {
     await expectNoViolations(page);
   });
 
+  test("the selected mobile sheet navigation item has no axe violations when hovered", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app");
+
+    await page.getByRole("button", { name: "Más módulos" }).click();
+    const selectedNavigationItem = page
+      .getByRole("dialog", { name: "Más módulos" })
+      .getByRole("button", { name: "Mi trabajo", exact: true });
+    await selectedNavigationItem.hover();
+    await page.waitForTimeout(200);
+
+    await expectNoViolations(page);
+  });
+
   test("the live app shell with the Zones success state has no axe violations", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
