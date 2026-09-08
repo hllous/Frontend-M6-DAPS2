@@ -175,6 +175,7 @@ import {
   getEnvironmentalInspectionFixture,
   getInspectionAttachments,
   getEnvironmentalReportFixture,
+  getSanctionOutcomeIntegrationExceptions,
   getViolationNoticeFixture,
   listEnvironmentalInspectionFixtures,
   paginateEnvironmentalReportFixtures,
@@ -403,7 +404,8 @@ export const handlers = [
       page: params.has("page") ? Number(params.get("page")) : undefined,
       pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
     };
-    return HttpResponse.json(paginateEnvironmentalReportFixtures(filterEnvironmentalReportFixtures(query), query.page, query.pageSize));
+    const page = paginateEnvironmentalReportFixtures(filterEnvironmentalReportFixtures(query), query.page, query.pageSize);
+    return HttpResponse.json({ ...page, sanctionOutcomeIntegrationExceptions: getSanctionOutcomeIntegrationExceptions() });
   }),
   http.get("*/api/environmental-reports/:reportId", ({ params }) => {
     const report = getEnvironmentalReportFixture(params.reportId as string);

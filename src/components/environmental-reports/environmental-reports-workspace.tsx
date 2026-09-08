@@ -32,6 +32,7 @@ import {
   ENVIRONMENTAL_REPORT_TYPE_LABELS,
   environmentalReportTypeSchema,
   issueViolationNoticeInputSchema,
+  mergeEnvironmentalReportRead,
   environmentalReportsAdapter,
   EnvironmentalReportRequestError,
   type IssueViolationNoticeInput,
@@ -39,18 +40,20 @@ import {
   type EnvironmentalInspectionScheduleInput,
   type EnvironmentalReport,
   type EnvironmentalReportType,
+  type SanctionOutcomeIntegrationException,
   type ViolationNotice,
 } from "@/lib/environmental-reports";
 import { establishmentDirectoryAdapter, type Establishment } from "@/lib/establishment-directory";
 import { CREW_CATALOG, SERVICE_TYPE_CATALOG, servicesAdapter, type Service } from "@/lib/services";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
+import { getEnvironmentalReportClosure, SANCTION_DECISION_LABELS, type EnvironmentalReportClosure } from "@/lib/sanction-outcomes";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { CreateRepairRequestDialog } from "@/components/services/create-repair-request-dialog";
 
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; reports: EnvironmentalReport[]; total: number };
+  | { status: "ready"; reports: EnvironmentalReport[]; total: number; sanctionOutcomeIntegrationExceptions: SanctionOutcomeIntegrationException[] };
 
 type Action = "start-review" | "forward" | "dismiss" | "close";
 
@@ -165,17 +168,21 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
 
   const fetchReports = useCallback(async () => {
     const page = await environmentalReportsAdapter.list({ page: 1, pageSize: 100 });
-    return { reports: page.environmentalReports.filter((report) => visibleToScenario(report, scenario)), total: page.total };
+    return {
+      reports: page.environmentalReports.filter((report) => visibleToScenario(report, scenario)),
+      total: page.total,
+      sanctionOutcomeIntegrationExceptions: page.sanctionOutcomeIntegrationExceptions,
+    };
   }, [scenario]);
 
   const loadReports = useCallback(() => {
     setLoadState({ status: "loading" });
-    void fetchReports().then(({ reports, total }) => setLoadState({ status: "ready", reports, total })).catch((error: unknown) => setLoadState({ status: "error", message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes." }));
+    void fetchReports().then(({ reports, total, sanctionOutcomeIntegrationExceptions }) => setLoadState({ status: "ready", reports, total, sanctionOutcomeIntegrationExceptions })).catch((error: unknown) => setLoadState({ status: "error", message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes." }));
   }, [fetchReports]);
 
   useEffect(() => {
     let current = true;
-    void fetchReports().then(({ reports, total }) => { if (current) setLoadState({ status: "ready", reports, total }); }).catch((error: unknown) => { if (current) setLoadState({ status: "error", message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes." }); });
+    void fetchReports().then(({ reports, total, sanctionOutcomeIntegrationExceptions }) => { if (current) setLoadState({ status: "ready", reports, total, sanctionOutcomeIntegrationExceptions }); }).catch((error: unknown) => { if (current) setLoadState({ status: "error", message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes." }); });
     return () => { current = false; };
   }, [fetchReports]);
 
@@ -200,7 +207,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
   const selectedReport = loadState.status === "ready" && selectedId ? loadState.reports.find((report) => report.id === selectedId) ?? null : null;
 
   const replaceReport = useCallback((updated: EnvironmentalReport) => {
-    setLoadState((state) => state.status === "ready" ? { ...state, reports: state.reports.map((report) => report.id === updated.id ? updated : report) } : state);
+    setLoadState((state) => state.status === "ready" ? { ...state, reports: state.reports.map((report) => report.id === updated.id ? mergeEnvironmentalReportRead(report, updated) : report) } : state);
   }, []);
 
   const handleCreated = useCallback((created: EnvironmentalReport) => {
@@ -249,6 +256,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:p-6 lg:p-8">
         <p className="sr-only" aria-live="polite">{announcement}</p>
         {scenario.actor.kind === "OFFICE" && <QueueFilters filterStatus={filterStatus} filterType={filterType} search={search} onStatus={setFilterStatus} onType={setFilterType} onSearch={setSearch} />}
+        {loadState.status === "ready" && scenario.actor.kind === "OFFICE" && loadState.sanctionOutcomeIntegrationExceptions.length > 0 && <SanctionOutcomeIntegrationExceptionsPanel exceptions={loadState.sanctionOutcomeIntegrationExceptions} />}
         {loadState.status === "loading" && <LoadingState />}
         {loadState.status === "error" && <ErrorState message={loadState.message} onRetry={loadReports} />}
         {loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={Boolean(filterStatus || filterType || search)} onClear={() => { setFilterStatus(""); setFilterType(""); setSearch(""); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}
@@ -287,6 +295,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
 
   const canIssueViolationNotice = isOffice && scenario.capabilities.includes("violationNotice:issue");
   const canViewViolationNotice = isOffice && scenario.capabilities.includes("violationNotice:view");
+  const canViewSanctionOutcome = isOffice && scenario.capabilities.includes("sanctionOutcome:view");
 
   const loadViolationNotice = useCallback(async (items: EnvironmentalInspection[]) => {
     const violationInspection = items.find((inspection) => inspection.outcome === "VIOLATION_FOUND");
@@ -361,6 +370,8 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
   const canSchedule = isOffice && report.status === "UNDER_REVIEW" && !activeInspection;
   const canReprogram = isOffice && report.status === "INSPECTION_SCHEDULED" && Boolean(activeInspection);
   const canReinspect = isOffice && report.status === "INSPECTED" && inspections.some((inspection) => inspection.outcome === "INCONCLUSIVE");
+  const closure = getEnvironmentalReportClosure(report);
+  const visibleClosure = closure && (closure.kind !== "sanctioned" || canViewSanctionOutcome) ? closure : null;
   const repairRequestInspection = inspections.find((inspection) => inspection.id === repairRequestInspectionId) ?? null;
   const canCreateRepairRequestFromInspection = (inspection: EnvironmentalInspection) => {
     if (isOffice) return true;
@@ -462,6 +473,8 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
         {canViewViolationNotice && completedViolationInspection && <ViolationNoticePanel inspection={completedViolationInspection} notice={violationNotice} loading={noticeLoading} error={noticeError} showIssue={showNoticeIssuance} canIssue={canSubmitNotice} hasEvidence={hasInspectionEvidence} onIssue={() => setIssueNoticeOpen(true)} />}
         <section className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]"><div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Contexto operativo</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2"><DataField label="Ubicación" value={reportAddress(report)} /><DataField label="Detalle del hallazgo" value={reportDetails(report)} wide /><DataField label="Prioridad" value={ENVIRONMENTAL_REPORT_PRIORITY_LABELS[report.priority]} /><DataField label="Creado" value={formatDate(report.createdAt)} /><DataField label="Última actualización" value={formatDate(report.updatedAt)} /></dl></div><div className="rounded-2xl border border-[var(--color-border)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Vigencia del registro</h2><p className="mt-2 text-sm text-[var(--color-text-secondary)]">La prioridad y los cambios tardíos de M2 se muestran como información de lectura.</p>{report.escalated && <p className="mt-4 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-sm font-semibold text-[var(--color-warning)]">Escalado por M2</p>}{report.citizenResponse && isOffice && <p className="mt-4 text-sm text-[var(--color-text)]">{report.citizenResponse}</p>}{report.ticketId && isOffice && <p className="mt-4 text-sm text-[var(--color-text-secondary)]">Ticket de origen: <span className="font-semibold tabular-nums text-[var(--color-text)]">{report.ticketId}</span></p>}</div></section>
          <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="inspection-history-title"><div className="flex items-center gap-2"><ClipboardCheck aria-hidden /><h2 id="inspection-history-title" className="text-sm font-bold text-[var(--color-text)]">Historia de inspecciones</h2></div>{loading && <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Cargando historia de inspecciones…</p>}{historyError && <p className="mt-3 text-sm text-[var(--color-danger)]" role="alert">{historyError}</p>}{!loading && !historyError && inspections.length === 0 && <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No hay inspecciones registradas.</p>}{!loading && !historyError && inspections.length > 0 && <ol className="mt-4 space-y-3">{inspections.map((inspection) => <li key={inspection.id} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-[var(--color-text)]">{inspection.id}</span><span className="text-sm text-[var(--color-text-secondary)]">{inspection.outcome ? `Resultado: ${inspection.outcome}` : "Inspección programada"}</span></div><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{inspection.scheduledDate} · {inspection.timeWindow.start}–{inspection.timeWindow.end} · {inspection.checklistVersion}</p>{inspection.serviceId && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Servicio POINT: <span className="font-semibold text-[var(--color-text)]">{inspection.serviceId}</span></p>}{scheduledService && inspection.id === inspections[inspections.length - 1]?.id && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Cuadrilla asignada: <span className="font-semibold text-[var(--color-text)]">{scheduledService.crewName ?? scheduledService.crewId ?? "Pendiente"}</span></p>}<div className="mt-3 flex flex-wrap items-center gap-2">{inspectionRepairRequests[inspection.id]?.map((request) => <span key={request.id} className="rounded-full border border-[var(--color-info-line)] bg-[var(--color-info-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-info)]" role="status" aria-label={`Derivación ${request.id}: ${request.status === "REQUESTED" ? "Pendiente" : request.status === "IN_PROGRESS" ? "En curso" : "Cerrada"}`}>{request.id} · {request.status === "REQUESTED" ? "Pendiente de respuesta de M3" : request.status === "IN_PROGRESS" ? "En curso" : "Cerrada"}</span>)}{canCreateRepairRequestFromInspection(inspection) && <Button type="button" variant="outline" className="min-h-12 gap-2 sm:min-h-10" onClick={() => setRepairRequestInspectionId(inspection.id)}><Wrench data-icon="inline-start" aria-hidden />Crear derivación de reparación</Button>}</div></li>)}</ol>}</section>
+        {visibleClosure && <EnvironmentalReportClosurePanel closure={visibleClosure} />}
+        {canViewSanctionOutcome && report.sanctionOutcome && <SanctionOutcomePanel outcome={report.sanctionOutcome} />}
       </main>
        <InspectionSchedulingDialog open={scheduleOpen} mode={scheduleMode} activeInspection={activeInspection} onOpenChange={setScheduleOpen} onSubmit={handleSchedule} />
        <IssueViolationNoticeDialog key={`${report.id}-${issueNoticeOpen ? "open" : "closed"}`} open={issueNoticeOpen} inspection={completedViolationInspection} onOpenChange={setIssueNoticeOpen} onSubmit={handleIssueNotice} />
@@ -480,6 +493,78 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
          }}
        />
     </div>
+  );
+}
+
+function EnvironmentalReportClosurePanel({ closure }: { closure: EnvironmentalReportClosure }) {
+  const isWaiting = closure.kind === "waiting" || closure.kind === "deadline-pending";
+  const isDeadline = closure.kind === "deadline" || closure.kind === "deadline-pending";
+  const tone = isWaiting
+    ? "border-[var(--color-info-line)] bg-[var(--color-info-fill)]"
+    : isDeadline
+      ? "border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]"
+      : "border-[var(--color-success-line)] bg-[var(--color-success-fill)]";
+  const iconTone = isWaiting
+    ? "text-[var(--color-info)]"
+    : isDeadline
+      ? "text-[var(--color-warning)]"
+      : "text-[var(--color-success)]";
+
+  return (
+    <section className={`rounded-2xl border p-4 sm:p-5 ${tone}`} role="region" aria-label="Estado de cierre">
+      <div className="flex items-start gap-3">
+        {isWaiting ? <Clock3 className={`mt-0.5 h-5 w-5 shrink-0 ${iconTone}`} aria-hidden /> : isDeadline ? <AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${iconTone}`} aria-hidden /> : <CircleCheck className={`mt-0.5 h-5 w-5 shrink-0 ${iconTone}`} aria-hidden />}
+        <div className="min-w-0">
+          <p className="font-semibold text-[var(--color-text)]">{closure.label}</p>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{closure.description}</p>
+          {"deadlineAt" in closure && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Plazo de M4: <span className="font-semibold tabular-nums text-[var(--color-text)]">{formatDate(closure.deadlineAt)}</span></p>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SanctionOutcomeIntegrationExceptionsPanel({ exceptions }: { exceptions: SanctionOutcomeIntegrationException[] }) {
+  return (
+    <section className="rounded-2xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-4 sm:p-5" role="region" aria-label="Excepciones de integración M4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-warning)]" aria-hidden />
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-[var(--color-text)]">Excepciones de integración M4</h2>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Estas resoluciones no pudieron asociarse a un acta conocida. Revise la correlación antes de tomar cualquier decisión fuera de M6.</p>
+        </div>
+      </div>
+      <ul className="mt-4 grid gap-3" role="list">
+        {exceptions.map((exception) => (
+          <li key={`${exception.violationNoticeId}-${exception.externalRef}`} className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-surface)] p-3">
+            <p className="font-semibold text-[var(--color-text)]">Acta recibida: <span className="break-words tabular-nums">{exception.violationNoticeId}</span></p>
+            <p className="mt-1 break-words text-sm text-[var(--color-text-secondary)]">Referencia externa: <span className="font-semibold text-[var(--color-text)]">{exception.externalRef}</span></p>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{exception.message}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function SanctionOutcomePanel({ outcome }: { outcome: NonNullable<EnvironmentalReport["sanctionOutcome"]> }) {
+  return (
+    <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" role="region" aria-label="Resolución de M4">
+      <div className="flex items-start gap-3">
+        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-action)]" aria-hidden />
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-[var(--color-text)]">Resolución de M4</h2>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Registro de solo lectura. M6 no edita ni reemplaza la decisión externa.</p>
+        </div>
+      </div>
+      <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+        <DataField label="Decisión" value={SANCTION_DECISION_LABELS[outcome.decision]} />
+        <DataField label="Fecha de decisión" value={formatDate(outcome.decidedAt)} />
+        <DataField label="Acta relacionada" value={outcome.violationNoticeId} />
+        <DataField label="Referencia externa" value={outcome.externalRef} />
+        {outcome.dismissalReason && <DataField label="Motivo informado por M4" value={outcome.dismissalReason} wide />}
+      </dl>
+    </section>
   );
 }
 

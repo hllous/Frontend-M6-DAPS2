@@ -35,6 +35,32 @@ export type EnvironmentalReportStatus = z.infer<typeof environmentalReportStatus
 export const environmentalReportPrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 export type EnvironmentalReportPriority = z.infer<typeof environmentalReportPrioritySchema>;
 
+export const sanctionDecisionSchema = z.enum([
+  "FINE_ISSUED",
+  "CLOSURE_ORDERED",
+  "FORMAL_NOTICE_ISSUED",
+  "DISMISSED",
+]);
+export type SanctionDecision = z.infer<typeof sanctionDecisionSchema>;
+
+export const sanctionOutcomeSchema = z.object({
+  violationNoticeId: z.string().trim().min(1),
+  decision: sanctionDecisionSchema,
+  decidedAt: z.string(),
+  externalRef: z.string().trim().min(1),
+  dismissalReason: z.string().nullable().optional(),
+});
+export type SanctionOutcome = z.infer<typeof sanctionOutcomeSchema>;
+
+export const sanctionOutcomeIntegrationExceptionSchema = z.object({
+  type: z.literal("UNCORRELATED_SANCTION_OUTCOME"),
+  violationNoticeId: z.string(),
+  externalRef: z.string(),
+  receivedAt: z.string(),
+  message: z.string(),
+});
+export type SanctionOutcomeIntegrationException = z.infer<typeof sanctionOutcomeIntegrationExceptionSchema>;
+
 export const createEnvironmentalReportInputSchema = z.object({
   reportType: environmentalReportTypeSchema,
   address: z.string().trim().min(1, "Debe indicar la ubicación del hallazgo."),
@@ -66,11 +92,27 @@ export const environmentalReportSchema = z.object({
   deadlineAt: z.string().nullable().optional(),
   escalated: z.boolean().optional(),
   citizenResponse: z.string().nullable().optional(),
+  sanctionOutcome: sanctionOutcomeSchema.nullable().optional(),
   assignedCrewId: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 }).passthrough();
 export type EnvironmentalReport = z.infer<typeof environmentalReportSchema>;
+
+export function mergeEnvironmentalReportRead(
+  current: EnvironmentalReport,
+  incoming: EnvironmentalReport,
+): EnvironmentalReport {
+  const currentUpdatedAt = Date.parse(current.updatedAt);
+  const incomingUpdatedAt = Date.parse(incoming.updatedAt);
+  if (!Number.isNaN(currentUpdatedAt) && !Number.isNaN(incomingUpdatedAt) && incomingUpdatedAt < currentUpdatedAt) {
+    return current;
+  }
+  if (current.sanctionOutcome && !incoming.sanctionOutcome) {
+    return { ...incoming, sanctionOutcome: current.sanctionOutcome };
+  }
+  return incoming;
+}
 
 export const environmentalInspectionOutcomeSchema = z.enum([
   "NO_VIOLATION",
@@ -227,6 +269,7 @@ export type EnvironmentalReportsPage = {
   pageSize: number;
   total: number;
   totalPages: number;
+  sanctionOutcomeIntegrationExceptions: SanctionOutcomeIntegrationException[];
 };
 
 export class EnvironmentalReportContractError extends Error {
@@ -387,6 +430,7 @@ export const environmentalReportsAdapter = {
     const parsed = z.object({
       data: z.array(environmentalReportSchema),
       meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
+      sanctionOutcomeIntegrationExceptions: z.array(sanctionOutcomeIntegrationExceptionSchema).optional(),
     }).safeParse(payload);
     if (!parsed.success) throw new EnvironmentalReportContractError("La lista de expedientes no respeta el contrato esperado.", { cause: parsed.error });
     return {
@@ -395,6 +439,7 @@ export const environmentalReportsAdapter = {
       pageSize: parsed.data.meta.pageSize,
       total: parsed.data.meta.total,
       totalPages: parsed.data.meta.totalPages,
+      sanctionOutcomeIntegrationExceptions: parsed.data.sanctionOutcomeIntegrationExceptions ?? [],
     };
   },
 

@@ -5,7 +5,7 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
-import { resetEnvironmentalReportFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
+import { ingestSanctionOutcomeFixture, resetEnvironmentalReportFixtures, updateEnvironmentalInspectionFixture, updateEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
 import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { repairRequestsAdapter } from "@/lib/repair-requests";
 import { resetServiceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
@@ -18,6 +18,75 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); re
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
+  it("shows an uncorrelated M4 outcome as an Office integration exception", async () => {
+    ingestSanctionOutcomeFixture({
+      violationNoticeId: "NOTICE-UNKNOWN",
+      decision: "CLOSURE_ORDERED",
+      decidedAt: "2026-09-08T10:00:00.000Z",
+      externalRef: "M4-CLOSURE-UNKNOWN",
+    });
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const exceptionPanel = await screen.findByRole("region", { name: "Excepciones de integración M4" });
+    expect(within(exceptionPanel).getByText("NOTICE-UNKNOWN")).toBeVisible();
+    expect(within(exceptionPanel).getByText("M4-CLOSURE-UNKNOWN")).toBeVisible();
+    expect(within(exceptionPanel).getByText(/no pudo correlacionarse/i)).toBeVisible();
+  });
+
+  it("shows the M4 SanctionOutcome as read-only in the Office detail", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1010/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1010" });
+
+    expect(within(detail).getByRole("region", { name: "Resolución de M4" })).toBeVisible();
+    expect(within(detail).getByText("Multa emitida")).toBeVisible();
+    expect(within(detail).getByText("M4-FINE-1010")).toBeVisible();
+    expect(within(detail).getByText(/solo lectura/i)).toBeVisible();
+    expect(within(detail).queryByRole("button", { name: /Editar|Eliminar|Modificar/ })).not.toBeInTheDocument();
+  });
+
+  it("does not expose M4 sanction detail to Field even when the report is assigned", async () => {
+    updateEnvironmentalReportFixture("ER-1010", { assignedCrewId: "crew-b" });
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
+    const list = await screen.findByRole("region", { name: "Reportes ambientales asignados" });
+    await user.click(within(list).getByRole("button", { name: /ER-1010/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1010" });
+
+    expect(within(detail).queryByRole("region", { name: "Resolución de M4" })).not.toBeInTheDocument();
+    expect(within(detail).queryByText("M4-FINE-1010")).not.toBeInTheDocument();
+  });
+
+  it("shows the active M4 deadline as a waiting state without an automatic-close CTA", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1009/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1009" });
+
+    expect(within(detail).getByRole("region", { name: "Estado de cierre" })).toHaveTextContent("Esperando resolución de M4");
+    expect(within(detail).getByText(/permanece abierto/i)).toBeVisible();
+    expect(within(detail).queryByRole("button", { name: "Cerrar expediente" })).not.toBeInTheDocument();
+  });
+
+  it("labels an already reflected deadline closure separately from local closure", async () => {
+    updateEnvironmentalReportFixture("ER-1009", { status: "CLOSED", deadlineAt: "2026-09-01T12:00:00.000Z" });
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1009/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1009" });
+    expect(within(detail).getByRole("region", { name: "Estado de cierre" })).toHaveTextContent("Cierre automático por vencimiento");
+
+    await user.click(within(detail).getByRole("button", { name: "Volver a expedientes" }));
+    const nextList = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(nextList).getByRole("button", { name: /ER-1011/ }));
+    const localDetail = await screen.findByRole("region", { name: "Detalle de ER-1011" });
+    expect(within(localDetail).getByRole("region", { name: "Estado de cierre" })).toHaveTextContent("Cierre local");
+  });
+
   it("shows Office's complete queue and exposes only valid actions", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
