@@ -538,7 +538,7 @@ export const handlers = [
       : getTreeInterventionFixture(parsed.data.sourceId);
     if (!source) {
       return HttpResponse.json(
-        { statusCode: 404, message: "Fuente de origen no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
+        { statusCode: 404, message: parsed.data.sourceType === "SERVICE" ? "Servicio de origen no encontrado." : "Intervención de arbolado de origen no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
         { status: 404 },
       );
     }
