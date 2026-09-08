@@ -51,7 +51,7 @@ const referralKindLabel: Record<Referral["kind"], string> = {
 };
 
 const referralKindDescription: Record<Referral["kind"], string> = {
-  REPAIR_REQUEST: "Daño detectado en un Servicio",
+  REPAIR_REQUEST: "Daño de infraestructura referido a M3",
   STREET_CLOSURE_REQUEST: "Corte solicitado para un Servicio",
 };
 
@@ -184,7 +184,9 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
   const fetchReferrals = useCallback(async () => {
     const page = await referralsAdapter.list();
     const referrals = page.referrals.filter((referral) => isReferralVisibleToScenario(referral, scenario));
-    const sourceIds = [...new Set(referrals.map((referral) => referral.sourceServiceId))];
+    const sourceIds = [...new Set(referrals
+      .filter((referral) => referral.kind === "STREET_CLOSURE_REQUEST" || referral.request.detectedInType === "SERVICE")
+      .map((referral) => referral.sourceServiceId))];
     const sourceResults = await Promise.all(sourceIds.map(async (sourceId) => {
       try {
         return { kind: "success" as const, sourceId, service: await servicesAdapter.get(sourceId) };
@@ -439,6 +441,7 @@ function ReferralRow({
   sourceUnavailable?: boolean;
   onOpen: () => void;
 }) {
+  const isEnvironmentalSource = referral.kind === "REPAIR_REQUEST" && referral.request.detectedInType === "INSPECTION";
   return (
     <li>
       <button
@@ -459,7 +462,7 @@ function ReferralRow({
             <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{referralKindLabel[referral.kind]}</span>
           </span>
           <span className="mt-1 block truncate text-sm text-[var(--color-text)]">{referralKindDescription[referral.kind]}</span>
-          <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">Servicio de origen: {referral.sourceServiceId} · {referral.sourceLabel}</span>
+           <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{isEnvironmentalSource ? "Inspección de origen" : "Servicio de origen"}: {referral.sourceServiceId} · {referral.sourceLabel}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text)]" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
           <ReferralStatusIcon referral={referral} className="h-3.5 w-3.5" />
@@ -486,6 +489,7 @@ function ReferralDetail({
   canRecover: boolean;
   onRecovered: (updatedReferral: Referral) => void;
 }) {
+  const isEnvironmentalSource = referral.kind === "REPAIR_REQUEST" && referral.request.detectedInType === "INSPECTION";
   return (
     <div className="flex min-h-full flex-col bg-[var(--color-surface)]" role="region" aria-label={`Detalle de ${referral.id}`}>
       <header className="border-b border-[var(--color-border)] bg-[var(--color-canvas)] px-4 py-3 sm:px-6 lg:px-8">
@@ -513,11 +517,11 @@ function ReferralDetail({
               <ExternalLink className="h-4 w-4" aria-hidden />
             </span>
             <div className="min-w-0">
-              <h2 id="referral-source-title" className="text-sm font-bold text-[var(--color-text)]">Servicio de origen</h2>
-              <p className="mt-1 text-sm text-[var(--color-text)]">{referral.sourceServiceId} · {referral.sourceLabel}</p>
-              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">La información del Servicio se consulta en su módulo de origen.</p>
-              <a className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-action)] underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" href={referral.sourceHref}>
-                Ver Servicio de origen
+               <h2 id="referral-source-title" className="text-sm font-bold text-[var(--color-text)]">{isEnvironmentalSource ? "Inspección de origen" : "Servicio de origen"}</h2>
+               <p className="mt-1 text-sm text-[var(--color-text)]">{referral.sourceServiceId} · {referral.sourceLabel}</p>
+               <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{isEnvironmentalSource ? "La información de la inspección se consulta en su expediente ambiental." : "La información del Servicio se consulta en su módulo de origen."}</p>
+               <a className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-action)] underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" href={referral.sourceHref}>
+                 {isEnvironmentalSource ? "Ver inspección fuente" : "Ver Servicio de origen"}
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </a>
             </div>

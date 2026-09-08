@@ -1,4 +1,5 @@
 import type { Service } from "./services";
+import { environmentalReportFixtures, getEnvironmentalInspectionFixture } from "./environmental-report-fixtures";
 import {
   type CreateRepairRequestInput,
   type RepairRequest,
@@ -12,6 +13,21 @@ const sourceContext = (service: Service) => ({
   label: service.title,
   href: `/app?destination=services&detail=${encodeURIComponent(service.id)}`,
 });
+
+const inspectionSourceContext = (inspectionId: string) => {
+  const inspection = getEnvironmentalInspectionFixture(inspectionId);
+  const report = inspection
+    ? environmentalReportFixtures.find((candidate) => candidate.id === inspection.reportId)
+    : null;
+  const reportId = report?.id ?? inspection?.reportId ?? inspectionId;
+
+  return {
+    type: "INSPECTION" as const,
+    id: inspectionId,
+    label: report ? `Inspección ${inspectionId} · ${report.id}` : `Inspección ambiental ${inspectionId}`,
+    href: `/app?destination=environment&detail=${encodeURIComponent(reportId)}&inspectionId=${encodeURIComponent(inspectionId)}`,
+  };
+};
 
 export const repairRequestFixtures: RepairRequest[] = [
   {
@@ -56,7 +72,7 @@ export function updateRepairRequestFixture(id: string, updates: Partial<RepairRe
   return updated;
 }
 
-export function createRepairRequestFixture(input: CreateRepairRequestInput, service: Service): RepairRequest {
+export function createRepairRequestFixture(input: CreateRepairRequestInput, service?: Service): RepairRequest {
   const now = new Date().toISOString();
   return {
     id: `RR-${Date.now()}`,
@@ -66,7 +82,9 @@ export function createRepairRequestFixture(input: CreateRepairRequestInput, serv
     publicSafetyRisk: input.publicSafetyRisk,
     detectedInType: input.detectedInType,
     detectedInId: input.detectedInId,
-    sourceContext: input.detectedInType === "SERVICE" ? sourceContext(service) : undefined,
+    sourceContext: input.detectedInType === "SERVICE"
+      ? service ? sourceContext(service) : undefined
+      : inspectionSourceContext(input.detectedInId),
     status: "REQUESTED",
     workOrderId: null,
     requestedAt: now,

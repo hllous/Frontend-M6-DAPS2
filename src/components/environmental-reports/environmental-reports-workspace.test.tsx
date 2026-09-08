@@ -1,18 +1,19 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { resetEnvironmentalReportFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
-import { resetServiceFixtures } from "@/lib/services-fixtures";
+import { repairRequestFixtures, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
+import { resetServiceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { scenarios } from "@/lib/scenarios";
 import { EnvironmentalReportsWorkspace } from "./environmental-reports-workspace";
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); resetServiceFixtures(); window.history.replaceState(null, "", "/app?destination=environment"); });
+afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); resetRepairRequestFixtures(); resetServiceFixtures(); window.localStorage.clear(); window.history.replaceState(null, "", "/app?destination=environment"); });
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
@@ -149,5 +150,58 @@ describe("EnvironmentalReportsWorkspace", () => {
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
 
     expect(within(detail).queryByRole("button", { name: "Emitir aviso de infracción" })).not.toBeInTheDocument();
+  });
+
+  it("lets Office create a pending RepairRequest from an inspection without deriving safety risk", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1012/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1012" });
+    const action = await within(detail).findByRole("button", { name: "Crear derivación de reparación" });
+    await user.click(action);
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Contexto de origen INS-1012")).toBeVisible();
+    expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2450");
+    expect(within(dialog).getByRole("link", { name: /Ver inspección fuente/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
+    await user.selectOptions(within(dialog).getByLabelText(/^Severidad/), "LOW");
+    await user.click(within(dialog).getByLabelText(/^Sí,/));
+    await user.click(within(dialog).getByRole("button", { name: /Crear deriv.*a M3/ }));
+
+    expect(await within(dialog).findByText(/pendiente de respuesta de M3/i)).toBeVisible();
+    expect(repairRequestFixtures[0]).toMatchObject({
+      detectedInType: "INSPECTION",
+      detectedInId: "INS-1012",
+      severity: "LOW",
+      publicSafetyRisk: true,
+      sourceContext: { type: "INSPECTION", id: "INS-1012" },
+    });
+  });
+
+  it("shows the inspection action to Field only when its linked Service belongs to the actor crew", async () => {
+    updateServiceFixture("SVC-1112", { crewId: "crew-a" });
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
+    const list = await screen.findByRole("region", { name: "Reportes ambientales asignados" });
+    await user.click(within(list).getByRole("button", { name: /ER-1012/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1012" });
+    await waitFor(() => expect(within(detail).queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument());
+  });
+
+  it("shows an unsent inspection referral after a pre-creation network failure", async () => {
+    server.use(http.post("*/api/repair-requests", () => HttpResponse.error()));
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
+    const list = await screen.findByRole("region", { name: "Reportes ambientales asignados" });
+    await user.click(within(list).getByRole("button", { name: /ER-1012/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1012" });
+    await user.click(await within(detail).findByRole("button", { name: "Crear derivación de reparación" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /Crear deriv.*a M3/ }));
+
+    expect(await within(dialog).findByText(/Derivación sin enviar/i)).toBeVisible();
+    expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2450");
+    expect(repairRequestFixtures).toHaveLength(1);
   });
 });

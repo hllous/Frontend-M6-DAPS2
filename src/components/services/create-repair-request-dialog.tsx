@@ -6,6 +6,8 @@ import { AlertCircle, CheckCircle2, ExternalLink, Info, Loader2 } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { NetworkFailureError } from "@/lib/authenticated-fetch";
+import type { EnvironmentalInspection, EnvironmentalReport } from "@/lib/environmental-reports";
 import { getFieldDraft, submitFieldAction } from "@/lib/field-drafts";
 import {
   createRepairRequestInputSchema,
@@ -19,13 +21,13 @@ import {
 } from "@/lib/repair-requests";
 import type { Service } from "@/lib/services";
 
-const EMPTY_FORM = (service: Service): CreateRepairRequestInput => ({
+const EMPTY_FORM = (sourceType: CreateRepairRequestInput["detectedInType"], sourceId: string, address = ""): CreateRepairRequestInput => ({
   damageType: "BROKEN_PAVEMENT",
-  address: "",
+  address,
   severity: "MEDIUM",
   publicSafetyRisk: false,
-  detectedInType: "SERVICE",
-  detectedInId: service.id,
+  detectedInType: sourceType,
+  detectedInId: sourceId,
 });
 
 type Outcome = "unsent" | null;
@@ -33,29 +35,43 @@ type Outcome = "unsent" | null;
 export function CreateRepairRequestDialog({
   open,
   service,
+  inspection,
+  report,
   onOpenChange,
   onCreated,
 }: {
   open: boolean;
-  service: Service;
+  service?: Service;
+  inspection?: EnvironmentalInspection;
+  report?: EnvironmentalReport;
   onOpenChange: (open: boolean) => void;
   onCreated: (request: RepairRequest) => void;
 }) {
+  const isInspection = Boolean(inspection);
+  const sourceId = inspection?.id ?? service?.id ?? "";
+  const sourceKey = service?.id ?? inspection?.id ?? "repair-request-source";
+  const sourceLabel = inspection
+    ? `Inspección ${inspection.id}${report ? ` · ${report.id}` : ""}`
+    : service?.title ?? `Servicio ${sourceId}`;
+  const sourceHref = inspection
+    ? `/app?destination=environment&detail=${encodeURIComponent(report?.id ?? inspection.reportId)}&inspectionId=${encodeURIComponent(inspection.id)}`
+    : `/app?destination=services&detail=${encodeURIComponent(sourceId)}`;
+  const sourceAddress = report?.address ?? report?.location?.address ?? "";
   const formId = useId();
   const [values, setValues] = useState<CreateRepairRequestInput>(() => {
-    const draft = getFieldDraft<CreateRepairRequestInput>(service.id, "repairRequest");
-    return draft?.payload ?? EMPTY_FORM(service);
+    const draft = getFieldDraft<CreateRepairRequestInput>(sourceKey, "repairRequest");
+    return draft?.payload ?? EMPTY_FORM(isInspection ? "INSPECTION" : "SERVICE", sourceId, sourceAddress);
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(() => (
-    getFieldDraft<CreateRepairRequestInput>(service.id, "repairRequest") ? "unsent" : null
+    getFieldDraft<CreateRepairRequestInput>(sourceKey, "repairRequest") ? "unsent" : null
   ));
   const [createdRequest, setCreatedRequest] = useState<RepairRequest | null>(null);
 
   function restoreDraft() {
-    const draft = getFieldDraft<CreateRepairRequestInput>(service.id, "repairRequest");
-    setValues(draft?.payload ?? EMPTY_FORM(service));
+    const draft = getFieldDraft<CreateRepairRequestInput>(sourceKey, "repairRequest");
+    setValues(draft?.payload ?? EMPTY_FORM(isInspection ? "INSPECTION" : "SERVICE", sourceId, sourceAddress));
     setOutcome(draft ? "unsent" : null);
     setCreatedRequest(null);
     setErrors({});
@@ -84,20 +100,35 @@ export function CreateRepairRequestDialog({
     }
 
     setIsSubmitting(true);
-    const result = await submitFieldAction({
-      service,
-      actionType: "repairRequest",
-      payload: parsed.data,
-      submit: repairRequestsAdapter.create,
-    });
-    if (result.kind === "success") {
-      setCreatedRequest(result.result);
-      onCreated(result.result);
-    } else if (result.kind === "draft-saved") {
-      setValues(result.draft.payload);
-      setOutcome("unsent");
+    if (service) {
+      const result = await submitFieldAction({
+        service,
+        actionType: "repairRequest",
+        payload: parsed.data,
+        submit: repairRequestsAdapter.create,
+      });
+      if (result.kind === "success") {
+        setCreatedRequest(result.result);
+        onCreated(result.result);
+      } else if (result.kind === "draft-saved") {
+        setValues(result.draft.payload);
+        setOutcome("unsent");
+      } else {
+        setErrors({ form: result.message });
+      }
     } else {
-      setErrors({ form: result.message });
+      try {
+        const created = await repairRequestsAdapter.create(parsed.data);
+        setCreatedRequest(created);
+        onCreated(created);
+      } catch (cause) {
+        if (cause instanceof NetworkFailureError) {
+          setValues(parsed.data);
+          setOutcome("unsent");
+        } else {
+          setErrors({ form: cause instanceof Error ? cause.message : "No se pudo crear la derivación." });
+        }
+      }
     }
     setIsSubmitting(false);
   }
@@ -120,7 +151,9 @@ export function CreateRepairRequestDialog({
         <DialogHeader>
           <DialogTitle>Crear derivación de reparación</DialogTitle>
           <DialogDescription>
-            Registre el daño de infraestructura que será referido a M3. La derivación conserva al Servicio como su Referral context.
+            {isInspection
+              ? "Registre el daño de infraestructura observado durante la inspección. La inspección permanece como fuente canónica de la derivación."
+              : "Registre el daño de infraestructura que será referido a M3. La derivación conserva al Servicio como su Referral context."}
           </DialogDescription>
         </DialogHeader>
 
@@ -128,13 +161,13 @@ export function CreateRepairRequestDialog({
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
             <div className="min-w-0 text-sm">
-              <p className="font-semibold text-[var(--color-text)]">Referral context: Servicio {service.id}</p>
-              <p className="mt-1 truncate text-[var(--color-text-secondary)]">{service.title}</p>
+              <p className="font-semibold text-[var(--color-text)]">{isInspection ? "Contexto de origen" : "Referral context: Servicio"} {sourceId}</p>
+              <p className="mt-1 truncate text-[var(--color-text-secondary)]">{sourceLabel}</p>
               <a
                 className="mt-2 inline-flex items-center gap-1 font-semibold text-[var(--color-action)] hover:underline"
-                href={`/app?destination=services&detail=${encodeURIComponent(service.id)}`}
+                href={sourceHref}
               >
-                Ver Servicio fuente <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                {isInspection ? "Ver inspección fuente" : "Ver Servicio fuente"} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
               </a>
             </div>
           </div>
@@ -144,7 +177,7 @@ export function CreateRepairRequestDialog({
           <div role="status" className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-bold text-[var(--color-warning)]">
               <AlertCircle className="h-4 w-4" aria-hidden />
-              <span>Unsent referral</span>
+              <span>{isInspection ? "Derivación sin enviar" : "Unsent referral"}</span>
             </div>
             <p className="mt-1 text-sm text-[var(--color-text)]">
               No se creó un registro de seguimiento porque el envío falló. Los valores quedaron retenidos en este dispositivo; revise la conexión y envíe la derivación manualmente.
@@ -159,7 +192,7 @@ export function CreateRepairRequestDialog({
               <span>Derivación creada y pendiente de respuesta de M3.</span>
             </div>
             <p className="mt-1 text-sm text-[var(--color-text)]">
-              Seguimiento {createdRequest.id} · Servicio {service.id}
+              Seguimiento {createdRequest.id} · {isInspection ? `Inspección ${sourceId}` : `Servicio ${sourceId}`}
             </p>
           </div>
         )}

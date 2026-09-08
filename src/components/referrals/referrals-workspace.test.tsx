@@ -6,7 +6,7 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { fixtureReferrals } from "@/app/api/referrals/route";
-import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
+import { addRepairRequestFixture, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { scenarios } from "@/lib/scenarios";
 import { resetStreetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import { ReferralsWorkspace } from "./referrals-workspace";
@@ -41,6 +41,36 @@ describe("ReferralsWorkspace", () => {
       "/app?destination=services&detail=SVC-1050",
     );
     expect(within(detail).getByText("La información del Servicio se consulta en su módulo de origen.")).toBeVisible();
+  });
+
+  it("exposes an EnvironmentalInspection source and keeps the RepairRequest pending", async () => {
+    addRepairRequestFixture({
+      id: "RR-INS-1012",
+      damageType: "BLOCKED_DRAIN",
+      address: "Av. Brasil 2450",
+      severity: "LOW",
+      publicSafetyRisk: true,
+      detectedInType: "INSPECTION",
+      detectedInId: "INS-1012",
+      sourceContext: {
+        type: "INSPECTION",
+        id: "INS-1012",
+        label: "Inspección INS-1012 · ER-1012",
+        href: "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012",
+      },
+      status: "REQUESTED",
+      workOrderId: null,
+      requestedAt: "2026-09-07T08:00:00.000Z",
+    });
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(list).getByRole("button", { name: /RR-INS-1012/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de RR-INS-1012" });
+    expect(within(detail).getByRole("heading", { name: "Inspección de origen" })).toBeVisible();
+    expect(within(detail).getByRole("link", { name: /Ver inspección fuente/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
+    expect(within(detail).getByRole("status", { name: "Estado: Pendiente" })).toBeVisible();
+    expect(within(detail).getByText(/M3 todavía no informó un identificador/)).toBeVisible();
   });
 
   it("surfaces stale and duplicate referrals without changing their status", async () => {

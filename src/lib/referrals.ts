@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { authenticatedFetch } from "./authenticated-fetch";
+import { environmentalInspectionFixtures, environmentalReportFixtures } from "./environmental-report-fixtures";
 import type { RepairRequest } from "./repair-requests";
 import { serviceFixtures } from "./services-fixtures";
 import type { OperationalScenario } from "./scenarios";
@@ -106,9 +107,15 @@ const referralsPageSchema = z.object({
 
 export function getReferralSourceServiceIds(scenario: OperationalScenario): string[] | undefined {
   if (scenario.actor.kind === "OFFICE") return undefined;
-  return serviceFixtures
+  const serviceIds = serviceFixtures
     .filter((service) => service.crewId === scenario.actor.crewId)
     .map((service) => service.id);
+  // ── Issue #137: EnvironmentalInspection referral visibility ──
+  const inspectionIds = environmentalInspectionFixtures
+    .filter((inspection) => inspection.serviceId && serviceIds.includes(inspection.serviceId))
+    .map((inspection) => inspection.id);
+  // ── End issue #137 ──
+  return [...serviceIds, ...inspectionIds];
 }
 
 export function isReferralVisibleToScenario(referral: Pick<Referral, "sourceServiceId"> | { sourceServiceId: string }, scenario: OperationalScenario): boolean {
@@ -120,15 +127,23 @@ export function serviceSourceHref(serviceId: string): string {
   return `/app?destination=services&detail=${encodeURIComponent(serviceId)}`;
 }
 
+function environmentalInspectionSourceHref(inspectionId: string): string {
+  const inspection = environmentalInspectionFixtures.find((candidate) => candidate.id === inspectionId);
+  const reportId = inspection?.reportId;
+  const report = reportId ? environmentalReportFixtures.find((candidate) => candidate.id === reportId) : undefined;
+  return `/app?destination=environment${report ? `&detail=${encodeURIComponent(report.id)}` : ""}&inspectionId=${encodeURIComponent(inspectionId)}`;
+}
+
 export function referralFromRepairRequest(request: RepairRequest): Referral {
   const source = request.sourceContext;
+  const isInspection = request.detectedInType === "INSPECTION";
   return {
     kind: "REPAIR_REQUEST",
     destination: "M3",
     id: request.id,
     sourceServiceId: request.detectedInId,
-    sourceLabel: source?.label ?? `Servicio ${request.detectedInId}`,
-    sourceHref: source?.href ?? serviceSourceHref(request.detectedInId),
+    sourceLabel: source?.label ?? (isInspection ? `Inspección ambiental ${request.detectedInId}` : `Servicio ${request.detectedInId}`),
+    sourceHref: source?.href ?? (isInspection ? environmentalInspectionSourceHref(request.detectedInId) : serviceSourceHref(request.detectedInId)),
     status: request.status,
     createdAt: request.createdAt ?? request.requestedAt,
     updatedAt: request.updatedAt ?? request.createdAt ?? request.requestedAt,
