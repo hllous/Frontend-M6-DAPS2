@@ -5,6 +5,8 @@ import type {
   EnvironmentalReport,
   EnvironmentalReportQuery,
   EnvironmentalReportStatus,
+  IssueViolationNoticeInput,
+  ViolationNotice,
 } from "./environmental-reports";
 import type { Attachment } from "./services";
 
@@ -67,31 +69,88 @@ const inspections: EnvironmentalInspection[] = [
     createdAt: "2026-09-06T08:30:00.000Z",
     updatedAt: "2026-09-06T08:30:00.000Z",
   },
+  {
+    id: "INS-1008",
+    reportId: "ER-1008",
+    serviceId: null,
+    inspectedAt: "2026-09-03T17:15:00.000Z",
+    scheduledDate: "2026-09-03",
+    timeWindow: { start: "09:00", end: "11:00" },
+    checklistVersion: "ambiental-v1",
+    checklist: [{ id: "source-1008", label: "Identificar la fuente del impacto", required: true }],
+    attachments: [{ id: "att-1008", url: "/mock/evidence/acta-1008.jpg", filename: "acta-1008.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-03T17:00:00.000Z" }],
+    findings: "Vertido constatado en la vía pública.",
+    violationType: "ILLEGAL_DUMPING",
+    severity: "HIGH",
+    suggestedAction: "FORMAL_NOTICE",
+    outcome: "VIOLATION_FOUND",
+    nextStep: "NOTICE_TO_BE_ISSUED",
+    notes: "Se constató la infracción.",
+    createdAt: "2026-09-03T08:00:00.000Z",
+    updatedAt: "2026-09-03T17:15:00.000Z",
+  },
 ];
 
 export let environmentalInspectionFixtures: EnvironmentalInspection[] = inspections.map((inspection) => ({
   ...inspection,
   checklist: inspection.checklist.map((item) => ({ ...item })),
+  attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
 }));
 const initialInspections = environmentalInspectionFixtures.map((inspection) => ({
   ...inspection,
   checklist: inspection.checklist.map((item) => ({ ...item })),
+  attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
 }));
+
+export let violationNoticeFixtures: ViolationNotice[] = [];
+const initialViolationNotices: ViolationNotice[] = [];
 
 export function resetEnvironmentalReportFixtures() {
   environmentalReportFixtures = initialReports.map((report) => ({ ...report }));
   resetEnvironmentalInspectionFixtures();
+  resetViolationNoticeFixtures();
 }
 
 export function resetEnvironmentalInspectionFixtures() {
   environmentalInspectionFixtures = initialInspections.map((inspection) => ({
     ...inspection,
     checklist: inspection.checklist.map((item) => ({ ...item })),
+    attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
   }));
+}
+
+export function resetViolationNoticeFixtures() {
+  violationNoticeFixtures = initialViolationNotices.map((notice) => ({ ...notice }));
 }
 
 export function getEnvironmentalInspectionFixture(id: string): EnvironmentalInspection | null {
   return environmentalInspectionFixtures.find((inspection) => inspection.id === id) ?? null;
+}
+
+export function getViolationNoticeFixture(inspectionId: string): ViolationNotice | null {
+  return violationNoticeFixtures.find((notice) => notice.inspectionId === inspectionId) ?? null;
+}
+
+export function addViolationNoticeFixture(notice: ViolationNotice) {
+  violationNoticeFixtures.unshift(notice);
+}
+
+export function createViolationNoticeFixture(inspectionId: string, input: IssueViolationNoticeInput): ViolationNotice {
+  const now = new Date().toISOString();
+  const sequence = String(violationNoticeFixtures.length + 1).padStart(4, "0");
+  return {
+    id: `NOTICE-${Date.now()}`,
+    noticeNumber: `ACTA-${new Date().getFullYear()}-${sequence}`,
+    inspectionId,
+    issuedAt: now,
+    establishmentId: input.establishmentId,
+    violationType: input.violationType,
+    severity: input.severity,
+    suggestedAction: input.suggestedAction,
+    priorNoticeCount: input.establishmentId
+      ? violationNoticeFixtures.filter((notice) => notice.establishmentId === input.establishmentId).length
+      : 0,
+  };
 }
 
 export function listEnvironmentalInspectionFixtures(reportId: string): EnvironmentalInspection[] {

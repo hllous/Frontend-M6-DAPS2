@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowUpRight,
+  Building2,
   CalendarDays,
   Check,
   ClipboardCheck,
@@ -29,13 +30,17 @@ import {
   ENVIRONMENTAL_REPORT_STATUS_LABELS,
   ENVIRONMENTAL_REPORT_TYPE_LABELS,
   environmentalReportTypeSchema,
+  issueViolationNoticeInputSchema,
   environmentalReportsAdapter,
   EnvironmentalReportRequestError,
+  type IssueViolationNoticeInput,
   type EnvironmentalInspection,
   type EnvironmentalInspectionScheduleInput,
   type EnvironmentalReport,
   type EnvironmentalReportType,
+  type ViolationNotice,
 } from "@/lib/environmental-reports";
+import { establishmentDirectoryAdapter, type Establishment } from "@/lib/establishment-directory";
 import { CREW_CATALOG, SERVICE_TYPE_CATALOG, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
 
@@ -57,6 +62,27 @@ const inspectionChecklist = [
   { id: "source", label: "Identificar la fuente del impacto", required: true },
   { id: "evidence", label: "Registrar observaciones para el acta", required: true },
 ];
+const violationTypeLabels: Record<string, string> = {
+  NOISE_LIMIT: "Límite de ruido",
+  ILLEGAL_DUMPING: "Disposición ilegal de residuos",
+  UNTREATED_DISCHARGE: "Vertido sin tratamiento",
+  HAZARDOUS_WASTE: "Residuos peligrosos",
+  AIR_EMISSION: "Emisión atmosférica",
+  NO_WASTE_MANAGEMENT: "Gestión inadecuada de residuos",
+  INSPECTION_OBSTRUCTION: "Obstrucción de inspección",
+};
+const severityLabels: Record<string, string> = {
+  LOW: "Baja",
+  MEDIUM: "Media",
+  HIGH: "Alta",
+  CRITICAL: "Crítica",
+};
+const suggestedActionLabels: Record<string, string> = {
+  WARNING: "Advertencia",
+  FORMAL_NOTICE: "Aviso formal",
+  FINE: "Multa sugerida",
+  CLOSURE: "Clausura sugerida",
+};
 const reportStatuses = Object.keys(ENVIRONMENTAL_REPORT_STATUS_LABELS) as EnvironmentalReport["status"][];
 
 const statusGroups = [
@@ -246,22 +272,60 @@ function ReportDetail({ report, scenario, onBack, onAction, onReportUpdated }: {
   const [scheduleMode, setScheduleMode] = useState<"schedule" | "reinspection">("schedule");
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [scheduledService, setScheduledService] = useState<Service | null>(null);
+  const [violationNotice, setViolationNotice] = useState<ViolationNotice | null>(null);
+  const [noticeLoading, setNoticeLoading] = useState(false);
+  const [noticeError, setNoticeError] = useState<string | null>(null);
+  const [issueNoticeOpen, setIssueNoticeOpen] = useState(false);
+
+  const canIssueViolationNotice = isOffice && scenario.capabilities.includes("violationNotice:issue");
+  const canViewViolationNotice = isOffice && scenario.capabilities.includes("violationNotice:view");
+
+  const loadViolationNotice = useCallback(async (items: EnvironmentalInspection[]) => {
+    const violationInspection = items.find((inspection) => inspection.outcome === "VIOLATION_FOUND");
+    if (!canViewViolationNotice || !violationInspection) {
+      setViolationNotice(null);
+      setNoticeLoading(false);
+      return null;
+    }
+
+    setNoticeLoading(true);
+    setNoticeError(null);
+    try {
+      const notice = await environmentalReportsAdapter.getViolationNotice(violationInspection.id);
+      setViolationNotice(notice);
+      return notice;
+    } catch (error) {
+      if (error instanceof EnvironmentalReportRequestError && error.status === 404) {
+        setViolationNotice(null);
+        return null;
+      }
+      setNoticeError(error instanceof Error ? error.message : "No se pudo cargar el acta de infracción.");
+      return null;
+    } finally {
+      setNoticeLoading(false);
+    }
+  }, [canViewViolationNotice]);
 
   const loadInspections = useCallback(async () => {
     const items = await environmentalReportsAdapter.listInspections(report.id);
     setInspections(items);
+    await loadViolationNotice(items);
     return items;
-  }, [report.id]);
+  }, [loadViolationNotice, report.id]);
 
   useEffect(() => {
     let current = true;
     void environmentalReportsAdapter.listInspections(report.id)
-      .then((items) => { if (current) { setInspections(items); setLoading(false); } })
+      .then(async (items) => { if (current) { setInspections(items); setLoading(false); await loadViolationNotice(items); } })
       .catch((error: unknown) => { if (current) { setHistoryError(error instanceof Error ? error.message : "No se pudo cargar la historia de inspecciones."); setLoading(false); } });
     return () => { current = false; };
-  }, [report.id]);
+  }, [loadViolationNotice, report.id]);
 
   const activeInspection = inspections.find((inspection) => !inspection.outcome) ?? null;
+  const completedViolationInspection = inspections.find((inspection) => inspection.outcome === "VIOLATION_FOUND") ?? null;
+  const showNoticeIssuance = canIssueViolationNotice && report.status === "VIOLATION_FOUND" && Boolean(completedViolationInspection);
+  const hasInspectionEvidence = Boolean(completedViolationInspection?.attachments?.length);
+  const canSubmitNotice = showNoticeIssuance && hasInspectionEvidence && !violationNotice && !noticeLoading;
   const canSchedule = isOffice && report.status === "UNDER_REVIEW" && !activeInspection;
   const canReprogram = isOffice && report.status === "INSPECTION_SCHEDULED" && Boolean(activeInspection);
   const canReinspect = isOffice && report.status === "INSPECTED" && inspections.some((inspection) => inspection.outcome === "INCONCLUSIVE");
@@ -313,6 +377,34 @@ function ReportDetail({ report, scenario, onBack, onAction, onReportUpdated }: {
     }
   }
 
+  async function handleIssueNotice(input: IssueViolationNoticeInput) {
+    setNoticeError(null);
+    if (!completedViolationInspection) throw new Error("No hay una inspección con infracción constatada.");
+    try {
+      const issuedNotice = await environmentalReportsAdapter.issueViolationNotice(completedViolationInspection.id, input);
+      setViolationNotice(issuedNotice);
+      onReportUpdated(await environmentalReportsAdapter.get(report.id));
+      await loadInspections();
+      setIssueNoticeOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo emitir el acta de infracción.";
+      if (error instanceof EnvironmentalReportRequestError && error.status === 409) {
+        const conflictMessage = `Conflicto al emitir el acta: ${message}`;
+        setNoticeError(conflictMessage);
+        try {
+          setViolationNotice(await environmentalReportsAdapter.getViolationNotice(completedViolationInspection.id));
+        } catch { /* the conflict message remains actionable */ }
+        try {
+          onReportUpdated(await environmentalReportsAdapter.get(report.id));
+        } catch { /* the original conflict remains the useful message */ }
+        setNoticeError(conflictMessage);
+        throw new Error(conflictMessage);
+      }
+      setNoticeError(message);
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }
+
   return (
     <div className="flex min-h-full flex-col bg-[var(--color-surface)]" role="region" aria-label={`Detalle de ${report.id}`}>
       <header className="border-b border-[var(--color-border)] bg-[var(--color-canvas)] px-4 py-3 sm:px-6 lg:px-8">
@@ -329,12 +421,97 @@ function ReportDetail({ report, scenario, onBack, onAction, onReportUpdated }: {
         {isOffice && actions.length > 0 && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Siguiente decisión de Oficina</h2><p className="mt-1 text-sm text-[var(--color-text-secondary)]">Las acciones disponibles respetan el estado actual del expediente.</p><div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`min-h-10 gap-2 ${tone ?? ""}`} onClick={() => void onAction(action, report)}><Icon data-icon="inline-start" aria-hidden />{label}</Button>)}</div></section>}
         {isOffice && (canSchedule || canReprogram || canReinspect) && <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="inspection-scheduling-title"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><CalendarDays aria-hidden /><div><h2 id="inspection-scheduling-title" className="text-sm font-bold text-[var(--color-text)]">Programación de inspección</h2><p className="mt-1 max-w-2xl text-sm text-[var(--color-text-secondary)]">{canReinspect ? "La inspección anterior fue inconclusa. Registre una nueva inspección y un nuevo Servicio POINT." : "Defina la fecha y la cuadrilla. El tipo de Servicio POINT se determina automáticamente."}</p></div></div><div className="flex flex-wrap gap-2">{(canSchedule || canReinspect) && <Button className="min-h-10 gap-2" onClick={() => { setScheduleMode(canReinspect ? "reinspection" : "schedule"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />{canReinspect ? "Programar reinspección" : "Programar inspección"}</Button>}{canReprogram && <Button variant="outline" className="min-h-10 gap-2" onClick={() => { setScheduleMode("schedule"); setScheduleOpen(true); }}><RefreshCw data-icon="inline-start" aria-hidden />Reprogramar inspección</Button>}</div></div></section>}
         {scheduleError && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{scheduleError}</div>}
+        {canViewViolationNotice && completedViolationInspection && <ViolationNoticePanel inspection={completedViolationInspection} notice={violationNotice} loading={noticeLoading} error={noticeError} showIssue={showNoticeIssuance} canIssue={canSubmitNotice} hasEvidence={hasInspectionEvidence} onIssue={() => setIssueNoticeOpen(true)} />}
         <section className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]"><div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Contexto operativo</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2"><DataField label="Ubicación" value={reportAddress(report)} /><DataField label="Detalle del hallazgo" value={reportDetails(report)} wide /><DataField label="Prioridad" value={ENVIRONMENTAL_REPORT_PRIORITY_LABELS[report.priority]} /><DataField label="Creado" value={formatDate(report.createdAt)} /><DataField label="Última actualización" value={formatDate(report.updatedAt)} /></dl></div><div className="rounded-2xl border border-[var(--color-border)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Vigencia del registro</h2><p className="mt-2 text-sm text-[var(--color-text-secondary)]">La prioridad y los cambios tardíos de M2 se muestran como información de lectura.</p>{report.escalated && <p className="mt-4 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-sm font-semibold text-[var(--color-warning)]">Escalado por M2</p>}{report.citizenResponse && isOffice && <p className="mt-4 text-sm text-[var(--color-text)]">{report.citizenResponse}</p>}{report.ticketId && isOffice && <p className="mt-4 text-sm text-[var(--color-text-secondary)]">Ticket de origen: <span className="font-semibold tabular-nums text-[var(--color-text)]">{report.ticketId}</span></p>}</div></section>
         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="inspection-history-title"><div className="flex items-center gap-2"><ClipboardCheck aria-hidden /><h2 id="inspection-history-title" className="text-sm font-bold text-[var(--color-text)]">Historia de inspecciones</h2></div>{loading && <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Cargando historia de inspecciones…</p>}{historyError && <p className="mt-3 text-sm text-[var(--color-danger)]" role="alert">{historyError}</p>}{!loading && !historyError && inspections.length === 0 && <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No hay inspecciones registradas.</p>}{!loading && !historyError && inspections.length > 0 && <ol className="mt-4 space-y-3">{inspections.map((inspection) => <li key={inspection.id} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-[var(--color-text)]">{inspection.id}</span><span className="text-sm text-[var(--color-text-secondary)]">{inspection.outcome ? `Resultado: ${inspection.outcome}` : "Inspección programada"}</span></div><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{inspection.scheduledDate} · {inspection.timeWindow.start}–{inspection.timeWindow.end} · {inspection.checklistVersion}</p>{inspection.serviceId && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Servicio POINT: <span className="font-semibold text-[var(--color-text)]">{inspection.serviceId}</span></p>}{scheduledService && inspection.id === inspections[inspections.length - 1]?.id && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Cuadrilla asignada: <span className="font-semibold text-[var(--color-text)]">{scheduledService.crewName ?? scheduledService.crewId ?? "Pendiente"}</span></p>}</li>)}</ol>}</section>
       </main>
       <InspectionSchedulingDialog open={scheduleOpen} mode={scheduleMode} activeInspection={activeInspection} onOpenChange={setScheduleOpen} onSubmit={handleSchedule} />
+      <IssueViolationNoticeDialog key={`${report.id}-${issueNoticeOpen ? "open" : "closed"}`} open={issueNoticeOpen} inspection={completedViolationInspection} onOpenChange={setIssueNoticeOpen} onSubmit={handleIssueNotice} />
     </div>
   );
+}
+
+function ViolationNoticePanel({ inspection, notice, loading, error, showIssue, canIssue, hasEvidence, onIssue }: { inspection: EnvironmentalInspection; notice: ViolationNotice | null; loading: boolean; error: string | null; showIssue: boolean; canIssue: boolean; hasEvidence: boolean; onIssue: () => void }) {
+  return <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="violation-notice-title"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><FilePlus2 className="mt-0.5 h-5 w-5 text-[var(--color-action)]" aria-hidden /><div><h2 id="violation-notice-title" className="text-sm font-bold text-[var(--color-text)]">Acta de infracción</h2><p className="mt-1 max-w-2xl text-sm text-[var(--color-text-secondary)]">El acta se emite una sola vez a partir de la inspección {inspection.id} y queda como registro de lectura.</p></div></div>{showIssue && !notice && <Button className="min-h-10 gap-2" onClick={onIssue} disabled={!canIssue}><FilePlus2 data-icon="inline-start" aria-hidden />Emitir aviso de infracción</Button>}</div>{loading && <p className="mt-4 flex items-center gap-2 text-sm text-[var(--color-text-secondary)]" role="status"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Consultando acta…</p>}{error && <div className="mt-4 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]" role="alert">{error}</div>}{!loading && !notice && showIssue && <div className="mt-4 space-y-2"><p className="text-sm text-[var(--color-text-secondary)]">La evidencia se conserva dentro de la inspección; no se copia al acta.</p>{!hasEvidence && <p className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-sm font-semibold text-[var(--color-warning)]">La emisión está bloqueada: agregue evidencia a la inspección antes de emitir el acta.</p>}</div>}{!loading && !notice && !showIssue && <p className="mt-4 text-sm text-[var(--color-text-secondary)]">No hay un acta disponible para esta inspección.</p>}{notice && <div className="mt-4 grid gap-4"><div className="rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)] p-3"><p className="font-semibold text-[var(--color-text)]">Acta inmutable</p><p className="mt-1 text-sm text-[var(--color-text-secondary)]">No se puede editar ni eliminar. Una corrección requiere una nueva inspección.</p></div><dl className="grid gap-4 sm:grid-cols-2"><DataField label="Número de acta" value={notice.noticeNumber} /><DataField label="Fecha de emisión" value={formatDate(notice.issuedAt)} /><DataField label="Actas previas del establecimiento" value={String(notice.priorNoticeCount)} /><DataField label="Tipo de infracción" value={violationTypeLabels[notice.violationType] ?? notice.violationType} /><DataField label="Gravedad" value={severityLabels[notice.severity] ?? notice.severity} /><DataField label="Acción sugerida" value={suggestedActionLabels[notice.suggestedAction] ?? notice.suggestedAction} /></dl>{notice.establishmentId ? <p className="text-sm text-[var(--color-text-secondary)]">Establecimiento resuelto: <span className="font-semibold text-[var(--color-text)]">{notice.establishmentId}</span></p> : <div className="flex items-start gap-3 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-sm text-[var(--color-text)]" role="status" aria-label="Aviso no-forwarded"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-warning)]" aria-hidden /><div><p className="font-semibold">Aviso no-forwarded</p><p className="mt-1 text-[var(--color-text-secondary)]"><span>M4 no fue contactado</span> y el expediente fue cerrado localmente. Este registro no representa una sanción externa.</p></div></div>}</div>}</section>;
+}
+
+function IssueViolationNoticeDialog({ open, inspection, onOpenChange, onSubmit }: { open: boolean; inspection: EnvironmentalInspection | null; onOpenChange: (open: boolean) => void; onSubmit: (input: IssueViolationNoticeInput) => Promise<void> }) {
+  const [query, setQuery] = useState("");
+  const [resolvedEstablishment, setResolvedEstablishment] = useState<Establishment | null>(null);
+  const [nonForwarded, setNonForwarded] = useState(false);
+  const [lookupState, setLookupState] = useState<"idle" | "loading" | "resolved" | "not-found">("idle");
+  const [lookupMessage, setLookupMessage] = useState<string | null>(null);
+  const [violationType, setViolationType] = useState<IssueViolationNoticeInput["violationType"] | "">(inspection?.violationType ?? "");
+  const [severity, setSeverity] = useState<IssueViolationNoticeInput["severity"] | "">(inspection?.severity ?? "");
+  const [suggestedAction, setSuggestedAction] = useState<IssueViolationNoticeInput["suggestedAction"] | "">(inspection?.suggestedAction ?? "");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function lookupEstablishment() {
+    const normalizedQuery = query.trim();
+    setErrors((current) => ({ ...current, establishment: "" }));
+    setResolvedEstablishment(null);
+    setNonForwarded(false);
+    if (!normalizedQuery) {
+      setLookupState("idle");
+      setLookupMessage("Ingrese un ID, nombre o dirección para buscar el establecimiento.");
+      return;
+    }
+    setLookupState("loading");
+    setLookupMessage(null);
+    try {
+      const establishment = await establishmentDirectoryAdapter.resolve({ query: normalizedQuery });
+      if (establishment) {
+        setResolvedEstablishment(establishment);
+        setLookupState("resolved");
+        setLookupMessage(null);
+      } else {
+        setLookupState("not-found");
+        setLookupMessage("No se encontró un establecimiento. M4 no será contactado por este flujo.");
+      }
+    } catch {
+      setLookupState("idle");
+      setLookupMessage("No se pudo consultar el directorio local. Intente nuevamente.");
+    }
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const nextErrors: Record<string, string> = {};
+    if (!resolvedEstablishment && !nonForwarded) nextErrors.establishment = "Resuelva un establecimiento o continúe sin establecimiento.";
+    if (!violationType) nextErrors.violationType = "Seleccione el tipo de infracción.";
+    if (!severity) nextErrors.severity = "Seleccione la gravedad.";
+    if (!suggestedAction) nextErrors.suggestedAction = "Seleccione la acción sugerida.";
+    setErrors(nextErrors);
+    setSubmitError(null);
+    if (Object.keys(nextErrors).length > 0 || !inspection) return;
+
+    const parsed = issueViolationNoticeInputSchema.safeParse({ establishmentId: resolvedEstablishment?.id ?? null, violationType, severity, suggestedAction });
+    if (!parsed.success) {
+      setSubmitError("Revise los datos requeridos antes de emitir el acta.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onSubmit(parsed.data);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "No se pudo emitir el acta de infracción.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const updateQuery = (value: string) => {
+    setQuery(value);
+    setResolvedEstablishment(null);
+    setNonForwarded(false);
+    setLookupState("idle");
+    setLookupMessage(null);
+    setErrors((current) => ({ ...current, establishment: "" }));
+  };
+
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[min(90vh,760px)] max-w-lg overflow-y-auto"><DialogHeader><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-action)]"><Building2 className="h-4 w-4" aria-hidden />Emisión de acta</div><DialogTitle>Emitir aviso de infracción</DialogTitle><DialogDescription>La emisión es inmutable. Verifique la inspección y seleccione un establecimiento antes de registrar el aviso.</DialogDescription></DialogHeader>{submitError && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{submitError}</div>}<form id="violation-notice-form" onSubmit={submit}><FieldGroup><Field><FieldLabel htmlFor="violation-establishment">Buscar establecimiento <span aria-hidden="true">*</span></FieldLabel><div className="flex flex-col gap-2 sm:flex-row"><input id="violation-establishment" value={query} onChange={(event) => updateQuery(event.target.value)} disabled={submitting || lookupState === "loading"} placeholder="ID, nombre o dirección" aria-invalid={Boolean(errors.establishment)} aria-describedby={errors.establishment ? "violation-establishment-error" : "violation-establishment-help"} className="h-12 min-w-0 flex-1 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /><Button type="button" variant="outline" className="min-h-12 gap-2 sm:min-h-10" onClick={() => void lookupEstablishment()} disabled={submitting || lookupState === "loading"}><Search data-icon="inline-start" aria-hidden />{lookupState === "loading" ? "Buscando…" : "Buscar establecimiento"}</Button></div>{errors.establishment && <FieldError id="violation-establishment-error">{errors.establishment}</FieldError>}{!errors.establishment && <FieldDescription id="violation-establishment-help">El directorio es un adapter local reemplazable. M4 no se contacta durante la búsqueda.</FieldDescription>}{lookupState === "resolved" && resolvedEstablishment && <div className="flex items-start gap-3 rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)] p-3" role="status"><Building2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-success)]" aria-hidden /><div><p className="font-semibold text-[var(--color-text)]">{resolvedEstablishment.name}</p><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{resolvedEstablishment.id} · {resolvedEstablishment.address}</p></div></div>}{lookupState === "not-found" && <div className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3" role="status"><p className="text-sm text-[var(--color-text)]">{lookupMessage}</p><Button type="button" variant="outline" className="mt-3 min-h-10" onClick={() => { setNonForwarded(true); setLookupMessage("Se registrará un aviso no-forwarded: M4 no fue contactado y el expediente se cerrará localmente."); }}>Continuar sin establecimiento</Button></div>}{lookupMessage && lookupState !== "not-found" && <p className="text-sm text-[var(--color-danger)]" role="alert">{lookupMessage}</p>}{nonForwarded && <div className="flex items-start gap-3 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3" role="status"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-warning)]" aria-hidden /><p className="text-sm text-[var(--color-text)]">Aviso no-forwarded: M4 no fue contactado. El expediente se cerrará localmente.</p></div>}</Field><Field><FieldLabel htmlFor="violation-type">Tipo de infracción <span aria-hidden="true">*</span></FieldLabel><select id="violation-type" value={violationType} onChange={(event) => { setViolationType(event.target.value as IssueViolationNoticeInput["violationType"]); setErrors((current) => ({ ...current, violationType: "" })); }} disabled={submitting} aria-required="true" aria-invalid={Boolean(errors.violationType)} aria-describedby={errors.violationType ? "violation-type-error" : undefined} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione el tipo</option>{Object.entries(violationTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{errors.violationType && <FieldError id="violation-type-error">{errors.violationType}</FieldError>}</Field><Field><FieldLabel htmlFor="violation-severity">Gravedad <span aria-hidden="true">*</span></FieldLabel><select id="violation-severity" value={severity} onChange={(event) => { setSeverity(event.target.value as IssueViolationNoticeInput["severity"]); setErrors((current) => ({ ...current, severity: "" })); }} disabled={submitting} aria-required="true" aria-invalid={Boolean(errors.severity)} aria-describedby={errors.severity ? "violation-severity-error" : undefined} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione la gravedad</option>{Object.entries(severityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{errors.severity && <FieldError id="violation-severity-error">{errors.severity}</FieldError>}</Field><Field><FieldLabel htmlFor="violation-suggested-action">Acción sugerida <span aria-hidden="true">*</span></FieldLabel><select id="violation-suggested-action" value={suggestedAction} onChange={(event) => { setSuggestedAction(event.target.value as IssueViolationNoticeInput["suggestedAction"]); setErrors((current) => ({ ...current, suggestedAction: "" })); }} disabled={submitting} aria-required="true" aria-invalid={Boolean(errors.suggestedAction)} aria-describedby={errors.suggestedAction ? "violation-suggested-action-error" : undefined} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione la acción</option>{Object.entries(suggestedActionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{errors.suggestedAction && <FieldError id="violation-suggested-action-error">{errors.suggestedAction}</FieldError>}</Field></FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Volver al expediente</Button><Button type="submit" form="violation-notice-form" disabled={submitting || (!resolvedEstablishment && !nonForwarded)} className="min-h-10 gap-2">{submitting && <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden />}{submitting ? "Emitiendo aviso…" : nonForwarded ? "Registrar aviso no-forwarded" : "Emitir aviso de infracción"}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function InspectionSchedulingDialog({ open, mode, activeInspection, onOpenChange, onSubmit }: { open: boolean; mode: "schedule" | "reinspection"; activeInspection: EnvironmentalInspection | null; onOpenChange: (open: boolean) => void; onSubmit: (input: EnvironmentalInspectionScheduleInput, crewId: string) => Promise<void> }) {

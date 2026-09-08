@@ -102,8 +102,8 @@ import { addTreeFixture, filterTreeFixtures, paginateTreeFixtures, treeFixtures,
 import { treeCreateInputSchema, treeUpdateInputSchema, type TreeQuery } from "@/lib/trees";
 import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures, getTreeSurveyFixture, paginateTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { treeHealthStatusSchema, treeSurveyCreateInputSchema, riskLevelSchema } from "@/lib/tree-surveys";
-import { addTreeInterventionFixture, createTreeInterventionFixture, filterTreeInterventionFixtures, getTreeInterventionFixture, paginateTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
-import { treeInterventionCreateInputSchema, treeInterventionStatusSchema, treeInterventionTypeSchema } from "@/lib/tree-interventions";
+import { addTreeInterventionFixture, createTreeInterventionFixture, filterTreeInterventionFixtures, getTreeInterventionFixture, paginateTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
+import { treeInterventionAuthorizeInputSchema, treeInterventionCreateInputSchema, treeInterventionStatusSchema, treeInterventionTypeSchema } from "@/lib/tree-interventions";
 import {
   addRepairRequestFixture,
   createRepairRequestFixture,
@@ -175,8 +175,11 @@ import {
   getEnvironmentalInspectionFixture,
   getInspectionAttachments,
   getEnvironmentalReportFixture,
+  getViolationNoticeFixture,
   listEnvironmentalInspectionFixtures,
   paginateEnvironmentalReportFixtures,
+  addViolationNoticeFixture,
+  createViolationNoticeFixture,
   updateEnvironmentalInspectionFixture,
   transitionEnvironmentalReportFixture,
 } from "@/lib/environmental-report-fixtures";
@@ -184,6 +187,7 @@ import {
   createEnvironmentalReportInputSchema,
   environmentalInspectionCompleteInputSchema,
   environmentalInspectionScheduleInputSchema,
+  issueViolationNoticeInputSchema,
   environmentalReportPrioritySchema,
   environmentalReportStatusSchema,
   environmentalReportTypeSchema,
@@ -472,6 +476,30 @@ export const handlers = [
     if (updated?.serviceId) updateServiceFixture(updated.serviceId, { status: "COMPLETED" });
     transitionEnvironmentalReportFixture(inspection.reportId, parsed.data.outcome === "NO_VIOLATION" ? "NO_VIOLATION" : parsed.data.outcome === "VIOLATION_FOUND" ? "VIOLATION_FOUND" : "INSPECTED");
     return HttpResponse.json(updated);
+  }),
+  // ── ViolationNotice issuance / M6 issue #135 ─────────────────────────────
+  http.get("*/api/environmental-inspections/:inspectionId/violation-notice", ({ params }) => {
+    const notice = getViolationNoticeFixture(params.inspectionId as string);
+    return notice
+      ? HttpResponse.json(notice)
+      : HttpResponse.json({ statusCode: 404, message: "La inspección no tiene un acta emitida.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${params.inspectionId}/violation-notice` }, { status: 404 });
+  }),
+  http.post("*/api/environmental-inspections/:inspectionId/violation-notice", async ({ params, request }) => {
+    const inspectionId = params.inspectionId as string;
+    const path = `/api/environmental-inspections/${inspectionId}/violation-notice`;
+    const inspection = getEnvironmentalInspectionFixture(inspectionId);
+    if (!inspection) return HttpResponse.json({ statusCode: 404, message: "Inspección no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path }, { status: 404 });
+    const parsed = issueViolationNoticeInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path }, { status: 400 });
+    if (inspection.outcome !== "VIOLATION_FOUND") return HttpResponse.json({ statusCode: 409, message: "Solo se puede emitir un acta sobre una inspección completada con infracción constatada.", error: "Conflict", timestamp: new Date().toISOString(), path }, { status: 409 });
+    if (!(inspection.attachments?.length ?? 0)) return HttpResponse.json({ statusCode: 400, message: "Debe adjuntar al menos una evidencia a la inspección antes de emitir el acta.", error: "Bad Request", timestamp: new Date().toISOString(), path }, { status: 400 });
+    if (getViolationNoticeFixture(inspectionId)) return HttpResponse.json({ statusCode: 409, message: "La inspección ya tiene un acta emitida. Las correcciones requieren una nueva inspección.", error: "Conflict", timestamp: new Date().toISOString(), path }, { status: 409 });
+    if (!getEnvironmentalReportFixture(inspection.reportId)) return HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path }, { status: 404 });
+
+    const notice = createViolationNoticeFixture(inspectionId, parsed.data);
+    addViolationNoticeFixture(notice);
+    transitionEnvironmentalReportFixture(inspection.reportId, notice.establishmentId ? "NOTICE_ISSUED" : "CLOSED");
+    return HttpResponse.json(notice, { status: 201 });
   }),
   http.post("*/api/environmental-reports/:reportId/start-review", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "RECEIVED", "UNDER_REVIEW")),
   http.post("*/api/environmental-reports/:reportId/forward", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "UNDER_REVIEW", "FORWARDED")),
@@ -1142,6 +1170,28 @@ export const handlers = [
     const created = createTreeInterventionFixture(parsed.data);
     addTreeInterventionFixture(created);
     return HttpResponse.json(created, { status: 201 });
+  }),
+  http.post("*/api/tree-interventions/:interventionId/submit-for-authorization", ({ params }) => {
+    const intervention = getTreeInterventionFixture(params.interventionId as string);
+    if (!intervention) return HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/submit-for-authorization` }, { status: 404 });
+    if (intervention.interventionType !== "REMOVAL") return HttpResponse.json({ statusCode: 400, message: "Solo las extracciones requieren el envío a autorización.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/submit-for-authorization` }, { status: 400 });
+    if (intervention.status !== "REQUESTED") return HttpResponse.json({ statusCode: 409, message: "Solo se puede enviar a autorización una extracción solicitada.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/submit-for-authorization` }, { status: 409 });
+    return HttpResponse.json(updateTreeInterventionFixture(params.interventionId as string, { status: "PENDING_AUTHORIZATION" }));
+  }),
+  http.post("*/api/tree-interventions/:interventionId/authorize", async ({ params, request }) => {
+    const parsed = treeInterventionAuthorizeInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/authorize` }, { status: 400 });
+    const intervention = getTreeInterventionFixture(params.interventionId as string);
+    if (!intervention) return HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/authorize` }, { status: 404 });
+    const validStatus = intervention.interventionType === "REMOVAL" ? intervention.status === "PENDING_AUTHORIZATION" : intervention.status === "REQUESTED";
+    if (!validStatus) return HttpResponse.json({ statusCode: 409, message: "La intervención no se encuentra en un estado autorizable.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/authorize` }, { status: 409 });
+    return HttpResponse.json(updateTreeInterventionFixture(params.interventionId as string, { status: "AUTHORIZED", authorizedByUserId: parsed.data.authorizedByUserId, authorizedAt: new Date().toISOString() }));
+  }),
+  http.post("*/api/tree-interventions/:interventionId/reject", ({ params }) => {
+    const intervention = getTreeInterventionFixture(params.interventionId as string);
+    if (!intervention) return HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/reject` }, { status: 404 });
+    if (intervention.interventionType !== "REMOVAL" || intervention.status !== "PENDING_AUTHORIZATION") return HttpResponse.json({ statusCode: 409, message: "Solo se puede rechazar una extracción pendiente de autorización.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/reject` }, { status: 409 });
+    return HttpResponse.json(updateTreeInterventionFixture(params.interventionId as string, { status: "REJECTED" }));
   }),
   // --- Containers catalog (#120) ---
   http.get("*/api/containers", ({ request }) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3, Eye, Info, Plus, ShieldAlert } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3, Eye, Info, Plus, Send, ShieldAlert, UserRound } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +66,7 @@ type RequestDialogProps = {
   initialType?: TreeInterventionType | null;
   initialAddress?: string;
   initialRequiresStreetClosure?: boolean;
+  initialPriority?: keyof typeof PRIORITY_LABELS;
   initialJustification?: string;
   onCreated?: (intervention: TreeInterventionDetail) => void;
 };
@@ -79,7 +80,7 @@ function formFor(props: RequestDialogProps): RequestForm {
     treeIds: selectedTrees.map((tree) => tree.id),
     address: props.initialAddress ?? selectedTrees[0]?.address ?? "",
     requiresStreetClosure: props.initialRequiresStreetClosure ?? false,
-    priority: props.initialType === "REMOVAL" ? "CRITICAL" : "MEDIUM",
+    priority: props.initialPriority ?? (props.initialType === "REMOVAL" ? "CRITICAL" : "MEDIUM"),
     justification: props.initialJustification ?? "",
   };
 }
@@ -88,7 +89,7 @@ function treeName(tree: Tree) {
   return `${tree.surveyCode} · ${tree.species}`;
 }
 
-function dateTimeLabel(value?: string) {
+function dateTimeLabel(value?: string | null) {
   return value ? new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "No registrada";
 }
 
@@ -186,6 +187,7 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
 
 export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScenario }) {
   const canRequest = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("treeIntervention:request");
+  const canAuthorize = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("treeIntervention:authorize");
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [trees, setTrees] = useState<Tree[]>([]);
   const [interventionType, setInterventionType] = useState<TreeInterventionType | "">("");
@@ -193,10 +195,13 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [page, setPage] = useState(1);
   const [requestVersion, setRequestVersion] = useState(0);
   const [requestOpen, setRequestOpen] = useState(false);
-  const [requestTreeIds, setRequestTreeIds] = useState<string[]>([]);
+  const [requestPrefill, setRequestPrefill] = useState<Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification">>({});
   const [detail, setDetail] = useState<TreeInterventionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<"submit" | "authorize" | "reject" | null>(null);
+  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const query = useMemo<TreeInterventionQuery>(() => ({ interventionType: interventionType || undefined, status: status || undefined, page, pageSize: 10 }), [interventionType, page, status]);
 
@@ -212,12 +217,29 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     return () => { current = false; };
   }, [query, requestVersion]);
 
-  const openRequest = (treeIds: string[] = []) => { setRequestTreeIds(treeIds); setRequestOpen(true); setNotice(null); };
+  const openRequest = (prefill: Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification"> = {}) => { setRequestPrefill(prefill); setRequestOpen(true); setNotice(null); };
   const openDetail = async (intervention: TreeIntervention) => {
-    setDetail(intervention); setDetailError(null); setDetailLoading(true);
+    setDetail(intervention); setDetailError(null); setActionError(null); setDetailLoading(true);
     try { setDetail(await treeInterventionsAdapter.get(intervention.id)); } catch (caught) { setDetailError(caught instanceof Error ? caught.message : "No se pudo cargar el detalle de la intervención."); } finally { setDetailLoading(false); }
   };
   const treeById = (id: string) => trees.find((tree) => tree.id === id);
+  const runAction = async (action: "submit" | "authorize" | "reject") => {
+    if (!detail) return;
+    setActionError(null); setActiveAction(action);
+    try {
+      const updated = action === "submit"
+        ? await treeInterventionsAdapter.submitForAuthorization(detail.id)
+        : action === "authorize"
+          ? await treeInterventionsAdapter.authorize(detail.id, { authorizedByUserId: scenario.actor.userId })
+          : await treeInterventionsAdapter.reject(detail.id);
+      setDetail(updated);
+      setRequestVersion((version) => version + 1);
+      setNotice(action === "submit" ? "La extracción fue enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
+      if (action === "reject") setRejectConfirmOpen(false);
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : "No se pudo actualizar la intervención.");
+    } finally { setActiveAction(null); }
+  };
 
   return (
     <section aria-labelledby="tree-interventions-title" className="flex max-w-5xl flex-col gap-5">
@@ -225,7 +247,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         <div>
           <p className="text-sm font-medium text-muted-foreground">Arbolado urbano</p>
           <h1 id="tree-interventions-title" className="text-2xl font-semibold tracking-tight">Intervenciones de arbolado</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Solicitudes de poda, extracción, plantación o tratamiento antes de su autorización y programación.</p>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Solicitudes de poda, extracción, plantación o tratamiento con su estado y decisión registrada.</p>
         </div>
         {canRequest ? <Button type="button" onClick={() => openRequest()}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención</Button> : null}
       </div>
@@ -259,14 +281,37 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         <div className="flex items-center justify-between gap-3" aria-label="Paginación de intervenciones"><span className="text-sm text-muted-foreground">Página {state.page.page} de {state.page.totalPages}</span><div className="flex gap-2"><Button type="button" variant="outline" size="sm" aria-label="Página anterior" disabled={state.page.page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft data-icon="inline-start" aria-hidden />Anterior</Button><Button type="button" variant="outline" size="sm" aria-label="Página siguiente" disabled={state.page.page >= state.page.totalPages} onClick={() => setPage((current) => current + 1)}>Siguiente<ChevronRight data-icon="inline-end" aria-hidden /></Button></div></div>
       </> : null}
 
-      {canRequest ? <TreeInterventionRequestDialog key={`${requestOpen}-${requestTreeIds.join(",")}`} open={requestOpen} onOpenChange={setRequestOpen} trees={trees} initialTreeIds={requestTreeIds} onCreated={() => { setNotice("Solicitud de intervención creada. Estado inicial: solicitada."); setPage(1); setRequestVersion((version) => version + 1); }} /> : null}
-      <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) setDetail(null); }}>
+      {canRequest ? <TreeInterventionRequestDialog key={`${requestOpen}-${JSON.stringify(requestPrefill)}`} open={requestOpen} onOpenChange={setRequestOpen} trees={trees} {...requestPrefill} onCreated={() => { setNotice("Solicitud de intervención creada. Estado inicial: solicitada."); setPage(1); setRequestVersion((version) => version + 1); }} /> : null}
+      <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { setDetail(null); setRejectConfirmOpen(false); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle><DialogDescription>Consulta de la solicitud. Las acciones de autorización y programación pertenecen a una etapa posterior.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle><DialogDescription>Consulte los datos de la solicitud y, según su estado y permisos, registre una decisión de autorización.</DialogDescription></DialogHeader>
           {detailLoading ? <p role="status">Cargando detalle…</p> : null}
           {detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}
           {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-mono text-xs text-muted-foreground">{detail.id}</p><p className="mt-1 font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p></div><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{PRIORITY_LABELS[detail.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ul className="flex flex-col gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <li key={tree?.id ?? detail.treeIds[index]} className="rounded-xl border border-border bg-muted px-3 py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</li>)}</ul></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
+          {detail && !detailLoading && !detailError ? (
+            <>
+              {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
+              <div className="flex flex-col gap-3 border-t border-[var(--color-border)] pt-4">
+                {detail.status === "AUTHORIZED" ? (
+                  <dl aria-label="Registro de autorización" className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-sm sm:grid-cols-2">
+                    <div><dt className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><UserRound className="size-3.5" aria-hidden />Persona autorizante</dt><dd className="mt-1">{detail.authorizedByUserId ?? "No registrada"}</dd></div>
+                    <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de autorización</dt><dd className="mt-1 tabular-nums">{dateTimeLabel(detail.authorizedAt)}</dd></div>
+                  </dl>
+                ) : null}
+                {detail.interventionType === "REMOVAL" && detail.status === "REQUESTED" && canRequest ? <Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "submit"} onClick={() => void runAction("submit")}><Send data-icon="inline-start" aria-hidden />{activeAction === "submit" ? "Enviando a autorización…" : "Enviar a autorización"}</Button> : null}
+                {canAuthorize && ((detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <div className="flex flex-wrap gap-2"><Button type="button" disabled={activeAction !== null} aria-busy={activeAction === "authorize"} onClick={() => void runAction("authorize")}><CheckCircle2 data-icon="inline-start" aria-hidden />{activeAction === "authorize" ? "Autorizando intervención…" : "Autorizar intervención"}</Button>{detail.interventionType === "REMOVAL" ? <Button type="button" variant="destructive" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(true)}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button> : null}</div> : null}
+                {detail.status === "REJECTED" && canRequest ? <div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">Esta decisión es terminal. Puede registrar una nueva solicitud con los datos de esta extracción.</p><Button type="button" variant="outline" onClick={() => { setDetail(null); openRequest({ initialTreeIds: detail.treeIds, initialType: detail.interventionType, initialAddress: detail.address, initialRequiresStreetClosure: detail.requiresStreetClosure, initialPriority: detail.priority, initialJustification: detail.justification ?? "" }); }}>Crear nueva solicitud</Button></div> : null}
+              </div>
+            </>
+          ) : null}
           <DialogFooter><Button type="button" variant="outline" onClick={() => setDetail(null)}>Cerrar detalle</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={rejectConfirmOpen} onOpenChange={(open) => { if (!activeAction) setRejectConfirmOpen(open); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmar rechazo</DialogTitle><DialogDescription>La extracción quedará rechazada y no podrá reabrirse desde esta solicitud.</DialogDescription></DialogHeader>
+          {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
+          <DialogFooter><Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(false)}>Conservar solicitud</Button><Button type="button" variant="destructive" disabled={activeAction !== null} aria-busy={activeAction === "reject"} onClick={() => void runAction("reject")}>{activeAction === "reject" ? "Rechazando intervención…" : "Confirmar rechazo de intervención"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </section>
