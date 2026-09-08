@@ -533,14 +533,22 @@ export const handlers = [
         { status: 400 },
       );
     }
-    const service = serviceFixtures.find((candidate) => candidate.id === parsed.data.sourceId);
-    if (!service) {
+    const source = parsed.data.sourceType === "SERVICE"
+      ? serviceFixtures.find((candidate) => candidate.id === parsed.data.sourceId)
+      : getTreeInterventionFixture(parsed.data.sourceId);
+    if (!source) {
       return HttpResponse.json(
-        { statusCode: 404, message: "Servicio de origen no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
+        { statusCode: 404, message: "Fuente de origen no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
         { status: 404 },
       );
     }
-    const created = createStreetClosureRequestFixture(parsed.data, service);
+    if (parsed.data.sourceType === "TREE_INTERVENTION" && source.status !== "AUTHORIZED") {
+      return HttpResponse.json(
+        { statusCode: 409, message: "Solo se puede solicitar un corte de calle desde una intervención de arbolado autorizada.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/street-closure-requests" },
+        { status: 409 },
+      );
+    }
+    const created = createStreetClosureRequestFixture(parsed.data, source);
     addStreetClosureRequestFixture(created);
     return HttpResponse.json(created, { status: 201 });
   }),

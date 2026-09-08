@@ -30,11 +30,29 @@ describe("TreeInterventionsPanel", () => {
     expect(await within(detail).findByText(/ARB-00443/)).toBeVisible();
     expect(await within(detail).findByText(/ARB-00445/)).toBeVisible();
     expect(within(detail).getByRole("button", { name: "Autorizar intervención" })).toBeVisible();
+    expect(within(detail).queryByRole("button", { name: "Solicitar corte de calle" })).not.toBeInTheDocument();
 
     await within(detail).getByRole("button", { name: "Cerrar detalle" }).click();
     await user.selectOptions(screen.getByLabelText("Filtrar por estado"), "AUTHORIZED");
     expect(await screen.findByRole("article", { name: /intervention-2|Tratamiento/i })).toBeVisible();
     expect(screen.queryByRole("article", { name: /intervention-1|Poda de seguridad/i })).not.toBeInTheDocument();
+  });
+
+  it("offers a street closure request only from an authorized intervention", async () => {
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+
+    const request = await screen.findByRole("article", { name: /intervention-2|Tratamiento/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+
+    expect(within(detail).getByRole("button", { name: "Solicitar corte de calle" })).toBeVisible();
+    await user.click(within(detail).getByRole("button", { name: "Solicitar corte de calle" }));
+
+    const closureDialog = await screen.findByRole("dialog", { name: /Solicitar corte de calle/ });
+    expect(within(closureDialog).getByText("Av. Mitre 1140")).toBeVisible();
+    expect(within(closureDialog).getByText(/intervention-2/)).toBeVisible();
+    expect(within(closureDialog).getByLabelText("Motivo *")).toHaveValue("");
   });
 
   it("creates a multi-tree request and enforces justification for removal", async () => {

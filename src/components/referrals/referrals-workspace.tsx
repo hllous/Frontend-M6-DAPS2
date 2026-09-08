@@ -55,6 +55,19 @@ const referralKindDescription: Record<Referral["kind"], string> = {
   STREET_CLOSURE_REQUEST: "Corte solicitado para un Servicio",
 };
 
+function sourceKindLabel(referral: Referral): string {
+  return referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "TREE_INTERVENTION"
+    ? "Intervención de arbolado de origen"
+    : "Servicio de origen";
+}
+
+function referralKindDescriptionFor(referral: Referral): string {
+  if (referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "TREE_INTERVENTION") {
+    return "Corte solicitado para una intervención de arbolado autorizada";
+  }
+  return referralKindDescription[referral.kind];
+}
+
 const repairStatusLabel: Record<"REQUESTED" | "IN_PROGRESS" | "CLOSED", string> = {
   REQUESTED: "Pendiente",
   IN_PROGRESS: "En curso",
@@ -184,7 +197,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
   const fetchReferrals = useCallback(async () => {
     const page = await referralsAdapter.list();
     const referrals = page.referrals.filter((referral) => isReferralVisibleToScenario(referral, scenario));
-    const sourceIds = [...new Set(referrals.map((referral) => referral.sourceServiceId))];
+    const sourceIds = [...new Set(referrals.flatMap((referral) => referral.sourceServiceId ? [referral.sourceServiceId] : []))];
     const sourceResults = await Promise.all(sourceIds.map(async (sourceId) => {
       try {
         return { kind: "success" as const, sourceId, service: await servicesAdapter.get(sourceId) };
@@ -268,7 +281,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
       <ReferralDetail
         referral={selectedReferral}
         anomaly={anomalies.get(selectedReferral.id) ?? { isStale: false, duplicateReferralIds: [], sourceChanges: [] }}
-        sourceUnavailable={loadState.status === "ready" ? loadState.sourceErrors.get(selectedReferral.sourceServiceId) : undefined}
+        sourceUnavailable={loadState.status === "ready" && selectedReferral.sourceServiceId ? loadState.sourceErrors.get(selectedReferral.sourceServiceId) : undefined}
         onBack={() => setSelectedId(null)}
         canRecover={scenario.actor.kind === "OFFICE"}
         onRecovered={handleReferralRecovered}
@@ -284,7 +297,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
             <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Derivaciones externas</h1>
             <p className="mt-1 max-w-2xl text-sm text-[var(--color-text-secondary)]">
               {scenario.actor.kind === "OFFICE"
-                ? "Seguimiento de solicitudes referidas a M3 y M7 desde Servicios."
+                ? "Seguimiento de solicitudes referidas a M3 y M7 desde Servicios e intervenciones autorizadas."
                 : "Solicitudes vinculadas exclusivamente a sus Servicios asignados."}
             </p>
           </div>
@@ -316,7 +329,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
           <ReferralReconciliationSummary referrals={loadState.referrals} anomalies={anomalies} />
           <section className="w-full" aria-label="Lista de derivaciones" aria-describedby="referrals-scope-note">
             <p id="referrals-scope-note" className="sr-only">
-              Seleccione una derivación para consultar su detalle. La información del Servicio se consulta mediante el enlace a su módulo de origen.
+              Seleccione una derivación para consultar su detalle. La fuente canónica se consulta mediante el enlace a su módulo de origen.
             </p>
             <ul className="grid gap-3" role="list">
               {loadState.referrals.map((referral) => (
@@ -324,7 +337,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
                   key={`${referral.kind}-${referral.id}`}
                   referral={referral}
                   anomaly={anomalies.get(referral.id)}
-                  sourceUnavailable={loadState.sourceErrors.has(referral.sourceServiceId)}
+                  sourceUnavailable={Boolean(referral.sourceServiceId && loadState.sourceErrors.has(referral.sourceServiceId))}
                   onOpen={() => setSelectedId(referral.id)}
                 />
               ))}
@@ -458,8 +471,8 @@ function ReferralRow({
             <span className="font-bold tabular-nums text-[var(--color-text)]">{referral.id}</span>
             <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{referralKindLabel[referral.kind]}</span>
           </span>
-          <span className="mt-1 block truncate text-sm text-[var(--color-text)]">{referralKindDescription[referral.kind]}</span>
-          <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">Servicio de origen: {referral.sourceServiceId} · {referral.sourceLabel}</span>
+          <span className="mt-1 block truncate text-sm text-[var(--color-text)]">{referralKindDescriptionFor(referral)}</span>
+          <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {referral.sourceId} · {referral.sourceLabel}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text)]" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
           <ReferralStatusIcon referral={referral} className="h-3.5 w-3.5" />
@@ -513,11 +526,15 @@ function ReferralDetail({
               <ExternalLink className="h-4 w-4" aria-hidden />
             </span>
             <div className="min-w-0">
-              <h2 id="referral-source-title" className="text-sm font-bold text-[var(--color-text)]">Servicio de origen</h2>
-              <p className="mt-1 text-sm text-[var(--color-text)]">{referral.sourceServiceId} · {referral.sourceLabel}</p>
-              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">La información del Servicio se consulta en su módulo de origen.</p>
+              <h2 id="referral-source-title" className="text-sm font-bold text-[var(--color-text)]">{sourceKindLabel(referral)}</h2>
+              <p className="mt-1 text-sm text-[var(--color-text)]">{referral.sourceId} · {referral.sourceLabel}</p>
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                {referral.sourceType === "TREE_INTERVENTION"
+                  ? "La intervención autorizada se consulta en su catálogo de origen."
+                  : "La información del Servicio se consulta en su módulo de origen."}
+              </p>
               <a className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-action)] underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" href={referral.sourceHref}>
-                Ver Servicio de origen
+                Ver {referral.sourceType === "TREE_INTERVENTION" ? "intervención de origen" : "Servicio de origen"}
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </a>
             </div>
@@ -598,7 +615,7 @@ function ReferralReconciliationPanel({
           <div className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-surface)] p-3">
             <h3 className="text-sm font-bold text-[var(--color-warning)]">Candidata a derivación duplicada</h3>
             <p className="mt-1 text-sm text-[var(--color-text)]">
-              Hay otra derivación abierta del mismo tipo para el Servicio {referral.sourceServiceId}.
+              Hay otra derivación abierta del mismo tipo para {sourceKindLabel(referral).toLowerCase()} {referral.sourceId}.
             </p>
             <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
               Registros relacionados: <span className="font-semibold tabular-nums">{anomaly.duplicateReferralIds.join(", ")}</span>. La coincidencia requiere revisión humana; M6 no fusiona ni reintenta por un error ambiguo.

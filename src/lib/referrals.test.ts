@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { getReferralSourceServiceIds, isReferralVisibleToScenario, type Referral } from "./referrals";
+import {
+  getReferralSourceServiceIds,
+  isReferralVisibleToScenario,
+  referralFromStreetClosureRequest,
+  treeInterventionSourceHref,
+  type Referral,
+} from "./referrals";
 import { scenarios } from "./scenarios";
+import { streetClosureRequestFixtures } from "./street-closure-request-fixtures";
 
 const repairReferral = {
   kind: "REPAIR_REQUEST",
@@ -25,5 +32,20 @@ describe("referral visibility boundary", () => {
     expect(getReferralSourceServiceIds(scenarios.fieldCrewLeader)).toContain("SVC-1050");
     expect(isReferralVisibleToScenario(repairReferral, scenarios.fieldCrewLeader)).toBe(true);
     expect(isReferralVisibleToScenario(otherServiceReferral, scenarios.fieldCrewLeader)).toBe(false);
+  });
+
+  it("keeps TreeIntervention referrals Office-only and points to the catalog source", () => {
+    const request = streetClosureRequestFixtures.find((candidate) => candidate.sourceType === "TREE_INTERVENTION");
+    if (!request) throw new Error("Expected a TreeIntervention closure request fixture");
+    const referral = referralFromStreetClosureRequest(request);
+
+    expect(referral).toMatchObject({
+      sourceType: "TREE_INTERVENTION",
+      sourceId: request.sourceId,
+      sourceTreeInterventionId: request.sourceId,
+      sourceHref: treeInterventionSourceHref(request.sourceId),
+    });
+    expect(isReferralVisibleToScenario(referral, scenarios.officeDutyQueue)).toBe(true);
+    expect(isReferralVisibleToScenario(referral, scenarios.fieldCrewLeader)).toBe(false);
   });
 });
