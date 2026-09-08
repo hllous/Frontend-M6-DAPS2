@@ -35,7 +35,7 @@ describe("/api/tree-interventions", () => {
     const response = await POST(new Request("http://localhost/api/tree-interventions", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(validInput) }));
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ ...validInput, status: "REQUESTED", serviceId: null, trees: expect.any(Array) });
-    expect(treeInterventionFixtures).toHaveLength(3);
+    expect(treeInterventionFixtures).toHaveLength(4);
   });
 
   it("rejects creation without the request capability and removal without justification", async () => {

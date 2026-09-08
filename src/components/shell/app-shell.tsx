@@ -6,15 +6,18 @@ import {
   ChevronLeft,
   CircleHelp,
   ClipboardList,
+  Clock3,
   GitPullRequest,
   Leaf,
   Map,
   PackageSearch,
   Play,
+  ShieldAlert,
   Settings2,
   Sprout,
 } from "lucide-react";
-import { useState, type ComponentType } from "react";
+import Link from "next/link";
+import { useEffect, useState, type ComponentType } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +49,7 @@ import { CatalogLanding } from "@/components/catalog/catalog-landing";
 import { ZonesPanel } from "./zones-panel";
 import { IndicatorsDashboard } from "@/components/indicators/indicators-dashboard";
 import { EnvironmentalReportsWorkspace } from "@/components/environmental-reports/environmental-reports-workspace";
+import { treeInterventionsAdapter, type TreeIntervention } from "@/lib/tree-interventions";
 
 type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
 type LogoutAction = (formData: FormData) => void | Promise<void>;
@@ -262,7 +266,59 @@ function WorkPanel({ scenario }: { scenario: OperationalScenario }) {
     return <FieldWorkPanel scenario={scenario} />;
   }
 
+  return <OfficeWorkPanel scenario={scenario} />;
+}
+
+const treeInterventionLabels = {
+  FORMATION_PRUNING: "Poda de formación",
+  SAFETY_PRUNING: "Poda de seguridad",
+  REMOVAL: "Extracción",
+  PLANTING: "Plantación",
+  TREATMENT: "Tratamiento",
+} satisfies Record<TreeIntervention["interventionType"], string>;
+
+type PendingTreeIntervention = TreeIntervention & { status: "REQUESTED" | "PENDING_AUTHORIZATION" };
+
+const treeInterventionStatusLabels = {
+  REQUESTED: "Solicitada",
+  PENDING_AUTHORIZATION: "Pendiente de autorización",
+} satisfies Record<Extract<TreeIntervention["status"], "REQUESTED" | "PENDING_AUTHORIZATION">, string>;
+
+function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
   const mayExecuteService = scenario.capabilities.includes("service:execute");
+  const [queue, setQueue] = useState<
+    | { status: "loading" }
+    | { status: "ready"; interventions: PendingTreeIntervention[] }
+    | { status: "error"; message: string }
+  >({ status: "loading" });
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    void treeInterventionsAdapter
+      .list({ pageSize: 100 })
+      .then((page) => {
+        if (!isCurrent) return;
+        setQueue({
+          status: "ready",
+          interventions: page.interventions.filter(
+            (item): item is PendingTreeIntervention =>
+              item.status === "REQUESTED" || item.status === "PENDING_AUTHORIZATION",
+          ),
+        });
+      })
+      .catch(() => {
+        if (!isCurrent) return;
+        setQueue({
+          status: "error",
+          message: "No se pudo cargar la cola de autorizaciones. Intente nuevamente más tarde.",
+        });
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   return (
     <section aria-labelledby="work-title" className={styles.workPanel}>
@@ -290,8 +346,57 @@ function WorkPanel({ scenario }: { scenario: OperationalScenario }) {
             )}
           </li>
         ))}
+        {queue.status === "loading" ? (
+          <li className={styles.workQueueMessage} aria-live="polite">
+            <span>Cargando decisiones de arbolado…</span>
+          </li>
+        ) : null}
+        {queue.status === "error" ? (
+          <li className={styles.workQueueMessage} role="alert">
+            <span>{queue.message}</span>
+          </li>
+        ) : null}
+        {queue.status === "ready"
+          ? queue.interventions.map((intervention, index) => (
+              <TreeInterventionWorkItem
+                key={intervention.id}
+                intervention={intervention}
+                index={scenario.work.items.length + index + 1}
+              />
+            ))
+          : null}
       </ol>
     </section>
+  );
+}
+
+function TreeInterventionWorkItem({
+  intervention,
+  index,
+}: {
+  intervention: PendingTreeIntervention;
+  index: number;
+}) {
+  const StatusIcon = intervention.status === "REQUESTED" ? Clock3 : ShieldAlert;
+
+  return (
+    <li>
+      <div>
+        <span className={styles.workIndex}>{String(index).padStart(2, "0")}</span>
+        <div className={styles.workInterventionCopy}>
+          <p>
+            <Link href="/app/catalog/tree-interventions">
+              {treeInterventionLabels[intervention.interventionType]} · {intervention.address}
+            </Link>
+          </p>
+          <span className={styles.workInterventionHint}>Intervención de arbolado</span>
+        </div>
+      </div>
+      <span className={`${styles.workState} ${intervention.status === "PENDING_AUTHORIZATION" ? styles.workStatePending : ""}`}>
+        <StatusIcon aria-hidden />
+        {treeInterventionStatusLabels[intervention.status]}
+      </span>
+    </li>
   );
 }
 

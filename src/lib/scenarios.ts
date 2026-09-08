@@ -36,7 +36,8 @@ export type Capability =
   // Frontend hypothesis for Phase 5 Tree management
   | "tree:manage"
   | "tree:survey"
-  | "treeIntervention:request";
+  | "treeIntervention:request"
+  | "treeIntervention:authorize";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -48,6 +49,7 @@ export type OperationalScenario = {
   id: ScenarioId;
   label: string;
   actor: {
+    userId: string;
     name: string;
     kind: "OFFICE" | "FIELD";
     fieldRole?: "CREW_LEADER" | "CREW_MEMBER";
@@ -69,7 +71,7 @@ export const scenarios: Record<
   officeDutyQueue: {
     id: "office-duty-queue",
     label: "Oficina · cola de decisiones",
-    actor: { name: "Lucía Fernández", kind: "OFFICE" },
+    actor: { userId: "user-lucia", name: "Lucía Fernández", kind: "OFFICE" },
     capabilities: [
       "service:view",
       "inventory:view",
@@ -94,6 +96,7 @@ export const scenarios: Record<
       "tree:manage",
       "tree:survey",
       "treeIntervention:request",
+      "treeIntervention:authorize",
       "zone:manage",
       "route:manage",
       "serviceFrequency:manage",
@@ -113,6 +116,7 @@ export const scenarios: Record<
     id: "field-crew-leader-route",
     label: "Campo · responsable de recorrido",
     actor: {
+      userId: "user-martin",
       name: "Martín Acosta",
       kind: "FIELD",
       fieldRole: "CREW_LEADER",
@@ -133,6 +137,7 @@ export const scenarios: Record<
     id: "field-crew-member-route",
     label: "Campo · integrante de cuadrilla",
     actor: {
+      userId: "user-sofia",
       name: "Sofía Navarro",
       kind: "FIELD",
       fieldRole: "CREW_MEMBER",
@@ -152,7 +157,7 @@ export const scenarios: Record<
   officeLimited: {
     id: "office-limited-intake",
     label: "Oficina · ingreso con alcance limitado",
-    actor: { name: "Andrea Ríos", kind: "OFFICE" },
+    actor: { userId: "user-ana", name: "Andrea Ríos", kind: "OFFICE" },
     capabilities: ["service:view", "environmentalReport:view", "map:view"],
     work: {
       title: "Acciones de la jornada",

@@ -14,8 +14,9 @@ function intervention(input: Omit<TreeIntervention, "trees">): TreeIntervention 
 }
 
 const INITIAL_TREE_INTERVENTIONS: TreeIntervention[] = [
-  intervention({ id: "intervention-1", interventionType: "SAFETY_PRUNING", treeIds: ["tree-2", "tree-4"], address: "Parque del Bicentenario, sector norte", requiresStreetClosure: true, priority: "HIGH", status: "REQUESTED", serviceId: null, justification: "Relevamiento 06/09/2026 (survey-2)." }),
-  intervention({ id: "intervention-2", interventionType: "TREATMENT", treeIds: ["tree-1"], address: "Av. Mitre 1140", requiresStreetClosure: false, priority: "MEDIUM", status: "AUTHORIZED", serviceId: null, justification: null }),
+  intervention({ id: "intervention-1", interventionType: "SAFETY_PRUNING", treeIds: ["tree-2", "tree-4"], address: "Parque del Bicentenario, sector norte", requiresStreetClosure: true, priority: "HIGH", status: "REQUESTED", serviceId: null, justification: "Relevamiento 06/09/2026 (survey-2).", authorizedByUserId: null, authorizedAt: null }),
+  intervention({ id: "intervention-2", interventionType: "TREATMENT", treeIds: ["tree-1"], address: "Av. Mitre 1140", requiresStreetClosure: false, priority: "MEDIUM", status: "AUTHORIZED", serviceId: null, justification: null, authorizedByUserId: "user-carlos", authorizedAt: "2026-09-06T10:15:00.000Z" }),
+  intervention({ id: "intervention-3", interventionType: "REMOVAL", treeIds: ["tree-4"], address: "Paseo de la Costa 220", requiresStreetClosure: false, priority: "CRITICAL", status: "REQUESTED", serviceId: null, justification: "El ejemplar presenta inestabilidad crítica.", authorizedByUserId: null, authorizedAt: null }),
 ];
 
 export const treeInterventionFixtures: TreeIntervention[] = structuredClone(INITIAL_TREE_INTERVENTIONS);
@@ -46,6 +47,17 @@ export function addTreeInterventionFixture(item: TreeIntervention) {
 
 export function getTreeInterventionFixture(id: string) {
   return treeInterventionFixtures.find((item) => item.id === id) ?? null;
+}
+
+export function updateTreeInterventionFixture(
+  id: string,
+  changes: Partial<Omit<TreeIntervention, "id" | "trees">>,
+) {
+  const index = treeInterventionFixtures.findIndex((item) => item.id === id);
+  if (index < 0) return null;
+  const updated = { ...treeInterventionFixtures[index], ...changes };
+  treeInterventionFixtures[index] = updated;
+  return updated;
 }
 
 export function refreshTreeInterventionLinks(item: TreeIntervention, trees: Tree[]) {
