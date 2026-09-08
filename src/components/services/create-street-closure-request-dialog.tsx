@@ -17,7 +17,9 @@ import {
   getFieldDraft,
   submitFieldAction,
 } from "@/lib/field-drafts";
+import { NetworkFailureError } from "@/lib/authenticated-fetch";
 import type { Service } from "@/lib/services";
+import type { TreeIntervention } from "@/lib/tree-interventions";
 import {
   createStreetClosureRequestInputSchema,
   streetClosureRequestsAdapter,
@@ -35,7 +37,25 @@ function serviceWindowValue(service: Service, time: string | null | undefined): 
   return service.scheduledDate && time ? `${service.scheduledDate}T${time}` : "";
 }
 
-function initialForm(service: Service): CreateStreetClosureRequestInput {
+type StreetClosureSource =
+  | { kind: "SERVICE"; record: Service }
+  | { kind: "TREE_INTERVENTION"; record: TreeIntervention };
+
+function initialForm(source: StreetClosureSource): CreateStreetClosureRequestInput {
+  if (source.kind === "TREE_INTERVENTION") {
+    return {
+      reason: "",
+      sourceType: "TREE_INTERVENTION",
+      sourceId: source.record.id,
+      sourceModule: "M6",
+      closureType: "PARTIAL",
+      requestedFrom: "",
+      requestedTo: "",
+      affectedSections: [{ ...EMPTY_SECTION }],
+    };
+  }
+
+  const service = source.record;
   const stored = getFieldDraft<CreateStreetClosureRequestInput>(service.id, "streetClosureRequest");
   if (stored?.payload) return stored.payload;
   return {
@@ -50,6 +70,15 @@ function initialForm(service: Service): CreateStreetClosureRequestInput {
   };
 }
 
+function sourceFromProps(
+  service: Service | null | undefined,
+  treeIntervention: TreeIntervention | null | undefined,
+): StreetClosureSource | null {
+  if (service) return { kind: "SERVICE", record: service };
+  if (treeIntervention?.status === "AUTHORIZED") return { kind: "TREE_INTERVENTION", record: treeIntervention };
+  return null;
+}
+
 function errorMap(issues: { path: PropertyKey[]; message: string }[]): FormErrors {
   return issues.reduce<FormErrors>((result, issue) => {
     const key = issue.path.length ? issue.path.join(".") : "form";
@@ -61,16 +90,19 @@ function errorMap(issues: { path: PropertyKey[]; message: string }[]): FormError
 export function CreateStreetClosureRequestDialog({
   open,
   onOpenChange,
-  service,
+  service = null,
+  treeIntervention = null,
   onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  service: Service | null;
+  service?: Service | null;
+  treeIntervention?: TreeIntervention | null;
   onCreated?: (request: StreetClosureRequest) => void;
 }) {
+  const source = sourceFromProps(service, treeIntervention);
   const [form, setForm] = useState<CreateStreetClosureRequestInput | null>(
-    service ? initialForm(service) : null,
+    source ? initialForm(source) : null,
   );
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,7 +179,7 @@ export function CreateStreetClosureRequestDialog({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!service || !form) return;
+    if (!source || !form) return;
     const parsed = createStreetClosureRequestInputSchema.safeParse(form);
     if (!parsed.success) {
       setErrors(errorMap(parsed.error.issues));
@@ -158,8 +190,26 @@ export function CreateStreetClosureRequestDialog({
     setIsSubmitting(true);
     setErrors({});
     setAnnouncement("");
+    if (source.kind === "TREE_INTERVENTION") {
+      try {
+        const created = await streetClosureRequestsAdapter.create(parsed.data);
+        setOutcome("pending");
+        setAnnouncement("Solicitud creada y pendiente de respuesta de M7.");
+        onCreated?.(created);
+      } catch (cause) {
+        if (cause instanceof NetworkFailureError) {
+          setOutcome("unsent");
+          setAnnouncement("La solicitud quedó sin enviar. Revise los valores y envíela manualmente cuando vuelva la conexión.");
+        } else {
+          setErrors({ form: cause instanceof Error ? cause.message : "No se pudo crear la solicitud." });
+          setAnnouncement("No se pudo crear la solicitud.");
+        }
+      }
+      setIsSubmitting(false);
+      return;
+    }
     const result = await submitFieldAction({
-      service,
+      service: source.record,
       actionType: "streetClosureRequest",
       payload: parsed.data,
       submit: streetClosureRequestsAdapter.create,
@@ -179,26 +229,37 @@ export function CreateStreetClosureRequestDialog({
     setIsSubmitting(false);
   }
 
-  if (!service || !form) return null;
+  if (!source || !form) return null;
 
-  const isComplete = outcome !== null;
+  const isComplete = outcome === "pending";
+  const sourceTitle = source.kind === "SERVICE" ? source.record.title : source.record.address;
+  const sourceTypeLabel = source.kind === "SERVICE" ? "Servicio" : "Intervención de arbolado";
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Solicitar corte de calle</DialogTitle>
           <DialogDescription>
-            Registre el pedido a M7 desde el contexto canónico del Servicio. La respuesta externa no se inventa en M6.
+            Registre el pedido a M7 desde el contexto canónico de la {sourceTypeLabel}. La respuesta externa no se inventa en M6.
           </DialogDescription>
         </DialogHeader>
 
         <div aria-live="polite" className="sr-only">{announcement}</div>
 
-        {outcome === "pending" && (
-          <div role="status" className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4 shadow-sm">
-            <p className="text-sm font-bold text-blue-800 dark:text-blue-200">Solicitud pendiente</p>
-            <p className="mt-1 text-sm text-blue-800/80 dark:text-blue-100/80">
+        {outcome === "pending" && source.kind === "SERVICE" && (
+          <div role="status" className="rounded-xl border border-[var(--color-info-line)] bg-[var(--color-info-fill)] p-4">
+            <p className="text-sm font-bold text-[var(--color-info)]">Solicitud pendiente</p>
+            <p className="mt-1 text-sm text-[var(--color-info)]">
               M6 creó el registro. Queda pendiente la respuesta de M7 y el Servicio conserva este contexto.
+            </p>
+          </div>
+        )}
+
+        {outcome === "pending" && source.kind === "TREE_INTERVENTION" && (
+          <div role="status" className="rounded-xl border border-[var(--color-info-line)] bg-[var(--color-info-fill)] p-4">
+            <p className="text-sm font-bold text-[var(--color-info)]">Solicitud pendiente</p>
+            <p className="mt-1 text-sm text-[var(--color-info)]">
+              M6 creó el registro desde la intervención autorizada. Queda pendiente la respuesta de M7.
             </p>
           </div>
         )}
@@ -213,13 +274,15 @@ export function CreateStreetClosureRequestDialog({
         )}
 
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Contexto del Servicio</p>
-          <p className="mt-1 text-sm font-bold text-[var(--color-text)]">{service.title}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Contexto de la {sourceTypeLabel}</p>
+          <p className="mt-1 text-sm font-bold text-[var(--color-text)]">{sourceTitle}</p>
           <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-            {service.id} · {service.mode === "ROUTE" ? "Recorrido" : "Punto"} · {service.scheduledDate}
+            {source.kind === "SERVICE"
+              ? `${source.record.id} · ${source.record.mode === "ROUTE" ? "Recorrido" : "Punto"} · ${source.record.scheduledDate}`
+              : `${source.record.id} · ${source.record.treeIds.length} ${source.record.treeIds.length === 1 ? "árbol vinculado" : "árboles vinculados"} · Estado autorizada`}
           </p>
           <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-            Este Servicio es la referencia de origen; no se duplica como una nueva fuente.
+            Esta {sourceTypeLabel} es la referencia de origen; no se duplica como una nueva fuente.
           </p>
         </div>
 
@@ -248,7 +311,7 @@ export function CreateStreetClosureRequestDialog({
                   aria-invalid={Boolean(errors.reason)}
                   aria-describedby={errors.reason ? "street-closure-reason-error" : undefined}
                   className="min-h-24 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-3 text-sm text-[var(--color-text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                  placeholder="Explique por qué el Servicio necesita el corte"
+                  placeholder={source.kind === "SERVICE" ? "Explique por qué el Servicio necesita el corte" : "Explique por qué la intervención de arbolado necesita el corte"}
                 />
                 {errors.reason && <FieldError id="street-closure-reason-error">{errors.reason}</FieldError>}
               </Field>
@@ -298,7 +361,9 @@ export function CreateStreetClosureRequestDialog({
                 </Field>
               </FieldGroup>
               <FieldDescription>
-                La ventana se prefija desde el Servicio cuando existe, pero debe revisarse y puede editarse antes del envío.
+                {source.kind === "SERVICE"
+                  ? "La ventana se prefija desde el Servicio cuando existe, pero debe revisarse y puede editarse antes del envío."
+                  : "Indique la ventana que M6 solicitará a M7. Puede editarla antes del envío."}
               </FieldDescription>
             </FieldGroup>
 

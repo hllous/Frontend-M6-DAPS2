@@ -8,6 +8,7 @@ import {
   resetStreetClosureRequestFixtures,
   updateStreetClosureRequestFixture,
 } from "./street-closure-request-fixtures";
+import { resetTreeInterventionFixtures } from "./tree-intervention-fixtures";
 import {
   StreetClosureRequestContractError,
   streetClosureRequestsAdapter,
@@ -17,6 +18,7 @@ const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => resetStreetClosureRequestFixtures());
+beforeEach(() => resetTreeInterventionFixtures());
 afterEach(() => {
   server.resetHandlers();
   vi.restoreAllMocks();
@@ -63,6 +65,26 @@ describe("street closure request adapter", () => {
     expect(created.status).toBe("REQUESTED");
     expect(created.affectedSections).toHaveLength(2);
     expect(created.sourceContext.sourceId).toBe("SVC-1050");
+  });
+
+  it("creates a TreeIntervention-sourced request with a compact canonical context", async () => {
+    const created = await streetClosureRequestsAdapter.create({
+      ...createInput,
+      sourceType: "TREE_INTERVENTION",
+      sourceId: "intervention-2",
+    });
+
+    expect(created).toMatchObject({
+      status: "REQUESTED",
+      sourceType: "TREE_INTERVENTION",
+      sourceId: "intervention-2",
+      sourceContext: {
+        sourceType: "TREE_INTERVENTION",
+        sourceId: "intervention-2",
+        interventionType: "TREATMENT",
+        address: "Av. Mitre 1140",
+      },
+    });
   });
 
   it("rejects an empty affected-section collection before submission", async () => {

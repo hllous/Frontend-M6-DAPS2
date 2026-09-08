@@ -31,7 +31,8 @@ describe("ReferralsWorkspace", () => {
     expect(within(list).getByRole("button", { name: /RR-1001/ })).toBeVisible();
     expect(within(list).getByRole("button", { name: /SCR-1001/ })).toBeVisible();
     expect(within(list).getByText("M3 · Reparaciones")).toBeVisible();
-    expect(within(list).getByText("M7 · Cortes de calle")).toBeVisible();
+    expect(within(list).getAllByText("M7 · Cortes de calle")).toHaveLength(2);
+    expect(within(list).getByRole("button", { name: /SCR-1002/ })).toBeVisible();
 
     await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de SCR-1001" });
@@ -73,6 +74,22 @@ describe("ReferralsWorkspace", () => {
     expect(within(detail).getByText(/M3 todavía no informó un identificador/)).toBeVisible();
   });
 
+  it("navigates TreeIntervention referrals to their catalog source", async () => {
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(list).getByRole("button", { name: /SCR-1002/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de SCR-1002" });
+
+    expect(within(detail).getByRole("heading", { name: "Intervención de arbolado de origen" })).toBeVisible();
+    expect(within(detail).getByRole("link", { name: /Ver intervención de origen/ })).toHaveAttribute(
+      "href",
+      "/app/catalog/tree-interventions?detail=intervention-2",
+    );
+    expect(within(detail).getByText(/Tratamiento.*Av\. Mitre 1140/)).toBeVisible();
+  });
+
   it("surfaces stale and duplicate referrals without changing their status", async () => {
     const all = fixtureReferrals();
     const base = all.find((referral) => referral.kind === "REPAIR_REQUEST");
@@ -100,8 +117,8 @@ describe("ReferralsWorkspace", () => {
 
   it("shows live source changes as reconciliation work and preserves the original context", async () => {
     const all = fixtureReferrals();
-    const base = all.find((referral) => referral.kind === "STREET_CLOSURE_REQUEST");
-    if (!base || base.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a closure referral fixture");
+    const base = all.find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "SERVICE");
+    if (!base || base.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a Service closure referral fixture");
     const changed = {
       ...base,
       id: "SCR-118-CHANGED-SOURCE",

@@ -38,7 +38,7 @@ function duplicateIdsFor(referral: Referral, referrals: Referral[]): string[] {
   return referrals
     .filter((candidate) =>
       candidate.kind === referral.kind &&
-      candidate.sourceServiceId === referral.sourceServiceId &&
+      candidate.sourceId === referral.sourceId &&
       isReferralOpen(candidate),
     )
     .map((candidate) => candidate.id)
@@ -50,7 +50,7 @@ function valueOrDash(value: string | null | undefined): string {
 }
 
 function sourceChangesFor(referral: Referral, service: Service | null | undefined): ReferralSourceChange[] {
-  if (!service) return [];
+  if (!service || referral.sourceType === "TREE_INTERVENTION") return [];
 
   if (referral.kind === "REPAIR_REQUEST") {
     return referral.sourceLabel === service.title
@@ -59,6 +59,7 @@ function sourceChangesFor(referral: Referral, service: Service | null | undefine
   }
 
   const recorded = referral.request.sourceContext;
+  if (recorded.sourceType !== "SERVICE") return [];
   const comparisons: Array<[string, string, string]> = [
     ["Nombre del Servicio", recorded.title, service.title],
     ["Modalidad", recorded.mode, service.mode],
@@ -94,7 +95,12 @@ export function getReferralAnomalies(
   return new Map(
     referrals.map((referral) => [
       referral.id,
-      getReferralAnomaly(referral, referrals, sourceServices.get(referral.sourceServiceId), now),
+      getReferralAnomaly(
+        referral,
+        referrals,
+        referral.sourceServiceId ? sourceServices.get(referral.sourceServiceId) : undefined,
+        now,
+      ),
     ]),
   );
 }

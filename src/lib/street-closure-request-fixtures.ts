@@ -1,4 +1,5 @@
 import type { Service } from "./services";
+import type { TreeIntervention } from "./tree-interventions";
 import type {
   StreetClosureRequest,
   StreetClosureRequestQuery,
@@ -32,6 +33,30 @@ const INITIAL_STREET_CLOSURE_REQUESTS: StreetClosureRequest[] = [
     },
     createdAt: "2026-09-04T18:00:00.000Z",
     updatedAt: "2026-09-04T18:00:00.000Z",
+  },
+  {
+    id: "SCR-1002",
+    reason: "La intervención autorizada requiere ordenar la circulación durante el tratamiento del arbolado.",
+    sourceType: "TREE_INTERVENTION",
+    sourceId: "intervention-2",
+    sourceModule: "M6",
+    closureType: "PARTIAL",
+    requestedFrom: "2026-09-10T09:00",
+    requestedTo: "2026-09-10T11:00",
+    affectedSections: [
+      { streetName: "Av. Mitre", fromCross: "Calle 10", toCross: "Calle 12" },
+    ],
+    status: "REQUESTED",
+    closureId: null,
+    sourceContext: {
+      sourceType: "TREE_INTERVENTION",
+      sourceId: "intervention-2",
+      title: "Tratamiento · Av. Mitre 1140",
+      interventionType: "TREATMENT",
+      address: "Av. Mitre 1140",
+    },
+    createdAt: "2026-09-05T08:30:00.000Z",
+    updatedAt: "2026-09-05T08:30:00.000Z",
   },
 ];
 
@@ -106,15 +131,37 @@ export function buildStreetClosureSourceContext(
   };
 }
 
+export function buildTreeInterventionStreetClosureSourceContext(
+  intervention: TreeIntervention,
+): StreetClosureRequest["sourceContext"] {
+  const typeLabel: Record<TreeIntervention["interventionType"], string> = {
+    FORMATION_PRUNING: "Poda de formación",
+    SAFETY_PRUNING: "Poda de seguridad",
+    REMOVAL: "Extracción",
+    PLANTING: "Plantación",
+    TREATMENT: "Tratamiento",
+  };
+  return {
+    sourceType: "TREE_INTERVENTION",
+    sourceId: intervention.id,
+    title: `${typeLabel[intervention.interventionType]} · ${intervention.address}`,
+    interventionType: intervention.interventionType,
+    address: intervention.address,
+  };
+}
+
 export function createStreetClosureRequestFixture(
   input: CreateStreetClosureRequestInput,
-  service: Service,
+  source: Service | TreeIntervention,
 ): StreetClosureRequest {
+  const sourceContext = input.sourceType === "SERVICE"
+    ? buildStreetClosureSourceContext(source as Service)
+    : buildTreeInterventionStreetClosureSourceContext(source as TreeIntervention);
   const now = new Date().toISOString();
   return {
     id: `SCR-${Math.floor(1000 + Math.random() * 9000)}`,
     ...input,
-    sourceContext: buildStreetClosureSourceContext(service),
+    sourceContext,
     status: "REQUESTED",
     closureId: null,
     createdAt: now,

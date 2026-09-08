@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3, Eye, Info, Plus, Send, ShieldAlert, UserRound } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,6 +11,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CreateStreetClosureRequestDialog } from "@/components/services/create-street-closure-request-dialog";
 import { treeInterventionCreateInputSchema, treeInterventionsAdapter, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
 import type { OperationalScenario } from "@/lib/scenarios";
 import type { Tree } from "@/lib/trees";
@@ -202,6 +203,12 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [actionError, setActionError] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<"submit" | "authorize" | "reject" | null>(null);
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [streetClosureIntervention, setStreetClosureIntervention] = useState<TreeInterventionDetail | null>(null);
+  const detailOpenedFromUrl = useRef(false);
+  const [initialDetailId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("detail");
+  });
   const [notice, setNotice] = useState<string | null>(null);
   const query = useMemo<TreeInterventionQuery>(() => ({ interventionType: interventionType || undefined, status: status || undefined, page, pageSize: 10 }), [interventionType, page, status]);
 
@@ -218,10 +225,18 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   }, [query, requestVersion]);
 
   const openRequest = (prefill: Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification"> = {}) => { setRequestPrefill(prefill); setRequestOpen(true); setNotice(null); };
-  const openDetail = async (intervention: TreeIntervention) => {
+  const openDetail = useCallback(async (intervention: TreeIntervention) => {
     setDetail(intervention); setDetailError(null); setActionError(null); setDetailLoading(true);
     try { setDetail(await treeInterventionsAdapter.get(intervention.id)); } catch (caught) { setDetailError(caught instanceof Error ? caught.message : "No se pudo cargar el detalle de la intervención."); } finally { setDetailLoading(false); }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (state.status !== "ready" || !initialDetailId || detail || detailOpenedFromUrl.current) return;
+    const intervention = state.page.interventions.find((item) => item.id === initialDetailId);
+    if (!intervention) return;
+    detailOpenedFromUrl.current = true;
+    void Promise.resolve().then(() => openDetail(intervention));
+  }, [state, initialDetailId, detail, openDetail]);
   const treeById = (id: string) => trees.find((tree) => tree.id === id);
   const runAction = async (action: "submit" | "authorize" | "reject") => {
     if (!detail) return;
@@ -282,6 +297,22 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       </> : null}
 
       {canRequest ? <TreeInterventionRequestDialog key={`${requestOpen}-${JSON.stringify(requestPrefill)}`} open={requestOpen} onOpenChange={setRequestOpen} trees={trees} {...requestPrefill} onCreated={() => { setNotice("Solicitud de intervención creada. Estado inicial: solicitada."); setPage(1); setRequestVersion((version) => version + 1); }} /> : null}
+      {canRequest && streetClosureIntervention ? (
+        <CreateStreetClosureRequestDialog
+          key={streetClosureIntervention.id}
+          open
+          service={null}
+          treeIntervention={streetClosureIntervention}
+          onOpenChange={(open) => {
+            if (!open) setStreetClosureIntervention(null);
+          }}
+          onCreated={() => {
+            setNotice("Solicitud de corte creada y pendiente de respuesta de M7.");
+            setStreetClosureIntervention(null);
+            setRequestVersion((version) => version + 1);
+          }}
+        />
+      ) : null}
       <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { setDetail(null); setRejectConfirmOpen(false); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle><DialogDescription>Consulte los datos de la solicitud y, según su estado y permisos, registre una decisión de autorización.</DialogDescription></DialogHeader>
@@ -297,6 +328,18 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                     <div><dt className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><UserRound className="size-3.5" aria-hidden />Persona autorizante</dt><dd className="mt-1">{detail.authorizedByUserId ?? "No registrada"}</dd></div>
                     <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de autorización</dt><dd className="mt-1 tabular-nums">{dateTimeLabel(detail.authorizedAt)}</dd></div>
                   </dl>
+                ) : null}
+                {canRequest && detail.status === "AUTHORIZED" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDetail(null);
+                      setStreetClosureIntervention(detail);
+                    }}
+                  >
+                    Solicitar corte de calle
+                  </Button>
                 ) : null}
                 {detail.interventionType === "REMOVAL" && detail.status === "REQUESTED" && canRequest ? <Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "submit"} onClick={() => void runAction("submit")}><Send data-icon="inline-start" aria-hidden />{activeAction === "submit" ? "Enviando a autorización…" : "Enviar a autorización"}</Button> : null}
                 {canAuthorize && ((detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <div className="flex flex-wrap gap-2"><Button type="button" disabled={activeAction !== null} aria-busy={activeAction === "authorize"} onClick={() => void runAction("authorize")}><CheckCircle2 data-icon="inline-start" aria-hidden />{activeAction === "authorize" ? "Autorizando intervención…" : "Autorizar intervención"}</Button>{detail.interventionType === "REMOVAL" ? <Button type="button" variant="destructive" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(true)}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button> : null}</div> : null}

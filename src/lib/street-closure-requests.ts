@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { treeInterventionTypeSchema } from "./tree-interventions";
 
 export const streetClosureTypeSchema = z.enum(["TOTAL", "PARTIAL"]);
 export type StreetClosureType = z.infer<typeof streetClosureTypeSchema>;
@@ -26,8 +27,8 @@ export const affectedSectionSchema = z.object({
 });
 export type AffectedSection = z.infer<typeof affectedSectionSchema>;
 
-export const streetClosureSourceContextSchema = z.object({
-  sourceType: streetClosureRequestSourceTypeSchema,
+const serviceStreetClosureSourceContextSchema = z.object({
+  sourceType: z.literal("SERVICE"),
   sourceId: z.string().min(1),
   title: z.string().min(1),
   mode: z.enum(["ROUTE", "POINT"]),
@@ -36,13 +37,26 @@ export const streetClosureSourceContextSchema = z.object({
   windowFrom: z.string().nullable(),
   windowTo: z.string().nullable(),
 });
+
+const treeInterventionStreetClosureSourceContextSchema = z.object({
+  sourceType: z.literal("TREE_INTERVENTION"),
+  sourceId: z.string().min(1),
+  title: z.string().min(1),
+  interventionType: treeInterventionTypeSchema,
+  address: z.string().min(1),
+});
+
+export const streetClosureSourceContextSchema = z.discriminatedUnion("sourceType", [
+  serviceStreetClosureSourceContextSchema,
+  treeInterventionStreetClosureSourceContextSchema,
+]);
 export type StreetClosureSourceContext = z.infer<typeof streetClosureSourceContextSchema>;
 
 export const createStreetClosureRequestInputSchema = z
   .object({
     reason: z.string().trim().min(1, "El motivo es obligatorio"),
-    sourceType: z.literal("SERVICE"),
-    sourceId: z.string().trim().min(1, "Debe indicar el servicio de origen"),
+    sourceType: streetClosureRequestSourceTypeSchema,
+    sourceId: z.string().trim().min(1, "Debe indicar la fuente de origen"),
     sourceModule: z.literal("M6"),
     closureType: streetClosureTypeSchema,
     requestedFrom: z.string().trim().min(1, "Indique el inicio de la ventana solicitada"),

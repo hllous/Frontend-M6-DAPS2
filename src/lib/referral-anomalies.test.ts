@@ -28,7 +28,7 @@ describe("referral anomaly detection", () => {
   });
 
   it("compares live Service data with the referral source context", () => {
-    const closure = fixtureReferrals().find((referral) => referral.kind === "STREET_CLOSURE_REQUEST");
+    const closure = fixtureReferrals().find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "SERVICE");
     const service = serviceFixtures.find((candidate) => candidate.id === closure?.sourceServiceId);
     if (!closure || closure.kind !== "STREET_CLOSURE_REQUEST" || !service) throw new Error("Expected closure and source fixtures");
 
