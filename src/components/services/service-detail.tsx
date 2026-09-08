@@ -615,6 +615,14 @@ export function ServiceDetail({
               <span className="text-[var(--color-text-secondary)] block font-medium">Zona</span>
               <span className="font-bold text-[var(--color-text)] mt-0.5 block">{service.zoneNames.join(", ")}</span>
             </li>
+            {service.targetRef ? (
+              <li className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+                <span className="text-[var(--color-text-secondary)] block font-medium">
+                  {service.targetType === "TREE" ? "Árboles vinculados" : "Objetivo"}
+                </span>
+                <span className="font-bold text-[var(--color-text)] mt-0.5 block">{service.targetRef}</span>
+              </li>
+            ) : null}
             <li className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
               <span className="text-[var(--color-text-secondary)] block font-medium">Cuadrilla</span>
               <span className="font-bold text-[var(--color-text)] mt-0.5 block">{service.crewName ?? "Sin asignar"}</span>

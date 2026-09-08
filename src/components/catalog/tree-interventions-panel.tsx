@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3, Eye, Info, Plus, Send, ShieldAlert, UserRound } from "lucide-react";
+import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3, Eye, Info, Plus, RefreshCw, Send, ShieldAlert, UserRound } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateStreetClosureRequestDialog } from "@/components/services/create-street-closure-request-dialog";
+import { SERVICE_TYPE_CATALOG, servicesAdapter, type CreateServiceInput } from "@/lib/services";
 import { treeInterventionCreateInputSchema, treeInterventionsAdapter, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
 import type { OperationalScenario } from "@/lib/scenarios";
 import type { Tree } from "@/lib/trees";
@@ -92,6 +93,16 @@ function treeName(tree: Tree) {
 
 function dateTimeLabel(value?: string | null) {
   return value ? new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "No registrada";
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function treeTargetRef(trees: Tree[], treeIds: string[]) {
+  return (trees.length ? trees : treeIds.map((id) => ({ id, surveyCode: id, species: "Árbol", address: null } as Tree)))
+    .map((tree) => treeName(tree))
+    .join("; ");
 }
 
 function InterventionStatusBadge({ status }: { status: TreeInterventionStatus }) {
@@ -189,6 +200,7 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
 export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScenario }) {
   const canRequest = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("treeIntervention:request");
   const canAuthorize = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("treeIntervention:authorize");
+  const canSchedule = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("service:schedule");
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [trees, setTrees] = useState<Tree[]>([]);
   const [interventionType, setInterventionType] = useState<TreeInterventionType | "">("");
@@ -201,8 +213,11 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [activeAction, setActiveAction] = useState<"submit" | "authorize" | "reject" | null>(null);
+  const [activeAction, setActiveAction] = useState<"submit" | "authorize" | "reject" | "schedule" | "retry-link" | null>(null);
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({ scheduledDate: today(), windowFrom: "08:00", windowTo: "12:00" });
+  const [unsyncedServiceId, setUnsyncedServiceId] = useState<string | null>(null);
   const [streetClosureIntervention, setStreetClosureIntervention] = useState<TreeInterventionDetail | null>(null);
   const detailOpenedFromUrl = useRef(false);
   const [initialDetailId] = useState<string | null>(() => {
@@ -226,7 +241,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
 
   const openRequest = (prefill: Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification"> = {}) => { setRequestPrefill(prefill); setRequestOpen(true); setNotice(null); };
   const openDetail = useCallback(async (intervention: TreeIntervention) => {
-    setDetail(intervention); setDetailError(null); setActionError(null); setDetailLoading(true);
+    setDetail(intervention); setDetailError(null); setActionError(null); setScheduleOpen(false); setUnsyncedServiceId(null); setDetailLoading(true);
     try { setDetail(await treeInterventionsAdapter.get(intervention.id)); } catch (caught) { setDetailError(caught instanceof Error ? caught.message : "No se pudo cargar el detalle de la intervención."); } finally { setDetailLoading(false); }
   }, []);
 
@@ -238,22 +253,75 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     void Promise.resolve().then(() => openDetail(intervention));
   }, [state, initialDetailId, detail, openDetail]);
   const treeById = (id: string) => trees.find((tree) => tree.id === id);
-  const runAction = async (action: "submit" | "authorize" | "reject") => {
+  const runAction = async (action: "submit" | "authorize" | "reject" | "schedule", input?: typeof scheduleForm) => {
     if (!detail) return;
     setActionError(null); setActiveAction(action);
     try {
+      if (action === "schedule") {
+        const treesForService = detail.trees ?? detail.treeIds.map(treeById).filter((tree): tree is Tree => Boolean(tree));
+        const firstTree = treesForService[0];
+        if (!firstTree || !input) {
+          setActionError("No se pudo determinar la zona operativa del árbol seleccionado.");
+          return;
+        }
+        const serviceInput: CreateServiceInput = {
+          title: `${TREE_INTERVENTION_LABELS[detail.interventionType]} · ${detail.address}`,
+          serviceTypeId: SERVICE_TYPE_CATALOG.find((serviceType) => serviceType.id === "st-tree-pruning")?.id ?? "st-tree-pruning",
+          origin: "MANUAL",
+          zoneIds: [firstTree.zoneId],
+          targetType: "TREE",
+          targetId: firstTree.id,
+          targetRef: treeTargetRef(treesForService, detail.treeIds),
+          scheduledDate: input.scheduledDate,
+          timeWindow: { start: input.windowFrom, end: input.windowTo },
+          notes: `Intervención de arbolado ${detail.id}.`,
+        };
+        const createdService = await servicesAdapter.create(serviceInput);
+        try {
+          const updated = await treeInterventionsAdapter.assignService(detail.id, { serviceId: createdService.id });
+          setDetail(updated);
+          setUnsyncedServiceId(null);
+          setScheduleOpen(false);
+          setRequestVersion((version) => version + 1);
+          setNotice(`Intervención programada. Servicio ${createdService.id} vinculado correctamente.`);
+        } catch (caught) {
+          setUnsyncedServiceId(createdService.id);
+          setScheduleOpen(false);
+          setActionError(`El Servicio ${createdService.id} fue creado, pero no pudo vincularse a la intervención. La operación quedó sin sincronizarse; puede reintentar la vinculación sin crear otro servicio. ${caught instanceof Error ? caught.message : ""}`.trim());
+        }
+        return;
+      }
+
       const updated = action === "submit"
         ? await treeInterventionsAdapter.submitForAuthorization(detail.id)
         : action === "authorize"
           ? await treeInterventionsAdapter.authorize(detail.id, { authorizedByUserId: scenario.actor.userId })
           : await treeInterventionsAdapter.reject(detail.id);
       setDetail(updated);
+      setScheduleOpen(false);
       setRequestVersion((version) => version + 1);
       setNotice(action === "submit" ? "La extracción fue enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
       if (action === "reject") setRejectConfirmOpen(false);
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : "No se pudo actualizar la intervención.");
     } finally { setActiveAction(null); }
+  };
+
+  const retryServiceLink = async () => {
+    if (!detail || !unsyncedServiceId) return;
+    setActionError(null);
+    setActiveAction("retry-link");
+    try {
+      const updated = await treeInterventionsAdapter.assignService(detail.id, { serviceId: unsyncedServiceId });
+      setDetail(updated);
+      setUnsyncedServiceId(null);
+      setRequestVersion((version) => version + 1);
+      setNotice(`Intervención programada. Servicio ${unsyncedServiceId} vinculado correctamente.`);
+    } catch (caught) {
+      setActionError(`El Servicio ${unsyncedServiceId} sigue sin vincularse. Revise el estado antes de volver a intentar. ${caught instanceof Error ? caught.message : ""}`.trim());
+    } finally {
+      setActiveAction(null);
+    }
   };
 
   return (
@@ -321,7 +389,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-mono text-xs text-muted-foreground">{detail.id}</p><p className="mt-1 font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p></div><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{PRIORITY_LABELS[detail.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ul className="flex flex-col gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <li key={tree?.id ?? detail.treeIds[index]} className="rounded-xl border border-border bg-muted px-3 py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</li>)}</ul></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
           {detail && !detailLoading && !detailError ? (
             <>
-              {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
+              {actionError ? <Alert variant="destructive"><AlertDescription className="flex flex-col gap-3"><span>{actionError}</span>{unsyncedServiceId ? <Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "retry-link"} onClick={() => void retryServiceLink()}><RefreshCw data-icon="inline-start" aria-hidden />{activeAction === "retry-link" ? "Reintentando vinculación…" : "Reintentar vinculación"}</Button> : null}</AlertDescription></Alert> : null}
               <div className="flex flex-col gap-3 border-t border-[var(--color-border)] pt-4">
                 {detail.status === "AUTHORIZED" ? (
                   <dl aria-label="Registro de autorización" className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-sm sm:grid-cols-2">
@@ -340,6 +408,39 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                   >
                     Solicitar corte de calle
                   </Button>
+                ) : null}
+                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <span className="font-mono font-semibold">{detail.serviceId}</span>.</AlertDescription></Alert> : null}
+                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !scheduleOpen ? <Button type="button" variant="default" disabled={activeAction !== null} onClick={() => { setScheduleForm({ scheduledDate: today(), windowFrom: "08:00", windowTo: "12:00" }); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
+                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && scheduleOpen ? (
+                  <form
+                    aria-label="Programar servicio para la intervención"
+                    className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void runAction("schedule", scheduleForm);
+                    }}
+                  >
+                    <p className="text-sm font-semibold">Servicio puntual de ejecución</p>
+                    <FieldGroup className="grid gap-3 sm:grid-cols-3">
+                      <Field>
+                        <FieldLabel htmlFor="tree-service-date">Fecha programada</FieldLabel>
+                        <input id="tree-service-date" type="date" required className={formControlClass} value={scheduleForm.scheduledDate} onChange={(event) => setScheduleForm({ ...scheduleForm, scheduledDate: event.target.value })} />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="tree-service-from">Desde</FieldLabel>
+                        <input id="tree-service-from" type="time" required className={formControlClass} value={scheduleForm.windowFrom} onChange={(event) => setScheduleForm({ ...scheduleForm, windowFrom: event.target.value })} />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="tree-service-to">Hasta</FieldLabel>
+                        <input id="tree-service-to" type="time" required className={formControlClass} value={scheduleForm.windowTo} onChange={(event) => setScheduleForm({ ...scheduleForm, windowTo: event.target.value })} />
+                      </Field>
+                    </FieldGroup>
+                    <p className="text-xs text-muted-foreground">{"Se crear\u00e1 un Service POINT con el primer \u00e1rbol como objetivo t\u00e9cnico y el listado completo de \u00e1rboles como contexto relacionado."}</p>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => setScheduleOpen(false)}>{"Cancelar programaci\u00f3n"}</Button>
+                      <Button type="submit" disabled={activeAction !== null} aria-busy={activeAction === "schedule"}><CalendarClock data-icon="inline-start" aria-hidden />{activeAction === "schedule" ? "Programando servicio\u2026" : "Programar servicio de intervenci\u00f3n"}</Button>
+                    </div>
+                  </form>
                 ) : null}
                 {detail.interventionType === "REMOVAL" && detail.status === "REQUESTED" && canRequest ? <Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "submit"} onClick={() => void runAction("submit")}><Send data-icon="inline-start" aria-hidden />{activeAction === "submit" ? "Enviando a autorización…" : "Enviar a autorización"}</Button> : null}
                 {canAuthorize && ((detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <div className="flex flex-wrap gap-2"><Button type="button" disabled={activeAction !== null} aria-busy={activeAction === "authorize"} onClick={() => void runAction("authorize")}><CheckCircle2 data-icon="inline-start" aria-hidden />{activeAction === "authorize" ? "Autorizando intervención…" : "Autorizar intervención"}</Button>{detail.interventionType === "REMOVAL" ? <Button type="button" variant="destructive" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(true)}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button> : null}</div> : null}

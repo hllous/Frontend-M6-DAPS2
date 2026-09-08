@@ -14,6 +14,8 @@ describe("operational scenarios", () => {
     expect(scenarios.fieldCrewLeader.capabilities).toContain("container:report");
     expect(scenarios.fieldCrewMember.capabilities).toContain("container:report");
     expect(scenarios.officeLimited.capabilities).not.toContain("container:report");
+    expect(scenarios.officeDutyQueue.capabilities).toContain("service:schedule");
+    expect(scenarios.officeLimited.capabilities).not.toContain("service:schedule");
   });
 
   it("returns operational scenarios by their stable name", () => {
