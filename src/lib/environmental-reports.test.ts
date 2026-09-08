@@ -98,4 +98,72 @@ describe("environmental reports adapter", () => {
     });
     expect(inspection).toMatchObject({ outcome: "NO_VIOLATION", nextStep: "CASE_CLOSED" });
   });
+
+  it("issues and reads an immutable violation notice through the dedicated inspection endpoints", async () => {
+    let requestBody: unknown;
+    server.use(
+      http.post("*/api/environmental-inspections/INS-1008/violation-notice", async ({ request }) => {
+        requestBody = await request.json();
+        return HttpResponse.json({
+          id: "NOTICE-1008",
+          noticeNumber: "ACTA-2026-0008",
+          inspectionId: "INS-1008",
+          issuedAt: "2026-09-07T15:00:00.000Z",
+          establishmentId: "EST-BOEDO-1880",
+          violationType: "ILLEGAL_DUMPING",
+          severity: "HIGH",
+          suggestedAction: "FORMAL_NOTICE",
+          priorNoticeCount: 2,
+        }, { status: 201 });
+      }),
+      http.get("*/api/environmental-inspections/INS-1008/violation-notice", () => HttpResponse.json({
+        id: "NOTICE-1008",
+        noticeNumber: "ACTA-2026-0008",
+        inspectionId: "INS-1008",
+        issuedAt: "2026-09-07T15:00:00.000Z",
+        establishmentId: "EST-BOEDO-1880",
+        violationType: "ILLEGAL_DUMPING",
+        severity: "HIGH",
+        suggestedAction: "FORMAL_NOTICE",
+        priorNoticeCount: 2,
+      })),
+    );
+
+    const input = {
+      establishmentId: "EST-BOEDO-1880",
+      violationType: "ILLEGAL_DUMPING" as const,
+      severity: "HIGH" as const,
+      suggestedAction: "FORMAL_NOTICE" as const,
+    };
+    const issued = await environmentalReportsAdapter.issueViolationNotice("INS-1008", input);
+    const read = await environmentalReportsAdapter.getViolationNotice("INS-1008");
+
+    expect(requestBody).toEqual(input);
+    expect(issued).toMatchObject({ noticeNumber: "ACTA-2026-0008", priorNoticeCount: 2 });
+    expect(read).toMatchObject({ inspectionId: "INS-1008", establishmentId: "EST-BOEDO-1880" });
+  });
+
+  it("preserves a 409 as a request conflict and rejects an empty establishment identifier", async () => {
+    server.use(http.post("*/api/environmental-inspections/INS-1008/violation-notice", () => HttpResponse.json({
+      statusCode: 409,
+      message: "La inspección ya tiene un acta emitida.",
+      error: "Conflict",
+      timestamp: new Date().toISOString(),
+      path: "/api/environmental-inspections/INS-1008/violation-notice",
+    }, { status: 409 })));
+
+    await expect(environmentalReportsAdapter.issueViolationNotice("INS-1008", {
+      establishmentId: "",
+      violationType: "ILLEGAL_DUMPING",
+      severity: "HIGH",
+      suggestedAction: "FORMAL_NOTICE",
+    })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+
+    await expect(environmentalReportsAdapter.issueViolationNotice("INS-1008", {
+      establishmentId: "EST-BOEDO-1880",
+      violationType: "ILLEGAL_DUMPING",
+      severity: "HIGH",
+      suggestedAction: "FORMAL_NOTICE",
+    })).rejects.toMatchObject({ status: 409 });
+  });
 });

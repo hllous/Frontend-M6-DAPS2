@@ -188,6 +188,29 @@ export const environmentalInspectionSchema = z.object({
 }).passthrough();
 export type EnvironmentalInspection = z.infer<typeof environmentalInspectionSchema>;
 
+export const issueViolationNoticeInputSchema = z.object({
+  // null is reserved for the explicit non-forwarded path. A resolved notice
+  // must always carry an establishment identifier for M4 projection.
+  establishmentId: z.string().trim().min(1, "Debe indicar un establecimiento válido.").nullable(),
+  violationType: environmentalInspectionViolationTypeSchema,
+  severity: environmentalInspectionSeveritySchema,
+  suggestedAction: environmentalInspectionSuggestedActionSchema,
+});
+export type IssueViolationNoticeInput = z.infer<typeof issueViolationNoticeInputSchema>;
+
+export const violationNoticeSchema = z.object({
+  id: z.string(),
+  noticeNumber: z.string(),
+  inspectionId: z.string(),
+  issuedAt: z.string(),
+  establishmentId: z.string().nullable(),
+  violationType: environmentalInspectionViolationTypeSchema,
+  severity: environmentalInspectionSeveritySchema,
+  suggestedAction: environmentalInspectionSuggestedActionSchema,
+  priorNoticeCount: z.number().int().nonnegative(),
+}).passthrough();
+export type ViolationNotice = z.infer<typeof violationNoticeSchema>;
+
 export type EnvironmentalReportQuery = {
   status?: EnvironmentalReportStatus;
   reportType?: EnvironmentalReportType;
@@ -331,6 +354,34 @@ function parseInspection(payload: unknown, message: string): EnvironmentalInspec
 }
 
 export const environmentalReportsAdapter = {
+  async issueViolationNotice(id: string, input: IssueViolationNoticeInput): Promise<ViolationNotice> {
+    const parsedInput = issueViolationNoticeInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new EnvironmentalReportContractError("Los datos para emitir el acta son inválidos.", { cause: parsedInput.error });
+    }
+    const payload = await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}/violation-notice`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsedInput.data),
+    });
+    const parsed = violationNoticeSchema.safeParse(resourcePayload(payload));
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
+      throw new EnvironmentalReportContractError("La respuesta de emisión del acta no respeta el contrato esperado.", { cause: parsed.error });
+    }
+    return parsed.data;
+  },
+
+  async getViolationNotice(id: string): Promise<ViolationNotice> {
+    const payload = await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}/violation-notice`);
+    const parsed = violationNoticeSchema.safeParse(resourcePayload(payload));
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
+      throw new EnvironmentalReportContractError("La respuesta del acta no respeta el contrato esperado.", { cause: parsed.error });
+    }
+    return parsed.data;
+  },
+
   async list(query: EnvironmentalReportQuery = {}): Promise<EnvironmentalReportsPage> {
     const payload = await requestJson(`/api/environmental-reports${queryString(query)}`);
     const parsed = z.object({
