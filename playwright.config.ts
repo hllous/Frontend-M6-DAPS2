@@ -23,6 +23,13 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
+  // Pre-visits every route once against the freshly-started dev server so
+  // the suite's own timed assertions never pay `next dev`'s on-first-request
+  // JIT compile cost — see e2e/global-setup.ts. (A real production build
+  // would dodge this too, but `next start` forces NODE_ENV=production,
+  // which src/lib/session.ts's getAuthMode() intentionally treats as "mock
+  // auth is unavailable" — a safety guard, not something to route around.)
+  globalSetup: "./e2e/global-setup.ts",
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
