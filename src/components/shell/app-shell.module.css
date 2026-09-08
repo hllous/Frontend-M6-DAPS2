@@ -30,6 +30,13 @@
 .workIndex { color: var(--color-text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
 .workList p { margin: 0; font-weight: 600; }
 .workState { color: var(--color-info); border: 1px solid var(--color-info-line); background: var(--color-info-fill); border-radius: 999px; padding: var(--space-6) var(--space-8); font-size: 12px; white-space: nowrap; }
+.workState :global(svg) { width: 14px; height: 14px; margin-right: var(--space-4); vertical-align: -2px; }
+.workStatePending { color: var(--color-warning); border-color: var(--color-warning-line); background: var(--color-warning-fill); }
+.workInterventionCopy { min-width: 0; }
+.workInterventionCopy a { color: var(--color-text); text-decoration: none; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.workInterventionCopy a:hover, .workInterventionCopy a:focus-visible { text-decoration: underline; }
+.workInterventionHint { display: block; margin-top: var(--space-4); color: var(--color-text-secondary); font-size: 12px; }
+.workQueueMessage { justify-content: flex-start !important; color: var(--color-text-secondary); font-size: 14px; }
 .permissionNote { margin: 0; max-width: 65ch; color: var(--color-text-secondary); font-size: 14px; }
 .placeholder { min-height: 420px; border-color: var(--color-border); background: var(--color-surface); }
 .placeholderIcon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; color: var(--color-action); background: var(--color-surface-subtle); }

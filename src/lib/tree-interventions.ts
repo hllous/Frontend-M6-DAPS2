@@ -23,6 +23,8 @@ export const treeInterventionSchema = z.object({
   status: treeInterventionStatusSchema,
   serviceId: z.string().nullable(),
   justification: z.string().nullable(),
+  authorizedByUserId: z.string().nullable().optional(),
+  authorizedAt: z.string().nullable().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -43,6 +45,11 @@ export const treeInterventionCreateInputSchema = z.object({
   message: "La justificación es obligatoria para solicitar una extracción.",
 });
 export type TreeInterventionCreateInput = z.infer<typeof treeInterventionCreateInputSchema>;
+
+export const treeInterventionAuthorizeInputSchema = z.object({
+  authorizedByUserId: z.string().trim().min(1, "No se pudo identificar a la persona autorizante."),
+});
+export type TreeInterventionAuthorizeInput = z.infer<typeof treeInterventionAuthorizeInputSchema>;
 
 export type TreeInterventionQuery = {
   interventionType?: TreeInterventionType;
@@ -147,5 +154,32 @@ export const treeInterventionsAdapter = {
     const parsedInput = treeInterventionCreateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new TreeInterventionContractError("Los datos de la intervención son inválidos.", { cause: parsedInput.error });
     return parseIntervention(await request("/api/tree-interventions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) }), "La respuesta de creación de la intervención no respeta el contrato esperado.");
+  },
+
+  async submitForAuthorization(id: string): Promise<TreeInterventionDetail> {
+    return parseIntervention(
+      await request(`/api/tree-interventions/${encodeURIComponent(id)}/submit-for-authorization`, { method: "POST" }),
+      "La respuesta de envío a autorización no respeta el contrato esperado.",
+    );
+  },
+
+  async authorize(id: string, input: TreeInterventionAuthorizeInput): Promise<TreeInterventionDetail> {
+    const parsedInput = treeInterventionAuthorizeInputSchema.safeParse(input);
+    if (!parsedInput.success) throw new TreeInterventionContractError("La identidad de autorización es inválida.", { cause: parsedInput.error });
+    return parseIntervention(
+      await request(`/api/tree-interventions/${encodeURIComponent(id)}/authorize`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }),
+      "La respuesta de autorización no respeta el contrato esperado.",
+    );
+  },
+
+  async reject(id: string): Promise<TreeInterventionDetail> {
+    return parseIntervention(
+      await request(`/api/tree-interventions/${encodeURIComponent(id)}/reject`, { method: "POST" }),
+      "La respuesta de rechazo no respeta el contrato esperado.",
+    );
   },
 };

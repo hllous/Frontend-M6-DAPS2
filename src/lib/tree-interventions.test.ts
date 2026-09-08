@@ -61,6 +61,48 @@ describe("treeInterventionsAdapter", () => {
     expect(fetchMock).toHaveBeenLastCalledWith("/api/tree-interventions/intervention-1", expect.objectContaining({ cache: "no-store" }));
   });
 
+  it("submits removals for authorization without inventing a request body", async () => {
+    const pending = { ...intervention, interventionType: "REMOVAL", status: "PENDING_AUTHORIZATION" };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(pending)));
+
+    await expect(treeInterventionsAdapter.submitForAuthorization("intervention-1")).resolves.toMatchObject({
+      status: "PENDING_AUTHORIZATION",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tree-interventions/intervention-1/submit-for-authorization",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
+  });
+
+  it("authorizes every intervention type with the current Office identity", async () => {
+    const authorized = {
+      ...intervention,
+      status: "AUTHORIZED",
+      authorizedByUserId: "user-lucia",
+      authorizedAt: "2026-09-07T14:30:00.000Z",
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(authorized)));
+
+    await expect(treeInterventionsAdapter.authorize("intervention-1", { authorizedByUserId: "user-lucia" })).resolves.toMatchObject(authorized);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tree-interventions/intervention-1/authorize",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ authorizedByUserId: "user-lucia" }) }),
+    );
+  });
+
+  it("rejects a removal without sending a reason to the backend", async () => {
+    const rejected = { ...intervention, interventionType: "REMOVAL", status: "REJECTED" };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(rejected)));
+
+    await expect(treeInterventionsAdapter.reject("intervention-1")).resolves.toMatchObject({ status: "REJECTED" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tree-interventions/intervention-1/reject",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
+  });
+
   it("blocks removal without justification before making a request", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     await expect(treeInterventionsAdapter.create({
