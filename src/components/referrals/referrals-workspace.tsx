@@ -51,7 +51,7 @@ const referralKindLabel: Record<Referral["kind"], string> = {
 };
 
 const referralKindDescription: Record<Referral["kind"], string> = {
-  REPAIR_REQUEST: "Daño de infraestructura referido a M3",
+  REPAIR_REQUEST: "Daño detectado en un Servicio",
   STREET_CLOSURE_REQUEST: "Corte solicitado para un Servicio",
 };
 

@@ -6,7 +6,8 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { resetEnvironmentalReportFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
-import { repairRequestFixtures, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
+import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
+import { repairRequestsAdapter } from "@/lib/repair-requests";
 import { resetServiceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { scenarios } from "@/lib/scenarios";
 import { EnvironmentalReportsWorkspace } from "./environmental-reports-workspace";
@@ -170,7 +171,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(dialog).getByRole("button", { name: /Crear deriv.*a M3/ }));
 
     expect(await within(dialog).findByText(/pendiente de respuesta de M3/i)).toBeVisible();
-    expect(repairRequestFixtures[0]).toMatchObject({
+    const created = await repairRequestsAdapter.list({ detectedInId: "INS-1012" });
+    expect(created.repairRequests).toHaveLength(1);
+    expect(created.repairRequests[0]).toMatchObject({
       detectedInType: "INSPECTION",
       detectedInId: "INS-1012",
       severity: "LOW",
@@ -202,6 +205,7 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     expect(await within(dialog).findByText(/Derivación sin enviar/i)).toBeVisible();
     expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2450");
-    expect(repairRequestFixtures).toHaveLength(1);
+    const notCreated = await repairRequestsAdapter.list({ detectedInId: "INS-1012" });
+    expect(notCreated.repairRequests).toHaveLength(0);
   });
 });

@@ -335,7 +335,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
   const loadInspections = useCallback(async () => {
     const items = await environmentalReportsAdapter.listInspections(report.id);
     setInspections(items);
-    await loadInspectionSources(items);
+    void loadInspectionSources(items);
     await loadViolationNotice(items);
     return items;
   }, [loadInspectionSources, loadViolationNotice, report.id]);
