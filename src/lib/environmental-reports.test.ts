@@ -29,6 +29,15 @@ describe("environmental reports adapter", () => {
     expect(report).toMatchObject({ reportType: "DUMPING", address: "Av. Rivadavia 2200", status: "RECEIVED" });
   });
 
+  it("accepts a ticket-originated report with null coordinates (M2 contract v1.6, #191)", async () => {
+    const report = await environmentalReportsAdapter.get("ER-1002");
+    expect(report).toMatchObject({ id: "ER-1002", ticketId: "TK-2026-091", lat: null, lng: null, address: "Av. Corrientes 4200" });
+
+    const page = await environmentalReportsAdapter.list({ ticketId: "TK-2026-091" });
+    expect(page.environmentalReports).toHaveLength(1);
+    expect(page.environmentalReports[0]).toMatchObject({ lat: null, lng: null });
+  });
+
   it("keeps review transitions explicit and rejects malformed success payloads", async () => {
     expect((await environmentalReportsAdapter.startReview("ER-1001")).status).toBe("UNDER_REVIEW");
     expect((await environmentalReportsAdapter.forward("ER-1001")).status).toBe("FORWARDED");

@@ -72,16 +72,20 @@ export type CreateEnvironmentalReportInput = z.infer<typeof createEnvironmentalR
 
 const reportLocationSchema = z.object({
   address: z.string().optional(),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
 }).passthrough();
 
 export const environmentalReportSchema = z.object({
   id: z.string(),
   reportType: environmentalReportTypeSchema,
   address: z.string().optional(),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
+  // M2 contract v1.6 dropped lat/lng from its location payload, so the backend
+  // always sends these as explicit `null` (not omitted) for ticket-originated
+  // reports (ticketId present) — see issue #191. `.nullable()` is required
+  // because Zod's `.optional()` alone rejects an explicit `null`.
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
   location: reportLocationSchema.optional(),
   description: z.string().optional(),
   details: z.string().optional(),
