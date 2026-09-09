@@ -103,6 +103,36 @@ describe("treeInterventionsAdapter", () => {
     expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
   });
 
+  it("assigns an existing Service and validates the updated intervention", async () => {
+    const linked = { ...intervention, status: "AUTHORIZED", serviceId: "SVC-1200" };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(linked)));
+
+    await expect(treeInterventionsAdapter.assignService("intervention-1", { serviceId: "SVC-1200" })).resolves.toMatchObject(linked);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tree-interventions/intervention-1/assign-service",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ serviceId: "SVC-1200" }),
+      }),
+    );
+  });
+
+  it("surfaces the duplicate-link conflict instead of treating it as success", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      statusCode: 409,
+      message: "La intervención ya tiene un servicio asociado.",
+      error: "Conflict",
+      timestamp: new Date().toISOString(),
+      path: "/api/tree-interventions/intervention-1/assign-service",
+    }), { status: 409 }));
+
+    await expect(treeInterventionsAdapter.assignService("intervention-1", { serviceId: "SVC-1200" })).rejects.toMatchObject({
+      constructor: TreeInterventionRequestError,
+      status: 409,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("blocks removal without justification before making a request", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     await expect(treeInterventionsAdapter.create({
