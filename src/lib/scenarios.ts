@@ -15,6 +15,7 @@ export type Capability =
   | "environmentalInspection:execute"
   | "violationNotice:issue"
   | "violationNotice:view"
+  | "sanctionOutcome:view"
   | "map:view"
   | "catalog:view"
   | "indicator:view"
@@ -84,6 +85,7 @@ export const scenarios: Record<
       "environmentalInspection:schedule",
       "violationNotice:issue",
       "violationNotice:view",
+      "sanctionOutcome:view",
       "map:view",
       "catalog:view",
       "serviceType:manage",
