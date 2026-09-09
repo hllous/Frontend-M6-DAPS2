@@ -51,6 +51,11 @@ export const treeInterventionAuthorizeInputSchema = z.object({
 });
 export type TreeInterventionAuthorizeInput = z.infer<typeof treeInterventionAuthorizeInputSchema>;
 
+export const treeInterventionAssignServiceInputSchema = z.object({
+  serviceId: z.string().trim().min(1, "Debe indicar el servicio que ejecutará la intervención."),
+});
+export type TreeInterventionAssignServiceInput = z.infer<typeof treeInterventionAssignServiceInputSchema>;
+
 export type TreeInterventionQuery = {
   interventionType?: TreeInterventionType;
   status?: TreeInterventionStatus;
@@ -180,6 +185,19 @@ export const treeInterventionsAdapter = {
     return parseIntervention(
       await request(`/api/tree-interventions/${encodeURIComponent(id)}/reject`, { method: "POST" }),
       "La respuesta de rechazo no respeta el contrato esperado.",
+    );
+  },
+
+  async assignService(id: string, input: TreeInterventionAssignServiceInput): Promise<TreeInterventionDetail> {
+    const parsedInput = treeInterventionAssignServiceInputSchema.safeParse(input);
+    if (!parsedInput.success) throw new TreeInterventionContractError("El servicio para la intervención es inválido.", { cause: parsedInput.error });
+    return parseIntervention(
+      await request(`/api/tree-interventions/${encodeURIComponent(id)}/assign-service`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }),
+      "La respuesta de asociación del servicio no respeta el contrato esperado.",
     );
   },
 };

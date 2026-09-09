@@ -37,7 +37,8 @@ export type Capability =
   | "tree:manage"
   | "tree:survey"
   | "treeIntervention:request"
-  | "treeIntervention:authorize";
+  | "treeIntervention:authorize"
+  | "service:schedule";
 
 export type ScenarioId =
   | "office-duty-queue"
@@ -97,6 +98,7 @@ export const scenarios: Record<
       "tree:survey",
       "treeIntervention:request",
       "treeIntervention:authorize",
+      "service:schedule",
       "zone:manage",
       "route:manage",
       "serviceFrequency:manage",

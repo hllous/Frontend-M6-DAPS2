@@ -129,6 +129,28 @@ describe("authenticated services BFF route", () => {
     expect(body.message).toMatch(/oficina/i);
   });
 
+  it("POST returns 403 for an Office actor without the scheduling capability", async () => {
+    const cookie = await authenticatedCookie("office-limited-intake");
+    const response = await POST(
+      new Request("http://localhost/api/services", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          serviceTypeId: "st-tree-pruning",
+          origin: "MANUAL",
+          zoneIds: ["zone-1"],
+          targetType: "TREE",
+          targetId: "tree-1",
+          targetRef: "ARB-001",
+          scheduledDate: "2026-09-10",
+          timeWindow: { start: "08:00", end: "12:00" },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
   it("POST rejects malformed or invalid input with 400", async () => {
     const cookie = await authenticatedCookie("office-duty-queue");
     const response = await POST(

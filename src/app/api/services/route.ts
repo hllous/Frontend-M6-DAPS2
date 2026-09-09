@@ -18,7 +18,7 @@ import {
   type ServiceStatus,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { zoneFixtures } from "@/lib/zones-fixtures";
 
@@ -136,6 +136,7 @@ export async function POST(request: Request) {
     if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, "Solo Oficina puede programar un servicio.", path);
     }
+    requireCapability(session, "service:schedule");
 
     let body: unknown;
     try {
@@ -218,6 +219,7 @@ export async function POST(request: Request) {
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
     return errorResponse(500, "No se pudo programar el servicio.", path);
   }
 }
