@@ -21,6 +21,7 @@ describe("environmental reports adapter", () => {
     const page = await environmentalReportsAdapter.list({ page: 1, pageSize: 100 });
     expect(new URL(requestedUrl).searchParams.get("pageSize")).toBe("100");
     expect(page.pageSize).toBe(100);
+    expect(page.sanctionOutcomeIntegrationExceptions).toEqual([]);
   });
 
   it("creates a received own-initiative report and posts operational details", async () => {
