@@ -6,13 +6,17 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { resetTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
+import { resetServiceFixtures, serviceFixtures } from "@/lib/services-fixtures";
 import { scenarios } from "@/lib/scenarios";
 import { TreeInterventionsPanel } from "./tree-interventions-panel";
 
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-beforeEach(() => resetTreeInterventionFixtures());
+beforeEach(() => {
+  resetTreeInterventionFixtures();
+  resetServiceFixtures();
+});
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
@@ -91,6 +95,80 @@ describe("TreeInterventionsPanel", () => {
     expect(await within(detail).findByText("Autorizada")).toBeVisible();
     expect(within(detail).getByText("user-lucia")).toBeVisible();
     expect(within(detail).getByText(/Fecha de autorización/)).toBeVisible();
+  });
+
+  it("schedules an authorized multi-tree intervention as a POINT Service and keeps every tree in context", async () => {
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+
+    await user.click(within(detail).getByRole("button", { name: "Autorizar intervención" }));
+    expect(await within(detail).findByRole("button", { name: "Programar servicio" })).toBeVisible();
+    await user.click(within(detail).getByRole("button", { name: "Programar servicio" }));
+
+    const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
+    expect(within(form).getByLabelText("Fecha programada")).toBeVisible();
+    expect(within(form).getByLabelText("Desde")).toBeVisible();
+    expect(within(form).getByLabelText("Hasta")).toBeVisible();
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+    expect(await within(detail).findByRole("alert")).toHaveTextContent(/Servicio vinculado: SVC-/);
+    expect(within(detail).getByText(/ARB-00443/)).toBeVisible();
+    expect(within(detail).getByText(/ARB-00445/)).toBeVisible();
+    const serviceId = detail.textContent?.match(/Servicio vinculado: (SVC-\d+)/)?.[1];
+    const linkedService = serviceFixtures.find((service) => service.id === serviceId);
+    expect(linkedService).toMatchObject({ mode: "POINT", targetType: "TREE", targetId: "tree-2", zoneIds: ["zone-2"] });
+    expect(linkedService?.targetRef).toMatch(/ARB-00443/);
+    expect(linkedService?.targetRef).toMatch(/ARB-00445/);
+  });
+
+  it("surfaces a created-but-unlinked Service as an actionable unsynced state", async () => {
+    server.use(
+      http.post("*/api/tree-interventions/:interventionId/assign-service", () => HttpResponse.json({
+        statusCode: 409,
+        message: "La intervención ya tiene un servicio asociado.",
+        error: "Conflict",
+        timestamp: new Date().toISOString(),
+        path: "/api/tree-interventions/intervention-2/assign-service",
+      }, { status: 409 })),
+    );
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name: /intervention-2|Tratamiento/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    await user.click(within(detail).getByRole("button", { name: "Programar servicio" }));
+    const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+
+    expect(await within(detail).findByRole("alert")).toHaveTextContent(/creado.*no pudo vincularse|sincronizar/i);
+    expect(within(detail).getByRole("button", { name: "Reintentar vinculación" })).toBeVisible();
+    expect(within(detail).queryByText(/La intervención fue programada/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the schedule error recoverable when Service creation fails", async () => {
+    server.use(
+      http.post("*/api/services", () => HttpResponse.json({
+        statusCode: 400,
+        message: "No se puede programar el servicio.",
+        error: "Bad Request",
+        timestamp: new Date().toISOString(),
+        path: "/api/services",
+      }, { status: 400 })),
+    );
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name: /intervention-2|Tratamiento/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    await user.click(within(detail).getByRole("button", { name: "Programar servicio" }));
+    const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+
+    expect(await within(detail).findByRole("alert")).toHaveTextContent("No se puede programar el servicio");
+    expect(within(detail).getByRole("form", { name: "Programar servicio para la intervención" })).toBeVisible();
+    expect(within(detail).queryByText(/Servicio vinculado:/)).not.toBeInTheDocument();
   });
 
   it("moves a removal to pending authorization before exposing authorize and reject", async () => {

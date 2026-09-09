@@ -7,13 +7,18 @@ import { GET } from "./route";
 import { POST as authorize } from "./authorize/route";
 import { POST as reject } from "./reject/route";
 import { POST as submitForAuthorization } from "./submit-for-authorization/route";
+import { POST as assignService } from "./assign-service/route";
+import { resetServiceFixtures } from "@/lib/services-fixtures";
 
-beforeEach(() => resetTreeInterventionFixtures());
+beforeEach(() => {
+  resetTreeInterventionFixtures();
+  resetServiceFixtures();
+});
 afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; });
 
-async function authenticatedCookie() {
+async function authenticatedCookie(scenarioId = "office-duty-queue") {
   process.env.M6_AUTH_MODE = "mock";
-  const response = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenarioId: "office-duty-queue" }) }));
+  const response = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenarioId }) }));
   return response.headers.get("set-cookie") ?? "";
 }
 
@@ -166,5 +171,65 @@ describe("/api/tree-interventions/[id]", () => {
       { params: Promise.resolve({ id: "intervention-1" }) },
     );
     expect(forbidden.status).toBe(403);
+  });
+
+  it("links an authorized intervention to a POINT Service", async () => {
+    const cookie = await authenticatedCookie();
+    const response = await assignService(
+      transitionRequest("intervention-2", "assign-service", cookie, { serviceId: "SVC-1043" }),
+      { params: Promise.resolve({ id: "intervention-2" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ id: "intervention-2", status: "AUTHORIZED", serviceId: "SVC-1043" });
+  });
+
+  it("gates linking by authorization, POINT mode and the unique existing link", async () => {
+    const cookie = await authenticatedCookie();
+
+    const unauthorized = await assignService(
+      transitionRequest("intervention-1", "assign-service", cookie, { serviceId: "SVC-1043" }),
+      { params: Promise.resolve({ id: "intervention-1" }) },
+    );
+    expect(unauthorized.status).toBe(409);
+
+    const wrongMode = await assignService(
+      transitionRequest("intervention-2", "assign-service", cookie, { serviceId: "SVC-1042" }),
+      { params: Promise.resolve({ id: "intervention-2" }) },
+    );
+    expect(wrongMode.status).toBe(400);
+
+    const linked = await assignService(
+      transitionRequest("intervention-2", "assign-service", cookie, { serviceId: "SVC-1043" }),
+      { params: Promise.resolve({ id: "intervention-2" }) },
+    );
+    expect(linked.status).toBe(200);
+
+    const duplicate = await assignService(
+      transitionRequest("intervention-2", "assign-service", cookie, { serviceId: "SVC-1062" }),
+      { params: Promise.resolve({ id: "intervention-2" }) },
+    );
+    expect(duplicate.status).toBe(409);
+  });
+
+  it("denies service linking to an Office session without service scheduling capability and to Field", async () => {
+    const limitedCookie = await authenticatedCookie("office-limited-intake");
+    const limited = await assignService(
+      transitionRequest("intervention-2", "assign-service", limitedCookie, { serviceId: "SVC-1043" }),
+      { params: Promise.resolve({ id: "intervention-2" }) },
+    );
+    expect(limited.status).toBe(403);
+
+    const fieldLogin = await login(new Request("http://localhost/api/session/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scenarioId: "field-crew-member-route" }),
+    }));
+    const fieldCookie = fieldLogin.headers.get("set-cookie") ?? "";
+    const field = await assignService(
+      transitionRequest("intervention-2", "assign-service", fieldCookie, { serviceId: "SVC-1043" }),
+      { params: Promise.resolve({ id: "intervention-2" }) },
+    );
+    expect(field.status).toBe(403);
   });
 });

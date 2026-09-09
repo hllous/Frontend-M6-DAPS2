@@ -103,7 +103,7 @@ import { treeCreateInputSchema, treeUpdateInputSchema, type TreeQuery } from "@/
 import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures, getTreeSurveyFixture, paginateTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { treeHealthStatusSchema, treeSurveyCreateInputSchema, riskLevelSchema } from "@/lib/tree-surveys";
 import { addTreeInterventionFixture, createTreeInterventionFixture, filterTreeInterventionFixtures, getTreeInterventionFixture, paginateTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
-import { treeInterventionAuthorizeInputSchema, treeInterventionCreateInputSchema, treeInterventionStatusSchema, treeInterventionTypeSchema } from "@/lib/tree-interventions";
+import { treeInterventionAssignServiceInputSchema, treeInterventionAuthorizeInputSchema, treeInterventionCreateInputSchema, treeInterventionStatusSchema, treeInterventionTypeSchema } from "@/lib/tree-interventions";
 import {
   addRepairRequestFixture,
   createRepairRequestFixture,
@@ -1202,6 +1202,22 @@ export const handlers = [
     if (!intervention) return HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/reject` }, { status: 404 });
     if (intervention.interventionType !== "REMOVAL" || intervention.status !== "PENDING_AUTHORIZATION") return HttpResponse.json({ statusCode: 409, message: "Solo se puede rechazar una extracción pendiente de autorización.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/reject` }, { status: 409 });
     return HttpResponse.json(updateTreeInterventionFixture(params.interventionId as string, { status: "REJECTED" }));
+  }),
+  http.post("*/api/tree-interventions/:interventionId/assign-service", async ({ params, request }) => {
+    const interventionId = params.interventionId as string;
+    const path = `/api/tree-interventions/${interventionId}/assign-service`;
+    const parsed = treeInterventionAssignServiceInputSchema.safeParse(await request.json().catch(() => undefined));
+    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path }, { status: 400 });
+
+    const intervention = getTreeInterventionFixture(interventionId);
+    if (!intervention) return HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path }, { status: 404 });
+    if (intervention.status !== "AUTHORIZED") return HttpResponse.json({ statusCode: 409, message: "Solo se puede asociar un servicio a una intervención autorizada.", error: "Conflict", timestamp: new Date().toISOString(), path }, { status: 409 });
+    if (intervention.serviceId) return HttpResponse.json({ statusCode: 409, message: "La intervención ya tiene un servicio asociado.", error: "Conflict", timestamp: new Date().toISOString(), path }, { status: 409 });
+
+    const service = serviceFixtures.find((candidate) => candidate.id === parsed.data.serviceId);
+    if (!service) return HttpResponse.json({ statusCode: 404, message: "Servicio no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path }, { status: 404 });
+    if (service.mode !== "POINT") return HttpResponse.json({ statusCode: 400, message: "El servicio de una intervención de arbolado debe ser de modo POINT.", error: "Bad Request", timestamp: new Date().toISOString(), path }, { status: 400 });
+    return HttpResponse.json(updateTreeInterventionFixture(interventionId, { serviceId: service.id }));
   }),
   // --- Containers catalog (#120) ---
   http.get("*/api/containers", ({ request }) => {
