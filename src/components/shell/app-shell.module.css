@@ -6,7 +6,7 @@
 .brandMark { display: grid; place-items: center; flex: 0 0 32px; }
 .brandMark svg { width: 28px; height: 28px; }
 .brandText { font-size: 14px; }
-.moduleNav { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--space-6); overflow-y: auto; scrollbar-color: color-mix(in srgb, var(--color-on-institutional) 38%, transparent) transparent; }
+.moduleNav { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--space-6); overflow: visible; }
 .catalogNavigationSlot { width: 100%; }
 .catalogNavigationSlot > * { width: 100%; }
 .navigationButton, .mobileNavigationButton, .sheetNavigationButton { justify-content: flex-start; width: 100%; }

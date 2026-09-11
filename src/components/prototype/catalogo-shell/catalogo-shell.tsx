@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Boxes,
   CalendarClock,
-  Check,
   ChevronDown,
   ChevronRight,
   MapPin,
@@ -246,7 +245,6 @@ export function CatalogSidebarDropdown() {
         </CollapsibleTrigger>
       </div>
       <CollapsibleContent className={styles.catalogSubmenu} data-catalog-submenu>
-        <div className={styles.catalogSubmenuLabel}>Recursos del catálogo</div>
         <div role="menu" aria-label="Recursos del catálogo">
           {catalogCategories.map(({ slug, label, icon: Icon }) => {
             const selected = slug === activeCategory;
@@ -261,7 +259,6 @@ export function CatalogSidebarDropdown() {
               >
                 <Icon aria-hidden />
                 <span>{label}</span>
-                {selected ? <Check className={styles.dropdownCheck} aria-hidden /> : null}
               </button>
             );
           })}
