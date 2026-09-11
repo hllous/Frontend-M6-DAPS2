@@ -12,6 +12,8 @@ export const greenSpaceSchema = z.object({
   spaceType: greenSpaceTypeSchema,
   areaM2: z.number(),
   zoneId: z.string(),
+  lat: z.number().nullable(),
+  lng: z.number().nullable(),
   active: z.boolean(),
 });
 export type GreenSpace = z.infer<typeof greenSpaceSchema>;
@@ -36,6 +38,8 @@ export const createGreenSpaceInputSchema = z.object({
   spaceType: greenSpaceTypeSchema,
   areaM2: z.number().positive("La superficie debe ser mayor que cero."),
   zoneId: z.string().trim().min(1, "La zona es obligatoria."),
+  lat: z.number().finite().optional(),
+  lng: z.number().finite().optional(),
 });
 export type CreateGreenSpaceInput = z.infer<typeof createGreenSpaceInputSchema>;
 

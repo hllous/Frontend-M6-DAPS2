@@ -10,7 +10,7 @@ import type { Tree } from "@/lib/trees";
 import { TreeSurveyPanel } from "./tree-survey-panel";
 
 const server = setupServer(...handlers);
-const tree: Tree = { id: "tree-2", surveyCode: "ARB-00443", zoneId: "zone-2", species: "Tipa", address: "Parque del Bicentenario, sector norte", lat: -34.5692, lng: -58.4051, heightM: 18, diameterCm: 72.5, active: true };
+const tree: Tree = { id: "tree-2", surveyCode: "ARB-00443", zoneId: "zone-2", species: "Tipa", address: "Parque del Bicentenario, sector norte", lat: -34.5692, lng: -58.4051, heightM: 18, diameterCm: 72.5, active: true, lastSurvey: null };
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => resetTreeSurveyFixtures());

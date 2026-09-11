@@ -39,8 +39,8 @@ describe("treeInterventionsAdapter", () => {
     const detail = {
       ...intervention,
       trees: [
-        { id: "tree-2", surveyCode: "ARB-00443", zoneId: "zone-2", species: "Tipa", address: "Parque del Bicentenario, sector norte", lat: -34.5692, lng: -58.4051, heightM: 18, diameterCm: 72.5, active: true },
-        { id: "tree-4", surveyCode: "ARB-00445", zoneId: "zone-1", species: "Ceibo", address: "Paseo de la Costa 220", lat: -34.58, lng: -58.39, heightM: 10.5, diameterCm: 44, active: true },
+        { id: "tree-2", surveyCode: "ARB-00443", zoneId: "zone-2", species: "Tipa", address: "Parque del Bicentenario, sector norte", lat: -34.5692, lng: -58.4051, heightM: 18, diameterCm: 72.5, active: true, lastSurvey: { surveyedAt: "2026-08-18T10:30:00.000Z", healthStatus: "HEALTHY", riskLevel: "LOW", riskType: null, suggestedIntervention: null } },
+        { id: "tree-4", surveyCode: "ARB-00445", zoneId: "zone-1", species: "Ceibo", address: "Paseo de la Costa 220", lat: -34.58, lng: -58.39, heightM: 10.5, diameterCm: 44, active: true, lastSurvey: null },
       ],
     };
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(intervention), { status: 201 }));

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
+import { updateTreeFixture } from "@/lib/tree-fixtures";
 import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures, paginateTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { treeHealthStatusSchema, treeSurveyCreateInputSchema, riskLevelSchema, type TreeSurveyQuery } from "@/lib/tree-surveys";
 import { getScenario } from "@/lib/scenarios";
@@ -44,6 +45,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
     const created = createTreeSurveyFixture(id, parsed.data, session.scenarioId);
     addTreeSurveyFixture(created);
+    updateTreeFixture(id, {
+      lastSurvey: {
+        surveyedAt: created.surveyedAt,
+        healthStatus: created.healthStatus,
+        riskLevel: created.riskLevel,
+        riskType: created.riskType,
+        suggestedIntervention: created.suggestedIntervention,
+      },
+    });
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);

@@ -1,10 +1,10 @@
 import type { GreenSpace, GreenSpaceQuery } from "./green-spaces";
 
 export const greenSpaceFixtures: GreenSpace[] = [
-  { id: "green-space-108-1", name: "Parque del Bicentenario", spaceType: "PARK", areaM2: 18500, zoneId: "zone-1", active: true },
-  { id: "green-space-108-2", name: "Rambla Costera", spaceType: "PROMENADE", areaM2: 920, zoneId: "zone-2", active: true },
-  { id: "green-space-108-3", name: "Plaza de las Artes", spaceType: "SQUARE", areaM2: 3600, zoneId: "zone-1", active: false },
-  { id: "green-space-108-4", name: "Cantero Central", spaceType: "PLANTER", areaM2: 180, zoneId: "zone-2", active: true },
+  { id: "green-space-108-1", name: "Parque del Bicentenario", spaceType: "PARK", areaM2: 18500, zoneId: "zone-1", lat: -34.5692, lng: -58.4051, active: true },
+  { id: "green-space-108-2", name: "Rambla Costera", spaceType: "PROMENADE", areaM2: 920, zoneId: "zone-2", lat: -34.5768, lng: -58.3974, active: true },
+  { id: "green-space-108-3", name: "Plaza de las Artes", spaceType: "SQUARE", areaM2: 3600, zoneId: "zone-1", lat: -34.5844, lng: -58.4123, active: false },
+  { id: "green-space-108-4", name: "Cantero Central", spaceType: "PLANTER", areaM2: 180, zoneId: "zone-2", lat: null, lng: null, active: true },
 ];
 
 export function filterGreenSpaceFixtures(query: GreenSpaceQuery): GreenSpace[] {

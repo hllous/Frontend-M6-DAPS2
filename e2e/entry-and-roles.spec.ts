@@ -21,7 +21,7 @@ test.describe("Office and Field mock entry and navigation @smoke", () => {
     await expect(page.getByRole("button", { name: "Iniciar servicio" }).first()).toBeVisible();
 
     await page.getByRole("button", { name: "Mapa" }).click();
-    await expect(page.getByText("Este destino estará disponible")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mapa operativo" })).toBeVisible();
   });
 });
 

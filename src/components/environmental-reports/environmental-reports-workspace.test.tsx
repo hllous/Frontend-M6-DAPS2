@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
@@ -14,7 +14,7 @@ import { EnvironmentalReportsWorkspace } from "./environmental-reports-workspace
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); resetRepairRequestFixtures(); resetServiceFixtures(); window.localStorage.clear(); window.history.replaceState(null, "", "/app?destination=environment"); });
+afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); resetRepairRequestFixtures(); resetServiceFixtures(); window.localStorage.clear(); window.history.replaceState(null, "", "/app?destination=environment"); vi.useRealTimers(); });
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
@@ -60,6 +60,8 @@ describe("EnvironmentalReportsWorkspace", () => {
   });
 
   it("shows the active M4 deadline as a waiting state without an automatic-close CTA", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-10T10:00:00.000Z"));
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });

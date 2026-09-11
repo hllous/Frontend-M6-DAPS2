@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { setupServer } from "msw/node";
 
@@ -49,5 +50,15 @@ describe("AppShell", () => {
     const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
     expect(within(moduleNavigation).queryByRole("button", { name: "Inventario" })).not.toBeInTheDocument();
     expect(within(moduleNavigation).getByRole("button", { name: "Servicios" })).toBeVisible();
+  });
+
+  it("opens the operational map from the map destination", async () => {
+    const user = userEvent.setup();
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+
+    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    await user.click(within(moduleNavigation).getByRole("button", { name: "Mapa" }));
+
+    expect(await screen.findByRole("heading", { name: "Mapa operativo" })).toBeVisible();
   });
 });

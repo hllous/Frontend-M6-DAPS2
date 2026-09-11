@@ -10,6 +10,7 @@ afterEach(() => {
   delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 async function authenticatedCookie(scenarioId: string) {
@@ -32,6 +33,8 @@ describe("/api/service-frequencies/:id", () => {
   });
 
   it("closes a future rule at validFrom and leaves its service records untouched", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-10T12:00:00.000Z"));
     const cookie = await authenticatedCookie("office-duty-queue");
     const servicesBefore = serviceFrequencyFixtures.map((frequency) => frequency.id);
     const response = await DELETE(new Request("http://localhost/api/service-frequencies/freq-2", { method: "DELETE", headers: { cookie } }), { params: Promise.resolve({ id: "freq-2" }) });

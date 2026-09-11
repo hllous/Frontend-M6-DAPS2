@@ -17,6 +17,7 @@ import {
   Sprout,
 } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useState, type ComponentType } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,11 @@ import { ZonesPanel } from "./zones-panel";
 import { IndicatorsDashboard } from "@/components/indicators/indicators-dashboard";
 import { EnvironmentalReportsWorkspace } from "@/components/environmental-reports/environmental-reports-workspace";
 import { treeInterventionsAdapter, type TreeIntervention } from "@/lib/tree-interventions";
+
+const MapaOperativo = dynamic(
+  () => import("@/components/map/mapa-operativo").then((module) => module.MapaOperativo),
+  { ssr: false },
+);
 
 type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
 type LogoutAction = (formData: FormData) => void | Promise<void>;
@@ -175,6 +181,8 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
           <IndicatorsDashboard scenario={scenario} />
         ) : destination === "environment" ? (
           <EnvironmentalReportsWorkspace scenario={scenario} />
+        ) : destination === "map" ? (
+          <MapaOperativo scenario={scenario} />
         ) : (
           <FoundationPlaceholder
             item={navigation.find((item) => item.id === destination)!}

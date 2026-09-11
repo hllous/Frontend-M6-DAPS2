@@ -2,6 +2,20 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import {
+  riskLevelSchema,
+  riskTypeSchema,
+  treeHealthStatusSchema,
+  treeInterventionTypeSchema,
+} from "./tree-surveys";
+
+export const treeLastSurveySchema = z.object({
+  surveyedAt: z.string(),
+  healthStatus: treeHealthStatusSchema,
+  riskLevel: riskLevelSchema,
+  riskType: riskTypeSchema.nullable(),
+  suggestedIntervention: treeInterventionTypeSchema.nullable(),
+});
 
 export const treeSchema = z.object({
   id: z.string(),
@@ -14,6 +28,7 @@ export const treeSchema = z.object({
   heightM: z.number(),
   diameterCm: z.number(),
   active: z.boolean(),
+  lastSurvey: treeLastSurveySchema.nullable().default(null),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });

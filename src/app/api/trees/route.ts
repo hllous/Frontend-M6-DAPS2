@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
     }
     if (treeFixtures.some((item) => item.surveyCode.toLowerCase() === parsed.data.surveyCode.toLowerCase())) return errorResponse(409, `Ya existe un árbol con el código de relevamiento '${parsed.data.surveyCode}'.`, path);
-    const created = { id: `tree-${Date.now()}`, ...parsed.data, address: parsed.data.address ?? null, lat: parsed.data.lat ?? null, lng: parsed.data.lng ?? null, active: parsed.data.active ?? true };
+    const created = { id: `tree-${Date.now()}`, ...parsed.data, address: parsed.data.address ?? null, lat: parsed.data.lat ?? null, lng: parsed.data.lng ?? null, active: parsed.data.active ?? true, lastSurvey: null };
     addTreeFixture(created);
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
