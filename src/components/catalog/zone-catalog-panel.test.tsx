@@ -27,9 +27,9 @@ describe("ZoneCatalogPanel component", () => {
 
     // Wait for fixtures to load
     await waitFor(() => {
-      expect(screen.getByText("Z-01")).toBeInTheDocument();
-      expect(screen.getByText("Zona Norte")).toBeInTheDocument();
-      expect(screen.getByText("Z-02")).toBeInTheDocument();
+      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
+      expect(screen.getByText("Z-PAL")).toBeInTheDocument();
     });
   });
 
@@ -38,15 +38,15 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Zona Norte")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
     });
 
     const searchInput = screen.getByLabelText("Buscar zonas operativas");
-    await user.type(searchInput, "Sur");
+    await user.type(searchInput, "Pal");
 
     await waitFor(() => {
-      expect(screen.queryByText("Zona Norte")).not.toBeInTheDocument();
-      expect(screen.getByText("Zona Sur")).toBeInTheDocument();
+      expect(screen.queryByText("Belgrano")).not.toBeInTheDocument();
+      expect(screen.getByText("Palermo")).toBeInTheDocument();
     });
   });
 
@@ -55,17 +55,17 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Zona Oeste")).toBeInTheDocument();
+      expect(screen.getByText("Recoleta")).toBeInTheDocument();
     });
 
     const statusFilter = screen.getByLabelText("Filtrar por estado");
     await user.selectOptions(statusFilter, "true");
 
     await waitFor(() => {
-      expect(screen.getByText("Zona Norte")).toBeInTheDocument();
-      expect(screen.getByText("Zona Sur")).toBeInTheDocument();
-      // Z-03 is inactive, should be filtered out
-      expect(screen.queryByText("Zona Oeste")).not.toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
+      expect(screen.getByText("Palermo")).toBeInTheDocument();
+      expect(screen.getByText("Recoleta")).toBeInTheDocument();
+      expect(screen.getByText("Retiro")).toBeInTheDocument();
     });
   });
 
@@ -74,7 +74,7 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-01")).toBeInTheDocument();
+      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
     });
 
     const newZoneButton = screen.getByRole("button", { name: /nueva zona/i });
@@ -102,7 +102,7 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-01")).toBeInTheDocument();
+      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: /nueva zona/i }));
@@ -110,13 +110,13 @@ describe("ZoneCatalogPanel component", () => {
     const codeInput = screen.getByLabelText("Código");
     const nameInput = screen.getByLabelText("Nombre");
 
-    await user.type(codeInput, "Z-01");
+    await user.type(codeInput, "Z-BEL");
     await user.type(nameInput, "Zona Duplicada");
 
     await user.click(screen.getByRole("button", { name: "Crear zona" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent("Ya existe una zona operativa con el código Z-01");
+      expect(screen.getByRole("alert")).toHaveTextContent("Ya existe una zona operativa con el código Z-BEL");
     });
   });
 
@@ -125,11 +125,11 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-01")).toBeInTheDocument();
+      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
     });
 
     // Find the row for Z-01 and click Editar
-    const row = screen.getByText("Z-01").closest("tr")!;
+    const row = screen.getByText("Z-BEL").closest("tr")!;
     const editButton = within(row).getByRole("button", { name: /editar/i });
     await user.click(editButton);
 
@@ -138,7 +138,7 @@ describe("ZoneCatalogPanel component", () => {
     const codeInput = screen.getByLabelText(/código/i);
     expect(codeInput).toHaveAttribute("readOnly");
     expect(codeInput).toHaveAttribute("aria-readonly", "true");
-    expect(codeInput).toHaveValue("Z-01");
+    expect(codeInput).toHaveValue("Z-BEL");
 
     const nameInput = screen.getByLabelText("Nombre");
     await user.clear(nameInput);
@@ -156,11 +156,11 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-01")).toBeInTheDocument();
+      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
     });
 
     // Click Dar de baja on Z-01 (which has active routes, containers, trees, green spaces)
-    const row = screen.getByText("Z-01").closest("tr")!;
+    const row = screen.getByText("Z-BEL").closest("tr")!;
     const deleteButton = within(row).getByRole("button", { name: /dar de baja/i });
     await user.click(deleteButton);
 
@@ -181,7 +181,7 @@ describe("ZoneCatalogPanel component", () => {
     // Dialog should close and zone status becomes Inactiva
     await waitFor(() => {
       expect(screen.queryByRole("heading", { name: "Confirmar baja de zona operativa" })).not.toBeInTheDocument();
-      const updatedRow = screen.getByText("Z-01").closest("tr")!;
+      const updatedRow = screen.getByText("Z-BEL").closest("tr")!;
       expect(within(updatedRow).getByText("Inactiva")).toBeInTheDocument();
     });
   });
@@ -191,10 +191,10 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-01")).toBeInTheDocument();
+      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
     });
 
-    const row = screen.getByText("Z-01").closest("tr")!;
+    const row = screen.getByText("Z-BEL").closest("tr")!;
     await user.click(within(row).getByRole("button", { name: /gestionar barrios/i }));
 
     const dialog = await screen.findByRole("dialog");
@@ -222,7 +222,7 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.fieldCrewMember} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-01")).toBeInTheDocument();
+      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
     });
 
     // "Nueva zona" should not exist

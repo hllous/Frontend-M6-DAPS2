@@ -1,9 +1,10 @@
 import type { Zone, ZoneQuery, ZoneReferenceReport } from "./zones";
 
 const INITIAL_ZONE_FIXTURES: Zone[] = [
-  { id: "zone-1", code: "Z-01", name: "Zona Norte", active: true, neighborhoodIds: ["barrio-1", "barrio-2"] },
-  { id: "zone-2", code: "Z-02", name: "Zona Sur", active: true, neighborhoodIds: ["barrio-3"] },
-  { id: "zone-3", code: "Z-03", name: "Zona Oeste", active: false, neighborhoodIds: [] },
+  { id: "zone-1", code: "Z-BEL", name: "Belgrano", active: true, neighborhoodIds: ["barrio-1", "barrio-2"] },
+  { id: "zone-2", code: "Z-PAL", name: "Palermo", active: true, neighborhoodIds: ["barrio-3"] },
+  { id: "zone-3", code: "Z-REC", name: "Recoleta", active: true, neighborhoodIds: [] },
+  { id: "zone-4", code: "Z-RET", name: "Retiro", active: true, neighborhoodIds: [] },
 ];
 
 export let zoneFixtures: Zone[] = INITIAL_ZONE_FIXTURES.map((item) => ({ ...item }));

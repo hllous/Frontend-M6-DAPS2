@@ -28,7 +28,7 @@ describe("ZonesPanel", () => {
     render(<ZonesPanel />);
 
     expect(await screen.findByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    expect(screen.getByText(/Z-01/)).toBeVisible();
+    expect(screen.getByText(/Z-BEL/)).toBeVisible();
   });
 
   it("renders an empty state when the adapter returns no zones", async () => {
@@ -60,7 +60,7 @@ describe("ZonesPanel", () => {
     render(<ZonesPanel />);
 
     expect(await screen.findByText("Inicie sesión para continuar")).toBeVisible();
-    expect(screen.queryByText(/Z-01/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Z-BEL/)).not.toBeInTheDocument();
   });
 
   it("renders the forbidden state on a 403 without offering a retry", async () => {

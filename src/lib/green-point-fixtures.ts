@@ -1,9 +1,9 @@
 import type { GreenPoint, GreenPointQuery } from "./green-points";
 
 const INITIAL_GREEN_POINTS: GreenPoint[] = [
-  { id: "green-point-1", code: "GP-001", name: "Punto verde Plaza Mitre", zoneId: "zone-1", wasteTypes: ["RECYCLABLE", "GREEN"], address: "Av. Mitre 1200", lat: -34.6037, lng: -58.3816, active: true },
+  { id: "green-point-1", code: "GP-001", name: "Punto verde Plaza Mitre", zoneId: "zone-1", wasteTypes: ["RECYCLABLE", "GREEN"], address: "Av. Cabildo 2100", lat: -34.5621, lng: -58.4561, active: true },
   { id: "green-point-2", code: "GP-002", name: "Punto verde Parque del Bicentenario", zoneId: "zone-2", wasteTypes: ["HOUSEHOLD", "RECYCLABLE", "BULKY"], address: "Av. Figueroa Alcorta 5000", lat: -34.5691, lng: -58.4053, active: true },
-  { id: "green-point-3", code: "GP-003", name: "Punto verde Estación Sur", zoneId: "zone-2", wasteTypes: ["RECYCLABLE", "MIXED"], address: "Av. Brasil 1800", lat: -34.6366, lng: -58.3781, active: false },
+  { id: "green-point-3", code: "GP-003", name: "Punto verde Estación Sur", zoneId: "zone-3", wasteTypes: ["RECYCLABLE", "MIXED"], address: "Av. Pueyrredón 1800", lat: -34.5881, lng: -58.3971, active: false },
 ];
 
 export const greenPointFixtures: GreenPoint[] = structuredClone(INITIAL_GREEN_POINTS);

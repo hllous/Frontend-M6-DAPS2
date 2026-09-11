@@ -265,7 +265,7 @@ describe("RouteCatalogPanel component", () => {
 
       // First stop is added
       expect(screen.getByTestId("stop-item-0")).toBeInTheDocument();
-      expect(screen.getByText("Zona Norte")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
 
       // Select zone-2 and add
       await user.selectOptions(zoneSelect, "zone-2");
@@ -275,7 +275,7 @@ describe("RouteCatalogPanel component", () => {
 
       // Second stop is added
       expect(screen.getByTestId("stop-item-1")).toBeInTheDocument();
-      expect(screen.getByText("Zona Sur")).toBeInTheDocument();
+      expect(screen.getByText("Palermo")).toBeInTheDocument();
 
       // Click "Guardar secuencia" (single atomic PUT)
       await user.click(screen.getByTestId("save-sequence-button"));
@@ -287,8 +287,8 @@ describe("RouteCatalogPanel component", () => {
       });
 
       const stopsList = screen.getByTestId("stops-list");
-      expect(within(stopsList).getByText("Zona Norte")).toBeInTheDocument();
-      expect(within(stopsList).getByText("Zona Sur")).toBeInTheDocument();
+      expect(within(stopsList).getByText("Belgrano")).toBeInTheDocument();
+      expect(within(stopsList).getByText("Palermo")).toBeInTheDocument();
       expect(within(stopsList).getByText("45 min")).toBeInTheDocument();
       expect(within(stopsList).getByText("60 min")).toBeInTheDocument();
     });
@@ -339,14 +339,14 @@ describe("RouteCatalogPanel component", () => {
 
       // Initially stop 0 is Zona Norte, stop 1 is Zona Sur
       const stop0 = screen.getByTestId("stop-item-0");
-      expect(within(stop0).getByText("Zona Norte")).toBeInTheDocument();
+      expect(within(stop0).getByText("Belgrano")).toBeInTheDocument();
 
       // Move stop 0 down
       await user.click(screen.getByTestId("stop-move-down-0"));
 
       // Now stop 0 is Zona Sur, stop 1 is Zona Norte
       const newStop0 = screen.getByTestId("stop-item-0");
-      expect(within(newStop0).getByText("Zona Sur")).toBeInTheDocument();
+      expect(within(newStop0).getByText("Palermo")).toBeInTheDocument();
 
       // Remove stop 1 (Zona Norte)
       await user.click(screen.getByTestId("stop-remove-1"));
@@ -363,8 +363,8 @@ describe("RouteCatalogPanel component", () => {
       });
 
       const stopsList = screen.getByTestId("stops-list");
-      expect(within(stopsList).getByText("Zona Sur")).toBeInTheDocument();
-      expect(within(stopsList).queryByText("Zona Norte")).not.toBeInTheDocument();
+      expect(within(stopsList).getByText("Palermo")).toBeInTheDocument();
+      expect(within(stopsList).queryByText("Belgrano")).not.toBeInTheDocument();
     });
 
     it("allows saving an empty stop sequence", async () => {
