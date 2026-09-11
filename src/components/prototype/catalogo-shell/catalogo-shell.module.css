@@ -1,0 +1,211 @@
+.destinationView,
+.routeView {
+  min-width: 0;
+}
+
+.destinationView {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.destinationNav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding-bottom: var(--space-14);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.destinationNavTitle,
+.routeNavTitle {
+  color: var(--color-text);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.destinationTabs {
+  display: flex;
+  gap: var(--space-8);
+  overflow-x: auto;
+  padding: 2px 2px var(--space-4);
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+.destinationTab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.categoryPanel {
+  min-width: 0;
+}
+
+.routeView {
+  display: grid;
+  grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-24);
+}
+
+.routeNav {
+  position: sticky;
+  top: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-14);
+  padding: var(--space-14);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.routeList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.routeLink {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 40px;
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.routeLink svg {
+  width: 18px;
+  height: 18px;
+}
+
+.routeLink:hover,
+.routeLink:focus-visible {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.routeLinkActive {
+  border-color: var(--color-action);
+  color: var(--color-on-institutional);
+  background: var(--color-action);
+}
+
+.routeLinkActive:hover,
+.routeLinkActive:focus-visible {
+  border-color: var(--color-action);
+  color: var(--color-on-institutional);
+  background: var(--color-action);
+}
+
+.switcher {
+  position: fixed;
+  z-index: 40;
+  right: 50%;
+  bottom: var(--space-16);
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 48px;
+  padding: var(--space-4);
+  transform: translateX(50%);
+  border: 1px solid var(--color-on-institutional-secondary);
+  border-radius: 16px;
+  background: var(--color-institutional);
+  color: var(--color-on-institutional);
+}
+
+.switcherButton {
+  color: var(--color-on-institutional);
+}
+
+.switcherButton:hover {
+  color: var(--color-on-institutional);
+  background: color-mix(in srgb, var(--color-on-institutional) 14%, transparent);
+}
+
+.switcherLabel {
+  min-width: 148px;
+  color: var(--color-on-institutional);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.prototypeLoading {
+  padding: var(--space-32);
+}
+
+@media (max-width: 1023px) {
+  .routeView {
+    grid-template-columns: minmax(170px, 200px) minmax(0, 1fr);
+    gap: var(--space-16);
+  }
+}
+
+@media (max-width: 760px) {
+  .destinationView {
+    gap: var(--space-16);
+  }
+
+  .destinationNavTitle,
+  .routeNavTitle {
+    font-size: 19px;
+  }
+
+  .destinationTab {
+    min-height: 48px;
+  }
+
+  .routeView {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-16);
+  }
+
+  .routeNav {
+    position: static;
+    width: 100%;
+  }
+
+  .routeList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .routeLink {
+    min-height: 48px;
+  }
+
+  .switcher {
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    max-width: calc(100vw - var(--space-32));
+  }
+
+  .switcherLabel {
+    min-width: 116px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switcher,
+  .destinationTabs,
+  .routeLink {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}

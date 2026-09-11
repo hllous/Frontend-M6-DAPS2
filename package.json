@@ -22,6 +22,7 @@
     "prototype:motion": "node src/app/prototype/motion/server.mjs",
     "prototype:ux-writing": "node src/app/prototype/ux-writing/server.mjs",
     "prototype:do-dont": "node src/app/prototype/do-dont/server.mjs",
+    "prototype:catalogo-shell": "next dev --port 4315",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

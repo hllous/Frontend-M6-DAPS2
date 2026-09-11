@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -94,7 +94,17 @@ function actorLabel(scenario: OperationalScenario) {
     : "Integrante de cuadrilla";
 }
 
-export function AppShell({ scenario, logoutAction }: { scenario: OperationalScenario; logoutAction?: LogoutAction }) {
+export function AppShell({
+  scenario,
+  logoutAction,
+  catalogContent,
+  initialDestination = "work",
+}: {
+  scenario: OperationalScenario;
+  logoutAction?: LogoutAction;
+  catalogContent?: ReactNode;
+  initialDestination?: Destination;
+}) {
   const [destination, setDestination] = useState<Destination>(() => {
     if (typeof window !== "undefined") {
       const urlDest = new URLSearchParams(window.location.search).get("destination") as Destination | null;
@@ -102,7 +112,7 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
         return urlDest;
       }
     }
-    return "work";
+    return initialDestination;
   });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const availableItems = navigation.filter((item) => isAllowed(item, scenario));
@@ -173,10 +183,12 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
         ) : destination === "referrals" ? (
           <ReferralsWorkspace scenario={scenario} />
         ) : destination === "catalog" ? (
-          <div className="flex flex-col gap-8">
-            <CatalogLanding scenario={scenario} />
-            <ZonesPanel />
-          </div>
+          catalogContent ?? (
+            <div className="flex flex-col gap-8">
+              <CatalogLanding scenario={scenario} />
+              <ZonesPanel />
+            </div>
+          )
         ) : destination === "dashboards" ? (
           <IndicatorsDashboard scenario={scenario} />
         ) : destination === "environment" ? (
