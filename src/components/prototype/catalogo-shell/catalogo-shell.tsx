@@ -5,6 +5,8 @@ import {
   ArrowRight,
   Boxes,
   CalendarClock,
+  Check,
+  ChevronDown,
   MapPin,
   Recycle,
   Route as RouteIcon,
@@ -32,6 +34,16 @@ import { TreeInterventionsPanel } from "@/components/catalog/tree-interventions-
 import { VehicleCatalogPanel } from "@/components/catalog/vehicle-catalog-panel";
 import { ZoneCatalogPanel } from "@/components/catalog/zone-catalog-panel";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuPositioner,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AppShell } from "@/components/shell/app-shell";
 import { ShellLoading } from "@/components/shell/shell-states";
 import { ensureMockWorkerStarted } from "@/mocks/ensure-worker-started";
@@ -138,6 +150,93 @@ export function DestinationCatalogPrototype({
   );
 }
 
+export function DropdownCatalogPrototype({
+  scenario,
+  initialCategory,
+}: {
+  scenario: OperationalScenario;
+  initialCategory: CatalogCategorySlug;
+}) {
+  const [activeCategory, setActiveCategory] = useState(initialCategory);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("variant", "C");
+    url.searchParams.set("destination", "catalog");
+    url.searchParams.set("category", initialCategory);
+    window.history.replaceState(window.history.state, "", url);
+  }, [initialCategory]);
+
+  const selectCategory = (category: CatalogCategorySlug) => {
+    setActiveCategory(category);
+    const url = new URL(window.location.href);
+    url.searchParams.set("variant", "C");
+    url.searchParams.set("destination", "catalog");
+    url.searchParams.set("category", category);
+    window.history.replaceState(window.history.state, "", url);
+  };
+
+  const activeOption = catalogCategories.find(({ slug }) => slug === activeCategory) ?? catalogCategories[0];
+  const ActiveIcon = activeOption.icon;
+
+  return (
+    <div className={styles.dropdownView}>
+      <nav className={styles.dropdownNav} aria-label="Categorías del catálogo">
+        <div>
+          <div className={styles.destinationNavTitle}>Catálogo</div>
+          <p className={styles.dropdownDescription}>Seleccione el recurso que desea administrar.</p>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className={styles.dropdownTrigger}
+                aria-label={`Categoría seleccionada: ${activeOption.label}`}
+              />
+            }
+          >
+            <span className={styles.dropdownTriggerLabel}>
+              <ActiveIcon data-icon="inline-start" aria-hidden />
+              {activeOption.label}
+            </span>
+            <ChevronDown data-icon="inline-end" aria-hidden />
+          </DropdownMenuTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuPositioner side="bottom" align="start" sideOffset={8}>
+              <DropdownMenuContent className={styles.dropdownContent}>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Recursos del catálogo</DropdownMenuLabel>
+                  {catalogCategories.map(({ slug, label, icon: Icon }) => {
+                    const selected = slug === activeCategory;
+                    return (
+                      <DropdownMenuItem
+                        key={slug}
+                        className={styles.dropdownItem}
+                        aria-current={selected ? "page" : undefined}
+                        onClick={() => selectCategory(slug)}
+                      >
+                        <Icon data-icon="inline-start" aria-hidden />
+                        <span>{label}</span>
+                        {selected ? <Check className={styles.dropdownCheck} aria-hidden /> : null}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenuPositioner>
+          </DropdownMenuPortal>
+        </DropdownMenu>
+      </nav>
+      <div key={activeCategory} className={styles.categoryPanel}>
+        <CatalogCategoryPanel scenario={scenario} category={activeCategory} />
+      </div>
+    </div>
+  );
+}
+
 export function NestedCatalogPrototype({
   scenario,
   category,
@@ -187,18 +286,21 @@ export function CatalogoPrototypeSwitcher({
   const activeCategory = category ?? (isCatalogCategorySlug(pathCategory) ? pathCategory : "zones");
 
   const move = useCallback((delta: number) => {
-    const nextVariant: PrototypeVariant = variant === "A" ? "B" : "A";
-    if (delta === 0) return;
+    const variants: PrototypeVariant[] = ["A", "B", "C"];
+    const currentIndex = variants.indexOf(variant);
+    const nextVariant = variants[(currentIndex + delta + variants.length) % variants.length];
+    const urlCategory = new URL(window.location.href).searchParams.get("category") ?? undefined;
+    const currentCategory = isCatalogCategorySlug(urlCategory) ? urlCategory : activeCategory;
 
-    if (nextVariant === "A") {
+    if (nextVariant === "A" || nextVariant === "C") {
       router.push(
-        `/prototype/catalogo-shell?variant=A&destination=catalog&category=${activeCategory}`,
+        `/prototype/catalogo-shell?variant=${nextVariant}&destination=catalog&category=${currentCategory}`,
         { scroll: false },
       );
       return;
     }
 
-    router.push(`/prototype/catalogo-shell/routes/${activeCategory}?variant=B`, { scroll: false });
+    router.push(`/prototype/catalogo-shell/routes/${currentCategory}?variant=B`, { scroll: false });
   }, [activeCategory, router, variant]);
 
   useEffect(() => {
@@ -216,7 +318,7 @@ export function CatalogoPrototypeSwitcher({
 
   if (process.env.NODE_ENV === "production") return null;
 
-  const label = variant === "A" ? "A · Destino interno" : "B · Rutas anidadas";
+  const label = variant === "A" ? "A · Destino interno" : variant === "B" ? "B · Rutas anidadas" : "C · Dropdown en Catálogo";
 
   return (
     <div className={styles.switcher} aria-label="Selector de variantes del prototipo">
