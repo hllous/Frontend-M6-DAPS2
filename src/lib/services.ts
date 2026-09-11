@@ -52,6 +52,34 @@ export const attachmentSchema = z.object({
 });
 export type Attachment = z.infer<typeof attachmentSchema>;
 
+export const zoneResultStatusSchema = z.enum(["SERVICED", "PARTIAL", "NOT_SERVICED"]);
+export type ZoneResultStatus = z.infer<typeof zoneResultStatusSchema>;
+
+export const notServicedReasonSchema = z.enum([
+  "VEHICLE_BREAKDOWN",
+  "CREW_UNAVAILABLE",
+  "BLOCKED_ACCESS",
+  "STREET_CLOSURE",
+  "WEATHER",
+  "EXCESS_VOLUME",
+  "SECURITY_INCIDENT",
+  "OTHER",
+]);
+export type NotServicedReason = z.infer<typeof notServicedReasonSchema>;
+
+export const zoneResultSchema = z.object({
+  id: z.string(),
+  serviceId: z.string(),
+  zoneId: z.string(),
+  status: zoneResultStatusSchema,
+  reason: notServicedReasonSchema.nullable().optional(),
+  notes: z.string().nullable().optional(),
+  proposedDate: z.string().nullable().optional(),
+  attachments: z.array(attachmentSchema).optional().default([]),
+  recordedAt: z.string(),
+});
+export type ZoneResult = z.infer<typeof zoneResultSchema>;
+
 export const serviceSchema = z.object({
   id: z.string(),
   serviceTypeId: z.string(),
@@ -63,6 +91,7 @@ export const serviceSchema = z.object({
   origin: serviceOriginSchema,
   zoneIds: z.array(z.string()).min(1),
   zoneNames: z.array(z.string()).optional().default([]),
+  zoneResults: z.array(zoneResultSchema).optional(),
   routeId: z.string().nullable().optional(),
   routeName: z.string().nullable().optional(),
   targetType: z.string().nullable().optional(),
@@ -227,21 +256,6 @@ export const assignCrewInputSchema = z.object({
 
 export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
 
-export const zoneResultStatusSchema = z.enum(["SERVICED", "PARTIAL", "NOT_SERVICED"]);
-export type ZoneResultStatus = z.infer<typeof zoneResultStatusSchema>;
-
-export const notServicedReasonSchema = z.enum([
-  "VEHICLE_BREAKDOWN",
-  "CREW_UNAVAILABLE",
-  "BLOCKED_ACCESS",
-  "STREET_CLOSURE",
-  "WEATHER",
-  "EXCESS_VOLUME",
-  "SECURITY_INCIDENT",
-  "OTHER",
-]);
-export type NotServicedReason = z.infer<typeof notServicedReasonSchema>;
-
 export const suspendServiceInputSchema = z.object({
   reason: notServicedReasonSchema,
   note: z.string().min(1, "La nota es obligatoria para suspender el servicio"),
@@ -268,19 +282,6 @@ export const confirmRescheduleInputSchema = z.object({
   }),
 });
 export type ConfirmRescheduleInput = z.infer<typeof confirmRescheduleInputSchema>;
-
-export const zoneResultSchema = z.object({
-  id: z.string(),
-  serviceId: z.string(),
-  zoneId: z.string(),
-  status: zoneResultStatusSchema,
-  reason: notServicedReasonSchema.nullable().optional(),
-  notes: z.string().nullable().optional(),
-  proposedDate: z.string().nullable().optional(),
-  attachments: z.array(attachmentSchema).optional().default([]),
-  recordedAt: z.string(),
-});
-export type ZoneResult = z.infer<typeof zoneResultSchema>;
 
 export const recordZoneResultInputSchema = z
   .object({

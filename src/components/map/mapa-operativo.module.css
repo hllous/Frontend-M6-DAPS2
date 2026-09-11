@@ -26,6 +26,21 @@
   color: var(--color-text-secondary);
 }
 
+.viewSwitcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.viewTab {
+  min-height: 40px;
+  flex: 1 1 140px;
+}
+
 .layout,
 .loading {
   display: grid;
@@ -50,6 +65,7 @@
 
 .mapToolbar {
   display: flex;
+  flex-wrap: wrap;
   min-height: 52px;
   align-items: center;
   justify-content: space-between;
@@ -89,6 +105,274 @@
   display: flex;
   min-height: 0;
   flex-direction: column;
+}
+
+.viewPanel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-16);
+  overflow-y: auto;
+  padding: var(--space-14);
+}
+
+.panelIntro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.panelTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.panelTitleRow svg {
+  width: 20px;
+  color: var(--color-action);
+}
+
+.panelTitleRow h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.panelIntro p,
+.mapHint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.zoneList,
+.routeStopList,
+.todayZoneList,
+.todayServiceList ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zoneButton,
+.routeStopButton {
+  display: grid;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-10);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: var(--space-10);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+}
+
+.zoneButton {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.zoneButton:hover,
+.routeStopButton:hover {
+  background: var(--color-surface-subtle);
+}
+
+.zoneButton:focus-visible,
+.routeStopButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.selected {
+  border-color: var(--color-accent);
+  background: var(--color-info-fill);
+}
+
+.zoneButton > span:last-child,
+.routeStopCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.zoneButton strong,
+.routeStopButton strong,
+.routeSummary strong,
+.todayZoneList strong,
+.todayServiceList strong {
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.zoneButton small,
+.routeStopCopy small,
+.routeSummary span,
+.todayZoneList small,
+.todayServiceList small,
+.todayServiceList span {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.zoneSwatch,
+.todayStatus {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  background: var(--color-info-fill);
+}
+
+.zbel { background: var(--color-info-fill); border-color: var(--color-info); }
+.zpal { background: var(--color-success-fill); border-color: var(--color-success); }
+.zrec { background: var(--color-warning-fill); border-color: var(--color-warning); }
+.zret { background: var(--color-danger-fill); border-color: var(--color-danger); }
+
+.mapHint {
+  margin-top: auto;
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--color-border);
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.fieldGroup label {
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.routeSelect {
+  min-height: 40px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  padding: 0 var(--space-10);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.routeSelect:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.routeSummary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-10);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.routeStopButton {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.sequenceBadge {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-action);
+  color: var(--color-on-institutional);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.duration {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.todaySummary {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.todayZoneList li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-10) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.todayStatus {
+  border-radius: 50%;
+}
+
+.todayZoneList li > span:nth-child(2),
+.todayServiceList li {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.statusLabel {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: var(--space-4) var(--space-6);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pending { color: var(--color-info); background: var(--color-info-fill); border-color: var(--color-info-line); }
+.serviced { color: var(--color-success); background: var(--color-success-fill); border-color: var(--color-success-line); }
+.partial { color: var(--color-warning); background: var(--color-warning-fill); border-color: var(--color-warning-line); }
+.not_serviced { color: var(--color-danger); background: var(--color-danger-fill); border-color: var(--color-danger-line); }
+
+.todayServiceList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--color-border);
+}
+
+.todayServiceList h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.todayServiceList li {
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sideLoading {
+  display: flex;
+  min-height: 300px;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-14);
+}
+
+.sideLoading > div {
+  height: 48px;
 }
 
 .layers {
@@ -265,6 +549,8 @@
   .workspace { gap: var(--space-16); }
   .heading { flex-direction: column; }
   .heading button { min-height: 48px; width: 100%; }
+  .viewSwitcher { gap: var(--space-6); }
+  .viewTab { min-height: 48px; flex-basis: calc(50% - var(--space-6)); }
   .layout,
   .loading {
     min-height: 0;
@@ -273,6 +559,9 @@
   .mapPlaceholder { min-height: 54vh; }
   .sidePanel { max-height: 52vh; }
   .layerControl { min-height: 48px; }
+  .routeSelect { min-height: 48px; }
+  .routeStopButton,
+  .zoneButton { min-height: 48px; }
   .loadingMap,
   .loadingPanel { min-height: 360px; }
 }
