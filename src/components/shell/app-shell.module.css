@@ -12,7 +12,7 @@
 .navigationButton:hover { color: var(--color-on-institutional); background: color-mix(in srgb, var(--color-on-institutional) 14%, transparent); }
 .navigationButton[aria-current="page"] { color: var(--color-institutional); background: var(--color-surface); }
 .collapseButton { align-self: flex-end; color: var(--color-on-institutional); }
-.topbar { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: var(--space-16); min-height: 72px; padding: var(--space-14) var(--space-24); border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
+.topbar { position: sticky; top: 0; z-index: 20; grid-column: 2; display: flex; align-self: start; align-items: center; justify-content: space-between; gap: var(--space-16); min-height: 72px; padding: var(--space-14) var(--space-24); border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
 .contextLabel { margin: 0; color: var(--color-text-secondary); font-size: 12px; }
 .actorName { margin: var(--space-4) 0 0; font-size: 14px; font-weight: 700; }
 .sessionState { display: inline-flex; align-items: center; gap: var(--space-8); color: var(--color-text-secondary); font-size: 12px; }
