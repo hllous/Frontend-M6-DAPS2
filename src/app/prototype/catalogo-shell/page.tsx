@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import {
   CatalogoPrototypeApp,
   CatalogoPrototypeSwitcher,
+  CatalogCategoryProvider,
+  CatalogSidebarDropdown,
   DropdownCatalogPrototype,
   DestinationCatalogPrototype,
 } from "@/components/prototype/catalogo-shell/catalogo-shell";
@@ -44,15 +46,25 @@ export default async function CatalogoShellPrototypePage({
   const variant = rawVariant === "C" ? "C" : "A";
   const catalogContent =
     variant === "C" ? (
-      <DropdownCatalogPrototype scenario={scenario} initialCategory={category} />
+      <DropdownCatalogPrototype scenario={scenario} />
     ) : (
       <DestinationCatalogPrototype scenario={scenario} initialCategory={category} />
     );
 
-  return (
+  const prototype = (
     <>
-      <CatalogoPrototypeApp scenario={scenario} catalogContent={catalogContent} />
+      <CatalogoPrototypeApp
+        scenario={scenario}
+        catalogContent={catalogContent}
+        catalogNavigation={variant === "C" ? <CatalogSidebarDropdown /> : undefined}
+      />
       <CatalogoPrototypeSwitcher variant={variant} category={category} />
     </>
   );
+
+  return variant === "C" ? (
+    <CatalogCategoryProvider key={category} initialCategory={category}>
+      {prototype}
+    </CatalogCategoryProvider>
+  ) : prototype;
 }

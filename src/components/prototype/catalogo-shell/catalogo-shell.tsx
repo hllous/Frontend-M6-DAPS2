@@ -7,10 +7,12 @@ import {
   CalendarClock,
   Check,
   ChevronDown,
+  ChevronRight,
   MapPin,
   Recycle,
   Route as RouteIcon,
   Scissors,
+  Settings2,
   Trash2,
   Trees,
   Truck,
@@ -19,7 +21,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 import { ContainerCatalogPanel } from "@/components/catalog/container-catalog-panel";
 import { CrewCatalogPanel } from "@/components/catalog/crew-catalog-panel";
@@ -44,7 +46,7 @@ import {
   DropdownMenuPositioner,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AppShell } from "@/components/shell/app-shell";
+import { AppShell, useShellNavigation } from "@/components/shell/app-shell";
 import { ShellLoading } from "@/components/shell/shell-states";
 import { ensureMockWorkerStarted } from "@/mocks/ensure-worker-started";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -75,9 +77,11 @@ const catalogCategories = [
 export function CatalogoPrototypeApp({
   scenario,
   catalogContent,
+  catalogNavigation,
 }: {
   scenario: OperationalScenario;
   catalogContent: ReactNode;
+  catalogNavigation?: ReactNode;
 }) {
   const [workerReady, setWorkerReady] = useState(process.env.NODE_ENV !== "development");
 
@@ -88,7 +92,49 @@ export function CatalogoPrototypeApp({
 
   if (!workerReady) return <ShellLoading />;
 
-  return <AppShell scenario={scenario} initialDestination="catalog" catalogContent={catalogContent} />;
+  return (
+    <AppShell
+      scenario={scenario}
+      initialDestination="catalog"
+      catalogContent={catalogContent}
+      catalogNavigation={catalogNavigation}
+    />
+  );
+}
+
+type CatalogCategoryContextValue = {
+  activeCategory: CatalogCategorySlug;
+  selectCategory: (category: CatalogCategorySlug) => void;
+};
+
+const CatalogCategoryContext = createContext<CatalogCategoryContextValue | null>(null);
+
+export function CatalogCategoryProvider({
+  initialCategory,
+  children,
+}: {
+  initialCategory: CatalogCategorySlug;
+  children: ReactNode;
+}) {
+  const router = useRouter();
+  const [activeCategory, setActiveCategory] = useState(initialCategory);
+
+  const selectCategory = (category: CatalogCategorySlug) => {
+    setActiveCategory(category);
+    router.replace(`/prototype/catalogo-shell?variant=C&destination=catalog&category=${category}`, { scroll: false });
+  };
+
+  return (
+    <CatalogCategoryContext.Provider value={{ activeCategory, selectCategory }}>
+      {children}
+    </CatalogCategoryContext.Provider>
+  );
+}
+
+function useCatalogCategory() {
+  const context = useContext(CatalogCategoryContext);
+  if (!context) throw new Error("useCatalogCategory must be used inside CatalogCategoryProvider");
+  return context;
 }
 
 export function DestinationCatalogPrototype({
@@ -150,7 +196,7 @@ export function DestinationCatalogPrototype({
   );
 }
 
-export function DropdownCatalogPrototype({
+function LegacyDropdownCatalogPrototype({
   scenario,
   initialCategory,
 }: {
@@ -234,6 +280,81 @@ export function DropdownCatalogPrototype({
         <CatalogCategoryPanel scenario={scenario} category={activeCategory} />
       </div>
     </div>
+  );
+}
+
+export function DropdownCatalogPrototype({
+  scenario,
+}: {
+  scenario: OperationalScenario;
+}) {
+  const { activeCategory } = useCatalogCategory();
+
+  return (
+    <div className={styles.dropdownView}>
+      <div className={styles.dropdownHeading}>
+        <div className={styles.destinationNavTitle}>Catálogo</div>
+        <p className={styles.dropdownDescription}>
+          Seleccione el recurso desde la navegación lateral.
+        </p>
+      </div>
+      <div key={activeCategory} className={styles.categoryPanel}>
+        <CatalogCategoryPanel scenario={scenario} category={activeCategory} />
+      </div>
+    </div>
+  );
+}
+
+export function CatalogSidebarDropdown() {
+  const { destination, selectDestination } = useShellNavigation();
+  const { activeCategory, selectCategory } = useCatalogCategory();
+  const activeOption = catalogCategories.find(({ slug }) => slug === activeCategory) ?? catalogCategories[0];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            variant={destination === "catalog" ? "default" : "ghost"}
+            className={`${styles.navigationButton} ${styles.catalogNavigationTrigger}`}
+            aria-current={destination === "catalog" ? "page" : undefined}
+            aria-label={`Catálogo. Recurso seleccionado: ${activeOption.label}`}
+            onClick={() => selectDestination("catalog")}
+          />
+        }
+      >
+        <Settings2 data-icon="inline-start" aria-hidden />
+        <span>Catálogo</span>
+        <ChevronRight className={styles.catalogNavigationChevron} data-icon="inline-end" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuPortal>
+        <DropdownMenuPositioner side="right" align="start" sideOffset={8}>
+          <DropdownMenuContent className={styles.catalogDropdownContent}>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Recursos del catálogo</DropdownMenuLabel>
+              {catalogCategories.map(({ slug, label, icon: Icon }) => {
+                const selected = slug === activeCategory;
+                return (
+                  <DropdownMenuItem
+                    key={slug}
+                    className={styles.catalogDropdownItem}
+                    aria-current={selected ? "page" : undefined}
+                    onClick={() => {
+                      selectCategory(slug);
+                    }}
+                  >
+                    <Icon data-icon="inline-start" aria-hidden />
+                    <span>{label}</span>
+                    {selected ? <Check className={styles.dropdownCheck} aria-hidden /> : null}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenuPositioner>
+      </DropdownMenuPortal>
+    </DropdownMenu>
   );
 }
 

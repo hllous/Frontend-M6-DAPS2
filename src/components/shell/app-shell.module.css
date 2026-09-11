@@ -7,6 +7,7 @@
 .brandMark svg { width: 28px; height: 28px; }
 .brandText { font-size: 14px; }
 .moduleNav { display: flex; flex: 1; flex-direction: column; gap: var(--space-6); }
+.catalogNavigationSlot { width: 100%; }
 .navigationButton, .mobileNavigationButton, .sheetNavigationButton { justify-content: flex-start; width: 100%; }
 .navigationButton { min-height: 40px; color: var(--color-on-institutional); }
 .navigationButton:hover { color: var(--color-on-institutional); background: color-mix(in srgb, var(--color-on-institutional) 14%, transparent); }
@@ -48,6 +49,9 @@
 .collapsed { grid-template-columns: 72px minmax(0, 1fr); }
 .collapsed .brandText, .collapsed .navigationButton span { display: none; }
 .collapsed .navigationButton { justify-content: center; }
+.collapsed .catalogNavigationTrigger { justify-content: center; }
+.collapsed .catalogNavigationTrigger span { display: none; }
+.collapsed .catalogNavigationChevron { display: none; }
 .collapsed .collapseButton svg { transform: rotate(180deg); }
 
 @media (min-width: 761px) and (max-width: 1023px) { .shell { grid-template-columns: 72px minmax(0, 1fr); } .brandText, .navigationButton span { display: none; } .navigationButton { justify-content: center; } .collapseButton { display: none; } }

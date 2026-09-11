@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -60,6 +60,19 @@ const MapaOperativo = dynamic(
 type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
 type LogoutAction = (formData: FormData) => void | Promise<void>;
 
+type ShellNavigationContextValue = {
+  destination: Destination;
+  selectDestination: (next: Destination) => void;
+};
+
+const ShellNavigationContext = createContext<ShellNavigationContextValue | null>(null);
+
+export function useShellNavigation() {
+  const context = useContext(ShellNavigationContext);
+  if (!context) throw new Error("useShellNavigation must be used inside AppShell");
+  return context;
+}
+
 type NavigationItem = {
   id: Destination;
   label: string;
@@ -98,11 +111,13 @@ export function AppShell({
   scenario,
   logoutAction,
   catalogContent,
+  catalogNavigation,
   initialDestination = "work",
 }: {
   scenario: OperationalScenario;
   logoutAction?: LogoutAction;
   catalogContent?: ReactNode;
+  catalogNavigation?: ReactNode;
   initialDestination?: Destination;
 }) {
   const [destination, setDestination] = useState<Destination>(() => {
@@ -127,7 +142,8 @@ export function AppShell({
   };
 
   return (
-    <div className={`${styles.shell} ${isCollapsed ? styles.collapsed : ""}`}>
+    <ShellNavigationContext.Provider value={{ destination, selectDestination }}>
+      <div className={`${styles.shell} ${isCollapsed ? styles.collapsed : ""}`}>
       <a className={styles.skipLink} href="#contenido-principal">
         Saltar al contenido principal
       </a>
@@ -138,12 +154,18 @@ export function AppShell({
         </div>
         <nav className={styles.moduleNav} aria-label="Módulos">
           {availableItems.map((item) => (
-            <NavigationButton
-              key={item.id}
-              item={item}
-              selected={destination === item.id}
-              onSelect={selectDestination}
-            />
+            item.id === "catalog" && catalogNavigation ? (
+              <div key={item.id} className={styles.catalogNavigationSlot}>
+                {catalogNavigation}
+              </div>
+            ) : (
+              <NavigationButton
+                key={item.id}
+                item={item}
+                selected={destination === item.id}
+                onSelect={selectDestination}
+              />
+            )
           ))}
         </nav>
         <Button
@@ -246,7 +268,8 @@ export function AppShell({
       <p className="sr-only" aria-live="polite">
         {navigation.find((item) => item.id === destination)?.label} seleccionado
       </p>
-    </div>
+      </div>
+    </ShellNavigationContext.Provider>
   );
 }
 
