@@ -228,7 +228,7 @@ export async function getSession(
 export function sessionCookieOptions(session: Session) {
   return {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     path: "/",
     maxAge: Math.max(0, Math.ceil((effectiveSessionExpiry(session) - Date.now()) / 1000)),
@@ -236,7 +236,7 @@ export function sessionCookieOptions(session: Session) {
 }
 
 export function sessionCookieRemovalOptions() {
-  return { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/", maxAge: 0 };
+  return { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 0 };
 }
 
 export function sessionSecret(environment: RuntimeEnvironment = process.env): string {

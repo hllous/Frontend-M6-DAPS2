@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   AUTH_COOKIE_NAME,
@@ -9,13 +9,26 @@ import {
   isSessionActive,
   publicSession,
   sealSession,
+  sessionCookieOptions,
   type Session,
 } from "./session";
 
 const now = Date.parse("2026-09-05T15:00:00.000Z");
 const secret = "test-session-secret-that-is-long-enough";
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("owned BFF session", () => {
+  it("marks the session cookie Secure only in production, so LAN/HTTP access works in dev", () => {
+    const session = createSession("office-duty-queue", { mode: "mock", now });
+
+    vi.stubEnv("NODE_ENV", "development");
+    expect(sessionCookieOptions(session).secure).toBe(false);
+
+    vi.stubEnv("NODE_ENV", "production");
+    expect(sessionCookieOptions(session).secure).toBe(true);
+  });
+
   it("seals a mock Office session without exposing its token-shaped contents", () => {
     const session = createSession("office-duty-queue", { mode: "mock", now });
     const cookie = sealSession(session, secret);
