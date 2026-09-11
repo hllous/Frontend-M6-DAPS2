@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "./login/route";
 import { GET as session } from "./route";
@@ -14,6 +14,7 @@ afterEach(() => {
   else process.env.M6_AUTH_MODE = originalEnvironment.authMode;
   if (originalEnvironment.devJwt === undefined) delete process.env.M6_DEV_JWT;
   else process.env.M6_DEV_JWT = originalEnvironment.devJwt;
+  vi.unstubAllEnvs();
 });
 
 function loginRequest(scenarioId: string) {
@@ -25,7 +26,7 @@ function loginRequest(scenarioId: string) {
 }
 
 describe("session route handlers", () => {
-  it("creates an opaque, secure cookie for a mock scenario", async () => {
+  it("creates an opaque cookie for a mock scenario", async () => {
     process.env.M6_AUTH_MODE = "mock";
     const response = await login(loginRequest("office-duty-queue"));
     const setCookie = response.headers.get("set-cookie") ?? "";
@@ -33,9 +34,15 @@ describe("session route handlers", () => {
     expect(response.status).toBe(200);
     expect(setCookie).toMatch(/m6_session=/);
     expect(setCookie).toMatch(/HttpOnly/i);
-    expect(setCookie).toMatch(/Secure/i);
     expect(setCookie).toMatch(/SameSite=Lax/i);
     expect(setCookie).not.toContain("office-duty-queue");
+  });
+
+  it("does not mark the cookie Secure outside production, so LAN/HTTP access works in dev", async () => {
+    process.env.M6_AUTH_MODE = "mock";
+    vi.stubEnv("NODE_ENV", "development");
+    const response = await login(loginRequest("office-duty-queue"));
+    expect(response.headers.get("set-cookie") ?? "").not.toMatch(/Secure/i);
   });
 
   it("forwards the server-provided development JWT without returning it", async () => {
