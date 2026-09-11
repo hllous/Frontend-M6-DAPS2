@@ -12,7 +12,7 @@ Abrir `http://localhost:4315/prototype/catalogo-shell` con una sesión activa.
 
 - `?variant=A&destination=catalog&category=zones` muestra el destino interno. La navegación usa botones y `window.history.replaceState`; el path no cambia.
 - `?variant=B` en `/prototype/catalogo-shell/routes/<category>` muestra rutas reales. La navegación usa enlaces de Next y el layout conserva el `AppShell`.
-- `?variant=C&destination=catalog&category=zones` convierte la entrada Catálogo de la sidebar en un dropdown lateral basado en el patrón de submenús de shadcn/Base UI.
+- `?variant=C&destination=catalog&category=zones` convierte la entrada Catálogo de la sidebar en un submenú inline colapsable basado en el patrón de submenús de shadcn/Base UI.
 - La barra flotante alterna A/B/C y también responde a las flechas izquierda/derecha.
 
 Las dos variantes montan el `AppShell` existente y los paneles de catálogo existentes. El código es descartable y queda en esta rama para servir como evidencia de la decisión.

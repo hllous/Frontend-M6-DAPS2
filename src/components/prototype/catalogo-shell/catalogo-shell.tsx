@@ -36,16 +36,7 @@ import { TreeInterventionsPanel } from "@/components/catalog/tree-interventions-
 import { VehicleCatalogPanel } from "@/components/catalog/vehicle-catalog-panel";
 import { ZoneCatalogPanel } from "@/components/catalog/zone-catalog-panel";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuPortal,
-  DropdownMenuPositioner,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AppShell, useShellNavigation } from "@/components/shell/app-shell";
 import { ShellLoading } from "@/components/shell/shell-states";
 import { ensureMockWorkerStarted } from "@/mocks/ensure-worker-started";
@@ -196,93 +187,6 @@ export function DestinationCatalogPrototype({
   );
 }
 
-function LegacyDropdownCatalogPrototype({
-  scenario,
-  initialCategory,
-}: {
-  scenario: OperationalScenario;
-  initialCategory: CatalogCategorySlug;
-}) {
-  const [activeCategory, setActiveCategory] = useState(initialCategory);
-
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("variant", "C");
-    url.searchParams.set("destination", "catalog");
-    url.searchParams.set("category", initialCategory);
-    window.history.replaceState(window.history.state, "", url);
-  }, [initialCategory]);
-
-  const selectCategory = (category: CatalogCategorySlug) => {
-    setActiveCategory(category);
-    const url = new URL(window.location.href);
-    url.searchParams.set("variant", "C");
-    url.searchParams.set("destination", "catalog");
-    url.searchParams.set("category", category);
-    window.history.replaceState(window.history.state, "", url);
-  };
-
-  const activeOption = catalogCategories.find(({ slug }) => slug === activeCategory) ?? catalogCategories[0];
-  const ActiveIcon = activeOption.icon;
-
-  return (
-    <div className={styles.dropdownView}>
-      <nav className={styles.dropdownNav} aria-label="Categorías del catálogo">
-        <div>
-          <div className={styles.destinationNavTitle}>Catálogo</div>
-          <p className={styles.dropdownDescription}>Seleccione el recurso que desea administrar.</p>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className={styles.dropdownTrigger}
-                aria-label={`Categoría seleccionada: ${activeOption.label}`}
-              />
-            }
-          >
-            <span className={styles.dropdownTriggerLabel}>
-              <ActiveIcon data-icon="inline-start" aria-hidden />
-              {activeOption.label}
-            </span>
-            <ChevronDown data-icon="inline-end" aria-hidden />
-          </DropdownMenuTrigger>
-          <DropdownMenuPortal>
-            <DropdownMenuPositioner side="bottom" align="start" sideOffset={8}>
-              <DropdownMenuContent className={styles.dropdownContent}>
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Recursos del catálogo</DropdownMenuLabel>
-                  {catalogCategories.map(({ slug, label, icon: Icon }) => {
-                    const selected = slug === activeCategory;
-                    return (
-                      <DropdownMenuItem
-                        key={slug}
-                        className={styles.dropdownItem}
-                        aria-current={selected ? "page" : undefined}
-                        onClick={() => selectCategory(slug)}
-                      >
-                        <Icon data-icon="inline-start" aria-hidden />
-                        <span>{label}</span>
-                        {selected ? <Check className={styles.dropdownCheck} aria-hidden /> : null}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenuPositioner>
-          </DropdownMenuPortal>
-        </DropdownMenu>
-      </nav>
-      <div key={activeCategory} className={styles.categoryPanel}>
-        <CatalogCategoryPanel scenario={scenario} category={activeCategory} />
-      </div>
-    </div>
-  );
-}
-
 export function DropdownCatalogPrototype({
   scenario,
 }: {
@@ -308,53 +212,62 @@ export function DropdownCatalogPrototype({
 export function CatalogSidebarDropdown() {
   const { destination, selectDestination } = useShellNavigation();
   const { activeCategory, selectCategory } = useCatalogCategory();
-  const activeOption = catalogCategories.find(({ slug }) => slug === activeCategory) ?? catalogCategories[0];
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            type="button"
-            variant={destination === "catalog" ? "default" : "ghost"}
-            className={`${styles.navigationButton} ${styles.catalogNavigationTrigger}`}
-            aria-current={destination === "catalog" ? "page" : undefined}
-            aria-label={`Catálogo. Recurso seleccionado: ${activeOption.label}`}
-            onClick={() => selectDestination("catalog")}
-          />
-        }
+    <Collapsible defaultOpen className={styles.catalogNavigationGroup}>
+      <div
+        className={`${styles.catalogNavigationRow} ${destination === "catalog" ? styles.catalogNavigationRowActive : ""}`}
+        data-catalog-navigation-row
       >
-        <Settings2 data-icon="inline-start" aria-hidden />
-        <span>Catálogo</span>
-        <ChevronRight className={styles.catalogNavigationChevron} data-icon="inline-end" aria-hidden />
-      </DropdownMenuTrigger>
-      <DropdownMenuPortal>
-        <DropdownMenuPositioner side="right" align="start" sideOffset={8}>
-          <DropdownMenuContent className={styles.catalogDropdownContent}>
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Recursos del catálogo</DropdownMenuLabel>
-              {catalogCategories.map(({ slug, label, icon: Icon }) => {
-                const selected = slug === activeCategory;
-                return (
-                  <DropdownMenuItem
-                    key={slug}
-                    className={styles.catalogDropdownItem}
-                    aria-current={selected ? "page" : undefined}
-                    onClick={() => {
-                      selectCategory(slug);
-                    }}
-                  >
-                    <Icon data-icon="inline-start" aria-hidden />
-                    <span>{label}</span>
-                    {selected ? <Check className={styles.dropdownCheck} aria-hidden /> : null}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenuPositioner>
-      </DropdownMenuPortal>
-    </DropdownMenu>
+        <Button
+          type="button"
+          variant="ghost"
+          className={styles.catalogNavigationButton}
+          data-catalog-navigation-button
+          aria-current={destination === "catalog" ? "page" : undefined}
+          onClick={() => selectDestination("catalog")}
+        >
+          <Settings2 data-icon="inline-start" aria-hidden />
+          <span className={styles.catalogNavigationLabel}>Catálogo</span>
+        </Button>
+        <CollapsibleTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={styles.catalogNavigationToggle}
+              data-catalog-navigation-toggle
+              aria-label="Mostrar u ocultar recursos del catálogo"
+            />
+          }
+        >
+          <ChevronDown aria-hidden />
+        </CollapsibleTrigger>
+      </div>
+      <CollapsibleContent className={styles.catalogSubmenu} data-catalog-submenu>
+        <div className={styles.catalogSubmenuLabel}>Recursos del catálogo</div>
+        <div role="menu" aria-label="Recursos del catálogo">
+          {catalogCategories.map(({ slug, label, icon: Icon }) => {
+            const selected = slug === activeCategory;
+            return (
+              <button
+                key={slug}
+                type="button"
+                role="menuitem"
+                className={`${styles.catalogSubmenuItem} ${selected ? styles.catalogSubmenuItemActive : ""}`}
+                aria-current={selected ? "page" : undefined}
+                onClick={() => selectCategory(slug)}
+              >
+                <Icon aria-hidden />
+                <span>{label}</span>
+                {selected ? <Check className={styles.dropdownCheck} aria-hidden /> : null}
+              </button>
+            );
+          })}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -439,7 +352,7 @@ export function CatalogoPrototypeSwitcher({
 
   if (process.env.NODE_ENV === "production") return null;
 
-  const label = variant === "A" ? "A · Destino interno" : variant === "B" ? "B · Rutas anidadas" : "C · Dropdown en Catálogo";
+  const label = variant === "A" ? "A · Destino interno" : variant === "B" ? "B · Rutas anidadas" : "C · Submenú en sidebar";
 
   return (
     <div className={styles.switcher} aria-label="Selector de variantes del prototipo">

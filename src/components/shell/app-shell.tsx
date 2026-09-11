@@ -143,7 +143,10 @@ export function AppShell({
 
   return (
     <ShellNavigationContext.Provider value={{ destination, selectDestination }}>
-      <div className={`${styles.shell} ${isCollapsed ? styles.collapsed : ""}`}>
+      <div
+        className={`${styles.shell} ${isCollapsed ? styles.collapsed : ""}`}
+        data-sidebar-collapsed={isCollapsed ? "true" : "false"}
+      >
       <a className={styles.skipLink} href="#contenido-principal">
         Saltar al contenido principal
       </a>
