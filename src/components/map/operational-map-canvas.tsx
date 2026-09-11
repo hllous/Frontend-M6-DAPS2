@@ -4,11 +4,12 @@ import { divIcon } from "leaflet";
 import { Fragment } from "react";
 import { MapContainer, Marker, Polygon, Popup, TileLayer, Tooltip } from "react-leaflet";
 
+import { COVERAGE_BAND_PATH_OPTIONS, type CoverageZoneOverlay } from "@/lib/map-coverage";
 import type { OperationalZone, RouteStopOverlay, TodayZoneCoverage } from "@/lib/operational-zones";
 
 import styles from "./operational-map-canvas.module.css";
 
-export type OperationalMapView = "inventory" | "zones" | "route" | "today";
+export type OperationalMapView = "inventory" | "zones" | "coverage" | "route" | "today";
 
 type OperationalMapMarker = {
   id: string;
@@ -27,6 +28,7 @@ type OperationalMapCanvasProps = {
   zones?: OperationalZone[];
   routeStops?: RouteStopOverlay[];
   todayZones?: TodayZoneCoverage[];
+  coverageZones?: CoverageZoneOverlay[];
   selectedStopSequence?: number | null;
   onSelectStop?: (sequence: number) => void;
   selectedZoneCode?: string | null;
@@ -59,12 +61,22 @@ function zonePathOptions(selected: boolean) {
   };
 }
 
+function coveragePathOptions(zone: CoverageZoneOverlay, selected: boolean) {
+  const bandPath = COVERAGE_BAND_PATH_OPTIONS[zone.band];
+  return {
+    ...bandPath,
+    color: selected ? "var(--color-accent)" : bandPath.color,
+    weight: selected ? 3 : 2,
+  };
+}
+
 export function OperationalMapCanvas({
   view,
   markers,
   zones = [],
   routeStops = [],
   todayZones = [],
+  coverageZones = [],
   selectedStopSequence = null,
   onSelectStop,
   selectedZoneCode = null,
@@ -73,6 +85,8 @@ export function OperationalMapCanvas({
   const mapLabel =
     view === "zones"
       ? "Mapa geográfico de zonas operativas"
+      : view === "coverage"
+        ? "Mapa geográfico de cobertura por zona"
       : view === "route"
         ? "Mapa geográfico del recorrido"
         : view === "today"
@@ -182,11 +196,37 @@ export function OperationalMapCanvas({
           )
         : null}
 
+      {view === "coverage"
+        ? coverageZones.map((zone) => (
+            <Polygon
+              key={zone.zoneCode}
+              positions={zone.geometry.coordinates}
+              pathOptions={coveragePathOptions(zone, selectedZoneCode === zone.zoneCode)}
+              eventHandlers={onSelectZone ? { click: () => onSelectZone(zone.zoneCode) } : undefined}
+            >
+              <Tooltip sticky>
+                <strong>{zone.zoneName}</strong>
+                <br />
+                {zone.rate === null ? "Sin datos para el período" : `Cobertura: ${formatCoverageRate(zone.rate)}`}
+                <br />
+                {zone.note}
+              </Tooltip>
+              <Popup>
+                <strong>{zone.zoneCode} · {zone.zoneName}</strong>
+                <span className={styles.popupDescription}>
+                  {zone.rate === null ? "Sin datos para el período" : `Cobertura ${formatCoverageRate(zone.rate)} · ${zone.note}`}
+                </span>
+              </Popup>
+            </Polygon>
+          ))
+        : null}
+
       {view !== "inventory"
         ? zones.map((zone) => {
             const isCoveredToday = todayZones.some((todayZone) => todayZone.zoneCode === zone.code);
             const isRouteZone = routeStops.some((stop) => stop.zoneCode === zone.code);
-            if ((view === "today" && isCoveredToday) || (view === "route" && isRouteZone) || view === "zones") {
+            const isCoverageZone = coverageZones.some((coverageZone) => coverageZone.zoneCode === zone.code);
+            if ((view === "today" && isCoveredToday) || (view === "route" && isRouteZone) || view === "zones" || (view === "coverage" && isCoverageZone)) {
               return null;
             }
 
@@ -199,4 +239,8 @@ export function OperationalMapCanvas({
         : null}
     </MapContainer>
   );
+}
+
+function formatCoverageRate(rate: number) {
+  return `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(rate)} %`;
 }

@@ -95,6 +95,39 @@ describe("MapaOperativo", () => {
     expect(screen.getByText(/4 zonas operativas/)).toBeVisible();
   });
 
+  it("shows coverage rates with a semantic legend and exact zone values", async () => {
+    server.use(
+      http.get("*/api/zones", () => HttpResponse.json(canonicalZoneResponse)),
+      http.get("*/api/indicators/coverage", () =>
+        HttpResponse.json({
+          period: { from: "2026-08-10", to: "2026-09-10" },
+          freshness: { updatedAt: "2026-09-10T12:00:00.000Z" },
+          summary: { attended: 334, scheduled: 382, rate: 87.4 },
+          byZone: [
+            { id: "zone-bel", label: "Belgrano", attended: 148, scheduled: 160, rate: 92.5 },
+            { id: "zone-pal", label: "Palermo", attended: 88, scheduled: 100, rate: 88 },
+            { id: "zone-rec", label: "Recoleta", attended: 58, scheduled: 80, rate: 72.5 },
+            { id: "zone-ret", label: "Retiro", attended: 40, scheduled: 42, rate: 95.2 },
+          ],
+          byServiceType: [],
+        }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    await user.click(await screen.findByRole("tab", { name: "Cobertura" }));
+
+    expect(await screen.findByRole("heading", { name: "Cobertura por zona" })).toBeVisible();
+    expect(screen.getByText(/92,5/)).toBeVisible();
+    expect(screen.getByText(/148 de 160 objetivos/)).toBeVisible();
+    expect(screen.getByText("Cobertura alta")).toBeVisible();
+    expect(screen.getByText("4 de 4 zonas con datos")).toBeVisible();
+    expect(screen.getByText("Recoleta")).toBeVisible();
+    expect(screen.getByText("Cobertura parcial")).toBeVisible();
+  });
+
   it("renders route stops with their nested zone, sequence and estimated duration", async () => {
     const route = {
       id: "route-map",
