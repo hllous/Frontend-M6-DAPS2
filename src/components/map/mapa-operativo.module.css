@@ -363,6 +363,99 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+.coverageLegend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+  padding-block: var(--space-10);
+  border-block: 1px solid var(--color-border);
+}
+
+.coverageLegendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.coverageLegendSwatch {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+}
+
+.coverageNoData { background: var(--color-surface-subtle); border-color: var(--color-border-strong); }
+.coverageLow { background: var(--color-danger-fill); border-color: var(--color-danger); }
+.coveragePartial { background: var(--color-warning-fill); border-color: var(--color-warning); }
+.coverageGood { background: var(--color-info-fill); border-color: var(--color-info); }
+.coverageHigh { background: var(--color-success-fill); border-color: var(--color-success); }
+
+.coverageSummary {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverageZoneList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coverageZoneButton {
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-10);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: var(--space-8);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+}
+
+.coverageZoneButton:hover {
+  background: var(--color-surface-subtle);
+}
+
+.coverageZoneButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.coverageZoneCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.coverageZoneCopy strong {
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.coverageZoneCopy small {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sideLoading {
   display: flex;
   min-height: 300px;

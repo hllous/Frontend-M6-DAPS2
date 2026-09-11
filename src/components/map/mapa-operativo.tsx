@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Boxes, MapPinned, RefreshCw, Route as RouteIcon } from "lucide-react";
+import { Activity, AlertTriangle, Boxes, MapPinned, RefreshCw, Route as RouteIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -16,6 +16,13 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CONTAINER_STATUS_LABELS } from "@/lib/containers";
+import { indicatorsAdapter, type CoverageIndicator } from "@/lib/indicators";
+import {
+  buildCoverageZoneOverlays,
+  COVERAGE_BAND_CLASSES,
+  COVERAGE_BAND_LABELS,
+  type CoverageZoneOverlay,
+} from "@/lib/map-coverage";
 import {
   operationalMapAdapter,
   type OperationalMapData,
@@ -59,6 +66,7 @@ type MapViewOption = {
 const mapViews: MapViewOption[] = [
   { id: "inventory", label: "Inventario", title: "Contexto territorial" },
   { id: "zones", label: "Zonas", title: "Zonas operativas" },
+  { id: "coverage", label: "Cobertura", title: "Cobertura por zona" },
   { id: "route", label: "Recorrido", title: "Recorrido operativo" },
   { id: "today", label: "Atención hoy", title: "Zonas atendidas hoy" },
 ];
@@ -147,6 +155,14 @@ const todayStatusLabels = {
   NOT_SERVICED: "No atendida",
 } as const;
 
+const coverageBandSwatchClass = {
+  "no-data": "coverageNoData",
+  low: "coverageLow",
+  partial: "coveragePartial",
+  good: "coverageGood",
+  high: "coverageHigh",
+} as const;
+
 function toListItems(data: OperationalMapData): MapListItem[] {
   return [
     ...data.containers.map((item) => ({
@@ -231,12 +247,23 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
   const [todayServices, setTodayServices] = useState<TodayServiceCoverage[]>([]);
   const [todayLoaded, setTodayLoaded] = useState(false);
   const [isTodayLoading, setIsTodayLoading] = useState(false);
+  const [coverage, setCoverage] = useState<CoverageIndicator | null>(null);
+  const [coverageLoaded, setCoverageLoaded] = useState(false);
+  const [isCoverageLoading, setIsCoverageLoading] = useState(false);
   const [selectedStopSequence, setSelectedStopSequence] = useState<number | null>(null);
   const [selectedZoneCode, setSelectedZoneCode] = useState<string | null>(null);
+  const availableMapViews = mapViews.filter(
+    (option) => option.id !== "coverage" || scenario.capabilities.includes("indicator:view"),
+  );
 
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    if (view === "coverage") {
+      setCoverage(null);
+      setCoverageLoaded(false);
+      setIsCoverageLoading(true);
+    }
     try {
       const [nextData, nextZones] = await Promise.all([
         operationalMapAdapter.load(),
@@ -249,7 +276,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -343,6 +370,30 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
     };
   }, [todayLoaded, view]);
 
+  useEffect(() => {
+    if (view !== "coverage" || coverageLoaded) return;
+    let isCurrent = true;
+
+    void indicatorsAdapter.getCoverage().then(
+      (nextCoverage) => {
+        if (!isCurrent) return;
+        setCoverage(nextCoverage);
+        setCoverageLoaded(true);
+        setIsCoverageLoading(false);
+      },
+      () => {
+        if (!isCurrent) return;
+        setViewError(viewLoadError);
+        setCoverageLoaded(true);
+        setIsCoverageLoading(false);
+      },
+    );
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [coverageLoaded, view]);
+
   const items = useMemo(() => (data ? toListItems(data) : []), [data]);
   const visibleItems = items.filter((item) => enabledLayers[item.layer]);
   const locatedItems = visibleItems.filter(
@@ -357,14 +408,25 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
     () => buildTodayZoneCoverage(todayServices, activeZoneRecords(zones)),
     [todayServices, zones],
   );
-  const currentView = mapViews.find((item) => item.id === view) ?? mapViews[0]!;
-  const isViewLoading = view === "route" ? isRouteLoading || !routesLoaded : view === "today" ? isTodayLoading || !todayLoaded : false;
+  const coverageZoneOverlays = useMemo(
+    () => buildCoverageZoneOverlays(zones, coverage),
+    [coverage, zones],
+  );
+  const currentView = availableMapViews.find((item) => item.id === view) ?? availableMapViews[0]!;
+  const isViewLoading = view === "route"
+    ? isRouteLoading || !routesLoaded
+    : view === "today"
+      ? isTodayLoading || !todayLoaded
+      : view === "coverage"
+        ? isCoverageLoading || !coverageLoaded
+        : false;
 
   const handleViewChange = (nextView: OperationalMapView) => {
     setView(nextView);
     setViewError(null);
     if (nextView === "today" && !todayLoaded) setIsTodayLoading(true);
     if (nextView === "route" && routesLoaded && selectedRouteId) setIsRouteLoading(true);
+    if (nextView === "coverage" && !coverageLoaded) setIsCoverageLoading(true);
   };
 
   const handleRouteChange = (nextRouteId: string) => {
@@ -393,7 +455,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
       </header>
 
       <div className={styles.viewSwitcher} role="tablist" aria-label="Vistas del mapa operativo">
-        {mapViews.map((option) => (
+        {availableMapViews.map((option) => (
           <Button
             key={option.id}
             id={`map-tab-${option.id}`}
@@ -431,6 +493,9 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
               setRoutesLoaded(false);
             } else if (view === "today") {
               setTodayLoaded(false);
+            } else if (view === "coverage") {
+              setCoverage(null);
+              setCoverageLoaded(false);
             }
           }}>
             Reintentar vista
@@ -443,7 +508,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
           <div className={styles.mapPanel}>
             <div className={styles.mapToolbar}>
               <strong>{currentView.title}</strong>
-              <span>{mapToolbarSummary(view, locatedItems.length, zones, routeStops.length, todayServices.length)}</span>
+              <span>{mapToolbarSummary(view, locatedItems.length, zones, routeStops.length, todayServices.length, coverageZoneOverlays)}</span>
             </div>
             <OperationalMapCanvas
               view={view}
@@ -451,6 +516,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
               zones={zones}
               routeStops={routeStops}
               todayZones={todayZoneCoverage}
+              coverageZones={coverageZoneOverlays}
               selectedStopSequence={selectedStopSequence}
               onSelectStop={setSelectedStopSequence}
               selectedZoneCode={selectedZoneCode}
@@ -482,6 +548,14 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                 onSelectStop={setSelectedStopSequence}
                 loading={isViewLoading}
               />
+            ) : view === "coverage" ? (
+              <CoverageMapPanel
+                coverage={coverage}
+                zones={coverageZoneOverlays}
+                loading={isViewLoading}
+                selectedZoneCode={selectedZoneCode}
+                onSelectZone={setSelectedZoneCode}
+              />
             ) : (
               <TodayMapPanel
                 services={todayServices}
@@ -502,10 +576,15 @@ function mapToolbarSummary(
   zones: OperationalZone[],
   routeStopCount: number,
   todayServiceCount: number,
+  coverageZones: CoverageZoneOverlay[],
 ) {
   if (view === "inventory") return `${locatedCount} ubicados`;
   if (view === "zones") return `${zones.length} zonas operativas`;
   if (view === "route") return `${routeStopCount} paradas`;
+  if (view === "coverage") {
+    const withData = coverageZones.filter((zone) => zone.rate !== null).length;
+    return `${withData} de ${coverageZones.length} zonas con datos`;
+  }
   return `${todayServiceCount} servicio${todayServiceCount === 1 ? "" : "s"} de atención`;
 }
 
@@ -614,6 +693,75 @@ function ZonesMapPanel({
         ))}
       </ul>
       <p className={styles.mapHint}>Seleccione una zona para destacarla en el mapa. El color no es el único indicador: cada zona conserva su código y nombre.</p>
+    </section>
+  );
+}
+
+function CoverageMapPanel({
+  coverage,
+  zones,
+  loading,
+  selectedZoneCode,
+  onSelectZone,
+}: {
+  coverage: CoverageIndicator | null;
+  zones: CoverageZoneOverlay[];
+  loading: boolean;
+  selectedZoneCode: string | null;
+  onSelectZone: (code: string) => void;
+}) {
+  if (loading) return <MapSideLoading label="Cargando cobertura por zona" />;
+
+  const zonesWithData = zones.filter((zone) => zone.rate !== null).length;
+  const legendBands = ["no-data", "low", "partial", "good", "high"] as const;
+
+  return (
+    <section className={styles.viewPanel} aria-labelledby="coverage-view-title">
+      <div className={styles.panelIntro}>
+        <div className={styles.panelTitleRow}>
+          <Activity aria-hidden />
+          <h2 id="coverage-view-title">Cobertura por zona</h2>
+        </div>
+        <p>
+          Objetivos atendidos sobre programados. Período: {coverage ? formatCoveragePeriod(coverage.period) : "no disponible"}.
+        </p>
+      </div>
+      <div className={styles.coverageLegend} role="group" aria-label="Escala semántica de cobertura">
+        {legendBands.map((band) => (
+          <span className={styles.coverageLegendItem} key={band}>
+            <span className={`${styles.coverageLegendSwatch} ${styles[coverageBandSwatchClass[band]]}`} aria-hidden />
+            <span>{COVERAGE_BAND_LABELS[band]}</span>
+          </span>
+        ))}
+      </div>
+      <p className={styles.coverageSummary}>
+        {zonesWithData} de {zones.length} zonas con datos
+        {coverage ? ` · Actualizado ${formatCoverageFreshness(coverage.freshness.updatedAt)}` : ""}
+      </p>
+      <ul className={styles.coverageZoneList}>
+        {zones.map((zone) => (
+          <li key={zone.zoneCode}>
+            <button
+              type="button"
+              className={`${styles.coverageZoneButton} ${selectedZoneCode === zone.zoneCode ? styles.selected : ""}`}
+              aria-pressed={selectedZoneCode === zone.zoneCode}
+              onClick={() => onSelectZone(selectedZoneCode === zone.zoneCode ? "" : zone.zoneCode)}
+            >
+              <span className={`${styles.coverageLegendSwatch} ${styles[coverageBandSwatchClass[zone.band]]}`} aria-hidden />
+              <span className={styles.coverageZoneCopy}>
+                <strong>{zone.zoneName}</strong>
+                <small>{zone.zoneCode} · {zone.note}</small>
+              </span>
+              <span className={COVERAGE_BAND_CLASSES[zone.band]}>
+                {COVERAGE_BAND_LABELS[zone.band]} · {formatCoverageRate(zone.rate)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className={styles.mapHint}>
+        Seleccione una zona para destacarla. El color se acompaña con la tasa, el código y el detalle atendido/programado.
+      </p>
     </section>
   );
 }
@@ -770,6 +918,21 @@ function TodayMapPanel({
 
 function totalRouteDuration(stops: ReturnType<typeof routeToStopOverlays>) {
   return stops.reduce((total, stop) => total + (stop.estimatedDurationMin ?? 0), 0);
+}
+
+function formatCoverageRate(rate: number | null) {
+  return rate === null
+    ? "Sin valor"
+    : `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(rate)} %`;
+}
+
+function formatCoveragePeriod(period: CoverageIndicator["period"]) {
+  const format = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short", year: "numeric" });
+  return `${format.format(new Date(`${period.from}T12:00:00`))} – ${format.format(new Date(`${period.to}T12:00:00`))}`;
+}
+
+function formatCoverageFreshness(updatedAt: string) {
+  return new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(updatedAt));
 }
 
 function MapSideLoading({ label }: { label: string }) {
