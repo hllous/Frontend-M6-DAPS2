@@ -6,7 +6,6 @@ import {
   Boxes,
   CalendarClock,
   ChevronDown,
-  ChevronRight,
   MapPin,
   Recycle,
   Route as RouteIcon,
@@ -106,12 +105,15 @@ export function CatalogCategoryProvider({
   initialCategory: CatalogCategorySlug;
   children: ReactNode;
 }) {
-  const router = useRouter();
   const [activeCategory, setActiveCategory] = useState(initialCategory);
 
   const selectCategory = (category: CatalogCategorySlug) => {
     setActiveCategory(category);
-    router.replace(`/prototype/catalogo-shell?variant=C&destination=catalog&category=${category}`, { scroll: false });
+    const url = new URL(window.location.href);
+    url.searchParams.set("variant", "C");
+    url.searchParams.set("destination", "catalog");
+    url.searchParams.set("category", category);
+    window.history.replaceState(window.history.state, "", url.toString());
   };
 
   return (
