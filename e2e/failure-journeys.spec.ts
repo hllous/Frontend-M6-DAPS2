@@ -113,6 +113,6 @@ test.describe("session lifecycle failure journeys @smoke", () => {
     await retryButton.click();
 
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    await expect(page.getByText("Z-01")).toBeVisible();
+    await expect(page.getByText("Z-BEL")).toBeVisible();
   });
 });

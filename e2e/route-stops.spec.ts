@@ -30,10 +30,10 @@ test.describe("Route stop-sequence builder #111", () => {
     await expect(detailView.getByText("REC-004")).toBeVisible();
     await expect(detailView.getByText("Recorrido Parque Industrial")).toBeVisible();
 
-    // Initially has 1 stop (Zona Sur, 50 min)
+    // Initially has 1 stop (Palermo, 50 min)
     const initialStopsList = detailView.getByTestId("stops-list");
     await expect(initialStopsList).toBeVisible();
-    await expect(initialStopsList.getByText("Zona Sur")).toBeVisible();
+    await expect(initialStopsList.getByText("Palermo")).toBeVisible();
     await expect(initialStopsList.getByText("50 min")).toBeVisible();
 
     // Click "Editar secuencia"
@@ -44,7 +44,7 @@ test.describe("Route stop-sequence builder #111", () => {
     await expect(builder).toBeVisible();
     await expect(builder.getByTestId("stop-item-0")).toBeVisible();
 
-    // Attempt to add duplicate zone-2 (Zona Sur is already in the sequence)
+    // Attempt to add duplicate zone-2 (Palermo is already in the sequence)
     const zoneSelect = builder.getByTestId("stop-zone-select");
     await zoneSelect.selectOption("zone-2");
     await builder.getByTestId("add-stop-button").click();
@@ -54,22 +54,22 @@ test.describe("Route stop-sequence builder #111", () => {
     await expect(errorBox).toBeVisible();
     await expect(errorBox).toContainText(/Una zona no puede repetirse en el mismo recorrido/i);
 
-    // Add zone-1 (Zona Norte, 40 min)
+    // Add zone-1 (Belgrano, 40 min)
     await zoneSelect.selectOption("zone-1");
     const durationInput = builder.getByTestId("stop-duration-input");
     await durationInput.fill("40");
     await builder.getByTestId("add-stop-button").click();
 
-    // Now 2 stops exist: index 0 (Zona Sur), index 1 (Zona Norte)
-    await expect(builder.getByTestId("stop-item-0")).toContainText("Zona Sur");
-    await expect(builder.getByTestId("stop-item-1")).toContainText("Zona Norte");
+    // Now 2 stops exist: index 0 (Palermo), index 1 (Belgrano)
+    await expect(builder.getByTestId("stop-item-0")).toContainText("Palermo");
+    await expect(builder.getByTestId("stop-item-1")).toContainText("Belgrano");
 
-    // Reorder: move stop 1 (Zona Norte) up to position 1
+    // Reorder: move stop 1 (Belgrano) up to position 1
     await builder.getByTestId("stop-move-up-1").click();
 
-    // Verified flipped order: index 0 is Zona Norte, index 1 is Zona Sur
-    await expect(builder.getByTestId("stop-item-0")).toContainText("Zona Norte");
-    await expect(builder.getByTestId("stop-item-1")).toContainText("Zona Sur");
+    // Verified flipped order: index 0 is Belgrano, index 1 is Palermo
+    await expect(builder.getByTestId("stop-item-0")).toContainText("Belgrano");
+    await expect(builder.getByTestId("stop-item-1")).toContainText("Palermo");
 
     // Save sequence: triggers single atomic PUT
     await builder.getByTestId("save-sequence-button").click();
@@ -80,9 +80,9 @@ test.describe("Route stop-sequence builder #111", () => {
     await expect(updatedStopsList).toBeVisible();
 
     const stopItems = updatedStopsList.locator("> div");
-    await expect(stopItems.nth(0)).toContainText("Zona Norte");
+    await expect(stopItems.nth(0)).toContainText("Belgrano");
     await expect(stopItems.nth(0)).toContainText("40 min");
-    await expect(stopItems.nth(1)).toContainText("Zona Sur");
+    await expect(stopItems.nth(1)).toContainText("Palermo");
     await expect(stopItems.nth(1)).toContainText("50 min");
   });
 
@@ -139,7 +139,7 @@ test.describe("Route stop-sequence builder #111", () => {
     await expect(builder).not.toBeVisible();
     const stopsList = detailView.getByTestId("stops-list");
     await expect(stopsList).toBeVisible();
-    await expect(stopsList).toContainText("Zona Norte");
+    await expect(stopsList).toContainText("Belgrano");
     await expect(stopsList).toContainText("25 min");
   });
 });

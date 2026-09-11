@@ -13,10 +13,10 @@ test.describe("Zones representative states @smoke", () => {
     await openCatalog(page);
 
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    await expect(page.getByText("Z-01")).toBeVisible();
-    await expect(page.getByText("Zona Norte")).toBeVisible();
-    await expect(page.getByText("Z-02")).toBeVisible();
-    await expect(page.getByText("Z-03")).toBeVisible();
+    await expect(page.getByText("Z-BEL")).toBeVisible();
+    await expect(page.getByText("Belgrano")).toBeVisible();
+    await expect(page.getByText("Z-PAL")).toBeVisible();
+    await expect(page.getByText("Z-REC")).toBeVisible();
   });
 
   test("shows the empty state for a search with no matching zones", async ({ page }) => {
