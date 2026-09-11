@@ -28,6 +28,32 @@
   transform: rotate(45deg);
 }
 
+.routeMarkerPin {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 3px solid var(--color-surface);
+  border-radius: 50% 50% 50% 7px;
+  background: var(--color-action);
+  color: var(--color-on-institutional);
+  transform: rotate(-45deg);
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1;
+  outline: 3px solid transparent;
+  outline-offset: 3px;
+  transition: outline-color 180ms ease-out;
+}
+
+.routeMarkerPin > span {
+  transform: rotate(45deg);
+}
+
+.routeMarkerSelected {
+  outline-color: var(--color-accent);
+}
+
 .action { background: var(--color-action); }
 .info { background: var(--color-info); }
 .success { background: var(--color-success); }
@@ -43,4 +69,8 @@
 
 @media (max-width: 760px) {
   .map { min-height: 54vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routeMarkerPin { transition: none; }
 }
