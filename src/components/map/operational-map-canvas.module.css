@@ -1,0 +1,46 @@
+.map {
+  min-height: 568px;
+  flex: 1;
+  background: var(--color-surface-subtle);
+  font-family: inherit;
+}
+
+.marker {
+  border: 0;
+  background: transparent;
+}
+
+.markerPin {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 3px solid var(--color-surface);
+  border-radius: 50% 50% 50% 7px;
+  color: var(--color-on-institutional);
+  transform: rotate(-45deg);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.markerPin > span {
+  transform: rotate(45deg);
+}
+
+.action { background: var(--color-action); }
+.info { background: var(--color-info); }
+.success { background: var(--color-success); }
+.warning { background: var(--color-warning); }
+.danger { background: var(--color-danger); }
+
+.popupDescription {
+  display: block;
+  max-width: 28ch;
+  margin-top: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 760px) {
+  .map { min-height: 54vh; }
+}

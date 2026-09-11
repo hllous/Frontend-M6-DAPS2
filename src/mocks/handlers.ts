@@ -1044,7 +1044,13 @@ export const handlers = [
         { status: 400 },
       );
     }
-    const greenSpace = { id: `green-space-108-${greenSpaceFixtures.length + 1}`, ...parsed.data, active: true };
+    const greenSpace = {
+      id: `green-space-108-${greenSpaceFixtures.length + 1}`,
+      ...parsed.data,
+      lat: parsed.data.lat ?? null,
+      lng: parsed.data.lng ?? null,
+      active: true,
+    };
     addGreenSpaceFixture(greenSpace);
     return HttpResponse.json(greenSpace, { status: 201 });
   }),
@@ -1128,7 +1134,7 @@ export const handlers = [
     const parsed = treeCreateInputSchema.safeParse(await request.json().catch(() => undefined));
     if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de árbol inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 400 });
     if (treeFixtures.some((item) => item.surveyCode.toLowerCase() === parsed.data.surveyCode.toLowerCase())) return HttpResponse.json({ statusCode: 409, message: "Ya existe un árbol con ese código de relevamiento.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 409 });
-    const created = { id: `tree-${Date.now()}`, ...parsed.data, address: parsed.data.address ?? null, lat: parsed.data.lat ?? null, lng: parsed.data.lng ?? null, active: parsed.data.active ?? true };
+    const created = { id: `tree-${Date.now()}`, ...parsed.data, address: parsed.data.address ?? null, lat: parsed.data.lat ?? null, lng: parsed.data.lng ?? null, active: parsed.data.active ?? true, lastSurvey: null };
     addTreeFixture(created);
     return HttpResponse.json(created, { status: 201 });
   }),
@@ -1157,6 +1163,15 @@ export const handlers = [
     if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/trees/${params.treeId}/surveys` }, { status: 400 });
     const created = createTreeSurveyFixture(params.treeId as string, parsed.data, "field-user-1");
     addTreeSurveyFixture(created);
+    updateTreeFixture(params.treeId as string, {
+      lastSurvey: {
+        surveyedAt: created.surveyedAt,
+        healthStatus: created.healthStatus,
+        riskLevel: created.riskLevel,
+        riskType: created.riskType,
+        suggestedIntervention: created.suggestedIntervention,
+      },
+    });
     return HttpResponse.json(created, { status: 201 });
   }),
   // --- Tree interventions (#128) ---

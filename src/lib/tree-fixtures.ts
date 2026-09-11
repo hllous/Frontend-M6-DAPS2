@@ -1,10 +1,10 @@
 import type { Tree, TreeQuery } from "./trees";
 
 const INITIAL_TREES: Tree[] = [
-  { id: "tree-1", surveyCode: "ARB-00442", zoneId: "zone-1", species: "Jacarandá", address: "Av. Mitre 1140", lat: -34.6038, lng: -58.3814, heightM: 12.4, diameterCm: 48, active: true },
-  { id: "tree-2", surveyCode: "ARB-00443", zoneId: "zone-2", species: "Tipa", address: "Parque del Bicentenario, sector norte", lat: -34.5692, lng: -58.4051, heightM: 18, diameterCm: 72.5, active: true },
-  { id: "tree-4", surveyCode: "ARB-00445", zoneId: "zone-1", species: "Ceibo", address: "Paseo de la Costa 220", lat: -34.58, lng: -58.39, heightM: 10.5, diameterCm: 44, active: true },
-  { id: "tree-3", surveyCode: "ARB-00444", zoneId: "zone-2", species: "Plátano", address: "Av. Brasil 1812", lat: -34.6368, lng: -58.378, heightM: 9.2, diameterCm: 39, active: false },
+  { id: "tree-1", surveyCode: "ARB-00442", zoneId: "zone-1", species: "Jacarandá", address: "Av. Mitre 1140", lat: -34.6038, lng: -58.3814, heightM: 12.4, diameterCm: 48, active: true, lastSurvey: { surveyedAt: "2026-08-20T09:00:00.000Z", healthStatus: "WEAKENED", riskLevel: "HIGH", riskType: "FALLING_BRANCH", suggestedIntervention: "SAFETY_PRUNING" } },
+  { id: "tree-2", surveyCode: "ARB-00443", zoneId: "zone-2", species: "Tipa", address: "Parque del Bicentenario, sector norte", lat: -34.5692, lng: -58.4051, heightM: 18, diameterCm: 72.5, active: true, lastSurvey: { surveyedAt: "2026-08-18T10:30:00.000Z", healthStatus: "HEALTHY", riskLevel: "LOW", riskType: null, suggestedIntervention: null } },
+  { id: "tree-4", surveyCode: "ARB-00445", zoneId: "zone-1", species: "Ceibo", address: "Paseo de la Costa 220", lat: -34.58, lng: -58.39, heightM: 10.5, diameterCm: 44, active: true, lastSurvey: null },
+  { id: "tree-3", surveyCode: "ARB-00444", zoneId: "zone-2", species: "Plátano", address: "Av. Brasil 1812", lat: -34.6368, lng: -58.378, heightM: 9.2, diameterCm: 39, active: false, lastSurvey: { surveyedAt: "2026-08-12T14:00:00.000Z", healthStatus: "DISEASED", riskLevel: "CRITICAL", riskType: "TRUNK_INSTABILITY", suggestedIntervention: "REMOVAL" } },
 ];
 
 export const treeFixtures: Tree[] = structuredClone(INITIAL_TREES);

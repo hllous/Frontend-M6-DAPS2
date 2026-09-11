@@ -115,6 +115,8 @@ export async function POST(request: Request) {
     const greenSpace: GreenSpace = {
       id: `green-space-108-${greenSpaceFixtures.length + 1}`,
       ...parsed.data,
+      lat: parsed.data.lat ?? null,
+      lng: parsed.data.lng ?? null,
       active: true,
     };
     addGreenSpaceFixture(greenSpace);
