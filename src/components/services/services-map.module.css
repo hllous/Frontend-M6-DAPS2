@@ -268,6 +268,21 @@
   color: var(--color-action);
 }
 
+/*
+ * Leaflet's attribution control sits bottom-right of the map and can overlap
+ * markers that fit-bounds positions near that corner, silently swallowing
+ * clicks meant for the marker underneath. Disable pointer events on the
+ * control itself (matches .counter's convention above) but keep the actual
+ * credit link clickable.
+ */
+:global(.leaflet-control-attribution) {
+  pointer-events: none;
+}
+
+:global(.leaflet-control-attribution a) {
+  pointer-events: auto;
+}
+
 @media (max-width: 760px) {
   .map {
     min-height: 54vh;
