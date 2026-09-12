@@ -95,7 +95,7 @@ const catalogCards = [
 
 export function CatalogLanding({ scenario }: { scenario: OperationalScenario }) {
   return (
-    <section aria-labelledby="catalog-title" className="flex max-w-4xl flex-col gap-6">
+    <section aria-labelledby="catalog-title" className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-muted-foreground">Configuración</p>
         <h1 id="catalog-title" className="text-2xl font-semibold tracking-tight">
