@@ -42,6 +42,46 @@ test.describe("responsive shell navigation @smoke", () => {
   });
 });
 
+test("keeps the session bar pinned while long content scrolls in Office and Field", async ({ page }) => {
+  const assertStickyTopbar = async () => {
+    const topbar = page.locator("header").first();
+    const main = page.getByRole("main");
+
+    await expect(topbar).toHaveCSS("position", "sticky");
+    await expect(topbar).toHaveCSS("top", "0px");
+
+    const initialLayout = await page.evaluate(() => {
+      const topbar = document.querySelector("header");
+      const main = document.querySelector("main");
+      if (!topbar || !main) throw new Error("No se encontro el shell principal.");
+
+      return {
+        topbarBottom: Math.round(topbar.getBoundingClientRect().bottom),
+        mainTop: Math.round(main.getBoundingClientRect().top),
+        scrollHeight: document.documentElement.scrollHeight,
+        viewportHeight: window.innerHeight,
+      };
+    });
+
+    expect(initialLayout.mainTop).toBeGreaterThanOrEqual(initialLayout.topbarBottom);
+    expect(initialLayout.scrollHeight).toBeGreaterThan(initialLayout.viewportHeight);
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => topbar.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(0);
+    await expect(main).toBeVisible();
+  };
+
+  await page.setViewportSize(WIDE_VIEWPORT);
+  await loginViaApi(page, "office-duty-queue");
+  await page.goto("/app?destination=services");
+  await assertStickyTopbar();
+
+  await page.setViewportSize(NARROW_VIEWPORT);
+  await loginViaApi(page, "field-crew-leader-route");
+  await page.goto("/app?destination=services");
+  await assertStickyTopbar();
+});
+
 test.describe("keyboard-only shell operation @smoke", () => {
   test("a keyboard-only actor can reach and switch to another destination", async ({ page }) => {
     await page.setViewportSize(WIDE_VIEWPORT);
