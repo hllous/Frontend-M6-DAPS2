@@ -52,7 +52,7 @@ describe("ServicesWorkspace component", () => {
     expect(within(preview).getByRole("button", { name: /Ver detalle completo/ })).toBeInTheDocument();
 
     // Map marker is highlighted
-    const marker = screen.getByRole("button", { name: /Parada 1: SVC-1042/ });
+    const marker = await screen.findByRole("button", { name: /Parada 1: SVC-1042/ });
     expect(marker).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -61,7 +61,7 @@ describe("ServicesWorkspace component", () => {
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-    const marker = screen.getByRole("button", { name: /SVC-1043/ });
+    const marker = await screen.findByRole("button", { name: /SVC-1043/ });
     await user.click(marker);
 
     // Preview opened
@@ -109,7 +109,7 @@ describe("ServicesWorkspace component", () => {
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-    const marker = screen.getByRole("button", { name: /Parada 1: SVC-1042/ });
+    const marker = await screen.findByRole("button", { name: /Parada 1: SVC-1042/ });
     marker.focus();
     expect(marker).toHaveFocus();
 
@@ -119,7 +119,7 @@ describe("ServicesWorkspace component", () => {
     });
     expect(marker).toHaveAttribute("aria-pressed", "true");
 
-    const marker2 = screen.getByRole("button", { name: /SVC-1043/ });
+    const marker2 = await screen.findByRole("button", { name: /SVC-1043/ });
     marker2.focus();
     await user.keyboard(" ");
     await waitFor(() => {
