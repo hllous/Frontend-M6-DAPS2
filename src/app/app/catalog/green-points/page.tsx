@@ -10,5 +10,5 @@ export default async function GreenPointsCatalogPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  return <main className="p-6"><GreenPointCatalogPanel scenario={getScenario(session.scenarioId)} /></main>;
+  return <GreenPointCatalogPanel scenario={getScenario(session.scenarioId)} />;
 }

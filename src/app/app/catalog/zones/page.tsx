@@ -10,9 +10,5 @@ export default async function ZonesCatalogPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  return (
-    <main className="p-6">
-      <ZoneCatalogPanel scenario={getScenario(session.scenarioId)} />
-    </main>
-  );
+  return <ZoneCatalogPanel scenario={getScenario(session.scenarioId)} />;
 }
