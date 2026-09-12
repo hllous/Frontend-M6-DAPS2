@@ -1,0 +1,295 @@
+.map {
+  height: 100%;
+  min-height: 360px;
+  background: var(--color-surface-subtle);
+  font-family: inherit;
+}
+
+.mapLayer {
+  position: relative;
+  height: 100%;
+  min-height: 360px;
+}
+
+.mapLoading {
+  display: grid;
+  min-height: 360px;
+  place-content: center;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.marker {
+  border: 0;
+  background: transparent;
+}
+
+.serviceMarker {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 3px solid var(--color-surface);
+  border-radius: 50% 50% 50% 7px;
+  background: var(--color-action);
+  color: var(--color-on-institutional);
+  transform: rotate(-45deg);
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1;
+  outline: 3px solid transparent;
+  outline-offset: 3px;
+  transition: outline-color 180ms ease-out, transform 180ms ease-out;
+}
+
+.serviceMarker > span {
+  transform: rotate(45deg);
+}
+
+.serviceMarker:hover {
+  transform: rotate(-45deg) scale(1.08);
+}
+
+.serviceMarkerSelected {
+  outline-color: var(--color-accent);
+}
+
+.zone {
+  transition: fill-opacity 180ms ease-out, weight 180ms ease-out;
+}
+
+.popupDescription {
+  display: block;
+  max-width: 28ch;
+  margin-top: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.stateOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-12);
+  padding: var(--space-24);
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.stateOverlay h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.stateOverlay p {
+  max-width: 42ch;
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.stateIcon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-danger-fill);
+  color: var(--color-danger);
+}
+
+.stateIcon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.loadingIndex {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 21;
+  display: flex;
+  max-width: min(420px, 100%);
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  transform: translate(-50%, 24px);
+}
+
+.loadingIndexHidden {
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  transform: none;
+}
+
+.loadingIndex button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-action);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.loadingIndex button:hover,
+.loadingIndex button[aria-pressed="true"] {
+  border-color: var(--color-action);
+  background: var(--color-info-fill);
+}
+
+.locationNotice {
+  position: absolute;
+  top: var(--space-12);
+  left: var(--space-12);
+  z-index: 10;
+  display: flex;
+  max-width: min(360px, calc(100% - 24px));
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--color-warning-line);
+  border-radius: 12px;
+  background: var(--color-warning-fill);
+  color: var(--color-warning);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.locationNotice > svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.locationNotice strong,
+.locationNotice span {
+  display: block;
+}
+
+.locationNotice span {
+  margin-top: var(--space-4);
+}
+
+.locationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+
+.locationAction {
+  min-height: 28px;
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--color-warning-line);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-warning);
+  font-weight: 700;
+}
+
+.locationAction:hover {
+  background: var(--color-warning-fill);
+}
+
+.locationAction[aria-pressed="true"] {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.emptyNotice {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  width: min(320px, calc(100% - 32px));
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-20);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.emptyNotice > svg {
+  width: 24px;
+  height: 24px;
+  color: var(--color-action);
+}
+
+.emptyNotice span {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.counter {
+  position: absolute;
+  bottom: var(--space-12);
+  left: var(--space-12);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.counter > svg {
+  width: 14px;
+  height: 14px;
+  color: var(--color-action);
+}
+
+@media (max-width: 760px) {
+  .map {
+    min-height: 54vh;
+  }
+
+  .mapLayer,
+  .mapLoading {
+    min-height: 54vh;
+  }
+
+  .stateOverlay {
+    padding: var(--space-16);
+  }
+
+  .loadingIndex {
+    max-width: 280px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .serviceMarker,
+  .zone {
+    transition: none;
+  }
+}
