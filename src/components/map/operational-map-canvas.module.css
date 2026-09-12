@@ -10,6 +10,39 @@
   background: transparent;
 }
 
+.markerCluster {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 3px solid var(--color-surface);
+  border-radius: 50%;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+  background: var(--color-action);
+  color: var(--color-on-institutional);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+  transition: outline-color 180ms ease-out;
+}
+
+.markerCluster:hover,
+.markerCluster:focus-visible {
+  outline-color: var(--color-focus);
+}
+
+.markerCluster:focus-visible {
+  outline-width: 3px;
+}
+
+.markerClusterCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .markerPin {
   display: grid;
   width: 34px;
@@ -72,5 +105,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .markerCluster,
   .routeMarkerPin { transition: none; }
 }
