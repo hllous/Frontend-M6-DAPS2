@@ -10,9 +10,5 @@ export default async function ContainersCatalogPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  return (
-    <main className="p-6">
-      <ContainerCatalogPanel scenario={getScenario(session.scenarioId)} />
-    </main>
-  );
+  return <ContainerCatalogPanel scenario={getScenario(session.scenarioId)} />;
 }
