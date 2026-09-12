@@ -9,9 +9,5 @@ export default async function CatalogPage() {
   await connection();
   const session = await getSession();
   if (!session) redirect("/login");
-  return (
-    <main className="p-6">
-      <CatalogLanding scenario={getScenario(session.scenarioId)} />
-    </main>
-  );
+  return <CatalogLanding scenario={getScenario(session.scenarioId)} />;
 }

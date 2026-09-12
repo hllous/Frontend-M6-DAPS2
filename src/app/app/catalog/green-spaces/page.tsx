@@ -10,5 +10,5 @@ export default async function GreenSpacesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  return <main className="p-6"><GreenSpacesPanel scenario={getScenario(session.scenarioId)} /></main>;
+  return <GreenSpacesPanel scenario={getScenario(session.scenarioId)} />;
 }
