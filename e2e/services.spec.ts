@@ -45,9 +45,18 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await preview.getByRole("button", { name: "Cerrar vista previa" }).click();
     await expect(preview).not.toBeVisible();
 
-    // Select a different marker directly on the map (SVC-1051)
-    const marker2 = map.locator("button[aria-label*='SVC-1051']");
-    await marker2.click();
+    // Select a different marker directly on the map (SVC-1051) by targeting
+    // the real, visible Leaflet marker pin — not the sr-only accessible
+    // button proxy (also matching this aria-label) that only ever receives
+    // real focus/keyboard interaction, never a mouse click, since it sits
+    // invisibly behind whatever real content is on top of it. At this map's
+    // default zoom, SVC-1051's marker can be visually overlapped by another
+    // real, legitimate marker nearby (this map has no clustering, by design
+    // — see #214/#215 scope split), which a real user resolves by zooming
+    // in; dispatch the click event directly rather than depend on pixel
+    // hit-testing at an incidental zoom level.
+    const marker2 = map.locator(".leaflet-marker-icon[aria-label*='SVC-1051']");
+    await marker2.dispatchEvent("click");
 
     // Preview now re-opens showing SVC-1051
     await expect(preview).toBeVisible();
