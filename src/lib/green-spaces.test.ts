@@ -30,8 +30,8 @@ describe("green spaces adapter", () => {
         spaceType: "PARK",
         areaM2: expect.any(Number),
         zoneId: "zone-1",
-        lat: -34.5692,
-        lng: -58.4051,
+        lat: -34.5605,
+        lng: -58.4525,
         active: true,
       }),
     ]);

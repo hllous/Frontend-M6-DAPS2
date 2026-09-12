@@ -12,19 +12,19 @@ test.describe("Zone catalog management #106", () => {
     await openZonesCatalog(page);
 
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    await expect(page.getByText("Z-01")).toBeVisible();
-    await expect(page.getByText("Zona Norte")).toBeVisible();
-    await expect(page.getByText("Z-02")).toBeVisible();
+    await expect(page.getByText("Z-BEL")).toBeVisible();
+    await expect(page.getByText("Belgrano")).toBeVisible();
+    await expect(page.getByText("Z-PAL")).toBeVisible();
 
     // Filter by search
     const searchInput = page.getByLabel("Buscar zonas operativas");
     await searchInput.fill("Sur");
-    await expect(page.getByText("Z-02")).toBeVisible();
-    await expect(page.getByText("Zona Norte")).not.toBeVisible();
+    await expect(page.getByText("Z-PAL")).toBeVisible();
+    await expect(page.getByText("Belgrano")).not.toBeVisible();
 
     // Clear search
     await searchInput.fill("");
-    await expect(page.getByText("Zona Norte")).toBeVisible();
+    await expect(page.getByText("Belgrano")).toBeVisible();
   });
 
   test("Office actor creates a new zone and it appears in the catalog", async ({ page }) => {
@@ -45,8 +45,8 @@ test.describe("Zone catalog management #106", () => {
   test("Office actor edits a zone and observes that code is immutable", async ({ page }) => {
     await openZonesCatalog(page);
 
-    // Find row for Z-02 and click Editar
-    const row = page.locator("tr", { hasText: "Z-02" });
+    // Find row for Z-PAL and click Editar
+    const row = page.locator("tr", { hasText: "Z-PAL" });
     await row.getByRole("button", { name: "Editar" }).click();
 
     await expect(page.getByRole("heading", { name: "Editar zona operativa" })).toBeVisible();
@@ -54,15 +54,15 @@ test.describe("Zone catalog management #106", () => {
     // Verify code input is read-only
     const codeInput = page.getByLabel(/Código/i);
     await expect(codeInput).toHaveAttribute("readonly");
-    await expect(codeInput).toHaveValue("Z-02");
+    await expect(codeInput).toHaveValue("Z-PAL");
 
     // Edit name
     const nameInput = page.getByLabel("Nombre");
-    await nameInput.fill("Zona Sur Parque Industrial");
+    await nameInput.fill("Palermo Parque Industrial");
 
     await page.getByRole("button", { name: "Guardar cambios" }).click();
 
-    await expect(page.getByText("Zona Sur Parque Industrial")).toBeVisible();
+    await expect(page.getByText("Palermo Parque Industrial")).toBeVisible();
   });
 
   test("Deactivating a referenced zone shows confirmation warning with references before allowing deactivation", async ({
@@ -70,8 +70,8 @@ test.describe("Zone catalog management #106", () => {
   }) => {
     await openZonesCatalog(page);
 
-    // Z-01 has references
-    const row = page.locator("tr", { hasText: "Z-01" });
+    // Z-BEL has references
+    const row = page.locator("tr", { hasText: "Z-BEL" });
     await row.getByRole("button", { name: "Dar de baja" }).click();
 
     // Confirmation dialog appears
@@ -91,7 +91,7 @@ test.describe("Zone catalog management #106", () => {
   test("Office actor assigns and removes neighborhoods from a zone", async ({ page }) => {
     await openZonesCatalog(page);
 
-    const row = page.locator("tr", { hasText: "Z-01" });
+    const row = page.locator("tr", { hasText: "Z-BEL" });
     await row.getByRole("button", { name: "Gestionar barrios" }).click();
 
     const dialog = page.getByRole("dialog");

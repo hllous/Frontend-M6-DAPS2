@@ -51,6 +51,32 @@ function toLeafletCoordinates(coordinates: [number, number][][]): MapCoordinate[
   return coordinates.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
 }
 
+function isPointInRing([pointLat, pointLng]: MapCoordinate, ring: MapCoordinate[]): boolean {
+  let inside = false;
+
+  for (let index = 0, previousIndex = ring.length - 1; index < ring.length; previousIndex = index++) {
+    const [lat, lng] = ring[index]!;
+    const [previousLat, previousLng] = ring[previousIndex]!;
+    const crossesLatitude = (lat > pointLat) !== (previousLat > pointLat);
+    const boundaryLng =
+      ((previousLng - lng) * (pointLat - lat)) / (previousLat - lat) + lng;
+
+    if (crossesLatitude && pointLng < boundaryLng) inside = !inside;
+  }
+
+  return inside;
+}
+
+/** Returns whether a Leaflet [latitude, longitude] coordinate belongs to a zone polygon. */
+export function isCoordinateInsideOperationalZone(
+  coordinate: MapCoordinate,
+  geometry: Pick<OperationalZoneGeometry, "coordinates">,
+): boolean {
+  const [outerRing, ...holes] = geometry.coordinates;
+  return Boolean(outerRing && isPointInRing(coordinate, outerRing)) &&
+    holes.every((hole) => !isPointInRing(coordinate, hole));
+}
+
 function polygonCenter(coordinates: MapCoordinate[][]): MapCoordinate {
   const ring = coordinates[0] ?? [];
   if (ring.length < 3) return ring[0] ?? [-34.58, -58.42];
@@ -129,7 +155,9 @@ export function routeToStopOverlays(route: Route, zones: Zone[]): RouteStopOverl
   return [...route.stops]
     .sort((left, right) => left.sequence - right.sequence)
     .map((stop) => {
-      const zone = stop.zone ?? zoneById.get(stop.zoneId);
+      // Prefer the current catalog record: the backend may embed a stale zone
+      // snapshot in a stop while the catalog already has the canonical code.
+      const zone = zoneById.get(stop.zoneId) ?? stop.zone;
       const zoneCode = zone?.code ?? stop.zoneId;
       const zoneName = zone?.name ?? `Zona ${stop.zoneId}`;
 

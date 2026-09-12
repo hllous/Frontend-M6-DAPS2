@@ -62,8 +62,8 @@ describe("authenticated zones [id] BFF route", () => {
       const body = await response.json();
       expect(body).toMatchObject({
         id: "zone-1",
-        code: "Z-01",
-        name: "Zona Norte",
+        code: "Z-BEL",
+        name: "Belgrano",
       });
     });
   });
@@ -128,7 +128,7 @@ describe("authenticated zones [id] BFF route", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.name).toBe("Zona Norte Renombrada");
-      expect(body.code).toBe("Z-01"); // Remains Z-01
+      expect(body.code).toBe("Z-BEL"); // Remains Z-BEL
     });
   });
 

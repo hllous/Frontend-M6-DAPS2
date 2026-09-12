@@ -139,14 +139,14 @@ describe("authenticated zones BFF route", () => {
       new Request("http://localhost/api/zones", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ code: "Z-01", name: "Zona Duplicada" }),
+        body: JSON.stringify({ code: "Z-BEL", name: "Zona Duplicada" }),
       }),
     );
 
     expect(response.status).toBe(409);
     const body = await response.json();
     expect(body.statusCode).toBe(409);
-    expect(body.message).toContain("Z-01");
+    expect(body.message).toContain("Z-BEL");
   });
 
   it("POST creates a new zone and returns 201 for Office actor", async () => {
