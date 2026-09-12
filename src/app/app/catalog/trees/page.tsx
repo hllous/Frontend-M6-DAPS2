@@ -10,5 +10,5 @@ export default async function TreesCatalogPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  return <main className="p-6"><TreeCatalogPanel scenario={getScenario(session.scenarioId)} /></main>;
+  return <TreeCatalogPanel scenario={getScenario(session.scenarioId)} />;
 }
