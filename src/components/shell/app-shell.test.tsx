@@ -1,6 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupServer } from "msw/node";
 
 import { AppShell } from "./app-shell";
@@ -50,6 +50,41 @@ describe("AppShell", () => {
     const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
     expect(within(moduleNavigation).queryByRole("button", { name: "Inventario" })).not.toBeInTheDocument();
     expect(within(moduleNavigation).getByRole("button", { name: "Servicios" })).toBeVisible();
+  });
+
+  it("only mounts module tooltips when the sidebar is collapsed", async () => {
+    const user = userEvent.setup();
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+
+    const moduleNavigation = screen.getByRole("navigation", { name: /M.dulos/ });
+    expect(moduleNavigation.querySelector('[data-slot="tooltip-trigger"]')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Contraer navegaci.n/ }));
+
+    expect(moduleNavigation.querySelector('[data-slot="tooltip-trigger"]')).toBeInTheDocument();
+    expect(within(moduleNavigation).getByRole("button", { name: "Servicios" })).toHaveAttribute("aria-label", "Servicios");
+  });
+
+  it("mounts module tooltips when tablet layout hides the labels", async () => {
+    const media = {
+      matches: true,
+      media: "(min-width: 761px) and (max-width: 1023px)",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    vi.stubGlobal("matchMedia", vi.fn(() => media));
+
+    try {
+      render(<AppShell scenario={scenarios.officeDutyQueue} />);
+      const moduleNavigation = screen.getByRole("navigation", { name: /M.dulos/ });
+
+      await waitFor(() => {
+        expect(moduleNavigation.querySelector('[data-slot="tooltip-trigger"]')).toBeInTheDocument();
+      });
+      expect(within(moduleNavigation).getByRole("button", { name: "Servicios" })).toHaveAttribute("aria-label", "Servicios");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("opens the operational map from the map destination", async () => {

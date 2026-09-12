@@ -80,6 +80,7 @@ const navigation: NavigationItem[] = [
 ];
 
 const mobileDestinations: Destination[] = ["work", "services", "map"];
+const tabletNavigationQuery = "(min-width: 761px) and (max-width: 1023px)";
 
 function isAllowed(item: NavigationItem, scenario: OperationalScenario) {
   const capabilityAllowed = !item.capability || scenario.capabilities.includes(item.capability);
@@ -94,6 +95,23 @@ function actorLabel(scenario: OperationalScenario) {
     : "Integrante de cuadrilla";
 }
 
+function useTabletNavigation() {
+  const [isTablet, setIsTablet] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+
+    const media = window.matchMedia(tabletNavigationQuery);
+    const update = () => setIsTablet(media.matches);
+    update();
+    media.addEventListener("change", update);
+
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return isTablet;
+}
+
 export function AppShell({ scenario, logoutAction }: { scenario: OperationalScenario; logoutAction?: LogoutAction }) {
   const [destination, setDestination] = useState<Destination>(() => {
     if (typeof window !== "undefined") {
@@ -105,6 +123,8 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
     return "work";
   });
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const isTablet = useTabletNavigation();
+  const navigationIsIconOnly = isCollapsed || isTablet;
   const availableItems = navigation.filter((item) => isAllowed(item, scenario));
 
   const selectDestination = (next: Destination) => {
@@ -133,6 +153,7 @@ export function AppShell({ scenario, logoutAction }: { scenario: OperationalScen
               item={item}
               selected={destination === item.id}
               onSelect={selectDestination}
+              showTooltip={navigationIsIconOnly}
             />
           ))}
         </nav>
@@ -243,11 +264,13 @@ function NavigationButton({
   selected,
   onSelect,
   compact = false,
+  showTooltip = false,
 }: {
   item: NavigationItem;
   selected: boolean;
   onSelect: (destination: Destination) => void;
   compact?: boolean;
+  showTooltip?: boolean;
 }) {
   const button = (
     <Button
@@ -255,13 +278,14 @@ function NavigationButton({
       className={compact ? styles.mobileNavigationButton : styles.navigationButton}
       onClick={() => onSelect(item.id)}
       aria-current={selected ? "page" : undefined}
+      aria-label={item.label}
     >
       <item.icon data-icon="inline-start" aria-hidden />
       <span>{item.label}</span>
     </Button>
   );
 
-  return compact ? button : (
+  return compact || !showTooltip ? button : (
     <Tooltip>
       <TooltipTrigger render={button} />
       <TooltipContent side="right">{item.label}</TooltipContent>

@@ -40,6 +40,29 @@ test.describe("responsive shell navigation @smoke", () => {
     await expect(page.getByText("Ambiente")).not.toBeVisible();
     await expect(page.getByRole("button", { name: "Expandir navegación" })).toBeVisible();
   });
+  test("shows delayed module tooltips only when labels are hidden", async ({ page }) => {
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app");
+
+    const moduleNavigation = page.locator("aside nav");
+    const servicesButton = page.locator("aside nav button").nth(1);
+    await servicesButton.hover();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+
+    await page.getByRole("button", { name: /Contraer/ }).click();
+    const tooltipRequestedAt = Date.now();
+    await servicesButton.hover();
+    await expect(page.getByRole("tooltip", { name: "Servicios" })).toBeVisible();
+    expect(Date.now() - tooltipRequestedAt).toBeGreaterThanOrEqual(300);
+
+    await page.setViewportSize({ width: 900, height: 900 });
+    await page.reload();
+    const tabletNavigation = page.locator("aside nav");
+    await expect(tabletNavigation.getByText("Servicios", { exact: true })).not.toBeVisible();
+    await page.locator("aside nav button").nth(1).hover();
+    await expect(page.getByRole("tooltip", { name: "Servicios" })).toBeVisible();
+  });
 });
 
 test("keeps the session bar pinned while long content scrolls in Office and Field", async ({ page }) => {
