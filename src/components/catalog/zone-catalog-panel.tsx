@@ -302,7 +302,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   };
 
   return (
-    <section aria-labelledby="zones-catalog-heading" className="flex flex-col gap-6 max-w-5xl">
+    <section aria-labelledby="zones-catalog-heading" className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>

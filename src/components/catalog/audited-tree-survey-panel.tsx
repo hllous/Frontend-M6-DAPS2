@@ -120,7 +120,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
   const fieldHasError = (field: FormErrorField) => formErrorField === field;
   const guidedSurvey = state.status === "ready" ? state.page.surveys.find((survey) => ["HIGH", "CRITICAL"].includes(survey.riskLevel) && survey.suggestedIntervention) ?? null : null;
 
-  return <section aria-labelledby="tree-surveys-title" className="flex max-w-5xl flex-col gap-5">
+  return <section aria-labelledby="tree-surveys-title" className="flex flex-col gap-5">
     {canRequestIntervention && guidedSurvey ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>El relevamiento de {dateLabel(guidedSurvey.surveyedAt)} indica una intervención sugerida.</span><Button type="button" onClick={() => { setInterventionSurvey(guidedSurvey); setInterventionOpen(true); }}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención sugerida</Button></AlertDescription></Alert> : null}
     {canRequestIntervention ? <TreeInterventionRequestDialog key={`${interventionOpen}-${interventionSurvey?.id ?? ""}`} open={interventionOpen} onOpenChange={setInterventionOpen} trees={[tree]} initialTreeIds={interventionSurvey ? [tree.id] : []} initialType={interventionSurvey?.suggestedIntervention} initialAddress={tree.address ?? ""} initialRequiresStreetClosure={interventionSurvey?.requiresStreetClosure} initialJustification={interventionSurvey ? `Relevamiento ${dateLabel(interventionSurvey.surveyedAt)} (${interventionSurvey.id}).` : undefined} onCreated={() => setNotice("Solicitud de intervención creada. Estado inicial: solicitada.")} /> : null}
     <div className="flex flex-wrap items-start justify-between gap-4">

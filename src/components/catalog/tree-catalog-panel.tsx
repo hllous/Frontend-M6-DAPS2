@@ -203,7 +203,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
   };
 
   return (
-    <section aria-labelledby="trees-title" className="flex max-w-7xl flex-col gap-6">
+    <section aria-labelledby="trees-title" className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 id="trees-title" className="text-2xl font-semibold tracking-tight">Árboles</h1>

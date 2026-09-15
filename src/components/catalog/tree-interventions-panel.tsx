@@ -325,7 +325,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   };
 
   return (
-    <section aria-labelledby="tree-interventions-title" className="flex max-w-5xl flex-col gap-5">
+    <section aria-labelledby="tree-interventions-title" className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-muted-foreground">Arbolado urbano</p>

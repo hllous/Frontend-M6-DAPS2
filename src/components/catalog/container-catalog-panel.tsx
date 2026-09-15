@@ -357,7 +357,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
     : undefined;
 
   return (
-    <section aria-labelledby="containers-title" className="flex max-w-5xl flex-col gap-5">
+    <section aria-labelledby="containers-title" className="flex flex-col gap-5">
       <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
         <div>
           <div className="flex items-center gap-2">

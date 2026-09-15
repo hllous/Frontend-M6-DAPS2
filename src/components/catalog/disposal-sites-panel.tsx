@@ -65,7 +65,7 @@ export function DisposalSitesPanel({ scenario }: { scenario: OperationalScenario
   };
 
   return (
-    <section aria-labelledby="disposal-sites-title" className="flex max-w-6xl flex-col gap-6">
+    <section aria-labelledby="disposal-sites-title" className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm font-medium text-muted-foreground">Catálogo · Servicios</p><h1 id="disposal-sites-title" className="text-2xl font-semibold tracking-tight">Sitios de disposición</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Destinos de disposición final que pueden referenciar los registros de recolección.</p></div>{canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nuevo sitio de disposición"}</Button> : null}</div>
       {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Esta sesión puede consultar el catálogo, pero no administrarlo.</p> : null}
       {message ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{message}</p> : null}

@@ -42,10 +42,10 @@
 .breakdown:first-child { padding-top: 0; border-top: 0; }
 .breakdownHeader h3 { margin: 0; font-size: 16px; line-height: 1.35; }
 .breakdownHeader p { margin: var(--space-6) 0 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.45; }
-.chartView { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+.chartView { display: flex; flex-direction: column; gap: var(--space-8); width: 100%; min-width: 0; }
 .chart { width: 100%; min-height: 220px; aspect-ratio: auto; }
-.chartDetails { display: flex; flex-direction: column; gap: var(--space-4); }
-.chartDetailButton { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-12); min-height: 40px; padding: var(--space-8) var(--space-10); border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 12px; text-align: left; }
+.chartDetails { display: flex; flex-direction: column; gap: var(--space-4); width: 100%; }
+.chartDetailButton { display: flex; width: 100%; align-items: baseline; justify-content: space-between; gap: var(--space-12); min-height: 40px; padding: var(--space-8) var(--space-10); border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 12px; text-align: left; }
 .chartDetailButton span:last-child { color: var(--color-text-secondary); font-variant-numeric: tabular-nums; text-align: right; }
 .chartDetailButton[aria-pressed="true"] { border-color: var(--color-action); background: var(--color-info-fill); color: var(--color-action); }
 .tableWrap { overflow-x: auto; }

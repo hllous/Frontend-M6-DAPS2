@@ -268,7 +268,7 @@ export function FieldWorkPanel({
           No hay servicios asignados para su cuadrilla en este turno.
         </div>
       ) : (
-        <ol className={styles.workList}>
+        <ol className="m-0 flex list-none flex-col gap-3 p-0">
           {services.map((service, index) => {
             const windowTiming = checkServiceWindowTiming(service);
             const isOutside =
@@ -317,7 +317,7 @@ export function FieldWorkPanel({
                   {isOutside && (
                     <div
                       role="status"
-                      className="ml-8 flex items-center gap-1.5 rounded-lg border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 px-2.5 py-1 text-xs font-medium text-[var(--color-warning)]"
+                      className="ml-8 flex self-start items-center gap-1.5 rounded-lg border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 px-2.5 py-1 text-xs font-medium text-[var(--color-warning)]"
                     >
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       <span>Aviso: Inicio fuera de ventana horaria</span>
@@ -327,7 +327,7 @@ export function FieldWorkPanel({
                   {draftPending && (
                     <div
                       role="status"
-                      className="ml-8 flex items-center gap-1.5 rounded-lg border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 px-2.5 py-1 text-xs font-medium text-[var(--color-warning)]"
+                      className="ml-8 flex self-start items-center gap-1.5 rounded-lg border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 px-2.5 py-1 text-xs font-medium text-[var(--color-warning)]"
                     >
                       <CloudOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       <span>Borrador local pendiente de envío (sin conexión)</span>
@@ -337,7 +337,7 @@ export function FieldWorkPanel({
                   {error && (
                     <div
                       role="alert"
-                      className="ml-8 flex items-center gap-1.5 rounded-lg border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/40 px-2.5 py-1 text-xs font-semibold text-[var(--color-danger)]"
+                      className="ml-8 flex self-start items-center gap-1.5 rounded-lg border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/40 px-2.5 py-1 text-xs font-semibold text-[var(--color-danger)]"
                     >
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       <span>{error}</span>
