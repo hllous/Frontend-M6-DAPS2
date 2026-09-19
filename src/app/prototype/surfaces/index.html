@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es" data-surface="B">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Radio y elevación · M6</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --theme: #12315b; --action: #1d4f82; --canvas: #f4f7fa; --surface: #ffffff;
+        --subtle: #eaf0f5; --ink: #172337; --muted: #536174; --line: #cbd5df;
+        --on-theme: #ffffff; --focus: #2377bd; --info-bg: #e0eef8; --info-fg: #15537e;
+        --warning-bg: #f8e8cf; --warning-fg: #7b480e;
+      }
+      [data-surface="A"] {
+        --radius-control: 4px; --radius-panel: 8px; --radius-overlay: 8px;
+        --panel-shadow: none; --raised-shadow: 0 8px 20px rgb(0 0 0 / 12%);
+        --surface-line: #b8c5d2;
+      }
+      [data-surface="B"] {
+        --radius-control: 8px; --radius-panel: 12px; --radius-overlay: 12px;
+        --panel-shadow: none; --raised-shadow: 0 12px 28px rgb(0 0 0 / 13%);
+        --surface-line: var(--line);
+      }
+      [data-surface="C"] {
+        --radius-control: 12px; --radius-panel: 16px; --radius-overlay: 16px;
+        --panel-shadow: none; --raised-shadow: none;
+        --surface-line: var(--line);
+      }
+      * { box-sizing: border-box; }
+      html { background: var(--canvas); color: var(--ink); font-family: "Inter", system-ui, sans-serif; }
+      body { margin: 0; min-width: 320px; background: var(--canvas); font-size: 16px; }
+      button, input { font: inherit; }
+      button { cursor: pointer; }
+      ::selection { background: var(--action); color: var(--on-theme); }
+      :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+      * { scrollbar-color: var(--line) var(--subtle); }
+      .experiment-note { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 24px; padding: 9px 24px; border-bottom: 1px solid var(--line); background: var(--subtle); font-size: 13px; }
+      .experiment-note strong { color: var(--theme); }
+      .experiment-note span:last-child { color: var(--muted); }
+      .app { display: grid; min-height: calc(100vh - 44px); grid-template-columns: 220px minmax(0, 1fr); }
+      .sidebar { background: var(--theme); color: var(--on-theme); }
+      .brand { display: flex; min-height: 64px; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid rgb(255 255 255 / 20%); }
+      .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgb(255 255 255 / 48%); border-radius: var(--radius-control); font-weight: 700; }
+      .brand strong, .brand small { display: block; }
+      .brand strong { font-size: 14px; }
+      .brand small { margin-top: 2px; color: rgb(255 255 255 / 74%); font-size: 11px; }
+      .nav { display: flex; flex-direction: column; gap: 4px; padding: 12px 10px; }
+      .nav button { min-height: 40px; border: 0; border-radius: var(--radius-control); padding: 0 12px; background: transparent; color: rgb(255 255 255 / 80%); text-align: left; font-size: 13px; font-weight: 600; }
+      .nav button:hover { background: rgb(255 255 255 / 10%); color: var(--on-theme); }
+      .nav button[aria-current="page"] { background: var(--surface); color: var(--theme); }
+      .main { min-width: 0; }
+      .topbar { display: flex; min-height: 64px; align-items: center; justify-content: space-between; gap: 20px; padding: 10px 24px; border-bottom: 1px solid var(--line); background: var(--surface); }
+      .topbar h1 { margin: 0; font-size: 20px; line-height: 1.4; }
+      .topbar p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+      .primary, .secondary { min-height: 40px; border-radius: var(--radius-control); padding: 0 14px; font-size: 14px; font-weight: 600; }
+      .primary { border: 0; background: var(--action); color: var(--on-theme); }
+      .primary:hover { background: var(--theme); }
+      .secondary { border: 1px solid var(--surface-line); background: var(--surface); color: var(--ink); }
+      .secondary:hover { background: var(--subtle); }
+      .workspace { padding: 24px 24px 100px; }
+      .heading-row { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+      .heading-row h2 { margin: 0; font-size: 28px; line-height: 1.2; letter-spacing: -0.025em; }
+      .heading-row p { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+      .grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; }
+      .panel { overflow: hidden; border: 1px solid var(--surface-line); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--panel-shadow); }
+      .panel-head { display: flex; min-height: 50px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--surface-line); }
+      .panel-head strong { font-size: 14px; }
+      .panel-head span { color: var(--muted); font-size: 12px; }
+      .rows { margin: 0; padding: 0; list-style: none; }
+      .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; padding: 13px 14px; border-bottom: 1px solid var(--surface-line); }
+      .row:last-child { border-bottom: 0; }
+      .row strong, .row small { display: block; }
+      .row strong { font-size: 14px; line-height: 1.4; }
+      .row small { margin-top: 3px; color: var(--muted); font-size: 12px; }
+      .status { align-self: center; border-radius: 999px; padding: 4px 8px; background: var(--info-bg); color: var(--info-fg); font-size: 11px; font-weight: 700; }
+      .status.warning { background: var(--warning-bg); color: var(--warning-fg); }
+      .side-stack { display: flex; flex-direction: column; gap: 16px; }
+      .detail { padding: 16px; }
+      .detail h3 { margin: 0; font-size: 18px; line-height: 1.35; }
+      .detail p { margin: 6px 0 16px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+      .detail label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+      .detail input { width: 100%; min-height: 40px; border: 1px solid var(--surface-line); border-radius: var(--radius-control); padding: 0 11px; background: var(--surface); color: var(--ink); font-size: 14px; }
+      .detail .primary { width: 100%; margin-top: 14px; }
+      .popover { border: 1px solid var(--surface-line); border-radius: var(--radius-overlay); padding: 14px; background: var(--surface); box-shadow: var(--raised-shadow); }
+      .popover strong { display: block; font-size: 13px; }
+      .popover p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+      .switcher { position: fixed; z-index: 5; bottom: 18px; left: 50%; display: flex; align-items: center; gap: 6px; transform: translateX(-50%); border-radius: 999px; padding: 6px; background: #111820; color: #ffffff; box-shadow: 0 14px 34px rgb(0 0 0 / 30%); }
+      .switcher button { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 19px; }
+      .switcher button:hover { background: rgb(255 255 255 / 14%); }
+      .switcher-output { min-width: 230px; text-align: center; }
+      .switcher-output strong, .switcher-output small { display: block; }
+      .switcher-output strong { font-size: 12px; }
+      .switcher-output small { margin-top: 2px; color: #bdc7d0; font-size: 10px; }
+      @media (max-width: 760px) {
+        .experiment-note { display: block; padding: 10px 14px; line-height: 1.4; }
+        .experiment-note span:last-child, .sidebar, .topbar p, .topbar .primary { display: none; }
+        .app { display: block; }
+        .topbar { padding: 10px 14px; }
+        .workspace { padding: 16px 14px 96px; }
+        .heading-row { align-items: flex-start; }
+        .heading-row h2 { font-size: 26px; }
+        .heading-row p { font-size: 14px; }
+        .heading-row .secondary { display: none; }
+        .grid { grid-template-columns: 1fr; gap: 16px; }
+        .side-stack { gap: 16px; }
+        .primary, .secondary, .detail input { min-height: 48px; }
+        .switcher-output { min-width: 190px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="experiment-note"><span><strong>Decisión aislada: radio y elevación.</strong> Paleta, Inter y densidad permanecen fijos.</span><span>Datos ilustrativos · sin acciones reales</span></div>
+    <div class="app">
+      <aside class="sidebar"><div class="brand"><span class="brand-mark">M6</span><span><strong>Ambiente e Higiene</strong><small>Municipalidad UADE</small></span></div><nav class="nav" aria-label="Navegación de muestra"><button type="button">Mi trabajo</button><button type="button" aria-current="page">Servicios</button><button type="button">Inventario</button><button type="button">Control ambiental</button><button type="button">Mapa</button></nav></aside>
+      <main class="main"><header class="topbar"><div><h1>Servicios</h1><p>Planificación y seguimiento territorial</p></div><button class="primary" type="button">Asignar cuadrilla</button></header>
+        <section class="workspace"><div class="heading-row"><div><h2>Operación de hoy</h2><p>Revisá prioridades y contexto territorial antes de actuar.</p></div><button class="secondary" type="button">Filtrar servicios</button></div>
+          <div class="grid"><section class="panel" aria-label="Servicios prioritarios"><div class="panel-head"><strong>Servicios prioritarios</strong><span>4 resultados</span></div><ul class="rows">
+            <li class="row"><span><strong>Inspección ambiental extraordinaria</strong><small>Villa General Mitre · 10:00</small></span><span class="status warning">Demorado</span></li>
+            <li class="row"><span><strong>Recolección de residuos voluminosos</strong><small>Villa del Parque · 08:30</small></span><span class="status">Asignado</span></li>
+            <li class="row"><span><strong>Mantenimiento de espacio verde</strong><small>Parque Chas · 09:15</small></span><span class="status warning">Planificado</span></li>
+            <li class="row"><span><strong>Vaciado y revisión de contenedor</strong><small>Villa Devoto · 10:30</small></span><span class="status">En curso</span></li>
+          </ul></section>
+          <aside class="side-stack"><section class="panel detail"><h3>Asignar cuadrilla</h3><p>El servicio está planificado y todavía no tiene responsable.</p><label for="crew">Cuadrilla</label><input id="crew" value="Cuadrilla 12" readonly /><button class="primary" type="button">Confirmar asignación</button></section><section class="popover"><strong>Actualización disponible</strong><p>La cuadrilla informó una nueva hora estimada: 11:20 ART.</p></section></aside></div>
+        </section>
+      </main>
+    </div>
+    <div class="switcher" aria-label="Selector de superficie"><button id="previous" type="button" aria-label="Variante anterior">←</button><div class="switcher-output" aria-live="polite"><strong id="surface-name"></strong><small>Solo cambian radio y elevación</small></div><button id="next" type="button" aria-label="Variante siguiente">→</button></div>
+    <script>
+      const surfaces = [{ key: "A", name: "A · Estructural nítida" }, { key: "B", name: "B · Cívica equilibrada" }, { key: "C", name: "C · Suave sin sombras" }]
+      const params = new URLSearchParams(location.search)
+      let current = Math.max(0, surfaces.findIndex(({ key }) => key === params.get("surface")?.toUpperCase()))
+      const output = document.querySelector("#surface-name")
+      function render() { const surface = surfaces[current]; document.documentElement.dataset.surface = surface.key; output.textContent = surface.name; params.set("surface", surface.key); history.replaceState(null, "", `${location.pathname}?${params}`) }
+      function cycle(direction) { current = (current + direction + surfaces.length) % surfaces.length; render() }
+      document.querySelector("#previous").addEventListener("click", () => cycle(-1)); document.querySelector("#next").addEventListener("click", () => cycle(1))
+      addEventListener("keydown", (event) => { if (event.target.matches("input, textarea, [contenteditable='true']")) return; if (event.key === "ArrowLeft") cycle(-1); if (event.key === "ArrowRight") cycle(1) })
+      render()
+    </script>
+  </body>
+</html>

@@ -33,5 +33,6 @@ src/app/            # App Router (páginas y rutas)
 src/app/api/health/ # endpoint de health check
 public/             # assets estáticos
 Dockerfile          # build multi-stage (standalone output)
-.github/workflows/  # CI (build + lint)
+.github/workflows/  # CI (build, lint, tests, Playwright smoke, security)
+e2e/                # Playwright smoke, failure-journey, and accessibility specs
 ```

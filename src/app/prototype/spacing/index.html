@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es" data-spacing="A">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Prototipo de escala de espaciado M6</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#172337;background:#f4f7fa;--nav:#12315b;--action:#1d4f82;--canvas:#f4f7fa;--surface:#fff;--subtle:#eaf0f5;--ink:#172337;--muted:#536174;--line:#cbd5df;--focus:#2377bd;--success-bg:#deefe7;--success:#1d6247;--page:16px;--section:16px;--panel:12px;--row:8px;--control-x:12px;--cluster:8px;--major:24px}
+    [data-spacing="B"]{--page:24px;--section:24px;--panel:14px;--row:10px;--control-x:14px;--cluster:10px;--major:32px}
+    [data-spacing="C"]{--page:32px;--section:32px;--panel:20px;--row:12px;--control-x:16px;--cluster:16px;--major:48px}
+    *{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink)}button,select,input{font:inherit}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+    .context{display:flex;min-height:44px;align-items:center;justify-content:space-between;gap:16px;padding:8px 24px;border-bottom:1px solid var(--line);background:var(--subtle);font-size:13px}.context strong{color:var(--nav)}.context span{color:var(--muted)}
+    .shell{display:grid;min-height:calc(100vh - 44px);grid-template-columns:220px minmax(0,1fr)}.sidebar{background:var(--nav);color:#fff}.brand{display:flex;min-height:64px;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgb(255 255 255/.2)}.brand-mark{display:grid;size:36px;place-items:center;border:1px solid rgb(255 255 255/.48);border-radius:12px;font-size:14px;font-weight:700}.brand span:last-child{display:grid;gap:2px}.brand small{color:rgb(255 255 255/.72);font-size:11px}.nav{display:flex;flex-direction:column;gap:4px;padding:12px 10px}.nav button{min-height:40px;border:0;border-radius:12px;padding:0 12px;background:transparent;color:rgb(255 255 255/.82);text-align:left;font-size:13px;font-weight:600}.nav button[aria-current="page"]{background:#fff;color:var(--nav)}
+    .content{min-width:0}.topbar{display:flex;min-height:64px;align-items:center;justify-content:space-between;gap:16px;padding:10px var(--page);border-bottom:1px solid var(--line);background:var(--surface)}.topbar h1{margin:0;font-size:20px}.topbar p{margin:2px 0 0;color:var(--muted);font-size:12px}.topbar button{min-height:40px;border:0;border-radius:12px;padding:0 var(--control-x);background:var(--action);color:#fff;font-size:14px;font-weight:600}
+    .workspace{padding:var(--page) var(--page) 100px}.intro{display:flex;align-items:end;justify-content:space-between;gap:var(--major);margin-bottom:var(--section)}.intro h2{margin:0;font-size:28px;line-height:34px}.intro p{max-width:62ch;margin:6px 0 0;color:var(--muted);font-size:14px;line-height:20px}.scale{max-width:390px;color:var(--muted);font-size:12px;text-align:right}.scale strong{display:block;margin-bottom:4px;color:var(--ink);font-size:13px}
+    .grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.75fr);gap:var(--section)}.panel{border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:var(--panel);border-bottom:1px solid var(--line)}.panel-head h3{margin:0;font-size:16px}.panel-head p{margin:3px 0 0;color:var(--muted);font-size:12px}.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 9px;background:var(--success-bg);color:var(--success);font-size:11px;font-weight:700}.badge::before{size:7px;border-radius:50%;background:currentColor;content:""}
+    table{width:100%;border-collapse:collapse}th,td{padding:var(--row) var(--panel);border-bottom:1px solid var(--line);text-align:left;font-size:13px}thead th{background:var(--subtle);font-size:12px}.status{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 9px;background:#e0eef8;color:#15537e;font-size:11px;font-weight:700}.status::before{content:"";size:7px;border-radius:50%;background:currentColor}.muted{color:var(--muted)}
+    .form{display:flex;flex-direction:column;gap:var(--cluster);padding:var(--panel)}.field{display:flex;flex-direction:column;gap:6px}.field label{font-size:13px;font-weight:600}.field input,.field select{min-height:40px;width:100%;border:1px solid var(--line);border-radius:12px;padding:0 var(--control-x);background:#fff;color:var(--ink)}.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:calc(var(--section) - var(--cluster))}.actions button{min-height:40px;border-radius:12px;padding:0 var(--control-x);font-size:14px;font-weight:600}.secondary{border:1px solid var(--line);background:#fff;color:var(--ink)}.primary{border:1px solid var(--action);background:var(--action);color:#fff}
+    .switcher{position:fixed;z-index:5;left:50%;bottom:18px;display:flex;align-items:center;gap:6px;transform:translateX(-50%);border:1px solid #fff3;border-radius:16px;padding:6px;background:#172337;color:#fff}.switcher button{display:grid;size:40px;place-items:center;border:0;border-radius:12px;background:#ffffff18;color:#fff;font-size:20px}.switcher-output{min-width:250px;text-align:center}.switcher-output strong,.switcher-output small{display:block}.switcher-output strong{font-size:13px}.switcher-output small{margin-top:2px;color:#ffffffb8;font-size:10px}
+    ::selection{background:#c9def0;color:#172337}
+    @media(max-width:760px){:root,[data-spacing="B"],[data-spacing="C"]{--page:16px}.context{display:block;padding:10px 14px;line-height:1.4}.context span,.sidebar,.topbar p{display:none}.shell{display:block}.topbar{padding:10px 14px}.workspace{padding:var(--page) 14px 100px}.intro{display:block}.scale{margin-top:var(--cluster);text-align:left}.grid{grid-template-columns:1fr}.panel:first-child{overflow-x:auto}table{min-width:570px}.switcher-output{min-width:210px}}
+  </style>
+</head>
+<body>
+  <div class="context"><strong>Comparación controlada · solo cambia el espaciado</strong><span>Colores, tipografía, alturas, radios y contenido permanecen fijos</span></div>
+  <div class="shell">
+    <aside class="sidebar"><div class="brand"><span class="brand-mark">M6</span><span><strong>Ambiente e Higiene</strong><small>Municipalidad UADE</small></span></div><nav class="nav"><button type="button">Mi trabajo</button><button type="button" aria-current="page">Servicios</button><button type="button">Inventario</button><button type="button">Control ambiental</button><button type="button">Mapa</button></nav></aside>
+    <main class="content">
+      <header class="topbar"><div><h1>Servicios</h1><p>Planificación y seguimiento operativo</p></div><button type="button">Programar servicio</button></header>
+      <section class="workspace">
+        <div class="intro"><div><h2>Servicios de hoy</h2><p>Revisá el avance, la asignación y las excepciones antes de cerrar la jornada.</p></div><div class="scale"><strong id="scale-title"></strong><span id="scale-values"></span></div></div>
+        <div class="grid">
+          <section class="panel"><div class="panel-head"><div><h3>Cola operativa</h3><p>5 servicios · jueves 3 de septiembre</p></div><span class="badge">Actualizado</span></div><table><thead><tr><th>Servicio</th><th>Zona</th><th>Estado</th><th>Horario</th></tr></thead><tbody><tr><th>Recolección domiciliaria</th><td class="muted">Norte</td><td><span class="status">En curso</span></td><td>08:00–10:00</td></tr><tr><th>Poda preventiva</th><td class="muted">Centro</td><td><span class="status">Programado</span></td><td>09:30–12:00</td></tr><tr><th>Limpieza de microbasural</th><td class="muted">Oeste</td><td><span class="status">Programado</span></td><td>11:00–13:00</td></tr><tr><th>Vaciado de contenedor</th><td class="muted">Sur</td><td><span class="status">Programado</span></td><td>13:00–14:30</td></tr></tbody></table></section>
+          <section class="panel"><div class="panel-head"><div><h3>Asignación rápida</h3><p>Los campos conservan 40 px de altura.</p></div></div><form class="form"><div class="field"><label for="crew">Cuadrilla</label><select id="crew"><option>Cuadrilla Norte 2</option></select></div><div class="field"><label for="vehicle">Vehículo</label><input id="vehicle" value="VH-024 · Camión compactador"></div><div class="field"><label for="note">Nota operativa</label><input id="note" placeholder="Agregar indicaciones"></div><div class="actions"><button class="secondary" type="button">Cancelar</button><button class="primary" type="button">Asignar</button></div></form></section>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="switcher" aria-label="Selector de escala"><button id="previous" type="button" aria-label="Variante anterior">←</button><div class="switcher-output" aria-live="polite"><strong id="spacing-name"></strong><small>Solo cambia el ritmo entre elementos</small></div><button id="next" type="button" aria-label="Variante siguiente">→</button></div>
+  <script>
+    const variants=[
+      {key:"A",name:"A · Múltiplos estrictos",values:"4 · 8 · 12 · 16 · 24 · 32 · 48 · 64"},
+      {key:"B",name:"B · Ritmo operativo fino",values:"4 · 6 · 8 · 10 · 12 · 14 · 16 · 20 · 24 · 32 · 40 · 48 · 64"},
+      {key:"C",name:"C · Escala amplia",values:"4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64 · 80"}
+    ]
+    const params=new URLSearchParams(location.search)
+    let current=Math.max(0,variants.findIndex(({key})=>key===params.get("spacing")?.toUpperCase()))
+    const output=document.querySelector("#spacing-name")
+    const title=document.querySelector("#scale-title")
+    const values=document.querySelector("#scale-values")
+    function render(){const variant=variants[current];document.documentElement.dataset.spacing=variant.key;output.textContent=variant.name;title.textContent=variant.name;values.textContent=variant.values;params.set("spacing",variant.key);history.replaceState(null,"",`${location.pathname}?${params}`)}
+    function cycle(direction){current=(current+direction+variants.length)%variants.length;render()}
+    document.querySelector("#previous").addEventListener("click",()=>cycle(-1))
+    document.querySelector("#next").addEventListener("click",()=>cycle(1))
+    addEventListener("keydown",event=>{if(["INPUT","TEXTAREA","SELECT"].includes(event.target.tagName)||event.target.isContentEditable)return;if(event.key==="ArrowLeft")cycle(-1);if(event.key==="ArrowRight")cycle(1)})
+    render()
+  </script>
+</body>
+</html>

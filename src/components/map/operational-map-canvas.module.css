@@ -1,0 +1,110 @@
+.map {
+  min-height: 568px;
+  flex: 1;
+  background: var(--color-surface-subtle);
+  font-family: inherit;
+}
+
+.marker {
+  border: 0;
+  background: transparent;
+}
+
+.markerCluster {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 3px solid var(--color-surface);
+  border-radius: 50%;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+  background: var(--color-action);
+  color: var(--color-on-institutional);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+  transition: outline-color 180ms ease-out;
+}
+
+.markerCluster:hover,
+.markerCluster:focus-visible {
+  outline-color: var(--color-focus);
+}
+
+.markerCluster:focus-visible {
+  outline-width: 3px;
+}
+
+.markerClusterCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.markerPin {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 3px solid var(--color-surface);
+  border-radius: 50% 50% 50% 7px;
+  color: var(--color-on-institutional);
+  transform: rotate(-45deg);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.markerPin > span {
+  transform: rotate(45deg);
+}
+
+.routeMarkerPin {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 3px solid var(--color-surface);
+  border-radius: 50% 50% 50% 7px;
+  background: var(--color-action);
+  color: var(--color-on-institutional);
+  transform: rotate(-45deg);
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1;
+  outline: 3px solid transparent;
+  outline-offset: 3px;
+  transition: outline-color 180ms ease-out;
+}
+
+.routeMarkerPin > span {
+  transform: rotate(45deg);
+}
+
+.routeMarkerSelected {
+  outline-color: var(--color-accent);
+}
+
+.action { background: var(--color-action); }
+.info { background: var(--color-info); }
+.success { background: var(--color-success); }
+.warning { background: var(--color-warning); }
+.danger { background: var(--color-danger); }
+
+.popupDescription {
+  display: block;
+  max-width: 28ch;
+  margin-top: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 760px) {
+  .map { min-height: 54vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markerCluster,
+  .routeMarkerPin { transition: none; }
+}
