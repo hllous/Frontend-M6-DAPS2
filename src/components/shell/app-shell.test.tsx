@@ -11,7 +11,10 @@ import { resetTreeInterventionFixtures, updateTreeInterventionFixture } from "@/
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-beforeEach(() => resetTreeInterventionFixtures());
+beforeEach(() => {
+  window.history.replaceState(null, "", "/");
+  resetTreeInterventionFixtures();
+});
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
