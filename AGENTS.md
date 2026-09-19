@@ -2,7 +2,9 @@
 
 ## Contexto de dominio (backend)
 
-Backend endpoints aren't modeled yet. [`docs/backend-context/`](docs/backend-context/) mirrors Backend's domain model and API standard (entities, enums, DER, Swagger convention) — read-only, dated per file; diverges from `Backend/docs/` over time. Event/integration docs (`eventos/`, `bloqueantes.md`) aren't mirrored: backend-to-backend traffic, not frontend-facing.
+Backend has finished all seven phases of its plan: 130 REST routes in 23 Swagger tags, live at `/api/docs`. [`docs/backend-context/`](docs/backend-context/) mirrors Backend's domain model, API standard and full endpoint catalogue (entities, enums, DER, Swagger convention, `api/endpoints.md`) — read-only, refreshed 2026-09-04 from `develop` commit `f497d6c`; diverges from `Backend/docs/` over time, so re-copy rather than edit. Event/integration docs (`eventos/`, `bloqueantes.md`) aren't mirrored: backend-to-backend traffic, not frontend-facing.
+
+`CONTRACTS.md` reads endpoint shapes off that mirror. Anything still marked `hypothesis` there is genuinely unconfirmed (capability names, M1's JWT claims, client-side-only rules) — not "Backend hasn't built it yet."
 
 ## Git Flow
 
@@ -13,6 +15,10 @@ Backend endpoints aren't modeled yet. [`docs/backend-context/`](docs/backend-con
 - PRs always target `develop`
 
 Rare cases (PR checklist, branch protection reference, the `hotfix/*` exception): [`docs/agents/git-flow.md`](docs/agents/git-flow.md).
+
+## Local e2e debugging
+
+Running `npm run dev` yourself against a Playwright `PLAYWRIGHT_BASE_URL` (reproducing a CI e2e failure, rather than letting Playwright start and stop its own server) needs env vars `playwright.config.ts` only sets automatically for its own server, and stopping that server doesn't reliably free the port on Windows. See [`docs/agents/e2e-local-debugging.md`](docs/agents/e2e-local-debugging.md).
 
 ## Agent skills
 
@@ -31,3 +37,13 @@ Default canonical labels: needs-triage, needs-info, ready-for-agent, ready-for-h
 ### Domain docs
 
 Single-context layout (CONTEXT.md + docs/adr/ at repo root). See `docs/agents/domain.md`.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="es" data-mobile="C" data-menu-open="false">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Navegación móvil · M6</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --theme: #12315b; --action: #1d4f82; --canvas: #f4f7fa; --surface: #ffffff;
+        --subtle: #eaf0f5; --ink: #172337; --muted: #536174; --line: #cbd5df;
+        --focus: #2377bd; --info-bg: #e0eef8; --info-fg: #15537e;
+        --warning-bg: #f8e8cf; --warning-fg: #7b480e;
+      }
+      * { box-sizing: border-box; }
+      html { min-width: 320px; background: #dfe6ed; color: var(--ink); font-family: "Inter", system-ui, sans-serif; }
+      body { margin: 0; min-width: 320px; }
+      button { cursor: pointer; font: inherit; }
+      :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+      .phone { position: relative; width: min(100%, 430px); min-height: 100vh; margin: 0 auto; overflow: hidden; border-inline: 1px solid var(--line); background: var(--canvas); }
+      .experiment-note { min-height: 54px; padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--subtle); font-size: 12px; line-height: 1.45; }
+      .experiment-note strong { color: var(--theme); }
+      .topbar { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+      .brand { display: flex; align-items: center; gap: 9px; }
+      .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 12px; background: var(--theme); color: var(--surface); font-size: 13px; font-weight: 700; }
+      .brand strong, .brand small { display: block; }
+      .brand strong { font-size: 13px; }
+      .brand small { margin-top: 1px; color: var(--muted); font-size: 10px; }
+      .icon-button { display: none; width: 48px; height: 48px; place-items: center; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--theme); }
+      .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+      .workspace { padding: 16px 14px 150px; }
+      .workspace h1 { margin: 0; font-size: 26px; line-height: 1.23; letter-spacing: -0.025em; }
+      .workspace > p { margin: 6px 0 16px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+      .segmented { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 12px; padding: 3px; background: var(--subtle); }
+      .segmented button { min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; }
+      .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--theme); }
+      .panel { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+      .panel-head { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+      .panel-head strong { font-size: 14px; }
+      .panel-head span { color: var(--muted); font-size: 12px; }
+      .rows { margin: 0; padding: 0; list-style: none; }
+      .row { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+      .row:last-child { border-bottom: 0; }
+      .row strong { display: block; font-size: 14px; line-height: 1.4; }
+      .row small { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; color: var(--muted); font-size: 12px; }
+      .row small span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .status { flex: 0 0 auto; color: var(--info-fg); font-weight: 700; }
+      .status.warning { color: var(--warning-fg); }
+      .bottom-nav { position: absolute; z-index: 3; right: 10px; bottom: 10px; left: 10px; display: none; min-height: 66px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+      .bottom-nav button { display: grid; min-width: 0; place-items: center; align-content: center; gap: 3px; border: 0; background: transparent; color: var(--muted); font-size: 10px; font-weight: 600; }
+      .bottom-nav button[aria-current="page"] { color: var(--action); }
+      .bottom-nav .icon { width: 21px; height: 21px; }
+      [data-mobile="A"] .bottom-all { display: grid; grid-template-columns: repeat(5, 1fr); }
+      [data-mobile="B"] .menu-trigger { display: grid; }
+      [data-mobile="B"] .workspace { padding-bottom: 96px; }
+      [data-mobile="C"] .bottom-focus { display: grid; grid-template-columns: repeat(4, 1fr); }
+      .backdrop { position: absolute; z-index: 7; inset: 0; display: none; border: 0; background: rgb(18 49 91 / 38%); }
+      .sheet { position: absolute; z-index: 8; right: 0; bottom: 0; left: 0; display: none; border: 1px solid var(--line); border-radius: 16px 16px 0 0; padding: 14px 14px 24px; background: var(--surface); }
+      [data-menu-open="true"] .backdrop, [data-menu-open="true"] .sheet { display: block; }
+      .sheet-head { display: flex; min-height: 44px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .sheet-head strong { font-size: 16px; }
+      .sheet-head button { display: grid; width: 44px; height: 44px; place-items: center; border: 0; border-radius: 12px; background: var(--subtle); color: var(--theme); }
+      .sheet-nav { display: grid; gap: 4px; }
+      .sheet-nav button { display: flex; min-height: 48px; align-items: center; gap: 12px; border: 0; border-radius: 12px; padding: 0 12px; background: transparent; color: var(--ink); text-align: left; font-size: 14px; font-weight: 600; }
+      .sheet-nav button[aria-current="page"] { background: var(--subtle); color: var(--action); }
+      .switcher { position: absolute; z-index: 5; right: 50%; bottom: 86px; display: flex; align-items: center; gap: 4px; transform: translateX(50%); border-radius: 999px; padding: 5px; background: #111820; color: #ffffff; }
+      [data-mobile="B"] .switcher { bottom: 18px; }
+      .switcher button { display: grid; width: 38px; height: 38px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; }
+      .switcher button:hover { background: rgb(255 255 255 / 14%); }
+      .switcher-output { min-width: 176px; text-align: center; }
+      .switcher-output strong, .switcher-output small { display: block; }
+      .switcher-output strong { font-size: 11px; }
+      .switcher-output small { margin-top: 2px; color: #bdc7d0; font-size: 9px; }
+      @media (max-width: 430px) { .phone { border-inline: 0; } }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></symbol>
+      <symbol id="i-service" viewBox="0 0 24 24"><path d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"/></symbol>
+      <symbol id="i-box" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4Zm0 0v10l8 4 8-4V7M12 11v10"/></symbol>
+      <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 4C10 4 5 9 5 16c5 1 12-2 15-12ZM4 20c3-5 7-8 12-11"/></symbol>
+      <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Zm6-3v15m6-12v15"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    </defs></svg>
+    <div class="phone">
+      <div class="experiment-note"><strong>Decisión aislada: navegación móvil.</strong><br />El sistema visual y el contenido permanecen fijos.</div>
+      <header class="topbar"><div class="brand"><span class="brand-mark">M6</span><span><strong>Ambiente e Higiene</strong><small>Trabajo de campo</small></span></div><button class="icon-button menu-trigger" type="button" aria-label="Abrir navegación"><svg class="icon"><use href="#i-menu"/></svg></button></header>
+      <main class="workspace"><h1>Servicios de hoy</h1><p>Revisá tus tareas y el contexto territorial.</p><div class="segmented"><button type="button" aria-pressed="true">Lista</button><button type="button" aria-pressed="false">Mapa</button></div><section class="panel"><div class="panel-head"><strong>Prioridades</strong><span>3 servicios</span></div><ul class="rows">
+        <li class="row"><strong>Inspección ambiental extraordinaria</strong><small><span>Villa General Mitre · 10:00</span><span class="status warning">Demorado</span></small></li>
+        <li class="row"><strong>Recolección de residuos voluminosos</strong><small><span>Villa del Parque · 08:30</span><span class="status">Asignado</span></small></li>
+        <li class="row"><strong>Mantenimiento de espacio verde</strong><small><span>Parque Chas · 09:15</span><span class="status warning">Planificado</span></small></li>
+      </ul></section></main>
+      <nav class="bottom-nav bottom-all" aria-label="Todos los módulos"><button type="button"><svg class="icon"><use href="#i-home"/></svg>Inicio</button><button type="button" aria-current="page"><svg class="icon"><use href="#i-service"/></svg>Servicios</button><button type="button"><svg class="icon"><use href="#i-box"/></svg>Inventario</button><button type="button"><svg class="icon"><use href="#i-leaf"/></svg>Ambiente</button><button type="button"><svg class="icon"><use href="#i-map"/></svg>Mapa</button></nav>
+      <nav class="bottom-nav bottom-focus" aria-label="Tareas frecuentes"><button type="button"><svg class="icon"><use href="#i-home"/></svg>Inicio</button><button type="button" aria-current="page"><svg class="icon"><use href="#i-service"/></svg>Servicios</button><button type="button"><svg class="icon"><use href="#i-map"/></svg>Mapa</button><button class="more-trigger" type="button"><svg class="icon"><use href="#i-more"/></svg>Más</button></nav>
+      <button class="backdrop" type="button" aria-label="Cerrar navegación"></button><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"><div class="sheet-head"><strong id="sheet-title">Navegación</strong><button class="close-menu" type="button" aria-label="Cerrar navegación"><svg class="icon"><use href="#i-close"/></svg></button></div><nav class="sheet-nav"><button type="button"><svg class="icon"><use href="#i-home"/></svg>Mi trabajo</button><button type="button" aria-current="page"><svg class="icon"><use href="#i-service"/></svg>Servicios</button><button type="button"><svg class="icon"><use href="#i-box"/></svg>Inventario</button><button type="button"><svg class="icon"><use href="#i-leaf"/></svg>Control ambiental</button><button type="button"><svg class="icon"><use href="#i-map"/></svg>Mapa</button></nav></section>
+      <div class="switcher" aria-label="Selector de navegación móvil"><button id="previous" type="button" aria-label="Variante anterior">←</button><div class="switcher-output" aria-live="polite"><strong id="mobile-name"></strong><small>Solo cambia la navegación</small></div><button id="next" type="button" aria-label="Variante siguiente">→</button></div>
+    </div>
+    <script>
+      const variants = [{ key: "A", name: "A · Cinco accesos" }, { key: "B", name: "B · Menú superior" }, { key: "C", name: "C · Tareas + Más" }]
+      const params = new URLSearchParams(location.search)
+      let current = Math.max(0, variants.findIndex(({ key }) => key === params.get("mobile")?.toUpperCase()))
+      const output = document.querySelector("#mobile-name")
+      function closeMenu() { document.documentElement.dataset.menuOpen = "false" }
+      function openMenu() { document.documentElement.dataset.menuOpen = "true" }
+      function render() { const variant = variants[current]; document.documentElement.dataset.mobile = variant.key; output.textContent = variant.name; params.set("mobile", variant.key); history.replaceState(null, "", `${location.pathname}?${params}`); closeMenu() }
+      function cycle(direction) { current = (current + direction + variants.length) % variants.length; render() }
+      document.querySelector("#previous").addEventListener("click", () => cycle(-1))
+      document.querySelector("#next").addEventListener("click", () => cycle(1))
+      document.querySelector(".menu-trigger").addEventListener("click", openMenu)
+      document.querySelector(".more-trigger").addEventListener("click", openMenu)
+      document.querySelector(".backdrop").addEventListener("click", closeMenu)
+      document.querySelector(".close-menu").addEventListener("click", closeMenu)
+      addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); if (event.key === "ArrowLeft") cycle(-1); if (event.key === "ArrowRight") cycle(1) })
+      render()
+      if (params.get("menu") === "true") openMenu()
+    </script>
+  </body>
+</html>

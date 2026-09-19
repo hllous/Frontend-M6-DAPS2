@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="es" data-workspace="A" data-focus="list">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mapa y lista móvil · M6</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --theme: #12315b; --action: #1d4f82; --accent: #c34f3d; --canvas: #f4f7fa;
+        --surface: #ffffff; --subtle: #eaf0f5; --ink: #172337; --muted: #536174;
+        --line: #cbd5df; --focus: #2377bd; --info-bg: #e0eef8; --info-fg: #15537e;
+        --warning-bg: #f8e8cf; --warning-fg: #7b480e;
+      }
+      * { box-sizing: border-box; }
+      html { min-width: 320px; background: #dfe6ed; color: var(--ink); font-family: "Inter", system-ui, sans-serif; }
+      body { margin: 0; min-width: 320px; }
+      button { cursor: pointer; font: inherit; }
+      :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+      .phone { position: relative; width: min(100%, 430px); min-height: 100vh; margin: 0 auto; overflow: hidden; border-inline: 1px solid var(--line); background: var(--canvas); }
+      .experiment-note { min-height: 50px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--subtle); font-size: 12px; line-height: 1.4; }
+      .experiment-note strong { color: var(--theme); }
+      .comparison { display: flex; min-height: 52px; align-items: center; justify-content: center; gap: 5px; border-bottom: 1px solid #29333d; background: #111820; color: var(--surface); }
+      .comparison button { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 18px; }
+      .comparison button:hover { background: rgb(255 255 255 / 14%); }
+      .comparison-output { min-width: 230px; text-align: center; }
+      .comparison-output strong, .comparison-output small { display: block; }
+      .comparison-output strong { font-size: 11px; }
+      .comparison-output small { margin-top: 2px; color: #bdc7d0; font-size: 9px; }
+      .topbar { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+      .brand { display: flex; align-items: center; gap: 9px; }
+      .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 12px; background: var(--theme); color: var(--surface); font-size: 13px; font-weight: 700; }
+      .brand strong, .brand small { display: block; }
+      .brand strong { font-size: 13px; }
+      .brand small { margin-top: 1px; color: var(--muted); font-size: 10px; }
+      .filter { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--theme); }
+      .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+      .workspace { position: relative; padding: 16px 14px 150px; }
+      .heading h1 { margin: 0; font-size: 26px; line-height: 1.23; letter-spacing: -0.025em; }
+      .heading p { margin: 5px 0 14px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+      .segmented { display: none; grid-template-columns: 1fr 1fr; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 3px; background: var(--subtle); }
+      .segmented button { min-height: 42px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; }
+      .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--theme); }
+      .panel { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+      .panel-head { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+      .panel-head strong { font-size: 14px; }
+      .panel-head span { color: var(--muted); font-size: 11px; }
+      .map-pane { position: relative; min-height: 430px; overflow: hidden; background: #e5ecdf; }
+      .district { position: absolute; border: 2px solid #91a88a; border-radius: 46% 54% 42% 58%; background: #d5e2cf; }
+      .district.one { inset: 30px 36% 52% 5%; transform: rotate(-8deg); }
+      .district.two { inset: 48% 4% 28px 40%; transform: rotate(6deg); }
+      .road { position: absolute; height: 8px; border: 2px solid #c3a978; border-width: 2px 0; background: #fffdf3; transform-origin: left center; }
+      .road.one { top: 43%; left: -8%; width: 120%; transform: rotate(-7deg); }
+      .road.two { top: 0; left: 67%; width: 95%; transform: rotate(69deg); }
+      .pin { position: absolute; display: grid; width: 34px; height: 34px; place-items: center; border: 3px solid var(--surface); border-radius: 50% 50% 50% 7px; background: var(--action); color: var(--surface); transform: translate(-50%, -50%) rotate(-45deg); font-size: 11px; font-weight: 700; }
+      .pin span { transform: rotate(45deg); }
+      .pin.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
+      .p1 { top: 27%; left: 23%; } .p2 { top: 43%; left: 54%; } .p3 { top: 67%; left: 69%; }
+      .rows { margin: 0; padding: 0; list-style: none; }
+      .row { padding: 12px; border-bottom: 1px solid var(--line); }
+      .row:last-child { border-bottom: 0; }
+      .row.selected { background: var(--subtle); }
+      .row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+      .row strong { font-size: 13px; line-height: 1.4; }
+      .row small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+      .status { flex: 0 0 auto; border-radius: 999px; padding: 4px 7px; background: var(--info-bg); color: var(--info-fg); font-size: 10px; font-weight: 700; }
+      .status.warning { background: var(--warning-bg); color: var(--warning-fg); }
+      .bottom-nav { position: absolute; z-index: 6; right: 10px; bottom: 10px; left: 10px; display: grid; min-height: 66px; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+      .bottom-nav button { display: grid; place-items: center; align-content: center; gap: 3px; border: 0; background: transparent; color: var(--muted); font-size: 10px; font-weight: 600; }
+      .bottom-nav button[aria-current="page"] { color: var(--action); }
+      .bottom-nav .icon { width: 21px; height: 21px; }
+
+      [data-workspace="A"] .segmented { display: grid; }
+      [data-workspace="A"][data-focus="list"] .map-panel { display: none; }
+      [data-workspace="A"][data-focus="map"] .list-panel { display: none; }
+      [data-workspace="B"] .workspace { min-height: calc(100vh - 160px); padding-inline: 0; padding-top: 0; }
+      [data-workspace="B"] .heading { position: absolute; z-index: 2; top: 12px; right: 14px; left: 14px; border: 1px solid var(--line); border-radius: 16px; padding: 12px; background: var(--surface); }
+      [data-workspace="B"] .heading p { margin-bottom: 0; }
+      [data-workspace="B"] .map-panel { border: 0; border-radius: 0; }
+      [data-workspace="B"] .map-panel .panel-head { display: none; }
+      [data-workspace="B"] .map-pane { min-height: calc(100vh - 160px); }
+      [data-workspace="B"] .list-panel { position: absolute; z-index: 4; right: 10px; bottom: 84px; left: 10px; max-height: 320px; overflow: auto; border-radius: 16px 16px 0 0; }
+      [data-workspace="B"] .list-panel::before { display: block; width: 42px; height: 4px; margin: 8px auto 2px; border-radius: 2px; background: var(--line); content: ""; }
+      [data-workspace="C"] .workspace { overflow-y: auto; }
+      [data-workspace="C"] .map-pane { min-height: 260px; }
+      [data-workspace="C"] .list-panel { margin-top: 14px; }
+      @media (max-width: 430px) { .phone { border-inline: 0; } }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10m-7 6h4"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></symbol>
+      <symbol id="i-service" viewBox="0 0 24 24"><path d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"/></symbol>
+      <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Zm6-3v15m6-12v15"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></symbol>
+    </defs></svg>
+    <div class="phone">
+      <div class="experiment-note"><strong>Decisión aislada: mapa + lista en móvil.</strong><br />Navegación y sistema visual permanecen fijos.</div>
+      <div class="comparison"><button id="previous" type="button" aria-label="Variante anterior">←</button><div class="comparison-output" aria-live="polite"><strong id="workspace-name"></strong><small>Solo cambia la relación mapa/lista</small></div><button id="next" type="button" aria-label="Variante siguiente">→</button></div>
+      <header class="topbar"><div class="brand"><span class="brand-mark">M6</span><span><strong>Mapa operativo</strong><small>Trabajo de campo</small></span></div><button class="filter" type="button" aria-label="Filtrar servicios"><svg class="icon"><use href="#i-filter"/></svg></button></header>
+      <main class="workspace"><div class="heading"><h1>Zona Norte</h1><p>3 servicios programados para hoy.</p></div><div class="segmented" aria-label="Vista"><button class="show-list" type="button" aria-pressed="true">Lista</button><button class="show-map" type="button" aria-pressed="false">Mapa</button></div>
+        <section class="panel map-panel"><div class="panel-head"><strong>Contexto territorial</strong><span>3 ubicaciones</span></div><div class="map-pane"><span class="district one"></span><span class="district two"></span><span class="road one"></span><span class="road two"></span><button class="pin p1" type="button" aria-label="Parada 1, Plaza Arenales"><span>1</span></button><button class="pin p2 selected" type="button" aria-label="Parada 2 seleccionada, Contenedor CT-0442"><span>2</span></button><button class="pin p3" type="button" aria-label="Parada 3, Nueva York 4100"><span>3</span></button></div></section>
+        <section class="panel list-panel"><div class="panel-head"><strong>Servicios</strong><span>Orden de recorrido</span></div><ol class="rows"><li class="row"><div class="row-head"><strong>1 · Plaza Arenales</strong><span class="status">Programado</span></div><small>Poda preventiva · 08:00</small></li><li class="row selected"><div class="row-head"><strong>2 · Contenedor CT-0442</strong><span class="status warning">Suspendido</span></div><small>Vaciado y revisión · 08:30</small></li><li class="row"><div class="row-head"><strong>3 · Nueva York 4100</strong><span class="status">Programado</span></div><small>Inspección ambiental · 09:00</small></li></ol></section>
+      </main>
+      <nav class="bottom-nav" aria-label="Tareas frecuentes"><button type="button"><svg class="icon"><use href="#i-home"/></svg>Inicio</button><button type="button"><svg class="icon"><use href="#i-service"/></svg>Servicios</button><button type="button" aria-current="page"><svg class="icon"><use href="#i-map"/></svg>Mapa</button><button type="button"><svg class="icon"><use href="#i-more"/></svg>Más</button></nav>
+    </div>
+    <script>
+      const variants = [{ key: "A", name: "A · Vista enfocada" }, { key: "B", name: "B · Mapa + bandeja" }, { key: "C", name: "C · Flujo apilado" }]
+      const params = new URLSearchParams(location.search)
+      let current = Math.max(0, variants.findIndex(({ key }) => key === params.get("workspace")?.toUpperCase()))
+      const output = document.querySelector("#workspace-name")
+      const listButton = document.querySelector(".show-list")
+      const mapButton = document.querySelector(".show-map")
+      function setFocus(focus) { document.documentElement.dataset.focus = focus; listButton.setAttribute("aria-pressed", String(focus === "list")); mapButton.setAttribute("aria-pressed", String(focus === "map")) }
+      function render() { const variant = variants[current]; document.documentElement.dataset.workspace = variant.key; output.textContent = variant.name; params.set("workspace", variant.key); history.replaceState(null, "", `${location.pathname}?${params}`) }
+      function cycle(direction) { current = (current + direction + variants.length) % variants.length; render() }
+      document.querySelector("#previous").addEventListener("click", () => cycle(-1))
+      document.querySelector("#next").addEventListener("click", () => cycle(1))
+      listButton.addEventListener("click", () => setFocus("list"))
+      mapButton.addEventListener("click", () => setFocus("map"))
+      addEventListener("keydown", (event) => { if (event.key === "ArrowLeft") cycle(-1); if (event.key === "ArrowRight") cycle(1) })
+      setFocus(params.get("focus") === "map" ? "map" : "list")
+      render()
+    </script>
+  </body>
+</html>

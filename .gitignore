@@ -8,6 +8,9 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
+/blob-report/
 
 # next.js
 /.next/
@@ -36,12 +39,16 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# agent scratch reports — belong at a worktree root during orchestration,
+# never in a commit (see docs/agents/e2e-local-debugging.md)
+/HANDOFF_REPORT.md
+
 # skills
 .claude/skills
 .agents/skills
 .github/skills
 .github/agents
 .github/hooks
-.codex
+.codex*
 skills-lock.json
 .impeccable/

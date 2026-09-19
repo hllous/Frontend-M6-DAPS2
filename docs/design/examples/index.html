@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ejemplos correctos e incorrectos &middot; Est&aacute;ndar M6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100,400;100,500;100,600;100,700&display=swap" rel="stylesheet">
+<style>
+
+    :root{font-family:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;color:#172337;background:#f4f7fa;--nav:#12315b;--action:#1d4f82;--accent:#c34f3d;--canvas:#f4f7fa;--surface:#fff;--subtle:#eaf0f5;--ink:#172337;--muted:#536174;--line:#cbd5df;--line-strong:#70849a;--focus:#2377bd;--danger:#9f2f27;--danger-bg:#f8e5e2;--danger-line:#ddb0ab;--success:#1d6247;--success-bg:#deefe7;--success-line:#9cc6b1;--warning:#7b480e;--warning-bg:#f8e8cf;--warning-line:#dfbd88;--info:#1c4f74;--info-bg:#dfecf6;--info-line:#a8c7dd;--ease:cubic-bezier(.16,1,.3,1)}
+    *{box-sizing:border-box;scrollbar-color:var(--line) transparent;scrollbar-width:thin}body{min-width:320px;margin:0;background:var(--canvas);color:var(--ink)}button,input,select{font:inherit}button:not(:disabled){cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:2px}::selection{background:#c9def0;color:var(--ink)}[hidden]{display:none!important}
+    .context{display:flex;min-height:44px;align-items:center;justify-content:space-between;gap:16px;padding:8px 24px;border-bottom:1px solid var(--line);background:var(--subtle);font-size:13px}.context strong{color:var(--nav)}.context span{color:var(--muted)}
+    .topbar{display:flex;min-height:64px;align-items:center;justify-content:space-between;gap:16px;padding:10px 24px;border-bottom:1px solid var(--line);background:var(--surface)}.identity{display:flex;align-items:center;gap:10px}.mark{display:grid;width:36px;height:36px;place-items:center;border:1px solid var(--nav);border-radius:12px;color:var(--nav);font-size:14px;font-weight:700}.topbar h1{margin:0;font-size:20px;line-height:28px}.topbar p{margin:2px 0 0;color:var(--muted);font-size:12px}.issue{border-radius:999px;padding:6px 10px;background:var(--subtle);color:var(--muted);font-size:12px;font-weight:700}
+    .workspace{max-width:1240px;margin:0 auto;padding:24px 24px 120px}
+    .heading{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:20px}.heading h2{margin:0;font-size:28px;line-height:34px}.heading>div>p{max-width:720px;margin:5px 0 0;color:var(--muted);font-size:16px;line-height:24px}.framework{max-width:340px;text-align:right}.framework strong{display:block;font-size:16px}.framework span{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:17px}
+    .meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}.meta-card{border:1px solid var(--line);border-radius:16px;padding:12px 14px;background:var(--surface)}.meta-card strong{display:block;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.meta-card span{display:block;margin-top:5px;font-size:14px;line-height:20px}
+    .area-tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:16px;padding-bottom:2px}.area-tabs button{flex:0 0 auto;min-height:40px;border:1px solid var(--line);border-radius:12px;padding:0 13px;background:var(--surface);color:var(--muted);font-size:13px;font-weight:700}.area-tabs button[aria-selected="true"]{border-color:var(--action);background:var(--action);color:#fff}
+    .area-head{border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:16px;background:var(--surface)}.area-head h3{margin:0;font-size:18px;line-height:25px}.area-head p{max-width:80ch;margin:6px 0 0;color:var(--muted);font-size:14px;line-height:21px}.ref{display:inline-block;margin-top:8px;border:1px solid var(--info-line);border-radius:999px;padding:3px 10px;background:var(--info-bg);color:var(--info);font-size:12px;font-weight:700}
+    .rules{display:grid;gap:12px}.rule{border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden}.rule>h4{margin:0;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--subtle);font-size:14px}.rule-body{display:grid;grid-template-columns:1fr 1fr}.rule-side{padding:12px 14px}.rule-side+.rule-side{border-left:1px solid var(--line)}.rule-side b{display:flex;align-items:center;gap:6px;font-size:12px;letter-spacing:.03em;text-transform:uppercase}.rule-side.do b{color:var(--success)}.rule-side.dont b{color:var(--danger)}.rule-side p{margin:6px 0 0;font-size:14px;line-height:21px}
+    .pairs{display:grid;gap:16px}.pair{border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden}.pair>h4{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:10px;margin:0;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--subtle);font-size:14px}.pair>h4 em{color:var(--muted);font-size:12px;font-style:normal;font-weight:500}
+    .cols{display:grid;grid-template-columns:1fr 1fr}.col+.col{border-left:1px solid var(--line)}.col-head{display:flex;align-items:center;gap:7px;padding:9px 14px;border-bottom:1px solid var(--line);font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}.col.do .col-head{background:var(--success-bg);color:var(--success)}.col.dont .col-head{background:var(--danger-bg);color:var(--danger)}.tick{display:grid;width:18px;height:18px;place-items:center;border-radius:999px;color:#fff;font-size:11px}.col.do .tick{background:var(--success)}.col.dont .tick{background:var(--danger)}
+    .demo{padding:16px;background:var(--canvas)}.note{padding:11px 14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:18px}
+    .gap-note{border:1px dashed #91a6b9;border-radius:16px;padding:12px 14px;background:#fbfcfd;color:var(--muted);font-size:13px;line-height:20px}.gap-note b{color:var(--ink)}
+    .checklist{border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden}.checklist h4{margin:0;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--subtle);font-size:14px}.checklist ul{margin:0;padding:10px 14px 12px 30px}.checklist li{margin:5px 0;font-size:14px;line-height:21px}
+    .stack{display:grid;gap:16px}
+    .field{display:grid;gap:6px;max-width:420px}.field label{font-size:14px;font-weight:600}.req{color:var(--muted);font-weight:500}.control{width:100%;min-height:40px;border:1px solid var(--line-strong);border-radius:12px;padding:0 12px;background:#fff;color:var(--ink)}.control.invalid{border-color:var(--danger)}.control:disabled{border-color:var(--line);background:var(--subtle);color:#8b97a6}.help{color:var(--muted);font-size:12px;line-height:17px}.error{color:var(--danger);font-size:12px;line-height:17px;font-weight:600}
+    .banner{border:1px solid var(--danger-line);border-radius:12px;padding:10px 12px;margin-bottom:14px;background:var(--danger-bg);color:var(--danger);font-size:13px;font-weight:600}
+    .btn{min-height:40px;border:1px solid var(--line-strong);border-radius:12px;padding:0 14px;background:#fff;color:var(--ink);font-size:14px;font-weight:600;transition:background-color 150ms,border-color 150ms}.btn:hover{background:var(--subtle)}.btn.primary{border-color:var(--action);background:var(--action);color:#fff}.btn.primary:hover{background:#18416c}.btn.danger{border-color:var(--danger);background:var(--danger);color:#fff}.btn.ghost{border-color:transparent;background:transparent;color:var(--action)}.btn.small{min-height:32px;padding:0 10px;font-size:13px}.btn:disabled{opacity:.55}
+    .row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.row.spread{justify-content:space-between}.push{margin-left:auto}
+    .card{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fff}.card h5{margin:0 0 6px;font-size:15px;line-height:22px}.card p{margin:0;color:var(--muted);font-size:13px;line-height:19px}
+    .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}.pill i{font-style:normal;font-size:11px;line-height:1}.pill.info{border-color:var(--info-line);background:var(--info-bg);color:var(--info)}.pill.ok{border-color:var(--success-line);background:var(--success-bg);color:var(--success)}.pill.warn{border-color:var(--warning-line);background:var(--warning-bg);color:var(--warning)}.pill.bad{border-color:var(--danger-line);background:var(--danger-bg);color:var(--danger)}
+    .dot{display:inline-flex;align-items:center;gap:6px;font-size:12px}.dot::before{content:"";width:10px;height:10px;border-radius:999px;background:currentColor}.dot.b{color:#1f7a4d}.dot.c{color:#b8860b}.dot.d{color:#b03a30}
+    table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left}th{background:var(--subtle);color:var(--muted);font-size:12px;font-weight:700}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}tbody tr:last-child td{border-bottom:0}
+    .phone{width:250px;margin:0 auto;border:1px solid var(--line);border-radius:16px;background:#fff;overflow:hidden}.phone-head{padding:10px 12px;border-bottom:1px solid var(--line);background:var(--subtle);font-size:12px;font-weight:700}.phone-body{padding:12px;display:grid;gap:10px}.phone-body.tight{padding:8px}.mini-card{border:1px solid var(--line);border-radius:12px;padding:10px}.mini-card strong{display:block;font-size:14px}.mini-card span{display:block;margin-top:3px;color:var(--muted);font-size:12px}.mini-card .pill{margin-top:7px}.scroller{overflow-x:auto}.scroller table{width:520px;font-size:11px}.scroller th,.scroller td{padding:5px 7px}
+    .bars{display:grid;gap:9px}.bar-row{display:grid;grid-template-columns:118px minmax(0,1fr) 48px;align-items:center;gap:10px;font-size:13px}.track{height:16px;border-radius:6px;background:var(--subtle)}.fill{height:100%;border-radius:6px;background:var(--action)}.fill.accent{background:var(--accent)}.bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+    .donut{display:grid;grid-template-columns:120px minmax(0,1fr);align-items:center;gap:16px}.donut-shape{width:120px;height:120px;border-radius:999px;background:conic-gradient(#e0563f 0 32%,#8f4fc4 0 58%,#2fae86 0 79%,#e8b23a 0 100%);-webkit-mask:radial-gradient(circle,transparent 46%,#000 47%);mask:radial-gradient(circle,transparent 46%,#000 47%)}.legend{display:grid;gap:5px;font-size:12px;color:var(--muted)}.legend span{display:flex;align-items:center;gap:7px}.legend i{width:10px;height:10px;border-radius:3px}
+    .map{position:relative;height:190px;border-radius:12px;border:1px solid var(--line);background:#eef2ee;overflow:hidden}.map::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 22% 30%,#d8e6d2 0 16%,transparent 17%),radial-gradient(circle at 74% 68%,#d8e6d2 0 20%,transparent 21%),linear-gradient(115deg,transparent 47.4%,#e3e8ee 47.5% 50%,transparent 50.1%),linear-gradient(20deg,transparent 63.4%,#e3e8ee 63.5% 65.4%,transparent 65.5%)}.map.flat{background:#f2f2f2}.map.flat::before{background:linear-gradient(115deg,transparent 47.4%,#e6e6e6 47.5% 50%,transparent 50.1%)}.map.flat::after{content:"";position:absolute;inset:auto 0 0 0;height:52%;background:#c34f3d33}
+    .pin{position:absolute;display:grid;width:26px;height:26px;place-items:center;transform:translate(-50%,-100%);border:2px solid #fff;border-radius:999px 999px 999px 2px;background:var(--action);color:#fff;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}.pin.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}.blob{position:absolute;width:14px;height:14px;transform:translate(-50%,-50%);border-radius:999px}
+    .map-card{position:absolute;left:10px;bottom:10px;display:grid;gap:5px;max-width:210px;border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}.map-card strong{font-size:13px}.map-card .meta{color:var(--muted);font-size:12px}
+    .motion-stage{position:relative;display:flex;height:154px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}.motion-panel{position:absolute;inset:0 0 0 40%;display:grid;align-content:center;gap:5px;padding:12px;border-left:1px solid var(--line);background:var(--subtle);font-size:13px;transform:translateX(100%);opacity:0;transition:transform 280ms var(--ease),opacity 280ms var(--ease)}.motion-panel strong{font-size:14px}.motion-panel span{color:var(--muted);font-size:12px}.motion-stage.open .motion-panel{transform:none;opacity:1}
+    .motion-stage.bad .motion-panel{transition:transform 900ms cubic-bezier(.2,1.9,.4,1),opacity 900ms}.loop{display:inline-block;animation:pulse 1.1s infinite}@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
+    .motion-list{display:grid;align-content:start;gap:7px;padding:12px;width:40%}.motion-list button{width:100%;min-height:36px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:13px;font-weight:600;text-align:left;padding:0 10px}.motion-list button[aria-pressed="true"]{border-color:var(--action);background:var(--info-bg);color:var(--info)}
+    .rm-note{border:1px solid var(--line);border-radius:12px;padding:9px 11px;margin-top:10px;background:#fff;font-size:12px;line-height:18px;color:var(--muted)}.rm-note b{color:var(--ink)}
+    .switcher{position:fixed;z-index:10;left:50%;bottom:18px;display:flex;max-width:calc(100vw - 28px);align-items:center;gap:6px;transform:translateX(-50%);border:1px solid #ffffff30;border-radius:16px;padding:6px;background:#172337;color:#fff}.switcher button{display:grid;flex:0 0 auto;width:40px;height:40px;place-items:center;border:0;border-radius:12px;background:#ffffff18;color:#fff}.switcher button:hover{background:#ffffff2a}.switcher svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:2}.switcher-output{width:300px;text-align:center}.switcher-output strong,.switcher-output small{display:block}.switcher-output strong{font-size:13px}.switcher-output small{margin-top:2px;color:#ffffffb8;font-size:12px;line-height:16px}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+    @media(max-width:1000px){.meta{grid-template-columns:1fr 1fr}}
+    @media(max-width:760px){.context{display:block;padding:10px 14px;line-height:20px}.context span{display:none}.topbar{padding:10px 14px}.topbar p,.issue{display:none}.workspace{padding:16px 14px 120px}.heading{display:block}.heading h2{font-size:26px;line-height:32px}.framework{max-width:none;margin-top:12px;text-align:left}.meta{grid-template-columns:1fr}.cols,.rule-body{grid-template-columns:1fr}.col+.col,.rule-side+.rule-side{border-left:0;border-top:1px solid var(--line)}.demo{padding:14px}.btn,.control,.area-tabs button{min-height:48px}.bar-row{grid-template-columns:96px minmax(0,1fr) 44px}.switcher-output{width:210px}}
+  
+    body{padding:0 0 64px}
+    .page-head{padding:24px;border-bottom:1px solid var(--line);background:var(--surface)}
+    .page-head h1{margin:0;font-size:28px;line-height:34px}
+    .page-head p{max-width:80ch;margin:8px 0 0;color:var(--muted);font-size:16px;line-height:24px}
+    .page-nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+    .page-nav a{min-height:40px;display:inline-flex;align-items:center;border:1px solid var(--line-strong);border-radius:12px;padding:0 12px;background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;text-decoration:none}
+    .page-nav a:hover{background:var(--subtle)}
+    main{max-width:1240px;margin:0 auto;padding:24px}
+    .area{margin-bottom:40px;scroll-margin-top:16px}
+    .area>h2{margin:0 0 6px;font-size:20px;line-height:28px}
+    .area .summary{max-width:80ch;margin:0 0 8px;color:var(--muted);font-size:14px;line-height:21px}
+    .pair,.checklist{margin-top:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden}
+    .pair>h3,.checklist>h3{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:10px;margin:0;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--subtle);font-size:14px}
+    .pair>h3 em{color:var(--muted);font-size:12px;font-style:normal;font-weight:500}
+    .card h4{margin:0 0 6px;font-size:15px;line-height:22px}
+    @media(max-width:760px){.page-head{padding:16px 14px}main{padding:16px 14px}.page-nav a{min-height:48px}}
+</style>
+</head>
+<body>
+<header class="page-head">
+  <h1>Ejemplos correctos e incorrectos</h1>
+  <p>Conjunto normativo de ejemplos del est&aacute;ndar M6, en el formato aprobado <strong>Par can&oacute;nico y lista de verificaci&oacute;n</strong>: un par renderizado por &aacute;rea de riesgo y una lista de verificaci&oacute;n aplicable en la revisi&oacute;n de pull requests. Las reglas viven en <code>DESIGN.md</code>; esta p&aacute;gina las hace verificables. Cuando ambos difieran, manda <code>DESIGN.md</code> y se corrige el ejemplo.</p>
+  <nav class="page-nav" aria-label="&Aacute;reas de riesgo"><a href="#forms">Formularios</a><a href="#actions">Acciones</a><a href="#statuses">Estados</a><a href="#responsive">Office / Field</a><a href="#dataviz">Mapa y gráficos</a><a href="#motion">Movimiento</a><a href="#voice">Voz</a></nav>
+</header>
+<main>
+<section class="area" id="forms">
+  <h2>Anatomía de campo y errores</h2>
+  <p class="summary">Dónde viven la etiqueta, la ayuda y el error, cómo se anuncia la invalidez y cómo se explica un control deshabilitado.</p>
+  <p class="ref">DESIGN.md · Anatomía de componentes y estados de interacción</p>
+  <section class="pair">
+    <h3>Campo con error de validación<em>Regla: La etiqueta, la ayuda y el error acompañan al control</em></h3>
+    <div class="cols">
+      <div class="col do"><div class="col-head"><span class="tick" aria-hidden="true">&#10003;</span>Correcto</div><div class="demo"><div class="field"><label for="dd-f1">Horario de inicio previsto <span class="req">(obligatorio)</span></label><input class="control invalid" id="dd-f1" value="04/09/2026 · 08:00" aria-invalid="true" aria-describedby="dd-f1-help dd-f1-err"><span class="help" id="dd-f1-help">Formato 24 h. El servicio fue actualizado a las 08:12.</span><span class="error" id="dd-f1-err">El horario deberá ser posterior a las 08:12.</span></div></div><p class="note">El mensaje nombra el problema y el próximo paso válido, y queda vinculado al control por aria-describedby.</p></div>
+      <div class="col dont"><div class="col-head"><span class="tick" aria-hidden="true">&#10005;</span>Incorrecto</div><div class="demo"><div class="banner">Se produjo un error. Revise los datos ingresados.</div><div class="field"><input class="control invalid" value="04/09/2026 · 08:00" placeholder="Horario de inicio"></div></div><p class="note">Sin etiqueta persistente, el placeholder desaparece al escribir; el borde rojo queda como único indicio y el aviso genérico no dice qué corregir.</p></div>
+    </div>
+  </section>
+  <section class="checklist"><h3>Lista de verificaci&oacute;n para revisi&oacute;n de PR</h3><ul><li>¿Cada control tiene etiqueta visible además de placeholder?</li><li>¿El borde del control usa --color-border-strong y no el --color-border decorativo?</li><li>¿El mensaje de error está debajo del control y referenciado por aria-describedby?</li><li>¿Los estados deshabilitado y de solo lectura tienen explicación textual visible?</li><li>¿La obligatoriedad se lee sin depender del color?</li></ul></section>
+</section>
+<section class="area" id="actions">
+  <h2>Jerarquía de acciones y confirmaciones destructivas</h2>
+  <p class="summary">Cuántas acciones primarias admite una superficie, cómo se separa lo destructivo y cómo se nombran los botones.</p>
+  <p class="ref">DESIGN.md · Anatomía de componentes · Redacción UX en español</p>
+  <section class="pair">
+    <h3>Barra de acciones de un servicio<em>Regla: Una sola acción primaria por superficie de tarea</em></h3>
+    <div class="cols">
+      <div class="col do"><div class="col-head"><span class="tick" aria-hidden="true">&#10003;</span>Correcto</div><div class="demo"><div class="card"><h4>Servicio SRV-2026-008431</h4><p>Barrido programado · Zona Norte · 04/09/2026</p><div class="row" style="margin-top:14px"><button class="btn primary">Registrar avance</button><button class="btn">Reprogramar servicio</button><button class="btn ghost push">Cancelar servicio</button></div></div></div><p class="note">Un único primario define la tarea esperada; lo destructivo se separa a la derecha y no compite visualmente.</p></div>
+      <div class="col dont"><div class="col-head"><span class="tick" aria-hidden="true">&#10005;</span>Incorrecto</div><div class="demo"><div class="card"><h4>Servicio SRV-2026-008431</h4><p>Barrido programado · Zona Norte · 04/09/2026</p><div class="row" style="margin-top:14px"><button class="btn primary">Aceptar</button><button class="btn primary">Enviar</button><button class="btn danger">Eliminar</button></div></div></div><p class="note">Tres rellenos sin jerarquía, etiquetas genéricas que no dicen qué ocurre y una acción destructiva adyacente a la confirmación.</p></div>
+    </div>
+  </section>
+  <section class="checklist"><h3>Lista de verificaci&oacute;n para revisi&oacute;n de PR</h3><ul><li>¿Hay exactamente una acción primaria rellena en la superficie?</li><li>¿Cada etiqueta es verbo + objeto y se entiende fuera de contexto?</li><li>¿La acción destructiva está separada de la confirmación?</li><li>¿La alternativa segura tiene nombre propio en vez de Cancelar genérico?</li><li>¿El progreso aparece en la acción que lo inició, sin cambiar su ancho ni perder su etiqueta?</li></ul></section>
+</section>
+<section class="area" id="statuses">
+  <h2>Estados operativos del servicio</h2>
+  <p class="summary">Cómo se representan los ServiceStatus del backend, qué no es un estado y cómo se evita depender del color.</p>
+  <p class="ref">DESIGN.md · Estados operativos</p>
+  <section class="pair">
+    <h3>Estado en una tabla de servicios<em>Regla: El estado combina relleno semántico, ícono y etiqueta en español</em></h3>
+    <div class="cols">
+      <div class="col do"><div class="col-head"><span class="tick" aria-hidden="true">&#10003;</span>Correcto</div><div class="demo"><table><thead><tr><th>Servicio</th><th>Zona</th><th>Estado</th></tr></thead><tbody><tr><td>SRV-008431</td><td>Norte</td><td><span class="pill info"><i aria-hidden="true">◷</i>Programado</span></td></tr><tr><td>SRV-008432</td><td>Centro</td><td><span class="pill warn"><i aria-hidden="true">⟳</i>A reprogramar</span></td></tr><tr><td>SRV-008433</td><td>Sur</td><td><span class="pill ok"><i aria-hidden="true">✓</i>Completado</span></td></tr></tbody></table></div><p class="note">Texto, ícono y color coinciden; la columna reserva ancho para A reprogramar, la etiqueta más larga.</p></div>
+      <div class="col dont"><div class="col-head"><span class="tick" aria-hidden="true">&#10005;</span>Incorrecto</div><div class="demo"><table><thead><tr><th>Servicio</th><th>Zona</th><th>Estado</th></tr></thead><tbody><tr><td>SRV-008431</td><td>Norte</td><td><span class="dot c"></span></td></tr><tr><td>SRV-008432</td><td>Centro</td><td><span class="dot d"></span></td></tr><tr><td>SRV-008433</td><td>Sur</td><td><span class="dot b">IN_PROGRESS</span></td></tr></tbody></table></div><p class="note">El color solo no distingue estados, y el valor crudo del backend en inglés no pertenece a la interfaz.</p></div>
+    </div>
+  </section>
+  <section class="checklist"><h3>Lista de verificaci&oacute;n para revisi&oacute;n de PR</h3><ul><li>¿La píldora incluye ícono y etiqueta en español, no solo color?</li><li>¿La etiqueta corresponde exactamente a la tabla aprobada de ServiceStatus?</li><li>¿Las condiciones que no son estado se muestran como aviso aparte?</li><li>¿El nombre accesible incluye el texto completo del estado?</li><li>¿El layout reserva ancho para A reprogramar, la etiqueta más larga?</li></ul></section>
+</section>
+<section class="area" id="responsive">
+  <h2>Comportamiento responsive entre Office y Field</h2>
+  <p class="summary">Cómo se transforma una tabla densa en pantalla angosta y cómo cambian los objetivos táctiles sin encoger el texto.</p>
+  <p class="ref">DESIGN.md · Escala tipográfica y densidad · Navegación móvil</p>
+  <section class="pair">
+    <h3>Lista de servicios en pantalla angosta<em>Regla: La tabla densa se transforma, no se comprime</em></h3>
+    <div class="cols">
+      <div class="col do"><div class="col-head"><span class="tick" aria-hidden="true">&#10003;</span>Correcto</div><div class="demo"><div class="phone"><div class="phone-head">Servicios · turno mañana</div><div class="phone-body"><div class="mini-card"><strong>SRV-008431 · Barrido</strong><span>Zona Norte · 08:00–10:00</span><span class="pill info"><i aria-hidden="true">◷</i>Programado</span></div><div class="mini-card"><strong>SRV-008432 · Poda</strong><span>Zona Centro · 09:30–12:00</span><span class="pill warn"><i aria-hidden="true">⟳</i>A reprogramar</span></div><button class="btn primary" style="width:100%;min-height:48px">Registrar avance</button></div></div></div><p class="note">Cada servicio se lee de un vistazo, el texto conserva su tamaño y la acción principal cumple el objetivo táctil de 48 px.</p></div>
+      <div class="col dont"><div class="col-head"><span class="tick" aria-hidden="true">&#10005;</span>Incorrecto</div><div class="demo"><div class="phone"><div class="phone-head">Servicios · turno mañana</div><div class="phone-body tight"><div class="scroller"><table><thead><tr><th>ID</th><th>Tipo</th><th>Zona</th><th>Inicio</th><th>Fin</th><th>Cuadrilla</th><th>Estado</th></tr></thead><tbody><tr><td>SRV-008431</td><td>Barrido</td><td>Norte</td><td>08:00</td><td>10:00</td><td>Norte 2</td><td>Programado</td></tr><tr><td>SRV-008432</td><td>Poda</td><td>Centro</td><td>09:30</td><td>12:00</td><td>Centro 1</td><td>A reprogramar</td></tr></tbody></table></div><div class="row" style="margin-top:8px"><button class="btn small">Avance</button><button class="btn small">Editar</button></div></div></div></div><p class="note">El scroll horizontal esconde columnas, el texto baja a 11 px y los controles de 32 px quedan por debajo del objetivo táctil.</p></div>
+    </div>
+  </section>
+  <section class="checklist"><h3>Lista de verificaci&oacute;n para revisi&oacute;n de PR</h3><ul><li>¿La vista angosta transforma la tabla en lugar de desplazarla horizontalmente?</li><li>¿Los controles táctiles alcanzan 48 px de alto?</li><li>¿El texto de lectura se mantiene en 16 px en Field?</li><li>¿La hoja y el teclado dejan accesibles la navegación y los controles críticos?</li><li>¿El layout tolera el zoom de texto del navegador sin recortes ni superposiciones?</li></ul></section>
+</section>
+<section class="area" id="dataviz">
+  <h2>Presentación de mapa y gráficos operativos</h2>
+  <p class="summary">Qué forma de gráfico corresponde a cada pregunta, cómo se acompaña con datos exactos y cómo se representan las paradas del recorrido.</p>
+  <p class="ref">DESIGN.md · Gráficos operativos · Marcadores de recorrido · Énfasis del mapa base</p>
+  <section class="pair">
+    <h3>Cumplimiento por zona<em>Regla: La forma del gráfico responde a la pregunta operativa</em></h3>
+    <div class="cols">
+      <div class="col do"><div class="col-head"><span class="tick" aria-hidden="true">&#10003;</span>Correcto</div><div class="demo"><div class="card"><h4>Cumplimiento por zona · agosto 2026</h4><p style="margin-bottom:12px">Porcentaje de servicios completados sobre programados. Actualizado 03/09 08:00.</p><div class="bars"><div class="bar-row"><span>Zona Norte</span><div class="track"><div class="fill" style="width:92%"></div></div><b>92%</b></div><div class="bar-row"><span>Zona Centro</span><div class="track"><div class="fill" style="width:81%"></div></div><b>81%</b></div><div class="bar-row"><span>Zona Oeste</span><div class="track"><div class="fill" style="width:74%"></div></div><b>74%</b></div><div class="bar-row"><span>Zona Sur</span><div class="track"><div class="fill accent" style="width:58%"></div></div><b>58%</b></div></div><div class="row" style="margin-top:12px"><button class="btn small">Ver tabla de datos</button></div></div></div><p class="note">El orden permite rankear, cada valor exacto está junto a su marca, el coral señala el único umbral incumplido y la tabla acompaña.</p></div>
+      <div class="col dont"><div class="col-head"><span class="tick" aria-hidden="true">&#10005;</span>Incorrecto</div><div class="demo"><div class="card"><h4>Cumplimiento por zona</h4><p style="margin-bottom:12px">Pase el cursor para ver los valores.</p><div class="donut"><div class="donut-shape" role="img" aria-label="Gráfico de dona"></div><div class="legend"><span><i style="background:#e0563f"></i>Zona Norte</span><span><i style="background:#8f4fc4"></i>Zona Centro</span><span><i style="background:#2fae86"></i>Zona Oeste</span><span><i style="background:#e8b23a"></i>Zona Sur</span></div></div></div></div><p class="note">La dona no permite rankear porcentajes, los valores dependen del hover y la paleta reutiliza verde, ámbar y rojo que ya significan estado.</p></div>
+    </div>
+  </section>
+  <section class="checklist"><h3>Lista de verificaci&oacute;n para revisi&oacute;n de PR</h3><ul><li>¿La forma elegida responde a la pregunta y no a la costumbre visual?</li><li>¿Hay una tabla acompañante con los valores exactos?</li><li>¿Unidades, rango de fechas y actualización están en texto y no solo en tooltips?</li><li>¿Los pines conservan número de orden y nombre accesible?</li><li>¿El color del gráfico permanece subordinado al significado, dejando su sentido a los colores semánticos?</li></ul></section>
+</section>
+<section class="area" id="motion">
+  <h2>Movimiento y movimiento reducido</h2>
+  <p class="summary">Cuánto se mueve una superficie al abrirse, qué se conserva bajo prefers-reduced-motion y qué movimiento no corresponde.</p>
+  <p class="ref">DESIGN.md · Movimiento y movimiento reducido</p>
+  <section class="pair">
+    <h3>Apertura del detalle de servicio<em>Regla: El movimiento explica una relación espacial</em></h3>
+    <div class="cols">
+      <div class="col do"><div class="col-head"><span class="tick" aria-hidden="true">&#10003;</span>Correcto</div><div class="demo"><div class="motion-stage" data-motion="good"><div class="motion-list"><button type="button" data-motion-trigger aria-pressed="false">SRV-008431</button><button type="button" data-motion-trigger aria-pressed="false">SRV-008432</button></div><div class="motion-panel"><strong>SRV-008431</strong><span>Barrido · Zona Norte</span><span>08:00–10:00</span></div></div><p class="rm-note"><b>Pruebe:</b> seleccione un servicio. El detalle recorre 280 ms desde el borde derecho y la fila seleccionada permanece marcada.</p></div><p class="note">El recorrido tiene origen y destino, la selección se conserva y la duración no retrasa la lectura.</p></div>
+      <div class="col dont"><div class="col-head"><span class="tick" aria-hidden="true">&#10005;</span>Incorrecto</div><div class="demo"><div class="motion-stage bad" data-motion="bad"><div class="motion-list"><button type="button" data-motion-trigger aria-pressed="false">SRV-008431 <span class="loop" aria-hidden="true">●</span></button><button type="button" data-motion-trigger aria-pressed="false">SRV-008432</button></div><div class="motion-panel"><strong>SRV-008431</strong><span>Barrido · Zona Norte</span><span>08:00–10:00</span></div></div><p class="rm-note"><b>Pruebe:</b> el detalle tarda 900 ms y rebota, mientras un indicador late de forma continua junto a la lista.</p></div><p class="note">El rebote y la duración larga hacen esperar en una tarea repetitiva, y el latido permanente compite con la lectura de datos.</p></div>
+    </div>
+  </section>
+  <section class="checklist"><h3>Lista de verificaci&oacute;n para revisi&oacute;n de PR</h3><ul><li>¿La transición tiene origen y destino concretos, no solo un fundido?</li><li>¿Las duraciones respetan 150 / 280 / 420 ms según el tipo de cambio?</li><li>¿No hay animación en bucle ni entrada de página completa?</li><li>¿Con prefers-reduced-motion el resultado sigue siendo evidente por color, borde, ícono y texto?</li><li>¿La selección y el estado se conservan durante la transición?</li></ul></section>
+</section>
+<section class="area" id="voice">
+  <h2>Voz institucional en español</h2>
+  <p class="summary">Cómo suenan las etiquetas, los errores y los estados vacíos bajo el registro formal aprobado.</p>
+  <p class="ref">DESIGN.md · Redacción UX en español</p>
+  <section class="pair">
+    <h3>Mensaje de validación<em>Regla: El error indica el problema y el próximo paso válido</em></h3>
+    <div class="cols">
+      <div class="col do"><div class="col-head"><span class="tick" aria-hidden="true">&#10003;</span>Correcto</div><div class="demo"><div class="field"><label for="dd-v1">Horario de inicio previsto</label><input class="control invalid" id="dd-v1" value="04/09/2026 · 08:00" aria-invalid="true" aria-describedby="dd-v1-err"><span class="error" id="dd-v1-err">El horario deberá ser posterior a las 08:12, hora de la última actualización del servicio.</span></div><div class="row" style="margin-top:14px"><button class="btn primary">Establecer 08:30</button><button class="btn">Regresar al servicio</button></div></div><p class="note">Registro formal, restricción explícita y una acción concreta que resuelve el problema en un paso.</p></div>
+      <div class="col dont"><div class="col-head"><span class="tick" aria-hidden="true">&#10005;</span>Incorrecto</div><div class="demo"><div class="field"><label for="dd-v2">Horario</label><input class="control invalid" id="dd-v2" value="04/09/2026 · 08:00" aria-invalid="true" aria-describedby="dd-v2-err"><span class="error" id="dd-v2-err">Error: ingresaste mal la fecha.</span></div><div class="row" style="margin-top:14px"><button class="btn primary">Aceptar</button><button class="btn">Cancelar</button></div></div><p class="note">Mezcla voseo con el registro formal del producto, atribuye culpa, no indica la restricción y ofrece botones genéricos.</p></div>
+    </div>
+  </section>
+  <section class="checklist"><h3>Lista de verificaci&oacute;n para revisi&oacute;n de PR</h3><ul><li>¿El registro formal se mantiene en etiquetas, ayudas, errores y confirmaciones?</li><li>¿La acción se nombra con verbo y objeto específicos?</li><li>¿Los términos de dominio coinciden con servicio, cuadrilla, asignación, recorrido y turno?</li><li>¿El estado vacío distingue su causa y ofrece la próxima acción?</li><li>¿La confirmación destructiva nombra el objeto afectado y su consecuencia?</li></ul></section>
+</section>
+</main>
+<script>
+  // The motion pair is the one example whose rule cannot be shown by a static
+  // image: it is about travel over time. This opens the detail panel so the
+  // approved 280ms easing can be compared against the rejected 900ms bounce.
+  document.addEventListener("click", event => {
+    const trigger = event.target.closest("[data-motion-trigger]")
+    if (!trigger) return
+    const stage = trigger.closest(".motion-stage")
+    stage.querySelectorAll("[data-motion-trigger]").forEach(b => b.setAttribute("aria-pressed", String(b === trigger)))
+    stage.classList.add("open")
+    stage.querySelector(".motion-panel strong").textContent = trigger.textContent.trim().split(" ")[0]
+  })
+</script>
+</body>
+</html>

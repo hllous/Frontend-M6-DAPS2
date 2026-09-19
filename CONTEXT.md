@@ -37,7 +37,7 @@ The state where a field crew's manually resubmitted local draft can't be applied
 _Avoid_: Sync error, merge conflict
 
 **Evidence**:
-A reason, a note, and a photo (where feasible), uploaded separately and attached by reference to a Service outcome or another resource's report/decision action (e.g. a Container overflow report, damage report, removal, or standalone repair completion — see that resource's `CONTRACTS.md` entry for which actions require it). Mandatory on every Service exception outcome (`PARTIALLY_COMPLETED`, any `PARTIAL`/`NOT_SERVICED` zone, `CANCELLED`, `SUSPENDED`); optional on a clean completion. For a non-Service action, an outcome reached *through* a linked Service uses that Service's own Evidence rather than a second, separate one.
+A reason, a note, and a photo (where feasible), uploaded separately and attached by reference to a Service outcome or another resource's report/decision action (e.g. a Container overflow report, damage report, removal, or standalone repair completion — see that resource's `CONTRACTS.md` entry for which actions require it). Mandatory on every Service exception outcome (`PARTIALLY_COMPLETED`, any `PARTIAL`/`NOT_SERVICED` zone, `CANCELLED`, `SUSPENDED`); optional on a clean completion. For a non-Service action, an outcome reached *through* a linked Service uses that Service's own Evidence rather than a second, separate one. Backend attaches Evidence to a **resource**, not to the individual action: `POST /evidence` accepts exactly four owner types — `SERVICE`, `ZONE_RESULT`, `INSPECTION`, `CONTAINER` — so a tree, a tree survey and a tree intervention cannot carry Evidence at all, and a Container's photos are a flat list across all its reports.
 _Avoid_: Attachment, proof, documentation
 
 **Office**:
@@ -63,3 +63,99 @@ _Avoid_: Role, permission, scope
 **My Work**:
 The capability-scoped landing view every actor sees on entry. For Field, it's their assigned Services; for Office, it's a personal action queue — items waiting on that specific Office actor, such as an unassigned Service. Never a cross-team or cross-zone summary; that belongs to a dashboard, not to My Work.
 _Avoid_: Home, Inbox, Dashboard (as a synonym for this view)
+
+**Sensitivity Tier**:
+A three-level classification (Tier 0 operational/catalog data, Tier 1 internal-operational/identity-adjacent data, Tier 2 regulated third-party data — a citizen's identity on an EnvironmentalReport, inspector findings, ViolationNotice/SanctionOutcome detail) that drives client storage, export, and audit rules everywhere in M6. Capability-gating stays per-resource (see Capability); Tier is a separate, orthogonal axis about how the data itself must be handled once an actor is authorized to see it. See [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md).
+_Avoid_: PII flag, confidential, sensitive (as an undefined adjective)
+
+**RepairRequest**:
+An M6 tracking record for infrastructure damage detected through a Service or EnvironmentalInspection and explicitly referred to M3. It follows the external repair request, not the M3 work order itself; Office sees all records, while Field sees only records related to its assigned work. `publicSafetyRisk` is an explicit fact separate from `severity`. A Container damage path that emits `containerDamaged` is not a RepairRequest.
+_Avoid_: work order, repair task
+
+**StreetClosureRequest**:
+An M6 tracking record for a street closure explicitly requested from M7 on behalf of a Service or an authorized TreeIntervention. Its response can affect whether the related work may proceed: a pending request blocks the Service from starting. It is created by Office; Field sees only the request context attached to its assigned Service.
+_Avoid_: traffic ticket, closure status (when referring to the M7 response)
+
+**Stale external referral**:
+An operational warning that a pending RepairRequest or StreetClosureRequest has exceeded its expected response window without a corresponding external update. It is not a new domain status and never changes the referral automatically.
+_Avoid_: failed referral, timed-out request
+
+**Manual referral recovery**:
+An explicit Office-only action used when an expected external event has not arrived, invoking the available transition after review and confirmation. It is exceptional reconciliation, not the normal way a referral changes state.
+_Avoid_: manual status edit, force transition
+
+**Street-closure dependency**:
+The operational dependency between a StreetClosureRequest and its source Service: a pending request prevents that Service from starting, approval permits execution, rejection requires an Office reschedule-or-cancel decision, and ending the closure releases the dependency. It is not a new Service status.
+_Avoid_: blocked Service status, traffic approval
+
+**Referral context**:
+The source reference that explains why a RepairRequest or StreetClosureRequest exists. The reference is canonical; the interface may show a readable summary and navigation back to the source, but it does not create a second authoritative copy of the source.
+_Avoid_: copied source, external work order
+
+**Duplicate referral candidate**:
+An existing active referral with the same source, referral kind, damage type when applicable, and location. It is a warning for human review, not an automatic merge or a guaranteed duplicate.
+_Avoid_: duplicate by text, automatic merge
+
+**Referral reconciliation**:
+An Office review of a referral whose source changed, whose external response is missing or out of order, or whose submission result is uncertain. Reconciliation preserves the recorded facts and never lets a local state overwrite an external decision.
+_Avoid_: force sync, last-write-wins
+
+**Uncorrelated external response**:
+An external response that cannot be matched confidently to the referral and source it claims to update. It is retained for review without changing the M6 referral or reopening its Service.
+_Avoid_: orphan event, automatic recovery
+
+**Unsent referral**:
+An attempted referral for which M6 has no created tracking record because submission failed before creation. It is distinct from a pending referral, which has a created record and is awaiting the external module.
+_Avoid_: failed status, pending request
+
+**Weather-triggered Service response**:
+An office decision applied to an existing Service whose origin is `WEATHER_ALERT`; it is handled per Service rather than as a shared batch state.
+_Avoid_: Weather cancellation, weather batch
+
+**Inspection follow-up**:
+An operational Service scheduled after an EnvironmentalInspection to address a finding. The finding is not itself a scheduled Service and does not automatically produce a set of Services.
+_Avoid_: Inspection batch, finding task
+
+**EnvironmentalReport**:
+The M6 environmental case file for a report or own-initiative detection, progressing through the eleven operational statuses from receipt to closure. It is distinct from M1's digital `caseFile`.
+_Avoid_: caseFile, ticket (when referring to the M6 case file)
+
+**Own-initiative detection**:
+An environmental situation observed by a Field actor outside an M2 citizen ticket, entering the received intake for Office triage.
+_Avoid_: ticket, complaint
+
+**Triage**:
+The Office review of a received EnvironmentalReport that determines whether M6 proceeds with inspection, returns it to M2, or dismisses it.
+_Avoid_: dispatch, approval
+
+**EnvironmentalInspection**:
+The inspection record attached to an EnvironmentalReport and executed through a POINT Service. It contains the checklist, findings, evidence, and inspection outcome.
+_Avoid_: inspection task, finding task
+
+**Inspection checklist**:
+A versioned set of checks that must be completed as part of an EnvironmentalInspection before its outcome is recorded.
+_Avoid_: inspection form, task list
+
+**Reinspection**:
+A new EnvironmentalInspection scheduled after an inconclusive inspection; the previous inspection remains part of the case history.
+_Avoid_: repeat inspection, inspection retry
+
+**ViolationNotice**:
+The formal, immutable act issued by Office after an inspection finds a violation. It may be recorded without being referred to M4 when no establishment can be identified.
+_Avoid_: sanction, fine, warning
+
+**Non-forwarded notice**:
+A recorded ViolationNotice that cannot be sent to M4 because no establishment was identified; it closes the M6 case without claiming an external sanctioning action.
+_Avoid_: failed notice, pending notice
+
+**SanctionOutcome**:
+The read-only M4 resolution associated with a ViolationNotice, representing the external decision that completes the sanctioning path.
+_Avoid_: internal resolution, notice status
+
+**Deadline closure**:
+The automatic closure of a case after the M4 response deadline expires, distinct from a sanction decision or an explicit dismissal by M4.
+_Avoid_: timeout dismissal, automatic rejection
+
+**Bulk Service operation**:
+A coordinated action intended to mutate multiple Services as one operational decision. It is outside the initial M6 blueprint until its backend authorization, audit, and partial-failure contract is defined.
+_Avoid_: Mass action, bulk edit
