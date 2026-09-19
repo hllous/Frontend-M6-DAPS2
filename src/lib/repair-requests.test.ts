@@ -8,6 +8,7 @@ import { resetRepairRequestFixtures } from "./repair-request-fixtures";
 import {
   REPAIR_DAMAGE_TYPE_LABEL,
   RepairRequestContractError,
+  RepairRequestRequestError,
   repairRequestsAdapter,
   type CreateRepairRequestInput,
 } from "./repair-requests";
@@ -76,6 +77,29 @@ describe("repair requests adapter", () => {
 
     const closed = await repairRequestsAdapter.close("RR-1001", { workOrderId: "WO-3001" });
     expect(closed.status).toBe("CLOSED");
+  });
+
+  it("preserves the backend message and status for a 409 recovery conflict", async () => {
+    server.use(
+      http.post("*/api/repair-requests/RR-1001/start", () =>
+        HttpResponse.json(
+          {
+            statusCode: 409,
+            message: "La derivación ya fue cerrada por otra operación.",
+            error: "Conflict",
+            timestamp: new Date().toISOString(),
+            path: "/api/repair-requests/RR-1001/start",
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    await expect(repairRequestsAdapter.start("RR-1001", { workOrderId: "WO-3001" })).rejects.toMatchObject({
+      name: "RepairRequestRequestError",
+      status: 409,
+      message: "La derivación ya fue cerrada por otra operación.",
+    } satisfies Partial<RepairRequestRequestError>);
   });
 
   it("exposes Spanish labels for closed enum families", () => {

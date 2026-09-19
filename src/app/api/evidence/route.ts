@@ -29,6 +29,7 @@ import { recordTelemetryEvent } from "@/lib/telemetry";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
+  413: "Payload Too Large",
   401: "Unauthorized",
   403: "Forbidden",
   404: "Not Found",
@@ -81,7 +82,12 @@ export async function POST(request: Request) {
       return errorResponse(400, "El cuerpo de la solicitud debe ser multipart/form-data válido.", path);
     }
 
-    const file = formData.get("file");
+    const files = formData.getAll("file");
+    if (files.length > 1) {
+      return errorResponse(400, "Solo se permite un archivo por solicitud de evidencia.", path);
+    }
+
+    const file = files[0] ?? null;
     const rawOwnerType = formData.get("ownerType");
     const ownerId = formData.get("ownerId");
 
@@ -137,7 +143,7 @@ export async function POST(request: Request) {
 
     // File validation: Size & MIME
     if (fileSize > MAX_FILE_SIZE) {
-      return errorResponse(400, "El archivo supera el tamaño máximo permitido de 10 MB.", path);
+      return errorResponse(413, "El archivo supera el tamaño máximo permitido de 10 MB.", path);
     }
 
     const mimeType = file.type || "application/octet-stream";

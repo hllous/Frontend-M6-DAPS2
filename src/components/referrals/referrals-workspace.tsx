@@ -30,10 +30,16 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { referralsAdapter, isReferralVisibleToScenario, referralFromRepairRequest, referralFromStreetClosureRequest, type Referral } from "@/lib/referrals";
 import { getReferralAnomalies, type ReferralAnomaly } from "@/lib/referral-anomalies";
-import { repairRequestsAdapter } from "@/lib/repair-requests";
+import {
+  RepairRequestRequestError,
+  repairRequestsAdapter,
+} from "@/lib/repair-requests";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { servicesAdapter, type Service } from "@/lib/services";
-import { streetClosureRequestsAdapter } from "@/lib/street-closure-requests";
+import {
+  StreetClosureRequestError,
+  streetClosureRequestsAdapter,
+} from "@/lib/street-closure-requests";
 
 type SourceServiceState = {
   sources: Map<string, Service>;
@@ -689,7 +695,7 @@ function ReferralRecoveryPanel({
   const actions = recoveryActionsFor(referral);
   const [activeAction, setActiveAction] = useState<RecoveryAction | null>(null);
 
-  if (actions.length === 0) return null;
+  if (actions.length === 0 && !activeAction) return null;
 
   return (
     <section
@@ -738,6 +744,7 @@ function ReferralRecoveryPanel({
             onRecovered(updatedReferral);
             setActiveAction(null);
           }}
+          onReferralRefreshed={onRecovered}
         />
       )}
     </section>
@@ -750,12 +757,14 @@ function ReferralRecoveryDialog({
   action,
   onOpenChange,
   onRecovered,
+  onReferralRefreshed,
 }: {
   open: boolean;
   referral: Referral;
   action: RecoveryAction;
   onOpenChange: (open: boolean) => void;
   onRecovered: (updatedReferral: Referral) => void;
+  onReferralRefreshed: (updatedReferral: Referral) => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -765,6 +774,7 @@ function ReferralRecoveryDialog({
           action={action}
           onOpenChange={onOpenChange}
           onRecovered={onRecovered}
+          onReferralRefreshed={onReferralRefreshed}
         />
       </DialogContent>
     </Dialog>
@@ -776,11 +786,13 @@ function ReferralRecoveryForm({
   action,
   onOpenChange,
   onRecovered,
+  onReferralRefreshed,
 }: {
   referral: Referral;
   action: RecoveryAction;
   onOpenChange: (open: boolean) => void;
   onRecovered: (updatedReferral: Referral) => void;
+  onReferralRefreshed: (updatedReferral: Referral) => void;
 }) {
   const formId = useMemo(() => `referral-recovery-${referral.id}-${action.transition}`, [referral.id, action.transition]);
   const [externalId, setExternalId] = useState("");
@@ -817,6 +829,21 @@ function ReferralRecoveryForm({
       onRecovered(updatedReferral);
       onOpenChange(false);
     } catch (cause) {
+      const isConflict =
+        (cause instanceof RepairRequestRequestError || cause instanceof StreetClosureRequestError) &&
+        cause.status === 409;
+
+      if (isConflict) {
+        try {
+          const refreshedReferral = action.kind === "REPAIR_REQUEST"
+            ? referralFromRepairRequest(await repairRequestsAdapter.get(referral.id))
+            : referralFromStreetClosureRequest(await streetClosureRequestsAdapter.get(referral.id));
+          onReferralRefreshed(refreshedReferral);
+        } catch {
+          // Keep the backend conflict message visible if the refresh is unavailable.
+        }
+      }
+
       setErrorMessage(cause instanceof Error ? cause.message : "No se pudo registrar la recuperación manual.");
     } finally {
       setIsSubmitting(false);
