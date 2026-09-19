@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { AlertCircle, Calendar, Check, Clock, Info, Loader2, MapPin, Route as RouteIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -66,9 +66,11 @@ export function ScheduleServiceDialog({
   const [genericOrigin, setGenericOrigin] = useState<ServiceOrigin>("MANUAL");
   const [manualTicketId, setManualTicketId] = useState(() => initialReferenceId ?? "");
 
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) setManualTicketId(initialReferenceId ?? "");
-  }, [initialOrigin, initialReferenceId, open]);
+  }
 
   // Effective origin & reference: locked when linked, user-selected otherwise
   const origin: ServiceOrigin = isLinked && initialOrigin ? initialOrigin : genericOrigin;

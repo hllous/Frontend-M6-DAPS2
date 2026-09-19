@@ -175,13 +175,15 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await loginViaApi(page, "office-duty-queue");
 
     // Navigate with linked-create query params
-    await page.goto("/app?destination=services&action=schedule&origin=TICKET&referenceId=TK-9921");
+    await page.goto(
+      "/app?destination=services&action=schedule&origin=TICKET&referenceId=550e8400-e29b-41d4-a716-446655440921",
+    );
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("heading", { name: "Programar servicio vinculado" })).toBeVisible();
     await expect(dialog.getByText("Origen vinculado preservado")).toBeVisible();
-    await expect(dialog.getByText("TK-9921")).toBeVisible();
+    await expect(dialog.getByText("550e8400-e29b-41d4-a716-446655440921")).toBeVisible();
 
     // Select a POINT service type
     await dialog.getByLabel(/Tipo de servicio/i).selectOption({ label: "Mantenimiento de contenedores (Punto)" });
