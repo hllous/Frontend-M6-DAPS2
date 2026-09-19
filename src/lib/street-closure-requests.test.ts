@@ -11,6 +11,7 @@ import {
 import { resetTreeInterventionFixtures } from "./tree-intervention-fixtures";
 import {
   StreetClosureRequestContractError,
+  StreetClosureRequestError,
   streetClosureRequestsAdapter,
 } from "./street-closure-requests";
 
@@ -104,6 +105,31 @@ describe("street closure request adapter", () => {
 
     const ended = await streetClosureRequestsAdapter.end(created.id);
     expect(ended.status).toBe("ENDED");
+  });
+
+  it("preserves the backend message and status for a 409 recovery conflict", async () => {
+    server.use(
+      http.post("*/api/street-closure-requests/SCR-1001/approve", () =>
+        HttpResponse.json(
+          {
+            statusCode: 409,
+            message: "El corte de calle ya fue finalizado por M7.",
+            error: "Conflict",
+            timestamp: new Date().toISOString(),
+            path: "/api/street-closure-requests/SCR-1001/approve",
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    await expect(
+      streetClosureRequestsAdapter.approve("SCR-1001", { closureId: "M7-C-882" }),
+    ).rejects.toMatchObject({
+      name: "StreetClosureRequestError",
+      status: 409,
+      message: "El corte de calle ya fue finalizado por M7.",
+    } satisfies Partial<StreetClosureRequestError>);
   });
 
   it.each([

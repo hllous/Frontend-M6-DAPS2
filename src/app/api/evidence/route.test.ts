@@ -141,7 +141,7 @@ describe("POST /api/evidence BFF route", () => {
     expect(response.status).toBe(400);
   });
 
-  it("returns 400 when file exceeds 10 MB", async () => {
+  it("returns 413 when file exceeds 10 MB", async () => {
     const cookie = await authenticatedCookie("field-crew-leader-route");
     const largeFile = new File(["dummy"], "big.jpg", { type: "image/jpeg" });
     const formData = new FormData();
@@ -157,9 +157,30 @@ describe("POST /api/evidence BFF route", () => {
         body: formData,
       }),
     );
+    expect(response.status).toBe(413);
+    const body = await response.json();
+    expect(body.error).toBe("Payload Too Large");
+    expect(body.message).toMatch(/10 MB/i);
+  });
+
+  it("returns 400 when more than one file is sent", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const formData = new FormData();
+    formData.append("file", new File(["first"], "first.jpg", { type: "image/jpeg" }));
+    formData.append("file", new File(["second"], "second.jpg", { type: "image/jpeg" }));
+    formData.append("ownerType", "ZONE_RESULT");
+    formData.append("ownerId", "ZR-1");
+
+    const response = await POST(
+      new Request("http://localhost/api/evidence", {
+        method: "POST",
+        headers: { cookie, "Idempotency-Key": "key-multiple-files" },
+        body: formData,
+      }),
+    );
     expect(response.status).toBe(400);
     const body = await response.json();
-    expect(body.message).toMatch(/10 MB/i);
+    expect(body.message).toBe("Solo se permite un archivo por solicitud de evidencia.");
   });
 
   it("returns 400 when MIME type is not allowed", async () => {

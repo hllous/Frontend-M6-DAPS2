@@ -204,6 +204,57 @@ describe("ReferralsWorkspace", () => {
     expect(within(detail).getByText("Cerrada")).toBeVisible();
   });
 
+  it("shows a 409 message, refreshes the referral, and removes the invalid action", async () => {
+    const all = fixtureReferrals();
+    const base = all.find((referral) => referral.id === "RR-1001");
+    if (!base || base.kind !== "REPAIR_REQUEST") throw new Error("Expected the RR-1001 repair referral fixture");
+
+    const refreshedRequest = {
+      ...base.request,
+      status: "CLOSED" as const,
+      workOrderId: "M3-OT-2048",
+      updatedAt: "2026-09-19T12:00:00.000Z",
+    };
+    server.use(
+      http.post("*/api/repair-requests/RR-1001/start", () =>
+        HttpResponse.json(
+          {
+            statusCode: 409,
+            message: "La derivación ya fue cerrada por otra operación.",
+            error: "Conflict",
+            timestamp: new Date().toISOString(),
+            path: "/api/repair-requests/RR-1001/start",
+          },
+          { status: 409 },
+        ),
+      ),
+      http.get("*/api/repair-requests/RR-1001", () => HttpResponse.json(refreshedRequest)),
+    );
+
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(list).getByRole("button", { name: /RR-1001/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
+    await user.click(within(detail).getByRole("button", { name: "Registrar inicio de reparación" }));
+
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getByLabelText(/Identificador externo de M3/), "M3-OT-2048");
+    await user.click(within(dialog).getByRole("button", { name: /Confirmar recuper/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status", { name: "Estado: Cerrada", hidden: true })).toBeVisible();
+    });
+    expect(screen.getByRole("dialog")).toBeVisible();
+    expect(within(screen.getByRole("dialog")).getByRole("alert")).toHaveTextContent(
+      "La derivación ya fue cerrada por otra operación.",
+    );
+
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Volver" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "Registrar inicio de reparación" })).not.toBeInTheDocument();
+  });
+
   it("keeps manual recovery unavailable to Field", async () => {
     const user = userEvent.setup();
     render(<ReferralsWorkspace scenario={scenarios.fieldCrewLeader} />);
