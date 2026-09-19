@@ -9,6 +9,7 @@ import { ScheduleServiceDialog } from "./schedule-service-dialog";
 import { servicesAdapter } from "@/lib/services";
 
 const server = setupServer(...handlers);
+const linkedTicketId = "550e8400-e29b-41d4-a716-446655440921";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
@@ -74,14 +75,14 @@ describe("ScheduleServiceDialog component", () => {
         onOpenChange={vi.fn()}
         onCreated={vi.fn()}
         initialOrigin="TICKET"
-        initialReferenceId="TK-9921"
+        initialReferenceId={linkedTicketId}
       />,
     );
 
     expect(screen.getByRole("heading", { name: "Programar servicio vinculado" })).toBeInTheDocument();
     expect(screen.getByText("Origen vinculado preservado")).toBeInTheDocument();
     expect(screen.getByText("Reclamo ciudadano (TICKET)")).toBeInTheDocument();
-    expect(screen.getByText("TK-9921")).toBeInTheDocument();
+    expect(screen.getByText(linkedTicketId)).toBeInTheDocument();
     // Generic origin select is not rendered in linked mode
     expect(screen.queryByLabelText("Origen del servicio *")).not.toBeInTheDocument();
   });
@@ -127,7 +128,7 @@ describe("ScheduleServiceDialog component", () => {
         onOpenChange={onOpenChange}
         onCreated={onCreated}
         initialOrigin="TICKET"
-        initialReferenceId="TK-9921"
+        initialReferenceId={linkedTicketId}
       />,
     );
 
@@ -152,10 +153,30 @@ describe("ScheduleServiceDialog component", () => {
     expect(created.status).toBe("SCHEDULED");
     expect(created.mode).toBe("POINT");
     expect(created.origin).toBe("TICKET");
-    expect(created.ticketId).toBe("TK-9921");
+    expect(created.ticketId).toBe(linkedTicketId);
     expect(created.targetRef).toBe("CT-0442");
     expect(created.crewId).toBeNull();
     expect(created.zoneIds).toEqual(["zone-1"]);
+  });
+
+  it("rejects a human publicId before creating a linked service", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+
+    render(
+      <ScheduleServiceDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        onCreated={onCreated}
+        initialOrigin="TICKET"
+        initialReferenceId="TK-2026-091"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Programar servicio" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/UUID.*TK-/i);
+    expect(onCreated).not.toHaveBeenCalled();
   });
 
   it("surfaces an error alert when the adapter rejects the creation", async () => {

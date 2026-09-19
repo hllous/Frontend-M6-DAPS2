@@ -89,6 +89,7 @@ export const environmentalReportSchema = z.object({
   location: reportLocationSchema.optional(),
   description: z.string().optional(),
   details: z.string().optional(),
+  publicId: z.string().nullable().optional(),
   ticketId: z.string().nullable().optional(),
   reporterSnapshot: z.unknown().optional(),
   status: environmentalReportStatusSchema,
@@ -261,6 +262,7 @@ export type EnvironmentalReportQuery = {
   status?: EnvironmentalReportStatus;
   reportType?: EnvironmentalReportType;
   priority?: EnvironmentalReportPriority;
+  publicId?: string;
   ticketId?: string;
   search?: string;
   page?: number;
@@ -339,6 +341,7 @@ function queryString(query: EnvironmentalReportQuery): string {
   if (query.status) params.set("status", query.status);
   if (query.reportType) params.set("reportType", query.reportType);
   if (query.priority) params.set("priority", query.priority);
+  if (query.publicId) params.set("publicId", query.publicId);
   if (query.ticketId) params.set("ticketId", query.ticketId);
   if (query.search) params.set("search", query.search);
   if (query.page !== undefined) params.set("page", String(query.page));

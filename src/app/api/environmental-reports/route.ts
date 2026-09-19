@@ -28,6 +28,7 @@ function queryFromUrl(url: URL): EnvironmentalReportQuery {
     status: environmentalReportStatusSchema.safeParse(url.searchParams.get("status")).data,
     reportType: environmentalReportTypeSchema.safeParse(url.searchParams.get("reportType")).data,
     priority: environmentalReportPrioritySchema.safeParse(url.searchParams.get("priority")).data,
+    publicId: url.searchParams.get("publicId") ?? undefined,
     ticketId: url.searchParams.get("ticketId") ?? undefined,
     search: url.searchParams.get("search") ?? undefined,
     page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,

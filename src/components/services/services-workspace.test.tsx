@@ -230,12 +230,12 @@ describe("ServicesWorkspace component", () => {
   });
 
   it("opens scheduling dialog via linked URL parameters prefilling origin and reference ID", async () => {
-    window.history.replaceState(null, "", "/app?destination=services&action=schedule&origin=TICKET&referenceId=TK-9921");
+    window.history.replaceState(null, "", "/app?destination=services&action=schedule&origin=TICKET&referenceId=550e8400-e29b-41d4-a716-446655440921");
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByRole("heading", { name: "Programar servicio vinculado" })).toBeInTheDocument();
     expect(screen.getByText("Origen vinculado preservado")).toBeInTheDocument();
-    expect(screen.getByText("TK-9921")).toBeInTheDocument();
+    expect(screen.getByText("550e8400-e29b-41d4-a716-446655440921")).toBeInTheDocument();
   });
 
   it("opens assign crew dialog from live preview, attaches crew, and reflects immediately in table and preview", async () => {

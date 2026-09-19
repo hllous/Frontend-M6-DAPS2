@@ -18,8 +18,9 @@ describe("environmental reports adapter", () => {
       requestedUrl = request.url;
       return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 } });
     }));
-    const page = await environmentalReportsAdapter.list({ page: 1, pageSize: 100 });
+    const page = await environmentalReportsAdapter.list({ page: 1, pageSize: 100, publicId: "TK-2026-000123" });
     expect(new URL(requestedUrl).searchParams.get("pageSize")).toBe("100");
+    expect(new URL(requestedUrl).searchParams.get("publicId")).toBe("TK-2026-000123");
     expect(page.pageSize).toBe(100);
     expect(page.sanctionOutcomeIntegrationExceptions).toEqual([]);
   });
@@ -31,11 +32,18 @@ describe("environmental reports adapter", () => {
 
   it("accepts a ticket-originated report with null coordinates (M2 contract v1.6, #191)", async () => {
     const report = await environmentalReportsAdapter.get("ER-1002");
-    expect(report).toMatchObject({ id: "ER-1002", ticketId: "TK-2026-091", lat: null, lng: null, address: "Av. Corrientes 4200" });
+    expect(report).toMatchObject({
+      id: "ER-1002",
+      publicId: "TK-2026-091",
+      ticketId: "550e8400-e29b-41d4-a716-446655440091",
+      lat: null,
+      lng: null,
+      address: "Av. Corrientes 4200",
+    });
 
-    const page = await environmentalReportsAdapter.list({ ticketId: "TK-2026-091" });
+    const page = await environmentalReportsAdapter.list({ publicId: "TK-2026-091" });
     expect(page.environmentalReports).toHaveLength(1);
-    expect(page.environmentalReports[0]).toMatchObject({ lat: null, lng: null });
+    expect(page.environmentalReports[0]).toMatchObject({ publicId: "TK-2026-091", lat: null, lng: null });
   });
 
   it("keeps review transitions explicit and rejects malformed success payloads", async () => {

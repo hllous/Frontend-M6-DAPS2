@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { AlertCircle, Calendar, Check, Clock, Info, Loader2, MapPin, Route as RouteIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,12 @@ interface ScheduleServiceDialogProps {
   initialReferenceId?: string;
 }
 
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string) {
+  return uuidPattern.test(value);
+}
+
 export function ScheduleServiceDialog({
   open,
   onOpenChange,
@@ -58,10 +64,18 @@ export function ScheduleServiceDialog({
     () => SERVICE_TYPE_CATALOG[0]?.id ?? "st-waste-route",
   );
   const [genericOrigin, setGenericOrigin] = useState<ServiceOrigin>("MANUAL");
+  const [manualTicketId, setManualTicketId] = useState(() => initialReferenceId ?? "");
+
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setManualTicketId(initialReferenceId ?? "");
+  }
 
   // Effective origin & reference: locked when linked, user-selected otherwise
   const origin: ServiceOrigin = isLinked && initialOrigin ? initialOrigin : genericOrigin;
-  const referenceId: string = isLinked ? (initialReferenceId ?? "") : "";
+  const referenceId: string = origin === "TICKET" ? manualTicketId : isLinked ? (initialReferenceId ?? "") : "";
+  const hasTrustedTicketContext = origin === "TICKET" && isUuid(initialReferenceId?.trim() ?? "");
 
   // Route mode state
   const [routeId, setRouteId] = useState<string>(
@@ -131,7 +145,12 @@ export function ScheduleServiceDialog({
     }
 
     if (origin === "TICKET" && !referenceId.trim()) {
-      setErrorMessage("El identificador de reclamo (ticketId) es obligatorio.");
+      setErrorMessage("Debe indicar el UUID técnico del reclamo.");
+      return;
+    }
+
+    if (origin === "TICKET" && !isUuid(referenceId.trim())) {
+      setErrorMessage("El ticketId debe ser un UUID válido. El identificador TK-… es publicId y no reemplaza el UUID técnico.");
       return;
     }
 
@@ -221,12 +240,26 @@ export function ScheduleServiceDialog({
                     {origin === "WEATHER_ALERT" && "Alerta meteorológica (WEATHER_ALERT)"}
                   </p>
                 </div>
-                <div>
-                  <span className="text-[var(--color-text-secondary)]">ID Referencia:</span>
-                  <p className="font-mono font-bold text-[var(--color-text)] mt-0.5">
-                    {referenceId || "(Sin ID)"}
-                  </p>
-                </div>
+                {origin === "TICKET" && !hasTrustedTicketContext ? (
+                  <Field>
+                    <FieldLabel htmlFor="linked-ticket-id">UUID del ticket de M2 *</FieldLabel>
+                    <input
+                      id="linked-ticket-id"
+                      value={manualTicketId}
+                      onChange={(event) => setManualTicketId(event.target.value)}
+                      className="mt-1 h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 font-mono text-xs text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"
+                      aria-describedby="linked-ticket-id-help"
+                    />
+                    <FieldDescription id="linked-ticket-id-help">Pegue el UUID técnico del expediente. El formato TK-… es publicId y no sirve para correlacionar eventos.</FieldDescription>
+                  </Field>
+                ) : (
+                  <div>
+                    <span className="text-[var(--color-text-secondary)]">{origin === "TICKET" ? "UUID de ticket:" : "ID Referencia:"}</span>
+                    <p className="font-mono font-bold text-[var(--color-text)] mt-0.5">
+                      {referenceId || "(Sin ID)"}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

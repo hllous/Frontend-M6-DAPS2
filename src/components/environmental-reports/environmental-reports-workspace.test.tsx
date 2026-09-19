@@ -105,6 +105,23 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(detail).getByRole("button", { name: "Desestimar expediente" })).toBeVisible();
   });
 
+  it("finds a report by publicId and keeps the technical ticketId in its detail", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const search = await screen.findByLabelText("Buscar expediente");
+
+    await user.type(search, "TK-2026-091");
+
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    expect(within(list).getByRole("button", { name: /ER-1002/ })).toBeVisible();
+    expect(within(list).queryByRole("button", { name: /ER-1003/ })).not.toBeInTheDocument();
+
+    await user.click(within(list).getByRole("button", { name: /ER-1002/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1002" });
+    expect(within(detail).getByText("TK-2026-091")).toBeVisible();
+    expect(within(detail).getByText("550e8400-e29b-41d4-a716-446655440091")).toBeVisible();
+  });
+
   it("keeps Field scoped and submits an own-initiative report", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
