@@ -24,12 +24,12 @@
 .pageHeading p { margin: 0 0 var(--space-8); color: var(--color-text-secondary); font-size: 14px; font-weight: 600; }
 .pageHeading h1 { margin: 0; font-size: clamp(26px, 3vw, 28px); line-height: 1.2; }
 .pageHeading span { display: block; margin-top: var(--space-10); color: var(--color-text-secondary); line-height: 1.5; }
-.workList { display: flex; flex-direction: column; gap: var(--space-12); list-style: none; margin: 0; padding: 0; max-width: 900px; }
+.workList { display: flex; flex-direction: column; gap: var(--space-12); list-style: none; margin: 0; padding: 0; max-width: 100%; }
 .workList li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-16); padding: var(--space-14); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
 .workList li > div { display: flex; align-items: center; gap: var(--space-14); min-width: 0; }
 .workIndex { color: var(--color-text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
 .workList p { margin: 0; font-weight: 600; }
-.workState { color: var(--color-info); border: 1px solid var(--color-info-line); background: var(--color-info-fill); border-radius: 999px; padding: var(--space-6) var(--space-8); font-size: 12px; white-space: nowrap; }
+.workState { display: inline-flex; align-items: center; gap: var(--space-4); color: var(--color-info); border: 1px solid var(--color-info-line); background: var(--color-info-fill); border-radius: 999px; padding: var(--space-6) var(--space-8); font-size: 12px; white-space: nowrap;}
 .workState :global(svg) { width: 14px; height: 14px; margin-right: var(--space-4); vertical-align: -2px; }
 .workStatePending { color: var(--color-warning); border-color: var(--color-warning-line); background: var(--color-warning-fill); }
 .workInterventionCopy { min-width: 0; }
