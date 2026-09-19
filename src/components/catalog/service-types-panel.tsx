@@ -117,7 +117,7 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
   };
 
   return (
-    <section aria-labelledby="service-types-title" className="flex max-w-6xl flex-col gap-6">
+    <section aria-labelledby="service-types-title" className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-muted-foreground">Catálogo · Servicios</p>

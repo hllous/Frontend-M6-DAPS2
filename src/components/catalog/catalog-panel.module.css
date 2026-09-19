@@ -1,4 +1,4 @@
-.resourcePanel { display: flex; flex-direction: column; gap: var(--space-20); max-width: 1080px; }
+.resourcePanel { display: flex; flex-direction: column; gap: var(--space-20); }
 .resourceHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-16); }
 .resourceHeading h2 { margin: 0; font-size: 28px; line-height: 1.2; }
 .resourceHeading p { margin: var(--space-8) 0 0; color: var(--color-text-secondary); }

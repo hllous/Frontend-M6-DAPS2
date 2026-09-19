@@ -207,7 +207,7 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
   };
 
   return (
-    <section aria-labelledby="green-points-title" className="flex max-w-7xl flex-col gap-6">
+    <section aria-labelledby="green-points-title" className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 id="green-points-title" className="text-2xl font-semibold tracking-tight">Puntos verdes</h1>
