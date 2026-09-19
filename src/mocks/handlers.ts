@@ -399,6 +399,7 @@ export const handlers = [
       status: environmentalReportStatusSchema.safeParse(params.get("status")).data,
       reportType: environmentalReportTypeSchema.safeParse(params.get("reportType")).data,
       priority: environmentalReportPrioritySchema.safeParse(params.get("priority")).data,
+      publicId: params.get("publicId") ?? undefined,
       ticketId: params.get("ticketId") ?? undefined,
       search: params.get("search") ?? undefined,
       page: params.has("page") ? Number(params.get("page")) : undefined,
