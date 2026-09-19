@@ -18,7 +18,7 @@ test.describe("Zone catalog management #106", () => {
 
     // Filter by search
     const searchInput = page.getByLabel("Buscar zonas operativas");
-    await searchInput.fill("Sur");
+    await searchInput.fill("lerm");
     await expect(page.getByText("Z-PAL")).toBeVisible();
     await expect(page.getByText("Belgrano")).not.toBeVisible();
 
