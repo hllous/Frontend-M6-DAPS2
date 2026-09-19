@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -115,35 +116,28 @@ function useTabletNavigation() {
 export function AppShell({
   scenario,
   logoutAction,
-  catalogContent,
-  initialDestination = "work",
+  routeContent,
 }: {
   scenario: OperationalScenario;
   logoutAction?: LogoutAction;
-  catalogContent?: ReactNode;
-  initialDestination?: Destination;
+  routeContent?: ReactNode;
 }) {
-  const [destination, setDestination] = useState<Destination>(() => {
-    if (typeof window !== "undefined") {
-      const urlDest = new URLSearchParams(window.location.search).get("destination") as Destination | null;
-      if (urlDest && navigation.some((item) => item.id === urlDest)) {
-        return urlDest;
-      }
-    }
-    return initialDestination;
-  });
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedDestination = searchParams.get("destination") as Destination | null;
+  const destination = pathname.startsWith("/app/catalog")
+    ? "catalog"
+    : requestedDestination && navigation.some((item) => item.id === requestedDestination)
+      ? requestedDestination
+      : "work";
   const [isCollapsed, setIsCollapsed] = useState(false);
   const isTablet = useTabletNavigation();
   const navigationIsIconOnly = isCollapsed || isTablet;
   const availableItems = navigation.filter((item) => isAllowed(item, scenario));
 
   const selectDestination = (next: Destination) => {
-    setDestination(next);
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.set("destination", next);
-      window.history.replaceState(null, "", url.toString());
-    }
+    router.push(`/app?destination=${next}`);
   };
 
   return (
@@ -197,19 +191,19 @@ export function AppShell({
       </header>
 
       <main className={styles.main} id="contenido-principal" tabIndex={-1}>
-        {destination === "work" ? (
+        {pathname.startsWith("/app/") ? (
+          routeContent
+        ) : destination === "work" ? (
           <WorkPanel scenario={scenario} />
         ) : destination === "services" ? (
           <ServicesWorkspace scenario={scenario} />
         ) : destination === "referrals" ? (
           <ReferralsWorkspace scenario={scenario} />
         ) : destination === "catalog" ? (
-          catalogContent ?? (
-            <div className="flex flex-col gap-8">
-              <CatalogLanding scenario={scenario} />
-              <ZonesPanel />
-            </div>
-          )
+          <div className="flex flex-col gap-8">
+            <CatalogLanding scenario={scenario} />
+            <ZonesPanel />
+          </div>
         ) : destination === "dashboards" ? (
           <IndicatorsDashboard scenario={scenario} />
         ) : destination === "environment" ? (

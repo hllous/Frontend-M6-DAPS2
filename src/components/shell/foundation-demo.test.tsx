@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
@@ -11,6 +11,7 @@ import { FoundationDemo } from "./foundation-demo";
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => window.history.replaceState(null, "", "/"));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 

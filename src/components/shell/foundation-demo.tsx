@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { loadScenario, ScenarioRequestError } from "@/lib/scenario-client";
@@ -21,9 +21,11 @@ type LoadState =
 export function FoundationDemo({
   scenarioId,
   logoutAction,
+  children,
 }: {
   scenarioId: ScenarioId;
   logoutAction?: (formData: FormData) => void | Promise<void>;
+  children?: ReactNode;
 }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [requestVersion, setRequestVersion] = useState(0);
@@ -84,5 +86,7 @@ export function FoundationDemo({
   if (state.status === "forbidden") return <main className="p-6"><ShellForbidden /></main>;
   if (state.status === "error") return <main className="p-6"><ShellError onRetry={retry} /></main>;
   if (state.status === "loading") return <main className="p-6"><ShellLoading /></main>;
-  return <AppShell scenario={state.scenario} logoutAction={logoutAction} />;
+  return (
+    <AppShell scenario={state.scenario} logoutAction={logoutAction} routeContent={children} />
+  );
 }
