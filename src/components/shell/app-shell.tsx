@@ -116,11 +116,11 @@ function useTabletNavigation() {
 export function AppShell({
   scenario,
   logoutAction,
-  catalogContent,
+  routeContent,
 }: {
   scenario: OperationalScenario;
   logoutAction?: LogoutAction;
-  catalogContent?: ReactNode;
+  routeContent?: ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -191,19 +191,19 @@ export function AppShell({
       </header>
 
       <main className={styles.main} id="contenido-principal" tabIndex={-1}>
-        {destination === "work" ? (
+        {pathname.startsWith("/app/") ? (
+          routeContent
+        ) : destination === "work" ? (
           <WorkPanel scenario={scenario} />
         ) : destination === "services" ? (
           <ServicesWorkspace scenario={scenario} />
         ) : destination === "referrals" ? (
           <ReferralsWorkspace scenario={scenario} />
         ) : destination === "catalog" ? (
-          pathname.startsWith("/app/catalog") ? catalogContent : (
-            <div className="flex flex-col gap-8">
-              <CatalogLanding scenario={scenario} />
-              <ZonesPanel />
-            </div>
-          )
+          <div className="flex flex-col gap-8">
+            <CatalogLanding scenario={scenario} />
+            <ZonesPanel />
+          </div>
         ) : destination === "dashboards" ? (
           <IndicatorsDashboard scenario={scenario} />
         ) : destination === "environment" ? (
