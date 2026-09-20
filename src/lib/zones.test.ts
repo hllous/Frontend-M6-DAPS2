@@ -17,6 +17,17 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("zones adapter", () => {
+  it("accepts the documented list response without detail-only neighborhood ids", async () => {
+    server.use(http.get("*/api/zones", () => HttpResponse.json({
+      data: [{ id: "zone-real-list", code: "Z-01", name: "Zona Norte", active: true }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(zonesAdapter.list()).resolves.toMatchObject({
+      zones: [{ id: "zone-real-list", code: "Z-01", name: "Zona Norte", active: true }],
+    });
+  });
+
   it("normalizes a successful paginated response into frontend-owned shapes", async () => {
     const page = await zonesAdapter.list();
 
