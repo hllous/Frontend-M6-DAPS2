@@ -11,13 +11,25 @@ import { recordTelemetryEvent } from "./telemetry";
 const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use una fecha con formato AAAA-MM-DD.");
 const dateTimeSchema = z.string().datetime({ offset: true });
 
+export const INVERTED_RANGE_MESSAGE = "La fecha «Desde» no puede ser posterior a «Hasta».";
+
 export const indicatorQuerySchema = z.object({
   from: calendarDateSchema.optional(),
   to: calendarDateSchema.optional(),
   zoneId: z.string().trim().min(1).optional(),
   serviceTypeId: z.string().trim().min(1).optional(),
-}).strict();
+}).strict().refine((query) => !query.from || !query.to || query.from <= query.to, {
+  path: ["to"],
+  message: INVERTED_RANGE_MESSAGE,
+});
 export type IndicatorQuery = z.infer<typeof indicatorQuerySchema>;
+
+/** Mensaje de rango invertido si el error lo incluye; si no, el genérico de formato. */
+export function indicatorQueryErrorMessage(error: { issues: Array<{ message: string }> }) {
+  return error.issues.some((issue) => issue.message === INVERTED_RANGE_MESSAGE)
+    ? INVERTED_RANGE_MESSAGE
+    : "Los filtros de indicadores no respetan el formato esperado.";
+}
 
 export type ResolvedIndicatorQuery = Required<Pick<IndicatorQuery, "from" | "to">> &
   Omit<IndicatorQuery, "from" | "to">;
@@ -158,7 +170,7 @@ export function defaultIndicatorQuery(now = new Date()): ResolvedIndicatorQuery 
 
 export function resolveIndicatorQuery(query: IndicatorQuery = {}, now = new Date()): ResolvedIndicatorQuery {
   const parsed = indicatorQuerySchema.safeParse(query);
-  if (!parsed.success) throw new IndicatorContractError("Los filtros de indicadores no respetan el formato esperado.", { cause: parsed.error });
+  if (!parsed.success) throw new IndicatorContractError(indicatorQueryErrorMessage(parsed.error), { cause: parsed.error });
   const defaults = defaultIndicatorQuery(now);
   return { ...defaults, ...parsed.data };
 }

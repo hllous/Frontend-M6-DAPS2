@@ -31,7 +31,7 @@ async function authenticatedCookie(scenarioId: string, mode = "mock") {
 }
 
 const confirmBody = {
-  scheduledDate: "2026-09-10",
+  scheduledDate: "2099-09-10",
   timeWindow: { start: "09:00", end: "13:00" },
 };
 

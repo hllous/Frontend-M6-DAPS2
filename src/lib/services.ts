@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { todayInArgentina } from "./argentina-date";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import {
   streetClosureRequestsAdapter,
@@ -275,7 +276,11 @@ export type CancelServiceInput = z.infer<typeof cancelServiceInputSchema>;
 export const confirmRescheduleInputSchema = z.object({
   scheduledDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD")
+    .refine(
+      (value) => !/^\d{4}-\d{2}-\d{2}$/.test(value) || value >= todayInArgentina(),
+      "La nueva fecha no puede ser anterior a hoy.",
+    ),
   timeWindow: z.object({
     start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
     end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),

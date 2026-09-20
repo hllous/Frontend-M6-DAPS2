@@ -631,13 +631,13 @@ test.describe("Office two-step Service reschedule flow @smoke", () => {
     // zoneIds snapshot is shown untouched ahead of confirming
     await expect(confirmDialog.getByText("Zona Sur")).toBeVisible();
 
-    await confirmDialog.locator("input[type='date']").fill("2026-09-13");
+    await confirmDialog.locator("input[type='date']").fill("2099-09-13");
     await confirmDialog.getByRole("button", { name: "Confirmar nueva fecha" }).click();
     await expect(confirmDialog).not.toBeVisible();
 
     // Back to SCHEDULED with the new date, zones preserved verbatim
     await expect(detailRegion.getByText("Programado").first()).toBeVisible();
-    await expect(detailRegion.getByText("2026-09-13")).toBeVisible();
+    await expect(detailRegion.getByText("2099-09-13")).toBeVisible();
     await expect(detailRegion.getByText("Zona Sur").first()).toBeVisible();
   });
 
