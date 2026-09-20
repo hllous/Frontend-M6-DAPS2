@@ -11,7 +11,7 @@ export type Shift = z.infer<typeof shiftSchema>;
 
 // El listado no trae miembros y el detalle los trae como members: [{ userId }].
 export const crewSchema = z.object({
-  id: z.string(), name: z.string(), crewType: crewTypeSchema, leaderUserId: z.string(), memberUserIds: z.array(z.string()).default([]), organizationId: z.string().nullable().default(null), defaultShift: shiftSchema, active: z.boolean(),
+  id: z.string(), name: z.string(), crewType: crewTypeSchema, leaderUserId: z.string().nullable(), memberUserIds: z.array(z.string()).default([]), organizationId: z.string().nullable().default(null), defaultShift: shiftSchema, active: z.boolean(),
 });
 const crewWireSchema = z.preprocess(withFlatIds("members", "userId", "memberUserIds"), crewSchema);
 export type Crew = z.infer<typeof crewSchema>;

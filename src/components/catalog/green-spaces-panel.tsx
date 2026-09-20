@@ -86,7 +86,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
 
   function openEdit(greenSpace: GreenSpace) {
     setEditing(greenSpace);
-    setForm({ name: greenSpace.name, spaceType: greenSpace.spaceType, areaM2: String(greenSpace.areaM2), zoneId: greenSpace.zoneId });
+    setForm({ name: greenSpace.name, spaceType: greenSpace.spaceType, areaM2: greenSpace.areaM2 === null ? "" : String(greenSpace.areaM2), zoneId: greenSpace.zoneId });
     setFormError(null);
     setFormOpen(true);
   }
@@ -173,7 +173,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
               return <tr key={greenSpace.id}>
                 <th scope="row" className="px-4 py-3 font-medium">{greenSpace.name}</th>
                 <td className="px-4 py-3">{spaceTypeLabels[greenSpace.spaceType]}</td>
-                <td className="px-4 py-3">{greenSpace.areaM2.toLocaleString("es-AR")} m²</td>
+                <td className="px-4 py-3">{greenSpace.areaM2 === null ? "—" : `${greenSpace.areaM2.toLocaleString("es-AR")} m²`}</td>
                 <td className="px-4 py-3">{zone ? `${zone.code} · ${zone.name}` : greenSpace.zoneId}</td>
                 <td className="px-4 py-3"><span className="inline-flex items-center gap-1">{greenSpace.active ? <Check aria-hidden className="size-4 text-[var(--color-success)]" /> : <X aria-hidden className="size-4 text-muted-foreground" />}{greenSpace.active ? "Activo" : "Inactivo"}</span></td>
                 {canManage ? <td className="flex gap-2 px-4 py-3"><Button variant="outline" size="sm" onClick={() => openEdit(greenSpace)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{greenSpace.active ? <Button variant="destructive" size="sm" onClick={() => void deactivate(greenSpace)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}

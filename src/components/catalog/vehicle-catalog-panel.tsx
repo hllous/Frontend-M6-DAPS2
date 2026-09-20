@@ -77,7 +77,7 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
 
   function openEdit(vehicle: Vehicle) {
     setEditing(vehicle);
-    setForm({ plate: vehicle.plate, vehicleType: vehicle.vehicleType, capacity: String(vehicle.capacity) });
+    setForm({ plate: vehicle.plate, vehicleType: vehicle.vehicleType, capacity: vehicle.capacity === null ? "" : String(vehicle.capacity) });
     setFormError(null);
     setFormOpen(true);
   }
@@ -152,7 +152,7 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
               <tr key={vehicle.id}>
                 <th scope="row" data-label="Patente">{vehicle.plate}</th>
                 <td data-label="Tipo">{vehicleTypeLabels[vehicle.vehicleType]}</td>
-                <td data-label="Capacidad">{vehicle.capacity}</td>
+                <td data-label="Capacidad">{vehicle.capacity ?? "—"}</td>
                 <td data-label="Estado"><span className={vehicle.active ? styles.active : styles.inactive}>{vehicle.active ? <Check aria-hidden /> : <X aria-hidden />}{vehicle.active ? "Activo" : "Inactivo"}</span></td>
                 {canManage ? <td className={styles.actions}><Button variant="outline" size="sm" onClick={() => openEdit(vehicle)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{vehicle.active ? <Button variant="destructive" size="sm" onClick={() => void deactivate(vehicle)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}
               </tr>

@@ -22,6 +22,17 @@ const intervention = {
 const linkedTree = { treeId: "tree-2" };
 
 describe("treeInterventionsAdapter", () => {
+  it("accepts nullable address and priority from the backend", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [{ ...intervention, treeIds: undefined, address: null, priority: null, trees: [{ treeId: "tree-2" }] }],
+      meta: { total: 1, page: 1, pageSize: 10, totalPages: 1 },
+    })));
+
+    await expect(treeInterventionsAdapter.list()).resolves.toMatchObject({
+      interventions: [{ id: "intervention-1", address: null, priority: null }],
+    });
+  });
+
   it("accepts the documented list response with linked trees instead of tree ids", async () => {
     const trees = [linkedTree];
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({

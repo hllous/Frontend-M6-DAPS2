@@ -260,7 +260,7 @@ export function filterContainerFixtures(query: ContainerQuery): Container[] {
     if (query.search) {
       const normalizedSearch = query.search.toLowerCase();
       const matchesCode = container.code.toLowerCase().includes(normalizedSearch);
-      const matchesAddress = container.address.toLowerCase().includes(normalizedSearch);
+      const matchesAddress = (container.address ?? "").toLowerCase().includes(normalizedSearch);
       if (!matchesCode && !matchesAddress) return false;
     }
     return true;

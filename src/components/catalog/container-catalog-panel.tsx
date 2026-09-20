@@ -250,9 +250,9 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       code: container.code,
       containerType: container.containerType,
       zoneId: container.zoneId,
-      address: container.address,
-      lat: String(container.lat),
-      lng: String(container.lng),
+      address: container.address ?? "",
+      lat: container.lat === null ? "" : String(container.lat),
+      lng: container.lng === null ? "" : String(container.lng),
       capacityLiters: String(container.capacityLiters),
     });
     setFormErrors({});
@@ -508,7 +508,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                     <td className="px-4 py-3">
                       {zone ? `${zone.code} · ${zone.name}` : container.zoneId}
                     </td>
-                    <td className="px-4 py-3">{container.address}</td>
+                    <td className="px-4 py-3">{container.address ?? "—"}</td>
                     <td className="px-4 py-3">{container.capacityLiters.toLocaleString("es-AR")} L</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={container.status} />
@@ -913,7 +913,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   Coordenadas
                 </dt>
                 <dd className="mt-0.5 font-medium text-foreground">
-                  {detailContainer.lat}, {detailContainer.lng}
+                  {detailContainer.lat === null || detailContainer.lng === null ? "—" : `${detailContainer.lat}, ${detailContainer.lng}`}
                 </dd>
               </div>
 
@@ -922,7 +922,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   Dirección
                 </dt>
                 <dd className="mt-0.5 font-medium text-foreground">
-                  {detailContainer.address}
+                  {detailContainer.address ?? "—"}
                 </dd>
               </div>
 

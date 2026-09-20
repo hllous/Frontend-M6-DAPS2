@@ -28,6 +28,17 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("containers adapter", () => {
+  it("accepts null address and coordinates from the backend", async () => {
+    server.use(http.get("*/api/containers", () => HttpResponse.json({
+      data: [{ id: "container-null", code: "CT-NULL", containerType: "HOUSEHOLD", zoneId: "zone-1", address: null, lat: null, lng: null, capacityLiters: 1100, status: "ACTIVE", damageType: null, severity: null, requiresPublicWorks: null }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(containersAdapter.list()).resolves.toMatchObject({
+      containers: [{ id: "container-null", address: null, lat: null, lng: null }],
+    });
+  });
+
   it("normalizes the documented paginated response and filters", async () => {
     const page = await containersAdapter.list({
       status: "ACTIVE",

@@ -20,6 +20,17 @@ const createInput = {
 };
 
 describe("crews adapter", () => {
+  it("accepts nullable leader and organization references", async () => {
+    server.use(http.get("*/api/crews", () => HttpResponse.json({
+      data: [{ id: "crew-null", name: "Cuadrilla sin asignación", crewType: "MUNICIPAL", defaultShift: "MORNING", leaderUserId: null, organizationId: null, active: true }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(crewsAdapter.list()).resolves.toMatchObject({
+      crews: [{ id: "crew-null", leaderUserId: null, organizationId: null }],
+    });
+  });
+
   it("accepts the documented list response without detail-only member ids", async () => {
     server.use(http.get("*/api/crews", () => HttpResponse.json({
       data: [{

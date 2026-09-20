@@ -119,7 +119,7 @@ function containerToTraceRecord(container: Container): TraceRecord {
   return {
     id: container.code,
     title: container.code,
-    detail: container.address,
+    detail: container.address ?? "Sin dirección registrada",
     zone: zoneLabel(container.zoneId),
     status: CONTAINER_STATUS_LABELS[container.status],
   };
