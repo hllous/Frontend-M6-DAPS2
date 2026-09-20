@@ -68,6 +68,17 @@ export async function POST(
     }
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+      const backendInput = {
+        inspectedAt: parsedInput.data.inspectedAt,
+        outcome: parsedInput.data.outcome,
+        ...(parsedInput.data.nextStep ? { nextStep: parsedInput.data.nextStep } : {}),
+        ...(parsedInput.data.findings ? { findings: parsedInput.data.findings } : {}),
+        checklist: parsedInput.data.checklist.map((item) => ({
+          itemCode: item.id,
+          label: item.label,
+          result: item.completed,
+        })),
+      };
       const backendResponse = await fetchBackend(
         request,
         `/environmental-inspections/${encodeURIComponent(id)}/complete`,
@@ -75,7 +86,7 @@ export async function POST(
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(parsedInput.data),
+          body: JSON.stringify(backendInput),
         },
       );
       return new NextResponse(await backendResponse.text(), {
@@ -103,7 +114,7 @@ export async function POST(
     }
 
     const updatedInspection = updateEnvironmentalInspectionFixture(id, {
-      inspectedAt: new Date().toISOString(),
+      inspectedAt: parsedInput.data.inspectedAt,
       checklist: inspection.checklist,
       findings: parsedInput.data.findings ?? null,
       violationType: parsedInput.data.violationType ?? null,
@@ -111,7 +122,7 @@ export async function POST(
       suggestedAction: parsedInput.data.suggestedAction ?? null,
       notes: parsedInput.data.conclusion ?? inspection.notes,
       outcome: parsedInput.data.outcome,
-      nextStep: nextStepForOutcome(parsedInput.data.outcome),
+      nextStep: parsedInput.data.nextStep ?? nextStepForOutcome(parsedInput.data.outcome),
     });
     if (!updatedInspection) return errorResponse(404, "InspecciÃ³n no encontrada.", path);
 
