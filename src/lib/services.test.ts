@@ -6,6 +6,7 @@ import { handlers } from "@/mocks/handlers";
 import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_SERVICES_QUERY } from "./services-fixtures";
 import {
+  BackendServiceZoneSelectionError,
   checkAssignmentConflicts,
   confirmRescheduleInputSchema,
   checkServiceWindowTiming,
@@ -13,6 +14,7 @@ import {
   ServiceRequestError,
   ServiceStartBlockedError,
   servicesAdapter,
+  toCreateServiceBackendInput,
 } from "./services";
 import { olvidarCatalogoDeEtiquetas } from "./service-labels";
 
@@ -25,6 +27,45 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 afterAll(() => server.close());
+
+describe("service backend input mapping", () => {
+  const baseInput = {
+    serviceTypeId: "service-type-1",
+    origin: "PLANNED" as const,
+    zoneIds: ["zone-1"],
+    scheduledDate: "2026-09-30",
+    timeWindow: { start: "08:00", end: "12:00" },
+  };
+
+  it("lets routes and inventory targets derive their zones", () => {
+    expect(toCreateServiceBackendInput({ ...baseInput, routeId: "route-1", zoneIds: ["zone-1", "zone-2"] }))
+      .not.toHaveProperty("zoneId");
+    expect(toCreateServiceBackendInput({
+      ...baseInput,
+      origin: "INSPECTION",
+      inspectionId: "inspection-1",
+      targetType: "TREE",
+      targetId: "tree-1",
+      targetRef: "ARB-001",
+    })).toEqual({
+      serviceTypeId: "service-type-1",
+      scheduledDate: "2026-09-30",
+      origin: "INSPECTION",
+      routeId: undefined,
+      targetType: "TREE",
+      targetId: "tree-1",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+      ticketId: undefined,
+      notes: undefined,
+    });
+  });
+
+  it("rejects multiple loose-location zones instead of discarding one", () => {
+    expect(() => toCreateServiceBackendInput({ ...baseInput, zoneIds: ["zone-1", "zone-2"] }))
+      .toThrow(BackendServiceZoneSelectionError);
+  });
+});
 
 describe("services adapter", () => {
   it("accepts the real backend shape: zones: [{zoneId, sequence}] and no title (#255)", async () => {

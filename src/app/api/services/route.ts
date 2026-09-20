@@ -8,6 +8,7 @@ import {
   paginateServiceFixtures,
 } from "@/lib/services-fixtures";
 import {
+  BackendServiceZoneSelectionError,
   createServiceInputSchema,
   ROUTE_CATALOG,
   SERVICE_TYPE_CATALOG,
@@ -16,6 +17,7 @@ import {
   type ServiceOrigin,
   type ServiceQuery,
   type ServiceStatus,
+  toCreateServiceBackendInput,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
@@ -155,10 +157,19 @@ export async function POST(request: Request) {
     const input = parsed.data;
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+      let backendInput;
+      try {
+        backendInput = toCreateServiceBackendInput(input);
+      } catch (error) {
+        if (error instanceof BackendServiceZoneSelectionError) {
+          return errorResponse(400, error.message, path);
+        }
+        throw error;
+      }
       const backendResponse = await fetchBackend(request, "/services", undefined, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
+        body: JSON.stringify(backendInput),
       });
       const bodyText = await backendResponse.text();
       return new NextResponse(bodyText, {

@@ -8,6 +8,7 @@ import {
 import {
   NOT_SERVICED_REASON_LABEL,
   suspendServiceInputSchema,
+  toSuspendServiceBackendInput,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
@@ -82,7 +83,8 @@ export async function POST(
         undefined,
         {
           method: "POST",
-          body: JSON.stringify(input),
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(toSuspendServiceBackendInput(input)),
         },
       );
       const bodyText = await backendResponse.text();

@@ -196,6 +196,34 @@ export const createServiceInputSchema = z
 
 export type CreateServiceInput = z.infer<typeof createServiceInputSchema>;
 
+export class BackendServiceZoneSelectionError extends Error {
+  constructor() {
+    super("La programación sin recorrido ni objetivo admite exactamente una zona.");
+    this.name = "BackendServiceZoneSelectionError";
+  }
+}
+
+export function toCreateServiceBackendInput(input: CreateServiceInput) {
+  const zoneIsDerived = Boolean(input.routeId || input.targetType || input.targetId);
+  if (!zoneIsDerived && input.zoneIds.length !== 1) {
+    throw new BackendServiceZoneSelectionError();
+  }
+
+  return {
+    serviceTypeId: input.serviceTypeId,
+    scheduledDate: input.scheduledDate,
+    origin: input.origin,
+    routeId: input.routeId,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    ...(!zoneIsDerived ? { zoneId: input.zoneIds[0] } : {}),
+    windowFrom: input.timeWindow.start,
+    windowTo: input.timeWindow.end,
+    ticketId: input.ticketId,
+    notes: input.notes,
+  };
+}
+
 export const containerLocationSchema = z.object({
   address: z.string().trim().min(1, "La nueva dirección es obligatoria."),
   lat: latitudeInput(),
@@ -287,6 +315,10 @@ export const suspendServiceInputSchema = z.object({
 });
 export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
 
+export function toSuspendServiceBackendInput(input: SuspendServiceInput) {
+  return { reason: input.reason };
+}
+
 export const rescheduleServiceInputSchema = z.object({
   reason: reasonInput("El motivo es obligatorio para reprogramar el servicio"),
 });
@@ -311,6 +343,14 @@ export const confirmRescheduleInputSchema = z.object({
   }),
 });
 export type ConfirmRescheduleInput = z.infer<typeof confirmRescheduleInputSchema>;
+
+export function toConfirmRescheduleBackendInput(input: ConfirmRescheduleInput) {
+  return {
+    scheduledDate: input.scheduledDate,
+    windowFrom: input.timeWindow.start,
+    windowTo: input.timeWindow.end,
+  };
+}
 
 export const recordZoneResultInputSchema = z
   .object({

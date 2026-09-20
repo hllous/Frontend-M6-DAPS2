@@ -226,4 +226,25 @@ describe("zone-results BFF route", () => {
     expect(results).toHaveLength(1);
     expect(results[0].zoneId).toBe("zone-3");
   });
+
+  it("forwards the zone-result DTO with JSON content type", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 201 }));
+    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+    const input = { zoneId: "zone-3", status: "PARTIAL" as const, reason: "WEATHER" as const, notes: "Lluvia intensa" };
+
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/zone-results", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(input),
+      }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+
+    expect(response.status).toBe(201);
+    const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
+    expect(JSON.parse(String(requestInit.body))).toEqual(input);
+  });
 });

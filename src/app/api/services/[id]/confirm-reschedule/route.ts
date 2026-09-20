@@ -5,7 +5,7 @@ import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
-import { confirmRescheduleInputSchema } from "@/lib/services";
+import { confirmRescheduleInputSchema, toConfirmRescheduleBackendInput } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -75,7 +75,8 @@ export async function POST(
         undefined,
         {
           method: "POST",
-          body: JSON.stringify(input),
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(toConfirmRescheduleBackendInput(input)),
         },
       );
       const bodyText = await backendResponse.text();

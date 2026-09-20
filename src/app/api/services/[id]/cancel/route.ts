@@ -77,6 +77,7 @@ export async function POST(
         undefined,
         {
           method: "POST",
+          headers: { "content-type": "application/json" },
           body: JSON.stringify(input),
         },
       );
