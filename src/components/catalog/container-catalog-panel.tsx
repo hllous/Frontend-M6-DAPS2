@@ -57,7 +57,7 @@ import { StartRelocationDialog } from "./start-relocation-dialog";
 import { CompleteRepairDialog } from "./complete-repair-dialog";
 import { RemoveContainerDialog } from "./remove-container-dialog";
 import { StartRepairDialog } from "./start-repair-dialog";
-import { MAX_INT32, parseCoordinateField } from "@/lib/input-limits";
+import { MAX_INT32, MAX_SEARCH_LENGTH, parseCoordinateField } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -401,6 +401,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
             type="search"
             placeholder="Código o dirección…"
             value={search}
+            maxLength={MAX_SEARCH_LENGTH}
             onChange={(e) => setSearch(e.target.value)}
             className={formControlClass}
           />

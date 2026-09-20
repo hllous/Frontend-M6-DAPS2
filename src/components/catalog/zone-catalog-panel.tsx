@@ -39,6 +39,7 @@ import {
   ZoneRequestError,
   zonesAdapter,
 } from "@/lib/zones";
+import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -356,6 +357,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               className={`${formControlClass} w-full pl-9`}
               placeholder="Buscar por código o nombre..."
               value={search}
+              maxLength={MAX_SEARCH_LENGTH}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>

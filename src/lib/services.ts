@@ -7,7 +7,7 @@ import {
   type StreetClosureRequest,
 } from "./street-closure-requests";
 import { recordTelemetryEvent } from "./telemetry";
-import { latitudeInput, longitudeInput } from "@/lib/input-limits";
+import { MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
 
 export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
 export type ServiceMode = z.infer<typeof serviceModeSchema>;
@@ -123,7 +123,7 @@ export const createServiceInputSchema = z
     title: z.string().optional(),
     serviceTypeId: z.string().min(1, "Debe seleccionar un tipo de servicio"),
     origin: serviceOriginSchema,
-    ticketId: z.string().optional(),
+    ticketId: z.string().max(MAX_TICKET_ID_LENGTH, `El ticketId no puede superar los ${MAX_TICKET_ID_LENGTH} caracteres.`).optional(),
     inspectionId: z.string().optional(),
     weatherAlertId: z.string().optional(),
     routeId: z.string().optional(),
@@ -138,7 +138,7 @@ export const createServiceInputSchema = z
       start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
       end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
     }),
-    notes: z.string().optional(),
+    notes: z.string().max(MAX_NOTES_LENGTH, `Las notas no pueden superar los ${MAX_NOTES_LENGTH} caracteres.`).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.origin === "TICKET" && (!data.ticketId || !data.ticketId.trim())) {
@@ -265,12 +265,12 @@ export const suspendServiceInputSchema = z.object({
 export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
 
 export const rescheduleServiceInputSchema = z.object({
-  reason: z.string().trim().min(1, "El motivo es obligatorio para reprogramar el servicio"),
+  reason: reasonInput("El motivo es obligatorio para reprogramar el servicio"),
 });
 export type RescheduleServiceInput = z.infer<typeof rescheduleServiceInputSchema>;
 
 export const cancelServiceInputSchema = z.object({
-  reason: z.string().trim().min(1, "El motivo es obligatorio para cancelar el servicio"),
+  reason: reasonInput("El motivo es obligatorio para cancelar el servicio"),
 });
 export type CancelServiceInput = z.infer<typeof cancelServiceInputSchema>;
 

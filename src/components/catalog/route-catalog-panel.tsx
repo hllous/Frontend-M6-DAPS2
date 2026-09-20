@@ -44,6 +44,7 @@ import {
   routesAdapter,
 } from "@/lib/routes";
 import { type Zone, zonesAdapter } from "@/lib/zones";
+import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -877,6 +878,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               type="text"
               placeholder="Buscar por código o nombre..."
               value={search}
+              maxLength={MAX_SEARCH_LENGTH}
               onChange={(e) => setSearch(e.target.value)}
               className={`${formControlClass} pl-9 w-full`}
               data-testid="search-routes-input"

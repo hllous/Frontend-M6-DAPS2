@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { externalIdListInput } from "@/lib/input-limits";
 
 export type ZoneQuery = {
   active?: boolean;
@@ -70,7 +71,7 @@ export const updateZoneInputSchema = z.object({
 export type UpdateZoneInput = z.infer<typeof updateZoneInputSchema>;
 
 export const assignNeighborhoodsInputSchema = z.object({
-  neighborhoodIds: z.array(z.string().trim().min(1, "El ID del barrio es obligatorio")).min(1),
+  neighborhoodIds: externalIdListInput({ itemMessage: "El ID del barrio es obligatorio", emptyMessage: "Seleccione al menos un barrio." }),
 });
 
 export type AssignNeighborhoodsInput = z.infer<typeof assignNeighborhoodsInputSchema>;
