@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { argentinaDay, todayInArgentina } from "./argentina-date";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 
@@ -29,7 +30,10 @@ export const treeSurveySchema = z.object({
 export type TreeSurvey = z.infer<typeof treeSurveySchema>;
 
 export const treeSurveyCreateInputSchema = z.object({
-  surveyedAt: z.string().trim().min(1, "La fecha del relevamiento es obligatoria."),
+  surveyedAt: z.string().trim().min(1, "La fecha del relevamiento es obligatoria.").refine((value) => {
+    const day = argentinaDay(value);
+    return day === null || day <= todayInArgentina();
+  }, "La fecha del relevamiento no puede ser futura."),
   healthStatus: treeHealthStatusSchema,
   riskLevel: riskLevelSchema,
   riskType: riskTypeSchema.optional(),
