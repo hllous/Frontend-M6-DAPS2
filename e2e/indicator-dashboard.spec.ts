@@ -36,16 +36,16 @@ test.describe("operational indicator dashboard #138", () => {
     await page.goto("/app?destination=dashboards");
 
     await expect(page.getByText(/Unidad de análisis:/)).toBeVisible();
-    await expect(page.getByRole("button", { name: /Centro.*93,6.*146.*156/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Centro.*89,7.*140.*156/i })).toBeVisible();
 
     await page.getByRole("button", { name: "Ver tabla de datos" }).click();
     const coverageTable = page.getByRole("region", { name: "Tabla de datos de Cobertura" });
     await expect(coverageTable).toBeVisible();
     await expect(coverageTable.getByRole("columnheader", { name: "Atendidos" }).first()).toBeVisible();
-    await expect(coverageTable.getByText("146 objetivos").first()).toBeVisible();
+    await expect(coverageTable.getByText("140 objetivos").first()).toBeVisible();
 
     await page.getByRole("button", { name: /Cumplimiento/ }).click();
-    await expect(page.getByText("Falta de cuadrilla").first()).toBeVisible();
+    await expect(page.getByText("Cuadrilla no disponible").first()).toBeVisible();
     await expect(page.getByText(/ZoneResult\.recordedAt/)).toBeVisible();
   });
 
@@ -62,7 +62,7 @@ test.describe("operational indicator dashboard #138", () => {
     const incidentsTable = page.getByRole("region", { name: "Tabla de datos de Incidencias" });
     await expect(incidentsTable.getByRole("columnheader", { name: "Desbordes" })).toBeVisible();
     await expect(incidentsTable.getByRole("columnheader", { name: "Daños" })).toBeVisible();
-    await expect(incidentsTable.getByText("Cerrados")).toBeVisible();
+    await expect(incidentsTable.getByText("Cerrado")).toBeVisible();
 
     await page.getByRole("button", { name: /Residuos/ }).click();
     await page.getByRole("button", { name: "Ver tabla de datos", exact: true }).click();
