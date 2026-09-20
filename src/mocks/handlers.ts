@@ -696,7 +696,7 @@ export const handlers = [
       body = await request.json();
     } catch {
       return HttpResponse.json(
-        { statusCode: 400, message: "JSON invÃ¡lido", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods` },
+        { statusCode: 400, message: "JSON inválido", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods` },
         { status: 400 },
       );
     }
