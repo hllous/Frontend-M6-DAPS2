@@ -71,7 +71,7 @@ export const createEnvironmentalReportInputSchema = z.object({
 export type CreateEnvironmentalReportInput = z.infer<typeof createEnvironmentalReportInputSchema>;
 
 const reportLocationSchema = z.object({
-  address: z.string().optional(),
+  address: z.string().nullable().optional(),
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
 }).passthrough();
@@ -79,7 +79,7 @@ const reportLocationSchema = z.object({
 export const environmentalReportSchema = z.object({
   id: z.string(),
   reportType: environmentalReportTypeSchema,
-  address: z.string().optional(),
+  address: z.string().nullable().optional(),
   // M2 contract v1.6 dropped lat/lng from its location payload, so the backend
   // always sends these as explicit `null` (not omitted) for ticket-originated
   // reports (ticketId present) — see issue #191. `.nullable()` is required
@@ -93,7 +93,7 @@ export const environmentalReportSchema = z.object({
   ticketId: z.string().nullable().optional(),
   reporterSnapshot: z.unknown().optional(),
   status: environmentalReportStatusSchema,
-  priority: environmentalReportPrioritySchema,
+  priority: environmentalReportPrioritySchema.nullable(),
   deadlineAt: z.string().nullable().optional(),
   escalated: z.boolean().optional(),
   citizenResponse: z.string().nullable().optional(),

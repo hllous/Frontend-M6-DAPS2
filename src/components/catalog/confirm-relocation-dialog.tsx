@@ -153,7 +153,7 @@ function ConfirmRelocationModalContent({
       <form id="confirm-relocation-form" onSubmit={handleSubmit} noValidate className="space-y-4">
         <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs space-y-1">
           <p className="font-medium text-foreground">Ubicación anterior registrada:</p>
-          <p className="text-muted-foreground">{container.address}</p>
+          <p className="text-muted-foreground">{container.address ?? "Sin dirección registrada"}</p>
         </div>
 
         <FieldGroup>

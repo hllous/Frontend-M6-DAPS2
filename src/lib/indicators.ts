@@ -60,7 +60,7 @@ export const complianceWireSchema = z.object({
     code: z.string(),
     name: z.string(),
     count,
-    reasons: z.array(z.object({ reason: z.string(), count })),
+    reasons: z.array(z.object({ reason: z.string().nullable(), count })),
   })),
 });
 export type ComplianceWire = z.infer<typeof complianceWireSchema>;
@@ -234,6 +234,9 @@ function normalizeCoverage(wire: CoverageWire, readAt: string): CoverageIndicato
 }
 
 function normalizeCompliance(wire: ComplianceWire, readAt: string): ComplianceIndicator {
+  const reasonLabel = (reason: string | null) => reason === null
+    ? "Sin motivo registrado"
+    : labelFor(NOT_SERVICED_REASON_LABEL, reason);
   return {
     family: "compliance", period: wire.period, freshness: { updatedAt: readAt },
     primary: { value: wire.finished.onTimePct, label: "Cumplimiento en fecha", unit: "%" },
@@ -249,8 +252,8 @@ function normalizeCompliance(wire: ComplianceWire, readAt: string): ComplianceIn
         label: zone.name,
         value: zone.count,
         unit: "objetivos",
-        note: zone.reasons.map((item) => labelFor(NOT_SERVICED_REASON_LABEL, item.reason)).join(" · ") || "Sin motivo registrado",
-        details: zone.reasons.map((item) => ({ label: labelFor(NOT_SERVICED_REASON_LABEL, item.reason), value: item.count, unit: "objetivos" })),
+        note: zone.reasons.map((item) => reasonLabel(item.reason)).join(" · ") || "Sin motivo registrado",
+        details: zone.reasons.map((item) => ({ label: reasonLabel(item.reason), value: item.count, unit: "objetivos" })),
         tone: "warning",
       })) },
     ],

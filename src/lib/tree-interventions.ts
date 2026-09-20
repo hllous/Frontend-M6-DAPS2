@@ -21,7 +21,7 @@ export const treeInterventionSchema = z.object({
   treeIds: z.array(z.string()).min(1),
   address: z.string().nullable().default(null),
   requiresStreetClosure: z.boolean(),
-  priority: treeInterventionPrioritySchema,
+  priority: treeInterventionPrioritySchema.nullable(),
   status: treeInterventionStatusSchema,
   serviceId: z.string().nullable(),
   justification: z.string().nullable(),

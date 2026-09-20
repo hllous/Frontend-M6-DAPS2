@@ -10,7 +10,7 @@ export const greenSpaceSchema = z.object({
   id: z.string(),
   name: z.string(),
   spaceType: greenSpaceTypeSchema,
-  areaM2: z.number(),
+  areaM2: z.number().nullable(),
   zoneId: z.string(),
   lat: z.number().nullable(),
   lng: z.number().nullable(),

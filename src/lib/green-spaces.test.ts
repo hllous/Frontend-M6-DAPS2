@@ -20,6 +20,17 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("green spaces adapter", () => {
+  it("accepts a null area from the backend", async () => {
+    server.use(http.get("*/api/green-spaces", () => HttpResponse.json({
+      data: [{ id: "green-space-null", name: "Plaza sin mensura", spaceType: "SQUARE", areaM2: null, zoneId: "zone-1", lat: null, lng: null, active: true }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(greenSpacesAdapter.list()).resolves.toMatchObject({
+      greenSpaces: [{ id: "green-space-null", areaM2: null }],
+    });
+  });
+
   it("normalizes the documented paginated response and filters", async () => {
     const page = await greenSpacesAdapter.list({ active: true, spaceType: "PARK", zoneId: "zone-1" });
 

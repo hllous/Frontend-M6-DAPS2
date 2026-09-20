@@ -9,6 +9,19 @@ afterEach(() => {
 });
 
 describe("indicatorsAdapter", () => {
+  it("accepts null as the backend bucket for no not-serviced reason", async () => {
+    const response = structuredClone(complianceIndicatorFixture);
+    response.notServicedRanking[0].reasons = [{ reason: null as never, count: 1 }];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(response)));
+
+    const result = await indicatorsAdapter.getCompliance({});
+
+    expect(result.breakdowns[1]?.points[0]).toMatchObject({
+      note: "Sin motivo registrado",
+      details: [{ label: "Sin motivo registrado", value: 1, unit: "objetivos" }],
+    });
+  });
+
   it("uses the last 30 days when the period is omitted", () => {
     expect(resolveIndicatorQuery({}, new Date("2026-09-07T12:00:00.000Z"))).toEqual({ from: "2026-08-09", to: "2026-09-07" });
   });

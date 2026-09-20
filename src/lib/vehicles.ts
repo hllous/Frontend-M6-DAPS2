@@ -17,7 +17,7 @@ const vehicleSchema = z.object({
   id: z.string(),
   plate: z.string(),
   vehicleType: vehicleTypeSchema,
-  capacity: z.number(),
+  capacity: z.number().nullable(),
   active: z.boolean(),
 });
 export type Vehicle = z.infer<typeof vehicleSchema>;

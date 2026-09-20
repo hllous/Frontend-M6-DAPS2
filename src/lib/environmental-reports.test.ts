@@ -12,6 +12,17 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); })
 afterAll(() => server.close());
 
 describe("environmental reports adapter", () => {
+  it("accepts a null priority from the backend", async () => {
+    server.use(http.get("*/api/environmental-reports", () => HttpResponse.json({
+      data: [{ id: "ER-NULL", reportType: "NOISE", address: null, lat: null, lng: null, ticketId: null, status: "RECEIVED", priority: null, deadlineAt: null, createdAt: "2026-09-20T10:00:00.000Z", updatedAt: "2026-09-20T10:00:00.000Z" }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(environmentalReportsAdapter.list()).resolves.toMatchObject({
+      environmentalReports: [{ id: "ER-NULL", priority: null }],
+    });
+  });
+
   it("requests the complete queue and preserves the eleven backend statuses", async () => {
     let requestedUrl = "";
     server.use(http.get("*/api/environmental-reports", ({ request }) => {
