@@ -38,6 +38,16 @@ export class AuthUnavailableError extends Error {
   }
 }
 
+export class BackendUnavailableError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message = "El backend no está disponible.") {
+    super(message);
+    this.name = "BackendUnavailableError";
+    this.status = status;
+  }
+}
+
 export class InvalidSessionError extends Error {
   constructor(message = "La sesión no es válida o ya expiró.") {
     super(message);
