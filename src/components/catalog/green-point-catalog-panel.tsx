@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -200,13 +201,12 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
 
   return (
     <section aria-labelledby="green-points-title" className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 id="green-points-title" className="text-2xl font-semibold tracking-tight">Puntos verdes</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Puntos de entrega voluntaria, su ubicación y el conjunto completo de residuos que aceptan.</p>
-        </div>
-        {canManage ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar punto verde</Button> : null}
-      </div>
+      <CatalogPageHeader
+        title="Puntos verdes"
+        titleId="green-points-title"
+        description="Puntos de entrega voluntaria, su ubicación y el conjunto completo de residuos que aceptan."
+        actions={canManage ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar punto verde</Button> : null}
+      />
 
       {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Esta sesión puede consultar el catálogo, pero no administrarlo.</p> : null}
       {notice ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{notice}</p> : null}

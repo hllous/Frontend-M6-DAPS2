@@ -5,6 +5,7 @@ import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -326,14 +327,12 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
 
   return (
     <section aria-labelledby="tree-interventions-title" className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">Arbolado urbano</p>
-          <h1 id="tree-interventions-title" className="text-2xl font-semibold tracking-tight">Intervenciones de arbolado</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Solicitudes de poda, extracción, plantación o tratamiento con su estado y decisión registrada.</p>
-        </div>
-        {canRequest ? <Button type="button" onClick={() => openRequest()}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención</Button> : null}
-      </div>
+      <CatalogPageHeader
+        title="Intervenciones de arbolado"
+        titleId="tree-interventions-title"
+        description="Solicitudes de poda, extracción, plantación o tratamiento con su estado y decisión registrada."
+        actions={canRequest ? <Button type="button" onClick={() => openRequest()}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención</Button> : null}
+      />
       {!canRequest ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription>Esta sesión puede consultar las solicitudes, pero no crear intervenciones de arbolado.</AlertDescription></Alert> : null}
       {notice ? <Alert><CheckCircle2 data-icon="inline-start" aria-hidden /><AlertDescription>{notice}</AlertDescription></Alert> : null}
       <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, Leaf, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -132,16 +133,12 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
 
   return (
     <section aria-labelledby="green-spaces-title" className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Leaf aria-hidden className="size-5 text-[var(--color-institutional)]" />
-            <h2 id="green-spaces-title" className="text-xl font-semibold tracking-tight">Espacios verdes</h2>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">Plazas, parques, canteros y ramblas disponibles para la planificación operativa.</p>
-        </div>
-        {canManage ? <Button onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar espacio verde</Button> : null}
-      </div>
+      <CatalogPageHeader
+        title="Espacios verdes"
+        titleId="green-spaces-title"
+        description="Plazas, parques, canteros y ramblas disponibles para la planificación operativa."
+        actions={canManage ? <Button onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar espacio verde</Button> : null}
+      />
 
       {notice ? <p className="text-sm text-[var(--color-success)]" role="status">{notice}</p> : null}
 

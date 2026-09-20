@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
-  Archive,
   ArchiveX,
   Check,
   CheckCircle2,
@@ -19,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -359,25 +359,17 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
 
   return (
     <section aria-labelledby="containers-title" className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Archive aria-hidden className="size-5 text-[var(--color-institutional)]" />
-            <h1 id="containers-title" className="text-xl font-semibold tracking-tight">
-              Contenedores
-            </h1>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Inventario urbano de contenedores de vía pública para recolección diferenciada y mantenimiento.
-          </p>
-        </div>
-        {canManage && (
+      <CatalogPageHeader
+        title="Contenedores"
+        titleId="containers-title"
+        description="Inventario urbano de contenedores de vía pública para recolección diferenciada y mantenimiento."
+        actions={canManage ? (
           <Button onClick={openCreate}>
             <Plus data-icon="inline-start" aria-hidden />
             Registrar contenedor
           </Button>
-        )}
-      </div>
+        ) : null}
+      />
 
       {notice && (
         <p

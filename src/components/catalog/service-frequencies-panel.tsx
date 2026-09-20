@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CalendarClock, Check, X } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -186,14 +187,12 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
 
   return (
     <section aria-labelledby="service-frequencies-title" className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">Catálogo · Planificación</p>
-          <h1 id="service-frequencies-title" className="text-2xl font-semibold tracking-tight">Frecuencias de servicio</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Configure reglas de recorrido por día, turno y vigencia. Esta configuración no genera Services automáticamente.</p>
-        </div>
-        {canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nueva frecuencia"}</Button> : null}
-      </div>
+      <CatalogPageHeader
+        title="Frecuencias de servicio"
+        titleId="service-frequencies-title"
+        description="Configure reglas de recorrido por día, turno y vigencia. Esta configuración no genera Services automáticamente."
+        actions={canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nueva frecuencia"}</Button> : null}
+      />
 
       {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Esta sesión puede consultar las frecuencias, pero no administrarlas.</p> : null}
       {message ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{message}</p> : null}

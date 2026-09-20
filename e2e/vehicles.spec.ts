@@ -19,7 +19,7 @@ test.describe("Vehicle catalog @smoke", () => {
     await page.goto("/app/catalog/vehicles");
     await page.getByRole("button", { name: "Registrar vehículo" }).click();
     await page.getByLabel("Patente").fill("AA 999 ZZ");
-    await page.getByLabel("Capacidad").fill("5");
+    await page.getByLabel("Capacidad (toneladas)").fill("10.5");
     await page.getByRole("button", { name: "Guardar vehículo" }).click();
 
     await expect(page.getByText("AA 999 ZZ")).toBeVisible();
