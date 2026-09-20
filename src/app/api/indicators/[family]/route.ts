@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "@/lib/indicator-fixtures";
-import { defaultIndicatorQuery, indicatorQuerySchema } from "@/lib/indicators";
+import { defaultIndicatorQuery, indicatorQueryErrorMessage, indicatorQuerySchema } from "@/lib/indicators";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
 const families = ["coverage", "compliance", "incidents", "waste"] as const;
@@ -17,7 +17,7 @@ function queryString(request: Request, family: IndicatorFamily) {
   const url = new URL(request.url);
   const raw = { from: url.searchParams.get("from") ?? undefined, to: url.searchParams.get("to") ?? undefined, zoneId: url.searchParams.get("zoneId") ?? undefined, serviceTypeId: url.searchParams.get("serviceTypeId") ?? undefined };
   const parsed = indicatorQuerySchema.safeParse(raw);
-  if (!parsed.success) return { error: "Los filtros de indicadores no respetan el formato esperado." } as const;
+  if (!parsed.success) return { error: indicatorQueryErrorMessage(parsed.error) } as const;
   const params = new URLSearchParams();
   if (parsed.data.from) params.set("from", parsed.data.from);
   if (parsed.data.to) params.set("to", parsed.data.to);
