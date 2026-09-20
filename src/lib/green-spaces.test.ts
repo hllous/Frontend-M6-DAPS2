@@ -8,6 +8,7 @@ import {
   GreenSpaceContractError,
   GreenSpaceRequestError,
   greenSpacesAdapter,
+  updateGreenSpaceInputSchema,
 } from "./green-spaces";
 
 const server = setupServer(...handlers);
@@ -113,5 +114,11 @@ describe("green spaces adapter", () => {
 
     server.use(http.get("*/api/green-spaces", () => HttpResponse.error()));
     await expect(greenSpacesAdapter.list()).rejects.toBeInstanceOf(NetworkFailureError);
+  });
+
+  it("treats spaceType as immutable: the update contract drops it", () => {
+    const parsed = updateGreenSpaceInputSchema.parse({ name: "Plaza Norte", spaceType: "PARK", areaM2: 10, zoneId: "zone-1" });
+    expect(parsed).not.toHaveProperty("spaceType");
+    expect(parsed).toMatchObject({ name: "Plaza Norte", areaM2: 10, zoneId: "zone-1" });
   });
 });

@@ -78,10 +78,27 @@ describe("environmental reports adapter", () => {
 
   it("keeps review transitions explicit and rejects malformed success payloads", async () => {
     expect((await environmentalReportsAdapter.startReview("ER-1001")).status).toBe("UNDER_REVIEW");
-    expect((await environmentalReportsAdapter.forward("ER-1001")).status).toBe("FORWARDED");
+    expect((await environmentalReportsAdapter.forward("ER-1001", { reason: "Corresponde a otra dependencia." })).status).toBe("FORWARDED");
     expect((await environmentalReportsAdapter.close("ER-1001")).status).toBe("CLOSED");
     server.use(http.get("*/api/environmental-reports/ER-1001", () => HttpResponse.json({ broken: true })));
     await expect(environmentalReportsAdapter.get("ER-1001")).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+  });
+
+  it("sends the required reason as JSON on forward and dismiss, and rejects an empty one before the request", async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.post("*/api/environmental-reports/ER-1001/forward", async ({ request }) => { bodies.push({ type: request.headers.get("content-type"), body: await request.json() }); return HttpResponse.json({ ...(await environmentalReportsAdapter.get("ER-1001")), status: "FORWARDED" }); }),
+      http.post("*/api/environmental-reports/ER-1001/dismiss", async ({ request }) => { bodies.push({ type: request.headers.get("content-type"), body: await request.json() }); return HttpResponse.json({ ...(await environmentalReportsAdapter.get("ER-1001")), status: "DISMISSED" }); }),
+    );
+    await environmentalReportsAdapter.forward("ER-1001", { reason: "  Otra dependencia  " });
+    await environmentalReportsAdapter.dismiss("ER-1001", { reason: "Duplicado" });
+    expect(bodies).toEqual([
+      { type: "application/json", body: { reason: "Otra dependencia" } },
+      { type: "application/json", body: { reason: "Duplicado" } },
+    ]);
+    await expect(environmentalReportsAdapter.forward("ER-1001", { reason: "   " })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+    await expect(environmentalReportsAdapter.dismiss("ER-1001", { reason: "x".repeat(501) })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+    expect(bodies).toHaveLength(2);
   });
 
   it("schedules an inspection with the selected checklist version and snapshot", async () => {

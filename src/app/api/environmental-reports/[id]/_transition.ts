@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { getEnvironmentalReportFixture, transitionEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
+import { reportDecisionInputSchema, type ReportDecisionInput } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
-const ERROR_LABELS: Record<number, string> = { 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 409: "Conflict", 503: "Service Unavailable", 500: "Internal Server Error" };
+const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 409: "Conflict", 503: "Service Unavailable", 500: "Internal Server Error" };
 
 function errorResponse(status: number, message: string, path: string) {
   return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status });
@@ -19,8 +20,18 @@ export async function transitionReport(request: Request, id: string, action: "st
     requireCapability(session, action === "close" ? "environmentalReport:close" : "environmentalReport:review");
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede revisar expedientes ambientales.", path);
 
+    // forward and dismiss take a required reason (backend ReportStatusChangeDto); start-review and close take no body.
+    let decision: ReportDecisionInput | undefined;
+    if (action === "forward" || action === "dismiss") {
+      let body: unknown;
+      try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
+      const parsed = reportDecisionInputSchema.safeParse(body);
+      if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+      decision = parsed.data;
+    }
+
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/environmental-reports/${encodeURIComponent(id)}/${action}`, action === "close" ? "environmentalReport:close" : "environmentalReport:review", { method: "POST" });
+      const backendResponse = await fetchBackend(request, `/environmental-reports/${encodeURIComponent(id)}/${action}`, action === "close" ? "environmentalReport:close" : "environmentalReport:review", decision ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(decision) } : { method: "POST" });
       return new NextResponse(await backendResponse.text(), { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
     }
 

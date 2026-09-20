@@ -109,9 +109,9 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
       return;
     }
     try {
-      const payload = { name: form.name.trim(), spaceType: form.spaceType, areaM2, zoneId: form.zoneId };
+      const payload = { name: form.name.trim(), areaM2, zoneId: form.zoneId };
       if (editing) await greenSpacesAdapter.update(editing.id, payload);
-      else await greenSpacesAdapter.create(payload);
+      else await greenSpacesAdapter.create({ ...payload, spaceType: form.spaceType });
       setFormOpen(false);
       setNotice(editing ? "Espacio verde actualizado." : "Espacio verde registrado.");
       setRequestVersion((version) => version + 1);
@@ -194,7 +194,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
           <form id="green-space-form" onSubmit={(event) => void save(event)}>
             <FieldGroup>
               <Field><FieldLabel htmlFor="green-space-name">Nombre</FieldLabel><input id="green-space-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={formControlClass} required aria-invalid={Boolean(formError)} aria-describedby={formError ? "green-space-name-error" : undefined} /><FieldError id="green-space-name-error" role="none">{formError}</FieldError></Field>
-              <Field><FieldLabel htmlFor="green-space-type-form">Tipo de espacio en el formulario</FieldLabel><select id="green-space-type-form" value={form.spaceType} onChange={(event) => setForm({ ...form, spaceType: event.target.value as GreenSpaceType })} className={formControlClass}>{spaceTypes.map((type) => <option key={type} value={type}>{spaceTypeLabels[type]}</option>)}</select></Field>
+              <Field><FieldLabel htmlFor="green-space-type-form">Tipo de espacio en el formulario</FieldLabel><select id="green-space-type-form" value={form.spaceType} onChange={(event) => setForm({ ...form, spaceType: event.target.value as GreenSpaceType })} className={formControlClass} disabled={Boolean(editing)} aria-describedby={editing ? "green-space-type-locked" : undefined}>{spaceTypes.map((type) => <option key={type} value={type}>{spaceTypeLabels[type]}</option>)}</select>{editing ? <FieldDescription id="green-space-type-locked">El tipo no se puede cambiar después de registrar el espacio verde.</FieldDescription> : null}</Field>
               <Field><FieldLabel htmlFor="green-space-area">Superficie (m²)</FieldLabel><input id="green-space-area" type="number" min="0.01" max={MAX_DECIMAL_10_2} step="0.01" value={form.areaM2} onChange={(event) => setForm({ ...form, areaM2: event.target.value })} className={formControlClass} required /><FieldDescription>Superficie declarada en metros cuadrados.</FieldDescription></Field>
               <Field><FieldLabel htmlFor="green-space-zone-form">Zona en el formulario</FieldLabel><select id="green-space-zone-form" value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })} className={formControlClass} required>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}</select></Field>
             </FieldGroup>

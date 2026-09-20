@@ -3,7 +3,7 @@ import { z } from "zod";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
-import { latitudeInput, longitudeInput } from "@/lib/input-limits";
+import { latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
 
 export const environmentalReportTypeSchema = z.enum([
   "NOISE",
@@ -70,6 +70,10 @@ export const createEnvironmentalReportInputSchema = z.object({
   description: z.string().trim().min(1, "Debe describir el hallazgo."),
 });
 export type CreateEnvironmentalReportInput = z.infer<typeof createEnvironmentalReportInputSchema>;
+
+// Backend ReportStatusChangeDto: forward and dismiss require a reason (max 500).
+export const reportDecisionInputSchema = z.object({ reason: reasonInput("Debe indicar el motivo.") });
+export type ReportDecisionInput = z.infer<typeof reportDecisionInputSchema>;
 
 const reportLocationSchema = z.object({
   address: z.string().nullable().optional(),
@@ -475,11 +479,11 @@ export const environmentalReportsAdapter = {
   async startReview(id: string): Promise<EnvironmentalReport> {
     return transition(id, "start-review", "La respuesta de inicio de revisión no respeta el contrato esperado.");
   },
-  async forward(id: string): Promise<EnvironmentalReport> {
-    return transition(id, "forward", "La respuesta de derivación no respeta el contrato esperado.");
+  async forward(id: string, input: ReportDecisionInput): Promise<EnvironmentalReport> {
+    return transition(id, "forward", "La respuesta de derivación no respeta el contrato esperado.", decisionBody(input));
   },
-  async dismiss(id: string): Promise<EnvironmentalReport> {
-    return transition(id, "dismiss", "La respuesta de desestimación no respeta el contrato esperado.");
+  async dismiss(id: string, input: ReportDecisionInput): Promise<EnvironmentalReport> {
+    return transition(id, "dismiss", "La respuesta de desestimación no respeta el contrato esperado.", decisionBody(input));
   },
   async close(id: string): Promise<EnvironmentalReport> {
     return transition(id, "close", "La respuesta de cierre no respeta el contrato esperado.");
@@ -527,6 +531,13 @@ export const environmentalReportsAdapter = {
   },
 };
 
-async function transition(id: string, action: string, message: string): Promise<EnvironmentalReport> {
-  return parseResource(await requestJson(`/api/environmental-reports/${encodeURIComponent(id)}/${action}`, { method: "POST" }), message);
+function decisionBody(input: ReportDecisionInput) {
+  const parsed = reportDecisionInputSchema.safeParse(input);
+  if (!parsed.success) throw new EnvironmentalReportContractError(parsed.error.issues[0]?.message ?? "El motivo es inválido.", { cause: parsed.error });
+  return parsed.data;
+}
+
+async function transition(id: string, action: string, message: string, body?: ReportDecisionInput): Promise<EnvironmentalReport> {
+  const init: RequestInit = body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { method: "POST" };
+  return parseResource(await requestJson(`/api/environmental-reports/${encodeURIComponent(id)}/${action}`, init), message);
 }

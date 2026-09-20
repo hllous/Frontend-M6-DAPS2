@@ -49,6 +49,7 @@ import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests
 import { getEnvironmentalReportClosure, SANCTION_DECISION_LABELS, type EnvironmentalReportClosure } from "@/lib/sanction-outcomes";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { CreateRepairRequestDialog } from "@/components/services/create-repair-request-dialog";
+import { ReportDecisionDialog, type ReportDecision } from "./report-decision-dialog";
 import { MAX_SEARCH_LENGTH, parseCoordinateField } from "@/lib/input-limits";
 
 type LoadState =
@@ -224,19 +225,23 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
     } catch { /* the original action error remains the useful message */ }
   }, [replaceReport, scenario]);
 
-  const handleAction = useCallback(async (action: Action, report: EnvironmentalReport) => {
+  const handleAction = useCallback(async (action: Action, report: EnvironmentalReport, reason?: string): Promise<string | null> => {
     setAnnouncement("");
     try {
-      const updated = action === "start-review" ? await environmentalReportsAdapter.startReview(report.id) : action === "forward" ? await environmentalReportsAdapter.forward(report.id) : action === "dismiss" ? await environmentalReportsAdapter.dismiss(report.id) : await environmentalReportsAdapter.close(report.id);
+      const updated = action === "start-review" ? await environmentalReportsAdapter.startReview(report.id) : action === "forward" ? await environmentalReportsAdapter.forward(report.id, { reason: reason ?? "" }) : action === "dismiss" ? await environmentalReportsAdapter.dismiss(report.id, { reason: reason ?? "" }) : await environmentalReportsAdapter.close(report.id);
       replaceReport(updated);
       setAnnouncement(`${report.id}: ${ENVIRONMENTAL_REPORT_STATUS_LABELS[updated.status]}.`);
+      return null;
     } catch (error) {
       if (error instanceof EnvironmentalReportRequestError && error.status === 409) {
         await refreshAfterConflict(report.id);
-        setAnnouncement(`${report.id} cambió mientras se procesaba la acción. Se actualizó el estado; revise nuevamente las acciones disponibles.`);
-      } else {
-        setAnnouncement(error instanceof Error ? error.message : "No se pudo actualizar el expediente.");
+        const message = `${report.id} cambió mientras se procesaba la acción. Se actualizó el estado; revise nuevamente las acciones disponibles.`;
+        setAnnouncement(message);
+        return message;
       }
+      const message = error instanceof Error ? error.message : "No se pudo actualizar el expediente.";
+      setAnnouncement(message);
+      return message;
     }
   }, [refreshAfterConflict, replaceReport]);
 
@@ -277,7 +282,7 @@ function ReportRow({ report, onOpen }: { report: EnvironmentalReport; onOpen: ()
   return <li><button type="button" onClick={onOpen} className="flex min-h-12 w-full items-start gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition-colors hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-subtle)] focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] sm:items-center" aria-label={`${report.id}, ${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}, ${ENVIRONMENTAL_REPORT_STATUS_LABELS[report.status]}`}><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-info-fill)] text-[var(--color-action)]"><MapPin className="h-4 w-4" aria-hidden /></span><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="font-bold tabular-nums text-[var(--color-text)]">{report.id}</span><span className="text-xs font-semibold text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}</span></span><span className="mt-1 block truncate text-sm text-[var(--color-text)]">{reportAddress(report)}</span><span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">Actualizado {formatDate(report.updatedAt)}{report.escalated ? " · Escalado" : ""}</span></span><StatusBadge status={report.status} /><ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-secondary)] sm:mt-0" aria-hidden /></button></li>;
 }
 
-function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction, onReportUpdated }: { report: EnvironmentalReport; scenario: OperationalScenario; focusedInspectionId: string | null; onBack: () => void; onAction: (action: Action, report: EnvironmentalReport) => Promise<void>; onReportUpdated: (report: EnvironmentalReport) => void }) {
+function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction, onReportUpdated }: { report: EnvironmentalReport; scenario: OperationalScenario; focusedInspectionId: string | null; onBack: () => void; onAction: (action: Action, report: EnvironmentalReport, reason?: string) => Promise<string | null>; onReportUpdated: (report: EnvironmentalReport) => void }) {
   const isOffice = scenario.actor.kind === "OFFICE";
   const [inspections, setInspections] = useState<EnvironmentalInspection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -293,6 +298,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
   const [noticeLoading, setNoticeLoading] = useState(false);
   const [noticeError, setNoticeError] = useState<string | null>(null);
   const [issueNoticeOpen, setIssueNoticeOpen] = useState(false);
+  const [pendingDecision, setPendingDecision] = useState<ReportDecision | null>(null);
 
   const canIssueViolationNotice = isOffice && scenario.capabilities.includes("violationNotice:issue");
   const canViewViolationNotice = isOffice && scenario.capabilities.includes("violationNotice:view");
@@ -468,7 +474,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
           <div><h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Expediente {report.id}</h1><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · actualización de {formatDate(report.updatedAt)}</p></div>
           <StatusBadge status={report.status} />
         </div>
-        {isOffice && actions.length > 0 && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Siguiente decisión de Oficina</h2><p className="mt-1 text-sm text-[var(--color-text-secondary)]">Las acciones disponibles respetan el estado actual del expediente.</p><div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`min-h-10 gap-2 ${tone ?? ""}`} onClick={() => void onAction(action, report)}><Icon data-icon="inline-start" aria-hidden />{label}</Button>)}</div></section>}
+        {isOffice && actions.length > 0 && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Siguiente decisión de Oficina</h2><p className="mt-1 text-sm text-[var(--color-text-secondary)]">Las acciones disponibles respetan el estado actual del expediente.</p><div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`min-h-10 gap-2 ${tone ?? ""}`} onClick={() => { if (action === "forward" || action === "dismiss") setPendingDecision(action); else void onAction(action, report); }}><Icon data-icon="inline-start" aria-hidden />{label}</Button>)}</div></section>}
         {isOffice && (canSchedule || canReprogram || canReinspect) && <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="inspection-scheduling-title"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><CalendarDays aria-hidden /><div><h2 id="inspection-scheduling-title" className="text-sm font-bold text-[var(--color-text)]">Programación de inspección</h2><p className="mt-1 max-w-2xl text-sm text-[var(--color-text-secondary)]">{canReinspect ? "La inspección anterior fue inconclusa. Registre una nueva inspección y un nuevo Servicio POINT." : "Defina la fecha y la cuadrilla. El tipo de Servicio POINT se determina automáticamente."}</p></div></div><div className="flex flex-wrap gap-2">{(canSchedule || canReinspect) && <Button className="min-h-10 gap-2" onClick={() => { setScheduleMode(canReinspect ? "reinspection" : "schedule"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />{canReinspect ? "Programar reinspección" : "Programar inspección"}</Button>}{canReprogram && <Button variant="outline" className="min-h-10 gap-2" onClick={() => { setScheduleMode("schedule"); setScheduleOpen(true); }}><RefreshCw data-icon="inline-start" aria-hidden />Reprogramar inspección</Button>}</div></div></section>}
         {scheduleError && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{scheduleError}</div>}
         {canViewViolationNotice && completedViolationInspection && <ViolationNoticePanel inspection={completedViolationInspection} notice={violationNotice} loading={noticeLoading} error={noticeError} showIssue={showNoticeIssuance} canIssue={canSubmitNotice} hasEvidence={hasInspectionEvidence} onIssue={() => setIssueNoticeOpen(true)} />}
@@ -477,6 +483,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
         {visibleClosure && <EnvironmentalReportClosurePanel closure={visibleClosure} />}
         {canViewSanctionOutcome && report.sanctionOutcome && <SanctionOutcomePanel outcome={report.sanctionOutcome} />}
       </main>
+       <ReportDecisionDialog decision={pendingDecision} reportId={report.id} onOpenChange={(open) => { if (!open) setPendingDecision(null); }} onConfirm={(decision, reason) => onAction(decision, report, reason)} />
        <InspectionSchedulingDialog open={scheduleOpen} mode={scheduleMode} activeInspection={activeInspection} onOpenChange={setScheduleOpen} onSubmit={handleSchedule} />
        <IssueViolationNoticeDialog key={`${report.id}-${issueNoticeOpen ? "open" : "closed"}`} open={issueNoticeOpen} inspection={completedViolationInspection} onOpenChange={setIssueNoticeOpen} onSubmit={handleIssueNotice} />
        <CreateRepairRequestDialog

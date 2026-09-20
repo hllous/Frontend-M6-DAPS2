@@ -44,7 +44,8 @@ export const createGreenSpaceInputSchema = z.object({
 });
 export type CreateGreenSpaceInput = z.infer<typeof createGreenSpaceInputSchema>;
 
-export const updateGreenSpaceInputSchema = createGreenSpaceInputSchema.partial().extend({
+// spaceType is immutable in the backend (UpdateGreenSpaceDto has no such field); zod strips it if a caller sends it.
+export const updateGreenSpaceInputSchema = createGreenSpaceInputSchema.omit({ spaceType: true }).partial().extend({
   active: z.boolean().optional(),
 });
 export type UpdateGreenSpaceInput = z.infer<typeof updateGreenSpaceInputSchema>;

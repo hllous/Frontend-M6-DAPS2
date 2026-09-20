@@ -23,7 +23,8 @@ export const createCrewInputSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio."), crewType: crewTypeSchema, leaderUserId: externalIdInput(), organizationId: externalIdInput(), defaultShift: shiftSchema,
 });
 export type CreateCrewInput = z.infer<typeof createCrewInputSchema>;
-export const updateCrewInputSchema = createCrewInputSchema.extend({ active: z.boolean() }).strict();
+// crewType is immutable in the backend (UpdateCrewDto has no such field), so an edit never carries it.
+export const updateCrewInputSchema = createCrewInputSchema.omit({ crewType: true }).extend({ active: z.boolean() }).strict();
 export type UpdateCrewInput = z.infer<typeof updateCrewInputSchema>;
 export const addCrewMembersInputSchema = z.object({ memberUserIds: externalIdListInput({ emptyMessage: "Seleccione al menos un integrante." }) }).strict();
 export type AddCrewMembersInput = z.infer<typeof addCrewMembersInputSchema>;
