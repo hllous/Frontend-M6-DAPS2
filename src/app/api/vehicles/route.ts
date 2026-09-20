@@ -6,6 +6,7 @@ import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, Invali
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { createVehicleInputSchema, type VehicleQuery, vehicleTypeSchema } from "@/lib/vehicles";
 import { addVehicleFixture, filterVehicleFixtures, paginateVehicleFixtures } from "@/lib/vehicles-fixtures";
+import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -28,8 +29,8 @@ function parseVehicleQuery(url: URL): VehicleQuery {
   return {
     active: active === null ? undefined : active === "true",
     vehicleType: vehicleType.success ? vehicleType.data : undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 

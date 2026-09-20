@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { MAX_DECIMAL_10_2, boundedDecimalInput } from "@/lib/input-limits";
 
 export const vehicleTypeSchema = z.enum([
   "COMPACTOR_TRUCK",
@@ -40,7 +41,7 @@ export type VehiclesPage = {
 export const createVehicleInputSchema = z.object({
   plate: z.string().trim().min(1, "La patente es obligatoria."),
   vehicleType: vehicleTypeSchema,
-  capacity: z.number().positive("La capacidad debe ser mayor que cero."),
+  capacity: boundedDecimalInput("La capacidad", MAX_DECIMAL_10_2, { positive: true }),
 });
 export type CreateVehicleInput = z.infer<typeof createVehicleInputSchema>;
 

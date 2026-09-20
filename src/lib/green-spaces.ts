@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { MAX_DECIMAL_10_2, boundedDecimalInput, latitudeInput, longitudeInput } from "@/lib/input-limits";
 
 export const greenSpaceTypeSchema = z.enum(["SQUARE", "PARK", "PLANTER", "MEDIAN", "PROMENADE"]);
 export type GreenSpaceType = z.infer<typeof greenSpaceTypeSchema>;
@@ -36,10 +37,10 @@ export type GreenSpacesPage = {
 export const createGreenSpaceInputSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio."),
   spaceType: greenSpaceTypeSchema,
-  areaM2: z.number().positive("La superficie debe ser mayor que cero."),
+  areaM2: boundedDecimalInput("La superficie", MAX_DECIMAL_10_2, { positive: true }),
   zoneId: z.string().trim().min(1, "La zona es obligatoria."),
-  lat: z.number().finite().optional(),
-  lng: z.number().finite().optional(),
+  lat: latitudeInput().optional(),
+  lng: longitudeInput().optional(),
 });
 export type CreateGreenSpaceInput = z.infer<typeof createGreenSpaceInputSchema>;
 

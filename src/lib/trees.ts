@@ -8,6 +8,7 @@ import {
   treeHealthStatusSchema,
   treeInterventionTypeSchema,
 } from "./tree-surveys";
+import { MAX_TREE_DIAMETER_CM, MAX_TREE_HEIGHT_M, boundedDecimalInput, latitudeInput, longitudeInput } from "@/lib/input-limits";
 
 export const treeLastSurveySchema = z.object({
   surveyedAt: z.string(),
@@ -34,18 +35,18 @@ export const treeSchema = z.object({
 });
 export type Tree = z.infer<typeof treeSchema>;
 
-const optionalLocationInput = z.number().finite().optional();
-const positiveMeasurement = z.number().finite().positive();
+const heightInput = boundedDecimalInput("La altura", MAX_TREE_HEIGHT_M, { positive: true });
+const diameterInput = boundedDecimalInput("El diámetro", MAX_TREE_DIAMETER_CM, { positive: true });
 
 export const treeCreateInputSchema = z.object({
   surveyCode: z.string().trim().min(1, "El código de relevamiento es obligatorio.").max(30, "El código de relevamiento no puede superar los 30 caracteres."),
   zoneId: z.string().trim().min(1, "La zona operativa es obligatoria."),
   species: z.string().trim().min(1, "La especie es obligatoria.").max(120, "La especie no puede superar los 120 caracteres."),
   address: z.string().trim().max(200, "La dirección no puede superar los 200 caracteres.").optional(),
-  lat: optionalLocationInput,
-  lng: optionalLocationInput,
-  heightM: positiveMeasurement,
-  diameterCm: positiveMeasurement,
+  lat: latitudeInput().optional(),
+  lng: longitudeInput().optional(),
+  heightM: heightInput,
+  diameterCm: diameterInput,
   active: z.boolean().optional(),
 });
 export type TreeCreateInput = z.infer<typeof treeCreateInputSchema>;
@@ -54,10 +55,10 @@ export const treeUpdateInputSchema = z.object({
   zoneId: z.string().trim().min(1, "La zona operativa es obligatoria.").optional(),
   species: z.string().trim().min(1, "La especie es obligatoria.").max(120, "La especie no puede superar los 120 caracteres.").optional(),
   address: z.string().trim().max(200, "La dirección no puede superar los 200 caracteres.").optional(),
-  lat: optionalLocationInput,
-  lng: optionalLocationInput,
-  heightM: positiveMeasurement.optional(),
-  diameterCm: positiveMeasurement.optional(),
+  lat: latitudeInput().optional(),
+  lng: longitudeInput().optional(),
+  heightM: heightInput.optional(),
+  diameterCm: diameterInput.optional(),
   active: z.boolean().optional(),
 }).strict();
 export type TreeUpdateInput = z.infer<typeof treeUpdateInputSchema>;

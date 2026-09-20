@@ -16,6 +16,7 @@ import {
 } from "@/lib/vehicles";
 
 import styles from "./catalog-panel.module.css";
+import { MAX_DECIMAL_10_2 } from "@/lib/input-limits";
 
 const vehicleTypes = vehicleTypeSchema.options;
 const vehicleTypeLabels: Record<VehicleType, string> = {
@@ -88,6 +89,10 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
     const capacity = Number(form.capacity);
     if (!form.plate.trim() || !Number.isFinite(capacity) || capacity <= 0) {
       setFormError("Indique una patente y una capacidad mayor que cero.");
+      return;
+    }
+    if (capacity > MAX_DECIMAL_10_2) {
+      setFormError(`La capacidad no puede superar ${MAX_DECIMAL_10_2.toLocaleString("es-AR")}.`);
       return;
     }
     try {
@@ -169,7 +174,7 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
             <FieldGroup>
               <Field><FieldLabel htmlFor="vehicle-plate">Patente</FieldLabel><input id="vehicle-plate" value={form.plate} onChange={(event) => setForm({ ...form, plate: event.target.value })} className={styles.control} required /></Field>
               <Field><FieldLabel htmlFor="vehicle-type-form">Tipo de vehículo para el registro</FieldLabel><select id="vehicle-type-form" value={form.vehicleType} onChange={(event) => setForm({ ...form, vehicleType: event.target.value as VehicleType })} className={styles.control}>{vehicleTypes.map((type) => <option key={type} value={type}>{vehicleTypeLabels[type]}</option>)}</select></Field>
-              <Field><FieldLabel htmlFor="vehicle-capacity">Capacidad</FieldLabel><input id="vehicle-capacity" type="number" min="1" step="1" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} className={styles.control} required /><FieldDescription>Capacidad operativa declarada para el vehículo.</FieldDescription></Field>
+              <Field><FieldLabel htmlFor="vehicle-capacity">Capacidad</FieldLabel><input id="vehicle-capacity" type="number" min="1" max={MAX_DECIMAL_10_2} step="1" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} className={styles.control} required /><FieldDescription>Capacidad operativa declarada para el vehículo.</FieldDescription></Field>
             </FieldGroup>
           </form>
           <DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)}>Cancelar</Button><Button type="submit" form="vehicle-form">Guardar vehículo</Button></DialogFooter>

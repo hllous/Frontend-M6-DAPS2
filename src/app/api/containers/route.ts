@@ -17,6 +17,7 @@ import {
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -52,9 +53,9 @@ function parseContainerQuery(url: URL): ContainerQuery {
       ? (rawType as ContainerQuery["containerType"])
       : undefined,
     zoneId: url.searchParams.get("zoneId") ?? undefined,
-    search: url.searchParams.get("search") ?? undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    search: searchParam(url.searchParams),
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 

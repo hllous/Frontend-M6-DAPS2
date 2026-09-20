@@ -17,6 +17,7 @@ import {
   routeFixtures,
 } from "@/lib/routes-fixtures";
 import { createRouteInputSchema, type Route, type RouteQuery } from "@/lib/routes";
+import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -45,9 +46,9 @@ function parseRouteQuery(url: URL): RouteQuery {
   return {
     active: url.searchParams.has("active") ? url.searchParams.get("active") === "true" : undefined,
     zoneId: url.searchParams.get("zoneId") ?? undefined,
-    search: url.searchParams.get("search") ?? undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    search: searchParam(url.searchParams),
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 
