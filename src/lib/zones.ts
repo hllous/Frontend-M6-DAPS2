@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 
@@ -35,13 +36,15 @@ export class ZoneRequestError extends Error {
   }
 }
 
+// El listado no trae barrios y el detalle los trae como neighborhoods: [{ neighborhoodId }].
 export const zoneSchema = z.object({
   id: z.string(),
   code: z.string(),
   name: z.string(),
   active: z.boolean(),
-  neighborhoodIds: z.array(z.string()),
+  neighborhoodIds: z.array(z.string()).optional(),
 });
+const zoneWireSchema = z.preprocess(withFlatIds("neighborhoods", "neighborhoodId", "neighborhoodIds"), zoneSchema);
 
 export type Zone = z.infer<typeof zoneSchema>;
 
@@ -83,7 +86,7 @@ export const zoneReferenceReportSchema = z.object({
 export type ZoneReferenceReport = z.infer<typeof zoneReferenceReportSchema>;
 
 const zonesEnvelopeSchema = z.object({
-  data: z.array(zoneSchema),
+  data: z.array(zoneWireSchema),
   meta: z.object({
     total: z.number(),
     page: z.number(),
@@ -141,7 +144,7 @@ async function handleSingleZoneResponse(response: Response, resource: "zones" = 
   if (!response.ok) {
     handleErrorPayload(payload, resource);
   }
-  const parsed = zoneSchema.safeParse(payload);
+  const parsed = zoneWireSchema.safeParse(payload);
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource });
     throw new ZoneContractError("La respuesta de zona no respeta el contrato esperado.", {

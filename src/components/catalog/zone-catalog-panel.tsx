@@ -223,10 +223,14 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     setIsLoadingNeighborhoods(true);
 
     try {
+      // El listado del backend no informa los barrios de la zona; el detalle sí,
+      // así que se pide cuando hace falta en vez de asumir que no tiene ninguno.
+      const detail = zone.neighborhoodIds === undefined ? await zonesAdapter.get(zone.id) : zone;
       const [options, assigned] = await Promise.all([
         neighborhoodsAdapter.search(),
-        neighborhoodsAdapter.resolveIds(zone.neighborhoodIds),
+        neighborhoodsAdapter.resolveIds(detail.neighborhoodIds ?? []),
       ]);
+      setNeighborhoodZone(detail);
       setNeighborhoodOptions(options);
       setAssignedNeighborhoods(assigned);
     } catch {
@@ -261,7 +265,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       });
       updateZoneInState(updated);
       setNeighborhoodZone(updated);
-      setAssignedNeighborhoods(await neighborhoodsAdapter.resolveIds(updated.neighborhoodIds));
+      setAssignedNeighborhoods(await neighborhoodsAdapter.resolveIds(updated.neighborhoodIds ?? []));
       setSelectedNeighborhoodIds([]);
       setNeighborhoodNotice("Barrios asignados correctamente.");
     } catch (caught) {
@@ -283,7 +287,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       const updated = await zonesAdapter.removeNeighborhood(neighborhoodZone.id, neighborhoodId);
       updateZoneInState(updated);
       setNeighborhoodZone(updated);
-      setAssignedNeighborhoods(await neighborhoodsAdapter.resolveIds(updated.neighborhoodIds));
+      setAssignedNeighborhoods(await neighborhoodsAdapter.resolveIds(updated.neighborhoodIds ?? []));
       setNeighborhoodNotice("Barrio quitado de la zona.");
     } catch (caught) {
       setNeighborhoodError(
@@ -593,7 +597,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                     {zone.name}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {zone.neighborhoodIds.length > 0
+                    {zone.neighborhoodIds === undefined
+                      ? "Ver en gestionar barrios"
+                      : zone.neighborhoodIds.length > 0
                       ? `${zone.neighborhoodIds.length} ${zone.neighborhoodIds.length === 1 ? "barrio" : "barrios"}`
                       : "Sin barrios"}
                   </td>
@@ -769,7 +775,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               ) : (
                 <div className="max-h-56 overflow-y-auto rounded-md border border-border" role="group" aria-label="Barrios disponibles">
                   {neighborhoodOptions.map((neighborhood) => {
-                    const isAssigned = neighborhoodZone?.neighborhoodIds.includes(neighborhood.id) ?? false;
+                    const isAssigned = neighborhoodZone?.neighborhoodIds?.includes(neighborhood.id) ?? false;
                     const isSelected = selectedNeighborhoodIds.includes(neighborhood.id);
                     return (
                       <label

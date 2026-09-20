@@ -722,7 +722,7 @@ export const handlers = [
     const zoneId = params.zoneId as string;
     const neighborhoodId = params.neighborhoodId as string;
     const zone = getZoneFixture(zoneId);
-    if (!zone || !zone.neighborhoodIds.includes(neighborhoodId)) {
+    if (!zone || !zone.neighborhoodIds?.includes(neighborhoodId)) {
       return HttpResponse.json(
         { statusCode: 404, message: "El barrio no esta asignado a la zona operativa.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods/${neighborhoodId}` },
         { status: 404 },

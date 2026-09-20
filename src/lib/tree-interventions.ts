@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 import { treeSchema, type Tree } from "./trees";
@@ -13,11 +14,12 @@ export type TreeInterventionStatus = z.infer<typeof treeInterventionStatusSchema
 export const treeInterventionPrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 export type TreeInterventionPriority = z.infer<typeof treeInterventionPrioritySchema>;
 
+// El backend devuelve trees: [{ treeId }] y address puede venir en null.
 export const treeInterventionSchema = z.object({
   id: z.string(),
   interventionType: treeInterventionTypeSchema,
   treeIds: z.array(z.string()).min(1),
-  address: z.string(),
+  address: z.string().nullable().default(null),
   requiresStreetClosure: z.boolean(),
   priority: treeInterventionPrioritySchema,
   status: treeInterventionStatusSchema,
@@ -30,7 +32,10 @@ export const treeInterventionSchema = z.object({
 });
 export type TreeIntervention = z.infer<typeof treeInterventionSchema> & { trees?: Tree[] };
 
-const treeInterventionResponseSchema = treeInterventionSchema.extend({ trees: z.array(treeSchema).optional() });
+const treeInterventionResponseSchema = z.preprocess(
+  withFlatIds("trees", "treeId", "treeIds"),
+  treeInterventionSchema.extend({ trees: z.array(treeSchema).optional() }),
+);
 export type TreeInterventionDetail = z.infer<typeof treeInterventionResponseSchema>;
 
 export const treeInterventionCreateInputSchema = z.object({

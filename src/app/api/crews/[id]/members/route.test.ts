@@ -42,6 +42,28 @@ describe("crew membership BFF route", () => {
     expect(await response.json()).toMatchObject({ id: "crew-membership", memberUserIds: ["user-ana"] });
   });
 
+  it("renames memberUserIds to the userIds the backend expects (#239)", async () => {
+    process.env.M6_AUTH_MODE = "backend-development";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const session = await login(new Request("http://localhost/api/session/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
+    }));
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 201, headers: { "content-type": "application/json" } }));
+
+    await POST(new Request("http://localhost/api/crews/crew-real/members", {
+      method: "POST",
+      headers: { cookie: session.headers.get("set-cookie") ?? "", "content-type": "application/json" },
+      body: JSON.stringify({ memberUserIds: ["usr-m1-0299"] }),
+    }), { params: Promise.resolve({ id: "crew-real" }) });
+
+    const init = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(init.body))).toEqual({ userIds: ["usr-m1-0299"] });
+    delete process.env.M6_DEV_JWT;
+  });
+
   it("keeps membership management Office-only, including for a Field actor's own crew", async () => {
     const request = new Request("http://localhost/api/crews/crew-b/members", {
       method: "POST",
