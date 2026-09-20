@@ -5,7 +5,7 @@ import { HttpResponse, http } from "msw";
 import { handlers } from "@/mocks/handlers";
 import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_ZONES_QUERY } from "./zones-fixtures";
-import { ZoneContractError, ZoneRequestError, zonesAdapter } from "./zones";
+import { ZoneContractError, ZoneRequestError, zoneLabel, zonesAdapter } from "./zones";
 
 const server = setupServer(...handlers);
 
@@ -270,5 +270,23 @@ describe("zones adapter", () => {
     );
 
     await expect(zonesAdapter.get("missing")).rejects.toThrow(ZoneRequestError);
+  });
+});
+
+describe("zoneLabel", () => {
+  const zones = [{ id: "zone-uuid-1", code: "Z-01", name: "Zona Norte", active: true }];
+
+  it("shows code and name when the zone is resolved", () => {
+    expect(zoneLabel(zones, "zone-uuid-1", true)).toBe("Z-01 · Zona Norte");
+  });
+
+  it("shows neutral text while zones are still loading", () => {
+    expect(zoneLabel([], "zone-uuid-1", false)).toBe("Cargando zona…");
+  });
+
+  it("never exposes the raw id when the zone cannot be resolved", () => {
+    const label = zoneLabel(zones, "zone-uuid-9", true);
+    expect(label).toBe("Zona no disponible");
+    expect(label).not.toContain("zone-uuid-9");
   });
 });
