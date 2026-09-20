@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { formControlClass } from "@/components/ui/form-control";
 import { greenSpacesAdapter, greenSpaceTypeSchema, type GreenSpace, type GreenSpaceQuery, type GreenSpaceType } from "@/lib/green-spaces";
-import { zonesAdapter, type Zone } from "@/lib/zones";
+import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";
 import type { OperationalScenario } from "@/lib/scenarios";
 
 type LoadState =
@@ -40,6 +40,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
   const [typeFilter, setTypeFilter] = useState<GreenSpaceType | "all">("all");
   const [zoneFilter, setZoneFilter] = useState("all");
   const [zones, setZones] = useState<Zone[]>([]);
+  const [zonesLoaded, setZonesLoaded] = useState(false);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [requestVersion, setRequestVersion] = useState(0);
   const [editing, setEditing] = useState<GreenSpace | null>(null);
@@ -56,9 +57,11 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
 
   useEffect(() => {
     let isCurrent = true;
-    void zonesAdapter.list().then((page) => {
+    void zonesAdapter.list({ pageSize: 100 }).then((page) => {
       if (isCurrent) setZones(page.zones);
-    }).catch(() => undefined);
+    }).catch(() => undefined).finally(() => {
+      if (isCurrent) setZonesLoaded(true);
+    });
     return () => { isCurrent = false; };
   }, []);
 
@@ -169,12 +172,11 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
             <caption className="sr-only">Espacios verdes registrados</caption>
             <thead className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground"><tr><th scope="col" className="px-4 py-3">Nombre</th><th scope="col" className="px-4 py-3">Tipo</th><th scope="col" className="px-4 py-3">Superficie</th><th scope="col" className="px-4 py-3">Zona</th><th scope="col" className="px-4 py-3">Estado</th>{canManage ? <th scope="col" className="px-4 py-3"><span className="sr-only">Acciones</span></th> : null}</tr></thead>
             <tbody className="divide-y divide-border">{state.greenSpaces.map((greenSpace) => {
-              const zone = zones.find((item) => item.id === greenSpace.zoneId);
               return <tr key={greenSpace.id}>
                 <th scope="row" className="px-4 py-3 font-medium">{greenSpace.name}</th>
                 <td className="px-4 py-3">{spaceTypeLabels[greenSpace.spaceType]}</td>
                 <td className="px-4 py-3">{greenSpace.areaM2 === null ? "—" : `${greenSpace.areaM2.toLocaleString("es-AR")} m²`}</td>
-                <td className="px-4 py-3">{zone ? `${zone.code} · ${zone.name}` : greenSpace.zoneId}</td>
+                <td className="px-4 py-3">{zoneLabel(zones, greenSpace.zoneId, zonesLoaded)}</td>
                 <td className="px-4 py-3"><span className="inline-flex items-center gap-1">{greenSpace.active ? <Check aria-hidden className="size-4 text-[var(--color-success)]" /> : <X aria-hidden className="size-4 text-muted-foreground" />}{greenSpace.active ? "Activo" : "Inactivo"}</span></td>
                 {canManage ? <td className="flex gap-2 px-4 py-3"><Button variant="outline" size="sm" onClick={() => openEdit(greenSpace)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{greenSpace.active ? <Button variant="destructive" size="sm" onClick={() => void deactivate(greenSpace)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}
               </tr>;

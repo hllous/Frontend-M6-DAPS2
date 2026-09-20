@@ -111,7 +111,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     let isCurrent = true;
     async function loadZones() {
       try {
-        const page = await zonesAdapter.list({ active: true });
+        const page = await zonesAdapter.list({ active: true, pageSize: 100 });
         if (isCurrent) {
           setAvailableZones(page.zones);
         }
@@ -280,7 +280,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         estimatedDurationMin: s.estimatedDurationMin ?? 30,
         zoneName:
           s.zone?.name ??
-          (availableZones.find((z) => z.id === s.zoneId)?.name || `Zona ${s.zoneId}`),
+          (availableZones.find((z) => z.id === s.zoneId)?.name || "Zona no disponible"),
         zoneCode: s.zone?.code ?? availableZones.find((z) => z.id === s.zoneId)?.code,
       })),
     );
@@ -610,7 +610,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                           </span>
                           <div>
                             <div className="font-medium text-foreground">
-                              {stop.zone?.name ?? `Zona ${stop.zoneId}`}
+                              {stop.zone?.name ?? "Zona no disponible"}
                             </div>
                             {stop.zone?.code && (
                               <div className="text-xs text-muted-foreground font-mono">

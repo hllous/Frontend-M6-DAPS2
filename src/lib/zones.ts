@@ -48,6 +48,13 @@ const zoneWireSchema = z.preprocess(withFlatIds("neighborhoods", "neighborhoodId
 
 export type Zone = z.infer<typeof zoneSchema>;
 
+/** Etiqueta de zona para tablas y detalles: nunca expone el id crudo. */
+export function zoneLabel(zones: Zone[], zoneId: string, loaded: boolean): string {
+  const zone = zones.find((candidate) => candidate.id === zoneId);
+  if (zone) return `${zone.code} · ${zone.name}`;
+  return loaded ? "Zona no disponible" : "Cargando zona…";
+}
+
 export const createZoneInputSchema = z.object({
   code: z.string().trim().min(1, "El código es obligatorio"),
   name: z.string().trim().min(1, "El nombre es obligatorio"),
