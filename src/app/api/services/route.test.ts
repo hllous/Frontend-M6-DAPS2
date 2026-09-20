@@ -42,7 +42,9 @@ describe("authenticated services BFF route", () => {
   it("returns a 401 body the services adapter parses as a typed request error, not a contract violation", async () => {
     const response = await GET(new Request("http://localhost/api/services"));
     const body = await response.json();
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(body), { status: 401 }));
+    // Una Response se lee una sola vez y el adapter ahora pide tambien los catalogos
+    // de etiquetas, asi que cada llamada necesita su propio cuerpo.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify(body), { status: 401 }));
 
     const error = await servicesAdapter.list().catch((caught: unknown) => caught);
 
