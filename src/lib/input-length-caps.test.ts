@@ -42,7 +42,7 @@ describe("ids and arrays (#251)", () => {
     expect(createCrewInputSchema.safeParse({ ...crew, leaderUserId: "u".repeat(100) }).success).toBe(true);
     expect(createCrewInputSchema.safeParse({ ...crew, leaderUserId: "u".repeat(101) }).success).toBe(false);
     expect(createCrewInputSchema.safeParse({ ...crew, organizationId: "o".repeat(101) }).success).toBe(false);
-    expect(updateCrewInputSchema.safeParse({ ...crew, active: true, organizationId: "o".repeat(101) }).success).toBe(false);
+    expect(updateCrewInputSchema.safeParse({ name: crew.name, leaderUserId: crew.leaderUserId, defaultShift: crew.defaultShift, active: true, organizationId: "o".repeat(101) }).success).toBe(false);
   });
 
   it("integrantes de cuadrilla: 100 si, 101 no, y cada id hasta 100 caracteres", () => {

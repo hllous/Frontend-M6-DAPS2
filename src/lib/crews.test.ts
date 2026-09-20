@@ -4,7 +4,7 @@ import { HttpResponse, http } from "msw";
 
 import { handlers } from "@/mocks/handlers";
 import { NetworkFailureError } from "./authenticated-fetch";
-import { crewsAdapter, CrewContractError, CrewRequestError } from "./crews";
+import { crewsAdapter, CrewContractError, CrewRequestError, updateCrewInputSchema } from "./crews";
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -79,7 +79,8 @@ describe("crews adapter", () => {
     await expect(crewsAdapter.get("crew-b")).resolves.toMatchObject({ id: "crew-b", memberUserIds: expect.any(Array) });
     const created = await crewsAdapter.create(createInput);
     expect(created).toMatchObject({ name: createInput.name, leaderUserId: createInput.leaderUserId, active: true });
-    const updated = await crewsAdapter.update(created.id, { ...createInput, name: "Cuadrilla Centro actualizada", active: true });
+    const { crewType: _crewType, ...editable } = createInput;
+    const updated = await crewsAdapter.update(created.id, { ...editable, name: "Cuadrilla Centro actualizada", active: true });
     expect(updated).toMatchObject({ id: created.id, name: "Cuadrilla Centro actualizada" });
     await expect(crewsAdapter.remove(created.id)).resolves.toMatchObject({ id: created.id, active: false });
   });
@@ -111,5 +112,11 @@ describe("crews adapter", () => {
     await expect(crewsAdapter.list()).rejects.toBeInstanceOf(CrewRequestError);
     server.use(http.get("*/api/crews", () => HttpResponse.error()));
     await expect(crewsAdapter.list()).rejects.toBeInstanceOf(NetworkFailureError);
+  });
+
+  it("treats crewType as immutable: the update contract rejects it", () => {
+    const editable = { name: "Cuadrilla Centro", leaderUserId: "user-maria", organizationId: "org-municipal", defaultShift: "MORNING", active: true };
+    expect(updateCrewInputSchema.safeParse(editable).success).toBe(true);
+    expect(updateCrewInputSchema.safeParse({ ...editable, crewType: "MUNICIPAL" }).success).toBe(false);
   });
 });
