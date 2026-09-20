@@ -55,10 +55,14 @@ test.describe("automated WCAG checks @smoke", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
     await page.getByRole("button", { name: "Más módulos" }).click();
-    await expect(page.getByRole("dialog", { name: "Más módulos" })).toBeVisible();
+    const mobileNavigationSheet = page.getByRole("dialog", { name: "Más módulos" });
+    await expect(mobileNavigationSheet).toBeVisible();
     // Otherwise the cursor stays over the trigger's screen position, which the sheet's
     // first pill now renders under — a spurious :hover state, not the steady-state page.
     await page.mouse.move(0, 0);
+    // Visibility is reached while the opening opacity transition is still blending every
+    // sheet colour with the page below, which gives axe transient contrast ratios.
+    await expect(mobileNavigationSheet).toHaveCSS("opacity", "1");
 
     await expectNoViolations(page);
   });
