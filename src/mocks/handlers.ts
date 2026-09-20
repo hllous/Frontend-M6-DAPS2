@@ -2681,7 +2681,7 @@ export const handlers = [
     return HttpResponse.json({
       ...complianceIndicatorFixture,
       period: { from: params.get("from") ?? complianceIndicatorFixture.period.from, to: params.get("to") ?? complianceIndicatorFixture.period.to },
-      unattendedZones: zoneId ? complianceIndicatorFixture.unattendedZones.filter((item) => item.id === zoneId) : complianceIndicatorFixture.unattendedZones,
+      notServicedRanking: zoneId ? complianceIndicatorFixture.notServicedRanking.filter((item) => item.zoneId === zoneId) : complianceIndicatorFixture.notServicedRanking,
     });
   }),
   http.get("*/api/indicators/incidents", ({ request }) => {

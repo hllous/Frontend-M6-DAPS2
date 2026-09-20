@@ -101,13 +101,12 @@ describe("MapaOperativo", () => {
       http.get("*/api/indicators/coverage", () =>
         HttpResponse.json({
           period: { from: "2026-08-10", to: "2026-09-10" },
-          freshness: { updatedAt: "2026-09-10T12:00:00.000Z" },
-          summary: { attended: 334, scheduled: 382, rate: 87.4 },
+          totals: { scheduled: 382, served: 334, partial: 0, notServiced: 24, pending: 24, coveragePct: 87.4 },
           byZone: [
-            { id: "zone-bel", label: "Belgrano", attended: 148, scheduled: 160, rate: 92.5 },
-            { id: "zone-pal", label: "Palermo", attended: 88, scheduled: 100, rate: 88 },
-            { id: "zone-rec", label: "Recoleta", attended: 58, scheduled: 80, rate: 72.5 },
-            { id: "zone-ret", label: "Retiro", attended: 40, scheduled: 42, rate: 95.2 },
+            { id: "zone-bel", code: "Z-BEL", name: "Belgrano", scheduled: 160, served: 148, partial: 0, notServiced: 6, pending: 6, coveragePct: 92.5 },
+            { id: "zone-pal", code: "Z-PAL", name: "Palermo", scheduled: 100, served: 88, partial: 0, notServiced: 6, pending: 6, coveragePct: 88 },
+            { id: "zone-rec", code: "Z-REC", name: "Recoleta", scheduled: 80, served: 58, partial: 0, notServiced: 12, pending: 10, coveragePct: 72.5 },
+            { id: "zone-ret", code: "Z-RET", name: "Retiro", scheduled: 42, served: 40, partial: 0, notServiced: 0, pending: 2, coveragePct: 95.2 },
           ],
           byServiceType: [],
         }),

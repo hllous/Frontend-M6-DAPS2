@@ -5,6 +5,13 @@ import { recordTelemetryEvent } from "./telemetry";
 
 export const wasteTypeSchema = z.enum(["HOUSEHOLD", "RECYCLABLE", "BULKY", "GREEN", "MIXED"]);
 export type WasteType = z.infer<typeof wasteTypeSchema>;
+export const WASTE_TYPE_LABELS: Record<WasteType, string> = {
+  HOUSEHOLD: "Domiciliarios",
+  RECYCLABLE: "Reciclables",
+  BULKY: "Voluminosos",
+  GREEN: "Verdes",
+  MIXED: "Mixtos",
+};
 
 export const greenPointSchema = z.object({
   id: z.string(),

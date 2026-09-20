@@ -51,27 +51,47 @@ describe("indicatorsAdapter", () => {
       indicatorsAdapter.getWaste(),
     ]);
 
-    expect(coverage).toMatchObject({ family: "coverage", primary: { value: 88.6, unit: "%" } });
+    expect(coverage).toMatchObject({ family: "coverage", primary: { value: 82.2, unit: "%" } });
     expect(coverage.summaryMetrics).toEqual([
-      { label: "Atendidos", value: 418, unit: "objetivos" },
+      { label: "Atendidos", value: 388, unit: "objetivos" },
+      { label: "Parciales", value: 30, unit: "objetivos" },
+      { label: "Pendientes", value: 30, unit: "objetivos" },
       { label: "Programados", value: 472, unit: "objetivos" },
     ]);
+    // El punto conserva el id de zona del backend: el mapa cruza la cobertura por ese id.
     expect(coverage.breakdowns[0]?.points[0]).toMatchObject({
+      id: "zone-1",
       label: "Centro",
-      value: 93.6,
+      value: 89.7,
+      note: "140 de 156 objetivos",
       details: [
-        { label: "Atendidos", value: 146, unit: "objetivos" },
+        { label: "Atendidos", value: 140, unit: "objetivos" },
+        { label: "Parciales", value: 6, unit: "objetivos" },
+        { label: "No atendidos", value: 4, unit: "objetivos" },
+        { label: "Pendientes", value: 6, unit: "objetivos" },
         { label: "Programados", value: 156, unit: "objetivos" },
       ],
     });
-    expect(compliance.breakdowns[1]?.points[0]).toMatchObject({ label: "Norte", value: 12, note: "Falta de cuadrilla" });
+    expect(compliance.breakdowns[1]?.points[0]).toMatchObject({
+      id: "zone-3",
+      label: "Norte",
+      value: 12,
+      note: "Cuadrilla no disponible · Condición meteorológica",
+    });
     expect(compliance.summaryMetrics).toEqual([
       { label: "Finalizados", value: 390, unit: "servicios" },
       { label: "En fecha", value: 344, unit: "servicios" },
       { label: "Demorados", value: 46, unit: "servicios" },
     ]);
-    expect(incidents.primary).toMatchObject({ value: 21.5, unit: "h" });
+    expect(incidents.primary).toMatchObject({ value: 2.4, unit: "días" });
+    // El riesgo de arbolado se ordena de crítico a sin riesgo, no como llega.
+    expect(incidents.breakdowns.find((item) => item.id === "tree-risk")?.points.map((point) => point.label))
+      .toEqual(["Crítico", "Alto", "Medio", "Bajo", "Sin riesgo"]);
+    expect(incidents.breakdowns.find((item) => item.id === "report-status")?.points[0])
+      .toMatchObject({ label: "Recibido", value: 8 });
     expect(waste).toMatchObject({ family: "waste", primary: { value: 42.7, unit: "%" } });
+    expect(waste.breakdowns[0]?.points[0]).toMatchObject({ label: "Domiciliarios", value: 9300, unit: "kg" });
+    expect(waste.breakdowns[1]?.points[0]).toMatchObject({ label: "Centro de recuperación", value: 10620 });
   });
 
   it("rejects a malformed family response at runtime", async () => {

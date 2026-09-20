@@ -20,17 +20,10 @@ import {
   type GreenPointQuery,
   type GreenPointUpdateInput,
   type WasteType,
+  WASTE_TYPE_LABELS,
 } from "@/lib/green-points";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { zonesAdapter, type Zone } from "@/lib/zones";
-
-const WASTE_TYPE_LABELS: Record<WasteType, string> = {
-  HOUSEHOLD: "Domiciliarios",
-  RECYCLABLE: "Reciclables",
-  BULKY: "Voluminosos",
-  GREEN: "Verdes",
-  MIXED: "Mixtos",
-};
 
 const wasteTypes = wasteTypeSchema.options;
 

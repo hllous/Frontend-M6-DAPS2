@@ -7,6 +7,7 @@ export const treeHealthStatusSchema = z.enum(["HEALTHY", "WEAKENED", "DISEASED",
 export type TreeHealthStatus = z.infer<typeof treeHealthStatusSchema>;
 export const riskLevelSchema = z.enum(["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 export type RiskLevel = z.infer<typeof riskLevelSchema>;
+export const RISK_LEVEL_LABELS: Record<RiskLevel, string> = { NONE: "Sin riesgo", LOW: "Bajo", MEDIUM: "Medio", HIGH: "Alto", CRITICAL: "Crítico" };
 export const riskTypeSchema = z.enum(["FALLING_BRANCH", "TRUNK_INSTABILITY", "ROOT_UPLIFT", "POWER_LINE_CONTACT", "SIGN_OBSTRUCTION", "PEST_INFESTATION"]);
 export type RiskType = z.infer<typeof riskTypeSchema>;
 export const treeInterventionTypeSchema = z.enum(["FORMATION_PRUNING", "SAFETY_PRUNING", "REMOVAL", "PLANTING", "TREATMENT"]);
