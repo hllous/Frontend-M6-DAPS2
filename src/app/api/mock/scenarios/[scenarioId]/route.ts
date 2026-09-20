@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { loadAuthorizedScenario } from "@/lib/bff-data";
 import {
   AuthUnavailableError,
+  BackendUnavailableError,
   ForbiddenSessionError,
   InvalidSessionError,
 } from "@/lib/session";
@@ -49,6 +50,9 @@ export async function GET(
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
       return errorResponse(403, "La sesión no puede consultar este escenario.", path);
+    }
+    if (error instanceof BackendUnavailableError) {
+      return errorResponse(error.status, error.message, path);
     }
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);

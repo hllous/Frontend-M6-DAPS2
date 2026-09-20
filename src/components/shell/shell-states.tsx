@@ -13,4 +13,4 @@ export function ShellError({
   description?: string;
 }) { return <Alert variant="destructive"><AlertTitle>{title}</AlertTitle><AlertDescription>{description} <button className="underline" onClick={onRetry}>Reintentar carga</button></AlertDescription></Alert>; }
 export function ShellForbidden() { return <Empty><EmptyHeader><EmptyTitle>Acceso no disponible</EmptyTitle><EmptyDescription>Su sesión no cuenta con la capacidad necesaria para este módulo.</EmptyDescription></EmptyHeader></Empty>; }
-export function ShellUnauthenticated() { return <Empty><EmptyHeader><EmptyTitle>Inicie sesión para continuar</EmptyTitle><EmptyDescription>La aplicación operativa requiere una sesión activa.</EmptyDescription></EmptyHeader></Empty>; }
+export function ShellUnauthenticated() { return <Empty><EmptyHeader><EmptyTitle>Inicie sesión para continuar</EmptyTitle><EmptyDescription>La aplicación operativa requiere una sesión activa. <a className="underline" href="/login">Volver a iniciar sesión</a></EmptyDescription></EmptyHeader></Empty>; }
