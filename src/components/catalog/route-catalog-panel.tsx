@@ -993,7 +993,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         )}
 
         {state.status === "ready" && state.items.length > 0 && (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-left text-sm" data-testid="routes-table">
               <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
                 <tr>

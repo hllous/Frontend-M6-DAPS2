@@ -481,7 +481,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       )}
 
       {state.status === "ready" && state.containers.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Inventario de contenedores registrados</caption>
             <thead className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">

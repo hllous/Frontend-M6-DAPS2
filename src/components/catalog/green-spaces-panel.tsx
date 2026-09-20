@@ -172,7 +172,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
       {state.status === "error" ? <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm"><span>{state.message}</span><Button variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar carga</Button></div> : null}
       {state.status === "ready" && state.greenSpaces.length === 0 ? <p className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">No hay espacios verdes que coincidan con los filtros.</p> : null}
       {state.status === "ready" && state.greenSpaces.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Espacios verdes registrados</caption>
             <thead className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground"><tr><th scope="col" className="px-4 py-3">Nombre</th><th scope="col" className="px-4 py-3">Tipo</th><th scope="col" className="px-4 py-3">Superficie</th><th scope="col" className="px-4 py-3">Zona</th><th scope="col" className="px-4 py-3">Estado</th>{canManage ? <th scope="col" className="px-4 py-3"><span className="sr-only">Acciones</span></th> : null}</tr></thead>
