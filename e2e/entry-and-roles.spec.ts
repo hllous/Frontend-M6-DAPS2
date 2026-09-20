@@ -9,7 +9,7 @@ test.describe("Office and Field mock entry and navigation @smoke", () => {
     await expect(page.getByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
     await expect(page.getByText("Lucía Fernández")).toBeVisible();
 
-    await page.getByRole("button", { name: "Catálogo" }).click();
+    await page.getByRole("link", { name: "Catálogo" }).click();
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
     await expect(page.getByText("Z-BEL")).toBeVisible();
   });
@@ -20,7 +20,7 @@ test.describe("Office and Field mock entry and navigation @smoke", () => {
     await expect(page.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Iniciar servicio" }).first()).toBeVisible();
 
-    await page.getByRole("button", { name: "Mapa" }).click();
+    await page.getByRole("link", { name: "Mapa" }).click();
     await expect(page.getByRole("heading", { name: "Mapa operativo" })).toBeVisible();
   });
 });

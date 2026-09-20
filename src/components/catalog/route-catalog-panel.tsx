@@ -442,7 +442,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         <div>
           <div className="flex items-center gap-2">
             <Link
-              href="/app/catalog"
+              href="/app?destination=catalog"
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-3.5 w-3.5" />

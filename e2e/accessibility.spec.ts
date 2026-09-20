@@ -34,7 +34,7 @@ test.describe("automated WCAG checks @smoke", () => {
     await page.getByRole("button", { name: "Más módulos" }).click();
     const selectedNavigationItem = page
       .getByRole("dialog", { name: "Más módulos" })
-      .getByRole("button", { name: "Mi trabajo", exact: true });
+      .getByRole("link", { name: "Mi trabajo", exact: true });
     await selectedNavigationItem.hover();
     await page.waitForTimeout(200);
 
@@ -44,7 +44,7 @@ test.describe("automated WCAG checks @smoke", () => {
   test("the live app shell with the Zones success state has no axe violations", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("button", { name: "Catálogo" }).click();
+    await page.getByRole("link", { name: "Catálogo" }).click();
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
 
     await expectNoViolations(page);
