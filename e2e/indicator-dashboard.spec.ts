@@ -76,6 +76,6 @@ test.describe("operational indicator dashboard #138", () => {
     await loginViaApi(page, "office-limited-intake");
     await page.goto("/app?destination=dashboards");
     await expect(page.getByRole("heading", { name: "Indicadores no disponibles" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Tableros" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Tableros" })).toHaveCount(0);
   });
 });

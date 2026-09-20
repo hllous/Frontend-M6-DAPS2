@@ -6,7 +6,7 @@ test.describe("DisposalSite catalog management #103", () => {
   test("Office can create, edit, and logically deactivate a disposal site", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("button", { name: "Catálogo" }).click();
+    await page.getByRole("link", { name: "Catálogo" }).click();
     await page.locator('a[href="/app/catalog/disposal-sites"]').click();
     await expect(page).toHaveURL(/\/app\/catalog\/disposal-sites$/);
 
