@@ -16,6 +16,7 @@ import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { getTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
+import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -77,12 +78,8 @@ export async function GET(request: Request) {
     const queryResult = streetClosureRequestQuerySchema.safeParse({
       status: new URL(request.url).searchParams.get("status") ?? undefined,
       sourceId: new URL(request.url).searchParams.get("sourceId") ?? undefined,
-      page: new URL(request.url).searchParams.has("page")
-        ? Number(new URL(request.url).searchParams.get("page"))
-        : undefined,
-      pageSize: new URL(request.url).searchParams.has("pageSize")
-        ? Number(new URL(request.url).searchParams.get("pageSize"))
-        : undefined,
+      page: pageParam(new URL(request.url).searchParams),
+      pageSize: pageSizeParam(new URL(request.url).searchParams),
     });
     if (!queryResult.success) {
       return errorResponse(400, "Los filtros de solicitudes de corte de calle son inválidos.", path);

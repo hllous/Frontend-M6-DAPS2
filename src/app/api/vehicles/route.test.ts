@@ -62,3 +62,38 @@ describe("vehicles BFF route", () => {
     expect(body).toMatchObject({ plate: "AA 222 CC", vehicleType: "VAN", capacity: 5, active: true });
   });
 });
+
+describe("vehicles BFF route pagination limits (#248)", () => {
+  async function forwardedUrl(query: string) {
+    process.env.M6_AUTH_MODE = "backend-development";
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response(JSON.stringify({ data: [] }), { status: 200, headers: { "content-type": "application/json" } }));
+    const loginResponse = await login(new Request("http://localhost/api/session/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
+    }));
+    const cookie = loginResponse.headers.get("set-cookie") ?? "";
+    backendFetch.mockClear();
+    await GET(new Request(`http://localhost/api/vehicles${query}`, { headers: { cookie } }));
+    const url = backendFetch.mock.calls[0]?.[0] as URL;
+    return url.searchParams;
+  }
+
+  it("clamps an out-of-range page and pageSize before calling the backend", async () => {
+    const params = await forwardedUrl("?page=99999999&pageSize=1000");
+
+    expect(params.get("page")).toBe("10000000");
+    expect(params.get("pageSize")).toBe("100");
+  });
+
+  it("does not forward a non-numeric page", async () => {
+    const params = await forwardedUrl("?page=abc&pageSize=0");
+
+    expect(params.has("page")).toBe(false);
+    expect(params.get("pageSize")).toBe("1");
+  });
+});

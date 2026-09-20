@@ -7,6 +7,7 @@ import { serviceTypeFixtures } from "@/lib/service-type-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 409: "Conflict", 503: "Service Unavailable", 500: "Internal Server Error" };
 
@@ -23,8 +24,8 @@ function parseQuery(url: URL): ServiceFrequencyQuery {
     shift: shift.success ? shift.data : undefined,
     weekday: Number.isInteger(weekday) && weekday >= 1 && weekday <= 7 ? weekday : undefined,
     validOn: url.searchParams.get("validOn") ?? undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 

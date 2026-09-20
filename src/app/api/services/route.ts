@@ -21,6 +21,7 @@ import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { zoneFixtures } from "@/lib/zones-fixtures";
+import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -55,13 +56,13 @@ function parseServiceQuery(url: URL): ServiceQuery {
     origin: (url.searchParams.get("origin") as ServiceOrigin) ?? undefined,
     zoneId: url.searchParams.get("zoneId") ?? undefined,
     crewId: url.searchParams.get("crewId") ?? undefined,
-    search: url.searchParams.get("search") ?? undefined,
+    search: searchParam(url.searchParams),
     timeFrom: url.searchParams.get("timeFrom") ?? undefined,
     timeTo: url.searchParams.get("timeTo") ?? undefined,
     scheduledFrom: url.searchParams.get("scheduledFrom") ?? undefined,
     scheduledTo: url.searchParams.get("scheduledTo") ?? undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 

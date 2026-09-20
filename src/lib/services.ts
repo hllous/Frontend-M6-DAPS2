@@ -7,6 +7,7 @@ import {
   type StreetClosureRequest,
 } from "./street-closure-requests";
 import { recordTelemetryEvent } from "./telemetry";
+import { latitudeInput, longitudeInput } from "@/lib/input-limits";
 
 export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
 export type ServiceMode = z.infer<typeof serviceModeSchema>;
@@ -174,8 +175,8 @@ export type CreateServiceInput = z.infer<typeof createServiceInputSchema>;
 
 export const containerLocationSchema = z.object({
   address: z.string().trim().min(1, "La nueva dirección es obligatoria."),
-  lat: z.number({ message: "La latitud debe ser un número válido." }),
-  lng: z.number({ message: "La longitud debe ser un número válido." }),
+  lat: latitudeInput(),
+  lng: longitudeInput(),
   zoneId: z.string().trim().min(1).optional(),
 });
 export type ContainerLocation = z.infer<typeof containerLocationSchema>;
@@ -259,17 +260,17 @@ export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
 
 export const suspendServiceInputSchema = z.object({
   reason: notServicedReasonSchema,
-  note: z.string().min(1, "La nota es obligatoria para suspender el servicio"),
+  note: z.string().trim().min(1, "La nota es obligatoria para suspender el servicio"),
 });
 export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
 
 export const rescheduleServiceInputSchema = z.object({
-  reason: z.string().min(1, "El motivo es obligatorio para reprogramar el servicio"),
+  reason: z.string().trim().min(1, "El motivo es obligatorio para reprogramar el servicio"),
 });
 export type RescheduleServiceInput = z.infer<typeof rescheduleServiceInputSchema>;
 
 export const cancelServiceInputSchema = z.object({
-  reason: z.string().min(1, "El motivo es obligatorio para cancelar el servicio"),
+  reason: z.string().trim().min(1, "El motivo es obligatorio para cancelar el servicio"),
 });
 export type CancelServiceInput = z.infer<typeof cancelServiceInputSchema>;
 

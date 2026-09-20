@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
+import { latitudeInput, longitudeInput } from "@/lib/input-limits";
 
 export const environmentalReportTypeSchema = z.enum([
   "NOISE",
@@ -64,8 +65,8 @@ export type SanctionOutcomeIntegrationException = z.infer<typeof sanctionOutcome
 export const createEnvironmentalReportInputSchema = z.object({
   reportType: environmentalReportTypeSchema,
   address: z.string().trim().min(1, "Debe indicar la ubicación del hallazgo."),
-  lat: z.number({ message: "La latitud debe ser un número válido." }),
-  lng: z.number({ message: "La longitud debe ser un número válido." }),
+  lat: latitudeInput(),
+  lng: longitudeInput(),
   description: z.string().trim().min(1, "Debe describir el hallazgo."),
 });
 export type CreateEnvironmentalReportInput = z.infer<typeof createEnvironmentalReportInputSchema>;
@@ -164,7 +165,7 @@ export const environmentalInspectionChecklistItemSchema = z.object({
 export type EnvironmentalInspectionChecklistItem = z.infer<typeof environmentalInspectionChecklistItemSchema>;
 
 export const environmentalInspectionChecklistResultSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().trim().min(1),
   label: z.string().trim().min(1),
   completed: z.boolean(),
 });

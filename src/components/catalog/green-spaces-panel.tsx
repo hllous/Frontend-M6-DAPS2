@@ -10,6 +10,7 @@ import { formControlClass } from "@/components/ui/form-control";
 import { greenSpacesAdapter, greenSpaceTypeSchema, type GreenSpace, type GreenSpaceQuery, type GreenSpaceType } from "@/lib/green-spaces";
 import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";
 import type { OperationalScenario } from "@/lib/scenarios";
+import { MAX_DECIMAL_10_2 } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -100,6 +101,10 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
     const areaM2 = Number(form.areaM2);
     if (!form.name.trim() || !Number.isFinite(areaM2) || areaM2 <= 0 || !form.zoneId) {
       setFormError("Indique nombre, una superficie mayor que cero y una zona.");
+      return;
+    }
+    if (areaM2 > MAX_DECIMAL_10_2) {
+      setFormError(`La superficie no puede superar ${MAX_DECIMAL_10_2.toLocaleString("es-AR")} m².`);
       return;
     }
     try {
@@ -193,7 +198,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
             <FieldGroup>
               <Field><FieldLabel htmlFor="green-space-name">Nombre</FieldLabel><input id="green-space-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={formControlClass} required aria-invalid={Boolean(formError)} aria-describedby={formError ? "green-space-name-error" : undefined} /><FieldError id="green-space-name-error" role="none">{formError}</FieldError></Field>
               <Field><FieldLabel htmlFor="green-space-type-form">Tipo de espacio en el formulario</FieldLabel><select id="green-space-type-form" value={form.spaceType} onChange={(event) => setForm({ ...form, spaceType: event.target.value as GreenSpaceType })} className={formControlClass}>{spaceTypes.map((type) => <option key={type} value={type}>{spaceTypeLabels[type]}</option>)}</select></Field>
-              <Field><FieldLabel htmlFor="green-space-area">Superficie (m²)</FieldLabel><input id="green-space-area" type="number" min="0.01" step="0.01" value={form.areaM2} onChange={(event) => setForm({ ...form, areaM2: event.target.value })} className={formControlClass} required /><FieldDescription>Superficie declarada en metros cuadrados.</FieldDescription></Field>
+              <Field><FieldLabel htmlFor="green-space-area">Superficie (m²)</FieldLabel><input id="green-space-area" type="number" min="0.01" max={MAX_DECIMAL_10_2} step="0.01" value={form.areaM2} onChange={(event) => setForm({ ...form, areaM2: event.target.value })} className={formControlClass} required /><FieldDescription>Superficie declarada en metros cuadrados.</FieldDescription></Field>
               <Field><FieldLabel htmlFor="green-space-zone-form">Zona en el formulario</FieldLabel><select id="green-space-zone-form" value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })} className={formControlClass} required>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}</select></Field>
             </FieldGroup>
           </form>

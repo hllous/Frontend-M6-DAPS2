@@ -57,6 +57,7 @@ import { StartRelocationDialog } from "./start-relocation-dialog";
 import { CompleteRepairDialog } from "./complete-repair-dialog";
 import { RemoveContainerDialog } from "./remove-container-dialog";
 import { StartRepairDialog } from "./start-repair-dialog";
+import { MAX_INT32, parseCoordinateField } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -286,18 +287,18 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       errors.address = "La dirección de instalación es obligatoria.";
     }
 
-    const latNum = Number(form.lat);
-    const lngNum = Number(form.lng);
-    if (!Number.isFinite(latNum)) {
-      errors.lat = "Indique una latitud numérica válida.";
-    }
-    if (!Number.isFinite(lngNum)) {
-      errors.lng = "Indique una longitud numérica válida.";
-    }
+    const latResult = parseCoordinateField(form.lat, "lat");
+    const lngResult = parseCoordinateField(form.lng, "lng");
+    if (latResult.error) errors.lat = latResult.error;
+    if (lngResult.error) errors.lng = lngResult.error;
+    const latNum = latResult.value ?? 0;
+    const lngNum = lngResult.value ?? 0;
 
     const capacityNum = Number(form.capacityLiters);
     if (!Number.isInteger(capacityNum) || capacityNum <= 0) {
       errors.capacityLiters = "La capacidad debe ser un número entero mayor a 0 litros.";
+    } else if (capacityNum > MAX_INT32) {
+      errors.capacityLiters = `La capacidad no puede superar ${MAX_INT32.toLocaleString("es-AR")} litros.`;
     }
 
     if (Object.keys(errors).length > 0) {
@@ -771,6 +772,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   id="container-capacity"
                   type="number"
                   min="1"
+                  max={MAX_INT32}
                   step="1"
                   value={form.capacityLiters}
                   onChange={(e) => setForm({ ...form, capacityLiters: e.target.value })}
@@ -810,6 +812,8 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   <input
                     id="container-lat"
                     type="number"
+                    min="-90"
+                    max="90"
                     step="any"
                     value={form.lat}
                     onChange={(e) => setForm({ ...form, lat: e.target.value })}
@@ -830,6 +834,8 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   <input
                     id="container-lng"
                     type="number"
+                    min="-180"
+                    max="180"
                     step="any"
                     value={form.lng}
                     onChange={(e) => setForm({ ...form, lng: e.target.value })}
