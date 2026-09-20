@@ -338,7 +338,7 @@ export function InspectionExecutionPanel({
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor={`${inputId}-inspected-at`}>Fecha y hora de inspección <span aria-hidden="true">*</span></FieldLabel>
-              <input id={`${inputId}-inspected-at`} type="datetime-local" value={inspectedAt} max={dateTimeLocalValue(new Date(Date.now() + 5 * 60_000).toISOString())} onChange={(event) => setInspectedAt(event.target.value)} disabled={!canExecute || isSubmitting} required className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" />
+              <input id={`${inputId}-inspected-at`} type="datetime-local" value={inspectedAt} onChange={(event) => setInspectedAt(event.target.value)} disabled={!canExecute || isSubmitting} required className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" />
               <FieldDescription>Indique cuándo se realizó la visita. Se admite una tolerancia de cinco minutos por diferencias de reloj.</FieldDescription>
             </Field>
             <Field>
