@@ -57,9 +57,9 @@ export function CrewCatalogPanel({ scenario }: { scenario: OperationalScenario }
   }, [query, requestVersion, scenario]);
 
   const userName = (id: string) => users.find((user) => user.id === id)?.displayName ?? "Usuario M1 no resuelto";
-  const organizationName = (id: string) => organizations.find((organization) => organization.id === id)?.displayName ?? "Organización M1 no resuelta";
+  const organizationName = (id: string | null) => id === null ? "Sin organización externa" : organizations.find((organization) => organization.id === id)?.displayName ?? "Organización M1 no resuelta";
   function openCreate() { setEditing(null); setForm({ ...emptyForm, leaderUserId: users[0]?.id ?? "", organizationId: organizations[0]?.id ?? "" }); setFormError(null); setFormOpen(true); }
-  function openEdit(crew: Crew) { setEditing(crew); setForm({ name: crew.name, crewType: crew.crewType, leaderUserId: crew.leaderUserId, organizationId: crew.organizationId, defaultShift: crew.defaultShift }); setFormError(null); setFormOpen(true); }
+  function openEdit(crew: Crew) { setEditing(crew); setForm({ name: crew.name, crewType: crew.crewType, leaderUserId: crew.leaderUserId, organizationId: crew.organizationId ?? "", defaultShift: crew.defaultShift }); setFormError(null); setFormOpen(true); }
   async function save(event: FormEvent) {
     event.preventDefault(); setFormError(null);
     if (!form.name.trim() || !form.leaderUserId || !form.organizationId) { setFormError("Complete el nombre, responsable y organización."); return; }

@@ -144,9 +144,9 @@ export function buildTreeInterventionStreetClosureSourceContext(
   return {
     sourceType: "TREE_INTERVENTION",
     sourceId: intervention.id,
-    title: `${typeLabel[intervention.interventionType]} · ${intervention.address}`,
+    title: `${typeLabel[intervention.interventionType]} · ${intervention.address ?? "sin dirección"}`,
     interventionType: intervention.interventionType,
-    address: intervention.address,
+    address: intervention.address ?? "",
   };
 }
 

@@ -66,7 +66,7 @@ export async function DELETE(
     if (!zone) {
       return errorResponse(404, "Zona operativa no encontrada.", path);
     }
-    if (!zone.neighborhoodIds.includes(neighborhoodId)) {
+    if (!zone.neighborhoodIds?.includes(neighborhoodId)) {
       return errorResponse(404, "El barrio no está asignado a la zona operativa.", path);
     }
 

@@ -27,6 +27,22 @@ describe("crews adapter", () => {
     expect(page).toMatchObject({ page: 1, pageSize: expect.any(Number), total: expect.any(Number) });
   });
 
+  it("accepts the real backend shapes: a list without members and a detail with members: [{userId}] (#239)", async () => {
+    server.use(http.get("*/api/crews", () => HttpResponse.json({
+      // Tal cual responde GET /crews del backend: sin miembros.
+      data: [{ id: "crew-real", name: "Cooperativa Barrancas", crewType: "COOPERATIVE", defaultShift: "AFTERNOON", leaderUserId: "usr-m1-0211", organizationId: "org-coop", active: true, createdAt: "2026-09-20T00:28:42.248Z", updatedAt: "2026-09-20T00:28:42.248Z" }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+    const page = await crewsAdapter.list();
+    expect(page.crews[0]).toMatchObject({ id: "crew-real", memberUserIds: [] });
+
+    server.use(http.get("*/api/crews/crew-real", () => HttpResponse.json({
+      id: "crew-real", name: "Cooperativa Barrancas", crewType: "COOPERATIVE", defaultShift: "AFTERNOON", leaderUserId: "usr-m1-0211", organizationId: "org-coop", active: true,
+      members: [{ userId: "usr-m1-0211" }, { userId: "usr-m1-0212" }],
+    })));
+    await expect(crewsAdapter.get("crew-real")).resolves.toMatchObject({ memberUserIds: ["usr-m1-0211", "usr-m1-0212"] });
+  });
+
   it("round-trips detail, create, update and logical delete without a membership call", async () => {
     await expect(crewsAdapter.get("crew-b")).resolves.toMatchObject({ id: "crew-b", memberUserIds: expect.any(Array) });
     const created = await crewsAdapter.create(createInput);
