@@ -575,7 +575,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       )}
 
       {state.status === "ready" && state.items.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Listado de zonas operativas</caption>
             <thead className="border-b border-border bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
