@@ -37,7 +37,7 @@ function fixtureResponse(family: IndicatorFamily, request: Request) {
   }
   if (family === "compliance") {
     const zoneId = url.searchParams.get("zoneId");
-    return { ...complianceIndicatorFixture, period, unattendedZones: zoneId ? complianceIndicatorFixture.unattendedZones.filter((item) => item.id === zoneId) : complianceIndicatorFixture.unattendedZones };
+    return { ...complianceIndicatorFixture, period, notServicedRanking: zoneId ? complianceIndicatorFixture.notServicedRanking.filter((item) => item.zoneId === zoneId) : complianceIndicatorFixture.notServicedRanking };
   }
   if (family === "incidents") return { ...incidentsIndicatorFixture, period };
   return { ...wasteIndicatorFixture, period };
