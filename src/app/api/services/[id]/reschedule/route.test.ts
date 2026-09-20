@@ -133,4 +133,24 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
     const updatedFixture = serviceFixtures.find((s) => s.id === "SVC-1050");
     expect(updatedFixture?.status).toBe("RESCHEDULED");
   });
+
+  it("forwards the status-change DTO with JSON content type", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/reschedule", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(rescheduleBody),
+      }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
+    expect(JSON.parse(String(requestInit.body))).toEqual(rescheduleBody);
+  });
 });

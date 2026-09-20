@@ -231,9 +231,11 @@ describe("authenticated services BFF route", () => {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
         body: JSON.stringify({
+          title: "Etiqueta sólo de presentación",
           serviceTypeId: "st-waste-route",
           origin: "PLANNED",
           zoneIds: ["zone-1"],
+          targetRef: "Referencia visible",
           scheduledDate: "2026-09-12",
           timeWindow: { start: "08:00", end: "12:00" },
         }),
@@ -248,5 +250,15 @@ describe("authenticated services BFF route", () => {
         headers: expect.any(Headers),
       }),
     );
+    const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
+    expect(JSON.parse(String(requestInit.body))).toEqual({
+      serviceTypeId: "st-waste-route",
+      scheduledDate: "2026-09-12",
+      origin: "PLANNED",
+      zoneId: "zone-1",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+    });
   });
 });
