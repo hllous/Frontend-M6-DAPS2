@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "./indicator-fixtures";
-import { indicatorsAdapter, IndicatorContractError, resolveIndicatorQuery } from "./indicators";
+import { indicatorQueryErrorMessage, indicatorQuerySchema, indicatorsAdapter, IndicatorContractError, INVERTED_RANGE_MESSAGE, resolveIndicatorQuery } from "./indicators";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -9,6 +9,40 @@ afterEach(() => {
 });
 
 describe("indicatorsAdapter", () => {
+  it("accepts null as the backend bucket for no not-serviced reason", async () => {
+    const response = structuredClone(complianceIndicatorFixture);
+    response.notServicedRanking[0].reasons = [{ reason: null as never, count: 1 }];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(response)));
+
+    const result = await indicatorsAdapter.getCompliance({});
+
+    expect(result.breakdowns[1]?.points[0]).toMatchObject({
+      note: "Sin motivo registrado",
+      details: [{ label: "Sin motivo registrado", value: 1, unit: "objetivos" }],
+    });
+  });
+
+  it("rejects an inverted date range with a message on the `to` field", () => {
+    const result = indicatorQuerySchema.safeParse({ from: "2026-09-20", to: "2026-09-01" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({ path: ["to"], message: INVERTED_RANGE_MESSAGE });
+    expect(indicatorQueryErrorMessage(result.error!)).toBe(INVERTED_RANGE_MESSAGE);
+  });
+
+  it("accepts equal, open-ended and ordered ranges and still rejects unknown keys", () => {
+    expect(indicatorQuerySchema.safeParse({ from: "2026-09-01", to: "2026-09-01" }).success).toBe(true);
+    expect(indicatorQuerySchema.safeParse({ from: "2026-09-01" }).success).toBe(true);
+    expect(indicatorQuerySchema.safeParse({ to: "2026-09-01" }).success).toBe(true);
+    expect(indicatorQuerySchema.safeParse({ from: "2026-09-01", to: "2026-09-20" }).success).toBe(true);
+    expect(indicatorQuerySchema.safeParse({ from: "2026-09-01", extra: "x" }).success).toBe(false);
+  });
+
+  it("does not call the backend for an inverted range", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    await expect(indicatorsAdapter.getCoverage({ from: "2026-09-20", to: "2026-09-01" })).rejects.toThrow(INVERTED_RANGE_MESSAGE);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("uses the last 30 days when the period is omitted", () => {
     expect(resolveIndicatorQuery({}, new Date("2026-09-07T12:00:00.000Z"))).toEqual({ from: "2026-08-09", to: "2026-09-07" });
   });

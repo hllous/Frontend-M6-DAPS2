@@ -17,6 +17,7 @@ import {
   zoneFixtures,
 } from "@/lib/zones-fixtures";
 import { createZoneInputSchema, type Zone, type ZoneQuery } from "@/lib/zones";
+import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -44,9 +45,9 @@ function errorResponse(status: number, message: string, path: string) {
 function parseZoneQuery(url: URL): ZoneQuery {
   return {
     active: url.searchParams.has("active") ? url.searchParams.get("active") === "true" : undefined,
-    search: url.searchParams.get("search") ?? undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    search: searchParam(url.searchParams),
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 

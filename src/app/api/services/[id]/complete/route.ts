@@ -6,6 +6,7 @@ import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
+import { MAX_NOTES_LENGTH } from "@/lib/input-limits";
 import { completeServiceInputSchema, type CompleteServiceInput, type ServiceStatus } from "@/lib/services";
 import {
   completeRepairFixture,
@@ -72,6 +73,12 @@ function transitionTargetContainer(
     default:
       break;
   }
+}
+
+// Cada nota de zona ya es libre; unidas pueden superar el tope de notas del backend.
+// Se corta con una elipsis en lugar de rechazar el cierre.
+function capStatusReason(value: string): string {
+  return value.length > MAX_NOTES_LENGTH ? `${value.slice(0, MAX_NOTES_LENGTH - 1)}…` : value;
 }
 
 export async function POST(
@@ -163,10 +170,12 @@ export async function POST(
     const computedStatus: ServiceStatus = allServiced ? "COMPLETED" : "PARTIALLY_COMPLETED";
     const historyLabel = computedStatus === "COMPLETED" ? "Completado" : "Parcial";
 
-    const nonServicedNotes = results
-      .filter((r) => r.status !== "SERVICED" && r.notes)
-      .map((r) => r.notes)
-      .join(" · ");
+    const nonServicedNotes = capStatusReason(
+      results
+        .filter((r) => r.status !== "SERVICED" && r.notes)
+        .map((r) => r.notes)
+        .join(" · "),
+    );
 
     if (computedStatus === "COMPLETED") {
       try {

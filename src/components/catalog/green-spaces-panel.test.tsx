@@ -80,4 +80,37 @@ describe("GreenSpacesPanel", () => {
     expect(await screen.findByText(/contrato documentado/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Reintentar carga" })).toBeVisible();
   });
+
+  it("shows the zone name in the Zona column and never the raw zone id", async () => {
+    render(<GreenSpacesPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /Parque del Bicentenario/ });
+    expect(await within(row).findByText("Z-BEL · Belgrano")).toBeVisible();
+    expect(within(row).queryByText("zone-1")).not.toBeInTheDocument();
+  });
+
+  it("shows neutral text while zones load and when a zone cannot be resolved", async () => {
+    let releaseZones = () => {};
+    const zonesGate = new Promise<void>((resolve) => { releaseZones = resolve; });
+    server.use(http.get("*/api/zones", async () => {
+      await zonesGate;
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } });
+    }));
+    render(<GreenSpacesPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /Parque del Bicentenario/ });
+    expect(within(row).getByText("Cargando zona…")).toBeVisible();
+    releaseZones();
+    expect(await within(row).findByText("Zona no disponible")).toBeVisible();
+    expect(within(row).queryByText("zone-1")).not.toBeInTheDocument();
+  });
+
+  it("requests zones with the maximum page size so every zone resolves", async () => {
+    const pageSizes: Array<string | null> = [];
+    server.use(http.get("*/api/zones", ({ request }) => {
+      pageSizes.push(new URL(request.url).searchParams.get("pageSize"));
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } });
+    }));
+    render(<GreenSpacesPanel scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("row", { name: /Parque del Bicentenario/ });
+    expect(pageSizes).toContain("100");
+  });
 });

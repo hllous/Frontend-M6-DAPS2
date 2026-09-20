@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 
@@ -24,15 +24,41 @@ describe("VehicleCatalogPanel", () => {
     expect(screen.getByRole("combobox", { name: "Tipo de vehículo" })).toBeVisible();
   });
 
+  it("shows capacity in tonnes with es-AR formatting", async () => {
+    render(<VehicleCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByRole("columnheader", { name: "Capacidad (t)" })).toBeVisible();
+    expect(screen.getByText("16 t")).toBeVisible();
+    expect(screen.getByText("5 t")).toBeVisible();
+  });
+
+  it("uses the same select label in the form as in the filter and accepts decimal tonnes", async () => {
+    const user = userEvent.setup();
+    render(<VehicleCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await user.click(await screen.findByRole("button", { name: "Registrar vehículo" }));
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByLabelText("Tipo de vehículo")).toBeVisible();
+    const capacity = dialog.getByLabelText("Capacidad (toneladas)");
+    expect(capacity).toHaveAttribute("step", "0.01");
+
+    await user.type(dialog.getByLabelText("Patente"), "AA 555 ZZ");
+    await user.type(capacity, "10.5");
+    await user.click(screen.getByRole("button", { name: "Guardar vehículo" }));
+
+    expect(await screen.findByText("AA 555 ZZ")).toBeVisible();
+    expect(screen.getByText("10,5 t")).toBeVisible();
+  });
+
   it("lets Office register a vehicle and refreshes the list", async () => {
     const user = userEvent.setup();
     render(<VehicleCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await user.click(await screen.findByRole("button", { name: "Registrar vehículo" }));
     await user.type(screen.getByLabelText("Patente"), "AA 999 ZZ");
-    await user.selectOptions(screen.getByLabelText("Tipo de vehículo para el registro"), "VAN");
-    await user.clear(screen.getByLabelText("Capacidad"));
-    await user.type(screen.getByLabelText("Capacidad"), "5");
+    await user.selectOptions(within(screen.getByRole("dialog")).getByLabelText("Tipo de vehículo"), "VAN");
+    await user.clear(screen.getByLabelText("Capacidad (toneladas)"));
+    await user.type(screen.getByLabelText("Capacidad (toneladas)"), "5");
     await user.click(screen.getByRole("button", { name: "Guardar vehículo" }));
 
     expect(await screen.findByText("AA 999 ZZ")).toBeVisible();

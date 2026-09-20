@@ -25,7 +25,7 @@ test.describe("responsive shell navigation @smoke", () => {
 
     await page.getByRole("button", { name: "Más módulos" }).click();
     await expect(page.getByRole("dialog", { name: "Más módulos" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Catálogo" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Catálogo" })).toBeVisible();
   });
 
   test("wide viewport shows the full sidebar and supports collapsing it", async ({ page }) => {
@@ -46,7 +46,7 @@ test.describe("responsive shell navigation @smoke", () => {
     await page.goto("/app");
 
     const moduleNavigation = page.locator("aside nav");
-    const servicesButton = page.locator("aside nav button").nth(1);
+    const servicesButton = page.locator("aside nav a").nth(1);
     await servicesButton.hover();
     await expect(page.getByRole("tooltip")).toHaveCount(0);
 
@@ -60,7 +60,7 @@ test.describe("responsive shell navigation @smoke", () => {
     await page.reload();
     const tabletNavigation = page.locator("aside nav");
     await expect(tabletNavigation.getByText("Servicios", { exact: true })).not.toBeVisible();
-    await page.locator("aside nav button").nth(1).hover();
+    await page.locator("aside nav a").nth(1).hover();
     await expect(page.getByRole("tooltip", { name: "Servicios" })).toBeVisible();
   });
 });

@@ -1,10 +1,10 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { resetEnvironmentalReportFixtures } from "./environmental-report-fixtures";
-import { EnvironmentalReportContractError, environmentalReportsAdapter } from "./environmental-reports";
+import { environmentalInspectionCompleteInputSchema, EnvironmentalReportContractError, environmentalReportsAdapter } from "./environmental-reports";
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -12,6 +12,36 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); })
 afterAll(() => server.close());
 
 describe("environmental reports adapter", () => {
+  it("requires the real completion timestamp and the violation next step", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-20T15:00:00.000Z"));
+    const base = {
+      inspectedAt: "2026-09-20T14:55:00.000Z",
+      outcome: "VIOLATION_FOUND" as const,
+      checklist: [{ id: "source", label: "Verificar la fuente", completed: true }],
+      findings: "Emisión visible",
+      violationType: "AIR_EMISSION" as const,
+      severity: "HIGH" as const,
+      suggestedAction: "FORMAL_NOTICE" as const,
+    };
+
+    expect(environmentalInspectionCompleteInputSchema.safeParse(base).success).toBe(false);
+    expect(environmentalInspectionCompleteInputSchema.safeParse({ ...base, nextStep: "NOTICE_TO_BE_ISSUED" }).success).toBe(true);
+    expect(environmentalInspectionCompleteInputSchema.safeParse({ ...base, inspectedAt: "2026-09-20T15:05:01.000Z", nextStep: "NOTICE_TO_BE_ISSUED" }).success).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("accepts a null priority from the backend", async () => {
+    server.use(http.get("*/api/environmental-reports", () => HttpResponse.json({
+      data: [{ id: "ER-NULL", reportType: "NOISE", address: null, lat: null, lng: null, ticketId: null, status: "RECEIVED", priority: null, deadlineAt: null, createdAt: "2026-09-20T10:00:00.000Z", updatedAt: "2026-09-20T10:00:00.000Z" }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(environmentalReportsAdapter.list()).resolves.toMatchObject({
+      environmentalReports: [{ id: "ER-NULL", priority: null }],
+    });
+  });
+
   it("requests the complete queue and preserves the eleven backend statuses", async () => {
     let requestedUrl = "";
     server.use(http.get("*/api/environmental-reports", ({ request }) => {
@@ -98,19 +128,21 @@ describe("environmental reports adapter", () => {
     }));
 
     const inspection = await environmentalReportsAdapter.completeInspection("INS-1005", {
+      inspectedAt: "2026-09-07T11:55:00.000Z",
       outcome: "NO_VIOLATION",
       checklist: [
-        { id: "emission-source", completed: true },
-        { id: "visible-impact", completed: true },
+        { id: "emission-source", label: "Identificar la fuente de emisión", completed: true },
+        { id: "visible-impact", label: "Registrar el impacto visible", completed: true },
       ],
       conclusion: "No se constató infracción durante la visita.",
     });
 
     expect(requestBody).toEqual({
+      inspectedAt: "2026-09-07T11:55:00.000Z",
       outcome: "NO_VIOLATION",
       checklist: [
-        { id: "emission-source", completed: true },
-        { id: "visible-impact", completed: true },
+        { id: "emission-source", label: "Identificar la fuente de emisión", completed: true },
+        { id: "visible-impact", label: "Registrar el impacto visible", completed: true },
       ],
       conclusion: "No se constató infracción durante la visita.",
     });

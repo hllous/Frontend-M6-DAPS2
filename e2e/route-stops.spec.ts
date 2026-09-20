@@ -15,7 +15,7 @@ test.describe("Route stop-sequence builder #111", () => {
   }) => {
     await openRoutesCatalog(page);
 
-    await expect(page.getByRole("heading", { name: "Catálogo de Recorridos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recorridos", level: 1 })).toBeVisible();
 
     // Locate dedicated fixture REC-004 (Recorrido Parque Industrial)
     const row = page.getByTestId("route-row-route-4");

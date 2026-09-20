@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { externalIdListInput } from "@/lib/input-limits";
 
 export type ZoneQuery = {
   active?: boolean;
@@ -48,6 +49,13 @@ const zoneWireSchema = z.preprocess(withFlatIds("neighborhoods", "neighborhoodId
 
 export type Zone = z.infer<typeof zoneSchema>;
 
+/** Etiqueta de zona para tablas y detalles: nunca expone el id crudo. */
+export function zoneLabel(zones: Zone[], zoneId: string, loaded: boolean): string {
+  const zone = zones.find((candidate) => candidate.id === zoneId);
+  if (zone) return `${zone.code} · ${zone.name}`;
+  return loaded ? "Zona no disponible" : "Cargando zona…";
+}
+
 export const createZoneInputSchema = z.object({
   code: z.string().trim().min(1, "El código es obligatorio"),
   name: z.string().trim().min(1, "El nombre es obligatorio"),
@@ -63,7 +71,7 @@ export const updateZoneInputSchema = z.object({
 export type UpdateZoneInput = z.infer<typeof updateZoneInputSchema>;
 
 export const assignNeighborhoodsInputSchema = z.object({
-  neighborhoodIds: z.array(z.string().trim().min(1, "El ID del barrio es obligatorio")).min(1),
+  neighborhoodIds: externalIdListInput({ itemMessage: "El ID del barrio es obligatorio", emptyMessage: "Seleccione al menos un barrio." }),
 });
 
 export type AssignNeighborhoodsInput = z.infer<typeof assignNeighborhoodsInputSchema>;

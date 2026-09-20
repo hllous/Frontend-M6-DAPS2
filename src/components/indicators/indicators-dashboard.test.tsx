@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -208,5 +208,25 @@ describe("IndicatorsDashboard", () => {
 
     expect(screen.getByText(/no se puede vincular con un registro operativo/i)).toBeVisible();
     expect(screen.queryByRole("link", { name: /Abrir catálogo de árboles/i })).not.toBeInTheDocument();
+  });
+
+  it("blocks an inverted date range with a message and does not call the backend", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Cobertura" });
+
+    let indicatorRequests = 0;
+    server.use(http.get("*/api/indicators/:family", () => { indicatorRequests += 1; return HttpResponse.json({}, { status: 500 }); }));
+
+    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-09-20" } });
+    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-09-01" } });
+    await user.click(screen.getByRole("button", { name: "Actualizar" }));
+
+    expect(await screen.findByText("La fecha «Desde» no puede ser posterior a «Hasta».")).toBeVisible();
+    expect(screen.getByLabelText("Hasta")).toBeInvalid();
+    expect(indicatorRequests).toBe(0);
+
+    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-09-20" } });
+    expect(screen.queryByText("La fecha «Desde» no puede ser posterior a «Hasta».")).not.toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@ import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_SERVICES_QUERY } from "./services-fixtures";
 import {
   checkAssignmentConflicts,
+  confirmRescheduleInputSchema,
   checkServiceWindowTiming,
   ServiceContractError,
   ServiceRequestError,
@@ -666,13 +667,36 @@ describe("services adapter", () => {
       );
 
       const confirmed = await servicesAdapter.confirmReschedule("SVC-1053", {
-        scheduledDate: "2026-09-12",
+        scheduledDate: "2099-09-12",
         timeWindow: { start: "09:00", end: "13:00" },
       });
 
       expect(confirmed.status).toBe("SCHEDULED");
-      expect(confirmed.scheduledDate).toBe("2026-09-12");
+      expect(confirmed.scheduledDate).toBe("2099-09-12");
       expect(confirmed.windowFrom).toBe("09:00");
+    });
+
+    it("rejects a reschedule date before today in Argentina, with a clear message, and accepts today", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-21T01:30:00Z"));
+      try {
+        const timeWindow = { start: "09:00", end: "13:00" };
+        const past = confirmRescheduleInputSchema.safeParse({ scheduledDate: "2026-09-19", timeWindow });
+        expect(past.success).toBe(false);
+        expect(past.error?.issues[0]).toMatchObject({ path: ["scheduledDate"], message: "La nueva fecha no puede ser anterior a hoy." });
+        // 2026-09-21T01:30Z is still 2026-09-20 in Argentina.
+        expect(confirmRescheduleInputSchema.safeParse({ scheduledDate: "2026-09-20", timeWindow }).success).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not send a reschedule with a past date to the backend", async () => {
+      const fetchMock = vi.spyOn(globalThis, "fetch");
+      await expect(
+        servicesAdapter.confirmReschedule("SVC-1053", { scheduledDate: "2020-01-01", timeWindow: { start: "09:00", end: "13:00" } }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("rejects invalid confirmReschedule input with ServiceContractError before sending request", async () => {

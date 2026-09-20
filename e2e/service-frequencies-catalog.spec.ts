@@ -6,7 +6,7 @@ test.describe("ServiceFrequency rule authoring #112", () => {
   test("Office creates, edits, and closes a rule without a generation action", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("button", { name: "Catálogo" }).click();
+    await page.getByRole("link", { name: "Catálogo" }).click();
     await page.locator('a[href="/app/catalog/service-frequencies"]').click();
     await expect(page).toHaveURL(/\/app\/catalog\/service-frequencies$/);
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { todayInArgentina } from "./argentina-date";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import {
   streetClosureRequestsAdapter,
@@ -7,6 +8,7 @@ import {
 } from "./street-closure-requests";
 import { catalogoDeEtiquetas, componerTituloDeServicio } from "./service-labels";
 import { recordTelemetryEvent } from "./telemetry";
+import { MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
 
 export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
 export type ServiceMode = z.infer<typeof serviceModeSchema>;
@@ -144,7 +146,7 @@ export const createServiceInputSchema = z
     title: z.string().optional(),
     serviceTypeId: z.string().min(1, "Debe seleccionar un tipo de servicio"),
     origin: serviceOriginSchema,
-    ticketId: z.string().optional(),
+    ticketId: z.string().max(MAX_TICKET_ID_LENGTH, `El ticketId no puede superar los ${MAX_TICKET_ID_LENGTH} caracteres.`).optional(),
     inspectionId: z.string().optional(),
     weatherAlertId: z.string().optional(),
     routeId: z.string().optional(),
@@ -159,7 +161,7 @@ export const createServiceInputSchema = z
       start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
       end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
     }),
-    notes: z.string().optional(),
+    notes: z.string().max(MAX_NOTES_LENGTH, `Las notas no pueden superar los ${MAX_NOTES_LENGTH} caracteres.`).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.origin === "TICKET" && (!data.ticketId || !data.ticketId.trim())) {
@@ -196,8 +198,8 @@ export type CreateServiceInput = z.infer<typeof createServiceInputSchema>;
 
 export const containerLocationSchema = z.object({
   address: z.string().trim().min(1, "La nueva dirección es obligatoria."),
-  lat: z.number({ message: "La latitud debe ser un número válido." }),
-  lng: z.number({ message: "La longitud debe ser un número válido." }),
+  lat: latitudeInput(),
+  lng: longitudeInput(),
   zoneId: z.string().trim().min(1).optional(),
 });
 export type ContainerLocation = z.infer<typeof containerLocationSchema>;
@@ -281,24 +283,28 @@ export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
 
 export const suspendServiceInputSchema = z.object({
   reason: notServicedReasonSchema,
-  note: z.string().min(1, "La nota es obligatoria para suspender el servicio"),
+  note: z.string().trim().min(1, "La nota es obligatoria para suspender el servicio"),
 });
 export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
 
 export const rescheduleServiceInputSchema = z.object({
-  reason: z.string().min(1, "El motivo es obligatorio para reprogramar el servicio"),
+  reason: reasonInput("El motivo es obligatorio para reprogramar el servicio"),
 });
 export type RescheduleServiceInput = z.infer<typeof rescheduleServiceInputSchema>;
 
 export const cancelServiceInputSchema = z.object({
-  reason: z.string().min(1, "El motivo es obligatorio para cancelar el servicio"),
+  reason: reasonInput("El motivo es obligatorio para cancelar el servicio"),
 });
 export type CancelServiceInput = z.infer<typeof cancelServiceInputSchema>;
 
 export const confirmRescheduleInputSchema = z.object({
   scheduledDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD")
+    .refine(
+      (value) => !/^\d{4}-\d{2}-\d{2}$/.test(value) || value >= todayInArgentina(),
+      "La nueva fecha no puede ser anterior a hoy.",
+    ),
   timeWindow: z.object({
     start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
     end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),

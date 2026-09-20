@@ -16,6 +16,17 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("vehicles adapter", () => {
+  it("accepts a null capacity when it does not apply", async () => {
+    server.use(http.get("*/api/vehicles", () => HttpResponse.json({
+      data: [{ id: "vehicle-null", plate: "AB 123 CD", vehicleType: "VAN", capacity: null, active: true }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(vehiclesAdapter.list()).resolves.toMatchObject({
+      vehicles: [{ id: "vehicle-null", capacity: null }],
+    });
+  });
+
   it("normalizes a filtered paginated response", async () => {
     const page = await vehiclesAdapter.list({ active: true, vehicleType: "COMPACTOR_TRUCK" });
 

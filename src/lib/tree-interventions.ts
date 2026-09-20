@@ -4,6 +4,7 @@ import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 import { treeSchema, type Tree } from "./trees";
+import { externalIdInput, externalIdListInput } from "@/lib/input-limits";
 
 export const treeInterventionTypeSchema = z.enum(["FORMATION_PRUNING", "SAFETY_PRUNING", "REMOVAL", "PLANTING", "TREATMENT"]);
 export type TreeInterventionType = z.infer<typeof treeInterventionTypeSchema>;
@@ -21,7 +22,7 @@ export const treeInterventionSchema = z.object({
   treeIds: z.array(z.string()).min(1),
   address: z.string().nullable().default(null),
   requiresStreetClosure: z.boolean(),
-  priority: treeInterventionPrioritySchema,
+  priority: treeInterventionPrioritySchema.nullable(),
   status: treeInterventionStatusSchema,
   serviceId: z.string().nullable(),
   justification: z.string().nullable(),
@@ -40,7 +41,7 @@ export type TreeInterventionDetail = z.infer<typeof treeInterventionResponseSche
 
 export const treeInterventionCreateInputSchema = z.object({
   interventionType: treeInterventionTypeSchema,
-  treeIds: z.array(z.string().trim().min(1)).min(1, "Seleccione al menos un árbol."),
+  treeIds: externalIdListInput({ emptyMessage: "Seleccione al menos un árbol." }),
   address: z.string().trim().min(1, "La dirección es obligatoria.").max(200, "La dirección no puede superar los 200 caracteres."),
   requiresStreetClosure: z.boolean(),
   priority: treeInterventionPrioritySchema,
@@ -52,7 +53,7 @@ export const treeInterventionCreateInputSchema = z.object({
 export type TreeInterventionCreateInput = z.infer<typeof treeInterventionCreateInputSchema>;
 
 export const treeInterventionAuthorizeInputSchema = z.object({
-  authorizedByUserId: z.string().trim().min(1, "No se pudo identificar a la persona autorizante."),
+  authorizedByUserId: externalIdInput("No se pudo identificar a la persona autorizante."),
 });
 export type TreeInterventionAuthorizeInput = z.infer<typeof treeInterventionAuthorizeInputSchema>;
 

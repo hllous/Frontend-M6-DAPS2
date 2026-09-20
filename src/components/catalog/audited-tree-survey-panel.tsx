@@ -13,6 +13,7 @@ import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OperationalScenario } from "@/lib/scenarios";
 import type { Tree } from "@/lib/trees";
+import { todayInArgentina } from "@/lib/argentina-date";
 import { cn } from "@/lib/utils";
 import { RISK_LEVEL_LABELS, treeSurveyCreateInputSchema, treeSurveysAdapter, type RiskLevel, type TreeHealthStatus, type TreeSurvey, type TreeSurveyCreateInput, type TreeSurveyQuery } from "@/lib/tree-surveys";
 import { TreeInterventionRequestDialog } from "./tree-interventions-panel";
@@ -24,7 +25,7 @@ type FormErrorField = "surveyedAt" | "healthStatus" | "riskLevel" | "riskType" |
 const HEALTH_LABELS: Record<TreeHealthStatus, string> = { HEALTHY: "Saludable", WEAKENED: "Debilitado", DISEASED: "Enfermo", DEAD: "Muerto" };
 const RISK_TYPE_LABELS = { FALLING_BRANCH: "Caída de ramas", TRUNK_INSTABILITY: "Inestabilidad del tronco", ROOT_UPLIFT: "Levantamiento de raíces", POWER_LINE_CONTACT: "Contacto con tendido eléctrico", SIGN_OBSTRUCTION: "Obstrucción de señalización", PEST_INFESTATION: "Infestación de plagas" } as const;
 const INTERVENTION_LABELS = { FORMATION_PRUNING: "Poda de formación", SAFETY_PRUNING: "Poda de seguridad", REMOVAL: "Extracción", PLANTING: "Plantación", TREATMENT: "Tratamiento" } as const;
-const emptyForm: FormState = { surveyedAt: new Date().toISOString().slice(0, 10), healthStatus: "", riskLevel: "", riskType: "", suggestedIntervention: "", requiresStreetClosure: false, requiresPublicWorks: false, notes: "" };
+const newForm = (surveyedAt: string): FormState => ({ surveyedAt, healthStatus: "", riskLevel: "", riskType: "", suggestedIntervention: "", requiresStreetClosure: false, requiresPublicWorks: false, notes: "" });
 
 const HEALTH_TONES: Record<TreeHealthStatus, string> = {
   HEALTHY: "bg-[var(--color-success-fill)] text-[var(--color-success)]",
@@ -68,7 +69,8 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
   const [page, setPage] = useState(1);
   const [requestVersion, setRequestVersion] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [today, setToday] = useState(() => todayInArgentina());
+  const [form, setForm] = useState<FormState>(() => newForm(today));
   const [formError, setFormError] = useState<string | null>(null);
   const [formErrorField, setFormErrorField] = useState<FormErrorField | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,7 +97,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
     return () => { current = false; };
   }, [query, requestVersion, tree.id]);
 
-  const openCreate = () => { setForm(emptyForm); setFormError(null); setFormErrorField(null); setNotice(null); setFormOpen(true); };
+  const openCreate = () => { const currentDay = todayInArgentina(); setToday(currentDay); setForm(newForm(currentDay)); setFormError(null); setFormErrorField(null); setNotice(null); setFormOpen(true); };
   const openDetail = async (survey: TreeSurvey) => {
     setDetail(survey); setDetailError(null); setDetailLoading(true);
     try { setDetail(await treeSurveysAdapter.getTreeSurvey(tree.id, survey.id)); }
@@ -123,7 +125,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
     {canRequestIntervention && guidedSurvey ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>El relevamiento de {dateLabel(guidedSurvey.surveyedAt)} indica una intervención sugerida.</span><Button type="button" onClick={() => { setInterventionSurvey(guidedSurvey); setInterventionOpen(true); }}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención sugerida</Button></AlertDescription></Alert> : null}
     {canRequestIntervention ? <TreeInterventionRequestDialog key={`${interventionOpen}-${interventionSurvey?.id ?? ""}`} open={interventionOpen} onOpenChange={setInterventionOpen} trees={[tree]} initialTreeIds={interventionSurvey ? [tree.id] : []} initialType={interventionSurvey?.suggestedIntervention} initialAddress={tree.address ?? ""} initialRequiresStreetClosure={interventionSurvey?.requiresStreetClosure} initialJustification={interventionSurvey ? `Relevamiento ${dateLabel(interventionSurvey.surveyedAt)} (${interventionSurvey.id}).` : undefined} onCreated={() => setNotice("Solicitud de intervención creada. Estado inicial: solicitada.")} /> : null}
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><Button type="button" variant="ghost" size="sm" className="mb-2 -ml-3 gap-1" onClick={onClose}><ArrowLeft data-icon="inline-start" aria-hidden />Volver al censo</Button><h2 id="tree-surveys-title" className="text-2xl font-semibold tracking-tight">Historial de relevamientos · {tree.surveyCode}</h2><p className="mt-1 text-sm text-muted-foreground">{tree.species} · {tree.address ?? "Sin dirección registrada"}</p></div>
+      <div><Button type="button" variant="ghost" size="sm" className="mb-2 -ml-3 gap-1" onClick={onClose}><ArrowLeft data-icon="inline-start" aria-hidden />Volver al censo</Button><h2 id="tree-surveys-title" className="text-2xl font-semibold tracking-tight">Historial de relevamientos · {tree.surveyCode}</h2><p className="mt-1 text-sm text-muted-foreground">{tree.species ?? "Especie no registrada"} · {tree.address ?? "Sin dirección registrada"}</p></div>
       {canSurvey ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar relevamiento</Button> : null}
     </div>
     {!canSurvey ? <Alert><AlertDescription>Esta sesión puede consultar el historial, pero no registrar relevamientos.</AlertDescription></Alert> : null}
@@ -146,7 +148,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
     <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent><DialogHeader><DialogTitle>Registrar relevamiento</DialogTitle><DialogDescription>Observación ambiental del árbol. El registro quedará guardado como parte del historial inmutable.</DialogDescription></DialogHeader>{formError && fieldHasError("form") ? <Alert variant="destructive"><AlertDescription>{formError}</AlertDescription></Alert> : null}<form id="tree-survey-form" onSubmit={(event) => void submit(event)} noValidate><FieldGroup>
       <Field data-invalid={fieldHasError("surveyedAt")}>
         <FieldLabel htmlFor="surveyed-at">Fecha del relevamiento <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-        <input id="surveyed-at" aria-label="Fecha del relevamiento" aria-invalid={fieldHasError("surveyedAt")} aria-describedby={fieldHasError("surveyedAt") ? "surveyed-at-help surveyed-at-error" : "surveyed-at-help"} type="date" className={formControlClass} value={form.surveyedAt} onChange={(event) => setForm({ ...form, surveyedAt: event.target.value })} required />
+        <input id="surveyed-at" aria-label="Fecha del relevamiento" aria-invalid={fieldHasError("surveyedAt")} aria-describedby={fieldHasError("surveyedAt") ? "surveyed-at-help surveyed-at-error" : "surveyed-at-help"} type="date" max={today} className={formControlClass} value={form.surveyedAt} onChange={(event) => setForm({ ...form, surveyedAt: event.target.value })} required />
         <FieldDescription id="surveyed-at-help">Indique la fecha en que se realizó la observación.</FieldDescription>
         {fieldHasError("surveyedAt") ? <FieldError id="surveyed-at-error">{formError}</FieldError> : null}
       </Field>

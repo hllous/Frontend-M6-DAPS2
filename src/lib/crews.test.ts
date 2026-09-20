@@ -20,10 +20,42 @@ const createInput = {
 };
 
 describe("crews adapter", () => {
-  it("normalizes the documented filtered paginated response including member ids", async () => {
+  it("accepts nullable leader and organization references", async () => {
+    server.use(http.get("*/api/crews", () => HttpResponse.json({
+      data: [{ id: "crew-null", name: "Cuadrilla sin asignación", crewType: "MUNICIPAL", defaultShift: "MORNING", leaderUserId: null, organizationId: null, active: true }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(crewsAdapter.list()).resolves.toMatchObject({
+      crews: [{ id: "crew-null", leaderUserId: null, organizationId: null }],
+    });
+  });
+
+  it("accepts the documented list response without detail-only member ids", async () => {
+    server.use(http.get("*/api/crews", () => HttpResponse.json({
+      data: [{
+        id: "crew-real-list",
+        name: "Cuadrilla Centro",
+        crewType: "MUNICIPAL",
+        defaultShift: "MORNING",
+        leaderUserId: "user-maria",
+        organizationId: "org-municipal",
+        active: true,
+        createdAt: "2026-09-20T10:00:00.000Z",
+        updatedAt: "2026-09-20T10:00:00.000Z",
+      }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(crewsAdapter.list()).resolves.toMatchObject({
+      crews: [{ id: "crew-real-list", name: "Cuadrilla Centro" }],
+    });
+  });
+
+  it("normalizes the documented filtered paginated response", async () => {
     const page = await crewsAdapter.list({ active: true, crewType: "MUNICIPAL", defaultShift: "MORNING" });
     expect(page.crews.length).toBeGreaterThan(0);
-    expect(page.crews[0]).toMatchObject({ name: expect.any(String), crewType: "MUNICIPAL", memberUserIds: expect.any(Array), active: true });
+    expect(page.crews[0]).toMatchObject({ name: expect.any(String), crewType: "MUNICIPAL", active: true });
     expect(page).toMatchObject({ page: 1, pageSize: expect.any(Number), total: expect.any(Number) });
   });
 
@@ -50,6 +82,26 @@ describe("crews adapter", () => {
     const updated = await crewsAdapter.update(created.id, { ...createInput, name: "Cuadrilla Centro actualizada", active: true });
     expect(updated).toMatchObject({ id: created.id, name: "Cuadrilla Centro actualizada" });
     await expect(crewsAdapter.remove(created.id)).resolves.toMatchObject({ id: created.id, active: false });
+  });
+
+  it("normalizes backend detail members into frontend member ids", async () => {
+    server.use(http.get("*/api/crews/crew-real-detail", () => HttpResponse.json({
+      id: "crew-real-detail",
+      name: "Cuadrilla Centro",
+      crewType: "MUNICIPAL",
+      defaultShift: "MORNING",
+      leaderUserId: "user-maria",
+      organizationId: "org-municipal",
+      active: true,
+      members: [{ userId: "user-maria" }, { userId: "user-pedro" }],
+      createdAt: "2026-09-20T10:00:00.000Z",
+      updatedAt: "2026-09-20T10:00:00.000Z",
+    })));
+
+    await expect(crewsAdapter.get("crew-real-detail")).resolves.toMatchObject({
+      id: "crew-real-detail",
+      memberUserIds: ["user-maria", "user-pedro"],
+    });
   });
 
   it("rejects malformed responses, documented errors and network failures explicitly", async () => {

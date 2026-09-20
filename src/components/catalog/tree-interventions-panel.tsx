@@ -5,6 +5,7 @@ import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -88,7 +89,7 @@ function formFor(props: RequestDialogProps): RequestForm {
 }
 
 function treeName(tree: Tree) {
-  return `${tree.surveyCode} · ${tree.species}`;
+  return `${tree.surveyCode} · ${tree.species ?? "Especie no registrada"}`;
 }
 
 function dateTimeLabel(value?: string | null) {
@@ -326,14 +327,12 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
 
   return (
     <section aria-labelledby="tree-interventions-title" className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">Arbolado urbano</p>
-          <h1 id="tree-interventions-title" className="text-2xl font-semibold tracking-tight">Intervenciones de arbolado</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Solicitudes de poda, extracción, plantación o tratamiento con su estado y decisión registrada.</p>
-        </div>
-        {canRequest ? <Button type="button" onClick={() => openRequest()}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención</Button> : null}
-      </div>
+      <CatalogPageHeader
+        title="Intervenciones de arbolado"
+        titleId="tree-interventions-title"
+        description="Solicitudes de poda, extracción, plantación o tratamiento con su estado y decisión registrada."
+        actions={canRequest ? <Button type="button" onClick={() => openRequest()}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención</Button> : null}
+      />
       {!canRequest ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription>Esta sesión puede consultar las solicitudes, pero no crear intervenciones de arbolado.</AlertDescription></Alert> : null}
       {notice ? <Alert><CheckCircle2 data-icon="inline-start" aria-hidden /><AlertDescription>{notice}</AlertDescription></Alert> : null}
       <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
@@ -357,7 +356,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
               <div><p className="font-mono text-xs text-muted-foreground">{intervention.id}</p><h2 className="mt-1 text-base font-semibold">{TREE_INTERVENTION_LABELS[intervention.interventionType]}</h2></div>
               <InterventionStatusBadge status={intervention.status} />
             </div>
-            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles</dt><dd className="mt-0.5">{intervention.treeIds.length} {intervention.treeIds.length === 1 ? "ejemplar" : "ejemplares"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{PRIORITY_LABELS[intervention.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{intervention.address}</dd></div></dl>
+            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles</dt><dd className="mt-0.5">{intervention.treeIds.length} {intervention.treeIds.length === 1 ? "ejemplar" : "ejemplares"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{intervention.priority === null ? "—" : PRIORITY_LABELS[intervention.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{intervention.address ?? "—"}</dd></div></dl>
             <div className="mt-4 flex justify-end"><Button type="button" size="sm" variant="outline" onClick={() => void openDetail(intervention)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button></div>
           </article>)}
         </div>
@@ -386,7 +385,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle><DialogDescription>Consulte los datos de la solicitud y, según su estado y permisos, registre una decisión de autorización.</DialogDescription></DialogHeader>
           {detailLoading ? <p role="status">Cargando detalle…</p> : null}
           {detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}
-          {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-mono text-xs text-muted-foreground">{detail.id}</p><p className="mt-1 font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p></div><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{PRIORITY_LABELS[detail.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ul className="flex flex-col gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <li key={tree?.id ?? detail.treeIds[index]} className="rounded-xl border border-border bg-muted px-3 py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</li>)}</ul></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
+          {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-mono text-xs text-muted-foreground">{detail.id}</p><p className="mt-1 font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p></div><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : PRIORITY_LABELS[detail.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "—"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ul className="flex flex-col gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <li key={tree?.id ?? detail.treeIds[index]} className="rounded-xl border border-border bg-muted px-3 py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</li>)}</ul></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
           {detail && !detailLoading && !detailError ? (
             <>
               {actionError ? <Alert variant="destructive"><AlertDescription className="flex flex-col gap-3"><span>{actionError}</span>{unsyncedServiceId ? <Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "retry-link"} onClick={() => void retryServiceLink()}><RefreshCw data-icon="inline-start" aria-hidden />{activeAction === "retry-link" ? "Reintentando vinculación…" : "Reintentar vinculación"}</Button> : null}</AlertDescription></Alert> : null}
@@ -444,7 +443,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                 ) : null}
                 {detail.interventionType === "REMOVAL" && detail.status === "REQUESTED" && canRequest ? <Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "submit"} onClick={() => void runAction("submit")}><Send data-icon="inline-start" aria-hidden />{activeAction === "submit" ? "Enviando a autorización…" : "Enviar a autorización"}</Button> : null}
                 {canAuthorize && ((detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <div className="flex flex-wrap gap-2"><Button type="button" disabled={activeAction !== null} aria-busy={activeAction === "authorize"} onClick={() => void runAction("authorize")}><CheckCircle2 data-icon="inline-start" aria-hidden />{activeAction === "authorize" ? "Autorizando intervención…" : "Autorizar intervención"}</Button>{detail.interventionType === "REMOVAL" ? <Button type="button" variant="destructive" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(true)}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button> : null}</div> : null}
-                {detail.status === "REJECTED" && canRequest ? <div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">Esta decisión es terminal. Puede registrar una nueva solicitud con los datos de esta extracción.</p><Button type="button" variant="outline" onClick={() => { setDetail(null); openRequest({ initialTreeIds: detail.treeIds, initialType: detail.interventionType, initialAddress: detail.address ?? undefined, initialRequiresStreetClosure: detail.requiresStreetClosure, initialPriority: detail.priority, initialJustification: detail.justification ?? "" }); }}>Crear nueva solicitud</Button></div> : null}
+                {detail.status === "REJECTED" && canRequest ? <div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">Esta decisión es terminal. Puede registrar una nueva solicitud con los datos de esta extracción.</p><Button type="button" variant="outline" onClick={() => { setDetail(null); openRequest({ initialTreeIds: detail.treeIds, initialType: detail.interventionType, initialAddress: detail.address ?? undefined, initialRequiresStreetClosure: detail.requiresStreetClosure, initialPriority: detail.priority ?? undefined, initialJustification: detail.justification ?? "" }); }}>Crear nueva solicitud</Button></div> : null}
               </div>
             </>
           ) : null}

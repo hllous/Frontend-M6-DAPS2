@@ -60,6 +60,7 @@ import {
   type SortDir,
   type SortKey,
 } from "./services-table";
+import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -726,6 +727,7 @@ export function ServicesWorkspace({
               <input
                 type="search"
                 value={search}
+                maxLength={MAX_SEARCH_LENGTH}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar servicio, zona o cuadrilla…"
                 aria-label="Buscar servicios por texto libre"

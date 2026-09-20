@@ -38,7 +38,7 @@ test.describe("Catalog shell navigation regression #231", () => {
     const sidebar = page.locator("aside[aria-label='Navegación principal']");
     await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
 
-    await sidebar.getByRole("button", { name: "Servicios" }).click();
+    await sidebar.getByRole("link", { name: "Servicios" }).click();
     await expect(page).toHaveURL(/\/app\?destination=services$/);
     await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
 
@@ -49,5 +49,31 @@ test.describe("Catalog shell navigation regression #231", () => {
     await page.goForward();
     await expect(page).toHaveURL(/\/app\?destination=services$/);
     await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+  });
+
+  test("sidebar destinations are real links that open in a new tab (#243)", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app");
+
+    const sidebar = page.locator("aside[aria-label='Navegación principal']");
+    const services = sidebar.getByRole("link", { name: "Servicios" });
+    await expect(services).toHaveAttribute("href", "/app?destination=services");
+
+    const [newTab] = await Promise.all([
+      page.context().waitForEvent("page"),
+      services.click({ modifiers: ["ControlOrMeta"] }),
+    ]);
+    await newTab.waitForLoadState();
+    await expect(newTab).toHaveURL(/\/app\?destination=services$/);
+    await expect(newTab.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page).toHaveURL(/\/app$/);
+  });
+
+  test("the legacy /app/catalog URL redirects to the canonical catalog destination (#243)", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app/catalog");
+
+    await expect(page).toHaveURL(/\/app\?destination=catalog$/);
+    await expect(page.getByRole("link", { name: "Catálogo" }).first()).toHaveAttribute("aria-current", "page");
   });
 });

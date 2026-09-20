@@ -100,9 +100,15 @@ function validationMessage(error: { issues: Array<{ message: string }> }) {
   return error.issues.map((issue) => issue.message).join(" ");
 }
 
+function dateTimeLocalValue(value = new Date().toISOString()) {
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
 function resultPayload(
   inspection: EnvironmentalInspection,
   checkedItems: Record<string, boolean>,
+  inspectedAt: string,
   outcome: EnvironmentalInspectionCompleteInput["outcome"],
   conclusion: string,
   findings: string,
@@ -110,9 +116,12 @@ function resultPayload(
   severity: EnvironmentalInspectionCompleteInput["severity"],
   suggestedAction: EnvironmentalInspectionCompleteInput["suggestedAction"],
 ): InspectionCompletionDraftPayload {
+  const inspectionDate = new Date(inspectedAt);
   return {
+    inspectedAt: Number.isNaN(inspectionDate.getTime()) ? inspectedAt : inspectionDate.toISOString(),
     outcome,
-    checklist: inspection.checklist.map((item) => ({ id: item.id, completed: checkedItems[item.id] === true })),
+    ...(outcome === "VIOLATION_FOUND" ? { nextStep: "NOTICE_TO_BE_ISSUED" as const } : {}),
+    checklist: inspection.checklist.map((item) => ({ id: item.id, label: item.label, completed: checkedItems[item.id] === true })),
     ...(conclusion.trim() ? { conclusion: conclusion.trim() } : {}),
     ...(findings.trim() ? { findings: findings.trim() } : {}),
     ...(violationType ? { violationType } : {}),
@@ -136,6 +145,7 @@ export function InspectionExecutionPanel({
   const [inspection, setInspection] = useState<EnvironmentalInspection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<EnvironmentalInspectionCompleteInput["outcome"]>(savedDraft?.payload.outcome ?? "NO_VIOLATION");
+  const [inspectedAt, setInspectedAt] = useState(() => dateTimeLocalValue(savedDraft?.payload.inspectedAt));
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(savedDraft?.payload.checklist.map((item) => [item.id, item.completed]) ?? []),
   );
@@ -231,7 +241,7 @@ export function InspectionExecutionPanel({
     setFormError(null);
     setSuccessMessage(null);
 
-    const payload = resultPayload(inspection, checkedItems, outcome, conclusion, findings, violationType, severity, suggestedAction);
+    const payload = resultPayload(inspection, checkedItems, inspectedAt, outcome, conclusion, findings, violationType, severity, suggestedAction);
     const parsed = environmentalInspectionCompleteInputSchema.safeParse(payload);
     if (!parsed.success) {
       setFormError(validationMessage(parsed.error));
@@ -280,6 +290,7 @@ export function InspectionExecutionPanel({
     setComposedAgainst(null);
     setConflict(null);
     setOutcome("NO_VIOLATION");
+    setInspectedAt(dateTimeLocalValue());
     setCheckedItems(Object.fromEntries((inspection?.checklist ?? []).map((item) => [item.id, false])));
     setConclusion("");
     setFindings("");
@@ -326,6 +337,11 @@ export function InspectionExecutionPanel({
 
           <FieldGroup>
             <Field>
+              <FieldLabel htmlFor={`${inputId}-inspected-at`}>Fecha y hora de inspección <span aria-hidden="true">*</span></FieldLabel>
+              <input id={`${inputId}-inspected-at`} type="datetime-local" value={inspectedAt} onChange={(event) => setInspectedAt(event.target.value)} disabled={!canExecute || isSubmitting} required className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" />
+              <FieldDescription>Indique cuándo se realizó la visita. Se admite una tolerancia de cinco minutos por diferencias de reloj.</FieldDescription>
+            </Field>
+            <Field>
               <FieldLabel htmlFor={`${inputId}-outcome`}>Resultado de la inspección <span aria-hidden="true">*</span></FieldLabel>
               <select id={`${inputId}-outcome`} value={outcome} onChange={(event) => setOutcome(environmentalInspectionOutcomeSchema.parse(event.target.value))} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-describedby={`${inputId}-outcome-help`}>
                 {environmentalInspectionOutcomeSchema.options.map((value) => <option key={value} value={value}>{OUTCOME_LABELS[value]}</option>)}
@@ -346,6 +362,7 @@ export function InspectionExecutionPanel({
             {(outcome === "NO_VIOLATION" || outcome === "INCONCLUSIVE") && <Field><FieldLabel htmlFor={`${inputId}-conclusion`}>{outcome === "NO_VIOLATION" ? "Conclusión" : "Explicación de la inspección inconclusa"} <span aria-hidden="true">*</span></FieldLabel><textarea id={`${inputId}-conclusion`} value={conclusion} onChange={(event) => setConclusion(event.target.value)} disabled={!canExecute || isSubmitting} className="min-h-28 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-describedby={`${inputId}-conclusion-help`} /><FieldDescription id={`${inputId}-conclusion-help`}>{outcome === "NO_VIOLATION" ? "Describa brevemente la conclusión de la visita." : "Explique qué impidió confirmar el resultado."}</FieldDescription></Field>}
 
             {outcome === "VIOLATION_FOUND" && <>
+              <Field><FieldLabel>Próximo paso</FieldLabel><p className="rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 py-2 text-sm">{NEXT_STEP_LABELS.NOTICE_TO_BE_ISSUED}</p><FieldDescription>Se informa al backend el paso requerido para continuar el expediente.</FieldDescription></Field>
               <Field><FieldLabel htmlFor={`${inputId}-findings`}>Hallazgos <span aria-hidden="true">*</span></FieldLabel><textarea id={`${inputId}-findings`} value={findings} onChange={(event) => setFindings(event.target.value)} disabled={!canExecute || isSubmitting} className="min-h-28 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field>
               <div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor={`${inputId}-violation-type`}>Tipo de infracción <span aria-hidden="true">*</span></FieldLabel><select id={`${inputId}-violation-type`} value={violationType ?? ""} onChange={(event) => setViolationType(event.target.value ? environmentalInspectionViolationTypeSchema.parse(event.target.value) : undefined)} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione un tipo</option>{environmentalInspectionViolationTypeSchema.options.map((value) => <option key={value} value={value}>{VIOLATION_TYPE_LABELS[value]}</option>)}</select></Field><Field><FieldLabel htmlFor={`${inputId}-severity`}>Gravedad <span aria-hidden="true">*</span></FieldLabel><select id={`${inputId}-severity`} value={severity ?? ""} onChange={(event) => setSeverity(event.target.value ? environmentalInspectionSeveritySchema.parse(event.target.value) : undefined)} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione una gravedad</option>{environmentalInspectionSeveritySchema.options.map((value) => <option key={value} value={value}>{SEVERITY_LABELS[value]}</option>)}</select></Field></div>
               <Field><FieldLabel htmlFor={`${inputId}-suggested-action`}>Acción sugerida <span aria-hidden="true">*</span></FieldLabel><select id={`${inputId}-suggested-action`} value={suggestedAction ?? ""} onChange={(event) => setSuggestedAction(event.target.value ? environmentalInspectionSuggestedActionSchema.parse(event.target.value) : undefined)} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Seleccione una acción</option>{environmentalInspectionSuggestedActionSchema.options.map((value) => <option key={value} value={value}>{SUGGESTED_ACTION_LABELS[value]}</option>)}</select><FieldDescription>La decisión final corresponde a Oficina y no se determina en este formulario.</FieldDescription></Field>

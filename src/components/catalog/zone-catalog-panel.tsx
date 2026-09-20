@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   AlertTriangle,
-  ArrowLeft,
   Check,
   Loader2,
   MapPin,
@@ -16,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,6 +38,7 @@ import {
   ZoneRequestError,
   zonesAdapter,
 } from "@/lib/zones";
+import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -307,43 +307,24 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
   return (
     <section aria-labelledby="zones-catalog-heading" className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Button
-              nativeButton={false}
-              render={<Link href="/app?destination=catalog" />}
-              variant="ghost"
-              size="sm"
-              className="gap-1 px-2 text-xs text-muted-foreground"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-              Catálogo
-            </Button>
-          </div>
-          <h1 id="zones-catalog-heading" className="text-2xl font-semibold tracking-tight">
-            Zonas operativas
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Configuración de áreas operativas para asignación de cuadrillas y recorridos de recolección.
-          </p>
-        </div>
-
-        {canManage && (
+      <CatalogPageHeader
+        title="Zonas operativas"
+        titleId="zones-catalog-heading"
+        description="Configuración de áreas operativas para asignación de cuadrillas y recorridos de recolección."
+        actions={canManage ? (
           <Button
             type="button"
             onClick={() => {
               setShowCreate(true);
               setCreateError(null);
             }}
-            className="gap-1.5 self-start sm:self-auto"
+            className="gap-1.5"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Nueva zona
           </Button>
-        )}
-      </div>
+        ) : null}
+      />
 
       {/* Filter and search bar */}
       <div className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_200px]">
@@ -356,6 +337,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               className={`${formControlClass} w-full pl-9`}
               placeholder="Buscar por código o nombre..."
               value={search}
+              maxLength={MAX_SEARCH_LENGTH}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
@@ -573,7 +555,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       )}
 
       {state.status === "ready" && state.items.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Listado de zonas operativas</caption>
             <thead className="border-b border-border bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">

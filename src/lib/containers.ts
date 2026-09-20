@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema, type Attachment, type Service, type ServiceStatus } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
+import { MAX_INT32, latitudeInput, longitudeInput } from "@/lib/input-limits";
 
 export { attachmentSchema, type Attachment };
 
@@ -37,9 +38,9 @@ export const containerSchema = z.object({
   code: z.string(),
   containerType: containerTypeSchema,
   zoneId: z.string(),
-  address: z.string(),
-  lat: z.number(),
-  lng: z.number(),
+  address: z.string().nullable(),
+  lat: z.number().nullable(),
+  lng: z.number().nullable(),
   capacityLiters: z.number(),
   status: containerStatusSchema,
   damageType: damageTypeSchema.nullable().optional(),
@@ -65,30 +66,29 @@ export type ContainersPage = {
   totalPages: number;
 };
 
+const capacityLitersInput = z
+  .number({ message: "La capacidad debe ser un número." })
+  .int("La capacidad debe ser un número entero.")
+  .positive("La capacidad debe ser mayor a 0 litros.")
+  .max(MAX_INT32, `La capacidad no puede superar ${MAX_INT32.toLocaleString("es-AR")} litros.`);
+
 export const createContainerInputSchema = z.object({
   code: z.string().trim().min(1, "El código es obligatorio."),
   containerType: containerTypeSchema,
   zoneId: z.string().trim().min(1, "La zona operativa es obligatoria."),
   address: z.string().trim().min(1, "La dirección es obligatoria."),
-  lat: z.number({ message: "La latitud debe ser un número válido." }),
-  lng: z.number({ message: "La longitud debe ser un número válido." }),
-  capacityLiters: z
-    .number({ message: "La capacidad debe ser un número." })
-    .int("La capacidad debe ser un número entero.")
-    .positive("La capacidad debe ser mayor a 0 litros."),
+  lat: latitudeInput(),
+  lng: longitudeInput(),
+  capacityLiters: capacityLitersInput,
 });
 export type CreateContainerInput = z.infer<typeof createContainerInputSchema>;
 
 export const updateContainerInputSchema = z.object({
   zoneId: z.string().trim().min(1, "La zona operativa es obligatoria.").optional(),
   address: z.string().trim().min(1, "La dirección es obligatoria.").optional(),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
-  capacityLiters: z
-    .number({ message: "La capacidad debe ser un número." })
-    .int("La capacidad debe ser un número entero.")
-    .positive("La capacidad debe ser mayor a 0 litros.")
-    .optional(),
+  lat: latitudeInput().optional(),
+  lng: longitudeInput().optional(),
+  capacityLiters: capacityLitersInput.optional(),
 });
 export type UpdateContainerInput = z.infer<typeof updateContainerInputSchema>;
 
@@ -101,8 +101,8 @@ export type ReportDamageInput = z.input<typeof reportDamageInputSchema>;
 
 export const confirmRelocationInputSchema = z.object({
   address: z.string().trim().min(1, "La dirección es obligatoria."),
-  lat: z.number({ message: "La latitud debe ser un número válido." }),
-  lng: z.number({ message: "La longitud debe ser un número válido." }),
+  lat: latitudeInput(),
+  lng: longitudeInput(),
   zoneId: z.string().trim().min(1).optional(),
 });
 export type ConfirmRelocationInput = z.infer<typeof confirmRelocationInputSchema>;

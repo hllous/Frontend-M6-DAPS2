@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, Eye, Pencil, Plus, Trash2, UserMinus, UserPlus, UsersRound, X } from "lucide-react";
+import { Check, Eye, Pencil, Plus, Trash2, UserMinus, UserPlus, X } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -56,10 +57,10 @@ export function CrewCatalogPanel({ scenario }: { scenario: OperationalScenario }
     return () => { current = false; };
   }, [query, requestVersion, scenario]);
 
-  const userName = (id: string) => users.find((user) => user.id === id)?.displayName ?? "Usuario M1 no resuelto";
+  const userName = (id: string | null) => id === null ? "—" : users.find((user) => user.id === id)?.displayName ?? "Usuario M1 no resuelto";
   const organizationName = (id: string | null) => id === null ? "Sin organización externa" : organizations.find((organization) => organization.id === id)?.displayName ?? "Organización M1 no resuelta";
   function openCreate() { setEditing(null); setForm({ ...emptyForm, leaderUserId: users[0]?.id ?? "", organizationId: organizations[0]?.id ?? "" }); setFormError(null); setFormOpen(true); }
-  function openEdit(crew: Crew) { setEditing(crew); setForm({ name: crew.name, crewType: crew.crewType, leaderUserId: crew.leaderUserId, organizationId: crew.organizationId ?? "", defaultShift: crew.defaultShift }); setFormError(null); setFormOpen(true); }
+  function openEdit(crew: Crew) { setEditing(crew); setForm({ name: crew.name, crewType: crew.crewType, leaderUserId: crew.leaderUserId ?? "", organizationId: crew.organizationId ?? "", defaultShift: crew.defaultShift }); setFormError(null); setFormOpen(true); }
   async function save(event: FormEvent) {
     event.preventDefault(); setFormError(null);
     if (!form.name.trim() || !form.leaderUserId || !form.organizationId) { setFormError("Complete el nombre, responsable y organización."); return; }
@@ -83,7 +84,12 @@ export function CrewCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
   return (
     <section aria-labelledby="crews-title" className={styles.resourcePanel}>
-      <div className={styles.resourceHeading}><div><div className={styles.titleWithIcon}><UsersRound aria-hidden /><h2 id="crews-title">Cuadrillas</h2></div><p>Consulte equipos, turnos y referencias de identidad administradas por M1.</p></div>{canManage ? <Button onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar cuadrilla</Button> : null}</div>
+      <CatalogPageHeader
+        title="Cuadrillas"
+        titleId="crews-title"
+        description="Consulte equipos, turnos y referencias de identidad administradas por M1."
+        actions={canManage ? <Button onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar cuadrilla</Button> : null}
+      />
       {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
       <div className={styles.filters} aria-label="Filtros de cuadrillas"><Field><FieldLabel htmlFor="crew-active-filter">Estado</FieldLabel><select id="crew-active-filter" value={activeFilter} onChange={(event) => setActiveFilter(event.target.value as typeof activeFilter)} className={styles.control}><option value="all">Todos</option><option value="true">Activas</option><option value="false">Inactivas</option></select></Field><Field><FieldLabel htmlFor="crew-type-filter">Tipo de cuadrilla</FieldLabel><select id="crew-type-filter" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as CrewType | "all")} className={styles.control}><option value="all">Todos los tipos</option>{crewTypes.map((type) => <option key={type} value={type}>{crewTypeLabels[type]}</option>)}</select></Field><Field><FieldLabel htmlFor="crew-shift-filter">Turno</FieldLabel><select id="crew-shift-filter" value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value as Shift | "all")} className={styles.control}><option value="all">Todos los turnos</option>{shifts.map((shift) => <option key={shift} value={shift}>{shiftLabels[shift]}</option>)}</select></Field></div>
       {state.status === "loading" ? <p className={styles.muted} aria-label="Cargando cuadrillas">Cargando cuadrillas…</p> : null}

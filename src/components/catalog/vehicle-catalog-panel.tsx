@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Pencil, Plus, Trash2, Truck, X } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/vehicles";
 
 import styles from "./catalog-panel.module.css";
+import { MAX_DECIMAL_10_2 } from "@/lib/input-limits";
 
 const vehicleTypes = vehicleTypeSchema.options;
 const vehicleTypeLabels: Record<VehicleType, string> = {
@@ -77,7 +79,7 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
 
   function openEdit(vehicle: Vehicle) {
     setEditing(vehicle);
-    setForm({ plate: vehicle.plate, vehicleType: vehicle.vehicleType, capacity: String(vehicle.capacity) });
+    setForm({ plate: vehicle.plate, vehicleType: vehicle.vehicleType, capacity: vehicle.capacity === null ? "" : String(vehicle.capacity) });
     setFormError(null);
     setFormOpen(true);
   }
@@ -88,6 +90,10 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
     const capacity = Number(form.capacity);
     if (!form.plate.trim() || !Number.isFinite(capacity) || capacity <= 0) {
       setFormError("Indique una patente y una capacidad mayor que cero.");
+      return;
+    }
+    if (capacity > MAX_DECIMAL_10_2) {
+      setFormError(`La capacidad no puede superar ${MAX_DECIMAL_10_2.toLocaleString("es-AR")}.`);
       return;
     }
     try {
@@ -115,13 +121,12 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
 
   return (
     <section aria-labelledby="vehicles-title" className={styles.resourcePanel}>
-      <div className={styles.resourceHeading}>
-        <div>
-          <div className={styles.titleWithIcon}><Truck aria-hidden /><h2 id="vehicles-title">Vehículos</h2></div>
-          <p>Registre los vehículos disponibles para la asignación de servicios.</p>
-        </div>
-        {canManage ? <Button onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar vehículo</Button> : null}
-      </div>
+      <CatalogPageHeader
+        title="Vehículos"
+        titleId="vehicles-title"
+        description="Registre los vehículos disponibles para la asignación de servicios."
+        actions={canManage ? <Button onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar vehículo</Button> : null}
+      />
 
       {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
       <div className={styles.filters} aria-label="Filtros de vehículos">
@@ -147,12 +152,12 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <caption className="sr-only">Vehículos registrados</caption>
-            <thead><tr><th scope="col">Patente</th><th scope="col">Tipo</th><th scope="col">Capacidad</th><th scope="col">Estado</th>{canManage ? <th scope="col"><span className="sr-only">Acciones</span></th> : null}</tr></thead>
+            <thead><tr><th scope="col">Patente</th><th scope="col">Tipo</th><th scope="col">Capacidad (t)</th><th scope="col">Estado</th>{canManage ? <th scope="col"><span className="sr-only">Acciones</span></th> : null}</tr></thead>
             <tbody>{state.vehicles.map((vehicle) => (
               <tr key={vehicle.id}>
                 <th scope="row" data-label="Patente">{vehicle.plate}</th>
                 <td data-label="Tipo">{vehicleTypeLabels[vehicle.vehicleType]}</td>
-                <td data-label="Capacidad">{vehicle.capacity}</td>
+                <td data-label="Capacidad (t)">{vehicle.capacity === null ? "—" : `${vehicle.capacity.toLocaleString("es-AR")} t`}</td>
                 <td data-label="Estado"><span className={vehicle.active ? styles.active : styles.inactive}>{vehicle.active ? <Check aria-hidden /> : <X aria-hidden />}{vehicle.active ? "Activo" : "Inactivo"}</span></td>
                 {canManage ? <td className={styles.actions}><Button variant="outline" size="sm" onClick={() => openEdit(vehicle)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{vehicle.active ? <Button variant="destructive" size="sm" onClick={() => void deactivate(vehicle)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}
               </tr>
@@ -168,8 +173,8 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
           <form id="vehicle-form" onSubmit={(event) => void save(event)}>
             <FieldGroup>
               <Field><FieldLabel htmlFor="vehicle-plate">Patente</FieldLabel><input id="vehicle-plate" value={form.plate} onChange={(event) => setForm({ ...form, plate: event.target.value })} className={styles.control} required /></Field>
-              <Field><FieldLabel htmlFor="vehicle-type-form">Tipo de vehículo para el registro</FieldLabel><select id="vehicle-type-form" value={form.vehicleType} onChange={(event) => setForm({ ...form, vehicleType: event.target.value as VehicleType })} className={styles.control}>{vehicleTypes.map((type) => <option key={type} value={type}>{vehicleTypeLabels[type]}</option>)}</select></Field>
-              <Field><FieldLabel htmlFor="vehicle-capacity">Capacidad</FieldLabel><input id="vehicle-capacity" type="number" min="1" step="1" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} className={styles.control} required /><FieldDescription>Capacidad operativa declarada para el vehículo.</FieldDescription></Field>
+              <Field><FieldLabel htmlFor="vehicle-type-form">Tipo de vehículo</FieldLabel><select id="vehicle-type-form" value={form.vehicleType} onChange={(event) => setForm({ ...form, vehicleType: event.target.value as VehicleType })} className={styles.control}>{vehicleTypes.map((type) => <option key={type} value={type}>{vehicleTypeLabels[type]}</option>)}</select></Field>
+              <Field><FieldLabel htmlFor="vehicle-capacity">Capacidad (toneladas)</FieldLabel><input id="vehicle-capacity" type="number" min="0.01" max={MAX_DECIMAL_10_2} step="0.01" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} className={styles.control} required /><FieldDescription>Capacidad operativa declarada, en toneladas. Admite hasta dos decimales.</FieldDescription></Field>
             </FieldGroup>
           </form>
           <DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)}>Cancelar</Button><Button type="submit" form="vehicle-form">Guardar vehículo</Button></DialogFooter>

@@ -195,7 +195,7 @@ function toListItems(data: OperationalMapData): MapListItem[] {
       id: item.id,
       layer: "greenSpaces" as const,
       title: item.name,
-      description: `${greenSpaceTypeLabels[item.spaceType]} · ${Math.round(item.areaM2).toLocaleString("es-AR")} m²`,
+      description: item.areaM2 === null ? `${greenSpaceTypeLabels[item.spaceType]} · superficie no registrada` : `${greenSpaceTypeLabels[item.spaceType]} · ${Math.round(item.areaM2).toLocaleString("es-AR")} m²`,
       lat: item.lat,
       lng: item.lng,
       markerSymbol: "E",

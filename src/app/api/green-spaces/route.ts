@@ -16,6 +16,7 @@ import {
 import { getScenario, type OperationalScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -39,8 +40,8 @@ function parseGreenSpaceQuery(url: URL): GreenSpaceQuery {
       ? (rawSpaceType as GreenSpaceQuery["spaceType"])
       : undefined,
     zoneId: url.searchParams.get("zoneId") ?? undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 

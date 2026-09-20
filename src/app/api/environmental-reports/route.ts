@@ -16,6 +16,7 @@ import {
 } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 409: "Conflict", 503: "Service Unavailable", 500: "Internal Server Error" };
 
@@ -30,9 +31,9 @@ function queryFromUrl(url: URL): EnvironmentalReportQuery {
     priority: environmentalReportPrioritySchema.safeParse(url.searchParams.get("priority")).data,
     publicId: url.searchParams.get("publicId") ?? undefined,
     ticketId: url.searchParams.get("ticketId") ?? undefined,
-    search: url.searchParams.get("search") ?? undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    search: searchParam(url.searchParams),
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 
