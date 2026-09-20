@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { todayInArgentina } from "./argentina-date";
 import { CONTAINER_STATUS_LABELS } from "./containers";
 import { ENVIRONMENTAL_REPORT_STATUS_LABELS, ENVIRONMENTAL_REPORT_TYPE_LABELS } from "./environmental-reports";
 import { WASTE_TYPE_LABELS } from "./green-points";
@@ -163,9 +164,10 @@ function formatCalendarDate(date: Date) {
 }
 
 export function defaultIndicatorQuery(now = new Date()): ResolvedIndicatorQuery {
-  const from = new Date(now);
+  const to = todayInArgentina(now);
+  const from = new Date(`${to}T00:00:00.000Z`);
   from.setUTCDate(from.getUTCDate() - 29);
-  return { from: formatCalendarDate(from), to: formatCalendarDate(now) };
+  return { from: formatCalendarDate(from), to };
 }
 
 export function resolveIndicatorQuery(query: IndicatorQuery = {}, now = new Date()): ResolvedIndicatorQuery {

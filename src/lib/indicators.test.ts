@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "./indicator-fixtures";
-import { indicatorQueryErrorMessage, indicatorQuerySchema, indicatorsAdapter, IndicatorContractError, INVERTED_RANGE_MESSAGE, resolveIndicatorQuery } from "./indicators";
+import { defaultIndicatorQuery, indicatorQueryErrorMessage, indicatorQuerySchema, indicatorsAdapter, IndicatorContractError, INVERTED_RANGE_MESSAGE, resolveIndicatorQuery } from "./indicators";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -45,6 +45,17 @@ describe("indicatorsAdapter", () => {
 
   it("uses the last 30 days when the period is omitted", () => {
     expect(resolveIndicatorQuery({}, new Date("2026-09-07T12:00:00.000Z"))).toEqual({ from: "2026-08-09", to: "2026-09-07" });
+  });
+
+  it("uses Argentina's calendar day for the default 30-day period", () => {
+    expect(defaultIndicatorQuery(new Date("2026-09-21T01:30:00.000Z"))).toEqual({
+      from: "2026-08-22",
+      to: "2026-09-20",
+    });
+    expect(defaultIndicatorQuery(new Date("2026-01-01T01:30:00.000Z"))).toEqual({
+      from: "2025-12-02",
+      to: "2025-12-31",
+    });
   });
 
   it("forwards coverage and compliance filters, but keeps snapshot families period-only", async () => {
