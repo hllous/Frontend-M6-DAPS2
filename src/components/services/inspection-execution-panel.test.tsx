@@ -94,10 +94,11 @@ describe("InspectionExecutionPanel", () => {
     await screen.findByText(/Resultado registrado/);
     expect(screen.getAllByText(/Siguiente paso:.*Cierre del expediente/).length).toBeGreaterThan(0);
     expect(completionBody).toEqual({
+      inspectedAt: expect.any(String),
       outcome: "NO_VIOLATION",
       checklist: [
-        { id: "source", completed: true },
-        { id: "impact", completed: true },
+        { id: "source", label: "Verificar la fuente observada", completed: true },
+        { id: "impact", label: "Registrar el impacto visible", completed: true },
       ],
       conclusion: "No se constató infracción durante la visita.",
     });
@@ -145,8 +146,10 @@ describe("InspectionExecutionPanel", () => {
     expect(await screen.findByText(/Resultado registrado/)).toBeVisible();
     expect(evidenceUploaded).toBe(true);
     expect(completionBody).toEqual({
+      inspectedAt: expect.any(String),
       outcome: "VIOLATION_FOUND",
-      checklist: [{ id: "source", completed: true }, { id: "impact", completed: true }],
+      nextStep: "NOTICE_TO_BE_ISSUED",
+      checklist: [{ id: "source", label: "Verificar la fuente observada", completed: true }, { id: "impact", label: "Registrar el impacto visible", completed: true }],
       findings: "Emisión visible",
       violationType: "AIR_EMISSION",
       severity: "HIGH",
