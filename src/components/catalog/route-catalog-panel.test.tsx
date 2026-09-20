@@ -23,7 +23,7 @@ describe("RouteCatalogPanel component", () => {
   it("renders the routes catalog with heading, search input, filters and table for Office", async () => {
     render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
-    expect(screen.getByRole("heading", { name: "Catálogo de Recorridos" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Recorridos", level: 1 })).toBeInTheDocument();
     expect(screen.getByTestId("create-route-button")).toBeVisible();
     expect(screen.getByTestId("search-routes-input")).toBeInTheDocument();
     expect(screen.getByTestId("active-filter-select")).toBeInTheDocument();

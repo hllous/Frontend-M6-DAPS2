@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, CircleOff, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -203,13 +204,12 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
   return (
     <section aria-labelledby="trees-title" className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 id="trees-title" className="text-2xl font-semibold tracking-tight">Árboles</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Censo de arbolado urbano, ubicación y medidas registradas para cada ejemplar.</p>
-        </div>
-        {canManage ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar árbol</Button> : null}
-      </div>
+      <CatalogPageHeader
+        title="Árboles"
+        titleId="trees-title"
+        description="Censo de arbolado urbano, ubicación y medidas registradas para cada ejemplar."
+        actions={canManage ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar árbol</Button> : null}
+      />
 
       {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Esta sesión puede consultar el censo, pero no administrarlo.</p> : null}
       {notice ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{notice}</p> : null}

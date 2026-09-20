@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -67,7 +68,12 @@ export function DisposalSitesPanel({ scenario }: { scenario: OperationalScenario
 
   return (
     <section aria-labelledby="disposal-sites-title" className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-sm font-medium text-muted-foreground">Catálogo · Servicios</p><h1 id="disposal-sites-title" className="text-2xl font-semibold tracking-tight">Sitios de disposición</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Destinos de disposición final que pueden referenciar los registros de recolección.</p></div>{canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nuevo sitio de disposición"}</Button> : null}</div>
+      <CatalogPageHeader
+        title="Sitios de disposición"
+        titleId="disposal-sites-title"
+        description="Destinos de disposición final que pueden referenciar los registros de recolección."
+        actions={canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nuevo sitio de disposición"}</Button> : null}
+      />
       {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Esta sesión puede consultar el catálogo, pero no administrarlo.</p> : null}
       {message ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{message}</p> : null}
       {showCreate && canManage ? <form onSubmit={submitCreate} className="rounded-xl border border-border bg-card p-5"><h2 className="text-lg font-semibold">Alta de sitio de disposición</h2><p className="mt-1 text-sm text-muted-foreground">El sitio podrá ser referenciado por registros de recolección existentes y futuros.</p><FieldGroup className="mt-5 grid gap-4 md:grid-cols-3"><Field><FieldLabel htmlFor="disposal-site-code">Código</FieldLabel><input id="disposal-site-code" className={formControlClass} required value={createDraft.code} aria-invalid={Boolean(createError)} aria-describedby={createError ? "disposal-site-code-error" : undefined} onChange={(event) => setCreateDraft({ ...createDraft, code: event.target.value })} /><FieldError id="disposal-site-code-error">{createError}</FieldError></Field><Field><FieldLabel htmlFor="disposal-site-name">Nombre</FieldLabel><input id="disposal-site-name" className={formControlClass} required value={createDraft.name} onChange={(event) => setCreateDraft({ ...createDraft, name: event.target.value })} /></Field><Field><FieldLabel htmlFor="disposal-site-type">Tipo</FieldLabel><select id="disposal-site-type" className={formControlClass} value={createDraft.siteType} onChange={(event) => { const parsed = disposalSiteTypeSchema.safeParse(event.target.value); if (parsed.success) setCreateDraft({ ...createDraft, siteType: parsed.data }); }}>{siteTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field></FieldGroup><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button><Button type="submit">Crear sitio</Button></div></form> : null}
