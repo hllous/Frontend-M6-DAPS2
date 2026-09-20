@@ -17,6 +17,7 @@ import {
   type ServiceTypeMode,
 } from "@/lib/service-types";
 import type { OperationalScenario } from "@/lib/scenarios";
+import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 const categories: Array<{ value: ServiceTypeCategory; label: string }> = [
   { value: "WASTE_COLLECTION", label: "Recolección" },
@@ -146,7 +147,7 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
       ) : null}
 
       <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[minmax(220px,1fr)_160px_190px_150px]">
-        <label className="flex flex-col gap-1 text-sm font-semibold">Buscar<input aria-label="Buscar tipos de servicio" className={formControlClass} placeholder="Código o nombre" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">Buscar<input aria-label="Buscar tipos de servicio" className={formControlClass} placeholder="Código o nombre" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => setSearch(event.target.value)} /></label>
         <label className="flex flex-col gap-1 text-sm font-semibold">Estado<select aria-label="Filtrar por estado" className={formControlClass} value={active} onChange={(event) => setActive(event.target.value)}><option value="all">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select></label>
         <label className="flex flex-col gap-1 text-sm font-semibold">Categoría<select aria-label="Filtrar por categoría" className={formControlClass} value={category} onChange={(event) => setCategory(event.target.value as ServiceTypeCategory | "")}><option value="">Todas</option>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         <label className="flex flex-col gap-1 text-sm font-semibold">Modo<select aria-label="Filtrar por modo" className={formControlClass} value={mode} onChange={(event) => setMode(event.target.value as ServiceTypeMode | "")}><option value="">Todos</option>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>

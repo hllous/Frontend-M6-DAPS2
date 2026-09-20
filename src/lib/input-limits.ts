@@ -8,6 +8,8 @@ export const MAX_EXTERNAL_ID_LENGTH = 100;
 export const MAX_NOTES_LENGTH = 2000;
 export const MAX_REASON_LENGTH = 500;
 export const MAX_ARRAY_ITEMS = 100;
+// CreateServiceDto limita `ticketId` a 64 (mas estricto que el resto de los ids externos).
+export const MAX_TICKET_ID_LENGTH = 64;
 
 export const MAX_INT32 = 2147483647;
 // Decimal(10,2): capacity, areaM2, weightKg, volumeM3.
@@ -55,6 +57,17 @@ export const externalIdInput = (message = "El identificador es obligatorio.") =>
     .trim()
     .min(1, message)
     .max(MAX_EXTERNAL_ID_LENGTH, `El identificador no puede superar los ${MAX_EXTERNAL_ID_LENGTH} caracteres.`);
+
+/** Lista de ids externos: hasta 100 elementos y 100 caracteres cada uno. */
+export const externalIdListInput = (options: { itemMessage?: string; emptyMessage?: string } = {}) =>
+  z
+    .array(externalIdInput(options.itemMessage))
+    .min(1, options.emptyMessage ?? "Seleccione al menos un elemento.")
+    .max(MAX_ARRAY_ITEMS, `No puede seleccionar más de ${MAX_ARRAY_ITEMS} elementos.`);
+
+/** Motivo de un cambio de estado (cancelar, reprogramar, aviso de demora). */
+export const reasonInput = (requiredMessage: string) =>
+  z.string().trim().min(1, requiredMessage).max(MAX_REASON_LENGTH, `El motivo no puede superar los ${MAX_REASON_LENGTH} caracteres.`);
 
 /** Fija `page` dentro de 1..MAX_PAGE; un valor no numerico se descarta (default del backend). */
 export function clampPage(value: number): number | undefined {

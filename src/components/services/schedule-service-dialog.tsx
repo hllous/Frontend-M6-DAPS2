@@ -26,6 +26,7 @@ import {
 } from "@/lib/services";
 import { zoneFixtures } from "@/lib/zones-fixtures";
 import { cn } from "@/lib/utils";
+import { MAX_NOTES_LENGTH } from "@/lib/input-limits";
 
 interface ScheduleServiceDialogProps {
   open: boolean;
@@ -470,6 +471,7 @@ export function ScheduleServiceDialog({
             <textarea
               id="service-notes"
               rows={2}
+              maxLength={MAX_NOTES_LENGTH}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Instrucciones especiales para la cuadrilla o restricciones de acceso…"

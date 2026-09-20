@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { externalIdInput, externalIdListInput } from "@/lib/input-limits";
 
 export const crewTypeSchema = z.enum(["MUNICIPAL", "COOPERATIVE", "CONTRACTOR"]);
 export const shiftSchema = z.enum(["MORNING", "AFTERNOON", "NIGHT"]);
@@ -19,12 +20,12 @@ export type CrewQuery = { active?: boolean; crewType?: CrewType; defaultShift?: 
 export type CrewsPage = { crews: Crew[]; page: number; pageSize: number; total: number; totalPages: number };
 
 export const createCrewInputSchema = z.object({
-  name: z.string().trim().min(1, "El nombre es obligatorio."), crewType: crewTypeSchema, leaderUserId: z.string().min(1), organizationId: z.string().min(1), defaultShift: shiftSchema,
+  name: z.string().trim().min(1, "El nombre es obligatorio."), crewType: crewTypeSchema, leaderUserId: externalIdInput(), organizationId: externalIdInput(), defaultShift: shiftSchema,
 });
 export type CreateCrewInput = z.infer<typeof createCrewInputSchema>;
 export const updateCrewInputSchema = createCrewInputSchema.extend({ active: z.boolean() }).strict();
 export type UpdateCrewInput = z.infer<typeof updateCrewInputSchema>;
-export const addCrewMembersInputSchema = z.object({ memberUserIds: z.array(z.string().min(1)).min(1) }).strict();
+export const addCrewMembersInputSchema = z.object({ memberUserIds: externalIdListInput({ emptyMessage: "Seleccione al menos un integrante." }) }).strict();
 export type AddCrewMembersInput = z.infer<typeof addCrewMembersInputSchema>;
 
 export class CrewContractError extends Error { constructor(message: string, options?: { cause?: unknown }) { super(message, options); this.name = "CrewContractError"; } }

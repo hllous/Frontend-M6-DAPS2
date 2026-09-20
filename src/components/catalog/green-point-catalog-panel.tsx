@@ -24,6 +24,7 @@ import {
 } from "@/lib/green-points";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";
+import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 const wasteTypes = wasteTypeSchema.options;
 
@@ -211,7 +212,7 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
       {notice ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{notice}</p> : null}
 
       <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[minmax(220px,1fr)_180px_190px_150px]">
-        <label className="flex flex-col gap-1 text-sm font-semibold">Buscar por nombre o dirección<input aria-label="Buscar punto verde" className={formControlClass} placeholder="Nombre o dirección" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">Buscar por nombre o dirección<input aria-label="Buscar punto verde" className={formControlClass} placeholder="Nombre o dirección" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => setSearch(event.target.value)} /></label>
         <label className="flex flex-col gap-1 text-sm font-semibold">Zona<select aria-label="Filtrar puntos verdes por zona" className={formControlClass} value={zoneFilter} onChange={(event) => setZoneFilter(event.target.value)}><option value="all">Todas</option>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}</select></label>
         <label className="flex flex-col gap-1 text-sm font-semibold">Residuo aceptado<select aria-label="Filtrar puntos verdes por residuo" className={formControlClass} value={wasteTypeFilter} onChange={(event) => setWasteTypeFilter(event.target.value as WasteType | "all")}><option value="all">Todos</option>{wasteTypes.map((type) => <option key={type} value={type}>{WASTE_TYPE_LABELS[type]}</option>)}</select></label>
         <label className="flex flex-col gap-1 text-sm font-semibold">Estado<select aria-label="Filtrar puntos verdes por estado" className={formControlClass} value={activeFilter} onChange={(event) => setActiveFilter(event.target.value as "all" | "true" | "false")}><option value="all">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select></label>
