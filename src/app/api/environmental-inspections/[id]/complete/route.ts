@@ -52,7 +52,7 @@ export async function POST(
     const session = getRequiredSession(request);
     const scenario = getScenario(session.scenarioId);
     if (!scenario.capabilities.includes("environmentalInspection:execute")) {
-      return errorResponse(403, "Solo la persona responsable de la cuadrilla puede completar la inspecciÃ³n.", path);
+      return errorResponse(403, "Solo la persona responsable de la cuadrilla puede completar la inspección.", path);
     }
 
     const requestBody = await request.text();
@@ -60,7 +60,7 @@ export async function POST(
     try {
       parsedBody = JSON.parse(requestBody);
     } catch {
-      return errorResponse(400, "El cuerpo de la solicitud debe ser un JSON vÃ¡lido.", path);
+      return errorResponse(400, "El cuerpo de la solicitud debe ser un JSON válido.", path);
     }
     const parsedInput = environmentalInspectionCompleteInputSchema.safeParse(parsedBody);
     if (!parsedInput.success) {
@@ -96,14 +96,14 @@ export async function POST(
     }
 
     const inspection = getEnvironmentalInspectionFixture(id);
-    if (!inspection) return errorResponse(404, "InspecciÃ³n no encontrada.", path);
+    if (!inspection) return errorResponse(404, "Inspección no encontrada.", path);
     const service = inspection.serviceId ? serviceFixtures.find((candidate) => candidate.id === inspection.serviceId) : null;
-    if (!service) return errorResponse(409, "La inspecciÃ³n no tiene un servicio operativo vinculado.", path);
+    if (!service) return errorResponse(409, "La inspección no tiene un servicio operativo vinculado.", path);
     if (scenario.actor.kind === "FIELD" && scenario.actor.crewId && service.crewId !== scenario.actor.crewId) {
-      return errorResponse(403, "Solo la cuadrilla asignada puede completar esta inspecciÃ³n.", path);
+      return errorResponse(403, "Solo la cuadrilla asignada puede completar esta inspección.", path);
     }
     if (service.status !== "IN_PROGRESS") {
-      return errorResponse(409, `La inspecciÃ³n solo puede completarse con el servicio en curso (estado actual: ${service.status}).`, path);
+      return errorResponse(409, `La inspección solo puede completarse con el servicio en curso (estado actual: ${service.status}).`, path);
     }
     if (parsedInput.data.outcome !== "NO_VIOLATION" && !(inspection.attachments?.length ?? 0)) {
       return errorResponse(400, "Debe adjuntar al menos una evidencia para este resultado.", path);
@@ -124,7 +124,7 @@ export async function POST(
       outcome: parsedInput.data.outcome,
       nextStep: parsedInput.data.nextStep ?? nextStepForOutcome(parsedInput.data.outcome),
     });
-    if (!updatedInspection) return errorResponse(404, "InspecciÃ³n no encontrada.", path);
+    if (!updatedInspection) return errorResponse(404, "Inspección no encontrada.", path);
 
     transitionEnvironmentalReportFixture(
       inspection.reportId,
@@ -144,9 +144,9 @@ export async function POST(
   } catch (error) {
     if (error instanceof InvalidSessionError) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesiÃ³n no estÃ¡ activa.", path);
+      return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo completar la inspecciÃ³n.", path);
+    return errorResponse(500, "No se pudo completar la inspección.", path);
   }
 }
