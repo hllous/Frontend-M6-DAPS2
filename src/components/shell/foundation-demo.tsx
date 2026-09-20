@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
-import { authenticatedFetch } from "@/lib/authenticated-fetch";
+import { authenticatedFetch, NetworkFailureError } from "@/lib/authenticated-fetch";
 import { loadScenario, ScenarioRequestError } from "@/lib/scenario-client";
 import type { OperationalScenario, ScenarioId } from "@/lib/scenarios";
 import { onRemoteLogout } from "@/lib/session-client";
@@ -15,8 +15,16 @@ type LoadState =
   | { status: "loading" }
   | { status: "unauthenticated" }
   | { status: "forbidden" }
-  | { status: "error" }
+  | { status: "error"; description?: string }
   | { status: "ready"; scenario: OperationalScenario };
+
+function errorDescription(caught: unknown): string | undefined {
+  if (caught instanceof NetworkFailureError) return caught.message;
+  if (caught instanceof ScenarioRequestError && caught.status >= 500) {
+    return `${caught.message} Reintente en unos minutos.`;
+  }
+  return undefined;
+}
 
 export function FoundationDemo({
   scenarioId,
@@ -71,7 +79,7 @@ export function FoundationDemo({
           setState({ status: "forbidden" });
           return;
         }
-        setState({ status: "error" });
+        setState({ status: "error", description: errorDescription(caught) });
       }
     }
     void requestScenario();
@@ -84,7 +92,7 @@ export function FoundationDemo({
 
   if (state.status === "unauthenticated") return <main className="p-6"><ShellUnauthenticated /></main>;
   if (state.status === "forbidden") return <main className="p-6"><ShellForbidden /></main>;
-  if (state.status === "error") return <main className="p-6"><ShellError onRetry={retry} /></main>;
+  if (state.status === "error") return <main className="p-6"><ShellError onRetry={retry} description={state.description} /></main>;
   if (state.status === "loading") return <main className="p-6"><ShellLoading /></main>;
   return (
     <AppShell scenario={state.scenario} logoutAction={logoutAction} routeContent={children} />
