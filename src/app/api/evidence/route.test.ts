@@ -264,6 +264,27 @@ describe("POST /api/evidence BFF route", () => {
     expect(zr?.attachments[0].filename).toBe("Foto_Calle_Con_Agua_12_final.jpg");
   });
 
+  it("forwards only the UploadEvidenceDto fields to the backend (no fileName or fileSize)", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    let sentKeys: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      sentKeys = [...(init?.body as FormData).keys()];
+      return new Response(JSON.stringify({ id: "att-1" }), { status: 201, headers: { "content-type": "application/json" } });
+    });
+    const formData = new FormData();
+    formData.append("file", new File(["img"], "acta.png", { type: "image/png" }));
+    formData.append("fileName", "acta.png");
+    formData.append("fileSize", "3");
+    formData.append("ownerType", "INSPECTION");
+    formData.append("ownerId", "8d5bc42e-b6e5-404e-aea4-b1654f6c6baa");
+
+    const response = await POST(new Request("http://localhost/api/evidence", { method: "POST", headers: { cookie, "Idempotency-Key": "idemp-backend-1" }, body: formData }));
+
+    expect(response.status).toBe(201);
+    expect(sentKeys).toEqual(["file", "ownerType", "ownerId"]);
+  });
+
   it("returns cached existing attachment when same Idempotency-Key is reused", async () => {
     addZoneResultFixture({
       id: "ZR-TEST-2",
