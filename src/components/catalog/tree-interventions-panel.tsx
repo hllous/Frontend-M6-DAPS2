@@ -13,7 +13,8 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateStreetClosureRequestDialog } from "@/components/services/create-street-closure-request-dialog";
-import { SERVICE_TYPE_CATALOG, servicesAdapter, type CreateServiceInput } from "@/lib/services";
+import { servicesAdapter, type CreateServiceInput } from "@/lib/services";
+import { resolveServiceType, TREE_PRUNING_SERVICE_TYPE_RULE } from "@/lib/service-types";
 import { treeInterventionCreateInputSchema, treeInterventionsAdapter, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
 import type { OperationalScenario } from "@/lib/scenarios";
 import type { Tree } from "@/lib/trees";
@@ -265,9 +266,10 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           setActionError("No se pudo determinar la zona operativa del árbol seleccionado.");
           return;
         }
+        const serviceType = await resolveServiceType(TREE_PRUNING_SERVICE_TYPE_RULE);
         const serviceInput: CreateServiceInput = {
           title: `${TREE_INTERVENTION_LABELS[detail.interventionType]} · ${detail.address}`,
-          serviceTypeId: SERVICE_TYPE_CATALOG.find((serviceType) => serviceType.id === "st-tree-pruning")?.id ?? "st-tree-pruning",
+          serviceTypeId: serviceType.id,
           origin: "MANUAL",
           zoneIds: [firstTree.zoneId],
           targetType: "TREE",
