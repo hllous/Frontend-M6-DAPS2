@@ -52,6 +52,9 @@ describe("POST /api/environmental-inspections/:id/complete", () => {
       outcome: "VIOLATION_FOUND",
       nextStep: "NOTICE_TO_BE_ISSUED",
       findings: "Emisión visible",
+      violationType: "AIR_EMISSION",
+      severity: "HIGH",
+      suggestedAction: "FORMAL_NOTICE",
       checklist: [{ itemCode: "source", label: "Verificar la fuente observada", result: true }],
     });
   });

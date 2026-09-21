@@ -210,6 +210,8 @@ export async function POST(request: Request) {
       vehicleId: null,
       vehiclePlate: null,
       ticketId: input.origin === "TICKET" ? (input.ticketId ?? null) : null,
+      inspectionId: input.origin === "INSPECTION" ? (input.inspectionId ?? null) : null,
+      weatherAlertId: input.origin === "WEATHER_ALERT" ? (input.weatherAlertId ?? null) : null,
       notes: input.notes ?? null,
       coordinates: { x: 50, y: 50 },
       attachments: [],

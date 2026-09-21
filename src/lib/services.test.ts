@@ -9,6 +9,7 @@ import {
   BackendServiceZoneSelectionError,
   checkAssignmentConflicts,
   confirmRescheduleInputSchema,
+  createServiceInputSchema,
   checkServiceWindowTiming,
   ServiceContractError,
   ServiceRequestError,
@@ -57,8 +58,31 @@ describe("service backend input mapping", () => {
       windowFrom: "08:00",
       windowTo: "12:00",
       ticketId: undefined,
+      inspectionId: "inspection-1",
       notes: undefined,
     });
+  });
+
+  it("sends each link only with its own origin, trimmed (#289)", () => {
+    const links = { inspectionId: " 3f2b8c1e-4d5a-4e6f-8a9b-0c1d2e3f4a5b ", weatherAlertId: " ALERT-7 " };
+    const byOrigin = (origin: "INSPECTION" | "WEATHER_ALERT" | "PLANNED") => {
+      const mapped = toCreateServiceBackendInput({ ...baseInput, ...links, origin });
+      return { inspectionId: mapped.inspectionId, weatherAlertId: mapped.weatherAlertId };
+    };
+
+    expect(byOrigin("INSPECTION")).toEqual({ inspectionId: "3f2b8c1e-4d5a-4e6f-8a9b-0c1d2e3f4a5b", weatherAlertId: undefined });
+    expect(byOrigin("WEATHER_ALERT")).toEqual({ inspectionId: undefined, weatherAlertId: "ALERT-7" });
+    expect(byOrigin("PLANNED")).toEqual({ inspectionId: undefined, weatherAlertId: undefined });
+    expect(toCreateServiceBackendInput({ ...baseInput, origin: "WEATHER_ALERT", weatherAlertId: "   " }).weatherAlertId).toBeUndefined();
+  });
+
+  it("requires a UUID inspectionId and caps weatherAlertId like the backend (#289)", () => {
+    const base = { ...baseInput, origin: "INSPECTION" as const };
+    expect(createServiceInputSchema.safeParse({ ...base, inspectionId: "INSP-12" }).success).toBe(false);
+    expect(createServiceInputSchema.safeParse({ ...base, inspectionId: "3f2b8c1e-4d5a-4e6f-8a9b-0c1d2e3f4a5b" }).success).toBe(true);
+    const alert = { ...baseInput, origin: "WEATHER_ALERT" as const };
+    expect(createServiceInputSchema.safeParse({ ...alert, weatherAlertId: "A".repeat(100) }).success).toBe(true);
+    expect(createServiceInputSchema.safeParse({ ...alert, weatherAlertId: "A".repeat(101) }).success).toBe(false);
   });
 
   it("sends a loose target as a zone with the text kept in the notes", () => {

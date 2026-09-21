@@ -78,15 +78,12 @@ type RuntimeEnvironment = {
 const localSessionSecret = "m6-local-development-session-secret";
 
 export function getAuthMode(environment: RuntimeEnvironment = process.env): AuthMode {
-  if (environment.NODE_ENV === "production") return "real-m1";
-  const configuredMode = environment.M6_AUTH_MODE ??
-    "mock";
-
+  const configuredMode = environment.M6_AUTH_MODE;
   if (configuredMode === "mock" || configuredMode === "backend-development" || configuredMode === "real-m1") {
     return configuredMode;
   }
 
-  return "real-m1";
+  return environment.NODE_ENV === "production" ? "real-m1" : "mock";
 }
 
 export function createSession(

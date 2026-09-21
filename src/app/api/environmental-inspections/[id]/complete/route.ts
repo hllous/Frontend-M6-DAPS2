@@ -6,7 +6,7 @@ import {
   transitionEnvironmentalReportFixture,
   updateEnvironmentalInspectionFixture,
 } from "@/lib/environmental-report-fixtures";
-import { environmentalInspectionCompleteInputSchema } from "@/lib/environmental-reports";
+import { environmentalInspectionCompleteInputSchema, inspectionChecklist } from "@/lib/environmental-reports";
 import { serviceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
@@ -73,6 +73,10 @@ export async function POST(
         outcome: parsedInput.data.outcome,
         ...(parsedInput.data.nextStep ? { nextStep: parsedInput.data.nextStep } : {}),
         ...(parsedInput.data.findings ? { findings: parsedInput.data.findings } : {}),
+        ...(parsedInput.data.conclusion ? { conclusion: parsedInput.data.conclusion } : {}),
+        ...(parsedInput.data.violationType ? { violationType: parsedInput.data.violationType } : {}),
+        ...(parsedInput.data.severity ? { severity: parsedInput.data.severity } : {}),
+        ...(parsedInput.data.suggestedAction ? { suggestedAction: parsedInput.data.suggestedAction } : {}),
         checklist: parsedInput.data.checklist.map((item) => ({
           itemCode: item.id,
           label: item.label,
@@ -108,19 +112,19 @@ export async function POST(
     if (parsedInput.data.outcome !== "NO_VIOLATION" && !(inspection.attachments?.length ?? 0)) {
       return errorResponse(400, "Debe adjuntar al menos una evidencia para este resultado.", path);
     }
-    const expectedChecklistIds = new Set(inspection.checklist.map((item) => item.id));
+    const expectedChecklistIds = new Set(inspectionChecklist(inspection).map((item) => item.id));
     if (parsedInput.data.checklist.length !== expectedChecklistIds.size || parsedInput.data.checklist.some((item) => !expectedChecklistIds.has(item.id))) {
       return errorResponse(400, "El checklist enviado no coincide con el checklist asignado.", path);
     }
 
     const updatedInspection = updateEnvironmentalInspectionFixture(id, {
       inspectedAt: parsedInput.data.inspectedAt,
-      checklist: inspection.checklist,
+      checklist: inspectionChecklist(inspection),
       findings: parsedInput.data.findings ?? null,
       violationType: parsedInput.data.violationType ?? null,
       severity: parsedInput.data.severity ?? null,
       suggestedAction: parsedInput.data.suggestedAction ?? null,
-      notes: parsedInput.data.conclusion ?? inspection.notes,
+      conclusion: parsedInput.data.conclusion ?? inspection.conclusion,
       outcome: parsedInput.data.outcome,
       nextStep: parsedInput.data.nextStep ?? nextStepForOutcome(parsedInput.data.outcome),
     });

@@ -24,6 +24,7 @@ import {
   environmentalInspectionSuggestedActionSchema,
   environmentalInspectionViolationTypeSchema,
   environmentalReportsAdapter,
+  inspectionChecklist,
   type EnvironmentalInspection,
   type EnvironmentalInspectionCompleteInput,
 } from "@/lib/environmental-reports";
@@ -121,7 +122,7 @@ function resultPayload(
     inspectedAt: Number.isNaN(inspectionDate.getTime()) ? inspectedAt : inspectionDate.toISOString(),
     outcome,
     ...(outcome === "VIOLATION_FOUND" ? { nextStep: "NOTICE_TO_BE_ISSUED" as const } : {}),
-    checklist: inspection.checklist.map((item) => ({ id: item.id, label: item.label, completed: checkedItems[item.id] === true })),
+    checklist: inspectionChecklist(inspection).map((item) => ({ id: item.id, label: item.label, completed: checkedItems[item.id] === true })),
     ...(conclusion.trim() ? { conclusion: conclusion.trim() } : {}),
     ...(findings.trim() ? { findings: findings.trim() } : {}),
     ...(violationType ? { violationType } : {}),
@@ -178,7 +179,7 @@ export function InspectionExecutionPanel({
         if (!current) return;
         setInspection(loaded);
         if (!savedDraft) {
-          setCheckedItems(Object.fromEntries(loaded.checklist.map((item) => [item.id, false])));
+          setCheckedItems(Object.fromEntries(inspectionChecklist(loaded).map((item) => [item.id, false])));
         }
       })
       .catch((error: unknown) => {
@@ -291,7 +292,7 @@ export function InspectionExecutionPanel({
     setConflict(null);
     setOutcome("NO_VIOLATION");
     setInspectedAt(dateTimeLocalValue());
-    setCheckedItems(Object.fromEntries((inspection?.checklist ?? []).map((item) => [item.id, false])));
+    setCheckedItems(Object.fromEntries((inspection ? inspectionChecklist(inspection) : []).map((item) => [item.id, false])));
     setConclusion("");
     setFindings("");
     setViolationType(undefined);
@@ -310,7 +311,7 @@ export function InspectionExecutionPanel({
 
   const completed = Boolean(inspection.outcome);
   const hasDraft = Boolean(composedAgainst);
-  const checklistComplete = inspection.checklist.every((item) => checkedItems[item.id] === true);
+  const checklistComplete = inspectionChecklist(inspection).every((item) => checkedItems[item.id] === true);
 
   return (
     <section className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" role="region" aria-labelledby={`inspection-execution-heading-${inputId}`}>
@@ -318,7 +319,7 @@ export function InspectionExecutionPanel({
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-action)]"><FileCheck aria-hidden />Control ambiental</div>
           <h2 id={`inspection-execution-heading-${inputId}`} className="mt-1 text-lg font-bold text-[var(--color-text)]">Ejecución de inspección ambiental</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · Checklist {inspection.checklistVersion} · {inspection.scheduledDate}</p>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · Checklist {inspection.checklistVersion ?? "—"} · {inspection.scheduledDate ?? inspection.inspectedAt ?? "—"}</p>
         </div>
         <span className="rounded-lg bg-[var(--color-info-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-info)]">Punto asignado</span>
       </div>
@@ -352,7 +353,7 @@ export function InspectionExecutionPanel({
             <fieldset className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] p-4">
               <legend className="px-1 text-sm font-semibold text-[var(--color-text)]">Checklist de inspección <span aria-hidden="true">*</span></legend>
               <p className="text-xs text-[var(--color-text-secondary)]">Marque cada control realizado antes de registrar el resultado.</p>
-              {inspection.checklist.map((item) => {
+              {inspectionChecklist(inspection).map((item) => {
                 const checkboxId = `${inputId}-check-${item.id}`;
                 return <label key={item.id} htmlFor={checkboxId} className="flex min-h-12 items-center gap-3 text-sm text-[var(--color-text)]"><input id={checkboxId} type="checkbox" checked={checkedItems[item.id] === true} onChange={(event) => setCheckedItems((current) => ({ ...current, [item.id]: event.target.checked }))} disabled={!canExecute || isSubmitting} className="size-5 accent-[var(--color-action)]" />{item.label}{item.required ? <span className="text-xs text-[var(--color-text-secondary)]">(obligatorio)</span> : null}</label>;
               })}
@@ -390,11 +391,11 @@ export function InspectionExecutionPanel({
 
 function InspectionResult({ inspection }: { inspection: EnvironmentalInspection }) {
   const outcome = inspection.outcome ?? "INCONCLUSIVE";
-  return <div className="mt-5 flex flex-col gap-4"><Alert role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Resultado registrado: {OUTCOME_LABELS[outcome]}</AlertTitle><AlertDescription>El servidor registró la inspección. Siguiente paso: {inspection.nextStep ? NEXT_STEP_LABELS[inspection.nextStep] : "pendiente de confirmación"}.</AlertDescription></Alert><dl className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Checklist</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.checklist.length} controles registrados</dd></div>{inspection.findings && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Hallazgos registrados</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.findings}</dd></div>}{inspection.attachments && inspection.attachments.length > 0 && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Evidencia</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.attachments.length} archivo(s) asociado(s)</dd></div>}</dl></div>;
+  return <div className="mt-5 flex flex-col gap-4"><Alert role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Resultado registrado: {OUTCOME_LABELS[outcome]}</AlertTitle><AlertDescription>El servidor registró la inspección. Siguiente paso: {inspection.nextStep ? NEXT_STEP_LABELS[inspection.nextStep] : "pendiente de confirmación"}.</AlertDescription></Alert><dl className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Checklist</dt><dd className="mt-1 text-[var(--color-text)]">{inspectionChecklist(inspection).length} controles registrados</dd></div>{inspection.findings && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Hallazgos registrados</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.findings}</dd></div>}{inspection.attachments && inspection.attachments.length > 0 && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Evidencia</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.attachments.length} archivo(s) asociado(s)</dd></div>}</dl></div>;
 }
 
 function ReadOnlyInspection({ inspection }: { inspection: EnvironmentalInspection }) {
-  return <div className="mt-5 flex flex-col gap-4"><h3 className="text-sm font-bold text-[var(--color-text)]">Checklist asignado</h3><ul className="flex flex-col gap-2" aria-label="Checklist de inspección en solo consulta">{inspection.checklist.map((item) => <li key={item.id} className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 text-sm text-[var(--color-text)]"><span aria-hidden="true" className="size-3 rounded-full border border-[var(--color-border-strong)]" />{item.label}{item.required ? <span className="text-xs text-[var(--color-text-secondary)]">(obligatorio)</span> : null}</li>)}</ul><p className="text-xs text-[var(--color-text-secondary)]">La persona responsable de la cuadrilla registra el resultado y la evidencia de esta inspección.</p></div>;
+  return <div className="mt-5 flex flex-col gap-4"><h3 className="text-sm font-bold text-[var(--color-text)]">Checklist asignado</h3><ul className="flex flex-col gap-2" aria-label="Checklist de inspección en solo consulta">{inspectionChecklist(inspection).map((item) => <li key={item.id} className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 text-sm text-[var(--color-text)]"><span aria-hidden="true" className="size-3 rounded-full border border-[var(--color-border-strong)]" />{item.label}{item.required ? <span className="text-xs text-[var(--color-text-secondary)]">(obligatorio)</span> : null}</li>)}</ul><p className="text-xs text-[var(--color-text-secondary)]">La persona responsable de la cuadrilla registra el resultado y la evidencia de esta inspección.</p></div>;
 }
 
 function EvidenceQueue({ queuedFiles, fileValidationError, onFileSelect, onRemoveFile, onRetryFile, disabled, existingCount }: { queuedFiles: QueuedEvidenceFile[]; fileValidationError: string | null; onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void; onRemoveFile: (id: string) => void; onRetryFile: (file: QueuedEvidenceFile) => void; disabled: boolean; existingCount: number }) {
