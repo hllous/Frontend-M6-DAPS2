@@ -4,6 +4,7 @@ import { fetchBackend } from "@/lib/bff-backend";
 import { getEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
+import { withInspectionAttachments } from "../_attachments";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
 function response(status: number, message: string, path: string) {
@@ -18,8 +19,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     requireCapability(session, "environmentalInspection:view");
     const scenario = getScenario(session.scenarioId);
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, "/environmental-inspections/" + encodeURIComponent(id), "environmentalInspection:view");
-      return new NextResponse(await backendResponse.text(), { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
+      return withInspectionAttachments(request, await fetchBackend(request, "/environmental-inspections/" + encodeURIComponent(id), "environmentalInspection:view"));
     }
     const inspection = getEnvironmentalInspectionFixture(id);
     if (!inspection) return response(404, "Inspección no encontrada.", path);

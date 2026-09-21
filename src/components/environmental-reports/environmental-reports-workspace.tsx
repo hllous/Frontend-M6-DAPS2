@@ -35,6 +35,7 @@ import {
   mergeEnvironmentalReportRead,
   environmentalReportsAdapter,
   EnvironmentalReportRequestError,
+  INSPECTION_CHECKLIST_TEMPLATE,
   type IssueViolationNoticeInput,
   type EnvironmentalInspection,
   type EnvironmentalInspectionScheduleInput,
@@ -44,7 +45,8 @@ import {
   type ViolationNotice,
 } from "@/lib/environmental-reports";
 import { establishmentDirectoryAdapter, type Establishment } from "@/lib/establishment-directory";
-import { CREW_CATALOG, servicesAdapter, type Service } from "@/lib/services";
+import { servicesAdapter, type Service } from "@/lib/services";
+import { crewsAdapter, type Crew } from "@/lib/crews";
 import { ENVIRONMENTAL_INSPECTION_SERVICE_TYPE_RULE, resolveServiceType, ServiceTypeNotFoundError } from "@/lib/service-types";
 import { zonesAdapter, type Zone } from "@/lib/zones";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
@@ -65,11 +67,6 @@ const reportTypes = environmentalReportTypeSchema.options;
 const inspectionChecklistVersions = [
   { value: "ambiental-v1", label: "Checklist ambiental v1" },
   { value: "ambiental-v2", label: "Checklist ambiental v2 (actualizado)" },
-];
-const inspectionChecklist = [
-  { id: "location", label: "Verificar ubicación y contexto del hallazgo", required: true },
-  { id: "source", label: "Identificar la fuente del impacto", required: true },
-  { id: "evidence", label: "Registrar observaciones para el acta", required: true },
 ];
 const violationTypeLabels: Record<string, string> = {
   NOISE_LIMIT: "Límite de ruido",
@@ -670,6 +667,7 @@ function InspectionSchedulingDialog({ open, mode, activeInspection, onOpenChange
   const [crewId, setCrewId] = useState("");
   const [zoneId, setZoneId] = useState("");
   const [zones, setZones] = useState<Zone[]>([]);
+  const [crews, setCrews] = useState<Crew[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -678,6 +676,11 @@ function InspectionSchedulingDialog({ open, mode, activeInspection, onOpenChange
     zonesAdapter
       .list({ active: true, pageSize: 100 })
       .then((page) => { if (active) setZones(page.zones.filter((zone) => zone.active)); })
+      .catch(() => undefined);
+    // Cuadrillas reales: assign-crew del backend exige un UUID, no los ids de CREW_CATALOG.
+    crewsAdapter
+      .list({ active: true, pageSize: 100 })
+      .then((page) => { if (active) setCrews(page.crews); })
       .catch(() => undefined);
     return () => { active = false; };
   }, []);
@@ -688,7 +691,7 @@ function InspectionSchedulingDialog({ open, mode, activeInspection, onOpenChange
     setSubmitting(true);
     setError(null);
     try {
-      await onSubmit({ scheduledDate: date, timeWindow: { start, end }, zoneId, checklistVersion: activeInspection?.checklistVersion ?? inspectionChecklistVersions[1].value, checklist: activeInspection?.checklist ?? inspectionChecklist }, crewId);
+      await onSubmit({ scheduledDate: date, timeWindow: { start, end }, zoneId, checklistVersion: activeInspection?.checklistVersion ?? inspectionChecklistVersions[1].value, checklist: activeInspection?.checklist ?? [...INSPECTION_CHECKLIST_TEMPLATE] }, crewId);
       setDate("");
       setCrewId("");
       setZoneId("");
@@ -699,7 +702,7 @@ function InspectionSchedulingDialog({ open, mode, activeInspection, onOpenChange
     }
   }
 
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-lg"><DialogHeader><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-action)]"><CalendarDays aria-hidden />Programación operativa</div><DialogTitle>{mode === "reinspection" ? "Programar reinspección" : activeInspection ? "Reprogramar inspección" : "Programar inspección"}</DialogTitle><DialogDescription>{mode === "reinspection" ? "La inspección anterior fue inconclusa. Se creará una nueva inspección con su propio Servicio POINT." : "Defina fecha y cuadrilla. El checklist se captura en la inspección y el modo POINT se asigna automáticamente."}</DialogDescription></DialogHeader>{error && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{error}</div>}<form id="inspection-scheduling-form" onSubmit={submit}><FieldGroup><Field><FieldLabel htmlFor="inspection-scheduled-date">Fecha de inspección</FieldLabel><input id="inspection-scheduled-date" aria-required="true" type="date" value={date} onChange={(event) => setDate(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="inspection-time-start">Inicio</FieldLabel><input id="inspection-time-start" type="time" value={start} onChange={(event) => setStart(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field><Field><FieldLabel htmlFor="inspection-time-end">Fin</FieldLabel><input id="inspection-time-end" type="time" value={end} onChange={(event) => setEnd(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field></div><Field><FieldLabel htmlFor="inspection-checklist-version">Versión del checklist</FieldLabel><select id="inspection-checklist-version" value={activeInspection?.checklistVersion ?? inspectionChecklistVersions[1].value} disabled className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface-subtle)] px-3 text-base text-[var(--color-text)]">{inspectionChecklistVersions.map((version) => <option key={version.value} value={version.value}>{version.label}</option>)}</select><FieldDescription>La versión queda capturada en la inspección y no se elige para el Servicio POINT.</FieldDescription></Field><Field><FieldLabel htmlFor="inspection-zone">Zona operativa</FieldLabel><select id="inspection-zone" value={zoneId} onChange={(event) => setZoneId(event.target.value)} disabled={submitting} aria-required="true" className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)]"><option value="">Seleccione una zona</option>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} — {zone.name}</option>)}</select></Field><Field><FieldLabel htmlFor="inspection-crew">Cuadrilla</FieldLabel><select id="inspection-crew" value={crewId} onChange={(event) => setCrewId(event.target.value)} disabled={submitting} aria-required="true" className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)]"><option value="">Seleccione una cuadrilla</option>{CREW_CATALOG.map((crew) => <option key={crew.id} value={crew.id}>{crew.name}</option>)}</select></Field></FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button><Button type="submit" form="inspection-scheduling-form" disabled={submitting} className="min-h-10 gap-2">{submitting && <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden />}{submitting ? "Guardando programación…" : mode === "reinspection" ? "Programar reinspección" : activeInspection ? "Guardar reprogramación" : "Programar inspección"}</Button></DialogFooter></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-lg"><DialogHeader><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-action)]"><CalendarDays aria-hidden />Programación operativa</div><DialogTitle>{mode === "reinspection" ? "Programar reinspección" : activeInspection ? "Reprogramar inspección" : "Programar inspección"}</DialogTitle><DialogDescription>{mode === "reinspection" ? "La inspección anterior fue inconclusa. Se creará una nueva inspección con su propio Servicio POINT." : "Defina fecha y cuadrilla. El checklist se captura en la inspección y el modo POINT se asigna automáticamente."}</DialogDescription></DialogHeader>{error && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{error}</div>}<form id="inspection-scheduling-form" onSubmit={submit}><FieldGroup><Field><FieldLabel htmlFor="inspection-scheduled-date">Fecha de inspección</FieldLabel><input id="inspection-scheduled-date" aria-required="true" type="date" value={date} onChange={(event) => setDate(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="inspection-time-start">Inicio</FieldLabel><input id="inspection-time-start" type="time" value={start} onChange={(event) => setStart(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field><Field><FieldLabel htmlFor="inspection-time-end">Fin</FieldLabel><input id="inspection-time-end" type="time" value={end} onChange={(event) => setEnd(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field></div><Field><FieldLabel htmlFor="inspection-checklist-version">Versión del checklist</FieldLabel><select id="inspection-checklist-version" value={activeInspection?.checklistVersion ?? inspectionChecklistVersions[1].value} disabled className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface-subtle)] px-3 text-base text-[var(--color-text)]">{inspectionChecklistVersions.map((version) => <option key={version.value} value={version.value}>{version.label}</option>)}</select><FieldDescription>La versión queda capturada en la inspección y no se elige para el Servicio POINT.</FieldDescription></Field><Field><FieldLabel htmlFor="inspection-zone">Zona operativa</FieldLabel><select id="inspection-zone" value={zoneId} onChange={(event) => setZoneId(event.target.value)} disabled={submitting} aria-required="true" className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)]"><option value="">Seleccione una zona</option>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} — {zone.name}</option>)}</select></Field><Field><FieldLabel htmlFor="inspection-crew">Cuadrilla</FieldLabel><select id="inspection-crew" value={crewId} onChange={(event) => setCrewId(event.target.value)} disabled={submitting} aria-required="true" className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)]"><option value="">Seleccione una cuadrilla</option>{crews.map((crew) => <option key={crew.id} value={crew.id}>{crew.name}</option>)}</select></Field></FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button><Button type="submit" form="inspection-scheduling-form" disabled={submitting} className="min-h-10 gap-2">{submitting && <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden />}{submitting ? "Guardando programación…" : mode === "reinspection" ? "Programar reinspección" : activeInspection ? "Guardar reprogramación" : "Programar inspección"}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function DataField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) { return <div className={wide ? "sm:col-span-2" : ""}><dt className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">{label}</dt><dd className="mt-1 text-sm text-[var(--color-text)]">{value}</dd></div>; }
