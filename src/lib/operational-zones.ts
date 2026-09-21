@@ -155,11 +155,11 @@ export function routeToStopOverlays(route: Route, zones: Zone[]): RouteStopOverl
   return [...route.stops]
     .sort((left, right) => left.sequence - right.sequence)
     .map((stop) => {
-      // Prefer the current catalog record: the backend may embed a stale zone
-      // snapshot in a stop while the catalog already has the canonical code.
-      const zone = zoneById.get(stop.zoneId) ?? stop.zone;
-      const zoneCode = zone?.code ?? stop.zoneId;
-      const zoneName = zone?.name ?? `Zona ${stop.zoneId}`;
+      // Prefer the current catalog record: the stop's zoneCode/zoneName may be a
+      // stale snapshot while the catalog already has the canonical code.
+      const zone = zoneById.get(stop.zoneId);
+      const zoneCode = zone?.code ?? stop.zoneCode;
+      const zoneName = zone?.name ?? stop.zoneName;
 
       return {
         id: stop.id,

@@ -176,16 +176,18 @@ describe("routes adapter", () => {
             stops: [
               {
                 id: "stop-new-1",
-                routeId: params.id,
                 sequence: 1,
                 zoneId: "zone-2",
+                zoneCode: "Z-PAL",
+                zoneName: "Palermo",
                 estimatedDurationMin: 35,
               },
               {
                 id: "stop-new-2",
-                routeId: params.id,
                 sequence: 2,
                 zoneId: "zone-1",
+                zoneCode: "Z-BEL",
+                zoneName: "Belgrano",
                 estimatedDurationMin: 55,
               },
             ],
@@ -273,5 +275,81 @@ describe("routes adapter", () => {
       expect((error as RouteRequestError).status).toBe(400);
       expect((error as RouteRequestError).message).toContain("Una zona no puede repetirse");
     });
+  });
+});
+
+// Contract test (#285): exact shape of backend GET /routes (RouteResponseDto /
+// RouteStopResponseDto). Stops carry flat zoneCode/zoneName and no routeId.
+describe("routes contract with the backend", () => {
+  const backendListResponse = {
+    data: [
+      {
+        id: "0b6f1c8e-2f3a-4c5d-9e7f-1a2b3c4d5e6f",
+        code: "R-01",
+        name: "Recorrido troncal Norte-Centro",
+        active: true,
+        stops: [
+          {
+            id: "5e1d2c3b-4a5f-4e6d-8c7b-9a0f1e2d3c4b",
+            sequence: 1,
+            zoneId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            zoneCode: "Z-BEL",
+            zoneName: "Belgrano",
+            estimatedDurationMin: 90,
+          },
+          {
+            id: "6f2e3d4c-5b6a-4f7e-9d8c-0b1a2f3e4d5c",
+            sequence: 2,
+            zoneId: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+            zoneCode: "Z-PAL",
+            zoneName: "Palermo",
+            estimatedDurationMin: 45,
+          },
+        ],
+        createdAt: "2026-09-02T10:00:00.000Z",
+        updatedAt: "2026-09-02T10:00:00.000Z",
+      },
+      {
+        id: "1c7a2d9f-3e4b-4d6c-8f0e-2b3c4d5e6f7a",
+        code: "R-02",
+        name: "Recorrido sin paradas",
+        active: false,
+        stops: [],
+        createdAt: "2026-09-02T10:00:00.000Z",
+        updatedAt: "2026-09-02T10:00:00.000Z",
+      },
+    ],
+    meta: { total: 2, page: 1, pageSize: 20, totalPages: 1 },
+  };
+
+  it("parses a GET /routes response with and without stops", async () => {
+    server.use(http.get("*/api/routes", () => HttpResponse.json(backendListResponse)));
+
+    const page = await routesAdapter.list();
+
+    expect(page.routes).toHaveLength(2);
+    expect(page.routes[0]?.stops).toEqual(backendListResponse.data[0]?.stops);
+    expect(page.routes[1]?.stops).toEqual([]);
+  });
+
+  it("parses a GET /routes/:id response whose stops carry no routeId", async () => {
+    const [route] = backendListResponse.data;
+    server.use(http.get("*/api/routes/:id", () => HttpResponse.json(route)));
+
+    const detail = await routesAdapter.get(route!.id);
+
+    expect(detail.stops.map((s) => s.zoneName)).toEqual(["Belgrano", "Palermo"]);
+  });
+
+  it("rejects a stop without the flat zone name", async () => {
+    const [route] = backendListResponse.data;
+    const { zoneName: _omitted, ...stopWithoutName } = route!.stops[0]!;
+    server.use(
+      http.get("*/api/routes", () =>
+        HttpResponse.json({ ...backendListResponse, data: [{ ...route, stops: [stopWithoutName] }] }),
+      ),
+    );
+
+    await expect(routesAdapter.list()).rejects.toBeInstanceOf(RouteContractError);
   });
 });
