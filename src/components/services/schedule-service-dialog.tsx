@@ -174,6 +174,11 @@ export function ScheduleServiceDialog({
       return;
     }
 
+    if (origin === "INSPECTION" && !isUuid(referenceId.trim())) {
+      setErrorMessage("El identificador de inspección debe ser el UUID de la inspección.");
+      return;
+    }
+
     if (origin === "WEATHER_ALERT" && !referenceId.trim()) {
       setErrorMessage("El identificador de alerta meteorológica es obligatorio.");
       return;

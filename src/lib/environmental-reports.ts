@@ -3,7 +3,7 @@ import { z } from "zod";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
-import { latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
+import { MAX_NOTES_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
 
 export const environmentalReportTypeSchema = z.enum([
   "NOISE",
@@ -67,7 +67,7 @@ export const createEnvironmentalReportInputSchema = z.object({
   address: z.string().trim().min(1, "Debe indicar la ubicación del hallazgo."),
   lat: latitudeInput(),
   lng: longitudeInput(),
-  description: z.string().trim().min(1, "Debe describir el hallazgo."),
+  description: z.string().trim().min(1, "Debe describir el hallazgo.").max(MAX_NOTES_LENGTH, `La descripción no puede superar los ${MAX_NOTES_LENGTH} caracteres.`),
 });
 export type CreateEnvironmentalReportInput = z.infer<typeof createEnvironmentalReportInputSchema>;
 
@@ -92,7 +92,9 @@ export const environmentalReportSchema = z.object({
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
   location: reportLocationSchema.optional(),
-  description: z.string().optional(),
+  // El backend siempre manda la clave y vale null en los expedientes que abre M2 y en
+  // los creados sin descripción (#289): un solo null tumbaba el listado entero.
+  description: z.string().nullable().optional(),
   details: z.string().optional(),
   publicId: z.string().nullable().optional(),
   ticketId: z.string().nullable().optional(),
