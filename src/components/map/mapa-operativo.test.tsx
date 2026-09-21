@@ -127,7 +127,7 @@ describe("MapaOperativo", () => {
     expect(screen.getByText("Cobertura parcial")).toBeVisible();
   });
 
-  it("renders route stops with their nested zone, sequence and estimated duration", async () => {
+  it("renders route stops with their zone, sequence and estimated duration", async () => {
     const route = {
       id: "route-map",
       code: "R-REC-N",
@@ -136,27 +136,27 @@ describe("MapaOperativo", () => {
       stops: [
         {
           id: "stop-map-1",
-          routeId: "route-map",
           sequence: 1,
           zoneId: "zone-bel",
           estimatedDurationMin: 35,
-          zone: { id: "zone-bel", code: "Z-BEL", name: "Belgrano" },
+          zoneCode: "Z-BEL",
+          zoneName: "Belgrano",
         },
         {
           id: "stop-map-2",
-          routeId: "route-map",
           sequence: 2,
           zoneId: "zone-rec",
           estimatedDurationMin: 40,
-          zone: { id: "zone-rec", code: "Z-REC", name: "Recoleta" },
+          zoneCode: "Z-REC",
+          zoneName: "Recoleta",
         },
         {
           id: "stop-map-3",
-          routeId: "route-map",
           sequence: 3,
           zoneId: "zone-pal",
           estimatedDurationMin: 50,
-          zone: { id: "zone-pal", code: "Z-PAL", name: "Palermo" },
+          zoneCode: "Z-PAL",
+          zoneName: "Palermo",
         },
       ],
     };
@@ -198,7 +198,6 @@ describe("MapaOperativo", () => {
       origin: "PLANNED",
       zoneIds: ["zone-bel", "zone-pal"],
       zoneNames: ["Belgrano", "Palermo"],
-      routeId: "route-map",
       routeName: "Recorrido Norte",
       scheduledDate: "2026-09-10",
       windowFrom: "09:00",

@@ -9,7 +9,7 @@ import {
 import { catalogoDeEtiquetas, componerTituloDeServicio } from "./service-labels";
 import { serviceTypeCategorySchema } from "./service-types";
 import { recordTelemetryEvent } from "./telemetry";
-import { MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
+import { MAX_EXTERNAL_ID_LENGTH, MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
 
 export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
 export type ServiceMode = z.infer<typeof serviceModeSchema>;
@@ -105,6 +105,7 @@ export const serviceSchema = z.object({
   targetId: z.string().nullable().optional(),
   targetRef: z.string().nullable().optional(),
   inspectionId: z.string().nullable().optional(),
+  weatherAlertId: z.string().nullable().optional(),
   scheduledDate: z.string(),
   windowFrom: z.string().nullable().optional(),
   windowTo: z.string().nullable().optional(),
@@ -150,7 +151,7 @@ export const createServiceInputSchema = z
     origin: serviceOriginSchema,
     ticketId: z.string().max(MAX_TICKET_ID_LENGTH, `El ticketId no puede superar los ${MAX_TICKET_ID_LENGTH} caracteres.`).optional(),
     inspectionId: z.string().optional(),
-    weatherAlertId: z.string().optional(),
+    weatherAlertId: z.string().max(MAX_EXTERNAL_ID_LENGTH, `El weatherAlertId no puede superar los ${MAX_EXTERNAL_ID_LENGTH} caracteres.`).optional(),
     routeId: z.string().optional(),
     zoneIds: z.array(z.string()).min(1, "Debe incluir al menos una zona"),
     targetType: z.string().optional(),
@@ -185,6 +186,12 @@ export const createServiceInputSchema = z
         code: z.ZodIssueCode.custom,
         path: ["inspectionId"],
         message: "El inspectionId es obligatorio para origen INSPECTION",
+      });
+    } else if (data.origin === "INSPECTION" && !z.uuid().safeParse(data.inspectionId?.trim()).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["inspectionId"],
+        message: "El inspectionId debe ser el UUID de la inspección.",
       });
     }
     if (data.origin === "WEATHER_ALERT" && (!data.weatherAlertId || !data.weatherAlertId.trim())) {
@@ -228,6 +235,9 @@ export function toCreateServiceBackendInput(input: CreateServiceInput) {
     windowFrom: input.timeWindow.start,
     windowTo: input.timeWindow.end,
     ticketId: input.ticketId,
+    // El backend da 400 si el vínculo llega con otro origen, y guarda null si viene vacío.
+    inspectionId: input.origin === "INSPECTION" ? input.inspectionId?.trim() || undefined : undefined,
+    weatherAlertId: input.origin === "WEATHER_ALERT" ? input.weatherAlertId?.trim() || undefined : undefined,
     notes,
   };
 }

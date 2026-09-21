@@ -277,11 +277,9 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       selectedRoute.stops.map((s, idx) => ({
         tempId: s.id || `stop-draft-${idx}-${Date.now()}`,
         zoneId: s.zoneId,
-        estimatedDurationMin: s.estimatedDurationMin ?? 30,
-        zoneName:
-          s.zone?.name ??
-          (availableZones.find((z) => z.id === s.zoneId)?.name || "Zona no disponible"),
-        zoneCode: s.zone?.code ?? availableZones.find((z) => z.id === s.zoneId)?.code,
+        estimatedDurationMin: s.estimatedDurationMin,
+        zoneName: s.zoneName,
+        zoneCode: s.zoneCode,
       })),
     );
     setNewStopZoneId("");
@@ -591,21 +589,17 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                           </span>
                           <div>
                             <div className="font-medium text-foreground">
-                              {stop.zone?.name ?? "Zona no disponible"}
+                              {stop.zoneName}
                             </div>
-                            {stop.zone?.code && (
-                              <div className="text-xs text-muted-foreground font-mono">
-                                {stop.zone.code}
-                              </div>
-                            )}
+                            <div className="text-xs text-muted-foreground font-mono">
+                              {stop.zoneCode}
+                            </div>
                           </div>
                         </div>
-                        {stop.estimatedDurationMin !== undefined && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
-                            <span>{stop.estimatedDurationMin} min</span>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span>{stop.estimatedDurationMin} min</span>
+                        </div>
                       </div>
                     ))}
                   </div>

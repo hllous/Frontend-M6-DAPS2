@@ -52,7 +52,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const parsed = environmentalInspectionScheduleInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const response = await fetchBackend(request, "/environmental-reports/" + encodeURIComponent(id) + "/inspections", "environmentalInspection:schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
+      // El backend solo acepta serviceId/inspectorId al programar (CreateInspectionDto
+      // con forbidNonWhitelisted): la fecha, la ventana, el checklist y la zona van al
+      // Service, no a la inspección.
+      const response = await fetchBackend(request, "/environmental-reports/" + encodeURIComponent(id) + "/inspections", "environmentalInspection:schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) });
       return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
     }
     const report = getEnvironmentalReportFixture(id);
