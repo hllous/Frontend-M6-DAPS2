@@ -35,17 +35,18 @@ import {
   mergeEnvironmentalReportRead,
   environmentalReportsAdapter,
   EnvironmentalReportRequestError,
-  INSPECTION_CHECKLIST_TEMPLATE,
   type IssueViolationNoticeInput,
   type EnvironmentalInspection,
-  type EnvironmentalInspectionScheduleInput,
   type EnvironmentalReport,
   type EnvironmentalReportType,
   type SanctionOutcomeIntegrationException,
   type ViolationNotice,
 } from "@/lib/environmental-reports";
 import { establishmentDirectoryAdapter, type Establishment } from "@/lib/establishment-directory";
-import { CREW_CATALOG, servicesAdapter, type Service } from "@/lib/services";
+import { servicesAdapter, type Service } from "@/lib/services";
+import { crewsAdapter, type Crew } from "@/lib/crews";
+import { zonesAdapter, type Zone } from "@/lib/zones";
+import { isCoordinateInsideOperationalZone, operationalZoneGeometries } from "@/lib/operational-zones";
 import { ENVIRONMENTAL_INSPECTION_SERVICE_TYPE_RULE, resolveServiceType, ServiceTypeNotFoundError } from "@/lib/service-types";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
 import { getEnvironmentalReportClosure, SANCTION_DECISION_LABELS, type EnvironmentalReportClosure } from "@/lib/sanction-outcomes";
@@ -62,6 +63,16 @@ type LoadState =
 type Action = "start-review" | "forward" | "dismiss" | "close";
 
 const reportTypes = environmentalReportTypeSchema.options;
+// Lo que pide el diálogo: todo va al Servicio POINT, la inspección sólo se da de alta.
+type InspectionSchedulingInput = { scheduledDate: string; timeWindow: { start: string; end: string }; zoneId: string; notes?: string };
+
+/** Zona operativa real que contiene las coordenadas del expediente, si las tiene. */
+function suggestedZoneId(report: EnvironmentalReport, zones: Zone[]): string {
+  if (report.lat == null || report.lng == null) return "";
+  const point: [number, number] = [report.lat, report.lng];
+  const geometry = operationalZoneGeometries.find((candidate) => isCoordinateInsideOperationalZone(point, candidate));
+  return zones.find((zone) => zone.code === geometry?.code)?.id ?? "";
+}
 const violationTypeLabels: Record<string, string> = {
   NOISE_LIMIT: "Límite de ruido",
   ILLEGAL_DUMPING: "Disposición ilegal de residuos",
@@ -385,10 +396,10 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
         ? [{ action: "close", label: "Cerrar expediente", icon: Check, tone: "text-[var(--color-danger)]" }]
         : [];
 
-  async function handleSchedule(input: EnvironmentalInspectionScheduleInput, crewId: string) {
+  async function handleSchedule(input: InspectionSchedulingInput, crewId: string) {
     setScheduleError(null);
     try {
-      const inspection = await environmentalReportsAdapter.schedule(report.id, input);
+      const inspection = await environmentalReportsAdapter.schedule(report.id, {});
       if (inspection.serviceId) {
         setScheduledService(await servicesAdapter.get(inspection.serviceId).catch(() => null));
       } else {
@@ -400,9 +411,9 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
             serviceTypeId: inspectionServiceType.id,
             origin: "INSPECTION",
             inspectionId: inspection.id,
-            zoneIds: ["zone-1"],
-            targetType: "ENVIRONMENTAL_REPORT",
-            targetId: report.id,
+            // Sin objetivo: el backend no tiene ENVIRONMENTAL_REPORT como targetType. La dirección
+            // viaja como texto (el mapper la deja en las notas) y la zona la elige Oficina.
+            zoneIds: [input.zoneId],
             targetRef: reportAddress(report),
             scheduledDate: input.scheduledDate,
             timeWindow: input.timeWindow,
@@ -478,7 +489,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
         {canViewSanctionOutcome && report.sanctionOutcome && <SanctionOutcomePanel outcome={report.sanctionOutcome} />}
       </main>
        <ReportDecisionDialog decision={pendingDecision} reportId={report.id} onOpenChange={(open) => { if (!open) setPendingDecision(null); }} onConfirm={(decision, reason) => onAction(decision, report, reason)} />
-       <InspectionSchedulingDialog open={scheduleOpen} mode={scheduleMode} activeInspection={activeInspection} onOpenChange={setScheduleOpen} onSubmit={handleSchedule} />
+       <InspectionSchedulingDialog open={scheduleOpen} mode={scheduleMode} report={report} activeInspection={activeInspection} onOpenChange={setScheduleOpen} onSubmit={handleSchedule} />
        <IssueViolationNoticeDialog key={`${report.id}-${issueNoticeOpen ? "open" : "closed"}`} open={issueNoticeOpen} inspection={completedViolationInspection} onOpenChange={setIssueNoticeOpen} onSubmit={handleIssueNotice} />
        <CreateRepairRequestDialog
          key={repairRequestInspection?.id ?? "no-inspection"}
@@ -659,23 +670,41 @@ function inspectionAgenda(service: Service): string {
   return `${service.scheduledDate.slice(0, 10)}${window}`;
 }
 
-function InspectionSchedulingDialog({ open, mode, activeInspection, onOpenChange, onSubmit }: { open: boolean; mode: "schedule" | "reinspection"; activeInspection: EnvironmentalInspection | null; onOpenChange: (open: boolean) => void; onSubmit: (input: EnvironmentalInspectionScheduleInput, crewId: string) => Promise<void> }) {
+function InspectionSchedulingDialog({ open, mode, report, activeInspection, onOpenChange, onSubmit }: { open: boolean; mode: "schedule" | "reinspection"; report: EnvironmentalReport; activeInspection: EnvironmentalInspection | null; onOpenChange: (open: boolean) => void; onSubmit: (input: InspectionSchedulingInput, crewId: string) => Promise<void> }) {
   const [date, setDate] = useState("");
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("11:00");
   const [crewId, setCrewId] = useState("");
+  const [chosenZoneId, setChosenZoneId] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
+  const [catalogs, setCatalogs] = useState<{ zones: Zone[]; crews: Crew[] } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Zonas y cuadrillas reales del backend (UUID): no se pueden fijar en el código.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    Promise.all([zonesAdapter.list({ active: true, pageSize: 100 }), crewsAdapter.list({ active: true, pageSize: 100 })])
+      .then(([zones, crews]) => { if (!cancelled) setCatalogs({ zones: zones.zones, crews: crews.crews }); })
+      .catch(() => { if (!cancelled) setError("No se pudieron cargar las zonas y cuadrillas. Cierre el diálogo y reintente."); });
+    return () => { cancelled = true; };
+  }, [open]);
+
+  const zones = catalogs?.zones ?? [];
+  const zoneId = chosenZoneId ?? suggestedZoneId(report, zones);
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!date || !crewId) { setError("Indique la fecha y la cuadrilla para continuar."); return; }
+    if (!date || !zoneId || !crewId) { setError("Indique la fecha, la zona y la cuadrilla para continuar."); return; }
     setSubmitting(true);
     setError(null);
     try {
-      await onSubmit({ scheduledDate: date, timeWindow: { start, end }, checklistVersion: "ambiental-v1", checklist: INSPECTION_CHECKLIST_TEMPLATE.map((item) => ({ ...item })) }, crewId);
+      await onSubmit({ scheduledDate: date, timeWindow: { start, end }, zoneId, notes: notes.trim() || undefined }, crewId);
       setDate("");
       setCrewId("");
+      setChosenZoneId(null);
+      setNotes("");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "No se pudo completar la programación.");
     } finally {
@@ -683,7 +712,7 @@ function InspectionSchedulingDialog({ open, mode, activeInspection, onOpenChange
     }
   }
 
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-lg"><DialogHeader><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-action)]"><CalendarDays aria-hidden />Programación operativa</div><DialogTitle>{mode === "reinspection" ? "Programar reinspección" : activeInspection ? "Reprogramar inspección" : "Programar inspección"}</DialogTitle><DialogDescription>{mode === "reinspection" ? "La inspección anterior fue inconclusa. Se creará una nueva inspección con su propio Servicio POINT." : "Defina fecha y cuadrilla. El checklist se captura en la inspección y el modo POINT se asigna automáticamente."}</DialogDescription></DialogHeader>{error && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{error}</div>}<form id="inspection-scheduling-form" onSubmit={submit}><FieldGroup><Field><FieldLabel htmlFor="inspection-scheduled-date">Fecha de inspección</FieldLabel><input id="inspection-scheduled-date" aria-required="true" type="date" value={date} onChange={(event) => setDate(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="inspection-time-start">Inicio</FieldLabel><input id="inspection-time-start" type="time" value={start} onChange={(event) => setStart(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field><Field><FieldLabel htmlFor="inspection-time-end">Fin</FieldLabel><input id="inspection-time-end" type="time" value={end} onChange={(event) => setEnd(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field></div><Field><FieldLabel htmlFor="inspection-crew">Cuadrilla</FieldLabel><select id="inspection-crew" value={crewId} onChange={(event) => setCrewId(event.target.value)} disabled={submitting} aria-required="true" className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)]"><option value="">Seleccione una cuadrilla</option>{CREW_CATALOG.map((crew) => <option key={crew.id} value={crew.id}>{crew.name}</option>)}</select></Field></FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button><Button type="submit" form="inspection-scheduling-form" disabled={submitting} className="min-h-10 gap-2">{submitting && <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden />}{submitting ? "Guardando programación…" : mode === "reinspection" ? "Programar reinspección" : activeInspection ? "Guardar reprogramación" : "Programar inspección"}</Button></DialogFooter></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-lg"><DialogHeader><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-action)]"><CalendarDays aria-hidden />Programación operativa</div><DialogTitle>{mode === "reinspection" ? "Programar reinspección" : activeInspection ? "Reprogramar inspección" : "Programar inspección"}</DialogTitle><DialogDescription>{mode === "reinspection" ? "La inspección anterior fue inconclusa. Se creará una nueva inspección con su propio Servicio POINT." : "Defina fecha, zona y cuadrilla. El checklist se completa en la inspección y el modo POINT se asigna automáticamente."}</DialogDescription></DialogHeader>{error && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{error}</div>}<form id="inspection-scheduling-form" onSubmit={submit}><FieldGroup><Field><FieldLabel htmlFor="inspection-scheduled-date">Fecha de inspección</FieldLabel><input id="inspection-scheduled-date" aria-required="true" type="date" value={date} onChange={(event) => setDate(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="inspection-time-start">Inicio</FieldLabel><input id="inspection-time-start" type="time" value={start} onChange={(event) => setStart(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field><Field><FieldLabel htmlFor="inspection-time-end">Fin</FieldLabel><input id="inspection-time-end" type="time" value={end} onChange={(event) => setEnd(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field></div><Field><FieldLabel htmlFor="inspection-zone">Zona operativa</FieldLabel><select id="inspection-zone" value={zoneId} onChange={(event) => setChosenZoneId(event.target.value)} disabled={submitting || !catalogs} aria-required="true" className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)]"><option value="">Seleccione una zona</option>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}</select><FieldDescription>{report.lat != null && report.lng != null ? "Se sugiere la zona que contiene la ubicación del expediente." : "El expediente no tiene coordenadas: elija la zona de la dirección."}</FieldDescription></Field><Field><FieldLabel htmlFor="inspection-crew">Cuadrilla</FieldLabel><select id="inspection-crew" value={crewId} onChange={(event) => setCrewId(event.target.value)} disabled={submitting || !catalogs} aria-required="true" className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)]"><option value="">Seleccione una cuadrilla</option>{catalogs?.crews.map((crew) => <option key={crew.id} value={crew.id}>{crew.name}</option>)}</select></Field><Field><FieldLabel htmlFor="inspection-notes">Notas del servicio (opcional)</FieldLabel><textarea id="inspection-notes" value={notes} onChange={(event) => setNotes(event.target.value)} disabled={submitting} maxLength={500} rows={2} className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></Field></FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button><Button type="submit" form="inspection-scheduling-form" disabled={submitting} className="min-h-10 gap-2">{submitting && <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden />}{submitting ? "Guardando programación…" : mode === "reinspection" ? "Programar reinspección" : activeInspection ? "Guardar reprogramación" : "Programar inspección"}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function DataField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) { return <div className={wide ? "sm:col-span-2" : ""}><dt className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">{label}</dt><dd className="mt-1 text-sm text-[var(--color-text)]">{value}</dd></div>; }

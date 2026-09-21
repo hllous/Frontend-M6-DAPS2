@@ -170,14 +170,31 @@ describe("EnvironmentalReportsWorkspace", () => {
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1002" });
     await user.click(within(detail).getByRole("button", { name: "Programar inspección" }));
 
+    const bodies: Record<string, unknown> = {};
+    const capture = ({ request }: { request: Request }) => {
+      const path = new URL(request.url).pathname;
+      if (request.method === "POST" && (path === "/api/services" || path.endsWith("/inspections"))) void request.clone().json().then((body) => { bodies[path] = body; });
+    };
+    server.events.on("request:start", capture);
+
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getByLabelText("Fecha de inspección"), "2026-09-10");
+    await within(dialog).findByRole("option", { name: "Palermo" });
+    await user.selectOptions(within(dialog).getByLabelText("Zona operativa"), "zone-2");
     await user.selectOptions(within(dialog).getByLabelText("Cuadrilla"), "crew-a");
     await user.click(within(dialog).getByRole("button", { name: "Programar inspección" }));
 
     expect(await within(detail).findByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();
     expect(within(detail).getByText(/^SVC-/)).toBeVisible();
     expect(within(detail).getByText(/Cuadrilla A/)).toBeVisible();
+    expect(within(detail).getByText(/2026-09-10 · 09:00–11:00/)).toBeVisible();
+    server.events.removeListener("request:start", capture);
+    // La inspección se da de alta sin agenda (CreateInspectionDto) y el servicio lleva la zona
+    // real elegida, sin targetType ENVIRONMENTAL_REPORT.
+    expect(bodies["/api/environmental-reports/ER-1002/inspections"]).toEqual({});
+    expect(bodies["/api/services"]).toMatchObject({ origin: "INSPECTION", zoneIds: ["zone-2"], scheduledDate: "2026-09-10", timeWindow: { start: "09:00", end: "11:00" }, targetRef: "Av. Corrientes 4200" });
+    expect(bodies["/api/services"]).not.toHaveProperty("targetType");
+    expect(bodies["/api/services"]).not.toHaveProperty("targetId");
   });
 
   it("lets authorized Office issue an immutable notice from a completed violation inspection", async () => {

@@ -230,15 +230,14 @@ export function linkEnvironmentalInspectionService(inspectionId: string, service
   return updateEnvironmentalInspectionFixture(inspectionId, { serviceId });
 }
 
-// La agenda del alta no es de la inspección (InspectionResponseDto no la tiene).
-export function createEnvironmentalInspectionFixture(reportId: string, _input: EnvironmentalInspectionScheduleInput): EnvironmentalInspectionRecord {
+export function createEnvironmentalInspectionFixture(reportId: string, input: EnvironmentalInspectionScheduleInput): EnvironmentalInspectionRecord {
   const now = new Date().toISOString();
   return {
     ...pendingInspection,
     id: crypto.randomUUID(),
     reportId,
-    serviceId: null,
-    inspectorId: null,
+    serviceId: input.serviceId ?? null,
+    inspectorId: input.inspectorId ?? null,
     attachments: [],
     createdAt: now,
     updatedAt: now,

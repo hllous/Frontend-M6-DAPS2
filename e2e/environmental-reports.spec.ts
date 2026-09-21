@@ -30,6 +30,7 @@ test.describe("EnvironmentalReport case file", () => {
     await detail.getByRole("button", { name: "Programar inspección" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Fecha de inspección").fill("2026-09-10");
+    await dialog.getByLabel("Zona operativa").selectOption("zone-2");
     await dialog.getByLabel("Cuadrilla").selectOption("crew-a");
     await dialog.getByRole("button", { name: "Programar inspección" }).click();
     await expect(detail.getByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();

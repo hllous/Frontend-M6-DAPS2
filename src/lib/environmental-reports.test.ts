@@ -196,16 +196,26 @@ describe("environmental reports adapter", () => {
     expect(bodies).toHaveLength(2);
   });
 
-  it("schedules an inspection and reads it back in the backend shape", async () => {
-    const inspection = await environmentalReportsAdapter.schedule("ER-1002", {
+  it("schedules an inspection sending only what CreateInspectionDto accepts", async () => {
+    let requestBody: unknown;
+    server.use(http.post("*/api/environmental-reports/ER-1002/inspections", async ({ request }) => {
+      requestBody = await request.json();
+      return HttpResponse.json(realCreatedInspection, { status: 201 });
+    }));
+
+    const inspection = await environmentalReportsAdapter.schedule("ER-1002", {});
+
+    expect(requestBody).toEqual({});
+    expect(inspection).toMatchObject({ id: realCreatedInspection.id, serviceId: null, outcome: null });
+    // Sin checklistItems todavía: la pantalla usa la plantilla del frontend.
+    expect(inspection.checklist.map((item) => item.id)).toEqual(["location", "source", "evidence"]);
+  });
+
+  it("rejects the old schedule body (agenda and checklist belong to the service)", async () => {
+    await expect(environmentalReportsAdapter.schedule("ER-1002", {
       scheduledDate: "2026-09-10",
       timeWindow: { start: "09:00", end: "11:00" },
-      checklistVersion: "ambiental-v1",
-      checklist: [{ id: "location", label: "Verificar ubicación y contexto del hallazgo", required: true }],
-    });
-
-    expect(inspection).toMatchObject({ reportId: "ER-1002", serviceId: null, outcome: null, checklistItems: [] });
-    expect(inspection.checklist.map((item) => item.id)).toEqual(["location", "source", "evidence"]);
+    } as never)).rejects.toBeInstanceOf(EnvironmentalReportContractError);
   });
 
   it("completes an inspection and reads back the real closing fields", async () => {

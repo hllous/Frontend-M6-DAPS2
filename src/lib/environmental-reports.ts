@@ -220,19 +220,12 @@ export const environmentalInspectionCompleteInputSchema = z
   });
 export type EnvironmentalInspectionCompleteInput = z.infer<typeof environmentalInspectionCompleteInputSchema>;
 
-// Hypothesis: schedule fields are kept explicit at this adapter seam until OpenAPI
-// exposes the authoritative request and response nesting.
+// Backend CreateInspectionDto (forbidNonWhitelisted): sólo serviceId e inspectorId.
+// La fecha, la franja y las notas son del Servicio POINT que se crea después.
 export const environmentalInspectionScheduleInputSchema = z.object({
-  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
-  timeWindow: z.object({
-    start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
-    end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
-  }),
-  checklistVersion: z.string().trim().min(1, "Debe seleccionar una versión de checklist"),
-  checklist: z.array(z.object({ id: z.string().min(1), label: z.string().min(1), required: z.boolean().default(true) })).min(1, "El checklist debe tener al menos un control"),
-  zoneId: z.string().trim().min(1).optional(),
-  notes: z.string().trim().optional(),
-});
+  serviceId: z.uuid().optional(),
+  inspectorId: z.string().trim().min(1).max(64).optional(),
+}).strict();
 export type EnvironmentalInspectionScheduleInput = z.infer<typeof environmentalInspectionScheduleInputSchema>;
 
 // Backend InspectionResponseDto (docs/api/openapi.json). `attachments` no es del DTO:
