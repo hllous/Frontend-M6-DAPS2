@@ -42,7 +42,7 @@ import {
   streetClosureRequestsAdapter,
   type StreetClosureDependency,
 } from "@/lib/street-closure-requests";
-import { cn } from "@/lib/utils";
+import { cn, normalizeForSearch } from "@/lib/utils";
 import { MapView } from "./map-view";
 import { AssignCrewDialog } from "./assign-crew-dialog";
 import { ScheduleServiceDialog } from "./schedule-service-dialog";
@@ -300,18 +300,18 @@ export function ServicesWorkspace({
     return loadState.services.filter((service) => {
       // Global search
       if (search.trim()) {
-        const q = search.trim().toLowerCase();
-        const haystack = [
-          service.id,
-          service.title,
-          service.serviceTypeName,
-          service.crewName ?? "sin asignar",
-          service.routeName ?? "",
-          service.targetRef ?? "",
-          ...service.zoneNames,
-        ]
-          .join(" ")
-          .toLowerCase();
+        const q = normalizeForSearch(search.trim());
+        const haystack = normalizeForSearch(
+          [
+            service.id,
+            service.title,
+            service.serviceTypeName,
+            service.crewName ?? "sin asignar",
+            service.routeName ?? "",
+            service.targetRef ?? "",
+            ...service.zoneNames,
+          ].join(" "),
+        );
         if (!haystack.includes(q)) return false;
       }
 
