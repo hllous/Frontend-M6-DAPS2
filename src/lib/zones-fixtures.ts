@@ -41,16 +41,16 @@ export function assignNeighborhoodsFixture(id: string, neighborhoodIds: string[]
   if (!zone) return null;
 
   return updateZoneFixture(id, {
-    neighborhoodIds: [...new Set([...zone.neighborhoodIds, ...neighborhoodIds])],
+    neighborhoodIds: [...new Set([...(zone.neighborhoodIds ?? []), ...neighborhoodIds])],
   });
 }
 
 export function removeNeighborhoodFixture(id: string, neighborhoodId: string): Zone | null {
   const zone = getZoneFixture(id);
-  if (!zone || !zone.neighborhoodIds.includes(neighborhoodId)) return null;
+  if (!zone || !zone.neighborhoodIds?.includes(neighborhoodId)) return null;
 
   return updateZoneFixture(id, {
-    neighborhoodIds: zone.neighborhoodIds.filter((candidate) => candidate !== neighborhoodId),
+    neighborhoodIds: (zone.neighborhoodIds ?? []).filter((candidate) => candidate !== neighborhoodId),
   });
 }
 

@@ -17,7 +17,7 @@ describe("crew detail BFF route", () => {
 
   it("allows Office to update and logically delete a crew", async () => {
     const sessionCookie = await cookie("office-duty-queue");
-    const input = { name: "Cuadrilla actualizada", crewType: "MUNICIPAL", leaderUserId: "user-maria", organizationId: "org-municipal", defaultShift: "MORNING", active: true };
+    const input = { name: "Cuadrilla actualizada", leaderUserId: "user-maria", organizationId: "org-municipal", defaultShift: "MORNING", active: true };
     const update = await PATCH(new Request("http://localhost/api/crews/crew-a", { method: "PATCH", headers: { cookie: sessionCookie, "content-type": "application/json" }, body: JSON.stringify(input) }), { params: { id: "crew-a" } });
     expect(update.status).toBe(200);
     const removal = await DELETE(new Request("http://localhost/api/crews/crew-a", { method: "DELETE", headers: { cookie: sessionCookie } }), { params: { id: "crew-a" } });

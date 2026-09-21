@@ -6,6 +6,7 @@
 .freshness svg { color: var(--color-success); }
 .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: var(--space-12); align-items: end; padding: var(--space-14); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
 .field { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+.fieldError { grid-column: 1 / -1; margin: 0; color: var(--color-danger); font-size: 12px; font-weight: 600; }
 .field label { color: var(--color-text-secondary); font-size: 12px; font-weight: 600; }
 .field input, .field select { min-width: 0; height: 40px; padding: 0 var(--space-10); border: 1px solid var(--color-border-strong); border-radius: 12px; background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 14px; }
 .filterAction { height: 40px; }

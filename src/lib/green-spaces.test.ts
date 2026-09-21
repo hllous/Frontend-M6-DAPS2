@@ -8,6 +8,7 @@ import {
   GreenSpaceContractError,
   GreenSpaceRequestError,
   greenSpacesAdapter,
+  updateGreenSpaceInputSchema,
 } from "./green-spaces";
 
 const server = setupServer(...handlers);
@@ -20,6 +21,17 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("green spaces adapter", () => {
+  it("accepts a null area from the backend", async () => {
+    server.use(http.get("*/api/green-spaces", () => HttpResponse.json({
+      data: [{ id: "green-space-null", name: "Plaza sin mensura", spaceType: "SQUARE", areaM2: null, zoneId: "zone-1", lat: null, lng: null, active: true }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(greenSpacesAdapter.list()).resolves.toMatchObject({
+      greenSpaces: [{ id: "green-space-null", areaM2: null }],
+    });
+  });
+
   it("normalizes the documented paginated response and filters", async () => {
     const page = await greenSpacesAdapter.list({ active: true, spaceType: "PARK", zoneId: "zone-1" });
 
@@ -102,5 +114,11 @@ describe("green spaces adapter", () => {
 
     server.use(http.get("*/api/green-spaces", () => HttpResponse.error()));
     await expect(greenSpacesAdapter.list()).rejects.toBeInstanceOf(NetworkFailureError);
+  });
+
+  it("treats spaceType as immutable: the update contract drops it", () => {
+    const parsed = updateGreenSpaceInputSchema.parse({ name: "Plaza Norte", spaceType: "PARK", areaM2: 10, zoneId: "zone-1" });
+    expect(parsed).not.toHaveProperty("spaceType");
+    expect(parsed).toMatchObject({ name: "Plaza Norte", areaM2: 10, zoneId: "zone-1" });
   });
 });

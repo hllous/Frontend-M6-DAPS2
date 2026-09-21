@@ -42,7 +42,9 @@ describe("authenticated services BFF route", () => {
   it("returns a 401 body the services adapter parses as a typed request error, not a contract violation", async () => {
     const response = await GET(new Request("http://localhost/api/services"));
     const body = await response.json();
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(body), { status: 401 }));
+    // Una Response se lee una sola vez y el adapter ahora pide tambien los catalogos
+    // de etiquetas, asi que cada llamada necesita su propio cuerpo.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify(body), { status: 401 }));
 
     const error = await servicesAdapter.list().catch((caught: unknown) => caught);
 
@@ -229,9 +231,11 @@ describe("authenticated services BFF route", () => {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
         body: JSON.stringify({
+          title: "Etiqueta sólo de presentación",
           serviceTypeId: "st-waste-route",
           origin: "PLANNED",
           zoneIds: ["zone-1"],
+          targetRef: "Referencia visible",
           scheduledDate: "2026-09-12",
           timeWindow: { start: "08:00", end: "12:00" },
         }),
@@ -246,5 +250,15 @@ describe("authenticated services BFF route", () => {
         headers: expect.any(Headers),
       }),
     );
+    const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
+    expect(JSON.parse(String(requestInit.body))).toEqual({
+      serviceTypeId: "st-waste-route",
+      scheduledDate: "2026-09-12",
+      origin: "PLANNED",
+      zoneId: "zone-1",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+    });
   });
 });

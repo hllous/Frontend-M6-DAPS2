@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
+import { latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
 
 export const environmentalReportTypeSchema = z.enum([
   "NOISE",
@@ -64,14 +65,18 @@ export type SanctionOutcomeIntegrationException = z.infer<typeof sanctionOutcome
 export const createEnvironmentalReportInputSchema = z.object({
   reportType: environmentalReportTypeSchema,
   address: z.string().trim().min(1, "Debe indicar la ubicación del hallazgo."),
-  lat: z.number({ message: "La latitud debe ser un número válido." }),
-  lng: z.number({ message: "La longitud debe ser un número válido." }),
+  lat: latitudeInput(),
+  lng: longitudeInput(),
   description: z.string().trim().min(1, "Debe describir el hallazgo."),
 });
 export type CreateEnvironmentalReportInput = z.infer<typeof createEnvironmentalReportInputSchema>;
 
+// Backend ReportStatusChangeDto: forward and dismiss require a reason (max 500).
+export const reportDecisionInputSchema = z.object({ reason: reasonInput("Debe indicar el motivo.") });
+export type ReportDecisionInput = z.infer<typeof reportDecisionInputSchema>;
+
 const reportLocationSchema = z.object({
-  address: z.string().optional(),
+  address: z.string().nullable().optional(),
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
 }).passthrough();
@@ -79,7 +84,7 @@ const reportLocationSchema = z.object({
 export const environmentalReportSchema = z.object({
   id: z.string(),
   reportType: environmentalReportTypeSchema,
-  address: z.string().optional(),
+  address: z.string().nullable().optional(),
   // M2 contract v1.6 dropped lat/lng from its location payload, so the backend
   // always sends these as explicit `null` (not omitted) for ticket-originated
   // reports (ticketId present) — see issue #191. `.nullable()` is required
@@ -93,7 +98,7 @@ export const environmentalReportSchema = z.object({
   ticketId: z.string().nullable().optional(),
   reporterSnapshot: z.unknown().optional(),
   status: environmentalReportStatusSchema,
-  priority: environmentalReportPrioritySchema,
+  priority: environmentalReportPrioritySchema.nullable(),
   deadlineAt: z.string().nullable().optional(),
   escalated: z.boolean().optional(),
   citizenResponse: z.string().nullable().optional(),
@@ -164,14 +169,20 @@ export const environmentalInspectionChecklistItemSchema = z.object({
 export type EnvironmentalInspectionChecklistItem = z.infer<typeof environmentalInspectionChecklistItemSchema>;
 
 export const environmentalInspectionChecklistResultSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().trim().min(1),
+  label: z.string().trim().min(1),
   completed: z.boolean(),
 });
 export type EnvironmentalInspectionChecklistResult = z.infer<typeof environmentalInspectionChecklistResultSchema>;
 
 export const environmentalInspectionCompleteInputSchema = z
   .object({
+    inspectedAt: z.string().datetime({ offset: true }).refine(
+      (value) => Date.parse(value) <= Date.now() + 5 * 60 * 1000,
+      "La fecha de inspección no puede ser futura.",
+    ),
     outcome: environmentalInspectionOutcomeSchema,
+    nextStep: environmentalInspectionNextStepSchema.optional(),
     checklist: z.array(environmentalInspectionChecklistResultSchema).min(1, "Debe completar el checklist de inspección."),
     conclusion: z.string().trim().optional(),
     findings: z.string().trim().optional(),
@@ -187,6 +198,7 @@ export const environmentalInspectionCompleteInputSchema = z
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["conclusion"], message: "La conclusión es obligatoria para un resultado sin infracción." });
     }
     if (data.outcome === "VIOLATION_FOUND") {
+      if (data.nextStep !== "NOTICE_TO_BE_ISSUED") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["nextStep"], message: "Una infracción constatada debe continuar con la emisión del aviso." });
       if (!data.findings) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["findings"], message: "Los hallazgos son obligatorios cuando se constata una infracción." });
       if (!data.violationType) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["violationType"], message: "Debe indicar el tipo de infracción constatada." });
       if (!data.severity) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["severity"], message: "Debe indicar la gravedad de la infracción constatada." });
@@ -467,11 +479,11 @@ export const environmentalReportsAdapter = {
   async startReview(id: string): Promise<EnvironmentalReport> {
     return transition(id, "start-review", "La respuesta de inicio de revisión no respeta el contrato esperado.");
   },
-  async forward(id: string): Promise<EnvironmentalReport> {
-    return transition(id, "forward", "La respuesta de derivación no respeta el contrato esperado.");
+  async forward(id: string, input: ReportDecisionInput): Promise<EnvironmentalReport> {
+    return transition(id, "forward", "La respuesta de derivación no respeta el contrato esperado.", decisionBody(input));
   },
-  async dismiss(id: string): Promise<EnvironmentalReport> {
-    return transition(id, "dismiss", "La respuesta de desestimación no respeta el contrato esperado.");
+  async dismiss(id: string, input: ReportDecisionInput): Promise<EnvironmentalReport> {
+    return transition(id, "dismiss", "La respuesta de desestimación no respeta el contrato esperado.", decisionBody(input));
   },
   async close(id: string): Promise<EnvironmentalReport> {
     return transition(id, "close", "La respuesta de cierre no respeta el contrato esperado.");
@@ -519,6 +531,13 @@ export const environmentalReportsAdapter = {
   },
 };
 
-async function transition(id: string, action: string, message: string): Promise<EnvironmentalReport> {
-  return parseResource(await requestJson(`/api/environmental-reports/${encodeURIComponent(id)}/${action}`, { method: "POST" }), message);
+function decisionBody(input: ReportDecisionInput) {
+  const parsed = reportDecisionInputSchema.safeParse(input);
+  if (!parsed.success) throw new EnvironmentalReportContractError(parsed.error.issues[0]?.message ?? "El motivo es inválido.", { cause: parsed.error });
+  return parsed.data;
+}
+
+async function transition(id: string, action: string, message: string, body?: ReportDecisionInput): Promise<EnvironmentalReport> {
+  const init: RequestInit = body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { method: "POST" };
+  return parseResource(await requestJson(`/api/environmental-reports/${encodeURIComponent(id)}/${action}`, init), message);
 }

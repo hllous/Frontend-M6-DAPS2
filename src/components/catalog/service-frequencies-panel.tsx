@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CalendarClock, Check, X } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -186,14 +187,12 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
 
   return (
     <section aria-labelledby="service-frequencies-title" className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">Catálogo · Planificación</p>
-          <h1 id="service-frequencies-title" className="text-2xl font-semibold tracking-tight">Frecuencias de servicio</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Configure reglas de recorrido por día, turno y vigencia. Esta configuración no genera Services automáticamente.</p>
-        </div>
-        {canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nueva frecuencia"}</Button> : null}
-      </div>
+      <CatalogPageHeader
+        title="Frecuencias de servicio"
+        titleId="service-frequencies-title"
+        description="Configure reglas de recorrido por día, turno y vigencia. Esta configuración no genera Services automáticamente."
+        actions={canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nueva frecuencia"}</Button> : null}
+      />
 
       {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Esta sesión puede consultar las frecuencias, pero no administrarlas.</p> : null}
       {message ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{message}</p> : null}
@@ -215,7 +214,7 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
         </form>
       ) : null}
 
-      <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_150px_150px_150px]">
+      <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-2 xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_150px_150px_150px]">
         <Field><FieldLabel htmlFor="filter-frequency-service-type">Tipo</FieldLabel><select id="filter-frequency-service-type" aria-label="Filtrar por tipo" className={formControlClass} value={serviceTypeId} onChange={(event) => setServiceTypeId(event.target.value)}><option value="">Todos</option>{serviceTypes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
         <Field><FieldLabel htmlFor="filter-frequency-route">Ruta</FieldLabel><select id="filter-frequency-route" aria-label="Filtrar por ruta" className={formControlClass} value={routeId} onChange={(event) => setRouteId(event.target.value)}><option value="">Todos</option>{routes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
         <Field><FieldLabel htmlFor="filter-frequency-shift">Turno</FieldLabel><select id="filter-frequency-shift" aria-label="Filtrar por turno" className={formControlClass} value={shift} onChange={(event) => setShift(event.target.value as ServiceFrequencyShift | "")}><option value="">Todos</option>{shifts.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
@@ -227,7 +226,7 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
       {state.status === "error" ? <div role="alert" className="rounded-xl border border-destructive/30 bg-card p-5"><p>{state.message}</p><Button type="button" variant="outline" className="mt-3" onClick={refresh}>Reintentar</Button></div> : null}
       {state.status === "ready" && state.items.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin frecuencias</EmptyTitle><EmptyDescription>No hay reglas para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty> : null}
       {state.status === "ready" && state.items.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full min-w-[900px] text-left text-sm"><caption className="sr-only">Frecuencias de servicio</caption><thead className="border-b border-border bg-muted text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Tipo de servicio</th><th className="px-4 py-3">Recorrido</th><th className="px-4 py-3">Días</th><th className="px-4 py-3">Turno</th><th className="px-4 py-3">Vigencia</th><th className="px-4 py-3"><span className="sr-only">Acciones</span></th></tr></thead><tbody>{state.items.map((item) => <tr key={item.id} className="border-b border-border last:border-0"><td className="px-4 py-3 font-medium">{serviceTypeNames.get(item.serviceTypeId) ?? item.serviceTypeId}</td><td className="px-4 py-3">{routeNames.get(item.routeId) ?? item.routeId}</td><td className="px-4 py-3">{item.weekdays.map(weekdayLabel).join(", ")}</td><td className="px-4 py-3">{shiftLabel(item.shift)}</td><td className="px-4 py-3"><span className="block">Desde {formatDate(item.validFrom)}</span><span className="text-muted-foreground">Hasta {formatDate(item.validTo)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2">{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => { setEditing({ item, weekdays: item.weekdays, shift: item.shift, validFrom: item.validFrom, validTo: item.validTo ?? "" }); setShowCreate(false); }}>Editar</Button>{item.validTo === null ? <Button type="button" size="sm" variant="destructive" onClick={() => setClosing(item)}>Cerrar vigencia</Button> : null}</> : null}</div></td></tr>)}</tbody></table>
         </div>
       ) : null}

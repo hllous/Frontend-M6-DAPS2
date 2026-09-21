@@ -6,6 +6,7 @@ import { createCrewInputSchema, type CrewQuery, crewTypeSchema, shiftSchema } fr
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 503: "Service Unavailable", 500: "Internal Server Error" };
 
@@ -21,8 +22,8 @@ function parseQuery(url: URL): CrewQuery {
     active: active === null ? undefined : active === "true",
     crewType: crewType.success ? crewType.data : undefined,
     defaultShift: defaultShift.success ? defaultShift.data : undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 

@@ -11,7 +11,7 @@ test.describe("Route catalog management #107", () => {
   test("Office actor lists routes and filters by active status, search, and zone", async ({ page }) => {
     await openRoutesCatalog(page);
 
-    await expect(page.getByRole("heading", { name: "Catálogo de Recorridos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recorridos", level: 1 })).toBeVisible();
     await expect(page.getByText("REC-001")).toBeVisible();
     await expect(page.getByText("Recorrido Casco Histórico")).toBeVisible();
     await expect(page.getByText("REC-002")).toBeVisible();

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { servicesAdapter, type Service } from "@/lib/services";
+import { MAX_REASON_LENGTH } from "@/lib/input-limits";
 
 interface RescheduleReasonDialogProps {
   open: boolean;
@@ -112,6 +113,7 @@ function RescheduleReasonForm({
           <textarea
             id={`${formId}-reason`}
             rows={3}
+            maxLength={MAX_REASON_LENGTH}
             value={reason}
             onChange={(e) => {
               setReason(e.target.value);

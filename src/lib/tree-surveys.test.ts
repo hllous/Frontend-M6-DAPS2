@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { treeSurveysAdapter, TreeSurveyContractError, TreeSurveyRequestError } from "./tree-surveys";
+import { treeSurveyCreateInputSchema, treeSurveysAdapter, TreeSurveyContractError, TreeSurveyRequestError } from "./tree-surveys";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 
 const survey = {
   id: "survey-1",
@@ -44,5 +47,41 @@ describe("treeSurveysAdapter", () => {
 
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ statusCode: 403, message: "Sin permiso", error: "Forbidden", timestamp: "now", path: "/api/trees/tree-2/surveys" }), { status: 403 }));
     await expect(treeSurveysAdapter.getTreeSurveys("tree-2")).rejects.toMatchObject({ constructor: TreeSurveyRequestError, status: 403 });
+  });
+});
+
+describe("treeSurveyCreateInputSchema", () => {
+  const validInput = { surveyedAt: "2026-09-20T12:00:00.000Z", healthStatus: "HEALTHY" as const, riskLevel: "LOW" as const, requiresStreetClosure: false, requiresPublicWorks: false };
+
+  function freezeAt(iso: string) {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(iso));
+  }
+
+  it("accepts today's Argentina date even when UTC already reads as tomorrow", () => {
+    freezeAt("2026-09-21T01:30:00Z");
+    expect(treeSurveyCreateInputSchema.safeParse(validInput).success).toBe(true);
+  });
+
+  it("rejects a survey dated after today in Argentina with a clear message", () => {
+    freezeAt("2026-09-21T01:30:00Z");
+    const result = treeSurveyCreateInputSchema.safeParse({ ...validInput, surveyedAt: "2026-09-21T12:00:00.000Z" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({ path: ["surveyedAt"], message: "La fecha del relevamiento no puede ser futura." });
+  });
+
+  it("accepts past dates", () => {
+    freezeAt("2026-09-20T15:00:00Z");
+    expect(treeSurveyCreateInputSchema.safeParse({ ...validInput, surveyedAt: "2026-01-05T12:00:00.000Z" }).success).toBe(true);
+  });
+
+  it("requires riskType for HIGH and CRITICAL risk levels", () => {
+    freezeAt("2026-09-20T15:00:00Z");
+    for (const riskLevel of ["HIGH", "CRITICAL"] as const) {
+      const result = treeSurveyCreateInputSchema.safeParse({ ...validInput, riskLevel });
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]).toMatchObject({ path: ["riskType"], message: "Indique el tipo de riesgo para niveles altos o críticos." });
+    }
+    expect(treeSurveyCreateInputSchema.safeParse({ ...validInput, riskLevel: "HIGH", riskType: "FALLING_BRANCH" }).success).toBe(true);
   });
 });

@@ -13,8 +13,9 @@ import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OperationalScenario } from "@/lib/scenarios";
 import type { Tree } from "@/lib/trees";
+import { todayInArgentina } from "@/lib/argentina-date";
 import { cn } from "@/lib/utils";
-import { treeSurveyCreateInputSchema, treeSurveysAdapter, type RiskLevel, type TreeHealthStatus, type TreeSurvey, type TreeSurveyCreateInput, type TreeSurveyQuery } from "@/lib/tree-surveys";
+import { RISK_LEVEL_LABELS, treeSurveyCreateInputSchema, treeSurveysAdapter, type RiskLevel, type TreeHealthStatus, type TreeSurvey, type TreeSurveyCreateInput, type TreeSurveyQuery } from "@/lib/tree-surveys";
 import { TreeInterventionRequestDialog } from "./tree-interventions-panel";
 
 type LoadState = { status: "loading" } | { status: "ready"; page: { surveys: TreeSurvey[]; page: number; pageSize: number; total: number; totalPages: number } } | { status: "error"; message: string };
@@ -22,10 +23,9 @@ type FormState = { surveyedAt: string; healthStatus: TreeHealthStatus | ""; risk
 type FormErrorField = "surveyedAt" | "healthStatus" | "riskLevel" | "riskType" | "suggestedIntervention" | "notes" | "form";
 
 const HEALTH_LABELS: Record<TreeHealthStatus, string> = { HEALTHY: "Saludable", WEAKENED: "Debilitado", DISEASED: "Enfermo", DEAD: "Muerto" };
-const RISK_LABELS: Record<RiskLevel, string> = { NONE: "Sin riesgo", LOW: "Bajo", MEDIUM: "Medio", HIGH: "Alto", CRITICAL: "Crítico" };
 const RISK_TYPE_LABELS = { FALLING_BRANCH: "Caída de ramas", TRUNK_INSTABILITY: "Inestabilidad del tronco", ROOT_UPLIFT: "Levantamiento de raíces", POWER_LINE_CONTACT: "Contacto con tendido eléctrico", SIGN_OBSTRUCTION: "Obstrucción de señalización", PEST_INFESTATION: "Infestación de plagas" } as const;
 const INTERVENTION_LABELS = { FORMATION_PRUNING: "Poda de formación", SAFETY_PRUNING: "Poda de seguridad", REMOVAL: "Extracción", PLANTING: "Plantación", TREATMENT: "Tratamiento" } as const;
-const emptyForm: FormState = { surveyedAt: new Date().toISOString().slice(0, 10), healthStatus: "", riskLevel: "", riskType: "", suggestedIntervention: "", requiresStreetClosure: false, requiresPublicWorks: false, notes: "" };
+const newForm = (surveyedAt: string): FormState => ({ surveyedAt, healthStatus: "", riskLevel: "", riskType: "", suggestedIntervention: "", requiresStreetClosure: false, requiresPublicWorks: false, notes: "" });
 
 const HEALTH_TONES: Record<TreeHealthStatus, string> = {
   HEALTHY: "bg-[var(--color-success-fill)] text-[var(--color-success)]",
@@ -57,7 +57,7 @@ function HealthBadge({ status }: { status: TreeHealthStatus }) {
 }
 
 function RiskBadge({ level }: { level: RiskLevel }) {
-  return <Badge variant="outline" className={cn("border-transparent", RISK_TONES[level])}><ShieldAlert data-icon="inline-start" aria-hidden />Riesgo {RISK_LABELS[level]}</Badge>;
+  return <Badge variant="outline" className={cn("border-transparent", RISK_TONES[level])}><ShieldAlert data-icon="inline-start" aria-hidden />Riesgo {RISK_LEVEL_LABELS[level]}</Badge>;
 }
 
 export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree; scenario: OperationalScenario; onClose: () => void }) {
@@ -69,7 +69,8 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
   const [page, setPage] = useState(1);
   const [requestVersion, setRequestVersion] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [today, setToday] = useState(() => todayInArgentina());
+  const [form, setForm] = useState<FormState>(() => newForm(today));
   const [formError, setFormError] = useState<string | null>(null);
   const [formErrorField, setFormErrorField] = useState<FormErrorField | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,7 +97,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
     return () => { current = false; };
   }, [query, requestVersion, tree.id]);
 
-  const openCreate = () => { setForm(emptyForm); setFormError(null); setFormErrorField(null); setNotice(null); setFormOpen(true); };
+  const openCreate = () => { const currentDay = todayInArgentina(); setToday(currentDay); setForm(newForm(currentDay)); setFormError(null); setFormErrorField(null); setNotice(null); setFormOpen(true); };
   const openDetail = async (survey: TreeSurvey) => {
     setDetail(survey); setDetailError(null); setDetailLoading(true);
     try { setDetail(await treeSurveysAdapter.getTreeSurvey(tree.id, survey.id)); }
@@ -124,7 +125,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
     {canRequestIntervention && guidedSurvey ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>El relevamiento de {dateLabel(guidedSurvey.surveyedAt)} indica una intervención sugerida.</span><Button type="button" onClick={() => { setInterventionSurvey(guidedSurvey); setInterventionOpen(true); }}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención sugerida</Button></AlertDescription></Alert> : null}
     {canRequestIntervention ? <TreeInterventionRequestDialog key={`${interventionOpen}-${interventionSurvey?.id ?? ""}`} open={interventionOpen} onOpenChange={setInterventionOpen} trees={[tree]} initialTreeIds={interventionSurvey ? [tree.id] : []} initialType={interventionSurvey?.suggestedIntervention} initialAddress={tree.address ?? ""} initialRequiresStreetClosure={interventionSurvey?.requiresStreetClosure} initialJustification={interventionSurvey ? `Relevamiento ${dateLabel(interventionSurvey.surveyedAt)} (${interventionSurvey.id}).` : undefined} onCreated={() => setNotice("Solicitud de intervención creada. Estado inicial: solicitada.")} /> : null}
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><Button type="button" variant="ghost" size="sm" className="mb-2 -ml-3 gap-1" onClick={onClose}><ArrowLeft data-icon="inline-start" aria-hidden />Volver al censo</Button><h2 id="tree-surveys-title" className="text-2xl font-semibold tracking-tight">Historial de relevamientos · {tree.surveyCode}</h2><p className="mt-1 text-sm text-muted-foreground">{tree.species} · {tree.address ?? "Sin dirección registrada"}</p></div>
+      <div><Button type="button" variant="ghost" size="sm" className="mb-2 -ml-3 gap-1" onClick={onClose}><ArrowLeft data-icon="inline-start" aria-hidden />Volver al censo</Button><h2 id="tree-surveys-title" className="text-2xl font-semibold tracking-tight">Historial de relevamientos · {tree.surveyCode}</h2><p className="mt-1 text-sm text-muted-foreground">{tree.species ?? "Especie no registrada"} · {tree.address ?? "Sin dirección registrada"}</p></div>
       {canSurvey ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar relevamiento</Button> : null}
     </div>
     {!canSurvey ? <Alert><AlertDescription>Esta sesión puede consultar el historial, pero no registrar relevamientos.</AlertDescription></Alert> : null}
@@ -136,18 +137,18 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
       </Field>
       <Field>
         <FieldLabel htmlFor="survey-risk-filter">Nivel de riesgo</FieldLabel>
-        <select id="survey-risk-filter" aria-label="Filtrar por nivel de riesgo" className={formControlClass} value={riskLevel} onChange={(event) => { setRiskLevel(event.target.value as RiskLevel | ""); setPage(1); }}><option value="">Todos</option>{Object.entries(RISK_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select id="survey-risk-filter" aria-label="Filtrar por nivel de riesgo" className={formControlClass} value={riskLevel} onChange={(event) => { setRiskLevel(event.target.value as RiskLevel | ""); setPage(1); }}><option value="">Todos</option>{Object.entries(RISK_LEVEL_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
       </Field>
     </FieldGroup>
     {state.status === "loading" ? <div role="status" aria-label="Cargando relevamientos" className="flex flex-col gap-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div> : null}
     {state.status === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{state.message}</span><Button type="button" variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></AlertDescription></Alert> : null}
     {state.status === "ready" && state.page.surveys.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin relevamientos</EmptyTitle><EmptyDescription>No hay registros para los filtros seleccionados. Quite uno o más filtros para consultar el historial completo.</EmptyDescription></EmptyHeader></Empty> : null}
-    {state.status === "ready" && state.page.surveys.length > 0 ? <><p className="text-sm text-muted-foreground" aria-live="polite">{state.page.total} {state.page.total === 1 ? "relevamiento" : "relevamientos"}</p><div className="grid gap-3">{state.page.surveys.map((survey) => <article key={survey.id} aria-label={`${dateLabel(survey.surveyedAt)} · ${RISK_LABELS[survey.riskLevel]}`} className="rounded-xl border border-border bg-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold">{dateLabel(survey.surveyedAt)}</p><div className="mt-2 flex flex-wrap gap-2"><HealthBadge status={survey.healthStatus} /><RiskBadge level={survey.riskLevel} /></div></div><Button type="button" size="sm" variant="outline" onClick={() => void openDetail(survey)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button></div><dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de riesgo</dt><dd className="mt-0.5">{survey.riskType ? RISK_TYPE_LABELS[survey.riskType] : "No informado"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Intervención sugerida</dt><dd className="mt-0.5">{survey.suggestedIntervention ? INTERVENTION_LABELS[survey.suggestedIntervention] : "No sugerida"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dependencias</dt><dd className="mt-0.5">{[survey.requiresStreetClosure && "Corte de calle", survey.requiresPublicWorks && "Obras públicas"].filter(Boolean).join(" · ") || "Ninguna"}</dd></div></dl></article>)}</div><div className="flex items-center justify-between gap-3" aria-label="Paginación de relevamientos"><span className="text-sm text-muted-foreground">Página {state.page.page} de {state.page.totalPages}</span><div className="flex gap-2"><Button type="button" variant="outline" size="sm" aria-label="Página anterior" disabled={state.page.page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft data-icon="inline-start" aria-hidden />Anterior</Button><Button type="button" variant="outline" size="sm" aria-label="Página siguiente" disabled={state.page.page >= state.page.totalPages} onClick={() => setPage((current) => current + 1)}>Siguiente<ChevronRight data-icon="inline-end" aria-hidden /></Button></div></div></> : null}
+    {state.status === "ready" && state.page.surveys.length > 0 ? <><p className="text-sm text-muted-foreground" aria-live="polite">{state.page.total} {state.page.total === 1 ? "relevamiento" : "relevamientos"}</p><div className="grid gap-3">{state.page.surveys.map((survey) => <article key={survey.id} aria-label={`${dateLabel(survey.surveyedAt)} · ${RISK_LEVEL_LABELS[survey.riskLevel]}`} className="rounded-xl border border-border bg-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold">{dateLabel(survey.surveyedAt)}</p><div className="mt-2 flex flex-wrap gap-2"><HealthBadge status={survey.healthStatus} /><RiskBadge level={survey.riskLevel} /></div></div><Button type="button" size="sm" variant="outline" onClick={() => void openDetail(survey)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button></div><dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de riesgo</dt><dd className="mt-0.5">{survey.riskType ? RISK_TYPE_LABELS[survey.riskType] : "No informado"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Intervención sugerida</dt><dd className="mt-0.5">{survey.suggestedIntervention ? INTERVENTION_LABELS[survey.suggestedIntervention] : "No sugerida"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dependencias</dt><dd className="mt-0.5">{[survey.requiresStreetClosure && "Corte de calle", survey.requiresPublicWorks && "Obras públicas"].filter(Boolean).join(" · ") || "Ninguna"}</dd></div></dl></article>)}</div><div className="flex items-center justify-between gap-3" aria-label="Paginación de relevamientos"><span className="text-sm text-muted-foreground">Página {state.page.page} de {state.page.totalPages}</span><div className="flex gap-2"><Button type="button" variant="outline" size="sm" aria-label="Página anterior" disabled={state.page.page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft data-icon="inline-start" aria-hidden />Anterior</Button><Button type="button" variant="outline" size="sm" aria-label="Página siguiente" disabled={state.page.page >= state.page.totalPages} onClick={() => setPage((current) => current + 1)}>Siguiente<ChevronRight data-icon="inline-end" aria-hidden /></Button></div></div></> : null}
 
     <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent><DialogHeader><DialogTitle>Registrar relevamiento</DialogTitle><DialogDescription>Observación ambiental del árbol. El registro quedará guardado como parte del historial inmutable.</DialogDescription></DialogHeader>{formError && fieldHasError("form") ? <Alert variant="destructive"><AlertDescription>{formError}</AlertDescription></Alert> : null}<form id="tree-survey-form" onSubmit={(event) => void submit(event)} noValidate><FieldGroup>
       <Field data-invalid={fieldHasError("surveyedAt")}>
         <FieldLabel htmlFor="surveyed-at">Fecha del relevamiento <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-        <input id="surveyed-at" aria-label="Fecha del relevamiento" aria-invalid={fieldHasError("surveyedAt")} aria-describedby={fieldHasError("surveyedAt") ? "surveyed-at-help surveyed-at-error" : "surveyed-at-help"} type="date" className={formControlClass} value={form.surveyedAt} onChange={(event) => setForm({ ...form, surveyedAt: event.target.value })} required />
+        <input id="surveyed-at" aria-label="Fecha del relevamiento" aria-invalid={fieldHasError("surveyedAt")} aria-describedby={fieldHasError("surveyedAt") ? "surveyed-at-help surveyed-at-error" : "surveyed-at-help"} type="date" max={today} className={formControlClass} value={form.surveyedAt} onChange={(event) => setForm({ ...form, surveyedAt: event.target.value })} required />
         <FieldDescription id="surveyed-at-help">Indique la fecha en que se realizó la observación.</FieldDescription>
         {fieldHasError("surveyedAt") ? <FieldError id="surveyed-at-error">{formError}</FieldError> : null}
       </Field>
@@ -159,7 +160,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
       </Field>
       <Field data-invalid={fieldHasError("riskLevel")}>
         <FieldLabel htmlFor="risk-level">Nivel de riesgo <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-        <select id="risk-level" aria-label="Nivel de riesgo" aria-invalid={fieldHasError("riskLevel")} aria-describedby={fieldHasError("riskLevel") ? "risk-level-help risk-level-error" : "risk-level-help"} className={formControlClass} value={form.riskLevel} onChange={(event) => setForm({ ...form, riskLevel: event.target.value as FormState["riskLevel"] })} required><option value="">Seleccione un nivel</option>{Object.entries(RISK_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select id="risk-level" aria-label="Nivel de riesgo" aria-invalid={fieldHasError("riskLevel")} aria-describedby={fieldHasError("riskLevel") ? "risk-level-help risk-level-error" : "risk-level-help"} className={formControlClass} value={form.riskLevel} onChange={(event) => setForm({ ...form, riskLevel: event.target.value as FormState["riskLevel"] })} required><option value="">Seleccione un nivel</option>{Object.entries(RISK_LEVEL_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <FieldDescription id="risk-level-help">Use el nivel que corresponda a la exposición observada.</FieldDescription>
         {fieldHasError("riskLevel") ? <FieldError id="risk-level-error">{formError}</FieldError> : null}
       </Field>

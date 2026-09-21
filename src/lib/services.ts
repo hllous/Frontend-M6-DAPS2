@@ -1,11 +1,14 @@
 import { z } from "zod";
 
+import { todayInArgentina } from "./argentina-date";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import {
   streetClosureRequestsAdapter,
   type StreetClosureRequest,
 } from "./street-closure-requests";
+import { catalogoDeEtiquetas, componerTituloDeServicio } from "./service-labels";
 import { recordTelemetryEvent } from "./telemetry";
+import { MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
 
 export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
 export type ServiceMode = z.infer<typeof serviceModeSchema>;
@@ -69,7 +72,9 @@ export type NotServicedReason = z.infer<typeof notServicedReasonSchema>;
 
 export const zoneResultSchema = z.object({
   id: z.string(),
-  serviceId: z.string(),
+  // El backend no repite el id del servicio dentro de cada resultado: ya esta en el
+  // recurso padre o en la ruta con la que se pidio. Se completa cuando se conoce.
+  serviceId: z.string().optional(),
   zoneId: z.string(),
   status: zoneResultStatusSchema,
   reason: notServicedReasonSchema.nullable().optional(),
@@ -116,12 +121,32 @@ export const serviceSchema = z.object({
 
 export type Service = z.infer<typeof serviceSchema>;
 
+/**
+ * Lo que responde el backend: las zonas vienen como `zones: [{ zoneId, sequence }]`
+ * y no hay `title`. Se aplanan los ids respetando el `sequence`, que es el orden en
+ * que un recorrido recorre las zonas, y el título lo compone parseServicio() con los
+ * catálogos. Las fixtures del modo mock ya traen `zoneIds` y `title`, y pasan igual.
+ */
+const serviceWireSchema = z.preprocess((value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const record = value as Record<string, unknown>;
+  if ("zoneIds" in record || !Array.isArray(record.zones)) return value;
+  const { zones, ...rest } = record;
+  const ordenadas = [...(zones as { zoneId?: unknown; sequence?: unknown }[])].sort(
+    (a, b) => Number(a?.sequence ?? 0) - Number(b?.sequence ?? 0),
+  );
+  const zoneResults = Array.isArray(record.zoneResults)
+    ? (record.zoneResults as Record<string, unknown>[]).map((resultado) => ({ serviceId: record.id, ...resultado }))
+    : record.zoneResults;
+  return { ...rest, zoneIds: ordenadas.map((zona) => zona?.zoneId), zoneResults };
+}, serviceSchema.extend({ title: z.string().optional() }));
+
 export const createServiceInputSchema = z
   .object({
     title: z.string().optional(),
     serviceTypeId: z.string().min(1, "Debe seleccionar un tipo de servicio"),
     origin: serviceOriginSchema,
-    ticketId: z.string().optional(),
+    ticketId: z.string().max(MAX_TICKET_ID_LENGTH, `El ticketId no puede superar los ${MAX_TICKET_ID_LENGTH} caracteres.`).optional(),
     inspectionId: z.string().optional(),
     weatherAlertId: z.string().optional(),
     routeId: z.string().optional(),
@@ -136,7 +161,7 @@ export const createServiceInputSchema = z
       start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
       end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
     }),
-    notes: z.string().optional(),
+    notes: z.string().max(MAX_NOTES_LENGTH, `Las notas no pueden superar los ${MAX_NOTES_LENGTH} caracteres.`).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.origin === "TICKET" && (!data.ticketId || !data.ticketId.trim())) {
@@ -171,10 +196,38 @@ export const createServiceInputSchema = z
 
 export type CreateServiceInput = z.infer<typeof createServiceInputSchema>;
 
+export class BackendServiceZoneSelectionError extends Error {
+  constructor() {
+    super("La programación sin recorrido ni objetivo admite exactamente una zona.");
+    this.name = "BackendServiceZoneSelectionError";
+  }
+}
+
+export function toCreateServiceBackendInput(input: CreateServiceInput) {
+  const zoneIsDerived = Boolean(input.routeId || input.targetType || input.targetId);
+  if (!zoneIsDerived && input.zoneIds.length !== 1) {
+    throw new BackendServiceZoneSelectionError();
+  }
+
+  return {
+    serviceTypeId: input.serviceTypeId,
+    scheduledDate: input.scheduledDate,
+    origin: input.origin,
+    routeId: input.routeId,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    ...(!zoneIsDerived ? { zoneId: input.zoneIds[0] } : {}),
+    windowFrom: input.timeWindow.start,
+    windowTo: input.timeWindow.end,
+    ticketId: input.ticketId,
+    notes: input.notes,
+  };
+}
+
 export const containerLocationSchema = z.object({
   address: z.string().trim().min(1, "La nueva dirección es obligatoria."),
-  lat: z.number({ message: "La latitud debe ser un número válido." }),
-  lng: z.number({ message: "La longitud debe ser un número válido." }),
+  lat: latitudeInput(),
+  lng: longitudeInput(),
   zoneId: z.string().trim().min(1).optional(),
 });
 export type ContainerLocation = z.infer<typeof containerLocationSchema>;
@@ -258,30 +311,46 @@ export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
 
 export const suspendServiceInputSchema = z.object({
   reason: notServicedReasonSchema,
-  note: z.string().min(1, "La nota es obligatoria para suspender el servicio"),
+  note: z.string().trim().min(1, "La nota es obligatoria para suspender el servicio"),
 });
 export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
 
+export function toSuspendServiceBackendInput(input: SuspendServiceInput) {
+  return { reason: input.reason };
+}
+
 export const rescheduleServiceInputSchema = z.object({
-  reason: z.string().min(1, "El motivo es obligatorio para reprogramar el servicio"),
+  reason: reasonInput("El motivo es obligatorio para reprogramar el servicio"),
 });
 export type RescheduleServiceInput = z.infer<typeof rescheduleServiceInputSchema>;
 
 export const cancelServiceInputSchema = z.object({
-  reason: z.string().min(1, "El motivo es obligatorio para cancelar el servicio"),
+  reason: reasonInput("El motivo es obligatorio para cancelar el servicio"),
 });
 export type CancelServiceInput = z.infer<typeof cancelServiceInputSchema>;
 
 export const confirmRescheduleInputSchema = z.object({
   scheduledDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD")
+    .refine(
+      (value) => !/^\d{4}-\d{2}-\d{2}$/.test(value) || value >= todayInArgentina(),
+      "La nueva fecha no puede ser anterior a hoy.",
+    ),
   timeWindow: z.object({
     start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
     end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
   }),
 });
 export type ConfirmRescheduleInput = z.infer<typeof confirmRescheduleInputSchema>;
+
+export function toConfirmRescheduleBackendInput(input: ConfirmRescheduleInput) {
+  return {
+    scheduledDate: input.scheduledDate,
+    windowFrom: input.timeWindow.start,
+    windowTo: input.timeWindow.end,
+  };
+}
 
 export const recordZoneResultInputSchema = z
   .object({
@@ -406,7 +475,7 @@ export const STATUS_ORDER: Record<ServiceStatus, number> = {
 };
 
 const servicesEnvelopeSchema = z.object({
-  data: z.array(serviceSchema),
+  data: z.array(serviceWireSchema),
   meta: z.object({
     total: z.number(),
     page: z.number(),
@@ -457,8 +526,38 @@ async function readJsonBody(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * Completa lo que el backend no manda: el título del servicio y los nombres de sus
+ * zonas, resueltos contra los catálogos. Es el único lugar donde se parsea una
+ * respuesta de servicio, así que el listado, el detalle y cada transición devuelven
+ * el mismo título y no se degrada después de una acción.
+ */
+async function completarEtiquetas(wire: z.infer<typeof serviceWireSchema>): Promise<Service> {
+  const { serviceTypes, zones } = await catalogoDeEtiquetas();
+  const nombresDeZona = wire.zoneIds.map((zoneId) => zones.get(zoneId)).filter((nombre): nombre is string => Boolean(nombre));
+  const nombreDeTipo = serviceTypes.get(wire.serviceTypeId);
+  return {
+    ...wire,
+    serviceTypeName: nombreDeTipo ?? wire.serviceTypeName,
+    zoneNames: wire.zoneNames.length > 0 ? wire.zoneNames : nombresDeZona,
+    title: wire.title ?? componerTituloDeServicio(wire, { serviceType: nombreDeTipo, zones: nombresDeZona }),
+  };
+}
+
+async function parseServicio(raw: unknown, message: string): Promise<Service> {
+  const parsed = serviceWireSchema.safeParse(raw);
+  if (!parsed.success) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+    throw new ServiceContractError(message, { cause: parsed.error });
+  }
+  return completarEtiquetas(parsed.data);
+}
+
 export const servicesAdapter = {
   async list(query: ServiceQuery = {}): Promise<ServicesPage> {
+    // Se arranca el catalogo junto con el listado y no despues: encadenarlos dejaba
+    // la pantalla en el esqueleto de carga durante dos viajes de ida y vuelta.
+    void catalogoDeEtiquetas();
     let response: Response;
     try {
       response = await authenticatedFetch(`/api/services${buildServicesQueryString(query)}`);
@@ -495,7 +594,7 @@ export const servicesAdapter = {
     }
 
     return {
-      services: parsed.data.data,
+      services: await Promise.all(parsed.data.data.map(completarEtiquetas)),
       page: parsed.data.meta.page,
       pageSize: parsed.data.meta.pageSize,
       total: parsed.data.meta.total,
@@ -504,6 +603,7 @@ export const servicesAdapter = {
   },
 
   async get(id: string): Promise<Service> {
+    void catalogoDeEtiquetas();
     let response: Response;
     try {
       response = await authenticatedFetch(`/api/services/${id}`);
@@ -531,15 +631,7 @@ export const servicesAdapter = {
       throw new ServiceRequestError(message, parsedError.data.statusCode);
     }
 
-    const parsed = serviceSchema.safeParse(payload);
-    if (!parsed.success) {
-      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-      throw new ServiceContractError("El detalle de servicio no respeta el contrato esperado.", {
-        cause: parsed.error,
-      });
-    }
-
-    return parsed.data;
+    return parseServicio(payload, "El detalle de servicio no respeta el contrato esperado.");
   },
 
   async create(input: CreateServiceInput): Promise<Service> {
@@ -588,16 +680,7 @@ export const servicesAdapter = {
         ? (payload as { data: unknown }).data
         : payload;
 
-    const parsed = serviceSchema.safeParse(raw);
-    if (!parsed.success) {
-      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-      throw new ServiceContractError(
-        "La respuesta de creación de servicio no respeta el contrato esperado.",
-        { cause: parsed.error },
-      );
-    }
-
-    return parsed.data;
+    return parseServicio(raw, "La respuesta de creación de servicio no respeta el contrato esperado.");
   },
 
   async assignCrew(serviceId: string, input: AssignCrewInput): Promise<Service> {
@@ -646,16 +729,7 @@ export const servicesAdapter = {
         ? (payload as { data: unknown }).data
         : payload;
 
-    const parsed = serviceSchema.safeParse(raw);
-    if (!parsed.success) {
-      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-      throw new ServiceContractError(
-        "La respuesta de asignación de servicio no respeta el contrato esperado.",
-        { cause: parsed.error },
-      );
-    }
-
-    return parsed.data;
+    return parseServicio(raw, "La respuesta de asignación de servicio no respeta el contrato esperado.");
   },
 
   async start(serviceId: string): Promise<Service> {
@@ -708,16 +782,7 @@ export const servicesAdapter = {
         ? (payload as { data: unknown }).data
         : payload;
 
-    const parsed = serviceSchema.safeParse(raw);
-    if (!parsed.success) {
-      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-      throw new ServiceContractError(
-        "La respuesta de inicio de servicio no respeta el contrato esperado.",
-        { cause: parsed.error },
-      );
-    }
-
-    return parsed.data;
+    return parseServicio(raw, "La respuesta de inicio de servicio no respeta el contrato esperado.");
   },
 
   async suspend(serviceId: string, input: SuspendServiceInput): Promise<Service> {
@@ -765,16 +830,7 @@ export const servicesAdapter = {
         ? (payload as { data: unknown }).data
         : payload;
 
-    const parsed = serviceSchema.safeParse(raw);
-    if (!parsed.success) {
-      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-      throw new ServiceContractError(
-        "La respuesta de suspensión de servicio no respeta el contrato esperado.",
-        { cause: parsed.error },
-      );
-    }
-
-    return parsed.data;
+    return parseServicio(raw, "La respuesta de suspensión de servicio no respeta el contrato esperado.");
   },
 
   async resume(serviceId: string): Promise<Service> {
@@ -812,16 +868,7 @@ export const servicesAdapter = {
         ? (payload as { data: unknown }).data
         : payload;
 
-    const parsed = serviceSchema.safeParse(raw);
-    if (!parsed.success) {
-      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-      throw new ServiceContractError(
-        "La respuesta de reanudación de servicio no respeta el contrato esperado.",
-        { cause: parsed.error },
-      );
-    }
-
-    return parsed.data;
+    return parseServicio(raw, "La respuesta de reanudación de servicio no respeta el contrato esperado.");
   },
 
   async reschedule(serviceId: string, input: RescheduleServiceInput): Promise<Service> {
@@ -869,16 +916,7 @@ export const servicesAdapter = {
         ? (payload as { data: unknown }).data
         : payload;
 
-    const parsed = serviceSchema.safeParse(raw);
-    if (!parsed.success) {
-      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-      throw new ServiceContractError(
-        "La respuesta de reprogramación de servicio no respeta el contrato esperado.",
-        { cause: parsed.error },
-      );
-    }
-
-    return parsed.data;
+    return parseServicio(raw, "La respuesta de reprogramación de servicio no respeta el contrato esperado.");
   },
 
   async cancel(serviceId: string, input: CancelServiceInput): Promise<Service> {
@@ -926,16 +964,7 @@ export const servicesAdapter = {
         ? (payload as { data: unknown }).data
         : payload;
 
-    const parsed = serviceSchema.safeParse(raw);
-    if (!parsed.success) {
-      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-      throw new ServiceContractError(
-        "La respuesta de cancelación de servicio no respeta el contrato esperado.",
-        { cause: parsed.error },
-      );
-    }
-
-    return parsed.data;
+    return parseServicio(raw, "La respuesta de cancelación de servicio no respeta el contrato esperado.");
   },
 
   async confirmReschedule(serviceId: string, input: ConfirmRescheduleInput): Promise<Service> {
@@ -983,16 +1012,7 @@ export const servicesAdapter = {
         ? (payload as { data: unknown }).data
         : payload;
 
-    const parsed = serviceSchema.safeParse(raw);
-    if (!parsed.success) {
-      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-      throw new ServiceContractError(
-        "La respuesta de confirmación de reprogramación no respeta el contrato esperado.",
-        { cause: parsed.error },
-      );
-    }
-
-    return parsed.data;
+    return parseServicio(raw, "La respuesta de confirmación de reprogramación no respeta el contrato esperado.");
   },
 
   async getZoneResults(serviceId: string): Promise<ZoneResult[]> {
@@ -1201,16 +1221,7 @@ export const servicesAdapter = {
         ? (payload as { data: unknown }).data
         : payload;
 
-    const parsed = serviceSchema.safeParse(raw);
-    if (!parsed.success) {
-      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-      throw new ServiceContractError(
-        "La respuesta de finalización de servicio no respeta el contrato esperado.",
-        { cause: parsed.error },
-      );
-    }
-
-    return parsed.data;
+    return parseServicio(raw, "La respuesta de finalización de servicio no respeta el contrato esperado.");
   },
 };
 

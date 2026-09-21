@@ -31,7 +31,7 @@ async function authenticatedCookie(scenarioId: string, mode = "mock") {
 }
 
 const confirmBody = {
-  scheduledDate: "2026-09-10",
+  scheduledDate: "2099-09-10",
   timeWindow: { start: "09:00", end: "13:00" },
 };
 
@@ -137,5 +137,31 @@ describe("POST /api/services/[id]/confirm-reschedule BFF route", () => {
 
     const updatedFixture = serviceFixtures.find((s) => s.id === "SVC-1053");
     expect(updatedFixture?.status).toBe("SCHEDULED");
+  });
+
+  it("forwards the DTO-shaped body and JSON content type in backend-development mode", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
+    );
+    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1053/confirm-reschedule", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(confirmBody),
+      }),
+      { params: Promise.resolve({ id: "SVC-1053" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
+    expect(JSON.parse(String(requestInit.body))).toEqual({
+      scheduledDate: "2099-09-10",
+      windowFrom: "09:00",
+      windowTo: "13:00",
+    });
   });
 });

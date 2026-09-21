@@ -11,7 +11,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
-import { defaultIndicatorQuery, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
+import { defaultIndicatorQuery, indicatorQueryErrorMessage, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
@@ -119,7 +119,7 @@ function containerToTraceRecord(container: Container): TraceRecord {
   return {
     id: container.code,
     title: container.code,
-    detail: container.address,
+    detail: container.address ?? "Sin dirección registrada",
     zone: zoneLabel(container.zoneId),
     status: CONTAINER_STATUS_LABELS[container.status],
   };
@@ -218,6 +218,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   const canView = scenario.capabilities.includes("indicator:view");
   const [query, setQuery] = useState<IndicatorQuery>(() => defaultIndicatorQuery());
   const [appliedQuery, setAppliedQuery] = useState<IndicatorQuery>(() => defaultIndicatorQuery());
+  const [filterError, setFilterError] = useState<string | null>(null);
   const [familyStates, setFamilyStates] = useState<Record<FamilyKey, FamilyState>>(emptyFamilyState);
   const [selectedFamily, setSelectedFamily] = useState<FamilyKey>("coverage");
   const [viewMode, setViewMode] = useState<ViewMode>("bars");
@@ -346,12 +347,13 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
         {freshness ? <div className={styles.freshness}><Database size={16} aria-hidden /> Actualizado {formatDateTime(freshness)}</div> : null}
       </div>
 
-      <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); setSelectedSignal(null); setRecordPlan(null); setRecordsStatus("idle"); setFamilyStates(emptyFamilyState()); setAppliedQuery({ ...query }); }}>
-        <div className={styles.field}><label htmlFor="indicator-from">Desde</label><input id="indicator-from" type="date" value={query.from ?? ""} onChange={(event) => setQuery((current) => ({ ...current, from: event.target.value || undefined }))} /></div>
-        <div className={styles.field}><label htmlFor="indicator-to">Hasta</label><input id="indicator-to" type="date" value={query.to ?? ""} onChange={(event) => setQuery((current) => ({ ...current, to: event.target.value || undefined }))} /></div>
+      <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); const validation = indicatorQuerySchema.safeParse(query); if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; } setFilterError(null); setSelectedSignal(null); setRecordPlan(null); setRecordsStatus("idle"); setFamilyStates(emptyFamilyState()); setAppliedQuery({ ...query }); }}>
+        <div className={styles.field}><label htmlFor="indicator-from">Desde</label><input id="indicator-from" type="date" value={query.from ?? ""} onChange={(event) => { setFilterError(null); setQuery((current) => ({ ...current, from: event.target.value || undefined })); }} /></div>
+        <div className={styles.field}><label htmlFor="indicator-to">Hasta</label><input id="indicator-to" type="date" value={query.to ?? ""} aria-invalid={filterError ? true : undefined} aria-describedby={filterError ? "indicator-to-error" : undefined} onChange={(event) => { setFilterError(null); setQuery((current) => ({ ...current, to: event.target.value || undefined })); }} /></div>
         <div className={styles.field}><label htmlFor="indicator-zone">Zona operativa</label><select id="indicator-zone" value={query.zoneId ?? ""} onChange={(event) => setQuery((current) => ({ ...current, zoneId: event.target.value || undefined }))}><option value="">Todas las zonas</option>{zoneOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
         <div className={styles.field}><label htmlFor="indicator-service-type">Tipo de servicio</label><select id="indicator-service-type" value={query.serviceTypeId ?? ""} onChange={(event) => setQuery((current) => ({ ...current, serviceTypeId: event.target.value || undefined }))}><option value="">Todos los tipos</option>{serviceTypeOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
         <Button className={styles.filterAction} type="submit" disabled={dashboardStatus === "loading"}><RefreshCw data-icon="inline-start" aria-hidden />{dashboardStatus === "loading" ? "Actualizando…" : "Actualizar"}</Button>
+        {filterError ? <p id="indicator-to-error" role="alert" className={styles.fieldError}>{filterError}</p> : null}
       </form>
 
       <div className={styles.summaryHeading}><h2>Resumen del período</h2><span>{appliedQuery.from && appliedQuery.to ? `${formatDate(appliedQuery.from)} – ${formatDate(appliedQuery.to)}` : "Últimos 30 días"}</span></div>

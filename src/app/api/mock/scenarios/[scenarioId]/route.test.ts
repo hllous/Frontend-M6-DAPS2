@@ -67,4 +67,41 @@ describe("authorized scenario BFF route", () => {
     const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
     expect(new Headers(requestInit.headers).get("Authorization")).toMatch(/^Bearer /);
   });
+
+  describe("backend failures while validating the session (#240)", () => {
+    async function getWithBackend(respond: () => Promise<Response>) {
+      process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+      vi.spyOn(globalThis, "fetch").mockImplementation(respond);
+      const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+      return GET(new Request("http://localhost/api/mock/scenarios/office-duty-queue", { headers: { cookie } }), {
+        params: Promise.resolve({ scenarioId: "office-duty-queue" }),
+      });
+    }
+
+    it.each([401, 403])("maps a backend %i to an invalid session", async (status) => {
+      const response = await getWithBackend(async () => new Response(null, { status }));
+
+      expect(response.status).toBe(401);
+      expect((await response.json()).message).toBe("La sesión no está activa.");
+    });
+
+    it("keeps the real status of a backend 500 and does not blame the session", async () => {
+      const response = await getWithBackend(async () => new Response(null, { status: 500 }));
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body.message).toBe("El backend respondió con un error (HTTP 500).");
+      expect(body.message).not.toContain("sesión");
+    });
+
+    it("answers 503 with its own message when the backend is unreachable", async () => {
+      const response = await getWithBackend(async () => {
+        throw new TypeError("fetch failed");
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(body.message).toBe("No se pudo conectar con el backend.");
+    });
+  });
 });

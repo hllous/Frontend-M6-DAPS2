@@ -140,4 +140,17 @@ describe("POST /api/services/[id]/cancel BFF route", () => {
     expect(body.status).toBe("CANCELLED");
     expect(body.statusReason).toBe(cancelBody.reason);
   });
+
+  it("forwards the status-change DTO with JSON content type", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+
+    const response = await cancelRequest("SVC-1050", cookie);
+
+    expect(response.status).toBe(200);
+    const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
+    expect(JSON.parse(String(requestInit.body))).toEqual(cancelBody);
+  });
 });

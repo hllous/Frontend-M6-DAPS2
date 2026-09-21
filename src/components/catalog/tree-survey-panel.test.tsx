@@ -14,7 +14,10 @@ const tree: Tree = { id: "tree-2", surveyCode: "ARB-00443", zoneId: "zone-2", sp
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => resetTreeSurveyFixtures());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.useRealTimers();
+});
 afterAll(() => server.close());
 
 describe("TreeSurveyPanel", () => {
@@ -72,5 +75,43 @@ describe("TreeSurveyPanel", () => {
     render(<TreeSurveyPanel tree={tree} scenario={scenarios.fieldCrewLeader} onClose={vi.fn()} />);
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeVisible();
+  });
+
+  it("defaults the survey date to today in Argentina (not UTC) and blocks later dates", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-21T01:30:00Z"));
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    await screen.findByRole("heading", { name: /Historial de relevamientos/ });
+    await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
+    const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
+    const dateInput = within(dialog).getByLabelText("Fecha del relevamiento");
+    expect(dateInput).toHaveValue("2026-09-20");
+    expect(dateInput).toHaveAttribute("max", "2026-09-20");
+  });
+
+  it("refreshes the default date each time the form opens instead of freezing it at load", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-20T15:00:00Z"));
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    await screen.findByRole("heading", { name: /Historial de relevamientos/ });
+    vi.setSystemTime(new Date("2026-09-22T15:00:00Z"));
+    await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
+    const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
+    expect(within(dialog).getByLabelText("Fecha del relevamiento")).toHaveValue("2026-09-22");
+  });
+
+  it("rejects a future date before calling the backend", async () => {
+    let posts = 0;
+    server.use(http.post("*/api/trees/:treeId/surveys", () => { posts += 1; return HttpResponse.json({}, { status: 500 }); }));
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    await screen.findByRole("heading", { name: /Historial de relevamientos/ });
+    await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
+    const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
+    fireEvent.change(within(dialog).getByLabelText("Fecha del relevamiento"), { target: { value: "2099-01-01" } });
+    fireEvent.change(within(dialog).getByLabelText("Estado sanitario"), { target: { value: "HEALTHY" } });
+    fireEvent.change(within(dialog).getByLabelText("Nivel de riesgo"), { target: { value: "LOW" } });
+    await within(dialog).getByRole("button", { name: "Guardar relevamiento" }).click();
+    expect((await within(dialog).findByRole("alert")).textContent).toContain("no puede ser futura");
+    expect(posts).toBe(0);
   });
 });
