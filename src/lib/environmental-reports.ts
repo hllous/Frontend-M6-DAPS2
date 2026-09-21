@@ -263,14 +263,24 @@ export const environmentalInspectionSchema = z.object({
 }).passthrough();
 export type EnvironmentalInspection = z.infer<typeof environmentalInspectionSchema>;
 
+// Plantilla del frontend: el backend no guarda checklist al programar, así que una
+// inspección recién creada llega con `checklistItems: []`.
+export const INSPECTION_CHECKLIST_TEMPLATE: readonly EnvironmentalInspectionChecklistItem[] = [
+  { id: "location", label: "Verificar ubicación y contexto del hallazgo", required: true },
+  { id: "source", label: "Identificar la fuente del impacto", required: true },
+  { id: "evidence", label: "Registrar observaciones para el acta", required: true },
+];
+
 /**
  * El checklist que muestra la UI. En modo mock viene como `checklist`
  * (items con `id`=código y `required`); contra el backend real viene como
- * `checklistItems` (`itemCode`). Se normaliza a la forma interna.
+ * `checklistItems` (`itemCode`). Se normaliza a la forma interna. Si todavía no
+ * hay nada relevado, se usa la plantilla.
  */
 export function inspectionChecklist(inspection: EnvironmentalInspection): EnvironmentalInspectionChecklistItem[] {
   if (inspection.checklist?.length) return inspection.checklist;
-  return (inspection.checklistItems ?? []).map((item) => ({
+  if (!inspection.checklistItems?.length) return INSPECTION_CHECKLIST_TEMPLATE.map((item) => ({ ...item }));
+  return inspection.checklistItems.map((item) => ({
     id: item.itemCode,
     label: item.label,
     required: true,
