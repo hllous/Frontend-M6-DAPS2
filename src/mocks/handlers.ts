@@ -471,10 +471,10 @@ export const handlers = [
       outcome: parsed.data.outcome,
       nextStep: parsed.data.nextStep ?? nextStep,
       findings: parsed.data.findings ?? null,
+      conclusion: parsed.data.conclusion || null,
       violationType: parsed.data.violationType ?? null,
       severity: parsed.data.severity ?? null,
       suggestedAction: parsed.data.suggestedAction ?? null,
-      notes: parsed.data.conclusion ?? inspection.notes,
     });
     if (updated?.serviceId) updateServiceFixture(updated.serviceId, { status: "COMPLETED" });
     transitionEnvironmentalReportFixture(inspection.reportId, parsed.data.outcome === "NO_VIOLATION" ? "NO_VIOLATION" : parsed.data.outcome === "VIOLATION_FOUND" ? "VIOLATION_FOUND" : "INSPECTED");

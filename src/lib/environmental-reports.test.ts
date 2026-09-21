@@ -187,6 +187,12 @@ describe("environmental reports adapter", () => {
     expect(inspection).toMatchObject({ outcome: "NO_VIOLATION", nextStep: "CASE_CLOSED" });
   });
 
+  it("caps the conclusion at the backend limit (2000)", () => {
+    const base = { inspectedAt: "2026-09-07T11:55:00.000Z", outcome: "NO_VIOLATION" as const, checklist: [{ id: "a", label: "A", completed: true }] };
+    expect(environmentalInspectionCompleteInputSchema.safeParse({ ...base, conclusion: "a".repeat(2000) }).success).toBe(true);
+    expect(environmentalInspectionCompleteInputSchema.safeParse({ ...base, conclusion: "a".repeat(2001) }).success).toBe(false);
+  });
+
   it("issues and reads an immutable violation notice through the dedicated inspection endpoints", async () => {
     let requestBody: unknown;
     server.use(

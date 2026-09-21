@@ -127,7 +127,7 @@ describe("InspectionExecutionPanel", () => {
       }),
       http.post("*/api/environmental-inspections/INS-TEST-1/complete", async ({ request }) => {
         completionBody = await request.json();
-        return HttpResponse.json(inspectionResponse({ outcome: "VIOLATION_FOUND", nextStep: "NOTICE_TO_BE_ISSUED", findings: "Emisión visible", attachments: [{ id: "att-test-1", url: "/evidence/test.jpg", filename: "test.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-07T12:00:00.000Z" }] }));
+        return HttpResponse.json(inspectionResponse({ outcome: "VIOLATION_FOUND", nextStep: "NOTICE_TO_BE_ISSUED", findings: "Emisión visible", conclusion: "Humo negro continuo.", violationType: "AIR_EMISSION", severity: "HIGH", suggestedAction: "FORMAL_NOTICE", attachments: [{ id: "att-test-1", url: "/evidence/test.jpg", filename: "test.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-07T12:00:00.000Z" }] }));
       }),
     );
 
@@ -137,6 +137,7 @@ describe("InspectionExecutionPanel", () => {
     await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto/ }));
     await user.selectOptions(screen.getByRole("combobox", { name: /Resultado/ }), "VIOLATION_FOUND");
     await user.type(screen.getByRole("textbox", { name: /Hallazgos/ }), "Emisión visible");
+    await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "Humo negro continuo.");
     await user.selectOptions(screen.getByRole("combobox", { name: /Tipo de infracc/ }), "AIR_EMISSION");
     await user.selectOptions(screen.getByRole("combobox", { name: /Gravedad/ }), "HIGH");
     await user.selectOptions(screen.getByRole("combobox", { name: /Acc/ }), "FORMAL_NOTICE");
@@ -150,11 +151,17 @@ describe("InspectionExecutionPanel", () => {
       outcome: "VIOLATION_FOUND",
       nextStep: "NOTICE_TO_BE_ISSUED",
       checklist: [{ id: "source", label: "Verificar la fuente observada", completed: true }, { id: "impact", label: "Registrar el impacto visible", completed: true }],
+      conclusion: "Humo negro continuo.",
       findings: "Emisión visible",
       violationType: "AIR_EMISSION",
       severity: "HIGH",
       suggestedAction: "FORMAL_NOTICE",
     });
+    // El resultado se lee de vuelta de la respuesta, con los cuatro campos de cierre.
+    expect(screen.getByText("Humo negro continuo.")).toBeVisible();
+    expect(screen.getByText("Emisión al aire")).toBeVisible();
+    expect(screen.getByText("Alta")).toBeVisible();
+    expect(screen.getByText("Aviso formal")).toBeVisible();
   });
 
   it("saves an offline draft and blocks resubmission when the service has drifted", async () => {

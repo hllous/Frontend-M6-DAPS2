@@ -40,6 +40,7 @@ describe("POST /api/environmental-inspections/:id/complete", () => {
         nextStep: "NOTICE_TO_BE_ISSUED",
         checklist: [{ id: "source", label: "Verificar la fuente observada", completed: true }],
         findings: "Emisión visible",
+        conclusion: "Humo negro continuo desde la chimenea.",
         violationType: "AIR_EMISSION",
         severity: "HIGH",
         suggestedAction: "FORMAL_NOTICE",
@@ -52,6 +53,10 @@ describe("POST /api/environmental-inspections/:id/complete", () => {
       outcome: "VIOLATION_FOUND",
       nextStep: "NOTICE_TO_BE_ISSUED",
       findings: "Emisión visible",
+      conclusion: "Humo negro continuo desde la chimenea.",
+      violationType: "AIR_EMISSION",
+      severity: "HIGH",
+      suggestedAction: "FORMAL_NOTICE",
       checklist: [{ itemCode: "source", label: "Verificar la fuente observada", result: true }],
     });
   });

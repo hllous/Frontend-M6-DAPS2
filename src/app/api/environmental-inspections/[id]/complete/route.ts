@@ -73,6 +73,10 @@ export async function POST(
         outcome: parsedInput.data.outcome,
         ...(parsedInput.data.nextStep ? { nextStep: parsedInput.data.nextStep } : {}),
         ...(parsedInput.data.findings ? { findings: parsedInput.data.findings } : {}),
+        ...(parsedInput.data.conclusion ? { conclusion: parsedInput.data.conclusion } : {}),
+        ...(parsedInput.data.violationType ? { violationType: parsedInput.data.violationType } : {}),
+        ...(parsedInput.data.severity ? { severity: parsedInput.data.severity } : {}),
+        ...(parsedInput.data.suggestedAction ? { suggestedAction: parsedInput.data.suggestedAction } : {}),
         checklist: parsedInput.data.checklist.map((item) => ({
           itemCode: item.id,
           label: item.label,
@@ -117,10 +121,10 @@ export async function POST(
       inspectedAt: parsedInput.data.inspectedAt,
       checklist: inspection.checklist,
       findings: parsedInput.data.findings ?? null,
+      conclusion: parsedInput.data.conclusion || null,
       violationType: parsedInput.data.violationType ?? null,
       severity: parsedInput.data.severity ?? null,
       suggestedAction: parsedInput.data.suggestedAction ?? null,
-      notes: parsedInput.data.conclusion ?? inspection.notes,
       outcome: parsedInput.data.outcome,
       nextStep: parsedInput.data.nextStep ?? nextStepForOutcome(parsedInput.data.outcome),
     });
