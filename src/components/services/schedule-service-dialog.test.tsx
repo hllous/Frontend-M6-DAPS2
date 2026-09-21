@@ -240,7 +240,7 @@ describe("ScheduleServiceDialog component", () => {
       })),
       http.get("*/api/routes/:routeId", () => HttpResponse.json({
         id: routeUuid, code: "R-01", name: "Recorrido Centro", active: true,
-        stops: [{ id: "stop-a", routeId: routeUuid, sequence: 1, zoneId: zoneUuid }],
+        stops: [{ id: "stop-a", sequence: 1, zoneId: zoneUuid, zoneCode: "Z-CEN", zoneName: "Centro", estimatedDurationMin: 30 }],
       })),
     );
     const create = vi.spyOn(servicesAdapter, "create").mockResolvedValue({ id: "SVC-1" } as never);

@@ -132,7 +132,7 @@ export function ScheduleServiceDialog({
   // Selected Route for ROUTE mode
   const selectedRoute = routes.find((r) => r.id === routeId);
   const selectedRouteZones = useMemo(
-    () => [...(selectedRoute?.stops ?? [])].sort((a, b) => a.sequence - b.sequence).map((stop) => ({ id: stop.zoneId, name: stop.zone?.name ?? stop.zoneId })),
+    () => [...(selectedRoute?.stops ?? [])].sort((a, b) => a.sequence - b.sequence).map((stop) => ({ id: stop.zoneId, name: stop.zoneName })),
     [selectedRoute],
   );
 
