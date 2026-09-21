@@ -14,7 +14,9 @@
 | **PostgreSQL** | Render (Managed, free) | ✅ Available | (Internal URL, no accesible desde afuera) |
 | **Frontend** (Next.js) | Vercel (free) | ✅ Live | `https://m6-ambiente-frontend.vercel.app` |
 
-El deploy está **enlazado a la rama `develop`** de cada repo: al pushear código a `develop` se actualiza automáticamente — el backend vía GitHub Actions + Deploy Hook de Render, el frontend vía auto-deploy nativo de Vercel (~2-5 min).
+El deploy está **enlazado a la rama `main`** de cada repo: al pushear código a `main` se actualiza automáticamente — el backend vía GitHub Actions + Deploy Hook de Render, el frontend vía auto-deploy nativo de Vercel (~2-5 min).
+
+El repositorio del frontend es independiente (`Frontend-M6-DAPS2`), por lo que en Vercel el **Root Directory** debe ser `./` y la rama de producción debe ser `main`. La configuración queda versionada en [`vercel.json`](../vercel.json) para que Vercel use Next.js, `npm ci` y `npm run build` aunque se cree o reconecte el proyecto.
 
 El backend cerró las siete fases de su plan: 130 rutas REST en 23 tags de Swagger, con migraciones de Prisma corriendo solas en cada deploy. El catálogo completo está espejado en [`backend-context/api/endpoints.md`](backend-context/api/endpoints.md).
 
