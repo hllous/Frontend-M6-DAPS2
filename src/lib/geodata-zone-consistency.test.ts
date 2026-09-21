@@ -68,11 +68,11 @@ describe("mock geodata", () => {
         stops: [
           {
             id: "stop-geodata-check",
-            routeId: "route-geodata-check",
             sequence: 1,
             zoneId: "zone-1",
             estimatedDurationMin: 20,
-            zone: { id: "zone-1", code: "Z-01", name: "Zona Norte" },
+            zoneCode: "Z-01",
+            zoneName: "Zona Norte",
           },
         ],
       },
