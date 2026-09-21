@@ -102,7 +102,7 @@ const inspections: EnvironmentalInspection[] = [
     suggestedAction: "FORMAL_NOTICE",
     outcome: "VIOLATION_FOUND",
     nextStep: "NOTICE_TO_BE_ISSUED",
-    notes: "Se constató la infracción.",
+    conclusion: "Se constató la infracción.",
     createdAt: "2026-09-03T08:00:00.000Z",
     updatedAt: "2026-09-03T17:15:00.000Z",
   },
@@ -119,24 +119,24 @@ inspections.push({
   checklist: [{ id: "source-1010", label: "Identificar la fuente del impacto", required: true }],
   attachments: [{ id: "att-1010", url: "/mock/evidence/acta-1010.jpg", filename: "acta-1010.jpg", contentType: "image/jpeg", uploadedAt: "2026-08-31T17:00:00.000Z" }],
   findings: "Descarga constatada en el establecimiento.",
-  violationType: "UNTREATED_DISCHARGE",
-  severity: "CRITICAL",
-  suggestedAction: "FINE",
-  outcome: "VIOLATION_FOUND",
-  nextStep: "NOTICE_TO_BE_ISSUED",
-  notes: "Se constató la infracción.",
+    violationType: "UNTREATED_DISCHARGE",
+    severity: "CRITICAL",
+    suggestedAction: "FINE",
+    outcome: "VIOLATION_FOUND",
+    nextStep: "NOTICE_TO_BE_ISSUED",
+    conclusion: "Se constató la infracción.",
   createdAt: "2026-08-31T08:00:00.000Z",
   updatedAt: "2026-08-31T17:15:00.000Z",
 });
 
 export let environmentalInspectionFixtures: EnvironmentalInspection[] = inspections.map((inspection) => ({
   ...inspection,
-  checklist: inspection.checklist.map((item) => ({ ...item })),
+  checklist: (inspection.checklist ?? []).map((item) => ({ ...item })),
   attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
 }));
 const initialInspections = environmentalInspectionFixtures.map((inspection) => ({
   ...inspection,
-  checklist: inspection.checklist.map((item) => ({ ...item })),
+  checklist: (inspection.checklist ?? []).map((item) => ({ ...item })),
   attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
 }));
 
@@ -170,7 +170,7 @@ export function resetEnvironmentalReportFixtures() {
 export function resetEnvironmentalInspectionFixtures() {
   environmentalInspectionFixtures = initialInspections.map((inspection) => ({
     ...inspection,
-    checklist: inspection.checklist.map((item) => ({ ...item })),
+    checklist: (inspection.checklist ?? []).map((item) => ({ ...item })),
     attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
   }));
 }

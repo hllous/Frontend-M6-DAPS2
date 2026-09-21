@@ -464,7 +464,7 @@ export const handlers = [
     if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
     if (parsed.data.outcome !== "NO_VIOLATION" && !(inspection.attachments?.length ?? 0)) return HttpResponse.json({ statusCode: 400, message: "Debe adjuntar al menos una evidencia para este resultado.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
     const nextStep = parsed.data.outcome === "NO_VIOLATION" ? "CASE_CLOSED" : parsed.data.outcome === "VIOLATION_FOUND" ? "NOTICE_TO_BE_ISSUED" : "REINSPECTION";
-    const expectedChecklistIds = new Set(inspection.checklist.map((item) => item.id));
+    const expectedChecklistIds = new Set((inspection.checklist ?? []).map((item) => item.id));
     if (parsed.data.checklist.length !== expectedChecklistIds.size || parsed.data.checklist.some((item) => !expectedChecklistIds.has(item.id))) return HttpResponse.json({ statusCode: 400, message: "El checklist enviado no coincide con el checklist asignado.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
     const updated = updateEnvironmentalInspectionFixture(inspectionId, {
       inspectedAt: parsed.data.inspectedAt,
@@ -474,7 +474,7 @@ export const handlers = [
       violationType: parsed.data.violationType ?? null,
       severity: parsed.data.severity ?? null,
       suggestedAction: parsed.data.suggestedAction ?? null,
-      notes: parsed.data.conclusion ?? inspection.notes,
+      conclusion: parsed.data.conclusion ?? inspection.conclusion,
     });
     if (updated?.serviceId) updateServiceFixture(updated.serviceId, { status: "COMPLETED" });
     transitionEnvironmentalReportFixture(inspection.reportId, parsed.data.outcome === "NO_VIOLATION" ? "NO_VIOLATION" : parsed.data.outcome === "VIOLATION_FOUND" ? "VIOLATION_FOUND" : "INSPECTED");
