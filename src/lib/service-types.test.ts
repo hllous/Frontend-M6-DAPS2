@@ -2,8 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ServiceTypeContractError,
+  ServiceTypeNotFoundError,
   ServiceTypeRequestError,
+  resolveServiceType,
   serviceTypesAdapter,
+  TREE_PRUNING_SERVICE_TYPE_RULE,
 } from "./service-types";
 
 afterEach(() => vi.restoreAllMocks());
@@ -103,5 +106,39 @@ describe("serviceTypesAdapter", () => {
       constructor: ServiceTypeRequestError,
       status: 409,
     });
+  });
+});
+
+describe("resolveServiceType", () => {
+  const pruning = { id: "0b8f2c6e-1a4d-4f7e-9c3b-5d2e8a1f6b70", code: "ARB-POD", name: "Poda de arbolado", category: "TREES", mode: "POINT", requiresVehicle: true, active: true };
+  const otherTrees = { ...pruning, id: "7c1d9e3a-2b5f-4a86-8d04-9e6f3b2a1c55", code: "ARB-EXT", name: "Extracción de arbolado" };
+  const listResponse = (items: unknown[]) => new Response(JSON.stringify({ data: items, meta: { total: items.length, page: 1, pageSize: 100, totalPages: 1 } }), { status: 200 });
+
+  it("looks the type up by category, mode and active state and returns the backend id", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(listResponse([pruning]));
+
+    await expect(resolveServiceType(TREE_PRUNING_SERVICE_TYPE_RULE)).resolves.toMatchObject({ id: pruning.id });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/service-types?active=true&category=TREES&mode=POINT&pageSize=100",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("prefers the usual code when the category has more than one active type", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(listResponse([otherTrees, pruning]));
+    await expect(resolveServiceType(TREE_PRUNING_SERVICE_TYPE_RULE)).resolves.toMatchObject({ code: "ARB-POD" });
+  });
+
+  it("falls back to the first active type of the category when the usual code is missing", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(listResponse([otherTrees]));
+    await expect(resolveServiceType(TREE_PRUNING_SERVICE_TYPE_RULE)).resolves.toMatchObject({ id: otherTrees.id });
+  });
+
+  it("fails with a Spanish message and never invents an id when nothing matches", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(listResponse([{ ...pruning, active: false }, { ...pruning, category: "GREEN_SPACES" }]));
+
+    const failure = await resolveServiceType(TREE_PRUNING_SERVICE_TYPE_RULE).catch((caught: unknown) => caught);
+    expect(failure).toBeInstanceOf(ServiceTypeNotFoundError);
+    expect((failure as Error).message).toBe("No hay un tipo de servicio activo de poda de arbolado en el catálogo. Cree o active uno en Catálogo > Tipos de servicio antes de continuar.");
   });
 });

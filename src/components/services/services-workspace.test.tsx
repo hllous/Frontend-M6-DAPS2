@@ -391,6 +391,18 @@ describe("ServicesWorkspace component", () => {
     expect(screen.getByText(/ya no requiere el servicio/i)).toBeVisible();
   });
 
+  it("shows the inspection execution panel for an INSPECTION service, resolved by type category", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = within(table).getByText(/Inspección ambiental — Establecimiento Costanera km 3/).closest("tr")!;
+    await user.click(row);
+    await user.click(await screen.findByRole("button", { name: /Ver detalle completo/ }));
+
+    expect(await screen.findByRole("heading", { name: "Ejecución de inspección ambiental" })).toBeInTheDocument();
+  });
+
   it("does not offer a cancel action for an IN_PROGRESS service", async () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);

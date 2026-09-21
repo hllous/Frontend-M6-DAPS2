@@ -259,6 +259,8 @@ describe("authenticated services BFF route", () => {
       zoneId: "zone-1",
       windowFrom: "08:00",
       windowTo: "12:00",
+      // targetRef no existe en el DTO: sin targetId se conserva en las notas y no se descarta.
+      notes: "Objetivo: Referencia visible",
     });
   });
 });

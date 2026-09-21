@@ -14,7 +14,7 @@ const service: Service = {
   id: "SVC-INS-1",
   serviceTypeId: "st-env-inspection",
   serviceTypeName: "Control ambiental",
-  title: "Inspección ambiental â€” Establecimiento de prueba",
+  title: "Inspección ambiental — Establecimiento de prueba",
   mode: "POINT",
   status: "IN_PROGRESS",
   statusReason: null,

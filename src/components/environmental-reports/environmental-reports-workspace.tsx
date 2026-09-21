@@ -44,7 +44,8 @@ import {
   type ViolationNotice,
 } from "@/lib/environmental-reports";
 import { establishmentDirectoryAdapter, type Establishment } from "@/lib/establishment-directory";
-import { CREW_CATALOG, SERVICE_TYPE_CATALOG, servicesAdapter, type Service } from "@/lib/services";
+import { CREW_CATALOG, servicesAdapter, type Service } from "@/lib/services";
+import { ENVIRONMENTAL_INSPECTION_SERVICE_TYPE_RULE, resolveServiceType, ServiceTypeNotFoundError } from "@/lib/service-types";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
 import { getEnvironmentalReportClosure, SANCTION_DECISION_LABELS, type EnvironmentalReportClosure } from "@/lib/sanction-outcomes";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -60,7 +61,6 @@ type LoadState =
 type Action = "start-review" | "forward" | "dismiss" | "close";
 
 const reportTypes = environmentalReportTypeSchema.options;
-const inspectionServiceType = SERVICE_TYPE_CATALOG.find((type) => type.id === "st-env-inspection")!;
 const inspectionChecklistVersions = [
   { value: "ambiental-v1", label: "Checklist ambiental v1" },
   { value: "ambiental-v2", label: "Checklist ambiental v2 (actualizado)" },
@@ -402,6 +402,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
       } else {
         let service: Service;
         try {
+          const inspectionServiceType = await resolveServiceType(ENVIRONMENTAL_INSPECTION_SERVICE_TYPE_RULE);
           service = await servicesAdapter.create({
             title: `Inspección ambiental · ${report.id}`,
             serviceTypeId: inspectionServiceType.id,
@@ -415,7 +416,8 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
             timeWindow: input.timeWindow,
             notes: input.notes,
           });
-        } catch {
+        } catch (error) {
+          if (error instanceof ServiceTypeNotFoundError) throw new Error(`La inspección quedó programada, pero no se pudo crear el Servicio POINT. ${error.message}`);
           throw new Error("La inspección quedó programada, pero no se pudo crear el Servicio POINT. Revise la agenda antes de continuar.");
         }
         try {

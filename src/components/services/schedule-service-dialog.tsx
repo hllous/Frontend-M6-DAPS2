@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { AlertCircle, Calendar, Check, Clock, Info, Loader2, MapPin, Route as RouteIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,18 +13,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  ROUTE_CATALOG,
-  SERVICE_TYPE_CATALOG,
-  servicesAdapter,
-  type CreateServiceInput,
-  type RouteCatalogItem,
-  type Service,
-  type ServiceMode,
-  type ServiceOrigin,
-  type ServiceTypeCatalogItem,
-} from "@/lib/services";
-import { zoneFixtures } from "@/lib/zones-fixtures";
+import { servicesAdapter, type CreateServiceInput, type Service, type ServiceMode, type ServiceOrigin } from "@/lib/services";
+import { routesAdapter, type Route } from "@/lib/routes";
+import { serviceTypesAdapter, type ServiceType } from "@/lib/service-types";
+import { zonesAdapter, type Zone } from "@/lib/zones";
 import { cn } from "@/lib/utils";
 import { MAX_NOTES_LENGTH } from "@/lib/input-limits";
 
@@ -35,6 +27,11 @@ interface ScheduleServiceDialogProps {
   initialOrigin?: ServiceOrigin;
   initialReferenceId?: string;
 }
+
+type Catalogs =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ready"; serviceTypes: ServiceType[]; routes: Route[]; zones: Zone[] };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -61,9 +58,8 @@ export function ScheduleServiceDialog({
   }, [initialOrigin]);
 
   // Form State
-  const [serviceTypeId, setServiceTypeId] = useState<string>(
-    () => SERVICE_TYPE_CATALOG[0]?.id ?? "st-waste-route",
-  );
+  const [catalogs, setCatalogs] = useState<Catalogs>({ status: "loading" });
+  const [chosenServiceTypeId, setServiceTypeId] = useState("");
   const [genericOrigin, setGenericOrigin] = useState<ServiceOrigin>("MANUAL");
   const [manualTicketId, setManualTicketId] = useState(() => initialReferenceId ?? "");
 
@@ -79,14 +75,10 @@ export function ScheduleServiceDialog({
   const hasTrustedTicketContext = origin === "TICKET" && isUuid(initialReferenceId?.trim() ?? "");
 
   // Route mode state
-  const [routeId, setRouteId] = useState<string>(
-    () => ROUTE_CATALOG[0]?.id ?? "route-1",
-  );
+  const [chosenRouteId, setRouteId] = useState("");
 
   // Point mode state
-  const [pointZoneId, setPointZoneId] = useState<string>(
-    () => zoneFixtures[0]?.id ?? "zone-1",
-  );
+  const [chosenZoneId, setPointZoneId] = useState("");
   const [targetType, setTargetType] = useState<string>("CONTAINER");
   const [targetRef, setTargetRef] = useState<string>("");
 
@@ -104,17 +96,45 @@ export function ScheduleServiceDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Selected Service Type determines Mode strictly
-  const selectedServiceType = useMemo<ServiceTypeCatalogItem | undefined>(() => {
-    return SERVICE_TYPE_CATALOG.find((t) => t.id === serviceTypeId);
-  }, [serviceTypeId]);
+  // Los tipos de servicio, recorridos y zonas son los del backend (UUID): no se pueden fijar en el código.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    Promise.all([
+      serviceTypesAdapter.list({ active: true, pageSize: 100 }),
+      routesAdapter.list({ active: true, pageSize: 100 }),
+      zonesAdapter.list({ active: true, pageSize: 100 }),
+    ])
+      .then(([types, routeList, zoneList]) => {
+        if (!cancelled) setCatalogs({ status: "ready", serviceTypes: types.serviceTypes.filter((t) => t.active), routes: routeList.routes, zones: zoneList.zones });
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogs({ status: "error" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
+  const serviceTypes = useMemo(() => (catalogs.status === "ready" ? catalogs.serviceTypes : []), [catalogs]);
+  const routes = useMemo(() => (catalogs.status === "ready" ? catalogs.routes : []), [catalogs]);
+  const zones = useMemo(() => (catalogs.status === "ready" ? catalogs.zones : []), [catalogs]);
+
+  // Sin elección explícita se toma la primera opción del catálogo.
+  const serviceTypeId = serviceTypes.some((t) => t.id === chosenServiceTypeId) ? chosenServiceTypeId : (serviceTypes[0]?.id ?? "");
+  const routeId = routes.some((r) => r.id === chosenRouteId) ? chosenRouteId : (routes[0]?.id ?? "");
+  const pointZoneId = zones.some((z) => z.id === chosenZoneId) ? chosenZoneId : (zones[0]?.id ?? "");
+
+  // Selected Service Type determines Mode strictly
+  const selectedServiceType = serviceTypes.find((t) => t.id === serviceTypeId);
   const derivedMode: ServiceMode = selectedServiceType?.mode ?? "ROUTE";
 
   // Selected Route for ROUTE mode
-  const selectedRoute = useMemo<RouteCatalogItem | undefined>(() => {
-    return ROUTE_CATALOG.find((r) => r.id === routeId);
-  }, [routeId]);
+  const selectedRoute = routes.find((r) => r.id === routeId);
+  const selectedRouteZones = useMemo(
+    () => [...(selectedRoute?.stops ?? [])].sort((a, b) => a.sequence - b.sequence).map((stop) => ({ id: stop.zoneId, name: stop.zone?.name ?? stop.zoneId })),
+    [selectedRoute],
+  );
 
   // Reset form when dialog opens
   const handleOpenChange = (nextOpen: boolean) => {
@@ -129,14 +149,8 @@ export function ScheduleServiceDialog({
     event.preventDefault();
     setErrorMessage(null);
 
-    // Build zone snapshot
-    const zoneIds =
-      derivedMode === "ROUTE"
-        ? (selectedRoute?.zoneIds ?? [])
-        : [pointZoneId];
-
-    if (zoneIds.length === 0) {
-      setErrorMessage("Debe seleccionarse al menos una zona para el servicio.");
+    if (catalogs.status !== "ready" || !selectedServiceType) {
+      setErrorMessage("No hay un tipo de servicio activo para programar. Cree o active uno en Catálogo > Tipos de servicio.");
       return;
     }
 
@@ -165,6 +179,27 @@ export function ScheduleServiceDialog({
       return;
     }
 
+    setIsSubmitting(true);
+
+    // Build zone snapshot. El listado de recorridos puede no traer las paradas: entonces se pide el detalle.
+    let zoneIds = [pointZoneId];
+    if (derivedMode === "ROUTE") {
+      try {
+        const stops = selectedRouteZones.length > 0 ? selectedRouteZones.map((zone) => zone.id) : (await routesAdapter.get(routeId)).stops.map((stop) => stop.zoneId);
+        zoneIds = [...new Set(stops)];
+      } catch (cause) {
+        setErrorMessage(cause instanceof Error ? cause.message : "No se pudo consultar el recorrido seleccionado.");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    if (zoneIds.filter(Boolean).length === 0) {
+      setErrorMessage(derivedMode === "ROUTE" ? "El recorrido seleccionado no tiene paradas con zona asignada." : "Debe seleccionarse al menos una zona para el servicio.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const payload: CreateServiceInput = {
       serviceTypeId,
       origin,
@@ -182,8 +217,6 @@ export function ScheduleServiceDialog({
       },
       notes: notes.trim() ? notes.trim() : undefined,
     };
-
-    setIsSubmitting(true);
 
     try {
       const createdService = await servicesAdapter.create(payload);
@@ -224,7 +257,17 @@ export function ScheduleServiceDialog({
           </div>
         )}
 
-        <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
+        {catalogs.status === "error" && (
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+            <span>No se pudieron cargar los tipos de servicio, recorridos y zonas. Cierre este diálogo y vuelva a intentarlo.</span>
+          </div>
+        )}
+
+        <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-4 py-2" aria-busy={catalogs.status === "loading"}>
           {/* Linked Origin Banner */}
           {isLinked ? (
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3.5">
@@ -291,7 +334,7 @@ export function ScheduleServiceDialog({
               onChange={(e) => setServiceTypeId(e.target.value)}
               className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs font-medium text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
             >
-              {SERVICE_TYPE_CATALOG.map((st) => (
+              {serviceTypes.map((st) => (
                 <option key={st.id} value={st.id}>
                   {st.name} ({st.mode === "ROUTE" ? "Recorrido" : "Punto"})
                 </option>
@@ -338,7 +381,7 @@ export function ScheduleServiceDialog({
                   onChange={(e) => setRouteId(e.target.value)}
                   className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                 >
-                  {ROUTE_CATALOG.map((r) => (
+                  {routes.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.name} ({r.code})
                     </option>
@@ -352,13 +395,13 @@ export function ScheduleServiceDialog({
                     Zonas cubiertas (snapshot inmutable):
                   </span>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {selectedRoute.zoneNames.map((zn, idx) => (
+                    {selectedRouteZones.map((zone) => (
                       <span
-                        key={idx}
+                        key={zone.id}
                         className="inline-flex items-center gap-1 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] px-2 py-0.5 text-xs text-[var(--color-text)]"
                       >
                         <Check className="h-3 w-3 text-blue-600 dark:text-blue-400" aria-hidden />
-                        {zn}
+                        {zone.name}
                       </span>
                     ))}
                   </div>
@@ -376,7 +419,7 @@ export function ScheduleServiceDialog({
                     onChange={(e) => setPointZoneId(e.target.value)}
                     className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                   >
-                    {zoneFixtures
+                    {zones
                       .filter((z) => z.active)
                       .map((z) => (
                         <option key={z.id} value={z.id}>
@@ -500,7 +543,7 @@ export function ScheduleServiceDialog({
           <Button
             type="submit"
             form={formId}
-            disabled={isSubmitting}
+            disabled={isSubmitting || catalogs.status !== "ready"}
             className="font-semibold"
           >
             {isSubmitting ? (

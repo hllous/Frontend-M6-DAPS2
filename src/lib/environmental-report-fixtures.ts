@@ -124,7 +124,7 @@ inspections.push({
   suggestedAction: "FINE",
   outcome: "VIOLATION_FOUND",
   nextStep: "NOTICE_TO_BE_ISSUED",
-  notes: "Se constatÃ³ la infracciÃ³n.",
+  notes: "Se constató la infracción.",
   createdAt: "2026-08-31T08:00:00.000Z",
   updatedAt: "2026-08-31T17:15:00.000Z",
 });
