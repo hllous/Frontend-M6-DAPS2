@@ -4,7 +4,7 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { resetEnvironmentalReportFixtures } from "./environmental-report-fixtures";
-import { environmentalInspectionCompleteInputSchema, EnvironmentalReportContractError, environmentalReportsAdapter } from "./environmental-reports";
+import { createEnvironmentalReportInputSchema, environmentalInspectionCompleteInputSchema, EnvironmentalReportContractError, environmentalReportSchema, environmentalReportsAdapter } from "./environmental-reports";
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -40,6 +40,27 @@ describe("environmental reports adapter", () => {
     await expect(environmentalReportsAdapter.list()).resolves.toMatchObject({
       environmentalReports: [{ id: "ER-NULL", priority: null }],
     });
+  });
+
+  it("accepts description null from M2 and descriptionless reports in list and detail (#289)", async () => {
+    const fromM2 = { id: "ER-M2", reportType: "NOISE", address: "Av. Corrientes 4200", lat: null, lng: null, description: null, publicId: "TK-2026-000123", ticketId: "550e8400-e29b-41d4-a716-446655440123", status: "RECEIVED", priority: null, deadlineAt: null, createdAt: "2026-09-20T10:00:00.000Z", updatedAt: "2026-09-20T10:00:00.000Z" };
+    const own = { ...fromM2, id: "ER-OWN", description: "Ruido de maquinaria.", publicId: null, ticketId: null };
+    server.use(
+      http.get("*/api/environmental-reports", () => HttpResponse.json({ data: [own, fromM2], meta: { total: 2, page: 1, pageSize: 20, totalPages: 1 } })),
+      http.get("*/api/environmental-reports/ER-M2", () => HttpResponse.json(fromM2)),
+    );
+
+    expect(environmentalReportSchema.safeParse(fromM2).success).toBe(true);
+    await expect(environmentalReportsAdapter.list()).resolves.toMatchObject({
+      environmentalReports: [{ id: "ER-OWN", description: "Ruido de maquinaria." }, { id: "ER-M2", description: null }],
+    });
+    await expect(environmentalReportsAdapter.get("ER-M2")).resolves.toMatchObject({ id: "ER-M2", description: null });
+  });
+
+  it("caps the new report description at the backend's 2000 characters", () => {
+    const input = { reportType: "DUMPING" as const, address: "Av. Rivadavia 2200", lat: -34.61, lng: -58.42 };
+    expect(createEnvironmentalReportInputSchema.safeParse({ ...input, description: "a".repeat(2000) }).success).toBe(true);
+    expect(createEnvironmentalReportInputSchema.safeParse({ ...input, description: "a".repeat(2001) }).success).toBe(false);
   });
 
   it("requests the complete queue and preserves the eleven backend statuses", async () => {
