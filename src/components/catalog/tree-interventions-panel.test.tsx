@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
@@ -8,6 +8,7 @@ import { handlers } from "@/mocks/handlers";
 import { resetTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
 import { resetServiceFixtures, serviceFixtures } from "@/lib/services-fixtures";
 import { scenarios } from "@/lib/scenarios";
+import { servicesAdapter } from "@/lib/services";
 import { TreeInterventionsPanel } from "./tree-interventions-panel";
 
 const server = setupServer(...handlers);
@@ -121,6 +122,50 @@ describe("TreeInterventionsPanel", () => {
     expect(linkedService).toMatchObject({ mode: "POINT", targetType: "TREE", targetId: "tree-2", zoneIds: ["zone-2"] });
     expect(linkedService?.targetRef).toMatch(/ARB-00443/);
     expect(linkedService?.targetRef).toMatch(/ARB-00445/);
+  });
+
+  it("creates the Service with the id returned by the Service types lookup, not a fixture id", async () => {
+    const backendServiceTypeId = "0b8f2c6e-1a4d-4f7e-9c3b-5d2e8a1f6b70";
+    server.use(
+      http.get("*/api/service-types", () => HttpResponse.json({
+        data: [{ id: backendServiceTypeId, code: "ARB-POD", name: "Poda de arbolado", category: "TREES", mode: "POINT", requiresVehicle: true, active: true }],
+        meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+      })),
+    );
+    const createSpy = vi.spyOn(servicesAdapter, "create");
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name: /intervention-2|Tratamiento/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    await user.click(within(detail).getByRole("button", { name: "Programar servicio" }));
+    const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+
+    expect(await within(detail).findByRole("alert")).toHaveTextContent(/Servicio vinculado: SVC-/);
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    expect(createSpy.mock.calls[0][0].serviceTypeId).toBe(backendServiceTypeId);
+    createSpy.mockRestore();
+  });
+
+  it("shows a clear Spanish error and creates nothing when there is no active pruning Service type", async () => {
+    server.use(
+      http.get("*/api/service-types", () => HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 } })),
+    );
+    const createSpy = vi.spyOn(servicesAdapter, "create");
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name: /intervention-2|Tratamiento/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    await user.click(within(detail).getByRole("button", { name: "Programar servicio" }));
+    const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+
+    expect(await within(detail).findByRole("alert")).toHaveTextContent("No hay un tipo de servicio activo de poda de arbolado en el catálogo");
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(within(detail).getByRole("form", { name: "Programar servicio para la intervención" })).toBeVisible();
+    createSpy.mockRestore();
   });
 
   it("surfaces a created-but-unlinked Service as an actionable unsynced state", async () => {

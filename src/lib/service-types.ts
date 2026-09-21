@@ -89,6 +89,40 @@ const errorResponseSchema = z.object({
   path: z.string(),
 });
 
+export class ServiceTypeNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ServiceTypeNotFoundError";
+  }
+}
+
+export type ServiceTypeMatchRule = {
+  category: ServiceTypeCategory;
+  mode: ServiceTypeMode;
+  /** Código habitual del tipo; desempata cuando hay más de un tipo activo en la categoría. */
+  preferredCode?: string;
+  /** Nombre del tipo para el mensaje de error ("poda de arbolado"). */
+  label: string;
+};
+
+/**
+ * Los ids de los tipos de servicio son UUID del backend y no se pueden fijar en el código:
+ * se resuelve el tipo contra `GET /service-types` por categoría, modo y estado activo.
+ * Si no hay ninguno, falla con un mensaje en español en vez de inventar un id.
+ */
+export async function resolveServiceType(rule: ServiceTypeMatchRule): Promise<ServiceType> {
+  const { serviceTypes } = await serviceTypesAdapter.list({ active: true, category: rule.category, mode: rule.mode, pageSize: 100 });
+  const candidates = serviceTypes.filter((item) => item.active && item.category === rule.category && item.mode === rule.mode);
+  const match = candidates.find((item) => item.code === rule.preferredCode) ?? candidates[0];
+  if (!match) {
+    throw new ServiceTypeNotFoundError(`No hay un tipo de servicio activo de ${rule.label} en el catálogo. Cree o active uno en Catálogo > Tipos de servicio antes de continuar.`);
+  }
+  return match;
+}
+
+export const TREE_PRUNING_SERVICE_TYPE_RULE: ServiceTypeMatchRule = { category: "TREES", mode: "POINT", preferredCode: "ARB-POD", label: "poda de arbolado" };
+export const ENVIRONMENTAL_INSPECTION_SERVICE_TYPE_RULE: ServiceTypeMatchRule = { category: "ENVIRONMENTAL_CONTROL", mode: "POINT", preferredCode: "AMB-INSP", label: "inspección ambiental" };
+
 function queryString(query: ServiceTypeQuery): string {
   const params = new URLSearchParams();
   if (query.active !== undefined) params.set("active", String(query.active));

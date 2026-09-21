@@ -95,7 +95,7 @@ export function ServiceDetail({
   backLabel?: string;
 }) {
   const windowTiming = checkServiceWindowTiming(service);
-  const isEnvironmentalInspectionService = service.origin === "INSPECTION" && service.serviceTypeId === "st-env-inspection";
+  const isEnvironmentalInspectionService = service.origin === "INSPECTION" && service.serviceTypeCategory === "ENVIRONMENTAL_CONTROL";
 
   return (
     <div className="flex h-full flex-col bg-[var(--color-surface)] overflow-hidden" role="region" aria-label={`Detalle completo de ${service.id}`}>

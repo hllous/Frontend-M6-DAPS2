@@ -61,6 +61,27 @@ describe("service backend input mapping", () => {
     });
   });
 
+  it("sends a loose target as a zone with the text kept in the notes", () => {
+    expect(toCreateServiceBackendInput({
+      ...baseInput,
+      targetType: "CONTAINER",
+      targetRef: "Av. Cabildo 2100",
+      notes: "Llevar conos.",
+    })).toEqual({
+      serviceTypeId: "service-type-1",
+      scheduledDate: "2026-09-30",
+      origin: "PLANNED",
+      routeId: undefined,
+      targetType: undefined,
+      targetId: undefined,
+      zoneId: "zone-1",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+      ticketId: undefined,
+      notes: "Objetivo: Av. Cabildo 2100 — Llevar conos.",
+    });
+  });
+
   it("rejects multiple loose-location zones instead of discarding one", () => {
     expect(() => toCreateServiceBackendInput({ ...baseInput, zoneIds: ["zone-1", "zone-2"] }))
       .toThrow(BackendServiceZoneSelectionError);
@@ -107,6 +128,7 @@ describe("services adapter", () => {
     expect(servicio?.zoneIds).toEqual(["zona-belgrano", "zona-palermo"]);
     expect(servicio?.zoneNames).toEqual(["Belgrano", "Palermo"]);
     expect(servicio?.serviceTypeName).toBe("Recolección domiciliaria");
+    expect(servicio?.serviceTypeCategory).toBe("WASTE_COLLECTION");
     expect(servicio?.title).toBe("Recolección domiciliaria — Belgrano, Palermo");
     expect(servicio?.title).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/);
   });
