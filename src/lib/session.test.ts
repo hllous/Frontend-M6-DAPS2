@@ -76,8 +76,13 @@ describe("owned BFF session", () => {
     );
   });
 
-  it("never enables development credentials in a production runtime", () => {
-    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "mock" })).toBe("real-m1");
-    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development" })).toBe("real-m1");
+  it("respects an explicit M6_AUTH_MODE override in production", () => {
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development" })).toBe("backend-development");
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "mock" })).toBe("mock");
+  });
+
+  it("fails closed to real M1 in production when M6_AUTH_MODE is unset", () => {
+    expect(getAuthMode({ NODE_ENV: "production" })).toBe("real-m1");
+    expect(getAuthMode({ NODE_ENV: "development" })).toBe("mock");
   });
 });
