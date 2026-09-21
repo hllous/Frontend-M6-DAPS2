@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -33,6 +33,7 @@ import {
   type Service,
   VEHICLE_CATALOG,
 } from "@/lib/services";
+import { serviceTypesAdapter } from "@/lib/service-types";
 import { cn } from "@/lib/utils";
 
 interface AssignCrewDialogProps {
@@ -85,12 +86,24 @@ function AssignCrewForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Derive service type requirements
-  const serviceType = useMemo(() => {
-    return SERVICE_TYPE_CATALOG.find((t) => t.id === service.serviceTypeId) ?? null;
-  }, [service]);
+  // Derive service type requirements. The fixture catalog resolves the mock ids;
+  // against the real backend the id is a UUID, so the adapter's answer wins once it loads.
+  const [requiresVehicle, setRequiresVehicle] = useState<boolean>(() =>
+    Boolean(SERVICE_TYPE_CATALOG.find((t) => t.id === service.serviceTypeId)?.requiresVehicle),
+  );
 
-  const requiresVehicle = Boolean(serviceType?.requiresVehicle);
+  useEffect(() => {
+    let active = true;
+    serviceTypesAdapter
+      .get(service.serviceTypeId)
+      .then((type) => {
+        if (active) setRequiresVehicle(type.requiresVehicle);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [service.serviceTypeId]);
 
   // Compute double-booking conflicts reactively
   const conflicts = useMemo(() => {
