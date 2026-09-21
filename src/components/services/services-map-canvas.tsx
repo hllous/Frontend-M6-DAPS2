@@ -99,6 +99,28 @@ function serviceZonePathOptions(selected: boolean) {
   };
 }
 
+function MapResizeController() {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+
+    // El contenedor del mapa vive dentro de paneles redimensionables (react-resizable-panels)
+    // y de un layout con flex/grid. Leaflet no detecta esos cambios de tamaño por sí solo:
+    // si no se le avisa con invalidateSize(), sigue usando las dimensiones con las que
+    // midió por última vez, lo que rompe el renderizado al hacer zoom y limita el arrastre
+    // a la zona que sí alcanzó a medir correctamente.
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, [map]);
+
+  return null;
+}
+
 function MapViewportController({
   locations,
   filterFingerprint,
@@ -174,6 +196,7 @@ export function ServicesMapCanvas({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <MapResizeController />
       <MapViewportController locations={locations} filterFingerprint={filterFingerprint} />
 
       {routeZones.map(({ zone, serviceIds }) => (

@@ -60,10 +60,6 @@ function zoneLabel(zoneId: string) {
   return zoneOptions.find((option) => option.id === zoneId)?.label ?? zoneId;
 }
 
-function serviceTypeLabel(serviceTypeId: string) {
-  return serviceTypeOptions.find((option) => option.id === serviceTypeId)?.label ?? serviceTypeId;
-}
-
 function defaultTracePlan(family: FamilyKey, period: { from: string; to: string }, zoneId?: string): TracePlan | null {
   if (family !== "coverage" && family !== "compliance") return null;
   return {
@@ -333,7 +329,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   };
 
   const visibleRecordsStatus = activeRecordPlan?.resource && recordsStatus === "idle" ? "loading" : recordsStatus;
-  const recordsView = <AccessibleRecords family={selectedFamily} period={selectedData?.period} appliedQuery={appliedQuery} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} onClear={clearSignal} />;
+  const recordsView = <AccessibleRecords family={selectedFamily} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} onClear={clearSignal} />;
   const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Tendencia" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} /></ModuleState>;
 
   if (!canView) {
@@ -420,7 +416,6 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
       <div><h2 id="indicator-detail-title">{meta.label}</h2><p>{formatDate(data.period.from)} – {formatDate(data.period.to)} · {data.primary.label}: <strong>{metricText(data.primary)}</strong></p></div>
       <div className={styles.viewActions}>
         <div className={styles.viewToggle} aria-label="Vista del detalle"><button type="button" aria-pressed={requestedViewMode === "bars"} onClick={() => onViewModeChange("bars")}>Barras</button><button type="button" aria-pressed={requestedViewMode === "table"} onClick={() => onViewModeChange("table")}>Tabla</button></div>
-        <Button className={styles.dataTableAction} type="button" variant="outline" size="lg" onClick={() => onViewModeChange("table")}>Ver tabla de datos</Button>
       </div>
     </div>
     {hasSummaryMetrics ? <div className={styles.summaryMetrics} aria-label={`Resumen exacto de ${meta.label}`}>{data.summaryMetrics.map((metric) => <div className={styles.summaryMetric} key={metric.label}><strong>{metricText(metric)}</strong><span>{metric.label}</span></div>)}</div> : null}
@@ -432,16 +427,7 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
   </section>;
 }
 
-function filterSummary(query: IndicatorQuery) {
-  const filters = [
-    query.zoneId ? `Zona: ${zoneLabel(query.zoneId)}` : null,
-    query.serviceTypeId ? `Tipo de servicio: ${serviceTypeLabel(query.serviceTypeId)}` : null,
-  ].filter((filter): filter is string => Boolean(filter));
-  return filters.length > 0 ? filters.join(" · ") : "sin filtros territoriales adicionales";
-}
-
-function AccessibleRecords({ family, period: requestedPeriod, appliedQuery, plan, selection, breakdown, point, records, status, familyStatus = "ready", onClear }: { family: FamilyKey; period?: { from: string; to: string }; appliedQuery: IndicatorQuery; plan: RecordPlan | null; selection: SelectedSignal | null; breakdown?: IndicatorBreakdown; point?: IndicatorPoint; records: TraceRecord[]; status: "idle" | "loading" | "ready" | "error"; familyStatus?: LoadStatus; onClear: () => void }) {
-  const period = requestedPeriod ?? defaultIndicatorQuery();
+function AccessibleRecords({ family, plan, selection, breakdown, point, records, status, familyStatus = "ready", onClear }: { family: FamilyKey; period?: { from: string; to: string }; plan: RecordPlan | null; selection: SelectedSignal | null; breakdown?: IndicatorBreakdown; point?: IndicatorPoint; records: TraceRecord[]; status: "idle" | "loading" | "ready" | "error"; familyStatus?: LoadStatus; onClear: () => void }) {
   const meta = familyMeta[family];
   const hasSelection = Boolean(selection && breakdown && point);
   return <section className={styles.records} aria-labelledby="indicator-records-title">
@@ -451,7 +437,6 @@ function AccessibleRecords({ family, period: requestedPeriod, appliedQuery, plan
       <div><h2 id="indicator-records-title">Registros accesibles</h2><p>Consulta los registros que explican la señal sin habilitar su gestión desde el tablero.</p></div>
       {plan?.resource ? <Link className={styles.recordsLink} href={plan.href}>{plan.linkLabel}</Link> : null}
     </div>
-    <p className={styles.recordsMeta}><strong>Familia:</strong> {meta.label} · <strong>Período:</strong> {formatDate(period.from)} – {formatDate(period.to)} · <strong>Filtros:</strong> {filterSummary(appliedQuery)}</p>
     <div className={styles.recordsContext} aria-live="polite">
       {plan?.resource === null && hasSelection ? <p>{plan.reason}</p> : hasSelection ? <p><strong>Filtro activo:</strong> {meta.label} · {breakdown?.title} · {point?.label} · {pointText(point!)}</p> : plan?.resource ? <p><strong>Sin filtro de señal.</strong> Se muestran todos los {plan.title.toLowerCase()} accesibles en el período.</p> : <p>Seleccione una señal compatible para consultar sus registros accesibles.</p>}
       {hasSelection ? <Button type="button" variant="outline" size="sm" onClick={onClear}>Quitar filtro de señal</Button> : null}

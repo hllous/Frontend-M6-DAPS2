@@ -124,7 +124,7 @@ describe("IndicatorsDashboard", () => {
     await user.keyboard("{Enter}");
     expect(screen.getAllByText(/Seleccionado:/)[0]?.closest("p")).toHaveTextContent("Seleccionado: Centro");
 
-    await user.click(screen.getByRole("button", { name: "Ver tabla de datos" }));
+    await user.click(screen.getByRole("button", { name: "Tabla" }));
     const coverageTable = screen.getByRole("region", { name: "Tabla de datos de Cobertura" });
     expect(within(coverageTable).getAllByRole("columnheader", { name: "Atendidos" })[0]).toBeVisible();
     expect(within(coverageTable).getAllByRole("columnheader", { name: "Programados" })[0]).toBeVisible();
@@ -150,7 +150,7 @@ describe("IndicatorsDashboard", () => {
     expect(screen.getByText(/reportes consideran el período y la resolución media usa solo reportes cerrados/i)).toBeVisible();
     expect(screen.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: /^Ver tabla de datos$/ }));
+    await user.click(screen.getByRole("button", { name: "Tabla" }));
     const incidentsTable = screen.getByRole("region", { name: "Tabla de datos de Incidencias" });
     expect(within(incidentsTable).getByRole("columnheader", { name: "Desbordes" })).toBeVisible();
     expect(within(incidentsTable).getByRole("columnheader", { name: "Daños" })).toBeVisible();
@@ -158,7 +158,7 @@ describe("IndicatorsDashboard", () => {
 
     await user.click(screen.getByRole("button", { name: /Residuos/ }));
     expect(screen.getAllByText(/Desvío de relleno sanitario/)[0]).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /^Ver tabla de datos$/ }));
+    await user.click(screen.getByRole("button", { name: "Tabla" }));
     const wasteTable = screen.getByRole("region", { name: "Tabla de datos de Residuos" });
     expect(within(wasteTable).getAllByRole("columnheader", { name: "Kilogramos" })[0]).toBeVisible();
     expect(within(wasteTable).getAllByRole("columnheader", { name: "Metros cúbicos" })[0]).toBeVisible();
