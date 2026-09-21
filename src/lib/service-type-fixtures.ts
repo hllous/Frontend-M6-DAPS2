@@ -4,8 +4,11 @@ const initialServiceTypes: ServiceType[] = [
   { id: "st-waste-route", code: "WASTE-ROUTE", name: "Recolección domiciliaria", category: "WASTE_COLLECTION", mode: "ROUTE", requiresVehicle: true, active: true },
   { id: "st-cleaning-route", code: "CLEAN-ROUTE", name: "Limpieza de calles", category: "STREET_CLEANING", mode: "ROUTE", requiresVehicle: true, active: true },
   { id: "st-container-point", code: "CONT-POINT", name: "Mantenimiento de contenedores", category: "CONTAINERS", mode: "POINT", requiresVehicle: true, active: true },
-  { id: "st-tree-point", code: "TREE-POINT", name: "Intervención de arbolado", category: "TREES", mode: "POINT", requiresVehicle: false, active: true },
+  // Los ids "st-tree-pruning" y "st-env-inspection" coinciden con SERVICE_TYPE_CATALOG: en modo mock el BFF
+  // resuelve el tipo del servicio por ese catálogo, así que el id que devuelve /service-types debe existir allí.
+  { id: "st-tree-pruning", code: "ARB-POD", name: "Poda de arbolado", category: "TREES", mode: "POINT", requiresVehicle: false, active: true },
   { id: "st-green-point", code: "GREEN-POINT", name: "Mantenimiento de espacios verdes", category: "GREEN_SPACES", mode: "POINT", requiresVehicle: false, active: false },
+  { id: "st-env-inspection", code: "AMB-INSP", name: "Inspección ambiental", category: "ENVIRONMENTAL_CONTROL", mode: "POINT", requiresVehicle: false, active: true },
 ];
 
 export const serviceTypeFixtures: ServiceType[] = structuredClone(initialServiceTypes);

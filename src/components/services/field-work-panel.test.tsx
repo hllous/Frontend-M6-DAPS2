@@ -101,7 +101,7 @@ const server = setupServer(
             sourceContext: {
               type: "SERVICE",
               id: "SVC-1050",
-              label: "Barrido mecÃ¡nico â€” Bulevar Costero",
+              label: "Barrido mecánico — Bulevar Costero",
               href: "/app?destination=services&detail=SVC-1050",
             },
             status: "REQUESTED",
@@ -121,7 +121,7 @@ const server = setupServer(
       sourceContext: {
         type: "SERVICE",
         id: "SVC-1050",
-        label: "Barrido mecÃ¡nico â€” Bulevar Costero",
+        label: "Barrido mecánico — Bulevar Costero",
         href: "/app?destination=services&detail=SVC-1050",
       },
       workOrderId: null,

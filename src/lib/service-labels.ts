@@ -1,4 +1,4 @@
-import { serviceTypesAdapter } from "./service-types";
+import { serviceTypesAdapter, type ServiceTypeCategory } from "./service-types";
 import { zonesAdapter } from "./zones";
 
 /**
@@ -11,7 +11,7 @@ import { zonesAdapter } from "./zones";
  * devuelve un mapa vacío en lugar de propagar el error: un nombre que falta degrada
  * la etiqueta, no tiene que tirar abajo la pantalla de servicios.
  */
-type Catalogo = { serviceTypes: Map<string, string>; zones: Map<string, string> };
+type Catalogo = { serviceTypes: Map<string, { name: string; category: ServiceTypeCategory }>; zones: Map<string, string> };
 
 let catalogoPendiente: Promise<Catalogo> | null = null;
 
@@ -19,8 +19,8 @@ async function cargarCatalogo(): Promise<Catalogo> {
   const [serviceTypes, zones] = await Promise.all([
     serviceTypesAdapter
       .list({ pageSize: 100 })
-      .then((page) => new Map(page.serviceTypes.map((item) => [item.id, item.name])))
-      .catch(() => new Map<string, string>()),
+      .then((page) => new Map(page.serviceTypes.map((item) => [item.id, { name: item.name, category: item.category }])))
+      .catch(() => new Map<string, { name: string; category: ServiceTypeCategory }>()),
     zonesAdapter
       .list({ pageSize: 100 })
       .then((page) => new Map(page.zones.map((zone) => [zone.id, zone.name])))

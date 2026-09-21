@@ -18,6 +18,11 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
+/** El formulario arma sus opciones con GET /service-types, /routes y /zones: se espera a que carguen. */
+async function catalogsLoaded() {
+  await screen.findByRole("option", { name: /Recolección domiciliaria/ });
+}
+
 describe("ScheduleServiceDialog component", () => {
   it("renders generic scheduling form with unassigned notice and derived mode", async () => {
     const onCreated = vi.fn();
@@ -31,6 +36,7 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
+    await catalogsLoaded();
     expect(screen.getByRole("heading", { name: "Programar nuevo servicio" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Origen del servicio/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Tipo de servicio/)).toBeInTheDocument();
@@ -52,6 +58,7 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
+    await catalogsLoaded();
     // Initial state: st-waste-route -> ROUTE
     expect(screen.getByText(/Recorrido \(ROUTE\)/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Recorrido asignado/)).toBeInTheDocument();
@@ -100,6 +107,7 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
+    await catalogsLoaded();
     const submitBtn = screen.getByRole("button", { name: "Programar servicio" });
     await user.click(submitBtn);
 
@@ -133,8 +141,9 @@ describe("ScheduleServiceDialog component", () => {
     );
 
     // Change to a POINT service type
+    await catalogsLoaded();
     const serviceTypeSelect = screen.getByLabelText(/Tipo de servicio/);
-    await user.selectOptions(serviceTypeSelect, "st-container-repair");
+    await user.selectOptions(serviceTypeSelect, "st-container-point");
 
     // Enter target ref
     const targetInput = screen.getByLabelText(/Identificador de objetivo/);
@@ -173,6 +182,7 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
+    await catalogsLoaded();
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/UUID.*TK-/i);
@@ -204,6 +214,7 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
+    await catalogsLoaded();
     const submitBtn = screen.getByRole("button", { name: "Programar servicio" });
     await user.click(submitBtn);
 
@@ -211,5 +222,45 @@ describe("ScheduleServiceDialog component", () => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
     expect(screen.getByText(/Contrato rechazado/i)).toBeInTheDocument();
+  });
+
+  it("sends the backend UUIDs of the service type and route, not fixture ids", async () => {
+    const user = userEvent.setup();
+    const typeId = "02c17693-4fd9-473b-bc38-299dae4d8fcb";
+    const routeUuid = "7d0a86c1-6ea5-4a11-9a48-0c9b7f0d55d1";
+    const zoneUuid = "1b0f1a52-5d3e-4a0c-8a11-2f5f0e6b7a90";
+    server.use(
+      http.get("*/api/service-types", () => HttpResponse.json({
+        data: [{ id: typeId, code: "REC-DOM", name: "Recolección domiciliaria", category: "WASTE_COLLECTION", mode: "ROUTE", requiresVehicle: true, active: true }],
+        meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+      })),
+      http.get("*/api/routes", () => HttpResponse.json({
+        data: [{ id: routeUuid, code: "R-01", name: "Recorrido Centro", active: true, stops: [] }],
+        meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+      })),
+      http.get("*/api/routes/:routeId", () => HttpResponse.json({
+        id: routeUuid, code: "R-01", name: "Recorrido Centro", active: true,
+        stops: [{ id: "stop-a", routeId: routeUuid, sequence: 1, zoneId: zoneUuid }],
+      })),
+    );
+    const create = vi.spyOn(servicesAdapter, "create").mockResolvedValue({ id: "SVC-1" } as never);
+
+    render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+    await catalogsLoaded();
+    await user.click(screen.getByRole("button", { name: "Programar servicio" }));
+
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create.mock.calls[0][0]).toMatchObject({ serviceTypeId: typeId, routeId: routeUuid, zoneIds: [zoneUuid] });
+  });
+
+  it("does not schedule when the catalogs cannot be loaded", async () => {
+    server.use(http.get("*/api/service-types", () => HttpResponse.error()));
+    const create = vi.spyOn(servicesAdapter, "create");
+
+    render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/No se pudieron cargar los tipos de servicio/);
+    expect(screen.getByRole("button", { name: "Programar servicio" })).toBeDisabled();
+    expect(create).not.toHaveBeenCalled();
   });
 });

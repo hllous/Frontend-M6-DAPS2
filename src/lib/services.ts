@@ -7,6 +7,7 @@ import {
   type StreetClosureRequest,
 } from "./street-closure-requests";
 import { catalogoDeEtiquetas, componerTituloDeServicio } from "./service-labels";
+import { serviceTypeCategorySchema } from "./service-types";
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
 
@@ -89,6 +90,7 @@ export const serviceSchema = z.object({
   id: z.string(),
   serviceTypeId: z.string(),
   serviceTypeName: z.string().optional().default("Servicio urbano"),
+  serviceTypeCategory: serviceTypeCategorySchema.optional(),
   title: z.string(),
   mode: serviceModeSchema,
   status: serviceStatusSchema,
@@ -204,23 +206,29 @@ export class BackendServiceZoneSelectionError extends Error {
 }
 
 export function toCreateServiceBackendInput(input: CreateServiceInput) {
-  const zoneIsDerived = Boolean(input.routeId || input.targetType || input.targetId);
+  // El backend exige targetType y targetId juntos, e ignora zoneId cuando hay bien: un objetivo sin
+  // targetId (p. ej. una dirección escrita a mano) se manda como ubicación suelta, con zoneId, y el
+  // texto se conserva en las notas para no perderlo.
+  const hasTarget = Boolean(input.targetType && input.targetId);
+  const zoneIsDerived = Boolean(input.routeId) || hasTarget;
   if (!zoneIsDerived && input.zoneIds.length !== 1) {
     throw new BackendServiceZoneSelectionError();
   }
+  const looseTarget = !hasTarget && !input.routeId ? input.targetRef?.trim() : undefined;
+  const notes = [looseTarget ? `Objetivo: ${looseTarget}` : undefined, input.notes].filter(Boolean).join(" — ") || undefined;
 
   return {
     serviceTypeId: input.serviceTypeId,
     scheduledDate: input.scheduledDate,
     origin: input.origin,
     routeId: input.routeId,
-    targetType: input.targetType,
-    targetId: input.targetId,
+    targetType: hasTarget ? input.targetType : undefined,
+    targetId: hasTarget ? input.targetId : undefined,
     ...(!zoneIsDerived ? { zoneId: input.zoneIds[0] } : {}),
     windowFrom: input.timeWindow.start,
     windowTo: input.timeWindow.end,
     ticketId: input.ticketId,
-    notes: input.notes,
+    notes,
   };
 }
 
@@ -535,10 +543,12 @@ async function readJsonBody(response: Response): Promise<unknown> {
 async function completarEtiquetas(wire: z.infer<typeof serviceWireSchema>): Promise<Service> {
   const { serviceTypes, zones } = await catalogoDeEtiquetas();
   const nombresDeZona = wire.zoneIds.map((zoneId) => zones.get(zoneId)).filter((nombre): nombre is string => Boolean(nombre));
-  const nombreDeTipo = serviceTypes.get(wire.serviceTypeId);
+  const tipo = serviceTypes.get(wire.serviceTypeId);
+  const nombreDeTipo = tipo?.name;
   return {
     ...wire,
     serviceTypeName: nombreDeTipo ?? wire.serviceTypeName,
+    serviceTypeCategory: tipo?.category ?? wire.serviceTypeCategory,
     zoneNames: wire.zoneNames.length > 0 ? wire.zoneNames : nombresDeZona,
     title: wire.title ?? componerTituloDeServicio(wire, { serviceType: nombreDeTipo, zones: nombresDeZona }),
   };
