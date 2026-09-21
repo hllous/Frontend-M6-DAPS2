@@ -162,6 +162,12 @@ export async function POST(request: Request) {
     }
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+      // UploadEvidenceDto (forbidNonWhitelisted) sólo acepta file, ownerType y ownerId:
+      // fileName y fileSize son para la validación de este BFF y darían 400.
+      const backendForm = new FormData();
+      backendForm.append("file", file);
+      backendForm.append("ownerType", ownerType);
+      backendForm.append("ownerId", ownerId);
       const backendResponse = await fetchBackend(
         request,
         "/evidence",
@@ -169,7 +175,7 @@ export async function POST(request: Request) {
         {
           method: "POST",
           headers: { "Idempotency-Key": idempotencyKey },
-          body: formData,
+          body: backendForm,
         },
       );
       const bodyText = await backendResponse.text();
