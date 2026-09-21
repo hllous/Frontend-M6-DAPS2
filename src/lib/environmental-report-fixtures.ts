@@ -1,6 +1,7 @@
 import type {
   CreateEnvironmentalReportInput,
-  EnvironmentalInspection,
+  EnvironmentalInspectionCompleteInput,
+  EnvironmentalInspectionRecord,
   EnvironmentalInspectionScheduleInput,
   EnvironmentalReport,
   EnvironmentalReportQuery,
@@ -46,99 +47,61 @@ if (sanctionedReport) sanctionedReport.sanctionOutcome = initialSanctionOutcome;
 export let environmentalReportFixtures: EnvironmentalReport[] = reports.map((report) => ({ ...report }));
 const initialReports = reports.map((report) => ({ ...report }));
 
-const inspections: EnvironmentalInspection[] = [
-  {
-    id: "INS-1005",
-    reportId: "ER-1005",
-    serviceId: "SVC-1072",
-    inspectedAt: null,
-    scheduledDate: "2026-09-05",
-    timeWindow: { start: "13:00", end: "16:00" },
-    checklistVersion: "ambiental-v1",
-    checklist: [
-      { id: "emission-source", label: "Identificar la fuente de emisión", required: true },
-      { id: "visible-impact", label: "Registrar el impacto visible", required: true },
-    ],
-    findings: null,
-    outcome: null,
-    nextStep: null,
-    notes: null,
-    createdAt: "2026-09-05T08:30:00.000Z",
-    updatedAt: "2026-09-05T08:30:00.000Z",
-  },
-  {
-    id: "INS-1012",
-    reportId: "ER-1012",
-    serviceId: "SVC-1112",
-    inspectedAt: null,
-    scheduledDate: "2026-09-07",
-    timeWindow: { start: "10:00", end: "13:00" },
-    checklistVersion: "ambiental-v1",
-    checklist: [
-      { id: "emission-source-1012", label: "Identificar la fuente de emisión", required: true },
-      { id: "visible-impact-1012", label: "Registrar el impacto visible", required: true },
-    ],
-    attachments: [],
-    findings: null,
-    outcome: null,
-    nextStep: null,
-    notes: null,
-    createdAt: "2026-09-06T08:30:00.000Z",
-    updatedAt: "2026-09-06T08:30:00.000Z",
-  },
+// Forma real de InspectionResponseDto (backend): sin agenda ni checklist asignado, que
+// son del servicio y de la plantilla del frontend. `attachments` lo agrega el BFF.
+const pendingInspection = { inspectorId: null, inspectedAt: null, findings: null, outcome: null, nextStep: null, conclusion: null, violationType: null, severity: null, suggestedAction: null, checklistItems: [] };
+
+const inspections: EnvironmentalInspectionRecord[] = [
+  { ...pendingInspection, id: "INS-1005", reportId: "ER-1005", serviceId: "SVC-1072", createdAt: "2026-09-05T08:30:00.000Z", updatedAt: "2026-09-05T08:30:00.000Z" },
+  { ...pendingInspection, id: "INS-1012", reportId: "ER-1012", serviceId: "SVC-1112", attachments: [], createdAt: "2026-09-06T08:30:00.000Z", updatedAt: "2026-09-06T08:30:00.000Z" },
   {
     id: "INS-1008",
     reportId: "ER-1008",
     serviceId: null,
+    inspectorId: "user-maria",
     inspectedAt: "2026-09-03T17:15:00.000Z",
-    scheduledDate: "2026-09-03",
-    timeWindow: { start: "09:00", end: "11:00" },
-    checklistVersion: "ambiental-v1",
-    checklist: [{ id: "source-1008", label: "Identificar la fuente del impacto", required: true }],
+    checklistItems: [{ id: "chk-1008", itemCode: "source", label: "Identificar la fuente del impacto", result: true, observations: null }],
     attachments: [{ id: "att-1008", url: "/mock/evidence/acta-1008.jpg", filename: "acta-1008.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-03T17:00:00.000Z" }],
     findings: "Vertido constatado en la vía pública.",
+    conclusion: "Se constató la infracción.",
     violationType: "ILLEGAL_DUMPING",
     severity: "HIGH",
     suggestedAction: "FORMAL_NOTICE",
     outcome: "VIOLATION_FOUND",
     nextStep: "NOTICE_TO_BE_ISSUED",
-    notes: "Se constató la infracción.",
     createdAt: "2026-09-03T08:00:00.000Z",
     updatedAt: "2026-09-03T17:15:00.000Z",
   },
+  {
+    id: "INS-1010",
+    reportId: "ER-1010",
+    serviceId: null,
+    inspectorId: "user-maria",
+    inspectedAt: "2026-08-31T17:15:00.000Z",
+    checklistItems: [{ id: "chk-1010", itemCode: "source", label: "Identificar la fuente del impacto", result: true, observations: null }],
+    attachments: [{ id: "att-1010", url: "/mock/evidence/acta-1010.jpg", filename: "acta-1010.jpg", contentType: "image/jpeg", uploadedAt: "2026-08-31T17:00:00.000Z" }],
+    findings: "Descarga constatada en el establecimiento.",
+    conclusion: "Se constató la infracción.",
+    violationType: "UNTREATED_DISCHARGE",
+    severity: "CRITICAL",
+    suggestedAction: "FINE",
+    outcome: "VIOLATION_FOUND",
+    nextStep: "NOTICE_TO_BE_ISSUED",
+    createdAt: "2026-08-31T08:00:00.000Z",
+    updatedAt: "2026-08-31T17:15:00.000Z",
+  },
 ];
 
-inspections.push({
-  id: "INS-1010",
-  reportId: "ER-1010",
-  serviceId: null,
-  inspectedAt: "2026-08-31T17:15:00.000Z",
-  scheduledDate: "2026-08-31",
-  timeWindow: { start: "09:00", end: "11:00" },
-  checklistVersion: "ambiental-v1",
-  checklist: [{ id: "source-1010", label: "Identificar la fuente del impacto", required: true }],
-  attachments: [{ id: "att-1010", url: "/mock/evidence/acta-1010.jpg", filename: "acta-1010.jpg", contentType: "image/jpeg", uploadedAt: "2026-08-31T17:00:00.000Z" }],
-  findings: "Descarga constatada en el establecimiento.",
-  violationType: "UNTREATED_DISCHARGE",
-  severity: "CRITICAL",
-  suggestedAction: "FINE",
-  outcome: "VIOLATION_FOUND",
-  nextStep: "NOTICE_TO_BE_ISSUED",
-  notes: "Se constató la infracción.",
-  createdAt: "2026-08-31T08:00:00.000Z",
-  updatedAt: "2026-08-31T17:15:00.000Z",
-});
+function copyInspection(inspection: EnvironmentalInspectionRecord): EnvironmentalInspectionRecord {
+  return {
+    ...inspection,
+    checklistItems: inspection.checklistItems.map((item) => ({ ...item })),
+    attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
+  };
+}
 
-export let environmentalInspectionFixtures: EnvironmentalInspection[] = inspections.map((inspection) => ({
-  ...inspection,
-  checklist: inspection.checklist.map((item) => ({ ...item })),
-  attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
-}));
-const initialInspections = environmentalInspectionFixtures.map((inspection) => ({
-  ...inspection,
-  checklist: inspection.checklist.map((item) => ({ ...item })),
-  attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
-}));
+export let environmentalInspectionFixtures: EnvironmentalInspectionRecord[] = inspections.map(copyInspection);
+const initialInspections = environmentalInspectionFixtures.map(copyInspection);
 
 const knownSanctionOutcomeNotices: ViolationNotice[] = [
   {
@@ -168,11 +131,7 @@ export function resetEnvironmentalReportFixtures() {
 }
 
 export function resetEnvironmentalInspectionFixtures() {
-  environmentalInspectionFixtures = initialInspections.map((inspection) => ({
-    ...inspection,
-    checklist: inspection.checklist.map((item) => ({ ...item })),
-    attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
-  }));
+  environmentalInspectionFixtures = initialInspections.map(copyInspection);
 }
 
 export function resetViolationNoticeFixtures() {
@@ -210,7 +169,7 @@ export function ingestSanctionOutcomeFixture(outcome: SanctionOutcome, now = new
   return result;
 }
 
-export function getEnvironmentalInspectionFixture(id: string): EnvironmentalInspection | null {
+export function getEnvironmentalInspectionFixture(id: string): EnvironmentalInspectionRecord | null {
   return environmentalInspectionFixtures.find((inspection) => inspection.id === id) ?? null;
 }
 
@@ -240,20 +199,15 @@ export function createViolationNoticeFixture(inspectionId: string, input: IssueV
   };
 }
 
-export function listEnvironmentalInspectionFixtures(reportId: string): EnvironmentalInspection[] {
+export function listEnvironmentalInspectionFixtures(reportId: string): EnvironmentalInspectionRecord[] {
   return environmentalInspectionFixtures.filter((inspection) => inspection.reportId === reportId);
 }
 
-export function updateEnvironmentalInspectionFixture(id: string, updates: Partial<EnvironmentalInspection>): EnvironmentalInspection | null {
+export function updateEnvironmentalInspectionFixture(id: string, updates: Partial<EnvironmentalInspectionRecord>): EnvironmentalInspectionRecord | null {
   const index = environmentalInspectionFixtures.findIndex((inspection) => inspection.id === id);
   if (index === -1) return null;
   const existing = environmentalInspectionFixtures[index];
-  const updated = {
-    ...existing,
-    ...updates,
-    checklist: updates.checklist ?? existing.checklist,
-    updatedAt: new Date().toISOString(),
-  };
+  const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
   environmentalInspectionFixtures[index] = updated;
   return updated;
 }
@@ -272,32 +226,31 @@ export function addAttachmentToInspection(inspectionId: string, attachment: Atta
   return true;
 }
 
-export function linkEnvironmentalInspectionService(inspectionId: string, serviceId: string): EnvironmentalInspection | null {
+export function linkEnvironmentalInspectionService(inspectionId: string, serviceId: string): EnvironmentalInspectionRecord | null {
   return updateEnvironmentalInspectionFixture(inspectionId, { serviceId });
 }
 
-export function createEnvironmentalInspectionFixture(reportId: string, input: EnvironmentalInspectionScheduleInput): EnvironmentalInspection {
+// La agenda del alta no es de la inspección (InspectionResponseDto no la tiene).
+export function createEnvironmentalInspectionFixture(reportId: string, _input: EnvironmentalInspectionScheduleInput): EnvironmentalInspectionRecord {
   const now = new Date().toISOString();
   return {
+    ...pendingInspection,
     id: crypto.randomUUID(),
     reportId,
     serviceId: null,
-    inspectedAt: null,
-    scheduledDate: input.scheduledDate,
-    timeWindow: { ...input.timeWindow },
-    checklistVersion: input.checklistVersion,
-    checklist: input.checklist.map((item) => ({ ...item })),
+    inspectorId: null,
     attachments: [],
-    findings: null,
-    outcome: null,
-    nextStep: null,
-    notes: input.notes ?? null,
     createdAt: now,
     updatedAt: now,
   };
 }
 
-export function addEnvironmentalInspectionFixture(inspection: EnvironmentalInspection) {
+/** Lo que el backend guarda del checklist al completar (ChecklistItemDto → checklistItems). */
+export function checklistItemsFromInput(checklist: EnvironmentalInspectionCompleteInput["checklist"]): EnvironmentalInspectionRecord["checklistItems"] {
+  return checklist.map((item) => ({ id: crypto.randomUUID(), itemCode: item.id, label: item.label, result: item.completed, observations: null }));
+}
+
+export function addEnvironmentalInspectionFixture(inspection: EnvironmentalInspectionRecord) {
   environmentalInspectionFixtures.unshift(inspection);
 }
 

@@ -35,28 +35,39 @@ const service: Service = {
   updatedAt: "2026-09-07T08:00:00.000Z",
 };
 
+// InspectionResponseDto real del backend (+ attachments, que agrega el BFF).
 function inspectionResponse(overrides: Record<string, unknown> = {}) {
   return {
     id: "INS-TEST-1",
     reportId: "ER-TEST-1",
     serviceId: "SVC-INS-1",
+    inspectorId: null,
     inspectedAt: null,
-    scheduledDate: "2026-09-07",
-    timeWindow: { start: "09:00", end: "11:00" },
-    checklistVersion: "ambiental-v1",
-    checklist: [
-      { id: "source", label: "Verificar la fuente observada", required: true },
-      { id: "impact", label: "Registrar el impacto visible", required: true },
-    ],
-    attachments: [],
     findings: null,
     outcome: null,
     nextStep: null,
-    notes: null,
+    conclusion: null,
+    violationType: null,
+    severity: null,
+    suggestedAction: null,
+    checklistItems: [],
+    attachments: [],
     createdAt: "2026-09-07T07:00:00.000Z",
     updatedAt: "2026-09-07T08:00:00.000Z",
     ...overrides,
   };
+}
+
+// Sin checklistItems la pantalla usa la plantilla del frontend.
+const templateChecklist = [
+  { id: "location", label: "Verificar ubicación y contexto del hallazgo", completed: true },
+  { id: "source", label: "Identificar la fuente del impacto", completed: true },
+  { id: "evidence", label: "Registrar observaciones para el acta", completed: true },
+];
+const recordedItems = templateChecklist.map((item, index) => ({ id: `chk-${index}`, itemCode: item.id, label: item.label, result: true, observations: null }));
+
+async function checkTemplate(user: ReturnType<typeof userEvent.setup>) {
+  for (const item of templateChecklist) await user.click(screen.getByRole("checkbox", { name: new RegExp(item.label) }));
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -78,7 +89,8 @@ describe("InspectionExecutionPanel", () => {
           inspectedAt: "2026-09-07T12:00:00.000Z",
           outcome: "NO_VIOLATION",
           nextStep: "CASE_CLOSED",
-          findings: null,
+          conclusion: "No se constató infracción durante la visita.",
+          checklistItems: recordedItems,
         }));
       }),
     );
@@ -86,8 +98,7 @@ describe("InspectionExecutionPanel", () => {
     render(<InspectionExecutionPanel service={service} canExecute />);
 
     expect(await screen.findByRole("heading", { name: "Ejecución de inspección ambiental" })).toBeVisible();
-    await user.click(screen.getByRole("checkbox", { name: /Verificar la fuente observada/ }));
-    await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto visible/ }));
+    await checkTemplate(user);
     await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "No se constató infracción durante la visita.");
     await user.click(screen.getByRole("button", { name: "Completar inspección" }));
 
@@ -96,12 +107,10 @@ describe("InspectionExecutionPanel", () => {
     expect(completionBody).toEqual({
       inspectedAt: expect.any(String),
       outcome: "NO_VIOLATION",
-      checklist: [
-        { id: "source", label: "Verificar la fuente observada", completed: true },
-        { id: "impact", label: "Registrar el impacto visible", completed: true },
-      ],
+      checklist: templateChecklist,
       conclusion: "No se constató infracción durante la visita.",
     });
+    expect(screen.getByText("No se constató infracción durante la visita.")).toBeVisible();
   });
 
   it("keeps the same assigned context read-only for a Crew Member", async () => {
@@ -111,7 +120,7 @@ describe("InspectionExecutionPanel", () => {
 
     expect(await screen.findByText("Esta inspección se encuentra en modo de solo consulta para integrantes de la cuadrilla.")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Completar inspección" })).not.toBeInTheDocument();
-    expect(screen.getByText("Verificar la fuente observada")).toBeVisible();
+    expect(screen.getByText("Identificar la fuente del impacto")).toBeVisible();
   });
 
   it("uploads inspection evidence before submitting a violation outcome", async () => {
@@ -127,14 +136,13 @@ describe("InspectionExecutionPanel", () => {
       }),
       http.post("*/api/environmental-inspections/INS-TEST-1/complete", async ({ request }) => {
         completionBody = await request.json();
-        return HttpResponse.json(inspectionResponse({ outcome: "VIOLATION_FOUND", nextStep: "NOTICE_TO_BE_ISSUED", findings: "Emisión visible", conclusion: "Humo negro continuo.", violationType: "AIR_EMISSION", severity: "HIGH", suggestedAction: "FORMAL_NOTICE", attachments: [{ id: "att-test-1", url: "/evidence/test.jpg", filename: "test.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-07T12:00:00.000Z" }] }));
+        return HttpResponse.json(inspectionResponse({ outcome: "VIOLATION_FOUND", nextStep: "NOTICE_TO_BE_ISSUED", findings: "Emisión visible", conclusion: "Humo negro continuo.", violationType: "AIR_EMISSION", severity: "HIGH", suggestedAction: "FORMAL_NOTICE", checklistItems: recordedItems, attachments: [{ id: "att-test-1", url: "/evidence/test.jpg", filename: "test.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-07T12:00:00.000Z" }] }));
       }),
     );
 
     render(<InspectionExecutionPanel service={service} canExecute />);
     await screen.findByRole("heading", { name: /Ejecuci/ });
-    await user.click(screen.getByRole("checkbox", { name: /Verificar la fuente/ }));
-    await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto/ }));
+    await checkTemplate(user);
     await user.selectOptions(screen.getByRole("combobox", { name: /Resultado/ }), "VIOLATION_FOUND");
     await user.type(screen.getByRole("textbox", { name: /Hallazgos/ }), "Emisión visible");
     await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "Humo negro continuo.");
@@ -150,14 +158,14 @@ describe("InspectionExecutionPanel", () => {
       inspectedAt: expect.any(String),
       outcome: "VIOLATION_FOUND",
       nextStep: "NOTICE_TO_BE_ISSUED",
-      checklist: [{ id: "source", label: "Verificar la fuente observada", completed: true }, { id: "impact", label: "Registrar el impacto visible", completed: true }],
+      checklist: templateChecklist,
       conclusion: "Humo negro continuo.",
       findings: "Emisión visible",
       violationType: "AIR_EMISSION",
       severity: "HIGH",
       suggestedAction: "FORMAL_NOTICE",
     });
-    // El resultado se lee de vuelta de la respuesta, con los cuatro campos de cierre.
+    // El resultado se lee de vuelta de la respuesta real, con los cuatro campos de cierre.
     expect(screen.getByText("Humo negro continuo.")).toBeVisible();
     expect(screen.getByText("Emisión al aire")).toBeVisible();
     expect(screen.getByText("Alta")).toBeVisible();
@@ -178,8 +186,7 @@ describe("InspectionExecutionPanel", () => {
 
     render(<InspectionExecutionPanel service={service} canExecute />);
     await screen.findByRole("heading", { name: /Ejecuci/ });
-    await user.click(screen.getByRole("checkbox", { name: /Verificar la fuente/ }));
-    await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto/ }));
+    await checkTemplate(user);
     await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "Sin infracción constatada.");
     await user.click(screen.getByRole("button", { name: /Completar inspecci/ }));
 

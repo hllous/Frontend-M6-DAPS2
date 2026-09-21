@@ -6,18 +6,16 @@ import {
   getEnvironmentalReportFixture,
   resetEnvironmentalReportFixtures,
 } from "@/lib/environmental-report-fixtures";
-import type { EnvironmentalInspection } from "@/lib/environmental-reports";
+import type { EnvironmentalInspectionRecord } from "@/lib/environmental-reports";
 import { GET, POST } from "./route";
 
-const completedViolationInspection: EnvironmentalInspection = {
+const completedViolationInspection: EnvironmentalInspectionRecord = {
   id: "INS-1008",
   reportId: "ER-1008",
   serviceId: null,
+  inspectorId: null,
   inspectedAt: "2026-09-07T12:00:00.000Z",
-  scheduledDate: "2026-09-03",
-  timeWindow: { start: "09:00", end: "11:00" },
-  checklistVersion: "ambiental-v1",
-  checklist: [{ id: "source", label: "Identificar la fuente", required: true }],
+  checklistItems: [{ id: "chk-1", itemCode: "source", label: "Identificar la fuente", result: true, observations: null }],
   attachments: [{ id: "att-1008", url: "/mock/evidence/acta.jpg", filename: "acta.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-07T11:00:00.000Z" }],
   findings: "Vertido constatado en la vía pública.",
   violationType: "ILLEGAL_DUMPING",
@@ -25,7 +23,7 @@ const completedViolationInspection: EnvironmentalInspection = {
   suggestedAction: "FORMAL_NOTICE",
   outcome: "VIOLATION_FOUND",
   nextStep: "NOTICE_TO_BE_ISSUED",
-  notes: "Se constató la infracción.",
+  conclusion: "Se constató la infracción.",
   createdAt: "2026-09-03T08:00:00.000Z",
   updatedAt: "2026-09-07T12:00:00.000Z",
 };

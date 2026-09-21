@@ -26,9 +26,11 @@ describe("POST /api/environmental-inspections/:id/complete", () => {
   it("translates the form command to the documented backend DTO", async () => {
     const cookie = await backendCookie();
     let backendBody: unknown;
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
-      backendBody = JSON.parse(String(init?.body));
-      return new Response(JSON.stringify({ id: "INS-TEST-1" }), { status: 200, headers: { "content-type": "application/json" } });
+    const urls: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      urls.push(String(input));
+      if (init?.body) backendBody = JSON.parse(String(init.body));
+      return new Response(JSON.stringify(String(input).includes("/evidence") ? [] : { id: "INS-TEST-1" }), { status: 200, headers: { "content-type": "application/json" } });
     });
 
     const response = await POST(new Request("http://localhost/api/environmental-inspections/INS-TEST-1/complete", {
@@ -59,5 +61,8 @@ describe("POST /api/environmental-inspections/:id/complete", () => {
       suggestedAction: "FORMAL_NOTICE",
       checklist: [{ itemCode: "source", label: "Verificar la fuente observada", result: true }],
     });
+    // La respuesta sale con la evidencia de GET /evidence, que InspectionResponseDto no trae.
+    expect(urls[1]).toBe("https://backend.internal/evidence?ownerType=INSPECTION&ownerId=INS-TEST-1");
+    expect(await response.json()).toEqual({ id: "INS-TEST-1", attachments: [] });
   });
 });

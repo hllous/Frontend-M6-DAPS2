@@ -1,5 +1,5 @@
 import type {
-  EnvironmentalInspection,
+  EnvironmentalInspectionRecord,
   EnvironmentalReport,
   SanctionOutcome,
   SanctionOutcomeIntegrationException,
@@ -46,7 +46,7 @@ export type EnvironmentalReportClosure =
 
 export type SanctionOutcomeIngestionContext = {
   reports: readonly EnvironmentalReport[];
-  inspections: readonly EnvironmentalInspection[];
+  inspections: readonly EnvironmentalInspectionRecord[];
   notices: readonly ViolationNotice[];
   outcomes: readonly SanctionOutcome[];
 };

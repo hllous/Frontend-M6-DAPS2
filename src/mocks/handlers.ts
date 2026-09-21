@@ -167,6 +167,7 @@ import { repairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import {
   addAttachmentToInspection,
+  checklistItemsFromInput,
   addEnvironmentalInspectionFixture,
   addEnvironmentalReportFixture,
   createEnvironmentalInspectionFixture,
@@ -432,15 +433,7 @@ export const handlers = [
     if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${reportId}/inspections` }, { status: 400 });
 
     const active = listEnvironmentalInspectionFixtures(reportId).find((inspection) => !inspection.outcome);
-    if (active && report.status === "INSPECTION_SCHEDULED") {
-      return HttpResponse.json(updateEnvironmentalInspectionFixture(active.id, {
-        scheduledDate: parsed.data.scheduledDate,
-        timeWindow: parsed.data.timeWindow,
-        checklistVersion: parsed.data.checklistVersion,
-        checklist: parsed.data.checklist,
-        notes: parsed.data.notes ?? null,
-      }));
-    }
+    if (active && report.status === "INSPECTION_SCHEDULED") return HttpResponse.json(active);
     const isFirstSchedule = report.status === "UNDER_REVIEW";
     const isReinspection = report.status === "INSPECTED" && listEnvironmentalInspectionFixtures(reportId).some((inspection) => inspection.outcome === "INCONCLUSIVE");
     if (!isFirstSchedule && !isReinspection) return HttpResponse.json({ statusCode: 409, message: `Solo se puede programar una inspección desde el estado actual: ${report.status}.`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${reportId}/inspections` }, { status: 409 });
@@ -464,12 +457,11 @@ export const handlers = [
     if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
     if (parsed.data.outcome !== "NO_VIOLATION" && !(inspection.attachments?.length ?? 0)) return HttpResponse.json({ statusCode: 400, message: "Debe adjuntar al menos una evidencia para este resultado.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
     const nextStep = parsed.data.outcome === "NO_VIOLATION" ? "CASE_CLOSED" : parsed.data.outcome === "VIOLATION_FOUND" ? "NOTICE_TO_BE_ISSUED" : "REINSPECTION";
-    const expectedChecklistIds = new Set(inspection.checklist.map((item) => item.id));
-    if (parsed.data.checklist.length !== expectedChecklistIds.size || parsed.data.checklist.some((item) => !expectedChecklistIds.has(item.id))) return HttpResponse.json({ statusCode: 400, message: "El checklist enviado no coincide con el checklist asignado.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
     const updated = updateEnvironmentalInspectionFixture(inspectionId, {
       inspectedAt: parsed.data.inspectedAt,
       outcome: parsed.data.outcome,
       nextStep: parsed.data.nextStep ?? nextStep,
+      checklistItems: checklistItemsFromInput(parsed.data.checklist),
       findings: parsed.data.findings ?? null,
       conclusion: parsed.data.conclusion || null,
       violationType: parsed.data.violationType ?? null,

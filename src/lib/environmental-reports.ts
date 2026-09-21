@@ -162,13 +162,21 @@ export const environmentalInspectionSuggestedActionSchema = z.enum([
 ]);
 export type EnvironmentalInspectionSuggestedAction = z.infer<typeof environmentalInspectionSuggestedActionSchema>;
 
-// Hypothesis: the backend has not published the exact checklist DTO yet.
-export const environmentalInspectionChecklistItemSchema = z.object({
-  id: z.string().min(1),
-  label: z.string().min(1),
-  required: z.boolean().default(true),
-}).passthrough();
-export type EnvironmentalInspectionChecklistItem = z.infer<typeof environmentalInspectionChecklistItemSchema>;
+// El checklist es una plantilla del frontend: el backend no lo guarda al programar,
+// sólo recibe lo relevado al completar (checklistItems).
+export type EnvironmentalInspectionChecklistItem = {
+  id: string;
+  label: string;
+  required: boolean;
+  result?: boolean;
+  observations?: string | null;
+};
+
+export const INSPECTION_CHECKLIST_TEMPLATE: readonly EnvironmentalInspectionChecklistItem[] = [
+  { id: "location", label: "Verificar ubicación y contexto del hallazgo", required: true },
+  { id: "source", label: "Identificar la fuente del impacto", required: true },
+  { id: "evidence", label: "Registrar observaciones para el acta", required: true },
+];
 
 export const environmentalInspectionChecklistResultSchema = z.object({
   id: z.string().trim().min(1),
@@ -221,33 +229,50 @@ export const environmentalInspectionScheduleInputSchema = z.object({
     end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
   }),
   checklistVersion: z.string().trim().min(1, "Debe seleccionar una versión de checklist"),
-  checklist: z.array(environmentalInspectionChecklistItemSchema).min(1, "El checklist debe tener al menos un control"),
+  checklist: z.array(z.object({ id: z.string().min(1), label: z.string().min(1), required: z.boolean().default(true) })).min(1, "El checklist debe tener al menos un control"),
   zoneId: z.string().trim().min(1).optional(),
   notes: z.string().trim().optional(),
 });
 export type EnvironmentalInspectionScheduleInput = z.infer<typeof environmentalInspectionScheduleInputSchema>;
 
-export const environmentalInspectionSchema = z.object({
+// Backend InspectionResponseDto (docs/api/openapi.json). `attachments` no es del DTO:
+// lo agrega el BFF desde GET /evidence para que Oficina sepa si hay evidencia.
+export const environmentalInspectionResponseSchema = z.object({
   id: z.string(),
   reportId: z.string(),
-  serviceId: z.string().nullable().optional(),
-  inspectedAt: z.string().nullable().optional(),
-  scheduledDate: z.string(),
-  timeWindow: z.object({ start: z.string(), end: z.string() }),
-  checklistVersion: z.string(),
-  checklist: z.array(environmentalInspectionChecklistItemSchema),
+  serviceId: z.string().nullable(),
+  // Interno: el BFF lo quita para Campo.
+  inspectorId: z.string().nullable().optional(),
+  inspectedAt: z.string().nullable(),
+  findings: z.string().nullable(),
+  outcome: environmentalInspectionOutcomeSchema.nullable(),
+  nextStep: environmentalInspectionNextStepSchema.nullable(),
+  conclusion: z.string().nullable(),
+  violationType: environmentalInspectionViolationTypeSchema.nullable(),
+  severity: environmentalInspectionSeveritySchema.nullable(),
+  suggestedAction: environmentalInspectionSuggestedActionSchema.nullable(),
+  checklistItems: z.array(z.object({
+    id: z.string(),
+    itemCode: z.string(),
+    label: z.string(),
+    result: z.boolean(),
+    observations: z.string().nullable(),
+  })),
   attachments: z.array(attachmentSchema).optional(),
-  findings: z.string().nullable().optional(),
-  conclusion: z.string().nullable().optional(),
-  violationType: environmentalInspectionViolationTypeSchema.nullable().optional(),
-  severity: environmentalInspectionSeveritySchema.nullable().optional(),
-  suggestedAction: environmentalInspectionSuggestedActionSchema.nullable().optional(),
-  outcome: environmentalInspectionOutcomeSchema.nullable().optional(),
-  nextStep: environmentalInspectionNextStepSchema.nullable().optional(),
-  notes: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 }).passthrough();
+/** La inspección tal como la devuelve el backend (y los mocks del BFF). */
+export type EnvironmentalInspectionRecord = z.infer<typeof environmentalInspectionResponseSchema>;
+
+// Único lugar donde checklistItems pasa a la forma de la pantalla: lo relevado si ya
+// se completó, o la plantilla del frontend si todavía no.
+export const environmentalInspectionSchema = environmentalInspectionResponseSchema.transform((inspection) => ({
+  ...inspection,
+  checklist: inspection.checklistItems.length > 0
+    ? inspection.checklistItems.map((item): EnvironmentalInspectionChecklistItem => ({ id: item.itemCode, label: item.label, required: true, result: item.result, observations: item.observations }))
+    : INSPECTION_CHECKLIST_TEMPLATE.map((item) => ({ ...item })),
+}));
 export type EnvironmentalInspection = z.infer<typeof environmentalInspectionSchema>;
 
 export const issueViolationNoticeInputSchema = z.object({

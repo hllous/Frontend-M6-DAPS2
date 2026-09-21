@@ -318,7 +318,7 @@ export function InspectionExecutionPanel({
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-action)]"><FileCheck aria-hidden />Control ambiental</div>
           <h2 id={`inspection-execution-heading-${inputId}`} className="mt-1 text-lg font-bold text-[var(--color-text)]">Ejecución de inspección ambiental</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · Checklist {inspection.checklistVersion} · {inspection.scheduledDate}</p>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · {service.scheduledDate.slice(0, 10)}</p>
         </div>
         <span className="rounded-lg bg-[var(--color-info-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-info)]">Punto asignado</span>
       </div>
