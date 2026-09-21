@@ -6,24 +6,133 @@ import { handlers } from "@/mocks/handlers";
 import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_SERVICES_QUERY } from "./services-fixtures";
 import {
+  BackendServiceZoneSelectionError,
   checkAssignmentConflicts,
+  confirmRescheduleInputSchema,
   checkServiceWindowTiming,
   ServiceContractError,
   ServiceRequestError,
   ServiceStartBlockedError,
   servicesAdapter,
+  toCreateServiceBackendInput,
 } from "./services";
+import { olvidarCatalogoDeEtiquetas } from "./service-labels";
 
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
+  olvidarCatalogoDeEtiquetas();
   vi.restoreAllMocks();
 });
 afterAll(() => server.close());
 
+describe("service backend input mapping", () => {
+  const baseInput = {
+    serviceTypeId: "service-type-1",
+    origin: "PLANNED" as const,
+    zoneIds: ["zone-1"],
+    scheduledDate: "2026-09-30",
+    timeWindow: { start: "08:00", end: "12:00" },
+  };
+
+  it("lets routes and inventory targets derive their zones", () => {
+    expect(toCreateServiceBackendInput({ ...baseInput, routeId: "route-1", zoneIds: ["zone-1", "zone-2"] }))
+      .not.toHaveProperty("zoneId");
+    expect(toCreateServiceBackendInput({
+      ...baseInput,
+      origin: "INSPECTION",
+      inspectionId: "inspection-1",
+      targetType: "TREE",
+      targetId: "tree-1",
+      targetRef: "ARB-001",
+    })).toEqual({
+      serviceTypeId: "service-type-1",
+      scheduledDate: "2026-09-30",
+      origin: "INSPECTION",
+      routeId: undefined,
+      targetType: "TREE",
+      targetId: "tree-1",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+      ticketId: undefined,
+      notes: undefined,
+    });
+  });
+
+  it("rejects multiple loose-location zones instead of discarding one", () => {
+    expect(() => toCreateServiceBackendInput({ ...baseInput, zoneIds: ["zone-1", "zone-2"] }))
+      .toThrow(BackendServiceZoneSelectionError);
+  });
+});
+
 describe("services adapter", () => {
+  it("accepts the real backend shape: zones: [{zoneId, sequence}] and no title (#255)", async () => {
+    server.use(
+      // Tal cual responde GET /services del backend: sin title y con las zonas anidadas,
+      // a proposito desordenadas para comprobar que se respeta el sequence.
+      http.get("*/api/services", () => HttpResponse.json({
+        data: [{
+          id: "9837fac5-22f5-4a39-bdef-6eb029a7db6f",
+          serviceTypeId: "02c17693-4fd9-473b-bc38-299dae4d8fcb",
+          mode: "ROUTE", status: "SCHEDULED", statusReason: null, origin: "MANUAL",
+          routeId: null, targetType: null, targetId: null,
+          scheduledDate: "2026-09-30T00:00:00.000Z", windowFrom: "10:00", windowTo: "11:00",
+          crewId: null, vehicleId: null, ticketId: null, notes: null,
+          zones: [{ zoneId: "zona-palermo", sequence: 2 }, { zoneId: "zona-belgrano", sequence: 1 }],
+          zoneResults: [], collectionRecords: [],
+          createdBy: "dev-local-user",
+          createdAt: "2026-09-20T00:39:42.432Z", updatedAt: "2026-09-20T00:39:42.432Z",
+        }],
+        meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+      })),
+      http.get("*/api/service-types", () => HttpResponse.json({
+        data: [{ id: "02c17693-4fd9-473b-bc38-299dae4d8fcb", code: "REC-DOM", name: "Recolección domiciliaria", category: "WASTE_COLLECTION", mode: "ROUTE", requiresVehicle: true, active: true }],
+        meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+      })),
+      http.get("*/api/zones", () => HttpResponse.json({
+        data: [
+          { id: "zona-belgrano", code: "Z-BEL", name: "Belgrano", active: true },
+          { id: "zona-palermo", code: "Z-PAL", name: "Palermo", active: true },
+        ],
+        meta: { total: 2, page: 1, pageSize: 100, totalPages: 1 },
+      })),
+    );
+
+    const page = await servicesAdapter.list();
+    const servicio = page.services[0];
+
+    // El sequence manda: Belgrano (1) antes que Palermo (2).
+    expect(servicio?.zoneIds).toEqual(["zona-belgrano", "zona-palermo"]);
+    expect(servicio?.zoneNames).toEqual(["Belgrano", "Palermo"]);
+    expect(servicio?.serviceTypeName).toBe("Recolección domiciliaria");
+    expect(servicio?.title).toBe("Recolección domiciliaria — Belgrano, Palermo");
+    expect(servicio?.title).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/);
+  });
+
+  it("falls back to a readable title when the catalogs fail, instead of breaking the list (#255)", async () => {
+    server.use(
+      http.get("*/api/services", () => HttpResponse.json({
+        data: [{
+          id: "svc-sin-catalogo",
+          serviceTypeId: "tipo-desconocido",
+          mode: "POINT", status: "SCHEDULED", origin: "MANUAL",
+          scheduledDate: "2026-09-30T00:00:00.000Z",
+          zones: [{ zoneId: "zona-x", sequence: 1 }],
+          createdAt: "2026-09-20T00:39:42.432Z", updatedAt: "2026-09-20T00:39:42.432Z",
+        }],
+        meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+      })),
+      http.get("*/api/service-types", () => HttpResponse.json({ statusCode: 503, message: "no disponible", error: "Service Unavailable", timestamp: "2026-09-20T00:00:00.000Z", path: "/api/service-types" }, { status: 503 })),
+      http.get("*/api/zones", () => HttpResponse.error()),
+    );
+
+    const page = await servicesAdapter.list();
+
+    expect(page.services[0]?.title).toBe("Servicio puntual — 2026-09-30");
+  });
+
   it("normalizes a successful paginated response into frontend-owned shapes", async () => {
     const page = await servicesAdapter.list();
 
@@ -599,13 +708,36 @@ describe("services adapter", () => {
       );
 
       const confirmed = await servicesAdapter.confirmReschedule("SVC-1053", {
-        scheduledDate: "2026-09-12",
+        scheduledDate: "2099-09-12",
         timeWindow: { start: "09:00", end: "13:00" },
       });
 
       expect(confirmed.status).toBe("SCHEDULED");
-      expect(confirmed.scheduledDate).toBe("2026-09-12");
+      expect(confirmed.scheduledDate).toBe("2099-09-12");
       expect(confirmed.windowFrom).toBe("09:00");
+    });
+
+    it("rejects a reschedule date before today in Argentina, with a clear message, and accepts today", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-21T01:30:00Z"));
+      try {
+        const timeWindow = { start: "09:00", end: "13:00" };
+        const past = confirmRescheduleInputSchema.safeParse({ scheduledDate: "2026-09-19", timeWindow });
+        expect(past.success).toBe(false);
+        expect(past.error?.issues[0]).toMatchObject({ path: ["scheduledDate"], message: "La nueva fecha no puede ser anterior a hoy." });
+        // 2026-09-21T01:30Z is still 2026-09-20 in Argentina.
+        expect(confirmRescheduleInputSchema.safeParse({ scheduledDate: "2026-09-20", timeWindow }).success).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not send a reschedule with a past date to the backend", async () => {
+      const fetchMock = vi.spyOn(globalThis, "fetch");
+      await expect(
+        servicesAdapter.confirmReschedule("SVC-1053", { scheduledDate: "2020-01-01", timeWindow: { start: "09:00", end: "13:00" } }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("rejects invalid confirmReschedule input with ServiceContractError before sending request", async () => {

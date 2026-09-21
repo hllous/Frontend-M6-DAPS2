@@ -8,6 +8,7 @@ import {
   paginateServiceFixtures,
 } from "@/lib/services-fixtures";
 import {
+  BackendServiceZoneSelectionError,
   createServiceInputSchema,
   ROUTE_CATALOG,
   SERVICE_TYPE_CATALOG,
@@ -16,11 +17,13 @@ import {
   type ServiceOrigin,
   type ServiceQuery,
   type ServiceStatus,
+  toCreateServiceBackendInput,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { zoneFixtures } from "@/lib/zones-fixtures";
+import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -55,13 +58,13 @@ function parseServiceQuery(url: URL): ServiceQuery {
     origin: (url.searchParams.get("origin") as ServiceOrigin) ?? undefined,
     zoneId: url.searchParams.get("zoneId") ?? undefined,
     crewId: url.searchParams.get("crewId") ?? undefined,
-    search: url.searchParams.get("search") ?? undefined,
+    search: searchParam(url.searchParams),
     timeFrom: url.searchParams.get("timeFrom") ?? undefined,
     timeTo: url.searchParams.get("timeTo") ?? undefined,
     scheduledFrom: url.searchParams.get("scheduledFrom") ?? undefined,
     scheduledTo: url.searchParams.get("scheduledTo") ?? undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 
@@ -154,10 +157,19 @@ export async function POST(request: Request) {
     const input = parsed.data;
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+      let backendInput;
+      try {
+        backendInput = toCreateServiceBackendInput(input);
+      } catch (error) {
+        if (error instanceof BackendServiceZoneSelectionError) {
+          return errorResponse(400, error.message, path);
+        }
+        throw error;
+      }
       const backendResponse = await fetchBackend(request, "/services", undefined, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
+        body: JSON.stringify(backendInput),
       });
       const bodyText = await backendResponse.text();
       return new NextResponse(bodyText, {

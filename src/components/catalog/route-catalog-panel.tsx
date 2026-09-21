@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   AlertTriangle,
   ArrowDown,
-  ArrowLeft,
   ArrowUp,
   CheckCircle2,
   Clock,
@@ -21,6 +19,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -44,6 +43,7 @@ import {
   routesAdapter,
 } from "@/lib/routes";
 import { type Zone, zonesAdapter } from "@/lib/zones";
+import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -111,7 +111,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     let isCurrent = true;
     async function loadZones() {
       try {
-        const page = await zonesAdapter.list({ active: true });
+        const page = await zonesAdapter.list({ active: true, pageSize: 100 });
         if (isCurrent) {
           setAvailableZones(page.zones);
         }
@@ -280,7 +280,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         estimatedDurationMin: s.estimatedDurationMin ?? 30,
         zoneName:
           s.zone?.name ??
-          (availableZones.find((z) => z.id === s.zoneId)?.name || `Zona ${s.zoneId}`),
+          (availableZones.find((z) => z.id === s.zoneId)?.name || "Zona no disponible"),
         zoneCode: s.zone?.code ?? availableZones.find((z) => z.id === s.zoneId)?.code,
       })),
     );
@@ -436,39 +436,20 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
   return (
     <div className="space-y-6">
-      {/* Header & Back navigation */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/app/catalog"
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Volver a Catálogos
-            </Link>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Catálogo de Recorridos
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gestione los recorridos operativos para la planificación y ejecución de servicios.
-          </p>
-        </div>
-
-        {canManage && (
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setShowCreate(true)}
-              className="inline-flex items-center gap-1.5"
-              data-testid="create-route-button"
-            >
-              <Plus className="h-4 w-4" />
-              Nuevo recorrido
-            </Button>
-          </div>
-        )}
-      </div>
+      <CatalogPageHeader
+        title="Recorridos"
+        description="Gestione los recorridos operativos para la planificación y ejecución de servicios."
+        actions={canManage ? (
+          <Button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center gap-1.5"
+            data-testid="create-route-button"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo recorrido
+          </Button>
+        ) : null}
+      />
 
       {/* Detail View of Selected Route (Lands here after creation or clicking Ver Detalle) */}
       {selectedRoute && (
@@ -610,7 +591,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                           </span>
                           <div>
                             <div className="font-medium text-foreground">
-                              {stop.zone?.name ?? `Zona ${stop.zoneId}`}
+                              {stop.zone?.name ?? "Zona no disponible"}
                             </div>
                             {stop.zone?.code && (
                               <div className="text-xs text-muted-foreground font-mono">
@@ -877,6 +858,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               type="text"
               placeholder="Buscar por código o nombre..."
               value={search}
+              maxLength={MAX_SEARCH_LENGTH}
               onChange={(e) => setSearch(e.target.value)}
               className={`${formControlClass} pl-9 w-full`}
               data-testid="search-routes-input"
@@ -928,10 +910,10 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
           size="sm"
           onClick={() => setRequestVersion((v) => v + 1)}
           className="inline-flex items-center gap-1.5 self-start sm:self-auto"
-          title="Refrescar listado"
+          title="Actualizar listado"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          Refrescar
+          Actualizar
         </Button>
       </div>
 
@@ -991,7 +973,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         )}
 
         {state.status === "ready" && state.items.length > 0 && (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-left text-sm" data-testid="routes-table">
               <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
                 <tr>

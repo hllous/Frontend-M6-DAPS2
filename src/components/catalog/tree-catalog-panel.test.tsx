@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
@@ -35,5 +36,38 @@ describe("TreeCatalogPanel", () => {
     const refreshedRow = await screen.findByRole("row", { name: /ARB-00442/ });
     await within(refreshedRow).getByRole("button", { name: "Dar de baja" }).click();
     expect(await screen.findByText(/Árbol dado de baja/)).toBeVisible();
+  });
+
+  it("shows the zone name in the Zona column and never the raw zone id", async () => {
+    render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /ARB-00442/ });
+    expect(await within(row).findByText("Z-BEL · Belgrano")).toBeVisible();
+    expect(within(row).queryByText("zone-1")).not.toBeInTheDocument();
+  });
+
+  it("shows neutral text while zones load and when a zone cannot be resolved", async () => {
+    let releaseZones = () => {};
+    const zonesGate = new Promise<void>((resolve) => { releaseZones = resolve; });
+    server.use(http.get("*/api/zones", async () => {
+      await zonesGate;
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } });
+    }));
+    render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /ARB-00442/ });
+    expect(within(row).getByText("Cargando zona…")).toBeVisible();
+    releaseZones();
+    expect(await within(row).findByText("Zona no disponible")).toBeVisible();
+    expect(within(row).queryByText("zone-1")).not.toBeInTheDocument();
+  });
+
+  it("requests zones with the maximum page size so every zone resolves", async () => {
+    const pageSizes: Array<string | null> = [];
+    server.use(http.get("*/api/zones", ({ request }) => {
+      pageSizes.push(new URL(request.url).searchParams.get("pageSize"));
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } });
+    }));
+    render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("row", { name: /ARB-00442/ });
+    expect(pageSizes).toContain("100");
   });
 });

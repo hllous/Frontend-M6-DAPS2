@@ -1,33 +1,38 @@
 import { z } from "zod";
 
+import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { externalIdInput, externalIdListInput } from "@/lib/input-limits";
 
 export const crewTypeSchema = z.enum(["MUNICIPAL", "COOPERATIVE", "CONTRACTOR"]);
 export const shiftSchema = z.enum(["MORNING", "AFTERNOON", "NIGHT"]);
 export type CrewType = z.infer<typeof crewTypeSchema>;
 export type Shift = z.infer<typeof shiftSchema>;
 
+// El listado no trae miembros y el detalle los trae como members: [{ userId }].
 export const crewSchema = z.object({
-  id: z.string(), name: z.string(), crewType: crewTypeSchema, leaderUserId: z.string(), memberUserIds: z.array(z.string()), organizationId: z.string(), defaultShift: shiftSchema, active: z.boolean(),
+  id: z.string(), name: z.string(), crewType: crewTypeSchema, leaderUserId: z.string().nullable(), memberUserIds: z.array(z.string()).default([]), organizationId: z.string().nullable().default(null), defaultShift: shiftSchema, active: z.boolean(),
 });
+const crewWireSchema = z.preprocess(withFlatIds("members", "userId", "memberUserIds"), crewSchema);
 export type Crew = z.infer<typeof crewSchema>;
 export type CrewQuery = { active?: boolean; crewType?: CrewType; defaultShift?: Shift; page?: number; pageSize?: number };
 export type CrewsPage = { crews: Crew[]; page: number; pageSize: number; total: number; totalPages: number };
 
 export const createCrewInputSchema = z.object({
-  name: z.string().trim().min(1, "El nombre es obligatorio."), crewType: crewTypeSchema, leaderUserId: z.string().min(1), organizationId: z.string().min(1), defaultShift: shiftSchema,
+  name: z.string().trim().min(1, "El nombre es obligatorio."), crewType: crewTypeSchema, leaderUserId: externalIdInput(), organizationId: externalIdInput(), defaultShift: shiftSchema,
 });
 export type CreateCrewInput = z.infer<typeof createCrewInputSchema>;
-export const updateCrewInputSchema = createCrewInputSchema.extend({ active: z.boolean() }).strict();
+// crewType is immutable in the backend (UpdateCrewDto has no such field), so an edit never carries it.
+export const updateCrewInputSchema = createCrewInputSchema.omit({ crewType: true }).extend({ active: z.boolean() }).strict();
 export type UpdateCrewInput = z.infer<typeof updateCrewInputSchema>;
-export const addCrewMembersInputSchema = z.object({ memberUserIds: z.array(z.string().min(1)).min(1) }).strict();
+export const addCrewMembersInputSchema = z.object({ memberUserIds: externalIdListInput({ emptyMessage: "Seleccione al menos un integrante." }) }).strict();
 export type AddCrewMembersInput = z.infer<typeof addCrewMembersInputSchema>;
 
 export class CrewContractError extends Error { constructor(message: string, options?: { cause?: unknown }) { super(message, options); this.name = "CrewContractError"; } }
 export class CrewRequestError extends Error { readonly status: number; constructor(message: string, status: number, options?: { cause?: unknown }) { super(message, options); this.name = "CrewRequestError"; this.status = status; } }
 
-const pageSchema = z.object({ data: z.array(crewSchema), meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }) });
+const pageSchema = z.object({ data: z.array(crewWireSchema), meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }) });
 const errorSchema = z.object({ statusCode: z.number(), message: z.union([z.string(), z.array(z.string())]), error: z.string(), timestamp: z.string(), path: z.string() });
 
 function queryString(query: CrewQuery) {
@@ -49,7 +54,7 @@ async function requestJson(path: string, init?: RequestInit) {
 }
 function resource(payload: unknown, message: string): Crew {
   const raw = payload && typeof payload === "object" && "data" in payload && !("id" in payload) ? (payload as { data: unknown }).data : payload;
-  const parsed = crewSchema.safeParse(raw); if (!parsed.success) { recordTelemetryEvent({ name: "request_malformed_response", resource: "crews" }); throw new CrewContractError(message, { cause: parsed.error }); } return parsed.data;
+  const parsed = crewWireSchema.safeParse(raw); if (!parsed.success) { recordTelemetryEvent({ name: "request_malformed_response", resource: "crews" }); throw new CrewContractError(message, { cause: parsed.error }); } return parsed.data;
 }
 
 export const crewsAdapter = {

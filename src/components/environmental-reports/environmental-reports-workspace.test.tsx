@@ -7,6 +7,7 @@ import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { ingestSanctionOutcomeFixture, resetEnvironmentalReportFixtures, updateEnvironmentalInspectionFixture, updateEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
 import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
+import { environmentalReportsAdapter } from "@/lib/environmental-reports";
 import { repairRequestsAdapter } from "@/lib/repair-requests";
 import { resetServiceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { scenarios } from "@/lib/scenarios";
@@ -103,6 +104,28 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(await within(detail).findByText("En revisión")).toBeVisible();
     expect(within(detail).getByRole("button", { name: "Derivar expediente" })).toBeVisible();
     expect(within(detail).getByRole("button", { name: "Desestimar expediente" })).toBeVisible();
+  });
+
+  it("asks for a reason before forwarding and sends it to the backend", async () => {
+    const user = userEvent.setup();
+    const forward = vi.spyOn(environmentalReportsAdapter, "forward");
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1001/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1001" });
+    await user.click(within(detail).getByRole("button", { name: "Iniciar revisión" }));
+    await user.click(await within(detail).findByRole("button", { name: "Derivar expediente" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Derivar expediente" });
+    await user.click(within(dialog).getByRole("button", { name: "Derivar expediente" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Debe indicar el motivo.");
+    expect(forward).not.toHaveBeenCalled();
+
+    await user.type(within(dialog).getByLabelText(/Motivo/), "Corresponde a otra dependencia");
+    await user.click(within(dialog).getByRole("button", { name: "Derivar expediente" }));
+
+    await waitFor(() => expect(forward).toHaveBeenCalledWith("ER-1001", { reason: "Corresponde a otra dependencia" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Derivar expediente" })).not.toBeInTheDocument());
   });
 
   it("finds a report by publicId and keeps the technical ticketId in its detail", async () => {

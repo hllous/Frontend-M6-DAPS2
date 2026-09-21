@@ -19,16 +19,43 @@ const intervention = {
   serviceId: null,
   justification: "Relevamiento 06/09/2026 (survey-2).",
 };
+const linkedTree = { treeId: "tree-2" };
 
 describe("treeInterventionsAdapter", () => {
+  it("accepts nullable address and priority from the backend", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [{ ...intervention, treeIds: undefined, address: null, priority: null, trees: [{ treeId: "tree-2" }] }],
+      meta: { total: 1, page: 1, pageSize: 10, totalPages: 1 },
+    })));
+
+    await expect(treeInterventionsAdapter.list()).resolves.toMatchObject({
+      interventions: [{ id: "intervention-1", address: null, priority: null }],
+    });
+  });
+
+  it("accepts the documented list response with linked trees instead of tree ids", async () => {
+    const trees = [linkedTree];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [{ ...intervention, treeIds: undefined, trees }],
+      meta: { total: 1, page: 1, pageSize: 10, totalPages: 1 },
+    })));
+
+    await expect(treeInterventionsAdapter.list()).resolves.toMatchObject({
+      interventions: [{ id: "intervention-1", treeIds: ["tree-2"] }],
+    });
+  });
+
   it("forwards intervention filters and validates a paginated response", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ data: [intervention], meta: { total: 1, page: 1, pageSize: 10, totalPages: 1 } })),
+      new Response(JSON.stringify({ data: [{ ...intervention, treeIds: undefined, trees: [linkedTree] }], meta: { total: 1, page: 1, pageSize: 10, totalPages: 1 } })),
     );
 
     await expect(
       treeInterventionsAdapter.list({ interventionType: "SAFETY_PRUNING", status: "REQUESTED", page: 1, pageSize: 10 }),
-    ).resolves.toMatchObject({ interventions: [intervention], totalPages: 1 });
+    ).resolves.toMatchObject({
+      interventions: [{ ...intervention, treeIds: ["tree-2"] }],
+      totalPages: 1,
+    });
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/tree-interventions?interventionType=SAFETY_PRUNING&status=REQUESTED&page=1&pageSize=10",
       expect.objectContaining({ cache: "no-store" }),
@@ -38,10 +65,8 @@ describe("treeInterventionsAdapter", () => {
   it("creates a multi-tree request and reads detail with linked trees", async () => {
     const detail = {
       ...intervention,
-      trees: [
-        { id: "tree-2", surveyCode: "ARB-00443", zoneId: "zone-2", species: "Tipa", address: "Parque del Bicentenario, sector norte", lat: -34.5692, lng: -58.4051, heightM: 18, diameterCm: 72.5, active: true, lastSurvey: { surveyedAt: "2026-08-18T10:30:00.000Z", healthStatus: "HEALTHY", riskLevel: "LOW", riskType: null, suggestedIntervention: null } },
-        { id: "tree-4", surveyCode: "ARB-00445", zoneId: "zone-1", species: "Ceibo", address: "Paseo de la Costa 220", lat: -34.58, lng: -58.39, heightM: 10.5, diameterCm: 44, active: true, lastSurvey: null },
-      ],
+      treeIds: undefined,
+      trees: [{ treeId: "tree-2" }, { treeId: "tree-4" }],
     };
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(intervention), { status: 201 }));
     const input = {
@@ -57,7 +82,7 @@ describe("treeInterventionsAdapter", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/tree-interventions", expect.objectContaining({ method: "POST", body: JSON.stringify(input) }));
 
     fetchMock.mockResolvedValue(new Response(JSON.stringify(detail)));
-    await expect(treeInterventionsAdapter.get("intervention-1")).resolves.toEqual(detail);
+    await expect(treeInterventionsAdapter.get("intervention-1")).resolves.toEqual(intervention);
     expect(fetchMock).toHaveBeenLastCalledWith("/api/tree-interventions/intervention-1", expect.objectContaining({ cache: "no-store" }));
   });
 

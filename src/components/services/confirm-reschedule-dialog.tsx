@@ -13,7 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { servicesAdapter, type Service } from "@/lib/services";
+import { todayInArgentina } from "@/lib/argentina-date";
+import { confirmRescheduleInputSchema, servicesAdapter, type Service } from "@/lib/services";
 
 interface ConfirmRescheduleDialogProps {
   open: boolean;
@@ -54,7 +55,9 @@ function ConfirmRescheduleForm({
   onConfirmed: (updatedService: Service) => void;
 }) {
   const formId = useId();
-  const [scheduledDate, setScheduledDate] = useState(() => service.scheduledDate);
+  // Sin prefill: la fecha actual del servicio puede ser pasada y el backend la rechaza.
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [minDate] = useState(() => todayInArgentina());
   const [windowStart, setWindowStart] = useState(() => service.windowFrom ?? "08:00");
   const [windowEnd, setWindowEnd] = useState(() => service.windowTo ?? "12:00");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,12 +66,19 @@ function ConfirmRescheduleForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrorMessage(null);
+    const input = { scheduledDate, timeWindow: { start: windowStart, end: windowEnd } };
+    if (!scheduledDate) {
+      setErrorMessage("Seleccione la nueva fecha del servicio.");
+      return;
+    }
+    const validation = confirmRescheduleInputSchema.safeParse(input);
+    if (!validation.success) {
+      setErrorMessage(validation.error.issues[0]?.message ?? "Revise la nueva fecha y la ventana horaria.");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const updated = await servicesAdapter.confirmReschedule(service.id, {
-        scheduledDate,
-        timeWindow: { start: windowStart, end: windowEnd },
-      });
+      const updated = await servicesAdapter.confirmReschedule(service.id, input);
       onConfirmed(updated);
       onOpenChange(false);
     } catch (cause) {
@@ -131,6 +141,7 @@ function ConfirmRescheduleForm({
             <input
               id={`${formId}-date`}
               type="date"
+              min={minDate}
               value={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}
               required

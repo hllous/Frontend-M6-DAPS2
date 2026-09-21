@@ -1,6 +1,8 @@
 import {
   AuthUnavailableError,
+  BackendUnavailableError,
   ForbiddenSessionError,
+  InvalidSessionError,
   getRequiredSession,
   requireCapability,
 } from "./session";
@@ -16,9 +18,21 @@ export async function loadAuthorizedScenario(
   requireCapability(session, "service:view");
 
   if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-    const backendResponse = await fetchBackend(request, "/service-types", "service:view");
+    let backendResponse: Response;
+    try {
+      backendResponse = await fetchBackend(request, "/service-types", "service:view");
+    } catch (error) {
+      if (error instanceof AuthUnavailableError) throw error;
+      throw new BackendUnavailableError(503, "No se pudo conectar con el backend.");
+    }
+    if (backendResponse.status === 401 || backendResponse.status === 403) {
+      throw new InvalidSessionError("El backend rechazó la sesión de desarrollo.");
+    }
     if (!backendResponse.ok) {
-      throw new AuthUnavailableError("El backend rechazó la sesión de desarrollo.");
+      throw new BackendUnavailableError(
+        backendResponse.status,
+        `El backend respondió con un error (HTTP ${backendResponse.status}).`,
+      );
     }
   }
 

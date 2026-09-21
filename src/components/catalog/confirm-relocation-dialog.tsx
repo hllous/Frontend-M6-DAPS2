@@ -23,6 +23,7 @@ import {
   ContainerRequestError,
   type Container,
 } from "@/lib/containers";
+import { parseCoordinateField } from "@/lib/input-limits";
 
 interface ConfirmRelocationDialogProps {
   open: boolean;
@@ -87,15 +88,10 @@ function ConfirmRelocationModalContent({
       errors.address = "La nueva dirección es obligatoria.";
     }
 
-    const latNum = Number(lat);
-    if (!lat.trim() || !Number.isFinite(latNum)) {
-      errors.lat = "Indique una latitud numérica válida.";
-    }
-
-    const lngNum = Number(lng);
-    if (!lng.trim() || !Number.isFinite(lngNum)) {
-      errors.lng = "Indique una longitud numérica válida.";
-    }
+    const latResult = parseCoordinateField(lat, "lat");
+    if (latResult.error) errors.lat = latResult.error;
+    const lngResult = parseCoordinateField(lng, "lng");
+    if (lngResult.error) errors.lng = lngResult.error;
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -109,8 +105,8 @@ function ConfirmRelocationModalContent({
     try {
       updated = await containersAdapter.confirmRelocation(container.id, {
         address: address.trim(),
-        lat: latNum,
-        lng: lngNum,
+        lat: latResult.value ?? 0,
+        lng: lngResult.value ?? 0,
       });
     } catch (err) {
       const msg =
@@ -153,7 +149,7 @@ function ConfirmRelocationModalContent({
       <form id="confirm-relocation-form" onSubmit={handleSubmit} noValidate className="space-y-4">
         <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs space-y-1">
           <p className="font-medium text-foreground">Ubicación anterior registrada:</p>
-          <p className="text-muted-foreground">{container.address}</p>
+          <p className="text-muted-foreground">{container.address ?? "Sin dirección registrada"}</p>
         </div>
 
         <FieldGroup>
@@ -186,6 +182,8 @@ function ConfirmRelocationModalContent({
               <input
                 id="relocation-lat"
                 type="number"
+                min="-90"
+                max="90"
                 step="any"
                 value={lat}
                 onChange={(e) => {
@@ -211,6 +209,8 @@ function ConfirmRelocationModalContent({
               <input
                 id="relocation-lng"
                 type="number"
+                min="-180"
+                max="180"
                 step="any"
                 value={lng}
                 onChange={(e) => {

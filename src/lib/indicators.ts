@@ -1,68 +1,105 @@
 import { z } from "zod";
 
+import { todayInArgentina } from "./argentina-date";
+import { CONTAINER_STATUS_LABELS } from "./containers";
+import { ENVIRONMENTAL_REPORT_STATUS_LABELS, ENVIRONMENTAL_REPORT_TYPE_LABELS } from "./environmental-reports";
+import { WASTE_TYPE_LABELS } from "./green-points";
+import { NOT_SERVICED_REASON_LABEL } from "./services";
+import { RISK_LEVEL_LABELS } from "./tree-surveys";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 
 const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use una fecha con formato AAAA-MM-DD.");
 const dateTimeSchema = z.string().datetime({ offset: true });
 
+export const INVERTED_RANGE_MESSAGE = "La fecha «Desde» no puede ser posterior a «Hasta».";
+
 export const indicatorQuerySchema = z.object({
   from: calendarDateSchema.optional(),
   to: calendarDateSchema.optional(),
   zoneId: z.string().trim().min(1).optional(),
   serviceTypeId: z.string().trim().min(1).optional(),
-}).strict();
+}).strict().refine((query) => !query.from || !query.to || query.from <= query.to, {
+  path: ["to"],
+  message: INVERTED_RANGE_MESSAGE,
+});
 export type IndicatorQuery = z.infer<typeof indicatorQuerySchema>;
+
+/** Mensaje de rango invertido si el error lo incluye; si no, el genérico de formato. */
+export function indicatorQueryErrorMessage(error: { issues: Array<{ message: string }> }) {
+  return error.issues.some((issue) => issue.message === INVERTED_RANGE_MESSAGE)
+    ? INVERTED_RANGE_MESSAGE
+    : "Los filtros de indicadores no respetan el formato esperado.";
+}
 
 export type ResolvedIndicatorQuery = Required<Pick<IndicatorQuery, "from" | "to">> &
   Omit<IndicatorQuery, "from" | "to">;
 
 const periodSchema = z.object({ from: calendarDateSchema, to: calendarDateSchema });
-const freshnessSchema = z.object({ updatedAt: dateTimeSchema });
+const count = z.number().finite().nonnegative();
+const percent = z.number().finite().min(0).max(100);
 
-const coverageBreakdownSchema = z.object({
+// Los enums viajan como string, no como z.enum: un valor nuevo del backend debe
+// mostrarse crudo en una etiqueta, no dejar el tablero entero en error.
+function labelFor(labels: Record<string, string>, value: string) {
+  return labels[value] ?? value;
+}
+
+const coverageRowSchema = z.object({
   id: z.string(),
-  label: z.string(),
-  attended: z.number().finite().nonnegative(),
-  scheduled: z.number().finite().nonnegative(),
-  rate: z.number().finite().min(0).max(100),
+  code: z.string(),
+  name: z.string(),
+  scheduled: count,
+  served: count,
+  partial: count,
+  notServiced: count,
+  pending: count,
+  coveragePct: percent,
 });
 
 export const coverageWireSchema = z.object({
   period: periodSchema,
-  freshness: freshnessSchema,
-  summary: z.object({ attended: z.number().finite().nonnegative(), scheduled: z.number().finite().nonnegative(), rate: z.number().finite().min(0).max(100) }),
-  byZone: z.array(coverageBreakdownSchema),
-  byServiceType: z.array(coverageBreakdownSchema),
+  totals: z.object({ scheduled: count, served: count, partial: count, notServiced: count, pending: count, coveragePct: percent }),
+  byZone: z.array(coverageRowSchema),
+  byServiceType: z.array(coverageRowSchema),
 });
 export type CoverageWire = z.infer<typeof coverageWireSchema>;
 
-const complianceZoneSchema = z.object({ id: z.string(), label: z.string(), unattended: z.number().finite().nonnegative(), reason: z.string() });
 export const complianceWireSchema = z.object({
   period: periodSchema,
-  freshness: freshnessSchema,
-  summary: z.object({ completed: z.number().finite().nonnegative(), onTime: z.number().finite().nonnegative(), delayed: z.number().finite().nonnegative(), onTimeRate: z.number().finite().min(0).max(100) }),
-  unattendedZones: z.array(complianceZoneSchema),
+  finished: z.object({ total: count, onTime: count, late: count, onTimePct: percent }),
+  notServicedRanking: z.array(z.object({
+    zoneId: z.string(),
+    code: z.string(),
+    name: z.string(),
+    count,
+    reasons: z.array(z.object({ reason: z.string().nullable(), count })),
+  })),
 });
 export type ComplianceWire = z.infer<typeof complianceWireSchema>;
 
-const incidentPointSchema = z.object({ id: z.string(), label: z.string(), count: z.number().finite().nonnegative() });
 export const incidentsWireSchema = z.object({
   period: periodSchema,
-  freshness: freshnessSchema,
-  containers: z.object({ byZone: z.array(z.object({ id: z.string(), label: z.string(), overflow: z.number().finite().nonnegative(), damage: z.number().finite().nonnegative() })) }),
-  treeRisk: z.object({ byLevel: z.array(incidentPointSchema) }),
-  reports: z.object({ byType: z.array(incidentPointSchema), byStatus: z.array(incidentPointSchema), meanResolutionHours: z.number().finite().nonnegative() }),
+  containers: z.object({
+    byStatus: z.array(z.object({ status: z.string(), count })),
+    byZone: z.array(z.object({ zoneId: z.string(), code: z.string(), name: z.string(), overflowed: count, damaged: count, total: count })),
+  }),
+  trees: z.object({ byRiskLevel: z.array(z.object({ riskLevel: z.string(), count })) }),
+  reports: z.object({
+    total: count,
+    byType: z.array(z.object({ reportType: z.string(), count })),
+    byStatus: z.array(z.object({ status: z.string(), count })),
+    avgResolutionDays: z.number().finite().nonnegative(),
+  }),
 });
 export type IncidentsWire = z.infer<typeof incidentsWireSchema>;
 
-const wastePointSchema = z.object({ id: z.string(), label: z.string(), kilograms: z.number().finite().nonnegative(), cubicMeters: z.number().finite().nonnegative() });
 export const wasteWireSchema = z.object({
   period: periodSchema,
-  freshness: freshnessSchema,
-  summary: z.object({ kilograms: z.number().finite().nonnegative(), cubicMeters: z.number().finite().nonnegative(), divertedRate: z.number().finite().min(0).max(100) }),
-  byType: z.array(wastePointSchema),
-  byDestination: z.array(wastePointSchema),
+  totals: z.object({ weightKg: count, volumeM3: count, divertedKg: count, divertedPct: percent }),
+  byWasteType: z.array(z.object({ wasteType: z.string(), weightKg: count, volumeM3: count })),
+  byDisposalSite: z.array(z.object({ disposalSiteId: z.string(), code: z.string(), name: z.string(), siteType: z.string(), weightKg: count, volumeM3: count })),
+  records: count,
 });
 export type WasteWire = z.infer<typeof wasteWireSchema>;
 
@@ -101,6 +138,7 @@ export type WasteIndicator = {
   period: IndicatorPeriod;
   freshness: IndicatorFreshness;
   primary: IndicatorMetric;
+  summaryMetrics: IndicatorMetric[];
   breakdowns: IndicatorBreakdown[];
 };
 
@@ -126,14 +164,15 @@ function formatCalendarDate(date: Date) {
 }
 
 export function defaultIndicatorQuery(now = new Date()): ResolvedIndicatorQuery {
-  const from = new Date(now);
+  const to = todayInArgentina(now);
+  const from = new Date(`${to}T00:00:00.000Z`);
   from.setUTCDate(from.getUTCDate() - 29);
-  return { from: formatCalendarDate(from), to: formatCalendarDate(now) };
+  return { from: formatCalendarDate(from), to };
 }
 
 export function resolveIndicatorQuery(query: IndicatorQuery = {}, now = new Date()): ResolvedIndicatorQuery {
   const parsed = indicatorQuerySchema.safeParse(query);
-  if (!parsed.success) throw new IndicatorContractError("Los filtros de indicadores no respetan el formato esperado.", { cause: parsed.error });
+  if (!parsed.success) throw new IndicatorContractError(indicatorQueryErrorMessage(parsed.error), { cause: parsed.error });
   const defaults = defaultIndicatorQuery(now);
   return { ...defaults, ...parsed.data };
 }
@@ -172,68 +211,148 @@ async function request(path: string) {
   return payload;
 }
 
-function normalizeCoverage(wire: CoverageWire): CoverageIndicator {
+const RISK_LEVEL_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "NONE"];
+
+function coveragePoints(rows: CoverageWire["byZone"]): IndicatorPoint[] {
+  return rows.map((row) => ({
+    id: row.id,
+    label: row.name,
+    value: row.coveragePct,
+    unit: "%",
+    note: `${row.served} de ${row.scheduled} objetivos`,
+    details: [
+      { label: "Atendidos", value: row.served, unit: "objetivos" },
+      { label: "Parciales", value: row.partial, unit: "objetivos" },
+      { label: "No atendidos", value: row.notServiced, unit: "objetivos" },
+      { label: "Pendientes", value: row.pending, unit: "objetivos" },
+      { label: "Programados", value: row.scheduled, unit: "objetivos" },
+    ],
+  }));
+}
+
+function normalizeCoverage(wire: CoverageWire, readAt: string): CoverageIndicator {
   return {
-    family: "coverage", period: wire.period, freshness: wire.freshness,
-    primary: { value: wire.summary.rate, label: "Cobertura de objetivos", unit: "%" },
+    family: "coverage", period: wire.period, freshness: { updatedAt: readAt },
+    primary: { value: wire.totals.coveragePct, label: "Cobertura de objetivos", unit: "%" },
     summaryMetrics: [
-      { value: wire.summary.attended, label: "Atendidos", unit: "objetivos" },
-      { value: wire.summary.scheduled, label: "Programados", unit: "objetivos" },
+      { value: wire.totals.served, label: "Atendidos", unit: "objetivos" },
+      { value: wire.totals.partial, label: "Parciales", unit: "objetivos" },
+      { value: wire.totals.pending, label: "Pendientes", unit: "objetivos" },
+      { value: wire.totals.scheduled, label: "Programados", unit: "objetivos" },
     ],
     breakdowns: [
-      { id: "zones", title: "Cobertura por zona", description: "Objetivos atendidos sobre objetivos programados.", points: wire.byZone.map((item) => ({ id: item.id, label: item.label, value: item.rate, unit: "%", note: `${item.attended} de ${item.scheduled} objetivos`, details: [{ label: "Atendidos", value: item.attended, unit: "objetivos" }, { label: "Programados", value: item.scheduled, unit: "objetivos" }] })) },
-      { id: "service-types", title: "Cobertura por tipo de servicio", description: "Comparación de cobertura entre servicios.", points: wire.byServiceType.map((item) => ({ id: item.id, label: item.label, value: item.rate, unit: "%", note: `${item.attended} de ${item.scheduled} objetivos`, details: [{ label: "Atendidos", value: item.attended, unit: "objetivos" }, { label: "Programados", value: item.scheduled, unit: "objetivos" }] })) },
+      { id: "zones", title: "Cobertura por zona", description: "Objetivos atendidos sobre objetivos programados.", points: coveragePoints(wire.byZone) },
+      { id: "service-types", title: "Cobertura por tipo de servicio", description: "Comparación de cobertura entre servicios.", points: coveragePoints(wire.byServiceType) },
     ],
   };
 }
 
-function normalizeCompliance(wire: ComplianceWire): ComplianceIndicator {
+function normalizeCompliance(wire: ComplianceWire, readAt: string): ComplianceIndicator {
+  const reasonLabel = (reason: string | null) => reason === null
+    ? "Sin motivo registrado"
+    : labelFor(NOT_SERVICED_REASON_LABEL, reason);
   return {
-    family: "compliance", period: wire.period, freshness: wire.freshness,
-    primary: { value: wire.summary.onTimeRate, label: "Cumplimiento en fecha", unit: "%" },
+    family: "compliance", period: wire.period, freshness: { updatedAt: readAt },
+    primary: { value: wire.finished.onTimePct, label: "Cumplimiento en fecha", unit: "%" },
     summaryMetrics: [
-      { value: wire.summary.completed, label: "Finalizados", unit: "servicios" },
-      { value: wire.summary.onTime, label: "En fecha", unit: "servicios" },
-      { value: wire.summary.delayed, label: "Demorados", unit: "servicios" },
+      { value: wire.finished.total, label: "Finalizados", unit: "servicios" },
+      { value: wire.finished.onTime, label: "En fecha", unit: "servicios" },
+      { value: wire.finished.late, label: "Demorados", unit: "servicios" },
     ],
     breakdowns: [
-      { id: "completion", title: "Finalización en fecha", description: `${wire.summary.completed} servicios finalizados en el período.`, points: [{ id: "on-time", label: "En fecha", value: wire.summary.onTime, unit: "servicios", tone: "success" }, { id: "delayed", label: "Demorados", value: wire.summary.delayed, unit: "servicios", tone: "warning" }] },
-      { id: "unattended-zones", title: "Zonas sin atención", description: "Ranking de zonas pendientes y motivo registrado.", points: wire.unattendedZones.map((item) => ({ id: item.id, label: item.label, value: item.unattended, unit: "objetivos", note: item.reason, tone: "warning" })) },
+      { id: "completion", title: "Finalización en fecha", description: `${wire.finished.total} servicios finalizados en el período.`, points: [{ id: "on-time", label: "En fecha", value: wire.finished.onTime, unit: "servicios", tone: "success" }, { id: "delayed", label: "Demorados", value: wire.finished.late, unit: "servicios", tone: "warning" }] },
+      { id: "unattended-zones", title: "Zonas sin atención", description: "Ranking de zonas no atendidas y motivos registrados.", points: wire.notServicedRanking.map((zone): IndicatorPoint => ({
+        id: zone.zoneId,
+        label: zone.name,
+        value: zone.count,
+        unit: "objetivos",
+        note: zone.reasons.map((item) => reasonLabel(item.reason)).join(" · ") || "Sin motivo registrado",
+        details: zone.reasons.map((item) => ({ label: reasonLabel(item.reason), value: item.count, unit: "objetivos" })),
+        tone: "warning",
+      })) },
     ],
   };
 }
 
-function normalizeIncidents(wire: IncidentsWire): IncidentsIndicator {
+function normalizeIncidents(wire: IncidentsWire, readAt: string): IncidentsIndicator {
+  const riskLevels = [...wire.trees.byRiskLevel].sort((a, b) => RISK_LEVEL_ORDER.indexOf(a.riskLevel) - RISK_LEVEL_ORDER.indexOf(b.riskLevel));
   return {
-    family: "incidents", period: wire.period, freshness: wire.freshness,
-    primary: { value: wire.reports.meanResolutionHours, label: "Resolución media de reportes", unit: "h" },
+    family: "incidents", period: wire.period, freshness: { updatedAt: readAt },
+    primary: { value: wire.reports.avgResolutionDays, label: "Resolución media de reportes", unit: "días" },
     breakdowns: [
-      { id: "containers", title: "Contenedores por zona", description: "Instantánea actual de incidentes por desborde y daño; valores en incidentes.", points: wire.containers.byZone.map((item) => ({ id: item.id, label: item.label, value: item.overflow + item.damage, unit: "incidentes", note: `${item.overflow} desbordes · ${item.damage} daños`, details: [{ label: "Desbordes", value: item.overflow, unit: "incidentes" }, { label: "Daños", value: item.damage, unit: "incidentes" }], tone: item.overflow + item.damage > 4 ? "danger" : "primary" })) },
-      { id: "tree-risk", title: "Riesgo de arbolado", description: "Inventario actual por nivel de riesgo; valores en árboles.", points: wire.treeRisk.byLevel.map((item) => ({ id: item.id, label: item.label, value: item.count, unit: "árboles", tone: item.label.toLowerCase().includes("alto") ? "danger" : "warning" })) },
-      { id: "reports", title: "Reportes por tipo", description: "Reportes recibidos en el período; valores en reportes.", points: wire.reports.byType.map((item) => ({ id: item.id, label: item.label, value: item.count, unit: "reportes" })) },
-      { id: "report-status", title: "Reportes por estado", description: "Reportes recibidos en el período, distribuidos por estado.", points: wire.reports.byStatus.map((item) => ({ id: item.id, label: item.label, value: item.count, unit: "reportes", tone: item.id === "closed" ? "success" : item.id === "open" ? "danger" : "warning" })) },
+      { id: "containers", title: "Contenedores por zona", description: "Instantánea actual de incidentes por desborde y daño; valores en incidentes.", points: wire.containers.byZone.map((zone): IndicatorPoint => ({
+        id: zone.zoneId,
+        label: zone.name,
+        value: zone.overflowed + zone.damaged,
+        unit: "incidentes",
+        note: `${zone.overflowed} desbordes · ${zone.damaged} daños sobre ${zone.total} contenedores`,
+        details: [{ label: "Desbordes", value: zone.overflowed, unit: "incidentes" }, { label: "Daños", value: zone.damaged, unit: "incidentes" }, { label: "Contenedores", value: zone.total, unit: "contenedores" }],
+        tone: zone.overflowed + zone.damaged > 4 ? "danger" : "primary",
+      })) },
+      { id: "container-status", title: "Contenedores por estado", description: "Instantánea actual del parque de contenedores.", points: wire.containers.byStatus.map((item): IndicatorPoint => ({
+        id: item.status,
+        label: labelFor(CONTAINER_STATUS_LABELS, item.status),
+        value: item.count,
+        unit: "contenedores",
+        tone: item.status === "ACTIVE" ? "success" : item.status === "OVERFLOWED" || item.status === "DAMAGED" ? "danger" : "warning",
+      })) },
+      { id: "tree-risk", title: "Riesgo de arbolado", description: "Inventario actual por nivel de riesgo; valores en árboles.", points: riskLevels.map((item): IndicatorPoint => ({
+        id: item.riskLevel,
+        label: labelFor(RISK_LEVEL_LABELS, item.riskLevel),
+        value: item.count,
+        unit: "árboles",
+        tone: item.riskLevel === "CRITICAL" || item.riskLevel === "HIGH" ? "danger" : item.riskLevel === "NONE" ? "success" : "warning",
+      })) },
+      { id: "reports", title: "Reportes por tipo", description: `${wire.reports.total} reportes recibidos en el período; valores en reportes.`, points: wire.reports.byType.map((item) => ({
+        id: item.reportType,
+        label: labelFor(ENVIRONMENTAL_REPORT_TYPE_LABELS, item.reportType),
+        value: item.count,
+        unit: "reportes",
+      })) },
+      { id: "report-status", title: "Reportes por estado", description: "Reportes recibidos en el período, distribuidos por estado.", points: wire.reports.byStatus.map((item): IndicatorPoint => ({
+        id: item.status,
+        label: labelFor(ENVIRONMENTAL_REPORT_STATUS_LABELS, item.status),
+        value: item.count,
+        unit: "reportes",
+        tone: item.status === "CLOSED" ? "success" : item.status === "RECEIVED" ? "danger" : "warning",
+      })) },
     ],
   };
 }
 
-function normalizeWaste(wire: WasteWire): WasteIndicator {
+function normalizeWaste(wire: WasteWire, readAt: string): WasteIndicator {
+  const massPoint = (id: string, label: string, weightKg: number, volumeM3: number): IndicatorPoint => ({
+    id,
+    label,
+    value: weightKg,
+    unit: "kg",
+    note: `${volumeM3.toLocaleString("es-AR")} m³`,
+    details: [{ label: "Metros cúbicos", value: volumeM3, unit: "m³" }],
+  });
   return {
-    family: "waste", period: wire.period, freshness: wire.freshness,
-    primary: { value: wire.summary.divertedRate, label: "Desvío de relleno sanitario", unit: "%" },
+    family: "waste", period: wire.period, freshness: { updatedAt: readAt },
+    primary: { value: wire.totals.divertedPct, label: "Desvío de relleno sanitario", unit: "%" },
+    summaryMetrics: [
+      { value: wire.totals.weightKg, label: "Peso registrado", unit: "kg" },
+      { value: wire.totals.divertedKg, label: "Desviado del relleno", unit: "kg" },
+      { value: wire.totals.volumeM3, label: "Volumen registrado", unit: "m³" },
+    ],
     breakdowns: [
-      { id: "types", title: "Residuos por tipo", description: "Kilogramos y metros cúbicos registrados por corriente de residuo.", points: wire.byType.map((item) => ({ id: item.id, label: item.label, value: item.kilograms, unit: "kg", note: `${item.cubicMeters.toLocaleString("es-AR")} m³`, details: [{ label: "Metros cúbicos", value: item.cubicMeters, unit: "m³" }] })) },
-      { id: "destinations", title: "Residuos por destino", description: "Kilogramos y metros cúbicos enviados a cada destino.", points: wire.byDestination.map((item) => ({ id: item.id, label: item.label, value: item.kilograms, unit: "kg", note: `${item.cubicMeters.toLocaleString("es-AR")} m³`, details: [{ label: "Metros cúbicos", value: item.cubicMeters, unit: "m³" }] })) },
+      { id: "types", title: "Residuos por tipo", description: `${wire.records} registros de disposición en el período.`, points: wire.byWasteType.map((item) => massPoint(item.wasteType, labelFor(WASTE_TYPE_LABELS, item.wasteType), item.weightKg, item.volumeM3)) },
+      { id: "destinations", title: "Residuos por destino", description: "Kilogramos y metros cúbicos enviados a cada destino.", points: wire.byDisposalSite.map((item) => massPoint(item.disposalSiteId, item.name, item.weightKg, item.volumeM3)) },
     ],
   };
 }
 
-async function get<T>(family: string, query: IndicatorQuery, schema: z.ZodType<T>, normalize: (wire: T) => T extends CoverageWire ? CoverageIndicator : T extends ComplianceWire ? ComplianceIndicator : T extends IncidentsWire ? IncidentsIndicator : WasteIndicator, message: string) {
+async function get<T>(family: string, query: IndicatorQuery, schema: z.ZodType<T>, normalize: (wire: T, readAt: string) => T extends CoverageWire ? CoverageIndicator : T extends ComplianceWire ? ComplianceIndicator : T extends IncidentsWire ? IncidentsIndicator : WasteIndicator, message: string) {
   const parsed = schema.safeParse(await request(`/api/indicators/${family}${queryString(query, family)}`));
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "indicators" });
     throw new IndicatorContractError(message, { cause: parsed.error });
   }
-  return normalize(parsed.data);
+  // El backend calcula los indicadores en cada consulta y no devuelve una marca
+  // de actualización, así que la frescura es el momento de la lectura.
+  return normalize(parsed.data, new Date().toISOString());
 }
 
 export const indicatorsAdapter = {

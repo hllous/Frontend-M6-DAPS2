@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { argentinaDay, todayInArgentina } from "./argentina-date";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 
@@ -7,6 +8,7 @@ export const treeHealthStatusSchema = z.enum(["HEALTHY", "WEAKENED", "DISEASED",
 export type TreeHealthStatus = z.infer<typeof treeHealthStatusSchema>;
 export const riskLevelSchema = z.enum(["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 export type RiskLevel = z.infer<typeof riskLevelSchema>;
+export const RISK_LEVEL_LABELS: Record<RiskLevel, string> = { NONE: "Sin riesgo", LOW: "Bajo", MEDIUM: "Medio", HIGH: "Alto", CRITICAL: "Crítico" };
 export const riskTypeSchema = z.enum(["FALLING_BRANCH", "TRUNK_INSTABILITY", "ROOT_UPLIFT", "POWER_LINE_CONTACT", "SIGN_OBSTRUCTION", "PEST_INFESTATION"]);
 export type RiskType = z.infer<typeof riskTypeSchema>;
 export const treeInterventionTypeSchema = z.enum(["FORMATION_PRUNING", "SAFETY_PRUNING", "REMOVAL", "PLANTING", "TREATMENT"]);
@@ -28,7 +30,10 @@ export const treeSurveySchema = z.object({
 export type TreeSurvey = z.infer<typeof treeSurveySchema>;
 
 export const treeSurveyCreateInputSchema = z.object({
-  surveyedAt: z.string().trim().min(1, "La fecha del relevamiento es obligatoria."),
+  surveyedAt: z.string().trim().min(1, "La fecha del relevamiento es obligatoria.").refine((value) => {
+    const day = argentinaDay(value);
+    return day === null || day <= todayInArgentina();
+  }, "La fecha del relevamiento no puede ser futura."),
   healthStatus: treeHealthStatusSchema,
   riskLevel: riskLevelSchema,
   riskType: riskTypeSchema.optional(),

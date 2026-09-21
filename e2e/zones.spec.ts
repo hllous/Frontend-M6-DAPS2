@@ -5,7 +5,7 @@ import { loginViaApi } from "./support/auth";
 async function openCatalog(page: import("@playwright/test").Page) {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app");
-  await page.getByRole("button", { name: "Catálogo" }).click();
+  await page.getByRole("link", { name: "Catálogo" }).click();
 }
 
 test.describe("Zones representative states @smoke", () => {

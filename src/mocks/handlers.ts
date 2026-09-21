@@ -467,9 +467,9 @@ export const handlers = [
     const expectedChecklistIds = new Set(inspection.checklist.map((item) => item.id));
     if (parsed.data.checklist.length !== expectedChecklistIds.size || parsed.data.checklist.some((item) => !expectedChecklistIds.has(item.id))) return HttpResponse.json({ statusCode: 400, message: "El checklist enviado no coincide con el checklist asignado.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
     const updated = updateEnvironmentalInspectionFixture(inspectionId, {
-      inspectedAt: new Date().toISOString(),
+      inspectedAt: parsed.data.inspectedAt,
       outcome: parsed.data.outcome,
-      nextStep,
+      nextStep: parsed.data.nextStep ?? nextStep,
       findings: parsed.data.findings ?? null,
       violationType: parsed.data.violationType ?? null,
       severity: parsed.data.severity ?? null,
@@ -722,7 +722,7 @@ export const handlers = [
     const zoneId = params.zoneId as string;
     const neighborhoodId = params.neighborhoodId as string;
     const zone = getZoneFixture(zoneId);
-    if (!zone || !zone.neighborhoodIds.includes(neighborhoodId)) {
+    if (!zone || !zone.neighborhoodIds?.includes(neighborhoodId)) {
       return HttpResponse.json(
         { statusCode: 404, message: "El barrio no esta asignado a la zona operativa.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/zones/${zoneId}/neighborhoods/${neighborhoodId}` },
         { status: 404 },
@@ -2681,7 +2681,7 @@ export const handlers = [
     return HttpResponse.json({
       ...complianceIndicatorFixture,
       period: { from: params.get("from") ?? complianceIndicatorFixture.period.from, to: params.get("to") ?? complianceIndicatorFixture.period.to },
-      unattendedZones: zoneId ? complianceIndicatorFixture.unattendedZones.filter((item) => item.id === zoneId) : complianceIndicatorFixture.unattendedZones,
+      notServicedRanking: zoneId ? complianceIndicatorFixture.notServicedRanking.filter((item) => item.zoneId === zoneId) : complianceIndicatorFixture.notServicedRanking,
     });
   }),
   http.get("*/api/indicators/incidents", ({ request }) => {

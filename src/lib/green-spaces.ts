@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { MAX_DECIMAL_10_2, boundedDecimalInput, latitudeInput, longitudeInput } from "@/lib/input-limits";
 
 export const greenSpaceTypeSchema = z.enum(["SQUARE", "PARK", "PLANTER", "MEDIAN", "PROMENADE"]);
 export type GreenSpaceType = z.infer<typeof greenSpaceTypeSchema>;
@@ -10,7 +11,7 @@ export const greenSpaceSchema = z.object({
   id: z.string(),
   name: z.string(),
   spaceType: greenSpaceTypeSchema,
-  areaM2: z.number(),
+  areaM2: z.number().nullable(),
   zoneId: z.string(),
   lat: z.number().nullable(),
   lng: z.number().nullable(),
@@ -36,14 +37,15 @@ export type GreenSpacesPage = {
 export const createGreenSpaceInputSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio."),
   spaceType: greenSpaceTypeSchema,
-  areaM2: z.number().positive("La superficie debe ser mayor que cero."),
+  areaM2: boundedDecimalInput("La superficie", MAX_DECIMAL_10_2, { positive: true }),
   zoneId: z.string().trim().min(1, "La zona es obligatoria."),
-  lat: z.number().finite().optional(),
-  lng: z.number().finite().optional(),
+  lat: latitudeInput().optional(),
+  lng: longitudeInput().optional(),
 });
 export type CreateGreenSpaceInput = z.infer<typeof createGreenSpaceInputSchema>;
 
-export const updateGreenSpaceInputSchema = createGreenSpaceInputSchema.partial().extend({
+// spaceType is immutable in the backend (UpdateGreenSpaceDto has no such field); zod strips it if a caller sends it.
+export const updateGreenSpaceInputSchema = createGreenSpaceInputSchema.omit({ spaceType: true }).partial().extend({
   active: z.boolean().optional(),
 });
 export type UpdateGreenSpaceInput = z.infer<typeof updateGreenSpaceInputSchema>;

@@ -475,6 +475,8 @@ export function ZoneExecutionPanel({
                   <input
                     id={`container-location-lat-${service.id}`}
                     type="number"
+                    min="-90"
+                    max="90"
                     step="any"
                     value={Number.isNaN(containerLocation.lat) ? "" : containerLocation.lat}
                     onChange={(event) => setContainerLocation((current) => ({ ...current, lat: Number(event.target.value) }))}
@@ -487,6 +489,8 @@ export function ZoneExecutionPanel({
                   <input
                     id={`container-location-lng-${service.id}`}
                     type="number"
+                    min="-180"
+                    max="180"
                     step="any"
                     value={Number.isNaN(containerLocation.lng) ? "" : containerLocation.lng}
                     onChange={(event) => setContainerLocation((current) => ({ ...current, lng: Number(event.target.value) }))}

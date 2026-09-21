@@ -7,6 +7,17 @@ afterEach(() => vi.restoreAllMocks());
 const tree = { id: "tree-101", surveyCode: "ARB-00442", zoneId: "zone-1", species: "Jacarandá", address: "Av. Mitre 1140", lat: -34.6038, lng: -58.3814, heightM: 12.4, diameterCm: 48, active: true };
 
 describe("treesAdapter", () => {
+  it("accepts nullable descriptive and measurement fields", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: "tree-null", surveyCode: "ARB-NULL", zoneId: "zone-1", species: null, address: null, lat: null, lng: null, heightM: null, diameterCm: null, active: true, createdAt: "2026-09-20T10:00:00.000Z", updatedAt: "2026-09-20T10:00:00.000Z" }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(treesAdapter.list()).resolves.toMatchObject({
+      trees: [{ id: "tree-null", species: null, heightM: null, diameterCm: null }],
+    });
+  });
+
   it("forwards the documented filters with an explicit page size", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ data: [tree], meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 } }), { status: 200 }));
     await expect(treesAdapter.list({ active: true, zoneId: "zone-1", search: "Jacarandá", pageSize: 100 })).resolves.toMatchObject({ trees: [tree], pageSize: 100 });

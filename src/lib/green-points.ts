@@ -2,9 +2,17 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { latitudeInput, longitudeInput } from "@/lib/input-limits";
 
 export const wasteTypeSchema = z.enum(["HOUSEHOLD", "RECYCLABLE", "BULKY", "GREEN", "MIXED"]);
 export type WasteType = z.infer<typeof wasteTypeSchema>;
+export const WASTE_TYPE_LABELS: Record<WasteType, string> = {
+  HOUSEHOLD: "Domiciliarios",
+  RECYCLABLE: "Reciclables",
+  BULKY: "Voluminosos",
+  GREEN: "Verdes",
+  MIXED: "Mixtos",
+};
 
 export const greenPointSchema = z.object({
   id: z.string(),
@@ -21,16 +29,14 @@ export const greenPointSchema = z.object({
 });
 export type GreenPoint = z.infer<typeof greenPointSchema>;
 
-const optionalLocationInput = z.number().finite().optional();
-
 export const greenPointCreateInputSchema = z.object({
   code: z.string().trim().min(1, "El código es obligatorio.").max(20, "El código no puede superar los 20 caracteres."),
   name: z.string().trim().min(1, "El nombre es obligatorio.").max(100, "El nombre no puede superar los 100 caracteres."),
   zoneId: z.string().trim().min(1, "La zona operativa es obligatoria."),
   wasteTypes: z.array(wasteTypeSchema).min(1, "Seleccione al menos un tipo de residuo.").max(5).refine((items) => new Set(items).size === items.length, "No repita tipos de residuo."),
   address: z.string().trim().max(200, "La dirección no puede superar los 200 caracteres.").optional(),
-  lat: optionalLocationInput,
-  lng: optionalLocationInput,
+  lat: latitudeInput().optional(),
+  lng: longitudeInput().optional(),
   active: z.boolean().optional(),
 });
 export type GreenPointCreateInput = z.infer<typeof greenPointCreateInputSchema>;
@@ -40,8 +46,8 @@ export const greenPointUpdateInputSchema = z.object({
   zoneId: z.string().trim().min(1, "La zona operativa es obligatoria.").optional(),
   wasteTypes: z.array(wasteTypeSchema).min(1, "Seleccione al menos un tipo de residuo.").max(5).refine((items) => new Set(items).size === items.length, "No repita tipos de residuo.").optional(),
   address: z.string().trim().max(200, "La dirección no puede superar los 200 caracteres.").optional(),
-  lat: optionalLocationInput,
-  lng: optionalLocationInput,
+  lat: latitudeInput().optional(),
+  lng: longitudeInput().optional(),
   active: z.boolean().optional(),
 }).strict();
 export type GreenPointUpdateInput = z.infer<typeof greenPointUpdateInputSchema>;

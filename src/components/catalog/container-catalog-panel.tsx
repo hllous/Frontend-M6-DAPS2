@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
-  Archive,
   ArchiveX,
   Check,
   CheckCircle2,
@@ -19,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -57,6 +57,7 @@ import { StartRelocationDialog } from "./start-relocation-dialog";
 import { CompleteRepairDialog } from "./complete-repair-dialog";
 import { RemoveContainerDialog } from "./remove-container-dialog";
 import { StartRepairDialog } from "./start-repair-dialog";
+import { MAX_INT32, MAX_SEARCH_LENGTH, parseCoordinateField } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -250,9 +251,9 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       code: container.code,
       containerType: container.containerType,
       zoneId: container.zoneId,
-      address: container.address,
-      lat: String(container.lat),
-      lng: String(container.lng),
+      address: container.address ?? "",
+      lat: container.lat === null ? "" : String(container.lat),
+      lng: container.lng === null ? "" : String(container.lng),
       capacityLiters: String(container.capacityLiters),
     });
     setFormErrors({});
@@ -286,18 +287,18 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       errors.address = "La dirección de instalación es obligatoria.";
     }
 
-    const latNum = Number(form.lat);
-    const lngNum = Number(form.lng);
-    if (!Number.isFinite(latNum)) {
-      errors.lat = "Indique una latitud numérica válida.";
-    }
-    if (!Number.isFinite(lngNum)) {
-      errors.lng = "Indique una longitud numérica válida.";
-    }
+    const latResult = parseCoordinateField(form.lat, "lat");
+    const lngResult = parseCoordinateField(form.lng, "lng");
+    if (latResult.error) errors.lat = latResult.error;
+    if (lngResult.error) errors.lng = lngResult.error;
+    const latNum = latResult.value ?? 0;
+    const lngNum = lngResult.value ?? 0;
 
     const capacityNum = Number(form.capacityLiters);
     if (!Number.isInteger(capacityNum) || capacityNum <= 0) {
       errors.capacityLiters = "La capacidad debe ser un número entero mayor a 0 litros.";
+    } else if (capacityNum > MAX_INT32) {
+      errors.capacityLiters = `La capacidad no puede superar ${MAX_INT32.toLocaleString("es-AR")} litros.`;
     }
 
     if (Object.keys(errors).length > 0) {
@@ -358,25 +359,17 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
 
   return (
     <section aria-labelledby="containers-title" className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Archive aria-hidden className="size-5 text-[var(--color-institutional)]" />
-            <h1 id="containers-title" className="text-xl font-semibold tracking-tight">
-              Contenedores
-            </h1>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Inventario urbano de contenedores de vía pública para recolección diferenciada y mantenimiento.
-          </p>
-        </div>
-        {canManage && (
+      <CatalogPageHeader
+        title="Contenedores"
+        titleId="containers-title"
+        description="Inventario urbano de contenedores de vía pública para recolección diferenciada y mantenimiento."
+        actions={canManage ? (
           <Button onClick={openCreate}>
             <Plus data-icon="inline-start" aria-hidden />
             Registrar contenedor
           </Button>
-        )}
-      </div>
+        ) : null}
+      />
 
       {notice && (
         <p
@@ -400,6 +393,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
             type="search"
             placeholder="Código o dirección…"
             value={search}
+            maxLength={MAX_SEARCH_LENGTH}
             onChange={(e) => setSearch(e.target.value)}
             className={formControlClass}
           />
@@ -479,7 +473,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       )}
 
       {state.status === "ready" && state.containers.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Inventario de contenedores registrados</caption>
             <thead className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
@@ -508,7 +502,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                     <td className="px-4 py-3">
                       {zone ? `${zone.code} · ${zone.name}` : container.zoneId}
                     </td>
-                    <td className="px-4 py-3">{container.address}</td>
+                    <td className="px-4 py-3">{container.address ?? "—"}</td>
                     <td className="px-4 py-3">{container.capacityLiters.toLocaleString("es-AR")} L</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={container.status} />
@@ -771,6 +765,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   id="container-capacity"
                   type="number"
                   min="1"
+                  max={MAX_INT32}
                   step="1"
                   value={form.capacityLiters}
                   onChange={(e) => setForm({ ...form, capacityLiters: e.target.value })}
@@ -810,6 +805,8 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   <input
                     id="container-lat"
                     type="number"
+                    min="-90"
+                    max="90"
                     step="any"
                     value={form.lat}
                     onChange={(e) => setForm({ ...form, lat: e.target.value })}
@@ -830,6 +827,8 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   <input
                     id="container-lng"
                     type="number"
+                    min="-180"
+                    max="180"
                     step="any"
                     value={form.lng}
                     onChange={(e) => setForm({ ...form, lng: e.target.value })}
@@ -913,7 +912,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   Coordenadas
                 </dt>
                 <dd className="mt-0.5 font-medium text-foreground">
-                  {detailContainer.lat}, {detailContainer.lng}
+                  {detailContainer.lat === null || detailContainer.lng === null ? "—" : `${detailContainer.lat}, ${detailContainer.lng}`}
                 </dd>
               </div>
 
@@ -922,7 +921,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   Dirección
                 </dt>
                 <dd className="mt-0.5 font-medium text-foreground">
-                  {detailContainer.address}
+                  {detailContainer.address ?? "—"}
                 </dd>
               </div>
 

@@ -6,11 +6,12 @@ import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures
 import { treeHealthStatusSchema, treeSurveyCreateInputSchema, riskLevelSchema, type TreeSurveyQuery } from "@/lib/tree-surveys";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 503: "Service Unavailable", 500: "Internal Server Error" };
 function errorResponse(status: number, message: string, path: string) { return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status }); }
 async function treeId(context: { params: Promise<{ id: string }> | { id: string } }) { return (await context.params).id; }
-function queryFromUrl(url: URL): TreeSurveyQuery { return { healthStatus: treeHealthStatusSchema.safeParse(url.searchParams.get("healthStatus")).data, riskLevel: riskLevelSchema.safeParse(url.searchParams.get("riskLevel")).data, page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined, pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined }; }
+function queryFromUrl(url: URL): TreeSurveyQuery { return { healthStatus: treeHealthStatusSchema.safeParse(url.searchParams.get("healthStatus")).data, riskLevel: riskLevelSchema.safeParse(url.searchParams.get("riskLevel")).data, page: pageParam(url.searchParams), pageSize: pageSizeParam(url.searchParams) }; }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
   const path = new URL(request.url).pathname;

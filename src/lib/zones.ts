@@ -1,7 +1,9 @@
 import { z } from "zod";
 
+import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { externalIdListInput } from "@/lib/input-limits";
 
 export type ZoneQuery = {
   active?: boolean;
@@ -35,15 +37,24 @@ export class ZoneRequestError extends Error {
   }
 }
 
+// El listado no trae barrios y el detalle los trae como neighborhoods: [{ neighborhoodId }].
 export const zoneSchema = z.object({
   id: z.string(),
   code: z.string(),
   name: z.string(),
   active: z.boolean(),
-  neighborhoodIds: z.array(z.string()),
+  neighborhoodIds: z.array(z.string()).optional(),
 });
+const zoneWireSchema = z.preprocess(withFlatIds("neighborhoods", "neighborhoodId", "neighborhoodIds"), zoneSchema);
 
 export type Zone = z.infer<typeof zoneSchema>;
+
+/** Etiqueta de zona para tablas y detalles: nunca expone el id crudo. */
+export function zoneLabel(zones: Zone[], zoneId: string, loaded: boolean): string {
+  const zone = zones.find((candidate) => candidate.id === zoneId);
+  if (zone) return `${zone.code} · ${zone.name}`;
+  return loaded ? "Zona no disponible" : "Cargando zona…";
+}
 
 export const createZoneInputSchema = z.object({
   code: z.string().trim().min(1, "El código es obligatorio"),
@@ -60,7 +71,7 @@ export const updateZoneInputSchema = z.object({
 export type UpdateZoneInput = z.infer<typeof updateZoneInputSchema>;
 
 export const assignNeighborhoodsInputSchema = z.object({
-  neighborhoodIds: z.array(z.string().trim().min(1, "El ID del barrio es obligatorio")).min(1),
+  neighborhoodIds: externalIdListInput({ itemMessage: "El ID del barrio es obligatorio", emptyMessage: "Seleccione al menos un barrio." }),
 });
 
 export type AssignNeighborhoodsInput = z.infer<typeof assignNeighborhoodsInputSchema>;
@@ -83,7 +94,7 @@ export const zoneReferenceReportSchema = z.object({
 export type ZoneReferenceReport = z.infer<typeof zoneReferenceReportSchema>;
 
 const zonesEnvelopeSchema = z.object({
-  data: z.array(zoneSchema),
+  data: z.array(zoneWireSchema),
   meta: z.object({
     total: z.number(),
     page: z.number(),
@@ -141,7 +152,7 @@ async function handleSingleZoneResponse(response: Response, resource: "zones" = 
   if (!response.ok) {
     handleErrorPayload(payload, resource);
   }
-  const parsed = zoneSchema.safeParse(payload);
+  const parsed = zoneWireSchema.safeParse(payload);
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource });
     throw new ZoneContractError("La respuesta de zona no respeta el contrato esperado.", {

@@ -199,6 +199,25 @@ describe("POST /api/services/[id]/complete BFF route", () => {
     expect(getContainerFixture("cont-2")?.status).toBe("OVERFLOWED");
   });
 
+  it("caps the joined non-serviced notes at the 2000-character notes limit (#251)", async () => {
+    updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
+    addZoneResultFixture({ id: "ZR-LONG-1", serviceId: "SVC-1050", zoneId: "zone-3", status: "PARTIAL", reason: "WEATHER", notes: "a".repeat(1500), attachments: [], recordedAt: "2026-09-05 10:00" });
+    addZoneResultFixture({ id: "ZR-LONG-2", serviceId: "SVC-1050", zoneId: "zone-1", status: "NOT_SERVICED", reason: "WEATHER", notes: "b".repeat(1500), attachments: [], recordedAt: "2026-09-05 11:00" });
+
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/complete", { method: "POST", headers: { cookie } }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("PARTIALLY_COMPLETED");
+    expect(body.statusReason).toHaveLength(2000);
+    expect(body.statusReason.endsWith("…")).toBe(true);
+    expect(body.statusReason.startsWith("a".repeat(1500))).toBe(true);
+  });
+
   it("transitions an overflowed linked Container when the Service is COMPLETED", async () => {
     updateServiceFixture("SVC-1050", {
       status: "IN_PROGRESS",

@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, Leaf, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 
+import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { formControlClass } from "@/components/ui/form-control";
 import { greenSpacesAdapter, greenSpaceTypeSchema, type GreenSpace, type GreenSpaceQuery, type GreenSpaceType } from "@/lib/green-spaces";
-import { zonesAdapter, type Zone } from "@/lib/zones";
+import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";
 import type { OperationalScenario } from "@/lib/scenarios";
+import { MAX_DECIMAL_10_2 } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -40,6 +42,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
   const [typeFilter, setTypeFilter] = useState<GreenSpaceType | "all">("all");
   const [zoneFilter, setZoneFilter] = useState("all");
   const [zones, setZones] = useState<Zone[]>([]);
+  const [zonesLoaded, setZonesLoaded] = useState(false);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [requestVersion, setRequestVersion] = useState(0);
   const [editing, setEditing] = useState<GreenSpace | null>(null);
@@ -56,9 +59,11 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
 
   useEffect(() => {
     let isCurrent = true;
-    void zonesAdapter.list().then((page) => {
+    void zonesAdapter.list({ pageSize: 100 }).then((page) => {
       if (isCurrent) setZones(page.zones);
-    }).catch(() => undefined);
+    }).catch(() => undefined).finally(() => {
+      if (isCurrent) setZonesLoaded(true);
+    });
     return () => { isCurrent = false; };
   }, []);
 
@@ -86,7 +91,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
 
   function openEdit(greenSpace: GreenSpace) {
     setEditing(greenSpace);
-    setForm({ name: greenSpace.name, spaceType: greenSpace.spaceType, areaM2: String(greenSpace.areaM2), zoneId: greenSpace.zoneId });
+    setForm({ name: greenSpace.name, spaceType: greenSpace.spaceType, areaM2: greenSpace.areaM2 === null ? "" : String(greenSpace.areaM2), zoneId: greenSpace.zoneId });
     setFormError(null);
     setFormOpen(true);
   }
@@ -99,10 +104,14 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
       setFormError("Indique nombre, una superficie mayor que cero y una zona.");
       return;
     }
+    if (areaM2 > MAX_DECIMAL_10_2) {
+      setFormError(`La superficie no puede superar ${MAX_DECIMAL_10_2.toLocaleString("es-AR")} m².`);
+      return;
+    }
     try {
-      const payload = { name: form.name.trim(), spaceType: form.spaceType, areaM2, zoneId: form.zoneId };
+      const payload = { name: form.name.trim(), areaM2, zoneId: form.zoneId };
       if (editing) await greenSpacesAdapter.update(editing.id, payload);
-      else await greenSpacesAdapter.create(payload);
+      else await greenSpacesAdapter.create({ ...payload, spaceType: form.spaceType });
       setFormOpen(false);
       setNotice(editing ? "Espacio verde actualizado." : "Espacio verde registrado.");
       setRequestVersion((version) => version + 1);
@@ -124,16 +133,12 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
 
   return (
     <section aria-labelledby="green-spaces-title" className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Leaf aria-hidden className="size-5 text-[var(--color-institutional)]" />
-            <h2 id="green-spaces-title" className="text-xl font-semibold tracking-tight">Espacios verdes</h2>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">Plazas, parques, canteros y ramblas disponibles para la planificación operativa.</p>
-        </div>
-        {canManage ? <Button onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar espacio verde</Button> : null}
-      </div>
+      <CatalogPageHeader
+        title="Espacios verdes"
+        titleId="green-spaces-title"
+        description="Plazas, parques, canteros y ramblas disponibles para la planificación operativa."
+        actions={canManage ? <Button onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar espacio verde</Button> : null}
+      />
 
       {notice ? <p className="text-sm text-[var(--color-success)]" role="status">{notice}</p> : null}
 
@@ -164,17 +169,16 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
       {state.status === "error" ? <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm"><span>{state.message}</span><Button variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar carga</Button></div> : null}
       {state.status === "ready" && state.greenSpaces.length === 0 ? <p className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">No hay espacios verdes que coincidan con los filtros.</p> : null}
       {state.status === "ready" && state.greenSpaces.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Espacios verdes registrados</caption>
             <thead className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground"><tr><th scope="col" className="px-4 py-3">Nombre</th><th scope="col" className="px-4 py-3">Tipo</th><th scope="col" className="px-4 py-3">Superficie</th><th scope="col" className="px-4 py-3">Zona</th><th scope="col" className="px-4 py-3">Estado</th>{canManage ? <th scope="col" className="px-4 py-3"><span className="sr-only">Acciones</span></th> : null}</tr></thead>
             <tbody className="divide-y divide-border">{state.greenSpaces.map((greenSpace) => {
-              const zone = zones.find((item) => item.id === greenSpace.zoneId);
               return <tr key={greenSpace.id}>
                 <th scope="row" className="px-4 py-3 font-medium">{greenSpace.name}</th>
                 <td className="px-4 py-3">{spaceTypeLabels[greenSpace.spaceType]}</td>
-                <td className="px-4 py-3">{greenSpace.areaM2.toLocaleString("es-AR")} m²</td>
-                <td className="px-4 py-3">{zone ? `${zone.code} · ${zone.name}` : greenSpace.zoneId}</td>
+                <td className="px-4 py-3">{greenSpace.areaM2 === null ? "—" : `${greenSpace.areaM2.toLocaleString("es-AR")} m²`}</td>
+                <td className="px-4 py-3">{zoneLabel(zones, greenSpace.zoneId, zonesLoaded)}</td>
                 <td className="px-4 py-3"><span className="inline-flex items-center gap-1">{greenSpace.active ? <Check aria-hidden className="size-4 text-[var(--color-success)]" /> : <X aria-hidden className="size-4 text-muted-foreground" />}{greenSpace.active ? "Activo" : "Inactivo"}</span></td>
                 {canManage ? <td className="flex gap-2 px-4 py-3"><Button variant="outline" size="sm" onClick={() => openEdit(greenSpace)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{greenSpace.active ? <Button variant="destructive" size="sm" onClick={() => void deactivate(greenSpace)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}
               </tr>;
@@ -190,8 +194,8 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
           <form id="green-space-form" onSubmit={(event) => void save(event)}>
             <FieldGroup>
               <Field><FieldLabel htmlFor="green-space-name">Nombre</FieldLabel><input id="green-space-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={formControlClass} required aria-invalid={Boolean(formError)} aria-describedby={formError ? "green-space-name-error" : undefined} /><FieldError id="green-space-name-error" role="none">{formError}</FieldError></Field>
-              <Field><FieldLabel htmlFor="green-space-type-form">Tipo de espacio en el formulario</FieldLabel><select id="green-space-type-form" value={form.spaceType} onChange={(event) => setForm({ ...form, spaceType: event.target.value as GreenSpaceType })} className={formControlClass}>{spaceTypes.map((type) => <option key={type} value={type}>{spaceTypeLabels[type]}</option>)}</select></Field>
-              <Field><FieldLabel htmlFor="green-space-area">Superficie (m²)</FieldLabel><input id="green-space-area" type="number" min="0.01" step="0.01" value={form.areaM2} onChange={(event) => setForm({ ...form, areaM2: event.target.value })} className={formControlClass} required /><FieldDescription>Superficie declarada en metros cuadrados.</FieldDescription></Field>
+              <Field><FieldLabel htmlFor="green-space-type-form">Tipo de espacio en el formulario</FieldLabel><select id="green-space-type-form" value={form.spaceType} onChange={(event) => setForm({ ...form, spaceType: event.target.value as GreenSpaceType })} className={formControlClass} disabled={Boolean(editing)} aria-describedby={editing ? "green-space-type-locked" : undefined}>{spaceTypes.map((type) => <option key={type} value={type}>{spaceTypeLabels[type]}</option>)}</select>{editing ? <FieldDescription id="green-space-type-locked">El tipo no se puede cambiar después de registrar el espacio verde.</FieldDescription> : null}</Field>
+              <Field><FieldLabel htmlFor="green-space-area">Superficie (m²)</FieldLabel><input id="green-space-area" type="number" min="0.01" max={MAX_DECIMAL_10_2} step="0.01" value={form.areaM2} onChange={(event) => setForm({ ...form, areaM2: event.target.value })} className={formControlClass} required /><FieldDescription>Superficie declarada en metros cuadrados.</FieldDescription></Field>
               <Field><FieldLabel htmlFor="green-space-zone-form">Zona en el formulario</FieldLabel><select id="green-space-zone-form" value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })} className={formControlClass} required>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}</select></Field>
             </FieldGroup>
           </form>

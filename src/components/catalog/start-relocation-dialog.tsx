@@ -106,7 +106,7 @@ function StartRelocationModalContent({
         <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs space-y-1">
           <p className="font-medium text-foreground">Detalles del contenedor:</p>
           <p className="text-muted-foreground">
-            <span className="font-semibold">Ubicación actual:</span> {container.address}
+            <span className="font-semibold">Ubicación actual:</span> {container.address ?? "Sin dirección registrada"}
           </p>
           <p className="text-muted-foreground">
             <span className="font-semibold">Capacidad:</span>{" "}

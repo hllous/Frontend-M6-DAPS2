@@ -337,7 +337,7 @@ describe("ServicesWorkspace component", () => {
     expect(within(confirmDialog).getByText("Zona Centro")).toBeInTheDocument();
 
     const dateInput = within(confirmDialog).getByLabelText(/Nueva fecha/i);
-    fireEvent.change(dateInput, { target: { value: "2026-09-12" } });
+    fireEvent.change(dateInput, { target: { value: "2099-09-12" } });
     await user.click(within(confirmDialog).getByRole("button", { name: "Confirmar nueva fecha" }));
 
     await waitFor(() => {
@@ -347,7 +347,7 @@ describe("ServicesWorkspace component", () => {
     await waitFor(() => {
       expect(screen.getByText("Programado")).toBeVisible();
     });
-    expect(screen.getByText("2026-09-12")).toBeVisible();
+    expect(screen.getByText("2099-09-12")).toBeVisible();
     // zoneIds preserved verbatim
     expect(screen.getByText("Zona Centro")).toBeVisible();
   });

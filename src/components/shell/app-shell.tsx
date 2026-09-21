@@ -18,10 +18,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Empty,
   EmptyDescription,
@@ -41,6 +41,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import type { Capability, OperationalScenario } from "@/lib/scenarios";
 
 import styles from "./app-shell.module.css";
@@ -79,6 +80,10 @@ const navigation: NavigationItem[] = [
   { id: "catalog", label: "Catálogo", capability: "catalog:view", icon: Settings2 },
   { id: "dashboards", label: "Tableros", capability: "indicator:view", icon: BarChart3 },
 ];
+
+// Una sola URL por pantalla: cada destino vive en /app?destination=<id>. Las rutas
+// /app/dashboard y /app/catalog quedan como alias que redirigen aca.
+const destinationHref = (id: Destination) => `/app?destination=${id}`;
 
 const mobileDestinations: Destination[] = ["work", "services", "map"];
 const tabletNavigationQuery = "(min-width: 761px) and (max-width: 1023px)";
@@ -123,7 +128,6 @@ export function AppShell({
   routeContent?: ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const requestedDestination = searchParams.get("destination") as Destination | null;
   const destination = pathname.startsWith("/app/catalog")
@@ -134,11 +138,8 @@ export function AppShell({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const isTablet = useTabletNavigation();
   const navigationIsIconOnly = isCollapsed || isTablet;
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const availableItems = navigation.filter((item) => isAllowed(item, scenario));
-
-  const selectDestination = (next: Destination) => {
-    router.push(`/app?destination=${next}`);
-  };
 
   return (
     <div className={`${styles.shell} ${isCollapsed ? styles.collapsed : ""}`}>
@@ -152,11 +153,10 @@ export function AppShell({
         </div>
         <nav className={styles.moduleNav} aria-label="Módulos">
           {availableItems.map((item) => (
-            <NavigationButton
+            <NavigationLink
               key={item.id}
               item={item}
               selected={destination === item.id}
-              onSelect={selectDestination}
               showTooltip={navigationIsIconOnly}
             />
           ))}
@@ -220,15 +220,14 @@ export function AppShell({
 
       <nav className={styles.mobileNav} aria-label="Navegación móvil">
         {availableItems.filter((item) => mobileDestinations.includes(item.id)).map((item) => (
-          <NavigationButton
+          <NavigationLink
             key={item.id}
             item={item}
             selected={destination === item.id}
-            onSelect={selectDestination}
             compact
           />
         ))}
-        <Sheet>
+        <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
           <SheetTrigger
             render={
               <Button className={styles.mobileNavigationButton} variant="ghost" aria-label="Más módulos" />
@@ -244,15 +243,16 @@ export function AppShell({
             </SheetHeader>
             <div className={styles.sheetNavigation}>
               {availableItems.map((item) => (
-                <Button
+                <Link
                   key={item.id}
-                  variant={destination === item.id ? "default" : "outline"}
-                  className={styles.sheetNavigationButton}
-                  onClick={() => selectDestination(item.id)}
+                  href={destinationHref(item.id)}
+                  className={cn(buttonVariants({ variant: destination === item.id ? "default" : "outline" }), styles.sheetNavigationButton)}
+                  aria-current={destination === item.id ? "page" : undefined}
+                  onClick={() => setIsMoreOpen(false)}
                 >
                   <item.icon data-icon="inline-start" aria-hidden />
                   {item.label}
-                </Button>
+                </Link>
               ))}
             </div>
           </SheetContent>
@@ -265,35 +265,35 @@ export function AppShell({
   );
 }
 
-function NavigationButton({
+function NavigationLink({
   item,
   selected,
-  onSelect,
   compact = false,
   showTooltip = false,
 }: {
   item: NavigationItem;
   selected: boolean;
-  onSelect: (destination: Destination) => void;
   compact?: boolean;
   showTooltip?: boolean;
 }) {
-  const button = (
-    <Button
-      variant={selected ? "default" : "ghost"}
-      className={compact ? styles.mobileNavigationButton : styles.navigationButton}
-      onClick={() => onSelect(item.id)}
+  const link = (
+    <Link
+      href={destinationHref(item.id)}
+      className={cn(
+        buttonVariants({ variant: selected ? "default" : "ghost" }),
+        compact ? styles.mobileNavigationButton : styles.navigationButton,
+      )}
       aria-current={selected ? "page" : undefined}
       aria-label={item.label}
     >
       <item.icon data-icon="inline-start" aria-hidden />
       <span>{item.label}</span>
-    </Button>
+    </Link>
   );
 
-  return compact || !showTooltip ? button : (
+  return compact || !showTooltip ? link : (
     <Tooltip>
-      <TooltipTrigger render={button} />
+      <TooltipTrigger render={link} />
       <TooltipContent side="right">{item.label}</TooltipContent>
     </Tooltip>
   );

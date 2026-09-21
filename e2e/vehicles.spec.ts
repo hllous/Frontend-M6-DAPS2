@@ -6,7 +6,7 @@ test.describe("Vehicle catalog @smoke", () => {
   test("lists vehicles from the catalog landing", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("button", { name: "Catálogo" }).click();
+    await page.getByRole("link", { name: "Catálogo" }).click();
     await page.locator('a[href="/app/catalog/vehicles"]').click();
 
     await expect(page).toHaveURL(/\/app\/catalog\/vehicles$/);
@@ -19,7 +19,7 @@ test.describe("Vehicle catalog @smoke", () => {
     await page.goto("/app/catalog/vehicles");
     await page.getByRole("button", { name: "Registrar vehículo" }).click();
     await page.getByLabel("Patente").fill("AA 999 ZZ");
-    await page.getByLabel("Capacidad").fill("5");
+    await page.getByLabel("Capacidad (toneladas)").fill("10.5");
     await page.getByRole("button", { name: "Guardar vehículo" }).click();
 
     await expect(page.getByText("AA 999 ZZ")).toBeVisible();

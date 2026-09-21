@@ -5,6 +5,7 @@ import { addTreeFixture, filterTreeFixtures, paginateTreeFixtures, treeFixtures 
 import { treeCreateInputSchema, type TreeQuery } from "@/lib/trees";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 409: "Conflict", 503: "Service Unavailable", 500: "Internal Server Error" };
 function errorResponse(status: number, message: string, path: string) { return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status }); }
@@ -12,9 +13,9 @@ function parseQuery(url: URL): TreeQuery {
   return {
     active: url.searchParams.has("active") ? url.searchParams.get("active") === "true" : undefined,
     zoneId: url.searchParams.get("zoneId") ?? undefined,
-    search: url.searchParams.get("search") ?? undefined,
-    page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-    pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
+    search: searchParam(url.searchParams),
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
   };
 }
 function backendQueryString(query: TreeQuery) {

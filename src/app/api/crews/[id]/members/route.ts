@@ -25,6 +25,8 @@ function requireOfficeCapability(request: Request) {
   return session;
 }
 
+// El backend nombra el campo userIds en POST /crews/{id}/members; adentro se sigue
+// llamando memberUserIds, asi que la traduccion queda en el borde, que es el BFF.
 export async function POST(request: Request, routeContext: PostContext) {
   const { id } = await routeContext.params;
   const path = new URL(request.url).pathname;
@@ -34,7 +36,7 @@ export async function POST(request: Request, routeContext: PostContext) {
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = addCrewMembersInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) return forwardResponse(await fetchBackend(request, `/crews/${id}/members`, "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }));
+    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) return forwardResponse(await fetchBackend(request, `/crews/${id}/members`, "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userIds: parsed.data.memberUserIds }) }));
     const crew = crewFixtures.find((item) => item.id === id);
     if (!crew) return errorResponse(404, `La cuadrilla ${id} no existe.`, path);
     crew.memberUserIds = [...new Set([...crew.memberUserIds, ...parsed.data.memberUserIds])];

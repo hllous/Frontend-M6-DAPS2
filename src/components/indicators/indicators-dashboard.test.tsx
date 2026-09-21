@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -92,7 +92,7 @@ describe("IndicatorsDashboard", () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("heading", { name: "Cobertura" });
-    const centro = await screen.findByRole("button", { name: /Centro.*93,6.*146.*156/i });
+    const centro = await screen.findByRole("button", { name: /Centro.*89,7.*140.*156/i });
 
     await user.hover(centro);
     expect(screen.getByRole("status", { name: /Detalle de Centro/i })).toBeVisible();
@@ -119,7 +119,7 @@ describe("IndicatorsDashboard", () => {
     expect(screen.getByText("Atendidos")).toBeVisible();
     expect(screen.getByText("Programados")).toBeVisible();
 
-    const centro = await screen.findByRole("button", { name: /Centro.*93,6.*146.*156/i });
+    const centro = await screen.findByRole("button", { name: /Centro.*89,7.*140.*156/i });
     centro.focus();
     await user.keyboard("{Enter}");
     expect(screen.getAllByText(/Seleccionado:/)[0]?.closest("p")).toHaveTextContent("Seleccionado: Centro");
@@ -128,13 +128,13 @@ describe("IndicatorsDashboard", () => {
     const coverageTable = screen.getByRole("region", { name: "Tabla de datos de Cobertura" });
     expect(within(coverageTable).getAllByRole("columnheader", { name: "Atendidos" })[0]).toBeVisible();
     expect(within(coverageTable).getAllByRole("columnheader", { name: "Programados" })[0]).toBeVisible();
-    expect(within(coverageTable).getAllByText("146 objetivos")[0]).toBeVisible();
+    expect(within(coverageTable).getAllByText("140 objetivos")[0]).toBeVisible();
     expect(within(coverageTable).getAllByText("156 objetivos")[0]).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
     expect((await screen.findAllByText("344 servicios"))[0]).toBeVisible();
     expect((await screen.findAllByText("Demorados"))[0]).toBeVisible();
-    expect(screen.getByText("Falta de cuadrilla")).toBeVisible();
+    expect(screen.getAllByText(/Cuadrilla no disponible/)[0]).toBeVisible();
     expect(screen.getByText(/ZoneResult\.recordedAt/i).closest("p")).toHaveTextContent("último ZoneResult.recordedAt");
   });
 
@@ -154,7 +154,7 @@ describe("IndicatorsDashboard", () => {
     const incidentsTable = screen.getByRole("region", { name: "Tabla de datos de Incidencias" });
     expect(within(incidentsTable).getByRole("columnheader", { name: "Desbordes" })).toBeVisible();
     expect(within(incidentsTable).getByRole("columnheader", { name: "Daños" })).toBeVisible();
-    expect(within(incidentsTable).getByText("Cerrados")).toBeVisible();
+    expect(within(incidentsTable).getByText("Cerrado")).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: /Residuos/ }));
     expect(screen.getAllByText(/Desvío de relleno sanitario/)[0]).toBeVisible();
@@ -170,7 +170,7 @@ describe("IndicatorsDashboard", () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("heading", { name: "Cobertura" });
-    await user.click(await screen.findByRole("button", { name: /Centro.*93,6/i }));
+    await user.click(await screen.findByRole("button", { name: /Centro.*89,7/i }));
 
     const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
     expect(within(recordsRegion).getByRole("row", { name: /SVC-1042/ })).toBeVisible();
@@ -208,5 +208,25 @@ describe("IndicatorsDashboard", () => {
 
     expect(screen.getByText(/no se puede vincular con un registro operativo/i)).toBeVisible();
     expect(screen.queryByRole("link", { name: /Abrir catálogo de árboles/i })).not.toBeInTheDocument();
+  });
+
+  it("blocks an inverted date range with a message and does not call the backend", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Cobertura" });
+
+    let indicatorRequests = 0;
+    server.use(http.get("*/api/indicators/:family", () => { indicatorRequests += 1; return HttpResponse.json({}, { status: 500 }); }));
+
+    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-09-20" } });
+    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-09-01" } });
+    await user.click(screen.getByRole("button", { name: "Actualizar" }));
+
+    expect(await screen.findByText("La fecha «Desde» no puede ser posterior a «Hasta».")).toBeVisible();
+    expect(screen.getByLabelText("Hasta")).toBeInvalid();
+    expect(indicatorRequests).toBe(0);
+
+    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-09-20" } });
+    expect(screen.queryByText("La fecha «Desde» no puede ser posterior a «Hasta».")).not.toBeInTheDocument();
   });
 });
