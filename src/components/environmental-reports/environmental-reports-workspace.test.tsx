@@ -172,6 +172,7 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getByLabelText("Fecha de inspección"), "2026-09-10");
+    await user.selectOptions(within(dialog).getByLabelText("Zona operativa"), "zone-1");
     await user.selectOptions(within(dialog).getByLabelText("Cuadrilla"), "crew-a");
     await user.click(within(dialog).getByRole("button", { name: "Programar inspección" }));
 

@@ -27,8 +27,8 @@ export default defineConfig({
   // the suite's own timed assertions never pay `next dev`'s on-first-request
   // JIT compile cost — see e2e/global-setup.ts. (A real production build
   // would dodge this too, but `next start` forces NODE_ENV=production,
-  // which src/lib/session.ts's getAuthMode() intentionally treats as "mock
-  // auth is unavailable" — a safety guard, not something to route around.)
+  // which src/lib/session.ts's getAuthMode() resolves to "real-m1" unless
+  // M6_AUTH_MODE is set explicitly — a safety default, not something to route around.)
   globalSetup: "./e2e/global-setup.ts",
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
