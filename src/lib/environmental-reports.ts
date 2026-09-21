@@ -3,7 +3,7 @@ import { z } from "zod";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
-import { latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
+import { MAX_NOTES_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
 
 export const environmentalReportTypeSchema = z.enum([
   "NOISE",
@@ -67,7 +67,7 @@ export const createEnvironmentalReportInputSchema = z.object({
   address: z.string().trim().min(1, "Debe indicar la ubicación del hallazgo."),
   lat: latitudeInput(),
   lng: longitudeInput(),
-  description: z.string().trim().min(1, "Debe describir el hallazgo."),
+  description: z.string().trim().min(1, "Debe describir el hallazgo.").max(MAX_NOTES_LENGTH, `La descripción no puede superar los ${MAX_NOTES_LENGTH} caracteres.`),
 });
 export type CreateEnvironmentalReportInput = z.infer<typeof createEnvironmentalReportInputSchema>;
 
@@ -92,7 +92,9 @@ export const environmentalReportSchema = z.object({
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
   location: reportLocationSchema.optional(),
-  description: z.string().optional(),
+  // El backend siempre manda la clave y vale null en los expedientes que abre M2 y en
+  // los creados sin descripción (#289): un solo null tumbaba el listado entero.
+  description: z.string().nullable().optional(),
   details: z.string().optional(),
   publicId: z.string().nullable().optional(),
   ticketId: z.string().nullable().optional(),
@@ -168,6 +170,16 @@ export const environmentalInspectionChecklistItemSchema = z.object({
 }).passthrough();
 export type EnvironmentalInspectionChecklistItem = z.infer<typeof environmentalInspectionChecklistItemSchema>;
 
+// Forma real del backend (InspectionResponseDto.checklistItems): cada ítem tiene un
+// `id` UUID, un `itemCode` (el código), `label`, `result` y `observations`.
+export const environmentalInspectionChecklistItemResponseSchema = z.object({
+  id: z.string(),
+  itemCode: z.string(),
+  label: z.string(),
+  result: z.boolean(),
+  observations: z.string().nullable().optional(),
+}).passthrough();
+
 export const environmentalInspectionChecklistResultSchema = z.object({
   id: z.string().trim().min(1),
   label: z.string().trim().min(1),
@@ -184,8 +196,8 @@ export const environmentalInspectionCompleteInputSchema = z
     outcome: environmentalInspectionOutcomeSchema,
     nextStep: environmentalInspectionNextStepSchema.optional(),
     checklist: z.array(environmentalInspectionChecklistResultSchema).min(1, "Debe completar el checklist de inspección."),
-    conclusion: z.string().trim().optional(),
-    findings: z.string().trim().optional(),
+    conclusion: z.string().trim().max(MAX_NOTES_LENGTH, `La conclusión no puede superar los ${MAX_NOTES_LENGTH} caracteres.`).optional(),
+    findings: z.string().trim().max(MAX_NOTES_LENGTH, `Los hallazgos no pueden superar los ${MAX_NOTES_LENGTH} caracteres.`).optional(),
     violationType: environmentalInspectionViolationTypeSchema.optional(),
     severity: environmentalInspectionSeveritySchema.optional(),
     suggestedAction: environmentalInspectionSuggestedActionSchema.optional(),
@@ -230,12 +242,16 @@ export const environmentalInspectionSchema = z.object({
   reportId: z.string(),
   serviceId: z.string().nullable().optional(),
   inspectedAt: z.string().nullable().optional(),
-  scheduledDate: z.string(),
-  timeWindow: z.object({ start: z.string(), end: z.string() }),
-  checklistVersion: z.string(),
-  checklist: z.array(environmentalInspectionChecklistItemSchema),
+  // Campos de agenda: son del frontend (el backend no los devuelve); se mantienen
+  // opcionales para que la respuesta real del backend siga parseando.
+  scheduledDate: z.string().optional(),
+  timeWindow: z.object({ start: z.string(), end: z.string() }).optional(),
+  checklistVersion: z.string().optional(),
+  checklist: z.array(environmentalInspectionChecklistItemSchema).optional(),
+  checklistItems: z.array(environmentalInspectionChecklistItemResponseSchema).optional(),
   attachments: z.array(attachmentSchema).optional(),
   findings: z.string().nullable().optional(),
+  conclusion: z.string().nullable().optional(),
   violationType: environmentalInspectionViolationTypeSchema.nullable().optional(),
   severity: environmentalInspectionSeveritySchema.nullable().optional(),
   suggestedAction: environmentalInspectionSuggestedActionSchema.nullable().optional(),
@@ -246,6 +262,20 @@ export const environmentalInspectionSchema = z.object({
   updatedAt: z.string(),
 }).passthrough();
 export type EnvironmentalInspection = z.infer<typeof environmentalInspectionSchema>;
+
+/**
+ * El checklist que muestra la UI. En modo mock viene como `checklist`
+ * (items con `id`=código y `required`); contra el backend real viene como
+ * `checklistItems` (`itemCode`). Se normaliza a la forma interna.
+ */
+export function inspectionChecklist(inspection: EnvironmentalInspection): EnvironmentalInspectionChecklistItem[] {
+  if (inspection.checklist?.length) return inspection.checklist;
+  return (inspection.checklistItems ?? []).map((item) => ({
+    id: item.itemCode,
+    label: item.label,
+    required: true,
+  }));
+}
 
 export const issueViolationNoticeInputSchema = z.object({
   // null is reserved for the explicit non-forwarded path. A resolved notice

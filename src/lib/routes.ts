@@ -30,17 +30,11 @@ export class RouteRequestError extends Error {
 
 export const routeStopSchema = z.object({
   id: z.string(),
-  routeId: z.string(),
   sequence: z.number().int().nonnegative(),
   zoneId: z.string(),
-  estimatedDurationMin: z.number().nonnegative().optional(),
-  zone: z
-    .object({
-      id: z.string(),
-      code: z.string(),
-      name: z.string(),
-    })
-    .optional(),
+  zoneCode: z.string(),
+  zoneName: z.string(),
+  estimatedDurationMin: z.number().nonnegative(),
 });
 
 export type RouteStop = z.infer<typeof routeStopSchema>;

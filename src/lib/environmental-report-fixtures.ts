@@ -20,8 +20,8 @@ const reports: EnvironmentalReport[] = [
   { id: "ER-1001", reportType: "ILLEGAL_DUMPSITE", address: "Av. Warnes 1840", lat: -34.598, lng: -58.452, description: "Acumulación de residuos y escombros en la esquina.", status: "RECEIVED", priority: "HIGH", ticketId: null, deadlineAt: null, escalated: false, assignedCrewId: "crew-b", createdAt: "2026-09-06T11:20:00.000Z", updatedAt: "2026-09-06T11:20:00.000Z" },
   // publicId present → M2 contract v1.6 (#191): backend always sends lat/lng
   // as explicit null for ticket-originated reports, address is the only location signal.
-  { id: "ER-1002", reportType: "NOISE", address: "Av. Corrientes 4200", lat: null, lng: null, description: "Ruido persistente de maquinaria durante la madrugada.", status: "UNDER_REVIEW", priority: "MEDIUM", publicId: "TK-2026-091", ticketId: "550e8400-e29b-41d4-a716-446655440091", deadlineAt: null, escalated: true, citizenResponse: "El vecino aportó horarios del ruido.", assignedCrewId: null, createdAt: "2026-09-06T09:10:00.000Z", updatedAt: "2026-09-06T10:45:00.000Z" },
-  { id: "ER-1003", reportType: "WATER_DISCHARGE", address: "Calle 12 760", lat: null, lng: null, description: "Descarga de líquido hacia el desagüe pluvial.", status: "FORWARDED", priority: "HIGH", publicId: "TK-2026-084", ticketId: "550e8400-e29b-41d4-a716-446655440084", deadlineAt: null, escalated: false, assignedCrewId: null, createdAt: "2026-09-05T16:00:00.000Z", updatedAt: "2026-09-06T08:30:00.000Z" },
+  { id: "ER-1002", reportType: "NOISE", address: "Av. Corrientes 4200", lat: null, lng: null, description: null, status: "UNDER_REVIEW", priority: "MEDIUM", publicId: "TK-2026-091", ticketId: "550e8400-e29b-41d4-a716-446655440091", deadlineAt: null, escalated: true, citizenResponse: "El vecino aportó horarios del ruido.", assignedCrewId: null, createdAt: "2026-09-06T09:10:00.000Z", updatedAt: "2026-09-06T10:45:00.000Z" },
+  { id: "ER-1003", reportType: "WATER_DISCHARGE", address: "Calle 12 760", lat: null, lng: null, description: null, status: "FORWARDED", priority: "HIGH", publicId: "TK-2026-084", ticketId: "550e8400-e29b-41d4-a716-446655440084", deadlineAt: null, escalated: false, assignedCrewId: null, createdAt: "2026-09-05T16:00:00.000Z", updatedAt: "2026-09-06T08:30:00.000Z" },
   { id: "ER-1004", reportType: "ODOR", address: "Rondeau 215", lat: -34.616, lng: -58.431, description: "Olor intenso de origen no determinado.", status: "DISMISSED", priority: "LOW", ticketId: null, deadlineAt: null, escalated: false, assignedCrewId: null, createdAt: "2026-09-05T13:00:00.000Z", updatedAt: "2026-09-05T14:20:00.000Z" },
   { id: "ER-1005", reportType: "AIR_EMISSION", address: "Av. La Plata 1120", lat: -34.621, lng: -58.423, description: "Emisión visible desde una chimenea industrial.", status: "INSPECTION_SCHEDULED", priority: "CRITICAL", ticketId: null, deadlineAt: "2026-09-12T12:00:00.000Z", escalated: true, assignedCrewId: null, createdAt: "2026-09-04T10:00:00.000Z", updatedAt: "2026-09-05T09:00:00.000Z" },
   { id: "ER-1006", reportType: "DUMPING", address: "Maza 680", lat: -34.620, lng: -58.418, description: "Vertido de residuos líquidos en la vía pública.", status: "INSPECTED", priority: "HIGH", ticketId: null, deadlineAt: "2026-09-11T12:00:00.000Z", escalated: false, assignedCrewId: null, createdAt: "2026-09-03T12:00:00.000Z", updatedAt: "2026-09-04T15:10:00.000Z" },
@@ -102,7 +102,7 @@ const inspections: EnvironmentalInspection[] = [
     suggestedAction: "FORMAL_NOTICE",
     outcome: "VIOLATION_FOUND",
     nextStep: "NOTICE_TO_BE_ISSUED",
-    notes: "Se constató la infracción.",
+    conclusion: "Se constató la infracción.",
     createdAt: "2026-09-03T08:00:00.000Z",
     updatedAt: "2026-09-03T17:15:00.000Z",
   },
@@ -119,24 +119,24 @@ inspections.push({
   checklist: [{ id: "source-1010", label: "Identificar la fuente del impacto", required: true }],
   attachments: [{ id: "att-1010", url: "/mock/evidence/acta-1010.jpg", filename: "acta-1010.jpg", contentType: "image/jpeg", uploadedAt: "2026-08-31T17:00:00.000Z" }],
   findings: "Descarga constatada en el establecimiento.",
-  violationType: "UNTREATED_DISCHARGE",
-  severity: "CRITICAL",
-  suggestedAction: "FINE",
-  outcome: "VIOLATION_FOUND",
-  nextStep: "NOTICE_TO_BE_ISSUED",
-  notes: "Se constató la infracción.",
+    violationType: "UNTREATED_DISCHARGE",
+    severity: "CRITICAL",
+    suggestedAction: "FINE",
+    outcome: "VIOLATION_FOUND",
+    nextStep: "NOTICE_TO_BE_ISSUED",
+    conclusion: "Se constató la infracción.",
   createdAt: "2026-08-31T08:00:00.000Z",
   updatedAt: "2026-08-31T17:15:00.000Z",
 });
 
 export let environmentalInspectionFixtures: EnvironmentalInspection[] = inspections.map((inspection) => ({
   ...inspection,
-  checklist: inspection.checklist.map((item) => ({ ...item })),
+  checklist: (inspection.checklist ?? []).map((item) => ({ ...item })),
   attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
 }));
 const initialInspections = environmentalInspectionFixtures.map((inspection) => ({
   ...inspection,
-  checklist: inspection.checklist.map((item) => ({ ...item })),
+  checklist: (inspection.checklist ?? []).map((item) => ({ ...item })),
   attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
 }));
 
@@ -170,7 +170,7 @@ export function resetEnvironmentalReportFixtures() {
 export function resetEnvironmentalInspectionFixtures() {
   environmentalInspectionFixtures = initialInspections.map((inspection) => ({
     ...inspection,
-    checklist: inspection.checklist.map((item) => ({ ...item })),
+    checklist: (inspection.checklist ?? []).map((item) => ({ ...item })),
     attachments: inspection.attachments?.map((attachment) => ({ ...attachment })),
   }));
 }
@@ -279,7 +279,7 @@ export function linkEnvironmentalInspectionService(inspectionId: string, service
 export function createEnvironmentalInspectionFixture(reportId: string, input: EnvironmentalInspectionScheduleInput): EnvironmentalInspection {
   const now = new Date().toISOString();
   return {
-    id: `INS-${Date.now()}`,
+    id: crypto.randomUUID(),
     reportId,
     serviceId: null,
     inspectedAt: null,
