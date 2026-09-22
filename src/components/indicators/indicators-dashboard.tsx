@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
 import { defaultIndicatorQuery, indicatorQueryErrorMessage, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
+import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
@@ -53,12 +54,9 @@ const familyMeta: Record<FamilyKey, { label: string; icon: typeof Activity; desc
 const familyOrder: FamilyKey[] = ["coverage", "compliance", "incidents", "waste"];
 const territorialBreakdownIds = new Set(["zones", "unattended-zones", "containers"]);
 const chartConfig: ChartConfig = { value: { label: "Valor", color: "var(--color-action)" } };
-const zoneOptions = [{ id: "zone-1", label: "Centro" }, { id: "zone-2", label: "Costera" }, { id: "zone-3", label: "Norte" }];
-const serviceTypeOptions = [{ id: "service-collection", label: "Recolección" }, { id: "service-sweeping", label: "Barrido" }, { id: "service-green", label: "Espacios verdes" }];
-
-function zoneLabel(zoneId: string) {
-  return zoneOptions.find((option) => option.id === zoneId)?.label ?? zoneId;
-}
+type FilterOption = { id: string; label: string };
+// Opciones reales de GET /zones y GET /service-types: el backend exige UUID en los filtros.
+type FilterCatalog = { zones: FilterOption[]; serviceTypes: FilterOption[] };
 
 function defaultTracePlan(family: FamilyKey, period: { from: string; to: string }, zoneId?: string): TracePlan | null {
   if (family !== "coverage" && family !== "compliance") return null;
@@ -111,12 +109,12 @@ function serviceToTraceRecord(service: Service): TraceRecord {
   };
 }
 
-function containerToTraceRecord(container: Container): TraceRecord {
+function containerToTraceRecord(container: Container, zones: Map<string, string>): TraceRecord {
   return {
     id: container.code,
     title: container.code,
     detail: container.address ?? "Sin dirección registrada",
-    zone: zoneLabel(container.zoneId),
+    zone: zones.get(container.zoneId) ?? "Sin zona informada",
     status: CONTAINER_STATUS_LABELS[container.status],
   };
 }
@@ -134,7 +132,7 @@ function formatDateTime(value: string) {
 }
 
 function familySummary(data: IndicatorData) {
-  return `${formatNumber(data.primary.value, data.primary.unit)} ${data.primary.unit}`;
+  return metricText(data.primary);
 }
 
 function emptyFamilyState(): Record<FamilyKey, FamilyState> {
@@ -222,6 +220,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   const [recordPlan, setRecordPlan] = useState<RecordPlan | null>(null);
   const [records, setRecords] = useState<TraceRecord[]>([]);
   const [recordsStatus, setRecordsStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [filterCatalog, setFilterCatalog] = useState<FilterCatalog | null>(null);
   const isNarrow = useNarrowDashboard();
   const familyRequestVersions = useRef<Record<FamilyKey, number>>({ coverage: 0, compliance: 0, incidents: 0, waste: 0 });
   const mountedRef = useRef(true);
@@ -244,6 +243,18 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (!canView) return;
+    let current = true;
+    // catalogoDeEtiquetas no rechaza: si un catálogo falla, devuelve un mapa vacío.
+    catalogoDeEtiquetas().then((catalog) => {
+      if (!current) return;
+      const options = (entries: Iterable<[string, string]>) => [...entries].map(([id, label]) => ({ id, label }));
+      setFilterCatalog({ zones: options(catalog.zones), serviceTypes: options([...catalog.serviceTypes].map(([id, type]) => [id, type.name])) });
+    });
+    return () => { current = false; };
+  }, [canView]);
 
   useEffect(() => {
     if (!canView) return;
@@ -275,7 +286,8 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     let current = true;
     const request = plan.resource === "services"
       ? servicesAdapter.list({ page: 1, pageSize: 100, zoneId: plan.zoneId, scheduledFrom: plan.period.from, scheduledTo: plan.period.to }).then((page) => page.services.map(serviceToTraceRecord))
-      : containersAdapter.list({ page: 1, pageSize: 100, zoneId: plan.zoneId }).then((page) => page.containers.map(containerToTraceRecord));
+      : Promise.all([containersAdapter.list({ page: 1, pageSize: 100, zoneId: plan.zoneId }), catalogoDeEtiquetas()])
+        .then(([page, catalog]) => page.containers.map((container) => containerToTraceRecord(container, catalog.zones)));
 
     request.then((nextRecords) => {
       if (!current) return;
@@ -346,8 +358,8 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); const validation = indicatorQuerySchema.safeParse(query); if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; } setFilterError(null); setSelectedSignal(null); setRecordPlan(null); setRecordsStatus("idle"); setFamilyStates(emptyFamilyState()); setAppliedQuery({ ...query }); }}>
         <div className={styles.field}><label htmlFor="indicator-from">Desde</label><input id="indicator-from" type="date" value={query.from ?? ""} onChange={(event) => { setFilterError(null); setQuery((current) => ({ ...current, from: event.target.value || undefined })); }} /></div>
         <div className={styles.field}><label htmlFor="indicator-to">Hasta</label><input id="indicator-to" type="date" value={query.to ?? ""} aria-invalid={filterError ? true : undefined} aria-describedby={filterError ? "indicator-to-error" : undefined} onChange={(event) => { setFilterError(null); setQuery((current) => ({ ...current, to: event.target.value || undefined })); }} /></div>
-        <div className={styles.field}><label htmlFor="indicator-zone">Zona operativa</label><select id="indicator-zone" value={query.zoneId ?? ""} onChange={(event) => setQuery((current) => ({ ...current, zoneId: event.target.value || undefined }))}><option value="">Todas las zonas</option>{zoneOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
-        <div className={styles.field}><label htmlFor="indicator-service-type">Tipo de servicio</label><select id="indicator-service-type" value={query.serviceTypeId ?? ""} onChange={(event) => setQuery((current) => ({ ...current, serviceTypeId: event.target.value || undefined }))}><option value="">Todos los tipos</option>{serviceTypeOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
+        <CatalogFilter id="indicator-zone" label="Zona operativa" allLabel="Todas las zonas" noun="zonas" options={filterCatalog?.zones} value={query.zoneId} onChange={(zoneId) => setQuery((current) => ({ ...current, zoneId }))} />
+        <CatalogFilter id="indicator-service-type" label="Tipo de servicio" allLabel="Todos los tipos" noun="tipos de servicio" options={filterCatalog?.serviceTypes} value={query.serviceTypeId} onChange={(serviceTypeId) => setQuery((current) => ({ ...current, serviceTypeId }))} />
         <Button className={styles.filterAction} type="submit" disabled={dashboardStatus === "loading"}><RefreshCw data-icon="inline-start" aria-hidden />{dashboardStatus === "loading" ? "Actualizando…" : "Actualizar"}</Button>
         {filterError ? <p id="indicator-to-error" role="alert" className={styles.fieldError}>{filterError}</p> : null}
       </form>
@@ -377,7 +389,18 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   );
 }
 
-function metricText(metric: { value: number; unit: string }) {
+function CatalogFilter({ id, label, allLabel, noun, options, value, onChange }: { id: string; label: string; allLabel: string; noun: string; options?: FilterOption[]; value?: string; onChange: (value: string | undefined) => void }) {
+  const hint = !options ? `Cargando ${noun}…` : options.length === 0 ? `No se pudieron cargar las ${noun}; el filtro no está disponible.` : null;
+  return <div className={styles.field}>
+    <label htmlFor={id}>{label}</label>
+    <select id={id} value={value ?? ""} disabled={!options?.length} aria-describedby={hint ? `${id}-hint` : undefined} onChange={(event) => onChange(event.target.value || undefined)}><option value="">{allLabel}</option>{options?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>
+    {hint ? <p id={`${id}-hint`} className={styles.note} role="status">{hint}</p> : null}
+  </div>;
+}
+
+function metricText(metric: { value: number | null; unit: string }) {
+  // Hoy sólo la resolución media de reportes puede venir null (ningún reporte cerrado en el período).
+  if (metric.value === null) return "Sin reportes cerrados";
   return `${formatNumber(metric.value, metric.unit)} ${metric.unit}`;
 }
 
