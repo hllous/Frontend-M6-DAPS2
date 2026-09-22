@@ -9,7 +9,7 @@ export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const scenario = getScenario(session.scenarioId);
+  const scenario = getScenario(session);
   if (!scenario.capabilities.includes("indicator:view")) redirect("/app");
   redirect("/app?destination=dashboards");
 }

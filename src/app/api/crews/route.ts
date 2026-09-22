@@ -40,7 +40,7 @@ function queryString(query: CrewQuery) {
 
 function requireOfficeCapability(request: Request) {
   const session = getRequiredSession(request);
-  const scenario = getScenario(session.scenarioId);
+  const scenario = getScenario(session);
   if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar cuadrillas.");
   requireCapability(session, "crew:manage");
   return session;
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     const session = getRequiredSession(request);
     const query = parseQuery(new URL(request.url));
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) return forwardResponse(await fetchBackend(request, `/crews${queryString(query)}`));
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     const scopedQuery = scenario.actor.kind === "FIELD" ? { ...query, crewId: scenario.actor.crewId } : query;
     return NextResponse.json(paginateCrewFixtures(filterCrewFixtures(scopedQuery), query.page, query.pageSize));
   } catch (error) {

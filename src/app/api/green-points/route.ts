@@ -25,7 +25,7 @@ function backendQueryString(query: GreenPointQuery) {
   const value = params.toString();
   return value ? `?${value}` : "";
 }
-function requireOfficeCapability(request: Request) { const session = getRequiredSession(request); const scenario = getScenario(session.scenarioId); if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar puntos verdes."); requireCapability(session, "greenPoint:manage"); return session; }
+function requireOfficeCapability(request: Request) { const session = getRequiredSession(request); const scenario = getScenario(session); if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar puntos verdes."); requireCapability(session, "greenPoint:manage"); return session; }
 
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;

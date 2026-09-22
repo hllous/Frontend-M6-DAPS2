@@ -10,5 +10,5 @@ export default async function ServiceFrequenciesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  return <ServiceFrequenciesPanel scenario={getScenario(session.scenarioId)} />;
+  return <ServiceFrequenciesPanel scenario={getScenario(session)} />;
 }

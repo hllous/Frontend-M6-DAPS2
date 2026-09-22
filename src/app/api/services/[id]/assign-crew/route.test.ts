@@ -121,7 +121,7 @@ describe("POST /api/services/[id]/assign-crew BFF route", () => {
       new Request("http://localhost/api/services/SVC-1051/assign-crew", {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ crewId: "crew-a", vehicleId: "veh-102" }),
+        body: JSON.stringify({ crewId: "crew-membership", vehicleId: "vehicle-4" }),
       }),
       { params: Promise.resolve({ id: "SVC-1051" }) },
     );
@@ -129,10 +129,70 @@ describe("POST /api/services/[id]/assign-crew BFF route", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.id).toBe("SVC-1051");
-    expect(body.crewId).toBe("crew-a");
-    expect(body.crewName).toBe("Cuadrilla A · López");
-    expect(body.vehicleId).toBe("veh-102");
-    expect(body.vehiclePlate).toBe("AE 456 FG");
+    expect(body.crewId).toBe("crew-membership");
+    expect(body.crewName).toBe("Cuadrilla E - Membresia");
+    expect(body.vehicleId).toBe("vehicle-4");
+    expect(body.vehiclePlate).toBe("AD 321 DE");
+  });
+
+  it("returns 404 for crews or vehicles that are not in their catalogs, like the backend", async () => {
+    const cookie = await authenticatedCookie("office-duty-queue");
+    for (const input of [{ crewId: "crew-zz" }, { crewId: "crew-membership", vehicleId: "veh-101" }]) {
+      const response = await POST(
+        new Request("http://localhost/api/services/SVC-1043/assign-crew", {
+          method: "POST",
+          headers: { cookie, "content-type": "application/json" },
+          body: JSON.stringify(input),
+        }),
+        { params: Promise.resolve({ id: "SVC-1043" }) },
+      );
+      expect(response.status).toBe(404);
+    }
+  });
+
+  it("returns 409 on overlap without overrideNote and accepts it with one", async () => {
+    // crew-c already holds SVC-1072 (13:00-16:00) and SVC-1053 (16:00-19:00) on SVC-1043 date (14:00-17:00).
+    const cookie = await authenticatedCookie("office-duty-queue");
+    const assign = (input: object) =>
+      POST(
+        new Request("http://localhost/api/services/SVC-1043/assign-crew", {
+          method: "POST",
+          headers: { cookie, "content-type": "application/json" },
+          body: JSON.stringify(input),
+        }),
+        { params: Promise.resolve({ id: "SVC-1043" }) },
+      );
+
+    const conflict = await assign({ crewId: "crew-c" });
+    expect(conflict.status).toBe(409);
+    expect((await conflict.json()).message).toMatch(/SVC-10(53|72)/);
+
+    const tooShort = await assign({ crewId: "crew-c", overrideNote: "corta" });
+    expect(tooShort.status).toBe(400);
+
+    const accepted = await assign({ crewId: "crew-c", overrideNote: "La poda termina antes de las 16." });
+    expect(accepted.status).toBe(200);
+    expect((await accepted.json()).crewName).toBe("Cuadrilla C · Ibáñez");
+  });
+
+  it("forwards overrideNote to the backend in backend-development mode", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const input = { crewId: "d907516e-ddb7-46d4-a7d4-cd235cbb1529", vehicleId: null, overrideNote: "Coordinado con el jefe de cuadrilla." };
+
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1043/assign-crew", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+      { params: Promise.resolve({ id: "SVC-1043" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/services/SVC-1043/assign-crew");
+    expect(JSON.parse(String((backendFetch.mock.calls[0]?.[1] as RequestInit).body))).toEqual(input);
   });
 
   it("successfully assigns crew without vehicle when ServiceType does not require vehicle", async () => {
@@ -142,7 +202,7 @@ describe("POST /api/services/[id]/assign-crew BFF route", () => {
       new Request("http://localhost/api/services/SVC-1043/assign-crew", {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ crewId: "crew-c" }),
+        body: JSON.stringify({ crewId: "crew-membership" }),
       }),
       { params: Promise.resolve({ id: "SVC-1043" }) },
     );
@@ -150,8 +210,8 @@ describe("POST /api/services/[id]/assign-crew BFF route", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.id).toBe("SVC-1043");
-    expect(body.crewId).toBe("crew-c");
-    expect(body.crewName).toBe("Cuadrilla C · Ibáñez");
+    expect(body.crewId).toBe("crew-membership");
+    expect(body.crewName).toBe("Cuadrilla E - Membresia");
     expect(body.vehicleId).toBeNull();
   });
 });

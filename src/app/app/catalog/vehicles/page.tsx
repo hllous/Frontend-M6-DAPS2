@@ -9,5 +9,5 @@ export default async function VehiclesPage() {
   await connection();
   const session = await getSession();
   if (!session) redirect("/login");
-  return <VehicleCatalogPanel scenario={getScenario(session.scenarioId)} />;
+  return <VehicleCatalogPanel scenario={getScenario(session)} />;
 }

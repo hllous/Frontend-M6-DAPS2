@@ -41,7 +41,7 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     if (scenario.actor.kind !== "OFFICE" || !scenario.capabilities.includes("container:manage")) {
       return errorResponse(403, "No tiene permisos para retirar contenedores.", path);

@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     const idempotencyKey = request.headers.get("Idempotency-Key") || request.headers.get("idempotency-key");
     if (!idempotencyKey || !idempotencyKey.trim()) {

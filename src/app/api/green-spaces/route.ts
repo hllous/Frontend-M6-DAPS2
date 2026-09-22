@@ -92,7 +92,7 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (!isOffice(scenario)) return errorResponse(403, "Solo Oficina puede gestionar espacios verdes.", path);
 
     const parsed = createGreenSpaceInputSchema.safeParse(await request.json().catch(() => undefined));

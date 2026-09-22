@@ -290,39 +290,19 @@ export const ROUTE_CATALOG: RouteCatalogItem[] = [
   { id: "route-4", code: "R-04", name: "Recorrido 4 Norte", zoneIds: ["zone-1"], zoneNames: ["Zona Norte"] },
 ];
 
-export type CrewCatalogItem = {
-  id: string;
-  name: string;
-  crewType: string;
-  defaultShift: string;
-  leaderName?: string;
-};
-
-export const CREW_CATALOG: CrewCatalogItem[] = [
-  { id: "crew-a", name: "Cuadrilla A · López", crewType: "URBAN_SERVICE", defaultShift: "Turno mañana", leaderName: "Carlos López" },
-  { id: "crew-b", name: "Cuadrilla B · Fernández", crewType: "URBAN_SERVICE", defaultShift: "Turno mañana", leaderName: "María Fernández" },
-  { id: "crew-c", name: "Cuadrilla C · Ibáñez", crewType: "TREE_CARE", defaultShift: "Turno tarde", leaderName: "Jorge Ibáñez" },
-  { id: "crew-d", name: "Cuadrilla D · Gómez", crewType: "CLEANING", defaultShift: "Turno noche", leaderName: "Lucía Gómez" },
-];
-
-export type VehicleCatalogItem = {
-  id: string;
-  plate: string;
-  vehicleType: string;
-  model?: string;
-};
-
-export const VEHICLE_CATALOG: VehicleCatalogItem[] = [
-  { id: "veh-101", plate: "AF 123 CD", vehicleType: "COMPACTOR", model: "Camión compactador 16m³" },
-  { id: "veh-102", plate: "AE 456 FG", vehicleType: "SWEEPER", model: "Barredora mecánica vial" },
-  { id: "veh-103", plate: "AD 789 GH", vehicleType: "CRANE", model: "Grúa hidráulica para contenedores" },
-  { id: "veh-104", plate: "AC 321 JK", vehicleType: "OPEN_BED", model: "Camión volcador 10m³" },
-  { id: "veh-105", plate: "AB 654 LM", vehicleType: "UTILITY", model: "Camioneta utilitaria de inspección" },
-];
+export const OVERRIDE_NOTE_MIN = 10;
+export const OVERRIDE_NOTE_MAX = 500;
 
 export const assignCrewInputSchema = z.object({
   crewId: z.string().min(1, "Debe seleccionar una cuadrilla"),
   vehicleId: z.string().nullable().optional(),
+  // El backend la exige cuando la cuadrilla o el vehículo ya están tomados en esa franja (409 sin ella).
+  overrideNote: z
+    .string()
+    .trim()
+    .min(OVERRIDE_NOTE_MIN, `La justificación debe tener al menos ${OVERRIDE_NOTE_MIN} caracteres.`)
+    .max(OVERRIDE_NOTE_MAX, `La justificación admite hasta ${OVERRIDE_NOTE_MAX} caracteres.`)
+    .optional(),
 });
 
 export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
@@ -1257,6 +1237,8 @@ function timeWindowsOverlap(
   return w1Start < w2End && w2Start < w1End;
 }
 
+const RESOURCE_HOLDING_STATUSES: ServiceStatus[] = ["SCHEDULED", "RESCHEDULED", "IN_PROGRESS", "SUSPENDED"];
+
 export function checkAssignmentConflicts({
   service,
   crewId,
@@ -1276,7 +1258,8 @@ export function checkAssignmentConflicts({
 
   for (const other of allServices) {
     if (other.id === service.id) continue;
-    if (other.status === "CANCELLED") continue;
+    // Mismo criterio que el backend: sólo ocupan recurso los servicios abiertos.
+    if (!RESOURCE_HOLDING_STATUSES.includes(other.status)) continue;
     if (other.scheduledDate !== service.scheduledDate) continue;
 
     const overlaps = timeWindowsOverlap(

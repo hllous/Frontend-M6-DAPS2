@@ -44,7 +44,7 @@ function queryString(query: ServiceFrequencyQuery) {
 
 function requireOfficeCapability(request: Request) {
   const session = getRequiredSession(request);
-  const scenario = getScenario(session.scenarioId);
+  const scenario = getScenario(session);
   if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar frecuencias de servicio.");
   requireCapability(session, "serviceFrequency:manage");
   return session;

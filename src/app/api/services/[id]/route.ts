@@ -37,7 +37,7 @@ export async function GET(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
       const backendResponse = await fetchBackend(request, `/services/${serviceId}`);

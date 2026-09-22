@@ -37,7 +37,7 @@ function errorResponse(status: number, message: string, path: string) {
 
 function sessionAndScenario(request: Request) {
   const session = getRequiredSession(request);
-  const scenario = getScenario(session.scenarioId);
+  const scenario = getScenario(session);
   return { session, scenario };
 }
 

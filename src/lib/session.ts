@@ -6,7 +6,7 @@ import {
 } from "node:crypto";
 import { cookies } from "next/headers";
 
-import { getScenario, type Capability, type ScenarioId } from "./scenarios";
+import { getScenario, type Capability, type ScenarioCrew, type ScenarioId } from "./scenarios";
 import { AUTH_COOKIE_NAME } from "./session-config";
 
 export { AUTH_COOKIE_NAME } from "./session-config";
@@ -25,6 +25,8 @@ export type Session = {
   absoluteExpiresAt: number;
   jwtExpiresAt: number;
   accessToken?: string;
+  /** Cuadrilla real de un escenario de Campo, resuelta contra GET /crews en el login (sólo modo backend). */
+  crew?: ScenarioCrew;
 };
 
 export type PublicSession = Omit<Session, "accessToken"> & {
@@ -157,7 +159,7 @@ export function requireSession(session: Session | undefined): Session {
 }
 
 export function requireCapability(session: Session, capability: Capability): Session {
-  const scenario = getScenario(session.scenarioId);
+  const scenario = getScenario(session);
   if (!scenario.capabilities.includes(capability)) throw new ForbiddenSessionError();
   return session;
 }
@@ -278,6 +280,7 @@ function isSession(value: Partial<Session>): value is Session {
     typeof value.lastActivityAt === "number" &&
     typeof value.absoluteExpiresAt === "number" &&
     typeof value.jwtExpiresAt === "number" &&
-    (value.mode === "mock" ? value.accessToken === undefined : typeof value.accessToken === "string")
+    (value.mode === "mock" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
+    (value.crew === undefined || (typeof value.crew?.id === "string" && typeof value.crew?.name === "string"))
   );
 }

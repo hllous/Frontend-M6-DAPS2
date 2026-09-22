@@ -19,7 +19,7 @@ function forwardResponse(response: Response) {
 
 function requireOfficeCapability(request: Request) {
   const session = getRequiredSession(request);
-  const scenario = getScenario(session.scenarioId);
+  const scenario = getScenario(session);
   if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar integrantes de cuadrillas.");
   requireCapability(session, "crew:manage");
   return session;

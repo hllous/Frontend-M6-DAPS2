@@ -9,5 +9,5 @@ export default async function CrewsPage() {
   await connection();
   const session = await getSession();
   if (!session) redirect("/login");
-  return <CrewCatalogPanel scenario={getScenario(session.scenarioId)} />;
+  return <CrewCatalogPanel scenario={getScenario(session)} />;
 }

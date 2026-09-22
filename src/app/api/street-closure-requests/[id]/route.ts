@@ -34,7 +34,7 @@ export async function GET(
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, "Solo Oficina puede consultar solicitudes de corte de calle.", path);
     }

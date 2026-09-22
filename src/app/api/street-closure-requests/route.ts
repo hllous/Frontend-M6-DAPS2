@@ -42,7 +42,7 @@ function errorResponse(status: number, message: string, path: string) {
 
 function requireReadAccess(request: Request, path: string, sourceId?: string) {
   const session = getRequiredSession(request);
-  const scenario = getScenario(session.scenarioId);
+  const scenario = getScenario(session);
   if (scenario.actor.kind === "OFFICE") return { session, scenario };
 
   // Field may read only the dependency context for a Service assigned to its crew.
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, "Solo Oficina puede crear solicitudes de corte de calle.", path);
     }

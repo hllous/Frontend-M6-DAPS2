@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
-import {
-  serviceFixtures,
-  updateServiceFixture,
-} from "@/lib/services-fixtures";
-import {
-  assignCrewInputSchema,
-  CREW_CATALOG,
-  SERVICE_TYPE_CATALOG,
-  VEHICLE_CATALOG,
-} from "@/lib/services";
+import { assignCrewFixture } from "@/lib/services-fixtures";
+import { assignCrewInputSchema } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -20,6 +12,7 @@ const ERROR_LABELS: Record<number, string> = {
   401: "Unauthorized",
   403: "Forbidden",
   404: "Not Found",
+  409: "Conflict",
   503: "Service Unavailable",
   500: "Internal Server Error",
 };
@@ -47,7 +40,7 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     // Permission check: crew/vehicle assignment is an Office decision, not a Field action.
     if (scenario.actor.kind !== "OFFICE") {
@@ -87,40 +80,9 @@ export async function POST(
       });
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
-
-    const serviceType = SERVICE_TYPE_CATALOG.find((t) => t.id === service.serviceTypeId);
-    if (serviceType?.requiresVehicle && (!input.vehicleId || !input.vehicleId.trim())) {
-      return errorResponse(
-        400,
-        "El tipo de servicio requiere la asignación obligatoria de un vehículo operativo.",
-        path,
-      );
-    }
-
-    const crew = CREW_CATALOG.find((c) => c.id === input.crewId);
-    const vehicle = input.vehicleId
-      ? VEHICLE_CATALOG.find((v) => v.id === input.vehicleId)
-      : null;
-
-    const historyEntry = {
-      label: "Asignado",
-      at: new Date().toISOString().slice(0, 16).replace("T", " "),
-      done: true,
-    };
-
-    const updated = updateServiceFixture(service.id, {
-      crewId: input.crewId,
-      crewName: crew?.name ?? input.crewId,
-      vehicleId: input.vehicleId ?? null,
-      vehiclePlate: vehicle?.plate ?? null,
-      history: [...service.history, historyEntry],
-    });
-
-    return NextResponse.json(updated, { status: 200 });
+    const result = assignCrewFixture(serviceId, input);
+    if ("status" in result) return errorResponse(result.status, result.message, path);
+    return NextResponse.json(result.service, { status: 200 });
   } catch (error) {
     if (error instanceof InvalidSessionError) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });

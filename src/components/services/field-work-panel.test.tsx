@@ -245,6 +245,27 @@ describe("FieldWorkPanel component", () => {
     expect(dialog).toHaveTextContent("SVC-1050");
   });
 
+  it("uses the real crew resolved for the session and shows a clear error when its services fail to load", async () => {
+    const realCrewId = "d907516e-ddb7-46d4-a7d4-cd235cbb1529";
+    const requested: string[] = [];
+    server.use(
+      http.get("*/api/services", ({ request }) => {
+        requested.push(new URL(request.url).searchParams.get("crewId") ?? "");
+        return HttpResponse.json(
+          { statusCode: 503, message: "El backend no responde.", error: "Service Unavailable", timestamp: new Date().toISOString(), path: "/api/services" },
+          { status: 503 },
+        );
+      }),
+    );
+    const scenario = { ...scenarios.fieldCrewLeader, actor: { ...scenarios.fieldCrewLeader.actor, crewId: realCrewId } };
+
+    render(<FieldWorkPanel scenario={scenario} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/No se pudieron cargar los servicios de la cuadrilla/);
+    expect(screen.queryByText(/No hay servicios asignados/)).not.toBeInTheDocument();
+    expect(requested).toEqual([realCrewId]);
+  });
+
   it("scopes list to actor's own crew and excludes other crews' services", async () => {
     render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
 
