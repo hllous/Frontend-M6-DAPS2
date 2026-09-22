@@ -1,11 +1,14 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { handlers } from "@/mocks/handlers";
-import type { Service } from "@/lib/services";
+import { servicesAdapter, type Service } from "@/lib/services";
+import { resetServiceFixtures, resetZoneResultFixtures, updateServiceFixture } from "@/lib/services-fixtures";
+import { resetEnvironmentalInspectionFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { InspectionExecutionPanel } from "./inspection-execution-panel";
 
 const server = setupServer(...handlers);
@@ -63,6 +66,10 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
   localStorage.clear();
+  resetServiceFixtures();
+  resetZoneResultFixtures();
+  resetEnvironmentalInspectionFixtures();
+  vi.restoreAllMocks();
 });
 afterAll(() => server.close());
 
@@ -186,6 +193,13 @@ describe("InspectionExecutionPanel", () => {
     await user.click(screen.getByRole("button", { name: /Completar inspecci/ }));
 
     expect(await screen.findByText(/Resultado registrado/)).toBeVisible();
+    // #295: la agenda sale del servicio (la inspección del backend no la trae) y el
+    // resultado muestra los cuatro campos de cierre.
+    expect(screen.getByText(/SVC-INS-1 · Checklist .* · 2026-09-07 · 09:00–11:00/)).toBeVisible();
+    expect(screen.getByText("Humo negro continuo.")).toBeVisible();
+    expect(screen.getByText("Emisión al aire")).toBeVisible();
+    expect(screen.getByText("Alta")).toBeVisible();
+    expect(screen.getByText("Aviso formal")).toBeVisible();
     expect(completionBody).toMatchObject({
       checklist: [
         { id: "location", label: "Verificar ubicación y contexto del hallazgo", completed: true },
@@ -197,6 +211,39 @@ describe("InspectionExecutionPanel", () => {
       severity: "HIGH",
       suggestedAction: "FORMAL_NOTICE",
     });
+  });
+
+  it("guides the crew to close the still-open POINT service with the zone result after the inspection (#295)", async () => {
+    const user = userEvent.setup();
+    const complete = vi.spyOn(servicesAdapter, "complete");
+    const openService = updateServiceFixture("SVC-1072", { status: "IN_PROGRESS" })!;
+    updateEnvironmentalInspectionFixture("INS-1005", { outcome: "NO_VIOLATION", nextStep: "CASE_CLOSED", conclusion: "Sin emisiones al momento de la visita.", inspectedAt: "2026-09-05T14:00:00.000Z" });
+    function Harness() {
+      const [current, setCurrent] = useState(openService);
+      return <InspectionExecutionPanel service={current} canExecute={current.status === "IN_PROGRESS"} onServiceUpdated={setCurrent} />;
+    }
+
+    render(<Harness />);
+
+    expect(await screen.findByRole("status", { name: "El servicio sigue abierto" })).toHaveTextContent("Registre el resultado de la zona y complete el servicio para cerrarlo.");
+    expect(screen.getByRole("heading", { name: "Registro de ejecución de zonas" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Guardar resultado de zona" }));
+    const completeButton = screen.getByRole("button", { name: "Completar servicio" });
+    await waitFor(() => expect(completeButton).toBeEnabled());
+    await user.click(completeButton);
+
+    expect(await screen.findByRole("status", { name: "Servicio cerrado" })).toBeVisible();
+    expect(complete).toHaveBeenCalledWith("SVC-1072", undefined);
+  });
+
+  it("does not offer the zone closure while the inspection is still pending", async () => {
+    server.use(http.get("*/api/environmental-inspections/INS-TEST-1", () => HttpResponse.json(inspectionResponse())));
+
+    render(<InspectionExecutionPanel service={service} canExecute />);
+
+    expect(await screen.findByRole("button", { name: "Completar inspección" })).toBeVisible();
+    expect(screen.queryByRole("status", { name: "El servicio sigue abierto" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Registro de ejecución de zonas" })).not.toBeInTheDocument();
   });
 
   it("saves an offline draft and blocks resubmission when the service has drifted", async () => {
