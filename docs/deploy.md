@@ -12,7 +12,7 @@
 |---|---|---|---|
 | **Backend** (NestJS) | Render (Web Service, free) | ✅ Live | `https://m6-backend-m64k.onrender.com` |
 | **PostgreSQL** | Render (Managed, free) | ✅ Available | (Internal URL, no accesible desde afuera) |
-| **Frontend** (Next.js) | Vercel (free) | ✅ Live | `https://m6-ambiente-frontend.vercel.app` |
+| **Frontend** (Next.js) | Vercel (free) | ✅ Live | `https://m6-ambiente-frontend-uade.vercel.app` |
 
 El deploy está **enlazado a la rama `main`** de cada repo: al pushear código a `main` se actualiza automáticamente — el backend vía GitHub Actions + Deploy Hook de Render, el frontend vía auto-deploy nativo de Vercel (~2-5 min).
 
@@ -26,8 +26,8 @@ El backend cerró las siete fases de su plan: 130 rutas REST en 23 tags de Swagg
 
 | Recurso | URL |
 |---|---|
-| Frontend (landing) | `https://m6-ambiente-frontend.vercel.app` |
-| Frontend health | `https://m6-ambiente-frontend.vercel.app/api/health` |
+| Frontend (landing) | `https://m6-ambiente-frontend-uade.vercel.app` |
+| Frontend health | `https://m6-ambiente-frontend-uade.vercel.app/api/health` |
 | Backend health | `https://m6-backend-m64k.onrender.com/health` |
 | Backend Swagger UI | `https://m6-backend-m64k.onrender.com/api/docs` |
 
@@ -41,7 +41,7 @@ curl https://m6-backend-m64k.onrender.com/health
 # → {"status":"ok","timestamp":"...","service":"m6-ambiente-backend"}
 
 # Frontend: debe devolver status ok
-curl https://m6-ambiente-frontend.vercel.app/api/health
+curl https://m6-ambiente-frontend-uade.vercel.app/api/health
 # → {"status":"ok","timestamp":"...","service":"m6-ambiente-frontend"}
 ```
 
