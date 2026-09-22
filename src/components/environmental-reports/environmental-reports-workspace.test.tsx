@@ -10,6 +10,7 @@ import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { environmentalReportsAdapter } from "@/lib/environmental-reports";
 import { repairRequestsAdapter } from "@/lib/repair-requests";
 import { resetServiceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
+import { servicesAdapter } from "@/lib/services";
 import { scenarios } from "@/lib/scenarios";
 import { EnvironmentalReportsWorkspace } from "./environmental-reports-workspace";
 
@@ -179,6 +180,32 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(await within(detail).findByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();
     expect(within(detail).getByText(/^SVC-/)).toBeVisible();
     expect(within(detail).getByText(/Cuadrilla A/)).toBeVisible();
+  });
+
+  it("reprograms a scheduled inspection through its linked Service instead of creating another inspection (#294)", async () => {
+    const user = userEvent.setup();
+    const schedule = vi.spyOn(environmentalReportsAdapter, "schedule");
+    const reschedule = vi.spyOn(servicesAdapter, "reschedule");
+    const confirmReschedule = vi.spyOn(servicesAdapter, "confirmReschedule");
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1005/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1005" });
+
+    await user.click(await within(detail).findByRole("button", { name: "Reprogramar inspección" }));
+    const reasonDialog = await screen.findByRole("dialog", { name: "Reprogramar SVC-1072" });
+    await user.type(within(reasonDialog).getByLabelText(/Motivo/), "Alerta meteorológica");
+    await user.click(within(reasonDialog).getByRole("button", { name: "Mover a reprogramar" }));
+
+    const confirmDialog = await screen.findByRole("dialog", { name: "Confirmar reprogramación de SVC-1072" });
+    await user.type(within(confirmDialog).getByLabelText("Nueva fecha *"), "2030-01-15");
+    await user.click(within(confirmDialog).getByRole("button", { name: "Confirmar nueva fecha" }));
+
+    await waitFor(() => expect(confirmReschedule).toHaveBeenCalledWith("SVC-1072", { scheduledDate: "2030-01-15", timeWindow: { start: "13:00", end: "16:00" } }));
+    expect(reschedule).toHaveBeenCalledWith("SVC-1072", { reason: "Alerta meteorológica" });
+    expect(schedule).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(detail).getByRole("button", { name: "Reprogramar inspección" })).toBeVisible();
   });
 
   it("lets authorized Office issue an immutable notice from a completed violation inspection", async () => {
