@@ -24,14 +24,19 @@ async function backendCookie() {
 
 describe("POST /api/environmental-inspections/:id/complete", () => {
   it("translates the form command to the documented backend DTO", async () => {
-    const cookie = await backendCookie();
     let backendBody: unknown;
     const urls: string[] = [];
+    // El mock va antes del login: en modo backend, Campo resuelve su cuadrilla real contra GET /crews (#293).
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      urls.push(String(input));
+      const url = String(input);
+      if (url.includes("/crews")) {
+        return new Response(JSON.stringify({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      urls.push(url);
       if (init?.body) backendBody = JSON.parse(String(init.body));
-      return new Response(JSON.stringify(String(input).includes("/evidence") ? [] : { id: "INS-TEST-1" }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify(url.includes("/evidence") ? [] : { id: "INS-TEST-1" }), { status: 200, headers: { "content-type": "application/json" } });
     });
+    const cookie = await backendCookie();
 
     const response = await POST(new Request("http://localhost/api/environmental-inspections/INS-TEST-1/complete", {
       method: "POST",
