@@ -157,6 +157,48 @@ describe("InspectionExecutionPanel", () => {
     });
   });
 
+  it("completes a freshly scheduled backend inspection (checklistItems: []) with the template and the four closing fields", async () => {
+    const user = userEvent.setup();
+    let completionBody: unknown;
+    // InspectionResponseDto real de una inspección recién programada: sin checklist todavía.
+    const backendInspection = { id: "INS-TEST-1", reportId: "ER-TEST-1", serviceId: "SVC-INS-1", inspectorId: null, inspectedAt: null, findings: null, outcome: null, nextStep: null, conclusion: null, violationType: null, severity: null, suggestedAction: null, checklistItems: [], createdAt: "2026-09-07T07:00:00.000Z", updatedAt: "2026-09-07T08:00:00.000Z" };
+    server.use(
+      http.get("*/api/environmental-inspections/INS-TEST-1", () => HttpResponse.json(backendInspection)),
+      http.post("*/api/evidence", () => HttpResponse.json({ id: "att-test-1", url: "/evidence/test.jpg", filename: "test.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-07T12:00:00.000Z" }, { status: 201 })),
+      http.post("*/api/environmental-inspections/INS-TEST-1/complete", async ({ request }) => {
+        completionBody = await request.json();
+        return HttpResponse.json({ ...backendInspection, outcome: "VIOLATION_FOUND", nextStep: "NOTICE_TO_BE_ISSUED", findings: "Emisión visible", conclusion: "Humo negro continuo.", violationType: "AIR_EMISSION", severity: "HIGH", suggestedAction: "FORMAL_NOTICE", checklistItems: [{ id: "chk-1", itemCode: "location", label: "Verificar ubicación y contexto del hallazgo", result: true, observations: null }] });
+      }),
+    );
+
+    render(<InspectionExecutionPanel service={service} canExecute />);
+    await screen.findByRole("heading", { name: /Ejecuci/ });
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes).toHaveLength(3);
+    for (const box of boxes) await user.click(box);
+    await user.selectOptions(screen.getByRole("combobox", { name: /Resultado/ }), "VIOLATION_FOUND");
+    await user.type(screen.getByRole("textbox", { name: /Hallazgos/ }), "Emisión visible");
+    await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "Humo negro continuo.");
+    await user.selectOptions(screen.getByRole("combobox", { name: /Tipo de infracc/ }), "AIR_EMISSION");
+    await user.selectOptions(screen.getByRole("combobox", { name: /Gravedad/ }), "HIGH");
+    await user.selectOptions(screen.getByRole("combobox", { name: /Acc/ }), "FORMAL_NOTICE");
+    await user.upload(screen.getByLabelText(/Seleccionar archivos/), new File(["evidence"], "chimenea.jpg", { type: "image/jpeg" }));
+    await user.click(screen.getByRole("button", { name: /Completar inspecci/ }));
+
+    expect(await screen.findByText(/Resultado registrado/)).toBeVisible();
+    expect(completionBody).toMatchObject({
+      checklist: [
+        { id: "location", label: "Verificar ubicación y contexto del hallazgo", completed: true },
+        { id: "source", label: "Identificar la fuente del impacto", completed: true },
+        { id: "evidence", label: "Registrar observaciones para el acta", completed: true },
+      ],
+      conclusion: "Humo negro continuo.",
+      violationType: "AIR_EMISSION",
+      severity: "HIGH",
+      suggestedAction: "FORMAL_NOTICE",
+    });
+  });
+
   it("saves an offline draft and blocks resubmission when the service has drifted", async () => {
     const user = userEvent.setup();
     let completionAttempts = 0;

@@ -11,6 +11,7 @@ import { serviceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { withInspectionAttachments } from "../../_attachments";
 
 const ERROR_LABELS: Record<number, string> = {
   400: "Bad Request",
@@ -83,7 +84,7 @@ export async function POST(
           result: item.completed,
         })),
       };
-      const backendResponse = await fetchBackend(
+      return withInspectionAttachments(request, await fetchBackend(
         request,
         `/environmental-inspections/${encodeURIComponent(id)}/complete`,
         "environmentalInspection:execute",
@@ -92,11 +93,7 @@ export async function POST(
           headers: { "content-type": "application/json" },
           body: JSON.stringify(backendInput),
         },
-      );
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      ));
     }
 
     const inspection = getEnvironmentalInspectionFixture(id);
