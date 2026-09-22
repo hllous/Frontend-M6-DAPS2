@@ -89,7 +89,8 @@ export const incidentsWireSchema = z.object({
     total: count,
     byType: z.array(z.object({ reportType: z.string(), count })),
     byStatus: z.array(z.object({ status: z.string(), count })),
-    avgResolutionDays: z.number().finite().nonnegative(),
+    // null cuando no se cerró ningún reporte en el período.
+    avgResolutionDays: z.number().finite().nonnegative().nullable(),
   }),
 });
 export type IncidentsWire = z.infer<typeof incidentsWireSchema>;
@@ -103,7 +104,8 @@ export const wasteWireSchema = z.object({
 });
 export type WasteWire = z.infer<typeof wasteWireSchema>;
 
-export type IndicatorMetric = { value: number; label: string; unit: string };
+/** `value: null` = no hay base para calcular la métrica (p. ej. ningún reporte cerrado). */
+export type IndicatorMetric = { value: number | null; label: string; unit: string };
 export type IndicatorPointDetail = { label: string; value: number; unit: string };
 export type IndicatorPoint = { id: string; label: string; value: number; unit: string; note?: string; details?: IndicatorPointDetail[]; tone?: "primary" | "success" | "warning" | "danger" };
 export type IndicatorBreakdown = { id: string; title: string; description: string; points: IndicatorPoint[] };
