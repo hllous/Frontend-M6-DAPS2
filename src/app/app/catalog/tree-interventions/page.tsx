@@ -10,5 +10,5 @@ export default async function TreeInterventionsCatalogPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  return <TreeInterventionsPanel scenario={getScenario(session.scenarioId)} />;
+  return <TreeInterventionsPanel scenario={getScenario(session)} />;
 }

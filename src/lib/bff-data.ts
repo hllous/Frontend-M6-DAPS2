@@ -36,5 +36,5 @@ export async function loadAuthorizedScenario(
     }
   }
 
-  return getScenario(scenarioId);
+  return getScenario(session);
 }

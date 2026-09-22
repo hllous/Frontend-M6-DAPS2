@@ -9,7 +9,7 @@ import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, Invali
 const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 503: "Service Unavailable", 500: "Internal Server Error" };
 function errorResponse(status: number, message: string, path: string) { return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status }); }
 async function targetId(context: { params: Promise<{ id: string }> | { id: string } }) { return (await context.params).id; }
-function requireOffice(request: Request) { const session = getRequiredSession(request); const scenario = getScenario(session.scenarioId); if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar puntos verdes."); requireCapability(session, "greenPoint:manage"); return session; }
+function requireOffice(request: Request) { const session = getRequiredSession(request); const scenario = getScenario(session); if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar puntos verdes."); requireCapability(session, "greenPoint:manage"); return session; }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
   const path = new URL(request.url).pathname;

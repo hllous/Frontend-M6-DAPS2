@@ -9,5 +9,5 @@ export default async function ServiceTypesPage() {
   await connection();
   const session = await getSession();
   if (!session) redirect("/login");
-  return <ServiceTypesPanel scenario={getScenario(session.scenarioId)} />;
+  return <ServiceTypesPanel scenario={getScenario(session)} />;
 }

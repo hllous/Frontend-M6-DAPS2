@@ -105,7 +105,7 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     // Permission check: mirror cancel/route.ts inline actor-kind check
     if (scenario.actor.kind !== "OFFICE") {

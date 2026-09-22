@@ -264,9 +264,16 @@ describe("ServicesWorkspace component", () => {
     expect(within(dialog).getByRole("heading", { name: "Asignar cuadrilla y vehículo" })).toBeInTheDocument();
     expect(within(dialog).getByText("SVC-1043")).toBeInTheDocument();
 
-    // Select crew-c
+    // Select crew-c (loaded from the crews adapter)
     const crewSelect = within(dialog).getByLabelText(/Cuadrilla asignada/i);
+    await within(dialog).findByRole("option", { name: "Cuadrilla C · Ibáñez" });
     await user.selectOptions(crewSelect, "crew-c");
+
+    // crew-c already holds SVC-1072 (13:00–16:00) that day: the backend requires a justification
+    await user.type(
+      within(dialog).getByLabelText(/Justificación del solapamiento/i),
+      "La poda termina antes de la inspección de las 16.",
+    );
 
     // Submit assignment
     const submitBtn = within(dialog).getByRole("button", { name: "Confirmar asignación" });

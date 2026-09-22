@@ -43,7 +43,7 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     // Permission check: reprogramming is an Office decision, not a Field action.
     if (scenario.actor.kind !== "OFFICE") {

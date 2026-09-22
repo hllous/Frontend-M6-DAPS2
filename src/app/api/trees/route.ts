@@ -30,7 +30,7 @@ function backendQueryString(query: TreeQuery) {
 }
 function requireOfficeCapability(request: Request) {
   const session = getRequiredSession(request);
-  const scenario = getScenario(session.scenarioId);
+  const scenario = getScenario(session);
   if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar árboles.");
   requireCapability(session, "tree:manage");
   return session;

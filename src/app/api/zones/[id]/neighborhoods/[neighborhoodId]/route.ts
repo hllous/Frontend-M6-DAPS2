@@ -41,7 +41,7 @@ export async function DELETE(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     if (scenario.actor.kind !== "OFFICE") {
       throw new ForbiddenSessionError("Solo el rol de Oficina puede quitar barrios de una zona operativa.");

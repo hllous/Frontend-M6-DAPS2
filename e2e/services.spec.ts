@@ -227,8 +227,9 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(dialog.getByRole("heading", { name: "Asignar cuadrilla y vehículo" })).toBeVisible();
     await expect(dialog.getByText("Vehículo opcional")).toBeVisible();
 
-    // Select crew Cuadrilla C · Ibáñez
-    await dialog.getByLabel(/Cuadrilla asignada/i).selectOption({ label: "Cuadrilla C · Ibáñez (Turno tarde)" });
+    // Select a crew with no other service that day (crew catalog, not a fixture list)
+    await dialog.getByLabel(/Cuadrilla asignada/i).selectOption({ label: "Cuadrilla E - Membresia" });
+    await expect(dialog.getByLabel(/Justificación del solapamiento/i)).toHaveCount(0);
 
     // Submit assignment
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
@@ -237,13 +238,13 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(dialog).not.toBeVisible();
 
     // Preview immediately reflects the assigned crew
-    await expect(preview.getByText("Cuadrilla C · Ibáñez")).toBeVisible();
+    await expect(preview.getByText("Cuadrilla E - Membresia")).toBeVisible();
 
     // Table row also shows the assigned crew
-    await expect(row.getByText("Cuadrilla C · Ibáñez")).toBeVisible();
+    await expect(row.getByText("Cuadrilla E - Membresia")).toBeVisible();
   });
 
-  test("enforces vehicle requirement and surfaces non-blocking overlap warning for service requiring vehicle", async ({ page }) => {
+  test("enforces vehicle requirement and requires an overlap justification for service requiring vehicle", async ({ page }) => {
     await page.setViewportSize(WIDE_VIEWPORT);
     await openServices(page);
 
@@ -263,7 +264,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(dialog.getByText("Vehículo obligatorio")).toBeVisible();
 
     // Select crew and clear vehicle
-    await dialog.getByLabel(/Cuadrilla asignada/i).selectOption({ label: "Cuadrilla A · López (Turno mañana)" });
+    await dialog.getByLabel(/Cuadrilla asignada/i).selectOption({ label: "Cuadrilla A · López" });
     await dialog.getByLabel(/Vehículo operativo/i).selectOption({ value: "" });
 
     // Submitting without vehicle is rejected
@@ -272,16 +273,15 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
       dialog.getByText("El tipo de servicio requiere la asignación obligatoria de un vehículo operativo."),
     ).toBeVisible();
 
-    // Select vehicle AF 123 CD (assigned to SVC-1042 at 09:00-13:00 on the same date)
-    await dialog.getByLabel(/Vehículo operativo/i).selectOption({ value: "veh-101" });
+    // Select vehicle AA 123 AA (assigned to SVC-1042 at 09:00-13:00 on the same date)
+    await dialog.getByLabel(/Vehículo operativo/i).selectOption({ label: "AA 123 AA" });
 
-    // Non-authoritative double-booking warning appears
-    await expect(dialog.getByRole("status")).toBeVisible();
-    await expect(dialog.getByText(/Aviso de superposición horaria \(no bloqueante\)/i)).toBeVisible();
-    await expect(dialog.getByText(/Aviso no bloqueante/i)).toBeVisible();
+    // Double-booking warning appears and asks for a justification (backend: overrideNote)
+    await expect(dialog.getByText(/^Aviso de superposición horaria$/i)).toBeVisible();
+    await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
+    await expect(dialog.getByText(/justifique la asignación en al menos 10 caracteres/i)).toBeVisible();
 
-    // Confirm button remains enabled and can be clicked without override rationale input
-    await expect(dialog.getByRole("button", { name: "Confirmar asignación" })).toBeEnabled();
+    await dialog.getByLabel(/Justificación del solapamiento/i).fill("SVC-1042 libera el camión antes de las 11:30.");
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
 
     // Dialog closes upon successful assignment
@@ -289,7 +289,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
 
     // Workspace preview immediately reflects the assigned crew and vehicle
     await expect(preview.getByText("Cuadrilla A · López")).toBeVisible();
-    await expect(preview.getByText("AF 123 CD")).toBeVisible();
+    await expect(preview.getByText("AA 123 AA")).toBeVisible();
 
     // Table row also shows the assigned crew
     await expect(row.getByText("Cuadrilla A · López")).toBeVisible();

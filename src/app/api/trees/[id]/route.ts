@@ -11,7 +11,7 @@ function errorResponse(status: number, message: string, path: string) { return N
 async function targetId(context: { params: Promise<{ id: string }> | { id: string } }) { return (await context.params).id; }
 function requireOffice(request: Request) {
   const session = getRequiredSession(request);
-  const scenario = getScenario(session.scenarioId);
+  const scenario = getScenario(session);
   if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar árboles.");
   requireCapability(session, "tree:manage");
   return session;

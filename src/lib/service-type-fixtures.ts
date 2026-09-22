@@ -9,6 +9,13 @@ const initialServiceTypes: ServiceType[] = [
   { id: "st-tree-pruning", code: "ARB-POD", name: "Poda de arbolado", category: "TREES", mode: "POINT", requiresVehicle: false, active: true },
   { id: "st-green-point", code: "GREEN-POINT", name: "Mantenimiento de espacios verdes", category: "GREEN_SPACES", mode: "POINT", requiresVehicle: false, active: false },
   { id: "st-env-inspection", code: "AMB-INSP", name: "Inspección ambiental", category: "ENVIRONMENTAL_CONTROL", mode: "POINT", requiresVehicle: false, active: true },
+  // Resto de los tipos que usan los servicios de fixture: el diálogo de asignar cuadrilla lee requiresVehicle
+  // de /service-types/:id y, sin el tipo, no deja confirmar (#284).
+  { id: "st-street-cleaning", code: "BAR-MEC", name: "Barrido mecánico", category: "STREET_CLEANING", mode: "ROUTE", requiresVehicle: true, active: true },
+  { id: "st-container-repair", code: "CONT-REP", name: "Reparación de contenedores", category: "CONTAINERS", mode: "POINT", requiresVehicle: true, active: true },
+  { id: "st-container-survey", code: "CONT-SRV", name: "Relevamiento de contenedores", category: "CONTAINERS", mode: "POINT", requiresVehicle: false, active: true },
+  { id: "st-dump-clearing", code: "BAS-LIMP", name: "Limpieza de microbasural", category: "STREET_CLEANING", mode: "POINT", requiresVehicle: true, active: true },
+  { id: "st-green-inspection", code: "PV-INSP", name: "Inspección de puntos verdes", category: "GREEN_SPACES", mode: "POINT", requiresVehicle: false, active: true },
 ];
 
 export const serviceTypeFixtures: ServiceType[] = structuredClone(initialServiceTypes);

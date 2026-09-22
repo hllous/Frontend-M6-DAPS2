@@ -49,7 +49,7 @@ export async function PUT(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     if (scenario.actor.kind !== "OFFICE") {
       throw new ForbiddenSessionError("Solo el rol de Oficina puede editar la secuencia de paradas de recorridos.");
