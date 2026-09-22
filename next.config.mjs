@@ -3,8 +3,10 @@ import path from "node:path";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Necesario para el build de Docker: genera un servidor "standalone"
-  // con solo lo necesario para correr en producción.
-  output: "standalone",
+  // con solo lo necesario para correr en producción. Vercel arma su propio
+  // empaquetado y con "standalone" el build falla buscando
+  // .next/next-server.js.nft.json, así que ahí se omite (VERCEL=1).
+  output: process.env.VERCEL ? undefined : "standalone",
   // El servidor de desarrollo bloquea por defecto los recursos de HMR pedidos
   // desde un origen distinto al que abrió el navegador; Playwright navega a
   // 127.0.0.1 aunque el server escucha en localhost, así que sin esto el bundle
