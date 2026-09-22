@@ -4,7 +4,7 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { resetEnvironmentalReportFixtures } from "./environmental-report-fixtures";
-import { createEnvironmentalReportInputSchema, environmentalInspectionCompleteInputSchema, EnvironmentalReportContractError, environmentalReportSchema, environmentalReportsAdapter } from "./environmental-reports";
+import { createEnvironmentalReportInputSchema, environmentalInspectionCompleteInputSchema, EnvironmentalReportContractError, environmentalReportSchema, environmentalReportsAdapter, inspectionChecklist } from "./environmental-reports";
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -253,5 +253,62 @@ describe("environmental reports adapter", () => {
       severity: "HIGH",
       suggestedAction: "FORMAL_NOTICE",
     })).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+// Respuestas reales del backend (develop, 21/09/2026): GET /environmental-inspections/:id
+// de una inspección recién programada y de una cerrada con infracción.
+const realCreatedInspection = {
+  id: "1e2d05e0-57f3-454d-839f-9b7674e4fe2c",
+  reportId: "968ed638-5ac6-441c-85e8-e0fdc2b78dca",
+  serviceId: null,
+  inspectorId: null,
+  inspectedAt: null,
+  findings: null,
+  outcome: null,
+  nextStep: null,
+  conclusion: null,
+  violationType: null,
+  severity: null,
+  suggestedAction: null,
+  checklistItems: [],
+  createdAt: "2026-09-21T19:24:07.649Z",
+  updatedAt: "2026-09-21T19:24:07.649Z",
+};
+const realCompletedInspection = {
+  ...realCreatedInspection,
+  id: "530bf11c-3e96-4ccd-bc3c-52c329578cda",
+  serviceId: "c842e0c1-1b66-4c35-ab6a-c389d5538d19",
+  inspectorId: "user-qa246",
+  inspectedAt: "2026-09-20T21:34:06.492Z",
+  findings: "Acopio de residuos a cielo abierto sobre la vereda.",
+  outcome: "VIOLATION_FOUND",
+  nextStep: "NOTICE_TO_BE_ISSUED",
+  conclusion: "QA-286 conclusión",
+  violationType: "ILLEGAL_DUMPING",
+  severity: "HIGH",
+  suggestedAction: "FINE",
+  checklistItems: [{ id: "2cf5e35f-cbd5-4708-b2ba-3b5e0acdb0c2", itemCode: "item-1", label: "Verificación del acopio", result: true, observations: null }],
+};
+
+describe("environmental inspection contract (backend InspectionResponseDto)", () => {
+  it("reads a real completed inspection with its closing fields and maps checklistItems", async () => {
+    server.use(http.get("*/api/environmental-inspections/:id", () => HttpResponse.json(realCompletedInspection)));
+    const inspection = await environmentalReportsAdapter.getInspection(realCompletedInspection.id);
+    expect(inspection).toMatchObject({ serviceId: realCompletedInspection.serviceId, conclusion: "QA-286 conclusión", violationType: "ILLEGAL_DUMPING", severity: "HIGH", suggestedAction: "FINE" });
+    expect(inspectionChecklist(inspection)).toEqual([{ id: "item-1", label: "Verificación del acopio", required: true }]);
+  });
+
+  it("gives a freshly scheduled inspection (checklistItems: []) the frontend template", async () => {
+    server.use(http.get("*/api/environmental-reports/:id/inspections", () => HttpResponse.json([realCompletedInspection, realCreatedInspection])));
+    const inspections = await environmentalReportsAdapter.listInspections(realCompletedInspection.reportId);
+    expect(inspections.map((inspection) => inspectionChecklist(inspection).length)).toEqual([1, 3]);
+    expect(inspectionChecklist(inspections[1]).map((item) => item.id)).toEqual(["location", "source", "evidence"]);
+  });
+
+  it("reads the inspection Field receives, without the internal inspectorId", async () => {
+    const { inspectorId: _internal, ...fieldView } = realCreatedInspection;
+    server.use(http.get("*/api/environmental-inspections/:id", () => HttpResponse.json(fieldView)));
+    await expect(environmentalReportsAdapter.getInspection(realCreatedInspection.id)).resolves.toMatchObject({ id: realCreatedInspection.id });
   });
 });

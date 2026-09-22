@@ -10,6 +10,7 @@ import {
   transitionEnvironmentalReportFixture,
 } from "@/lib/environmental-report-fixtures";
 import { environmentalInspectionScheduleInputSchema, type EnvironmentalInspection } from "@/lib/environmental-reports";
+import { withInspectionAttachments } from "@/app/api/environmental-inspections/_attachments";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
@@ -26,8 +27,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const scenario = getScenario(session.scenarioId);
     if (scenario.actor.kind === "FIELD") return errorResponse(404, "Historia de inspecciones no encontrada.", path);
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const response = await fetchBackend(request, "/environmental-reports/" + encodeURIComponent(id) + "/inspections", "environmentalInspection:view");
-      return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+      return withInspectionAttachments(request, await fetchBackend(request, "/environmental-reports/" + encodeURIComponent(id) + "/inspections", "environmentalInspection:view"));
     }
     if (!getEnvironmentalReportFixture(id)) return errorResponse(404, "Expediente ambiental no encontrado.", path);
     return NextResponse.json(listEnvironmentalInspectionFixtures(id));
