@@ -208,6 +208,24 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(detail).getByRole("button", { name: "Reprogramar inspección" })).toBeVisible();
   });
 
+  it("shows the inspection history with the Service agenda, the crew name and the result in Spanish (#295)", async () => {
+    // Como el backend real: la inspección no trae agenda y el servicio no trae crewName.
+    updateEnvironmentalInspectionFixture("INS-1005", { scheduledDate: undefined, timeWindow: undefined, outcome: "VIOLATION_FOUND" });
+    updateServiceFixture("SVC-1072", { crewName: null, scheduledDate: "2026-09-05T00:00:00.000Z" });
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1005/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1005" });
+
+    const item = (await within(detail).findByText("INS-1005")).closest("li")!;
+    expect(within(item).getByText("Resultado: Infracción constatada")).toBeVisible();
+    expect(await within(item).findByText(/^2026-09-05 · 13:00–16:00 ·/)).toBeVisible();
+    expect(within(item).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
+    expect(item).not.toHaveTextContent("crew-c");
+    expect(item).not.toHaveTextContent("VIOLATION_FOUND");
+  });
+
   it("lets authorized Office issue an immutable notice from a completed violation inspection", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);

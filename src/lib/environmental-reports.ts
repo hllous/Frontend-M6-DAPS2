@@ -132,6 +132,11 @@ export const environmentalInspectionOutcomeSchema = z.enum([
   "INCONCLUSIVE",
 ]);
 export type EnvironmentalInspectionOutcome = z.infer<typeof environmentalInspectionOutcomeSchema>;
+export const ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS: Record<EnvironmentalInspectionOutcome, string> = {
+  NO_VIOLATION: "Sin infracción",
+  VIOLATION_FOUND: "Infracción constatada",
+  INCONCLUSIVE: "Inconclusa",
+};
 
 export const environmentalInspectionNextStepSchema = z.enum([
   "NOTICE_TO_BE_ISSUED",
