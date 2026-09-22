@@ -1,22 +1,28 @@
+import { crewsAdapter } from "./crews";
 import { serviceTypesAdapter, type ServiceTypeCategory } from "./service-types";
 import { zonesAdapter } from "./zones";
 
 /**
- * El backend no devuelve un título de servicio ni nombres de zona: `GET /services`
- * trae `serviceTypeId` y `zones: [{ zoneId, sequence }]`, todos UUID. El título es
+ * El backend no devuelve un título de servicio ni nombres de zona o de cuadrilla:
+ * `GET /services` trae `serviceTypeId`, `crewId` y `zones: [{ zoneId, sequence }]`,
+ * todos UUID. El título es
  * presentación, no dominio, así que se compone en el frontend con los catálogos.
  *
- * Los dos mapas se piden una vez por carga de página y se memorizan: un listado de
+ * Los mapas se piden una vez por carga de página y se memorizan: un listado de
  * 20 servicios no puede disparar 20 consultas de catálogo. Si el catálogo falla, se
  * devuelve un mapa vacío en lugar de propagar el error: un nombre que falta degrada
  * la etiqueta, no tiene que tirar abajo la pantalla de servicios.
  */
-type Catalogo = { serviceTypes: Map<string, { name: string; category: ServiceTypeCategory }>; zones: Map<string, string> };
+type Catalogo = {
+  serviceTypes: Map<string, { name: string; category: ServiceTypeCategory }>;
+  zones: Map<string, string>;
+  crews: Map<string, string>;
+};
 
 let catalogoPendiente: Promise<Catalogo> | null = null;
 
 async function cargarCatalogo(): Promise<Catalogo> {
-  const [serviceTypes, zones] = await Promise.all([
+  const [serviceTypes, zones, crews] = await Promise.all([
     serviceTypesAdapter
       .list({ pageSize: 100 })
       .then((page) => new Map(page.serviceTypes.map((item) => [item.id, { name: item.name, category: item.category }])))
@@ -25,8 +31,12 @@ async function cargarCatalogo(): Promise<Catalogo> {
       .list({ pageSize: 100 })
       .then((page) => new Map(page.zones.map((zone) => [zone.id, zone.name])))
       .catch(() => new Map<string, string>()),
+    crewsAdapter
+      .list({ pageSize: 100 })
+      .then((page) => new Map(page.crews.map((crew) => [crew.id, crew.name])))
+      .catch(() => new Map<string, string>()),
   ]);
-  return { serviceTypes, zones };
+  return { serviceTypes, zones, crews };
 }
 
 export function catalogoDeEtiquetas(): Promise<Catalogo> {

@@ -526,12 +526,12 @@ async function readJsonBody(response: Response): Promise<unknown> {
 
 /**
  * Completa lo que el backend no manda: el título del servicio y los nombres de sus
- * zonas, resueltos contra los catálogos. Es el único lugar donde se parsea una
+ * zonas y de su cuadrilla, resueltos contra los catálogos. Es el único lugar donde se parsea una
  * respuesta de servicio, así que el listado, el detalle y cada transición devuelven
  * el mismo título y no se degrada después de una acción.
  */
 async function completarEtiquetas(wire: z.infer<typeof serviceWireSchema>): Promise<Service> {
-  const { serviceTypes, zones } = await catalogoDeEtiquetas();
+  const { serviceTypes, zones, crews } = await catalogoDeEtiquetas();
   const nombresDeZona = wire.zoneIds.map((zoneId) => zones.get(zoneId)).filter((nombre): nombre is string => Boolean(nombre));
   const tipo = serviceTypes.get(wire.serviceTypeId);
   const nombreDeTipo = tipo?.name;
@@ -540,6 +540,7 @@ async function completarEtiquetas(wire: z.infer<typeof serviceWireSchema>): Prom
     serviceTypeName: nombreDeTipo ?? wire.serviceTypeName,
     serviceTypeCategory: tipo?.category ?? wire.serviceTypeCategory,
     zoneNames: wire.zoneNames.length > 0 ? wire.zoneNames : nombresDeZona,
+    crewName: wire.crewName ?? (wire.crewId ? crews.get(wire.crewId) ?? null : null),
     title: wire.title ?? componerTituloDeServicio(wire, { serviceType: nombreDeTipo, zones: nombresDeZona }),
   };
 }

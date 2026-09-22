@@ -9,6 +9,8 @@ import {
   resetStreetClosureRequestFixtures,
   updateStreetClosureRequestFixture,
 } from "@/lib/street-closure-request-fixtures";
+import { resetServiceFixtures, resetZoneResultFixtures, updateServiceFixture } from "@/lib/services-fixtures";
+import { resetEnvironmentalInspectionFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { ServicesWorkspace } from "./services-workspace";
 
 const server = setupServer(...handlers);
@@ -408,6 +410,29 @@ describe("ServicesWorkspace component", () => {
     await user.click(await screen.findByRole("button", { name: /Ver detalle completo/ }));
 
     expect(await screen.findByRole("heading", { name: "Ejecución de inspección ambiental" })).toBeInTheDocument();
+  });
+
+  it("reflects the closed POINT service in the detail after the crew completes it from the inspection guide (#295)", async () => {
+    updateServiceFixture("SVC-1112", { status: "IN_PROGRESS" });
+    updateEnvironmentalInspectionFixture("INS-1012", { outcome: "NO_VIOLATION", nextStep: "CASE_CLOSED", conclusion: "Sin emisiones.", inspectedAt: "2026-09-07T11:00:00.000Z" });
+    window.history.replaceState(null, "", "/app?detail=SVC-1112");
+    const user = userEvent.setup();
+    try {
+      render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
+
+      expect(await screen.findByRole("status", { name: "El servicio sigue abierto" })).toBeVisible();
+      await user.click(screen.getByRole("button", { name: "Guardar resultado de zona" }));
+      const completeButton = screen.getByRole("button", { name: "Completar servicio" });
+      await waitFor(() => expect(completeButton).toBeEnabled());
+      await user.click(completeButton);
+
+      expect(await screen.findByRole("status", { name: "Servicio cerrado" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Suspender servicio" })).not.toBeInTheDocument();
+    } finally {
+      resetServiceFixtures();
+      resetZoneResultFixtures();
+      resetEnvironmentalInspectionFixtures();
+    }
   });
 
   it("does not offer a cancel action for an IN_PROGRESS service", async () => {
