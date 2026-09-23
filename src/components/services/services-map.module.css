@@ -58,6 +58,30 @@
   outline-color: var(--color-accent);
 }
 
+.serviceMarkerGreenSpace {
+  background: var(--color-success);
+}
+
+.greenSpaceBadge {
+  position: absolute;
+  top: -6px;
+  right: -2px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 2px solid var(--color-success);
+  border-radius: 50%;
+  background: var(--color-success-fill);
+  color: var(--color-success);
+  pointer-events: none;
+}
+
+.greenSpaceBadge svg {
+  width: 12px;
+  height: 12px;
+}
+
 .zone {
   transition: fill-opacity 180ms ease-out, weight 180ms ease-out;
 }
