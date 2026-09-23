@@ -106,7 +106,7 @@ function polygonCenter(coordinates: MapCoordinate[][]): MapCoordinate {
 }
 
 /**
- * Filtered from the official CABA Barrios GeoJSON using the backend's four
+ * Filtered from the official CABA Barrios GeoJSON using the backend's eight
  * stable operational zone codes and the source barrio names. Source:
  * https://cdn.buenosaires.gob.ar/datosabiertos/datasets/innovacion-transformacion-digital/barrios/barrios.geojson
  * (CC-BY-2.5-AR).

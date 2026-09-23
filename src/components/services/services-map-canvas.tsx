@@ -7,7 +7,7 @@ import { MapContainer, Marker, Polygon, Popup, TileLayer, Tooltip, useMap } from
 
 import type { Service } from "@/lib/services";
 import type { MapCoordinate } from "@/lib/operational-zones";
-import type { ServiceMapLocation, ServiceMapZone } from "@/lib/services-map";
+import { summarizeServiceZones, type ServiceMapLocation } from "@/lib/services-map";
 
 import styles from "./services-map.module.css";
 
@@ -21,10 +21,24 @@ type ServicesMapCanvasProps = {
   filterFingerprint?: string;
 };
 
-function serviceMarkerIcon(markerNumber: number, selected: boolean) {
+// Paths of lucide's TreeDeciduous: divIcon takes an HTML string, not a React node.
+const greenSpaceBadge =
+  `<span class="${styles.greenSpaceBadge}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 19a4 4 0 0 1-2.24-7.32A3.5 3.5 0 0 1 9 6.03V6a3 3 0 1 1 6 0v.04a3.5 3.5 0 0 1 3.24 5.65A4 4 0 0 1 16 19Z"/><path d="M12 19v3"/></svg></span>`;
+
+function isGreenSpaceService(service: Service) {
+  return service.targetType === "GREEN_SPACE";
+}
+
+function serviceMarkerIcon(markerNumber: number, selected: boolean, greenSpace: boolean) {
+  const classes = [
+    styles.serviceMarker,
+    greenSpace ? styles.serviceMarkerGreenSpace : "",
+    selected ? styles.serviceMarkerSelected : "",
+  ].join(" ");
+
   return divIcon({
     className: styles.marker,
-    html: `<span class="${styles.serviceMarker} ${selected ? styles.serviceMarkerSelected : ""}"><span>${markerNumber}</span></span>`,
+    html: `<span class="${classes}"><span>${markerNumber}</span></span>${greenSpace ? greenSpaceBadge : ""}`,
     iconSize: [42, 48],
     iconAnchor: [21, 46],
     popupAnchor: [0, -44],
@@ -48,7 +62,8 @@ function AccessibleServiceMarker({
 }: AccessibleServiceMarkerProps) {
   const markerRef = useRef<LeafletMarker | null>(null);
   const locationLabel = location.locationLabel ?? "Ubicación resuelta";
-  const accessibleLabel = `Parada ${markerNumber}: ${service.id} — ${service.title} (${location.zones
+  const greenSpace = isGreenSpaceService(service);
+  const accessibleLabel = `Parada ${markerNumber}${greenSpace ? " en espacio verde" : ""}: ${service.id} — ${service.title} (${location.zones
     .map((zone) => zone.name)
     .join(", ")})`;
 
@@ -76,7 +91,7 @@ function AccessibleServiceMarker({
       position={location.coordinates!}
       title={`${service.id} · ${service.title} · ${locationLabel}`}
       alt={accessibleLabel}
-      icon={serviceMarkerIcon(markerNumber, selected)}
+      icon={serviceMarkerIcon(markerNumber, selected, greenSpace)}
       eventHandlers={{ click: () => onSelect(service.id) }}
     >
       <Popup>
@@ -84,7 +99,9 @@ function AccessibleServiceMarker({
         <span className={styles.popupDescription}>
           {service.serviceTypeName} · {service.mode === "ROUTE" ? "Recorrido" : "Punto"}
         </span>
-        <span className={styles.popupDescription}>{locationLabel}</span>
+        <span className={styles.popupDescription}>
+          {greenSpace ? `Espacio verde · ${locationLabel}` : locationLabel}
+        </span>
       </Popup>
     </Marker>
   );
@@ -149,25 +166,6 @@ function MapViewportController({
   return null;
 }
 
-function uniqueRouteZones(locations: ServiceMapLocation[]) {
-  const zonesById = new Map<string, { zone: ServiceMapZone; serviceIds: string[] }>();
-
-  for (const location of locations) {
-    if (location.locationType !== "route") continue;
-
-    for (const zone of location.zones) {
-      const current = zonesById.get(zone.zoneId);
-      if (current) {
-        if (!current.serviceIds.includes(location.serviceId)) current.serviceIds.push(location.serviceId);
-      } else {
-        zonesById.set(zone.zoneId, { zone, serviceIds: [location.serviceId] });
-      }
-    }
-  }
-
-  return [...zonesById.values()];
-}
-
 export function ServicesMapCanvas({
   services,
   locations,
@@ -176,7 +174,11 @@ export function ServicesMapCanvas({
   filterFingerprint,
 }: ServicesMapCanvasProps) {
   const servicesById = useMemo(() => new Map(services.map((service) => [service.id, service])), [services]);
-  const routeZones = useMemo(() => uniqueRouteZones(locations), [locations]);
+  // Polygons stay limited to zones a route crosses; the count covers every service in the zone.
+  const routeZones = useMemo(
+    () => summarizeServiceZones(locations).filter((summary) => summary.hasRoute),
+    [locations],
+  );
   const visibleMarkers = locations.flatMap((location) => {
     const service = servicesById.get(location.serviceId);
     if (!service || !location.coordinates) return [];

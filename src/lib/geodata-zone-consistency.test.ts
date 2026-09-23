@@ -26,6 +26,12 @@ const inventoryFixtures: LocatedInventoryItem[] = [
 ];
 
 describe("mock geodata", () => {
+  it("ships the boundaries of the eight operational zones of the demo seed", () => {
+    expect(operationalZoneGeometries.map((geometry) => geometry.code).sort()).toEqual(
+      ["Z-BEL", "Z-COL", "Z-MON", "Z-PAL", "Z-PMA", "Z-REC", "Z-RET", "Z-SNI"],
+    );
+  });
+
   it("uses the same canonical zone codes as the boundary GeoJSON", () => {
     expect(zoneFixtures.filter((zone) => zone.active).map((zone) => zone.code)).toEqual(
       operationalZoneGeometries.map((geometry) => geometry.code),
