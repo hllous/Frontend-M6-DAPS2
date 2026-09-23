@@ -5,6 +5,10 @@ const INITIAL_ZONE_FIXTURES: Zone[] = [
   { id: "zone-2", code: "Z-PAL", name: "Palermo", active: true, neighborhoodIds: ["barrio-3"] },
   { id: "zone-3", code: "Z-REC", name: "Recoleta", active: true, neighborhoodIds: [] },
   { id: "zone-4", code: "Z-RET", name: "Retiro", active: true, neighborhoodIds: [] },
+  { id: "zone-5", code: "Z-COL", name: "Colegiales", active: true, neighborhoodIds: [] },
+  { id: "zone-6", code: "Z-SNI", name: "San Nicolás", active: true, neighborhoodIds: [] },
+  { id: "zone-7", code: "Z-PMA", name: "Puerto Madero", active: true, neighborhoodIds: [] },
+  { id: "zone-8", code: "Z-MON", name: "Montserrat", active: true, neighborhoodIds: [] },
 ];
 
 export let zoneFixtures: Zone[] = INITIAL_ZONE_FIXTURES.map((item) => ({ ...item }));

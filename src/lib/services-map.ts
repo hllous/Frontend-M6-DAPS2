@@ -1,5 +1,6 @@
 import type { Container } from "./containers";
 import type { GreenPoint } from "./green-points";
+import type { GreenSpace } from "./green-spaces";
 import {
   isCoordinateInsideOperationalZone,
   type MapCoordinate,
@@ -25,7 +26,11 @@ export type ServiceMapLocation = {
   zones: ServiceMapZone[];
 };
 
-type LocatedCatalogItem = Pick<Container, "id" | "address" | "lat" | "lng"> | Pick<GreenPoint, "id" | "address" | "lat" | "lng"> | Pick<Tree, "id" | "address" | "lat" | "lng" | "surveyCode">;
+type LocatedCatalogItem =
+  | Pick<Container, "id" | "address" | "lat" | "lng">
+  | Pick<GreenPoint, "id" | "address" | "lat" | "lng">
+  | Pick<GreenSpace, "id" | "name" | "lat" | "lng">
+  | Pick<Tree, "id" | "address" | "lat" | "lng" | "surveyCode">;
 
 function hasCoordinates(item: LocatedCatalogItem | undefined): item is LocatedCatalogItem & { lat: number; lng: number } {
   return item?.lat !== null && item?.lat !== undefined && item?.lng !== null && item?.lng !== undefined;
@@ -62,11 +67,15 @@ function targetForService(service: Service, mapData: OperationalMapData): Locate
   if (service.targetType === "GREEN_POINT") {
     return mapData.greenPoints.find((item) => item.id === service.targetId);
   }
+  if (service.targetType === "GREEN_SPACE") {
+    return mapData.greenSpaces.find((item) => item.id === service.targetId);
+  }
 
   return undefined;
 }
 
 function targetLabel(target: LocatedCatalogItem): string {
+  if ("name" in target) return target.name;
   if ("surveyCode" in target) return target.address ?? target.surveyCode;
   return target.address ?? target.id;
 }
@@ -147,4 +156,26 @@ export function resolveServiceMapLocations(
       ? resolvePointLocation(service, mapData, zones)
       : resolveRouteLocation(service, zones)),
   }));
+}
+
+export type ServiceMapZoneSummary = {
+  zone: ServiceMapZone;
+  serviceIds: string[];
+  hasRoute: boolean;
+};
+
+/** Groups every service (point or route) under each zone it belongs to. */
+export function summarizeServiceZones(locations: ServiceMapLocation[]): ServiceMapZoneSummary[] {
+  const zonesById = new Map<string, ServiceMapZoneSummary>();
+
+  for (const location of locations) {
+    for (const zone of location.zones) {
+      const current = zonesById.get(zone.zoneId) ?? { zone, serviceIds: [], hasRoute: false };
+      if (!current.serviceIds.includes(location.serviceId)) current.serviceIds.push(location.serviceId);
+      current.hasRoute ||= location.locationType === "route";
+      zonesById.set(zone.zoneId, current);
+    }
+  }
+
+  return [...zonesById.values()];
 }
