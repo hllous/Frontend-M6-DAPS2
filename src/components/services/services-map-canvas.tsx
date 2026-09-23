@@ -174,11 +174,8 @@ export function ServicesMapCanvas({
   filterFingerprint,
 }: ServicesMapCanvasProps) {
   const servicesById = useMemo(() => new Map(services.map((service) => [service.id, service])), [services]);
-  // Polygons stay limited to zones a route crosses; the count covers every service in the zone.
-  const routeZones = useMemo(
-    () => summarizeServiceZones(locations).filter((summary) => summary.hasRoute),
-    [locations],
-  );
+  // Every zone with a service gets its outline, so neighbouring barrios stay distinguishable.
+  const serviceZones = useMemo(() => summarizeServiceZones(locations), [locations]);
   const visibleMarkers = locations.flatMap((location) => {
     const service = servicesById.get(location.serviceId);
     if (!service || !location.coordinates) return [];
@@ -201,7 +198,7 @@ export function ServicesMapCanvas({
       <MapResizeController />
       <MapViewportController locations={locations} filterFingerprint={filterFingerprint} />
 
-      {routeZones.map(({ zone, serviceIds }) => (
+      {serviceZones.map(({ zone, serviceIds }) => (
         <Polygon
           key={zone.zoneId}
           positions={zone.coordinates}

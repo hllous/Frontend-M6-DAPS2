@@ -159,13 +159,12 @@ describe("summarizeServiceZones", () => {
     const palermo = summaries.find((summary) => summary.zone.code === "Z-PAL");
 
     expect(belgrano).toMatchObject({
-      hasRoute: true,
       serviceIds: ["SVC-ROUTE-1", "SVC-TREE-1", "SVC-GREEN-SPACE-1"],
     });
-    expect(palermo).toMatchObject({ hasRoute: true, serviceIds: ["SVC-ROUTE-1", "SVC-POINT-PAL"] });
+    expect(palermo).toMatchObject({ serviceIds: ["SVC-ROUTE-1", "SVC-POINT-PAL"] });
   });
 
-  it("marks zones with only point services as not crossed by a route", () => {
+  it("includes zones that only have point services, so their outline is drawn", () => {
     const locations = resolveServiceMapLocations(
       [makeService({ id: "SVC-TREE-1", targetType: "TREE", targetId: "tree-1" })],
       mapData,
@@ -173,7 +172,7 @@ describe("summarizeServiceZones", () => {
     );
 
     expect(summarizeServiceZones(locations)).toEqual([
-      expect.objectContaining({ hasRoute: false, serviceIds: ["SVC-TREE-1"] }),
+      expect.objectContaining({ zone: expect.objectContaining({ code: "Z-BEL" }), serviceIds: ["SVC-TREE-1"] }),
     ]);
   });
 });
