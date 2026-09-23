@@ -189,8 +189,12 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await dialog.getByLabel(/Tipo de servicio/i).selectOption({ label: "Mantenimiento de contenedores (Punto)" });
     await expect(dialog.getByText(/Punto fijo \(POINT\)/i)).toBeVisible();
 
-    // Enter target ref
-    await dialog.getByLabel(/Identificador de objetivo/i).fill("CT-0442");
+    // Pick the real container from the inventory (#319)
+    await expect(dialog.getByLabel(/Tipo de objetivo/i)).toHaveValue("CONTAINER");
+    await dialog.getByLabel(/Buscar contenedor/i).fill("CONT-002");
+    const asset = dialog.getByLabel(/Bien del inventario/i);
+    await expect(asset.locator("option", { hasText: "CONT-002" })).toHaveCount(1);
+    await asset.selectOption({ label: "CONT-002 · Av. Santa Fe 3400" });
 
     // Submit
     await dialog.getByRole("button", { name: "Programar servicio" }).click();
@@ -202,7 +206,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const preview = page.locator("aside[aria-labelledby='preview-title']");
     await expect(preview).toBeVisible();
     await expect(preview.getByText("Sin asignar")).toBeVisible();
-    await expect(preview.getByText("CT-0442")).toBeVisible();
+    await expect(preview.getByText(/CONT-002/).first()).toBeVisible();
   });
 
   test("attaches a crew without vehicle to an already-scheduled service that does not require one", async ({ page }) => {
