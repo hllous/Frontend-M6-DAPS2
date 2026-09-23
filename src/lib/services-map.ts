@@ -161,7 +161,6 @@ export function resolveServiceMapLocations(
 export type ServiceMapZoneSummary = {
   zone: ServiceMapZone;
   serviceIds: string[];
-  hasRoute: boolean;
 };
 
 /** Groups every service (point or route) under each zone it belongs to. */
@@ -170,9 +169,8 @@ export function summarizeServiceZones(locations: ServiceMapLocation[]): ServiceM
 
   for (const location of locations) {
     for (const zone of location.zones) {
-      const current = zonesById.get(zone.zoneId) ?? { zone, serviceIds: [], hasRoute: false };
+      const current = zonesById.get(zone.zoneId) ?? { zone, serviceIds: [] };
       if (!current.serviceIds.includes(location.serviceId)) current.serviceIds.push(location.serviceId);
-      current.hasRoute ||= location.locationType === "route";
       zonesById.set(zone.zoneId, current);
     }
   }

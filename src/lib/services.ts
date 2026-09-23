@@ -154,7 +154,7 @@ export const createServiceInputSchema = z
     weatherAlertId: z.string().max(MAX_EXTERNAL_ID_LENGTH, `El weatherAlertId no puede superar los ${MAX_EXTERNAL_ID_LENGTH} caracteres.`).optional(),
     routeId: z.string().optional(),
     zoneIds: z.array(z.string()).min(1, "Debe incluir al menos una zona"),
-    targetType: z.string().optional(),
+    targetType: z.enum(["CONTAINER", "TREE", "GREEN_SPACE", "GREEN_POINT"]).optional(),
     targetId: z.string().optional(),
     targetRef: z.string().optional(),
     scheduledDate: z
