@@ -17,6 +17,10 @@ import { servicesAdapter, type CreateServiceInput, type Service, type ServiceMod
 import { routesAdapter, type Route } from "@/lib/routes";
 import { serviceTypesAdapter, type ServiceType } from "@/lib/service-types";
 import { zonesAdapter, type Zone } from "@/lib/zones";
+import { containersAdapter } from "@/lib/containers";
+import { treesAdapter } from "@/lib/trees";
+import { greenSpacesAdapter } from "@/lib/green-spaces";
+import { greenPointsAdapter } from "@/lib/green-points";
 import { cn } from "@/lib/utils";
 import { MAX_NOTES_LENGTH } from "@/lib/input-limits";
 
@@ -32,6 +36,55 @@ type Catalogs =
   | { status: "loading" }
   | { status: "error" }
   | { status: "ready"; serviceTypes: ServiceType[]; routes: Route[]; zones: Zone[] };
+
+type InventoryTargetType = "CONTAINER" | "TREE" | "GREEN_SPACE" | "GREEN_POINT";
+type TargetKind = InventoryTargetType | "LOCATION";
+type TargetOption = { id: string; label: string; zoneId: string };
+type TargetOptions = { status: "idle" | "loading" | "error" } | { status: "ready"; options: TargetOption[] };
+
+const TARGET_KIND_LABELS: Record<TargetKind, string> = {
+  CONTAINER: "Contenedor",
+  TREE: "Árbol urbano",
+  GREEN_SPACE: "Espacio verde",
+  GREEN_POINT: "Punto verde",
+  LOCATION: "Ubicación suelta (sin bien del inventario)",
+};
+
+const TARGET_PAGE_SIZE = 20;
+
+/** Busca bienes del inventario del tipo pedido y los muestra por código o dirección, nunca por UUID. */
+async function searchTargets(type: InventoryTargetType, search: string): Promise<TargetOption[]> {
+  const term = search.trim() || undefined;
+  switch (type) {
+    case "CONTAINER":
+      return (await containersAdapter.list({ search: term, pageSize: TARGET_PAGE_SIZE })).containers.map((c) => ({
+        id: c.id,
+        label: [c.code, c.address].filter(Boolean).join(" · "),
+        zoneId: c.zoneId,
+      }));
+    case "TREE":
+      return (await treesAdapter.list({ active: true, search: term, pageSize: TARGET_PAGE_SIZE })).trees.map((t) => ({
+        id: t.id,
+        label: [t.surveyCode, t.species, t.address].filter(Boolean).join(" · "),
+        zoneId: t.zoneId,
+      }));
+    case "GREEN_POINT":
+      return (await greenPointsAdapter.list({ active: true, search: term, pageSize: TARGET_PAGE_SIZE })).greenPoints.map((g) => ({
+        id: g.id,
+        label: [g.code, g.name, g.address].filter(Boolean).join(" · "),
+        zoneId: g.zoneId,
+      }));
+    case "GREEN_SPACE": {
+      // ponytail: el adapter de espacios verdes no expone `search`; se filtra por nombre sobre los primeros 100.
+      const { greenSpaces } = await greenSpacesAdapter.list({ active: true, pageSize: 100 });
+      const needle = term?.toLocaleLowerCase("es");
+      return greenSpaces
+        .filter((g) => !needle || g.name.toLocaleLowerCase("es").includes(needle))
+        .slice(0, TARGET_PAGE_SIZE)
+        .map((g) => ({ id: g.id, label: g.name, zoneId: g.zoneId }));
+    }
+  }
+}
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -63,12 +116,6 @@ export function ScheduleServiceDialog({
   const [genericOrigin, setGenericOrigin] = useState<ServiceOrigin>("MANUAL");
   const [manualTicketId, setManualTicketId] = useState(() => initialReferenceId ?? "");
 
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (open !== prevOpen) {
-    setPrevOpen(open);
-    if (open) setManualTicketId(initialReferenceId ?? "");
-  }
-
   // Effective origin & reference: locked when linked, user-selected otherwise
   const origin: ServiceOrigin = isLinked && initialOrigin ? initialOrigin : genericOrigin;
   const referenceId: string = origin === "TICKET" ? manualTicketId : isLinked ? (initialReferenceId ?? "") : "";
@@ -79,8 +126,25 @@ export function ScheduleServiceDialog({
 
   // Point mode state
   const [chosenZoneId, setPointZoneId] = useState("");
-  const [targetType, setTargetType] = useState<string>("CONTAINER");
+  const [targetType, setTargetType] = useState<TargetKind>("CONTAINER");
   const [targetRef, setTargetRef] = useState<string>("");
+  const [targetSearch, setTargetSearch] = useState("");
+  const [targetOptions, setTargetOptions] = useState<TargetOptions>({ status: "idle" });
+  const [selectedTarget, setSelectedTarget] = useState<TargetOption | null>(null);
+
+  // El diálogo no se desmonta al cerrarse: al reabrir no puede arrastrar el objetivo del servicio anterior.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setManualTicketId(initialReferenceId ?? "");
+      setTargetType("CONTAINER");
+      setTargetRef("");
+      setTargetSearch("");
+      setTargetOptions({ status: "idle" });
+      setSelectedTarget(null);
+    }
+  }
 
   // Scheduling temporal state
   const [scheduledDate, setScheduledDate] = useState<string>(() => {
@@ -116,6 +180,13 @@ export function ScheduleServiceDialog({
     };
   }, [open]);
 
+  // Cambiar el tipo de objetivo invalida el bien elegido: un id de contenedor no es un árbol.
+  const handleTargetTypeChange = (next: TargetKind) => {
+    setTargetType(next);
+    setSelectedTarget(null);
+    setTargetSearch("");
+  };
+
   const serviceTypes = useMemo(() => (catalogs.status === "ready" ? catalogs.serviceTypes : []), [catalogs]);
   const routes = useMemo(() => (catalogs.status === "ready" ? catalogs.routes : []), [catalogs]);
   const zones = useMemo(() => (catalogs.status === "ready" ? catalogs.zones : []), [catalogs]);
@@ -128,6 +199,33 @@ export function ScheduleServiceDialog({
   // Selected Service Type determines Mode strictly
   const selectedServiceType = serviceTypes.find((t) => t.id === serviceTypeId);
   const derivedMode: ServiceMode = selectedServiceType?.mode ?? "ROUTE";
+
+  const inventoryType = derivedMode === "POINT" && targetType !== "LOCATION" ? targetType : null;
+  useEffect(() => {
+    if (!open || !inventoryType) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setTargetOptions({ status: "loading" });
+      searchTargets(inventoryType, targetSearch)
+        .then((options) => {
+          if (!cancelled) setTargetOptions({ status: "ready", options });
+        })
+        .catch(() => {
+          if (!cancelled) setTargetOptions({ status: "error" });
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [open, inventoryType, targetSearch]);
+
+  const visibleTargetOptions = useMemo(() => {
+    const options = targetOptions.status === "ready" ? targetOptions.options : [];
+    // La elección se conserva aunque una búsqueda posterior ya no la traiga.
+    return selectedTarget && !options.some((o) => o.id === selectedTarget.id) ? [selectedTarget, ...options] : options;
+  }, [targetOptions, selectedTarget]);
+  const selectedTargetZone = zones.find((z) => z.id === selectedTarget?.zoneId);
 
   // Selected Route for ROUTE mode
   const selectedRoute = routes.find((r) => r.id === routeId);
@@ -154,8 +252,13 @@ export function ScheduleServiceDialog({
       return;
     }
 
-    if (derivedMode === "POINT" && !targetRef.trim()) {
-      setErrorMessage("Debe indicar el identificador o dirección del objetivo puntual.");
+    if (inventoryType && !selectedTarget) {
+      setErrorMessage(`Debe elegir el ${TARGET_KIND_LABELS[inventoryType].toLocaleLowerCase("es")} sobre el que se ejecuta el servicio.`);
+      return;
+    }
+
+    if (derivedMode === "POINT" && !inventoryType && !targetRef.trim()) {
+      setErrorMessage("Debe indicar la dirección o referencia de la ubicación.");
       return;
     }
 
@@ -187,7 +290,8 @@ export function ScheduleServiceDialog({
     setIsSubmitting(true);
 
     // Build zone snapshot. El listado de recorridos puede no traer las paradas: entonces se pide el detalle.
-    let zoneIds = [pointZoneId];
+    // Con un bien del inventario la zona sale del bien, igual que en el backend.
+    let zoneIds = [inventoryType && selectedTarget ? selectedTarget.zoneId : pointZoneId];
     if (derivedMode === "ROUTE") {
       try {
         const stops = selectedRouteZones.length > 0 ? selectedRouteZones.map((zone) => zone.id) : (await routesAdapter.get(routeId)).stops.map((stop) => stop.zoneId);
@@ -213,8 +317,9 @@ export function ScheduleServiceDialog({
       weatherAlertId: origin === "WEATHER_ALERT" ? referenceId.trim() : undefined,
       routeId: derivedMode === "ROUTE" ? routeId : undefined,
       zoneIds,
-      targetType: derivedMode === "POINT" ? targetType : undefined,
-      targetRef: derivedMode === "POINT" ? targetRef.trim() : undefined,
+      targetType: inventoryType ?? undefined,
+      targetId: inventoryType ? selectedTarget?.id : undefined,
+      targetRef: derivedMode !== "POINT" ? undefined : inventoryType ? selectedTarget?.label : targetRef.trim(),
       scheduledDate,
       timeWindow: {
         start: windowStart,
@@ -415,62 +520,97 @@ export function ScheduleServiceDialog({
             </div>
           ) : (
             <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3.5 flex flex-col gap-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field>
-                  <FieldLabel htmlFor="point-zone">Zona operativa *</FieldLabel>
-                  <select
-                    id="point-zone"
-                    value={pointZoneId}
-                    onChange={(e) => setPointZoneId(e.target.value)}
-                    className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                  >
-                    {zones
-                      .filter((z) => z.active)
-                      .map((z) => (
-                        <option key={z.id} value={z.id}>
-                          {z.name} ({z.code})
+              <Field>
+                <FieldLabel htmlFor="target-type">Tipo de objetivo *</FieldLabel>
+                <select
+                  id="target-type"
+                  value={targetType}
+                  onChange={(e) => handleTargetTypeChange(e.target.value as TargetKind)}
+                  className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                >
+                  {(Object.keys(TARGET_KIND_LABELS) as TargetKind[]).map((kind) => (
+                    <option key={kind} value={kind}>
+                      {TARGET_KIND_LABELS[kind]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              {inventoryType ? (
+                <>
+                  <Field>
+                    <FieldLabel htmlFor="target-search">Buscar {TARGET_KIND_LABELS[inventoryType].toLocaleLowerCase("es")}</FieldLabel>
+                    <input
+                      id="target-search"
+                      type="search"
+                      value={targetSearch}
+                      onChange={(e) => setTargetSearch(e.target.value)}
+                      placeholder={inventoryType === "GREEN_SPACE" ? "Nombre del espacio" : "Código o dirección"}
+                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="target-id">Bien del inventario *</FieldLabel>
+                    <select
+                      id="target-id"
+                      value={selectedTarget?.id ?? ""}
+                      onChange={(e) => setSelectedTarget(visibleTargetOptions.find((o) => o.id === e.target.value) ?? null)}
+                      aria-describedby="target-id-status"
+                      aria-busy={targetOptions.status === "loading"}
+                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                    >
+                      <option value="">Seleccione un bien…</option>
+                      {visibleTargetOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
                         </option>
                       ))}
-                  </select>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="target-type">Tipo de objetivo</FieldLabel>
-                  <select
-                    id="target-type"
-                    value={targetType}
-                    onChange={(e) => setTargetType(e.target.value)}
-                    className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                  >
-                    <option value="CONTAINER">Contenedor</option>
-                    <option value="TREE">Árbol urbano</option>
-                    <option value="GREEN_POINT">Punto verde</option>
-                    <option value="LOCATION">Ubicación / Dirección</option>
-                  </select>
-                </Field>
-              </div>
-
-              <Field>
-                <FieldLabel htmlFor="target-ref">Identificador de objetivo / Dirección *</FieldLabel>
-                <input
-                  id="target-ref"
-                  type="text"
-                  value={targetRef}
-                  onChange={(e) => setTargetRef(e.target.value)}
-                  placeholder={
-                    targetType === "CONTAINER"
-                      ? "p. ej. CT-0442"
-                      : targetType === "TREE"
-                      ? "p. ej. TR-0884"
-                      : "p. ej. Av. Rivadavia 2200"
-                  }
-                  required
-                  className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                />
-                <FieldDescription>
-                  Identificador del elemento en inventario o dirección geográfica específica del trabajo puntual.
-                </FieldDescription>
-              </Field>
+                    </select>
+                    <FieldDescription id="target-id-status" aria-live="polite">
+                      {targetOptions.status === "loading" && "Buscando en el inventario…"}
+                      {targetOptions.status === "ready" && targetOptions.options.length === 0 && "No hay bienes que coincidan con la búsqueda."}
+                      {targetOptions.status === "ready" && targetOptions.options.length > 0 &&
+                        (selectedTargetZone ? `Zona derivada del bien: ${selectedTargetZone.name}.` : "La zona del servicio se deriva del bien elegido.")}
+                    </FieldDescription>
+                    {targetOptions.status === "error" && (
+                      <FieldError>No se pudo consultar el inventario. Cambie la búsqueda para reintentar.</FieldError>
+                    )}
+                  </Field>
+                </>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field>
+                    <FieldLabel htmlFor="point-zone">Zona operativa *</FieldLabel>
+                    <select
+                      id="point-zone"
+                      value={pointZoneId}
+                      onChange={(e) => setPointZoneId(e.target.value)}
+                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                    >
+                      {zones
+                        .filter((z) => z.active)
+                        .map((z) => (
+                          <option key={z.id} value={z.id}>
+                            {z.name} ({z.code})
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="target-ref">Dirección o referencia *</FieldLabel>
+                    <input
+                      id="target-ref"
+                      type="text"
+                      value={targetRef}
+                      onChange={(e) => setTargetRef(e.target.value)}
+                      placeholder="p. ej. Av. Rivadavia 2200"
+                      required
+                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                    />
+                    <FieldDescription>Sin bien del inventario el servicio se ubica por zona; la referencia queda en las notas.</FieldDescription>
+                  </Field>
+                </div>
+              )}
             </div>
           )}
 

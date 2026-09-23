@@ -62,7 +62,7 @@ describe("ScheduleServiceDialog component", () => {
     // Initial state: st-waste-route -> ROUTE
     expect(screen.getByText(/Recorrido \(ROUTE\)/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Recorrido asignado/)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Identificador de objetivo/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Tipo de objetivo/)).not.toBeInTheDocument();
 
     // Select POINT type: "st-tree-pruning" (Poda y arbolado)
     const serviceTypeSelect = screen.getByLabelText(/Tipo de servicio/);
@@ -71,8 +71,10 @@ describe("ScheduleServiceDialog component", () => {
     // Mode is now POINT
     expect(screen.getByText(/Punto fijo \(POINT\)/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Recorrido asignado/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/Zona operativa/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Identificador de objetivo/)).toBeInTheDocument();
+    // Con un bien del inventario la zona se deriva del bien: no se pide.
+    expect(screen.queryByLabelText(/Zona operativa/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Tipo de objetivo/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Bien del inventario/)).toBeInTheDocument();
   });
 
   it("prefills and locks linked context for TICKET origin without retyping", async () => {
@@ -145,10 +147,11 @@ describe("ScheduleServiceDialog component", () => {
     const serviceTypeSelect = screen.getByLabelText(/Tipo de servicio/);
     await user.selectOptions(serviceTypeSelect, "st-container-point");
 
-    // Enter target ref
-    const targetInput = screen.getByLabelText(/Identificador de objetivo/);
-    await user.clear(targetInput);
-    await user.type(targetInput, "CT-0442");
+    // Busca y elige el contenedor real del inventario (#319)
+    const create = vi.spyOn(servicesAdapter, "create");
+    await user.type(screen.getByLabelText(/Buscar contenedor/), "CONT-002");
+    const option = await screen.findByRole("option", { name: "CONT-002 · Av. Santa Fe 3400" });
+    await user.selectOptions(screen.getByLabelText(/Bien del inventario/), option);
 
     // Submit
     const submitBtn = screen.getByRole("button", { name: "Programar servicio" });
@@ -158,14 +161,93 @@ describe("ScheduleServiceDialog component", () => {
       expect(onCreated).toHaveBeenCalledTimes(1);
     });
 
+    expect(create.mock.calls[0][0]).toMatchObject({ targetType: "CONTAINER", targetId: "cont-2", zoneIds: ["zone-2"] });
     const created = onCreated.mock.calls[0][0];
     expect(created.status).toBe("SCHEDULED");
     expect(created.mode).toBe("POINT");
     expect(created.origin).toBe("TICKET");
     expect(created.ticketId).toBe(linkedTicketId);
-    expect(created.targetRef).toBe("CT-0442");
+    expect(created.targetType).toBe("CONTAINER");
+    expect(created.targetId).toBe("cont-2");
+    expect(created.targetRef).toBe("CONT-002 · Av. Santa Fe 3400");
     expect(created.crewId).toBeNull();
-    expect(created.zoneIds).toEqual(["zone-1"]);
+    expect(created.zoneIds).toEqual(["zone-2"]);
+  });
+
+  it("requires picking an inventory asset when the target type is one (#319)", async () => {
+    const user = userEvent.setup();
+    const create = vi.spyOn(servicesAdapter, "create");
+
+    render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+    await catalogsLoaded();
+    await user.selectOptions(screen.getByLabelText(/Tipo de servicio/), "st-tree-pruning");
+    await user.selectOptions(screen.getByLabelText(/Tipo de objetivo/), "TREE");
+    await screen.findByRole("option", { name: /ARB-00442/ });
+    await user.click(screen.getByRole("button", { name: "Programar servicio" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Debe elegir el árbol urbano/);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("clears the chosen asset when the target type changes (#319)", async () => {
+    const user = userEvent.setup();
+
+    render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+    await catalogsLoaded();
+    await user.selectOptions(screen.getByLabelText(/Tipo de servicio/), "st-tree-pruning");
+    await user.selectOptions(screen.getByLabelText(/Tipo de objetivo/), "TREE");
+    const tree = await screen.findByRole("option", { name: /ARB-00442/ });
+    await user.selectOptions(screen.getByLabelText(/Bien del inventario/), tree);
+    expect(screen.getByLabelText(/Bien del inventario/)).toHaveValue("tree-1");
+    expect(screen.getByText("Zona derivada del bien: Belgrano.")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/Tipo de objetivo/), "CONTAINER");
+
+    expect(screen.getByLabelText(/Bien del inventario/)).toHaveValue("");
+    await screen.findByRole("option", { name: /CONT-001/ });
+    expect(screen.queryByRole("option", { name: /ARB-00442/ })).not.toBeInTheDocument();
+  });
+
+  it("does not carry the chosen asset over when the dialog is reopened (#319)", async () => {
+    const user = userEvent.setup();
+    const create = vi.spyOn(servicesAdapter, "create");
+    const props = { onOpenChange: vi.fn(), onCreated: vi.fn() };
+
+    const { rerender } = render(<ScheduleServiceDialog open={true} {...props} />);
+    await catalogsLoaded();
+    await user.selectOptions(screen.getByLabelText(/Tipo de servicio/), "st-tree-pruning");
+    await user.selectOptions(screen.getByLabelText(/Tipo de objetivo/), "TREE");
+    const tree = await screen.findByRole("option", { name: /ARB-00442/ });
+    await user.selectOptions(screen.getByLabelText(/Bien del inventario/), tree);
+    expect(screen.getByLabelText(/Bien del inventario/)).toHaveValue("tree-1");
+
+    rerender(<ScheduleServiceDialog open={false} {...props} />);
+    rerender(<ScheduleServiceDialog open={true} {...props} />);
+    await catalogsLoaded();
+
+    expect(screen.getByLabelText(/Tipo de objetivo/)).toHaveValue("CONTAINER");
+    expect(screen.getByLabelText(/Bien del inventario/)).toHaveValue("");
+    await user.click(screen.getByRole("button", { name: "Programar servicio" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Debe elegir el contenedor/);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("schedules a loose location by zone, without targetType or targetId", async () => {
+    const user = userEvent.setup();
+    const create = vi.spyOn(servicesAdapter, "create").mockResolvedValue({ id: "SVC-1" } as never);
+
+    render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+    await catalogsLoaded();
+    await user.selectOptions(screen.getByLabelText(/Tipo de servicio/), "st-tree-pruning");
+    await user.selectOptions(screen.getByLabelText(/Tipo de objetivo/), "LOCATION");
+    await user.type(screen.getByLabelText(/Dirección o referencia/), "Av. Rivadavia 2200");
+    await user.click(screen.getByRole("button", { name: "Programar servicio" }));
+
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    const payload = create.mock.calls[0][0];
+    expect(payload).toMatchObject({ targetRef: "Av. Rivadavia 2200", zoneIds: [expect.any(String)] });
+    expect(payload.targetType).toBeUndefined();
+    expect(payload.targetId).toBeUndefined();
   });
 
   it("rejects a human publicId before creating a linked service", async () => {
