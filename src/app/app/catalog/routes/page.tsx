@@ -10,5 +10,5 @@ export default async function RoutesCatalogPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  return <RouteCatalogPanel scenario={getScenario(session.scenarioId)} />;
+  return <RouteCatalogPanel scenario={getScenario(session)} />;
 }

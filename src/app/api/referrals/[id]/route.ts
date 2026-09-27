@@ -15,7 +15,7 @@ export async function GET(
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE" && scenario.actor.kind !== "FIELD") {
       return errorResponse(403, "Solo Oficina o Campo puede consultar derivaciones.", path);
     }

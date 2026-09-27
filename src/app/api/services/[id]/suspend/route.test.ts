@@ -155,7 +155,10 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
     );
+    // El login resuelve la cuadrilla de Campo contra GET /crews antes de la llamada bajo prueba.
+    backendFetch.mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] }), { status: 200 }));
     const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+    backendFetch.mockClear();
 
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/suspend", {

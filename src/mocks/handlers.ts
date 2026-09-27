@@ -5,6 +5,7 @@ import {
   addAttachmentToService,
   addAttachmentToZoneResult,
   addServiceFixture,
+  assignCrewFixture,
   addZoneResultFixture,
   evidenceCache,
   filterServiceFixtures,
@@ -21,7 +22,6 @@ import {
   completeServiceInputSchema,
   confirmRescheduleInputSchema,
   createServiceInputSchema,
-  CREW_CATALOG,
   evidenceOwnerTypeSchema,
   NOT_SERVICED_REASON_LABEL,
   recordZoneResultInputSchema,
@@ -36,7 +36,6 @@ import {
   type ServiceQuery,
   type ServiceStatus,
   type ZoneResult,
-  VEHICLE_CATALOG,
 } from "@/lib/services";
 import {
   addZoneFixture,
@@ -1438,54 +1437,20 @@ export const handlers = [
       );
     }
 
-    const service = serviceFixtures.find((s) => s.id === params.serviceId);
-    if (!service) {
+    const result = assignCrewFixture(String(params.serviceId), parsed.data);
+    if ("status" in result) {
       return HttpResponse.json(
         {
-          statusCode: 404,
-          message: "Servicio no encontrado.",
-          error: "Not Found",
+          statusCode: result.status,
+          message: result.message,
+          error: { 400: "Bad Request", 404: "Not Found", 409: "Conflict" }[result.status],
           timestamp: new Date().toISOString(),
           path: `/api/services/${params.serviceId}/assign-crew`,
         },
-        { status: 404 },
+        { status: result.status },
       );
     }
-
-    const serviceType = SERVICE_TYPE_CATALOG.find((t) => t.id === service.serviceTypeId);
-    if (serviceType?.requiresVehicle && (!parsed.data.vehicleId || !parsed.data.vehicleId.trim())) {
-      return HttpResponse.json(
-        {
-          statusCode: 400,
-          message: "El tipo de servicio requiere la asignación obligatoria de un vehículo operativo.",
-          error: "Bad Request",
-          timestamp: new Date().toISOString(),
-          path: `/api/services/${params.serviceId}/assign-crew`,
-        },
-        { status: 400 },
-      );
-    }
-
-    const crew = CREW_CATALOG.find((c) => c.id === parsed.data.crewId);
-    const vehicle = parsed.data.vehicleId
-      ? VEHICLE_CATALOG.find((v) => v.id === parsed.data.vehicleId)
-      : null;
-
-    const historyEntry = {
-      label: "Asignado",
-      at: new Date().toISOString().slice(0, 16).replace("T", " "),
-      done: true,
-    };
-
-    const updated = updateServiceFixture(service.id, {
-      crewId: parsed.data.crewId,
-      crewName: crew?.name ?? parsed.data.crewId,
-      vehicleId: parsed.data.vehicleId ?? null,
-      vehiclePlate: vehicle?.plate ?? null,
-      history: [...service.history, historyEntry],
-    });
-
-    return HttpResponse.json(updated, { status: 200 });
+    return HttpResponse.json(result.service, { status: 200 });
   }),
   http.post("*/api/services/:serviceId/start", ({ params }) => {
     const service = serviceFixtures.find((s) => s.id === params.serviceId);

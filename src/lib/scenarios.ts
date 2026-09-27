@@ -55,8 +55,14 @@ export type OperationalScenario = {
     name: string;
     kind: "OFFICE" | "FIELD";
     fieldRole?: "CREW_LEADER" | "CREW_MEMBER";
+    /** Id de la cuadrilla en los fixtures del modo mock. */
     crewId?: string;
     crewName?: string;
+    /**
+     * Nombre exacto de la cuadrilla en el backend (el seed no le da código y el id cambia con cada seed).
+     * En modo backend el login lo resuelve contra GET /crews y la sesión guarda el id real.
+     */
+    backendCrewName?: string;
   };
   capabilities: Capability[];
   work: {
@@ -126,6 +132,7 @@ export const scenarios: Record<
       fieldRole: "CREW_LEADER",
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
+      backendCrewName: "Cuadrilla Belgrano — Recolección",
     },
     capabilities: ["service:view", "service:execute", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view", "environmentalInspection:view", "environmentalInspection:execute", "tree:survey"],
     work: {
@@ -147,6 +154,7 @@ export const scenarios: Record<
       fieldRole: "CREW_MEMBER",
       crewId: "crew-b",
       crewName: "Cuadrilla B · Fernández",
+      backendCrewName: "Cuadrilla Belgrano — Recolección",
     },
     capabilities: ["service:view", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view", "environmentalInspection:view", "tree:survey"],
     work: {
@@ -176,8 +184,16 @@ const scenariosById = Object.values(scenarios).reduce(
   {} as Record<ScenarioId, OperationalScenario>,
 );
 
-export function getScenario(id: ScenarioId): OperationalScenario {
-  return scenariosById[id];
+export type ScenarioCrew = { id: string; name: string };
+
+/** Con una sesión, la cuadrilla resuelta contra el backend pisa la de fixture del escenario. */
+export function getScenario(
+  ref: ScenarioId | { scenarioId: ScenarioId; crew?: ScenarioCrew },
+): OperationalScenario {
+  if (typeof ref === "string") return scenariosById[ref];
+  const scenario = scenariosById[ref.scenarioId];
+  if (!ref.crew) return scenario;
+  return { ...scenario, actor: { ...scenario.actor, crewId: ref.crew.id, crewName: ref.crew.name } };
 }
 
 export function isScenarioId(value: unknown): value is ScenarioId {

@@ -566,6 +566,18 @@ export function ServicesWorkspace({
     setConfirmingRescheduleServiceId(null);
   }, []);
 
+  // Lo que cambian los paneles de ejecución (resultado por zona, completar el
+  // servicio o la inspección) vuelve al listado; sin esto el detalle queda viejo.
+  const handleServiceUpdated = useCallback((updatedService: Service) => {
+    setLoadState((prev) => {
+      if (prev.status !== "ready") return prev;
+      return {
+        ...prev,
+        services: prev.services.map((s) => (s.id === updatedService.id ? updatedService : s)),
+      };
+    });
+  }, []);
+
   const handleServiceCancelled = useCallback((updatedService: Service) => {
     setLoadState((prev) => {
       if (prev.status !== "ready") return prev;
@@ -600,6 +612,7 @@ export function ServicesWorkspace({
           onCancelService={canReschedule ? (s) => setCancelingServiceId(s.id) : undefined}
           onCreateRepairRequest={canCreateRepairRequest ? (s) => setRepairRequestServiceId(s.id) : undefined}
           onCreateStreetClosureRequest={canCreateStreetClosureRequest ? (s) => setStreetClosureServiceId(s.id) : undefined}
+          onServiceUpdated={handleServiceUpdated}
           canStartService={canExecuteService}
           isResuming={resumingId === detailService.id}
           resumeError={resumeErrors[detailService.id] ?? null}

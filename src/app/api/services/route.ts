@@ -98,7 +98,7 @@ export async function GET(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     const query = parseServiceQuery(new URL(request.url));
 
     // Field actors can only see services assigned to their own crew
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     // Permission check: scheduling is an Office decision, not a Field action.
     if (scenario.actor.kind !== "OFFICE") {

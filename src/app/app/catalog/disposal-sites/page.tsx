@@ -9,5 +9,5 @@ export default async function DisposalSitesPage() {
   await connection();
   const session = await getSession();
   if (!session) redirect("/login");
-  return <DisposalSitesPanel scenario={getScenario(session.scenarioId)} />;
+  return <DisposalSitesPanel scenario={getScenario(session)} />;
 }

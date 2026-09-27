@@ -69,7 +69,7 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, "Solo Oficina puede programar y asociar un servicio.", path);
     }

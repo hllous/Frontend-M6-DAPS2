@@ -47,7 +47,7 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     // Permission check: only actors with service:execute capability (Crew Leader)
     if (!scenario.capabilities.includes("service:execute")) {
