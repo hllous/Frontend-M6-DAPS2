@@ -14,9 +14,9 @@ export const coverageIndicatorFixture: CoverageWire = {
     { id: "zone-3", code: "Z-NOR", name: "Norte", scheduled: 108, served: 82, partial: 8, notServiced: 10, pending: 8, coveragePct: 75.9 },
   ],
   byServiceType: [
-    { id: "service-collection", code: "REC-DOM", name: "Recolección domiciliaria", scheduled: 198, served: 176, partial: 10, notServiced: 6, pending: 6, coveragePct: 88.9 },
-    { id: "service-sweeping", code: "BAR-CAL", name: "Barrido de calles", scheduled: 168, served: 132, partial: 12, notServiced: 12, pending: 12, coveragePct: 78.6 },
-    { id: "service-green", code: "ESP-VER", name: "Mantenimiento de espacios verdes", scheduled: 106, served: 80, partial: 8, notServiced: 6, pending: 12, coveragePct: 75.5 },
+    { id: "st-waste-route", code: "REC-DOM", name: "Recolección domiciliaria", scheduled: 198, served: 176, partial: 10, notServiced: 6, pending: 6, coveragePct: 88.9 },
+    { id: "st-cleaning-route", code: "BAR-CAL", name: "Barrido de calles", scheduled: 168, served: 132, partial: 12, notServiced: 12, pending: 12, coveragePct: 78.6 },
+    { id: "st-green-point", code: "ESP-VER", name: "Mantenimiento de espacios verdes", scheduled: 106, served: 80, partial: 8, notServiced: 6, pending: 12, coveragePct: 75.5 },
   ],
 };
 

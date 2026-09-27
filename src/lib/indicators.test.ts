@@ -22,6 +22,16 @@ describe("indicatorsAdapter", () => {
     });
   });
 
+  it("accepts avgResolutionDays null when no report was closed in the period (#302)", async () => {
+    const response = structuredClone(incidentsIndicatorFixture);
+    (response.reports as { avgResolutionDays: number | null }).avgResolutionDays = null;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(response)));
+
+    const result = await indicatorsAdapter.getIncidents({});
+
+    expect(result.primary).toEqual({ value: null, label: "Resolución media de reportes", unit: "días" });
+  });
+
   it("rejects an inverted date range with a message on the `to` field", () => {
     const result = indicatorQuerySchema.safeParse({ from: "2026-09-20", to: "2026-09-01" });
     expect(result.success).toBe(false);

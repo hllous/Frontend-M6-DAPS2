@@ -17,7 +17,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     const item = getRepairRequestFixture(id);
     if (scenario.actor.kind === "FIELD") {
       const sourceService = item?.detectedInType === "SERVICE"

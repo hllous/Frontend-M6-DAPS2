@@ -32,7 +32,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar tipos de servicio.");
     requireCapability(session, "serviceType:manage");
     const id = await targetId(context);
@@ -58,7 +58,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede dar de baja un tipo de servicio.");
     requireCapability(session, "serviceType:manage");
     const id = await targetId(context);

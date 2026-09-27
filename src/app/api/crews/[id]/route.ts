@@ -14,7 +14,7 @@ type Context = { params: Promise<{ id: string }> | { id: string } };
 async function context(request: Request, routeContext: Context) {
   const { id } = await routeContext.params;
   const session = getRequiredSession(request);
-  return { id, path: new URL(request.url).pathname, session, scenario: getScenario(session.scenarioId) };
+  return { id, path: new URL(request.url).pathname, session, scenario: getScenario(session) };
 }
 function forwardResponse(response: Response) { return new NextResponse(response.body, { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
 function requireOfficeCapability(session: ReturnType<typeof getRequiredSession>, scenario: ReturnType<typeof getScenario>) {

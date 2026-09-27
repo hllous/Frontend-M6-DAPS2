@@ -1,11 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { delay, http, HttpResponse } from "msw";
+import { delay, http, HttpResponse, passthrough } from "msw";
 import { setupServer } from "msw/node";
 
 import { scenarios } from "@/lib/scenarios";
-import { coverageIndicatorFixture } from "@/lib/indicator-fixtures";
+import { coverageIndicatorFixture, incidentsIndicatorFixture } from "@/lib/indicator-fixtures";
+import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
 import { handlers } from "@/mocks/handlers";
 
 import { IndicatorsDashboard } from "./indicators-dashboard";
@@ -16,6 +17,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
   vi.unstubAllGlobals();
+  olvidarCatalogoDeEtiquetas();
 });
 afterAll(() => server.close());
 
@@ -208,6 +210,55 @@ describe("IndicatorsDashboard", () => {
 
     expect(screen.getByText(/no se puede vincular con un registro operativo/i)).toBeVisible();
     expect(screen.queryByRole("link", { name: /Abrir catálogo de árboles/i })).not.toBeInTheDocument();
+  });
+
+  it("shows «Sin reportes cerrados» when the backend sends avgResolutionDays null (#302)", async () => {
+    server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json({ ...incidentsIndicatorFixture, reports: { ...incidentsIndicatorFixture.reports, avgResolutionDays: null } })));
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    const incidentsButton = within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i });
+    expect(await within(incidentsButton).findByText("Sin reportes cerrados")).toBeVisible();
+    expect(within(familyBand).queryByText("No se pudo cargar Incidencias")).not.toBeInTheDocument();
+
+    await user.click(incidentsButton);
+    expect(await screen.findByRole("heading", { name: "Incidencias" })).toBeVisible();
+    expect(screen.getByText(/Resolución media de reportes:/).closest("p")).toHaveTextContent("Sin reportes cerrados");
+  });
+
+  it("lists real zones and service types and sends their UUIDs as filters (#302)", async () => {
+    const zoneId = "3f0c1a52-6a7e-4c1b-9a3e-1d2b3c4d5e6f";
+    const serviceTypeId = "a52e440f-37d0-42a4-92c7-28c281cf21e3";
+    const page = (data: unknown[]) => ({ data, meta: { total: data.length, page: 1, pageSize: 100, totalPages: 1 } });
+    server.use(
+      http.get("*/api/zones", () => HttpResponse.json(page([{ id: zoneId, code: "Z-SUR", name: "Zona Sur real", active: true, createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z" }]))),
+      http.get("*/api/service-types", () => HttpResponse.json(page([{ id: serviceTypeId, code: "ARB-CENSO", name: "Censo de arbolado urbano", category: "TREES", mode: "ROUTE", requiresVehicle: false, active: true, createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z" }]))),
+    );
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Cobertura" });
+
+    const requested: string[] = [];
+    server.use(http.get("*/api/indicators/:family", ({ request }) => { requested.push(new URL(request.url).search); return passthrough(); }));
+    await user.selectOptions(await screen.findByLabelText("Zona operativa"), "Zona Sur real");
+    await user.selectOptions(screen.getByLabelText("Tipo de servicio"), "Censo de arbolado urbano");
+    expect(screen.queryByRole("option", { name: "Centro" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Actualizar" }));
+
+    await vi.waitFor(() => expect(requested.some((search) => search.includes(`zoneId=${zoneId}`) && search.includes(`serviceTypeId=${serviceTypeId}`))).toBe(true));
+  });
+
+  it("disables the catalog filters with a notice while loading and when the catalogs fail (#302)", async () => {
+    server.use(
+      http.get("*/api/zones", () => HttpResponse.json({ statusCode: 503, message: "No disponible" }, { status: 503 })),
+      http.get("*/api/service-types", async () => { await delay("infinite"); return HttpResponse.json({}); }),
+    );
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    expect(screen.getByLabelText("Zona operativa")).toBeDisabled();
+    expect(screen.getByLabelText("Tipo de servicio")).toBeDisabled();
+    expect(screen.getByText("Cargando tipos de servicio…")).toBeVisible();
   });
 
   it("blocks an inverted date range with a message and does not call the backend", async () => {

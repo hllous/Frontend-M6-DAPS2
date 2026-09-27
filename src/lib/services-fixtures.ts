@@ -1,4 +1,14 @@
-import type { Attachment, Service, ServiceQuery, ZoneResult } from "./services";
+import { crewFixtures } from "./crew-fixtures";
+import {
+  checkAssignmentConflicts,
+  SERVICE_TYPE_CATALOG,
+  type AssignCrewInput,
+  type Attachment,
+  type Service,
+  type ServiceQuery,
+  type ZoneResult,
+} from "./services";
+import { vehicleFixtures } from "./vehicles-fixtures";
 
 const INITIAL_SERVICE_FIXTURES: Service[] = [
   {
@@ -19,8 +29,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "13:00",
     crewId: "crew-a",
     crewName: "Cuadrilla A · López",
-    vehicleId: "veh-101",
-    vehiclePlate: "AF 123 CD",
+    vehicleId: "vehicle-1",
+    vehiclePlate: "AA 123 AA",
     coordinates: { x: 22, y: 30 },
     attachments: [],
     history: [
@@ -76,8 +86,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "14:00",
     crewId: "crew-a",
     crewName: "Cuadrilla A · López",
-    vehicleId: "veh-102",
-    vehiclePlate: "AE 456 FG",
+    vehicleId: "vehicle-2",
+    vehiclePlate: "AB 456 BC",
     coordinates: { x: 34, y: 34 },
     attachments: [],
     history: [
@@ -105,8 +115,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "12:00",
     crewId: "crew-b",
     crewName: "Cuadrilla B · Fernández",
-    vehicleId: "veh-102",
-    vehiclePlate: "AE 456 FG",
+    vehicleId: "vehicle-2",
+    vehiclePlate: "AB 456 BC",
     coordinates: { x: 50, y: 44 },
     attachments: [],
     history: [
@@ -133,8 +143,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "15:00",
     crewId: "crew-b",
     crewName: "Cuadrilla B · Fernández",
-    vehicleId: "veh-103",
-    vehiclePlate: "AG 789 HI",
+    vehicleId: "vehicle-3",
+    vehiclePlate: "AC 789 CD",
     coordinates: { x: 52, y: 46 },
     attachments: [],
     history: [
@@ -160,8 +170,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "13:00",
     crewId: "crew-b",
     crewName: "Cuadrilla B · Fernández",
-    vehicleId: "veh-103",
-    vehiclePlate: "AG 789 HI",
+    vehicleId: "vehicle-3",
+    vehiclePlate: "AC 789 CD",
     coordinates: { x: 53, y: 45 },
     attachments: [],
     history: [
@@ -268,8 +278,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "11:00",
     crewId: "crew-d",
     crewName: "Cuadrilla D · Gómez",
-    vehicleId: "veh-104",
-    vehiclePlate: "AE 321 ZA",
+    vehicleId: "vehicle-4",
+    vehiclePlate: "AD 321 DE",
     coordinates: { x: 40, y: 74 },
     attachments: [],
     history: [
@@ -419,8 +429,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "11:00",
     crewId: "crew-b",
     crewName: "Cuadrilla B · Fernández",
-    vehicleId: "veh-105",
-    vehiclePlate: "AB 654 LM",
+    vehicleId: "vehicle-4",
+    vehiclePlate: "AD 321 DE",
     coordinates: { x: 25, y: 26 },
     attachments: [],
     history: [
@@ -498,8 +508,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "15:00",
     crewId: "crew-a",
     crewName: "Cuadrilla A · López",
-    vehicleId: "veh-102",
-    vehiclePlate: "AE 456 FG",
+    vehicleId: "vehicle-2",
+    vehiclePlate: "AB 456 BC",
     coordinates: { x: 29, y: 40 },
     attachments: [],
     history: [
@@ -527,8 +537,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "13:00",
     crewId: "crew-a",
     crewName: "Cuadrilla A · López",
-    vehicleId: "veh-101",
-    vehiclePlate: "AF 123 CD",
+    vehicleId: "vehicle-1",
+    vehiclePlate: "AA 123 AA",
     coordinates: { x: 31, y: 32 },
     attachments: [],
     history: [
@@ -555,8 +565,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "12:00",
     crewId: "crew-b",
     crewName: "Cuadrilla B · Fernández",
-    vehicleId: "veh-102",
-    vehiclePlate: "AE 456 FG",
+    vehicleId: "vehicle-2",
+    vehiclePlate: "AB 456 BC",
     coordinates: { x: 54, y: 47 },
     attachments: [],
     history: [
@@ -583,8 +593,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "12:00",
     crewId: "crew-b",
     crewName: "Cuadrilla B · Fernández",
-    vehicleId: "veh-103",
-    vehiclePlate: "AG 789 HI",
+    vehicleId: "vehicle-3",
+    vehiclePlate: "AC 789 CD",
     coordinates: { x: 56, y: 49 },
     attachments: [],
     history: [
@@ -611,8 +621,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "12:00",
     crewId: "crew-b",
     crewName: "Cuadrilla B · Fernández",
-    vehicleId: "veh-102",
-    vehiclePlate: "AE 456 FG",
+    vehicleId: "vehicle-2",
+    vehiclePlate: "AB 456 BC",
     coordinates: { x: 60, y: 44 },
     attachments: [],
     history: [
@@ -639,8 +649,8 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     windowTo: "12:00",
     crewId: "crew-b",
     crewName: "Cuadrilla B · Fernández",
-    vehicleId: "veh-102",
-    vehiclePlate: "AE 456 FG",
+    vehicleId: "vehicle-2",
+    vehiclePlate: "AB 456 BC",
     coordinates: { x: 58, y: 40 },
     attachments: [],
     history: [
@@ -693,6 +703,52 @@ export function updateServiceFixture(id: string, updates: Partial<Service>): Ser
   };
   serviceFixtures[index] = updated;
   return updated;
+}
+
+/**
+ * assign-crew del modo mock con las reglas del backend: cuadrilla y vehículo tienen que existir
+ * en sus catálogos (404), el tipo puede exigir vehículo (400) y un solapamiento sin
+ * overrideNote da 409 (services.service.ts, assertOverrideNote).
+ */
+export function assignCrewFixture(
+  serviceId: string,
+  input: AssignCrewInput,
+): { service: Service } | { status: 400 | 404 | 409; message: string } {
+  const service = serviceFixtures.find((s) => s.id === serviceId);
+  if (!service) return { status: 404, message: `Servicio ${serviceId} no encontrado.` };
+
+  const serviceType = SERVICE_TYPE_CATALOG.find((t) => t.id === service.serviceTypeId);
+  if (serviceType?.requiresVehicle && !input.vehicleId?.trim()) {
+    return { status: 400, message: "El tipo de servicio requiere la asignación obligatoria de un vehículo operativo." };
+  }
+
+  const crew = crewFixtures.find((c) => c.id === input.crewId);
+  if (!crew) return { status: 404, message: `Cuadrilla ${input.crewId} no encontrada.` };
+  const vehicle = input.vehicleId ? vehicleFixtures.find((v) => v.id === input.vehicleId) : null;
+  if (input.vehicleId && !vehicle) return { status: 404, message: `Vehículo ${input.vehicleId} no encontrado.` };
+
+  const { crewConflict, vehicleConflict } = checkAssignmentConflicts({
+    service,
+    crewId: input.crewId,
+    vehicleId: input.vehicleId,
+    allServices: serviceFixtures,
+  });
+  const overlapping = [crewConflict, vehicleConflict].filter((s): s is Service => Boolean(s));
+  if (overlapping.length > 0 && !input.overrideNote) {
+    return {
+      status: 409,
+      message: `La asignación se solapa con ${overlapping.map((s) => s.id).join(", ")}. Se puede asignar igual, pero hace falta una justificación.`,
+    };
+  }
+
+  const updated = updateServiceFixture(service.id, {
+    crewId: crew.id,
+    crewName: crew.name,
+    vehicleId: vehicle?.id ?? null,
+    vehiclePlate: vehicle?.plate ?? null,
+    history: [...service.history, { label: "Asignado", at: new Date().toISOString().slice(0, 16).replace("T", " "), done: true }],
+  });
+  return { service: updated ?? service };
 }
 
 export function resetServiceFixtures(): void {

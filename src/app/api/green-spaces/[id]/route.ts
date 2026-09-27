@@ -28,7 +28,7 @@ async function greenSpaceId(context: { params: Promise<{ id: string }> | { id: s
 
 function isOffice(request: Request) {
   const session = getRequiredSession(request);
-  return getScenario(session.scenarioId).actor.kind === "OFFICE";
+  return getScenario(session).actor.kind === "OFFICE";
 }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {

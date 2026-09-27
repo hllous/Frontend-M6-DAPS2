@@ -15,6 +15,10 @@ const canonicalZones = [
   { id: "zone-pal", code: "Z-PAL", name: "Palermo", active: true, neighborhoodIds: [] },
   { id: "zone-rec", code: "Z-REC", name: "Recoleta", active: true, neighborhoodIds: [] },
   { id: "zone-ret", code: "Z-RET", name: "Retiro", active: true, neighborhoodIds: [] },
+  { id: "zone-col", code: "Z-COL", name: "Colegiales", active: true, neighborhoodIds: [] },
+  { id: "zone-sni", code: "Z-SNI", name: "San Nicolás", active: true, neighborhoodIds: [] },
+  { id: "zone-pma", code: "Z-PMA", name: "Puerto Madero", active: true, neighborhoodIds: [] },
+  { id: "zone-mon", code: "Z-MON", name: "Montserrat", active: true, neighborhoodIds: [] },
 ];
 
 const canonicalZoneResponse = {
@@ -73,7 +77,7 @@ describe("MapaOperativo", () => {
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeVisible();
   });
 
-  it("shows the four official operational zones with an accessible list", async () => {
+  it("shows the eight official operational zones with an accessible list", async () => {
     server.use(
       http.get("*/api/zones", () => HttpResponse.json(canonicalZoneResponse)),
     );
@@ -92,7 +96,8 @@ describe("MapaOperativo", () => {
     expect(screen.getByText("Recoleta")).toBeVisible();
     expect(screen.getByText("Z-RET")).toBeVisible();
     expect(screen.getByText("Retiro")).toBeVisible();
-    expect(screen.getByText(/4 zonas operativas/)).toBeVisible();
+    for (const code of ["Z-COL", "Z-SNI", "Z-PMA", "Z-MON"]) expect(screen.getByText(code)).toBeVisible();
+    expect(screen.getByText(/8 zonas operativas/)).toBeVisible();
   });
 
   it("shows coverage rates with a semantic legend and exact zone values", async () => {
@@ -122,7 +127,7 @@ describe("MapaOperativo", () => {
     expect(screen.getByText(/92,5/)).toBeVisible();
     expect(screen.getByText(/148 de 160 objetivos/)).toBeVisible();
     expect(screen.getByText("Cobertura alta")).toBeVisible();
-    expect(screen.getByText("4 de 4 zonas con datos")).toBeVisible();
+    expect(screen.getByText("4 de 8 zonas con datos")).toBeVisible();
     expect(screen.getByText("Recoleta")).toBeVisible();
     expect(screen.getByText("Cobertura parcial")).toBeVisible();
   });

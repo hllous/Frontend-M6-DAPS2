@@ -87,7 +87,7 @@ export async function handleTreeInterventionTransition(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, `Solo Oficina puede ${transitionLabel(transition)}.`, path);
     }

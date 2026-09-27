@@ -19,7 +19,7 @@ async function requestContext(request: Request, context: Context) {
   const { id } = await context.params;
   const path = new URL(request.url).pathname;
   const session = getRequiredSession(request);
-  const scenario = getScenario(session.scenarioId);
+  const scenario = getScenario(session);
   return { id, path, session, scenario };
 }
 

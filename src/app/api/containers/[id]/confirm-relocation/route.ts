@@ -43,7 +43,7 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     if (!scenario.capabilities.includes("container:manage")) {
       return errorResponse(403, "No tiene permisos para confirmar la reubicación de contenedores.", path);

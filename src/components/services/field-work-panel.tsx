@@ -40,6 +40,7 @@ export function FieldWorkPanel({
     crewId ? filterServiceFixtures({ crewId }) : [],
   );
   const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [startingId, setStartingId] = useState<string | null>(null);
   const [startErrors, setStartErrors] = useState<Record<string, string>>({});
   const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
@@ -61,9 +62,13 @@ export function FieldWorkPanel({
       if (!crewId) return;
       try {
         const page = await servicesAdapter.list({ crewId, pageSize: 50 });
-        if (isCurrent) setServices(page.services);
-      } catch {
-        // Retain existing services if refresh fails
+        if (isCurrent) {
+          setServices(page.services);
+          setLoadError(null);
+        }
+      } catch (cause) {
+        // Retain existing services if refresh fails, but say so: an empty list would read as "nothing assigned".
+        if (isCurrent) setLoadError(cause instanceof Error ? cause.message : "No se pudieron cargar los servicios de la cuadrilla.");
       }
     }
     void load();
@@ -263,7 +268,13 @@ export function FieldWorkPanel({
         </span>
       </div>
 
-      {services.length === 0 ? (
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">
+          No se pudieron cargar los servicios de la cuadrilla: {loadError}
+        </div>
+      )}
+
+      {services.length === 0 && !loadError ? (
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-center text-sm text-[var(--color-text-secondary)]">
           No hay servicios asignados para su cuadrilla en este turno.
         </div>

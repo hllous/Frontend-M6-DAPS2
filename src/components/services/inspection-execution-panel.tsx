@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { NetworkFailureError } from "@/lib/authenticated-fetch";
 import {
+  ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS,
   environmentalInspectionCompleteInputSchema,
   environmentalInspectionOutcomeSchema,
   environmentalInspectionSeveritySchema,
@@ -37,6 +38,7 @@ import {
 } from "@/lib/field-drafts";
 import { servicesAdapter, ServiceRequestError, type Service } from "@/lib/services";
 import { DraftConflictView } from "./draft-conflict-view";
+import { ZoneExecutionPanel } from "./zone-execution-panel";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type QueuedEvidenceFile = {
@@ -55,11 +57,6 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const ACCEPTED_FILE_TYPES = "image/jpeg,image/png,image/webp,application/pdf";
 
-const OUTCOME_LABELS: Record<EnvironmentalInspectionCompleteInput["outcome"], string> = {
-  NO_VIOLATION: "Sin infracción",
-  VIOLATION_FOUND: "Infracción constatada",
-  INCONCLUSIVE: "Inconclusa",
-};
 
 const NEXT_STEP_LABELS: Record<NonNullable<EnvironmentalInspection["nextStep"]>, string> = {
   NOTICE_TO_BE_ISSUED: "Aviso a emitir por Oficina",
@@ -268,7 +265,7 @@ export function InspectionExecutionPanel({
       if (action.kind === "success") {
         setInspection(action.result);
         setComposedAgainst(null);
-        setSuccessMessage(`Inspección registrada: ${OUTCOME_LABELS[action.result.outcome ?? "INCONCLUSIVE"]}. Siguiente paso: ${action.result.nextStep ? NEXT_STEP_LABELS[action.result.nextStep] : "pendiente de confirmación"}.`);
+        setSuccessMessage(`Inspección registrada: ${ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS[action.result.outcome ?? "INCONCLUSIVE"]}. Siguiente paso: ${action.result.nextStep ? NEXT_STEP_LABELS[action.result.nextStep] : "pendiente de confirmación"}.`);
         const updatedService = await servicesAdapter.get(service.id).catch(() => null);
         if (updatedService) onServiceUpdated?.(updatedService);
       } else if (action.kind === "draft-saved") {
@@ -319,7 +316,7 @@ export function InspectionExecutionPanel({
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-action)]"><FileCheck aria-hidden />Control ambiental</div>
           <h2 id={`inspection-execution-heading-${inputId}`} className="mt-1 text-lg font-bold text-[var(--color-text)]">Ejecución de inspección ambiental</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · Checklist {inspection.checklistVersion ?? "—"} · {inspection.scheduledDate ?? inspection.inspectedAt ?? "—"}</p>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · Checklist {inspection.checklistVersion ?? "—"} · {service.scheduledDate.slice(0, 10)} · {service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "—"}</p>
         </div>
         <span className="rounded-lg bg-[var(--color-info-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-info)]">Punto asignado</span>
       </div>
@@ -345,7 +342,7 @@ export function InspectionExecutionPanel({
             <Field>
               <FieldLabel htmlFor={`${inputId}-outcome`}>Resultado de la inspección <span aria-hidden="true">*</span></FieldLabel>
               <select id={`${inputId}-outcome`} value={outcome} onChange={(event) => setOutcome(environmentalInspectionOutcomeSchema.parse(event.target.value))} disabled={!canExecute || isSubmitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-describedby={`${inputId}-outcome-help`}>
-                {environmentalInspectionOutcomeSchema.options.map((value) => <option key={value} value={value}>{OUTCOME_LABELS[value]}</option>)}
+                {environmentalInspectionOutcomeSchema.options.map((value) => <option key={value} value={value}>{ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS[value]}</option>)}
               </select>
               <FieldDescription id={`${inputId}-outcome-help`}>Seleccione el resultado que refleja la visita realizada.</FieldDescription>
             </Field>
@@ -379,6 +376,8 @@ export function InspectionExecutionPanel({
 
       {successMessage && <Alert className="mt-4" role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Inspección completada</AlertTitle><AlertDescription>{successMessage}</AlertDescription></Alert>}
 
+      {completed && <ServiceClosureGuide service={service} canExecute={canExecute} onServiceUpdated={onServiceUpdated} />}
+
       <Dialog open={Boolean(conflict)} onOpenChange={(open) => { if (!open) setConflict(null); }}>
         <DialogContent className="max-w-lg border-[var(--color-border)] bg-[var(--color-surface)]">
           <DialogHeader><DialogTitle>Conflicto de sincronización</DialogTitle><DialogDescription>No se aplicó el borrador local automáticamente.</DialogDescription></DialogHeader>
@@ -391,7 +390,21 @@ export function InspectionExecutionPanel({
 
 function InspectionResult({ inspection }: { inspection: EnvironmentalInspection }) {
   const outcome = inspection.outcome ?? "INCONCLUSIVE";
-  return <div className="mt-5 flex flex-col gap-4"><Alert role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Resultado registrado: {OUTCOME_LABELS[outcome]}</AlertTitle><AlertDescription>El servidor registró la inspección. Siguiente paso: {inspection.nextStep ? NEXT_STEP_LABELS[inspection.nextStep] : "pendiente de confirmación"}.</AlertDescription></Alert><dl className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Checklist</dt><dd className="mt-1 text-[var(--color-text)]">{inspectionChecklist(inspection).length} controles registrados</dd></div>{inspection.findings && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Hallazgos registrados</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.findings}</dd></div>}{inspection.attachments && inspection.attachments.length > 0 && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Evidencia</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.attachments.length} archivo(s) asociado(s)</dd></div>}</dl></div>;
+  return <div className="mt-5 flex flex-col gap-4"><Alert role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Resultado registrado: {ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS[outcome]}</AlertTitle><AlertDescription>El servidor registró la inspección. Siguiente paso: {inspection.nextStep ? NEXT_STEP_LABELS[inspection.nextStep] : "pendiente de confirmación"}.</AlertDescription></Alert><dl className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Checklist</dt><dd className="mt-1 text-[var(--color-text)]">{inspectionChecklist(inspection).length} controles registrados</dd></div>{inspection.conclusion && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Conclusión</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.conclusion}</dd></div>}{inspection.findings && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Hallazgos registrados</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.findings}</dd></div>}{inspection.violationType && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Tipo de infracción</dt><dd className="mt-1 text-[var(--color-text)]">{VIOLATION_TYPE_LABELS[inspection.violationType]}</dd></div>}{inspection.severity && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Gravedad</dt><dd className="mt-1 text-[var(--color-text)]">{SEVERITY_LABELS[inspection.severity]}</dd></div>}{inspection.suggestedAction && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Acción sugerida</dt><dd className="mt-1 text-[var(--color-text)]">{SUGGESTED_ACTION_LABELS[inspection.suggestedAction]}</dd></div>}{inspection.attachments && inspection.attachments.length > 0 && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Evidencia</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.attachments.length} archivo(s) asociado(s)</dd></div>}</dl></div>;
+}
+
+/**
+ * Completar la inspección no cierra el Servicio POINT: queda IN_PROGRESS hasta que la
+ * cuadrilla registra el resultado por zona y lo completa, como cualquier servicio.
+ * No hay cierre automático; esto sólo lleva a ese flujo.
+ */
+function ServiceClosureGuide({ service, canExecute, onServiceUpdated }: { service: Service; canExecute: boolean; onServiceUpdated?: (updated: Service) => void }) {
+  if (service.status !== "IN_PROGRESS" && service.status !== "COMPLETED" && service.status !== "PARTIALLY_COMPLETED") return null;
+  const open = service.status === "IN_PROGRESS";
+  return <>
+    <Alert className="mt-4" role="status" aria-label={open ? "El servicio sigue abierto" : "Servicio cerrado"}>{open ? <AlertTriangle aria-hidden /> : <CheckCircle2 aria-hidden />}<AlertTitle>{open ? "El servicio sigue abierto" : "Servicio cerrado"}</AlertTitle><AlertDescription>{open ? `La inspección quedó registrada, pero ${service.id} sigue en curso. ${canExecute ? "Registre el resultado de la zona y complete el servicio para cerrarlo." : "La cuadrilla asignada tiene que registrar el resultado de la zona y completarlo."}` : `${service.id} quedó cerrado con el resultado por zona.`}</AlertDescription></Alert>
+    <ZoneExecutionPanel service={service} canExecute={canExecute} onServiceUpdated={onServiceUpdated} />
+  </>;
 }
 
 function ReadOnlyInspection({ inspection }: { inspection: EnvironmentalInspection }) {

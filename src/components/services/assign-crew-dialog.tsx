@@ -10,6 +10,7 @@ import {
   Info,
   Loader2,
   MapPin,
+  RefreshCw,
   Route,
   Truck,
   Users,
@@ -25,15 +26,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { crewsAdapter, type Crew } from "@/lib/crews";
 import {
   checkAssignmentConflicts,
-  CREW_CATALOG,
-  SERVICE_TYPE_CATALOG,
+  OVERRIDE_NOTE_MAX,
+  OVERRIDE_NOTE_MIN,
   servicesAdapter,
+  ServiceRequestError,
   type Service,
-  VEHICLE_CATALOG,
 } from "@/lib/services";
 import { serviceTypesAdapter } from "@/lib/service-types";
+import { vehiclesAdapter, type Vehicle } from "@/lib/vehicles";
 import { cn } from "@/lib/utils";
 
 interface AssignCrewDialogProps {
@@ -83,27 +86,54 @@ function AssignCrewForm({
 
   const [crewId, setCrewId] = useState<string>(() => service.crewId ?? "");
   const [vehicleId, setVehicleId] = useState<string>(() => service.vehicleId ?? "");
+  const [overrideNote, setOverrideNote] = useState("");
+  // El backend puede ver un solapamiento que la lista cargada en pantalla no muestra: su 409 también pide la justificación.
+  const [backendConflict, setBackendConflict] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Derive service type requirements. The fixture catalog resolves the mock ids;
-  // against the real backend the id is a UUID, so the adapter's answer wins once it loads.
-  const [requiresVehicle, setRequiresVehicle] = useState<boolean>(() =>
-    Boolean(SERVICE_TYPE_CATALOG.find((t) => t.id === service.serviceTypeId)?.requiresVehicle),
-  );
+  // Cuadrillas, vehículos y requiresVehicle salen del backend: sin ellos no se puede confirmar.
+  const [resources, setResources] = useState<
+    | { status: "loading" }
+    | { status: "error"; message: string }
+    | { status: "ready"; crews: Crew[]; vehicles: Vehicle[]; requiresVehicle: boolean }
+  >({ status: "loading" });
+  const [loadVersion, setLoadVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
-    serviceTypesAdapter
-      .get(service.serviceTypeId)
-      .then((type) => {
-        if (active) setRequiresVehicle(type.requiresVehicle);
+    Promise.all([
+      crewsAdapter.list({ active: true, pageSize: 100 }),
+      vehiclesAdapter.list({ active: true, pageSize: 100 }),
+      serviceTypesAdapter.get(service.serviceTypeId),
+    ])
+      .then(([crewsPage, vehiclesPage, type]) => {
+        if (active) {
+          setResources({
+            status: "ready",
+            crews: crewsPage.crews,
+            vehicles: vehiclesPage.vehicles,
+            requiresVehicle: type.requiresVehicle,
+          });
+        }
       })
-      .catch(() => undefined);
+      .catch((cause: unknown) => {
+        if (active) {
+          setResources({
+            status: "error",
+            message: cause instanceof Error ? cause.message : "No se pudieron cargar los datos de la asignación.",
+          });
+        }
+      });
     return () => {
       active = false;
     };
-  }, [service.serviceTypeId]);
+  }, [service.serviceTypeId, loadVersion]);
+
+  const ready = resources.status === "ready";
+  const requiresVehicle = ready && resources.requiresVehicle;
+  const crews = ready ? resources.crews : [];
+  const vehicles = ready ? resources.vehicles : [];
 
   // Compute double-booking conflicts reactively
   const conflicts = useMemo(() => {
@@ -114,12 +144,13 @@ function AssignCrewForm({
       allServices,
     });
   }, [service, crewId, vehicleId, allServices]);
+  const needsOverrideNote = Boolean(conflicts.crewConflict || conflicts.vehicleConflict || backendConflict);
 
   if (!service) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!service) return;
+    if (!service || !ready) return;
 
     if (!crewId) {
       setErrorMessage("Debe seleccionar una cuadrilla asignada.");
@@ -133,6 +164,13 @@ function AssignCrewForm({
       return;
     }
 
+    if (needsOverrideNote && overrideNote.trim().length < OVERRIDE_NOTE_MIN) {
+      setErrorMessage(
+        `Hay un solapamiento: justifique la asignación en al menos ${OVERRIDE_NOTE_MIN} caracteres.`,
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -140,10 +178,15 @@ function AssignCrewForm({
       const updated = await servicesAdapter.assignCrew(service.id, {
         crewId,
         vehicleId: vehicleId ? vehicleId : null,
+        ...(needsOverrideNote && { overrideNote: overrideNote.trim() }),
       });
       onAssigned(updated);
       onOpenChange(false);
     } catch (cause) {
+      if (cause instanceof ServiceRequestError && cause.status === 409 && !needsOverrideNote) {
+        setBackendConflict(cause.message);
+        return;
+      }
       const msg =
         cause instanceof Error
           ? cause.message
@@ -154,8 +197,8 @@ function AssignCrewForm({
     }
   }
 
-  const selectedCrew = CREW_CATALOG.find((c) => c.id === crewId);
-  const selectedVehicle = VEHICLE_CATALOG.find((v) => v.id === vehicleId);
+  const selectedCrew = crews.find((c) => c.id === crewId);
+  const selectedVehicle = vehicles.find((v) => v.id === vehicleId);
 
   return (
     <>
@@ -202,7 +245,7 @@ function AssignCrewForm({
 
             {/* Vehicle Requirement Indicator */}
             <div className="shrink-0">
-              {requiresVehicle ? (
+              {!ready ? null : requiresVehicle ? (
                 <span className="inline-flex items-center gap-1 rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-warning)]">
                   <Truck className="h-3.5 w-3.5" aria-hidden />
                   Vehículo obligatorio
@@ -240,6 +283,37 @@ function AssignCrewForm({
             </div>
           )}
 
+          {resources.status === "loading" && (
+            <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]" role="status">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              <span>Cargando cuadrillas, vehículos y requisitos del tipo de servicio…</span>
+            </div>
+          )}
+
+          {resources.status === "error" && (
+            <div className="flex flex-col gap-2 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-xs text-[var(--color-danger)]" role="alert">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+                <div className="font-semibold">
+                  No se pudieron cargar los datos para asignar: {resources.message}
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="self-start text-xs gap-1.5"
+                onClick={() => {
+                  setResources({ status: "loading" });
+                  setLoadVersion((version) => version + 1);
+                }}
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                Reintentar
+              </Button>
+            </div>
+          )}
+
           <FieldGroup className="space-y-4">
             {/* Field: Crew */}
             <Field>
@@ -251,16 +325,18 @@ function AssignCrewForm({
                 value={crewId}
                 onChange={(e) => {
                   setCrewId(e.target.value);
+                  setBackendConflict(null);
                   setErrorMessage(null);
                 }}
+                disabled={!ready}
                 required
                 aria-describedby={`${formId}-crew-desc`}
                 className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               >
                 <option value="">Seleccione una cuadrilla…</option>
-                {CREW_CATALOG.map((c) => (
+                {crews.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.defaultShift})
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -284,8 +360,10 @@ function AssignCrewForm({
                 value={vehicleId}
                 onChange={(e) => {
                   setVehicleId(e.target.value);
+                  setBackendConflict(null);
                   setErrorMessage(null);
                 }}
+                disabled={!ready}
                 aria-describedby={`${formId}-vehicle-desc`}
                 className={cn(
                   "w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]",
@@ -295,9 +373,9 @@ function AssignCrewForm({
                 <option value="">
                   {requiresVehicle ? "Seleccione un vehículo requerido…" : "Sin vehículo asignado"}
                 </option>
-                {VEHICLE_CATALOG.map((v) => (
+                {vehicles.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.plate} — {v.model ?? v.vehicleType}
+                    {v.plate}
                   </option>
                 ))}
               </select>
@@ -310,7 +388,7 @@ function AssignCrewForm({
           </FieldGroup>
 
           {/* Double-booking non-authoritative warning banner */}
-          {(conflicts.crewConflict || conflicts.vehicleConflict) && (
+          {needsOverrideNote && (
             <div
               className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/60 p-4 space-y-2 text-xs text-[var(--color-warning)]"
               role="status"
@@ -318,7 +396,7 @@ function AssignCrewForm({
             >
               <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-[var(--color-warning)]">
                 <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-                <span>Aviso de superposición horaria (no bloqueante)</span>
+                <span>Aviso de superposición horaria</span>
               </div>
 
               {conflicts.crewConflict && (
@@ -328,6 +406,10 @@ function AssignCrewForm({
                   <strong>{conflicts.crewConflict.id}</strong> (&quot;{conflicts.crewConflict.title}&quot;) en la misma fecha (
                   {conflicts.crewConflict.scheduledDate} {conflicts.crewConflict.windowFrom ?? ""}&ndash;{conflicts.crewConflict.windowTo ?? ""}).
                 </p>
+              )}
+
+              {backendConflict && !conflicts.crewConflict && !conflicts.vehicleConflict && (
+                <p className="leading-relaxed">{backendConflict}</p>
               )}
 
               {conflicts.vehicleConflict && (
@@ -342,10 +424,34 @@ function AssignCrewForm({
               <div className="flex items-center gap-1.5 pt-1 text-[11px] font-medium text-[var(--color-text-secondary)] border-t border-[var(--color-warning-line)]/50">
                 <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 <span>
-                  Aviso no bloqueante: la normativa operativa permite confirmar la asignación sin restricción técnica. No se requiere justificación ni nota de anulación.
+                  Se puede asignar igual, pero hay que justificar por qué: la justificación queda registrada con la asignación.
                 </span>
               </div>
             </div>
+          )}
+
+          {needsOverrideNote && (
+            <Field>
+              <FieldLabel htmlFor={`${formId}-override-note`}>
+                Justificación del solapamiento <span className="text-[var(--color-danger)]" aria-hidden>*</span>
+              </FieldLabel>
+              <textarea
+                id={`${formId}-override-note`}
+                value={overrideNote}
+                onChange={(e) => {
+                  setOverrideNote(e.target.value);
+                  setErrorMessage(null);
+                }}
+                required
+                maxLength={OVERRIDE_NOTE_MAX}
+                rows={3}
+                aria-describedby={`${formId}-override-note-desc`}
+                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+              />
+              <FieldDescription id={`${formId}-override-note-desc`}>
+                Entre {OVERRIDE_NOTE_MIN} y {OVERRIDE_NOTE_MAX} caracteres. Ej.: la otra parada termina antes; se coordinó con el jefe de cuadrilla.
+              </FieldDescription>
+            </Field>
           )}
 
           <DialogFooter className="border-t border-[var(--color-border)] pt-4 gap-2 sm:justify-end">
@@ -364,7 +470,7 @@ function AssignCrewForm({
               form={formId}
               variant="default"
               size="sm"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !ready}
               className="text-xs font-semibold gap-1.5"
             >
               {isSubmitting ? (
