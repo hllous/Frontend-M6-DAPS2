@@ -54,8 +54,17 @@ export function filterServiceFrequencyFixtures(query: ServiceFrequencyQuery): Se
 export function paginateServiceFrequencyFixtures(items: ServiceFrequency[], page = 1, pageSize = 20) {
   const start = (page - 1) * pageSize;
   return {
-    data: items.slice(start, start + pageSize),
+    data: items.slice(start, start + pageSize).map(serviceFrequencyResponseFixture),
     meta: { total: items.length, page, pageSize, totalPages: Math.max(1, Math.ceil(items.length / pageSize)) },
+  };
+}
+
+// Replica la serialización de Date del backend sin alterar el estado del mock.
+export function serviceFrequencyResponseFixture(item: ServiceFrequency) {
+  return {
+    ...item,
+    validFrom: `${item.validFrom}T00:00:00.000Z`,
+    validTo: item.validTo === null ? null : `${item.validTo}T00:00:00.000Z`,
   };
 }
 
