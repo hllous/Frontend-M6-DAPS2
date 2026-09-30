@@ -83,16 +83,35 @@ export async function GET(request: Request) {
   try {
     const { session, scenario } = sessionAndScenario(request);
     const query = queryFromUrl(new URL(request.url));
+    const useBackend = session.mode === "backend-development" && Boolean(process.env.M6_BACKEND_ORIGIN);
 
     if (scenario.actor.kind === "FIELD") {
-      if (!query.detectedInId || !fieldCanAccessSource(scenario, query.detectedInId)) {
+      if (!query.detectedInId) {
+        return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
+      }
+      if (useBackend) {
+        if (!session.crew?.id) {
+          return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
+        }
+        const serviceResponse = await fetchBackend(request, `/services/${encodeURIComponent(query.detectedInId)}`);
+        if (!serviceResponse.ok) {
+          return new NextResponse(await serviceResponse.text(), {
+            status: serviceResponse.status,
+            headers: { "content-type": serviceResponse.headers.get("content-type") ?? "application/json" },
+          });
+        }
+        const service = await serviceResponse.json();
+        if (service?.crewId !== session.crew.id) {
+          return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
+        }
+      } else if (!fieldCanAccessSource(scenario, query.detectedInId)) {
         return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
       }
     } else if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, "Solo Oficina o Campo puede consultar derivaciones.", path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (useBackend) {
       const backendResponse = await fetchBackend(request, `/repair-requests${new URL(request.url).search}`);
       return new NextResponse(await backendResponse.text(), {
         status: backendResponse.status,
