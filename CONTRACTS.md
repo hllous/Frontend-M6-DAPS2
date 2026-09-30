@@ -1,12 +1,10 @@
-# M6 Frontend Contract Hypotheses
+# M6 Frontend API Contracts and Known Gaps
 
-This document started when no M6 backend endpoint existed. **Backend has since finished all seven phases of its plan** — 130 routes across 23 Swagger tags as of `develop` commit `f497d6c` (mirrored 2026-09-04 in [`docs/backend-context/api/endpoints.md`](docs/backend-context/api/endpoints.md)). What remains a hypothesis here is narrower than it was: the request-side conventions Backend never documented, the capability names, the M1 identity fields M1 itself hasn't published, and the client-side rules the frontend enforces on top of a permissive backend. Endpoint shapes are now checkable against a real implementation. See [ADR-0003](docs/adr/0003-hand-written-contract-hypotheses-with-permanent-zod-validation.md) for why the hand-written-plus-Zod approach was chosen over waiting, and why the Zod layer stays even now.
-
-Every row below is `hypothesis` until marked `confirmed`, with a link to the Backend doc or source that confirmed it. A row still marked `hypothesis` is what the frontend is built to expect, not a claim about how the backend works.
+This document describes the API behavior the frontend consumes, the frontend-only rules layered on top, and the remaining contract hypotheses. Backend's seven implementation phases are complete; the current mirror records `develop` commit `eda505f` (2026-09-30), with 130 routes across 23 Swagger tags. See [`docs/backend-context/api/endpoints.md`](docs/backend-context/api/endpoints.md) and [`docs/backend-context/`](docs/backend-context/README.md). Endpoint details marked **confirmed** come from that mirror and Backend's implementation; **hypothesis** means the wire contract or external integration is still unconfirmed. See [ADR-0003](docs/adr/0003-hand-written-contract-hypotheses-with-permanent-zod-validation.md) for why the project retains handwritten schemas and runtime Zod validation.
 
 ## Anchor: Backend's own documented standard
 
-`docs/backend-context/api/estandar-swagger.md` is Backend's own team-approved API standard (read-only mirror, refreshed 2026-09-04 from `develop` commit `f497d6c`). Every endpoint Backend shipped follows it, so this document adopts it verbatim rather than inventing a competing shape:
+[`docs/backend-context/api/estandar-swagger.md`](docs/backend-context/api/estandar-swagger.md) is Backend's API standard, copied from `develop` commit `eda505f`. This document adopts it rather than inventing a competing shape:
 
 - **Success**: bare resource object (or array) on the wire, never wrapped in `{ data: ... }`.
 - **Paginated lists**: `{ data: T[], meta: { total, page, pageSize, totalPages } }`.
@@ -16,11 +14,11 @@ Every row below is `hypothesis` until marked `confirmed`, with a link to the Bac
 
 ## Identity and session boundary with M1
 
-**Confirmed decision (2026-09-01): M1 issues the user JWT; M6 validates it.** M6 does not issue a replacement user token. M1's v2 document also declares `POST /api/v1/auth/login`, `POST /api/v1/auth/empleados/login`, `POST /api/v1/auth/refresh`, and `POST /api/v1/auth/logout`; login and refresh return the access token in `Authorization: Bearer`, with the refresh token in `X-Refresh-Token` on login and the token lifetime in `X-Token-Expires-In`.
+**Decision:** M1 issues the user JWT; M6 validates it. M6 does not issue a replacement user token. M1's v2 document declares `POST /api/v1/auth/login`, `POST /api/v1/auth/empleados/login`, `POST /api/v1/auth/refresh`, and `POST /api/v1/auth/logout`; login and refresh return the access token in `Authorization: Bearer`, with the refresh token in `X-Refresh-Token` on login and the token lifetime in `X-Token-Expires-In`.
 
-This is not yet a complete verification contract. M1 still has to publish `alg`, `iss`, `aud`, signing-key/JWKS distribution, mandatory JWT claims, exact TTLs, refresh request body and rotation/revocation behavior. Treat every missing field as **hypothesis**, not as an implementation detail to invent.
+This is not yet a complete verification contract. M1 still has to publish `alg`, `iss`, `aud`, signing-key/JWKS distribution, mandatory JWT claims, exact TTLs, refresh request body and rotation/revocation behavior. Treat every missing field as **hypothesis**, not as an implementation detail to invent. The current frontend has `mock` and `backend-development` modes; `real-m1` deliberately fails closed. It does not yet log in to M1.
 
-The browser talks only to the Next.js BFF. The BFF talks only to M6 Backend; M6 Backend owns the server-to-server adapter to M1 for login, refresh and logout, and independently validates the M1 token for domain requests. The original M1 access token is stored in the sealed, `httpOnly` BFF session cookie; only BFF server code can unseal it and forward it as Bearer to M6 Backend. It never reaches browser JavaScript. M6 currently has no domain use case that consumes M1's citizen, organization or representation events/endpoints. If one appears, it is introduced behind a typed identity-directory adapter, so REST and Kafka request/response remain swappable transports.
+The browser talks only to same-origin Next.js Route Handlers. In `backend-development` mode those handlers read the sealed session cookie and call M6 Backend server-side with `M6_DEV_JWT` as Bearer; `M6_BACKEND_ORIGIN` is never exposed to browser code. The real M1 token flow described by the architecture decision is not implemented yet. M6 currently has no domain use case that consumes M1's citizen, organization or representation events/endpoints. If one appears, it is introduced behind a typed identity-directory adapter, so REST and Kafka request/response remain swappable transports.
 
 ## Request conventions (mostly confirmed)
 
@@ -32,11 +30,11 @@ Backend's written standard fixes response shapes and says nothing about request 
 
 ## Business-rule error discriminability (confirmed gap)
 
-Backend's `ErrorResponseDto` (`src/common/dto/error-response.dto.ts`) carries `statusCode`, `message`, `error`, `timestamp`, `path` — a free-text `message` and **no machine-readable discriminator**. That's still true with Backend's plan closed, so it is no longer a "wait and see" but a standing gap. M6 wanted to tell a *blocking* 409 (a Service state-machine violation) apart from a *warning-with-override* 409 (crew double-booking, overridable with a note — see #10); the second case doesn't exist server-side anyway (`AssignCrewDto` has no double-booking check at all), so nothing is currently blocked by this. The `code` field (`SCREAMING_SNAKE_CASE`, e.g. `INVALID_STATE_TRANSITION`) stays the proposed fix if a real need appears — raise it as a Backend issue rather than parsing `message` strings, which would break on any wording change.
+Backend's `ErrorResponseDto` carries `statusCode`, `message`, `error`, `timestamp`, and `path` — a free-text `message` and **no machine-readable discriminator**. That remains a standing gap. M6 wanted to distinguish a blocking 409 (a Service state-machine violation) from a warning-with-override 409 (crew double-booking, overridable with a note — see #10); the second case does not exist server-side (`AssignCrewDto` has no double-booking check), so the frontend must not promise an override. A `code` field (`SCREAMING_SNAKE_CASE`, e.g. `INVALID_STATE_TRANSITION`) remains a possible fix if a real need appears; report it to Backend rather than parsing message strings.
 
-## Concurrency / staleness detection (hypothesis)
+## Concurrency / staleness (known limitation)
 
-Relevant to Service reschedule/cancel and the local-draft conflict behavior in [ADR-0001](docs/adr/0001-no-offline-queue-for-field-service-actions.md). The frontend compares the `updatedAt` it last read for a resource against the server's current `updatedAt` before submitting a mutation, as an optimistic client-side pre-check — no new backend field needed, since every resource already carries `updatedAt` per Backend's own DTO example. This is advisory only: the backend's 409 at submit time is the authoritative backstop regardless of what the client's pre-check found.
+For a local Field draft, the frontend fetches the Service again and compares its `updatedAt` with the snapshot the draft was composed against before offering manual resubmission; a mismatch is shown as a conflict per [ADR-0001](docs/adr/0001-no-offline-queue-for-field-service-actions.md). This catches changes seen by that fresh read, but Backend does not compare a caller's version or provide an atomic concurrent-write guard. A 409 may reject an invalid current state; it is not a guaranteed stale-write check, and a change can still land between the frontend read and mutation. Route stop-sequence editing has the same advisory-only limit.
 
 ## Evidence / upload contract (confirmed)
 
@@ -46,24 +44,23 @@ Backend shipped this as **one generic endpoint**, not a per-resource sub-route �
 - `GET /evidence?ownerType=&ownerId=` — every attachment on that resource, oldest-to-newest. Returns a bare array, not a paginated envelope.
 - **`ownerType` is a closed set of four**: `SERVICE`, `ZONE_RESULT`, `INSPECTION`, `CONTAINER`. Trees, tree surveys and tree interventions are **not** valid owners — the tree-side evidence rows below stay gaps for that reason, not because the upload path is missing.
 - `ownerId` must reference an already-existing resource; 404 otherwise. So evidence is always attached *after* the owner is created, never in the same call.
-- **`Idempotency-Key` header is required** (a client-minted UUID, one per upload attempt). The same key re-sent for the same owner returns the existing `Attachment` instead of re-uploading, backed by a unique DB constraint on (`ownerType`, `ownerId`, `idempotencyKey`) — a real guarantee, not a pre-check that could lose a race. This is exactly the retryable-upload shape ADR-0001 assumed; retry is per-upload, not a general offline queue.
-- **Accepted types**: `image/jpeg`, `image/png`, `image/webp`, `application/pdf`. **Max 10 MB** per file; 400 on either violation. The frontend enforces both client-side before submitting.
-- `filename` in the response is the **sanitized original upload name**. Backend strips path components, control characters, leading dots and excessive length, and forces the extension implied by the validated MIME type. Keep the user's selected name locally for a draft/progress row; after upload, the response filename is the canonical display name.
-- Backend validates the **actual file content** by inspecting its signature (magic bytes), not only the declared MIME type. A MIME/content mismatch or a file over 10 MB returns 400.
-- JPEG, PNG and WebP metadata is stripped before storage. PDFs are accepted but currently pass through unsanitized. Malware scanning is not available yet; frontend controls remain defense in depth.
-- The stored size is the size of the processed file after image metadata removal. The response contract is unchanged and does not expose that size: `{ id, url, filename, contentType, uploadedAt }`.
+- **`Idempotency-Key` header is required** (documented as a client-minted UUID, one per upload attempt). The service checks that the header is non-empty; it does not validate UUID format. Sequential reuse for the same owner returns the existing `Attachment`, and a unique DB constraint on (`ownerType`, `ownerId`, `idempotencyKey`) prevents duplicate attachment rows. In a simultaneous-request race, both files may reach R2 before one insert loses the uniqueness race, so the guarantee is record-level idempotency, not an atomic storage transaction. This is the retryable-upload shape ADR-0001 assumes; retry is per-upload, not a general offline queue.
+- **Accepted declared types**: `image/jpeg`, `image/png`, `image/webp`, `application/pdf`. **Max 10 MB** per file. Backend checks the MIME value supplied by Multer and the file size; it does not inspect magic bytes, so this is not a guarantee that the contents match the declared type.
+- Backend generates `filename` as a random UUID plus the extension selected from the declared MIME type. It does not preserve or sanitize the original filename. The response is `{ id, url, filename, contentType, uploadedAt }`.
+- Backend stores the uploaded bytes as received. It does not currently strip JPEG/PNG/WebP metadata or scan for malware. PDFs also pass through unchanged. Frontend checks are defense in depth, not a security boundary. These server-side controls remain release requirements under Backend issue #90 and [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md).
+- `size` records the uploaded file size; it is not returned in the response.
 - An exception outcome still carries an **array** of evidence refs, not a single one ("reason + note, photo where feasible" doesn't cap the count — see the `Evidence` term in `CONTEXT.md`). With a one-file-per-call endpoint, that means N sequential uploads, each with its own idempotency key.
 - Storage is Cloudflare R2 (S3-compatible, public bucket); `url` is directly renderable.
 
 ## Adapter seam (pattern, applies to every resource)
 
-Each resource gets a typed adapter object, consumed by TanStack Query hooks — never called directly from components:
+Each resource gets a typed adapter object. Browser-facing adapters call the same-origin BFF Route Handlers; components do not call M6 Backend directly:
 
 - Plain CRUD methods: `list(query)`, `get(id)`, `create(input)`.
 - One method per backend action-endpoint, named after the action: `assign`, `start`, `suspend`, `resume`, `cancel`, `reschedule`, etc. — mirroring Backend's `POST /resource/:id/verb` convention.
 - Every method parses its response through the resource's Zod schema before returning. A contract violation throws immediately, at the adapter boundary, rather than reaching the UI as untyped or malformed data.
-- Auth header attachment is a stub at this layer (`getToken()` injected from the BFF session, never from browser storage) — resolved in full by the authentication/session ticket.
-- **Replacement boundary** (ADR-0003): when Backend's OpenAPI ships, only the adapter's internals change — the fetch call, and where the Zod schema's shape comes from. Method signatures and inferred TS types stay stable, so UI and query-hook code never needs to change. The Zod validation layer itself stays permanently, even after a generated client exists.
+- The BFF reads the session cookie, checks the frontend capability for UI-level access, and attaches the server-held bearer token when forwarding to Backend. The raw token is never read from browser storage.
+- **Replacement boundary** (ADR-0003): Backend serves Swagger/OpenAPI at `/api/docs`, but the project has no versioned generated client. The handwritten Zod schemas remain the runtime boundary; when a published schema is adopted, replace adapter internals without weakening validation or changing view-level types unnecessarily.
 
 ## Naming conventions
 
@@ -82,7 +79,7 @@ One MSW handler set and fixture collection, reused across unit tests, Storybook,
 
 ## Capability annotations
 
-Each action endpoint below notes the capability it requires (from [#8](https://github.com/hllous/Frontend-M6-DAPS2/issues/8)'s capability model), the same way Backend's own standard notes required roles in each endpoint's description.
+Each action endpoint below notes the frontend Capability associated with it (from [#8](https://github.com/hllous/Frontend-M6-DAPS2/issues/8)). These are not Backend role requirements: the current backend does not apply domain `@Roles()` restrictions, and M1's claims-to-Capability mapping remains unconfirmed.
 
 ## Worked example: Service
 
@@ -91,7 +88,7 @@ Drawn directly from [#10](https://github.com/hllous/Frontend-M6-DAPS2/issues/10)
 | Endpoint | Capability | Purpose | Status |
 |---|---|---|---|
 | `POST /services` | `service:schedule` | Create — generic `PLANNED`/`MANUAL` form, or linked-create prefilled from a `TICKET`/`INSPECTION`/`WEATHER_ALERT` reference. `mode` is copied from the `ServiceType`, never chosen directly | confirmed shape, [endpoints.md](docs/backend-context/api/endpoints.md) |
-| `GET /services` | — (scoped by actor per #8) | List — paginated, filterable (`status`, `serviceTypeId`, `mode`, `origin`, `crewId`, `vehicleId`, `zoneId`, `ticketId`, `scheduledFrom`, `scheduledTo`), sortable | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /services` | — (scoped by actor per #8) | List — paginated and filterable (`status`, `serviceTypeId`, `mode`, `origin`, `crewId`, `vehicleId`, `zoneId`, `ticketId`, `scheduledFrom`, `scheduledTo`). Backend fixes the sort order; it does not expose client-controlled sorting. | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
 | `GET /services/:id` | — (scoped by actor per #8) | Detail, with zones, ZoneResults and CollectionRecords | confirmed |
 | `POST /services/:id/assign-crew` | `service:assign` | Attach crew + vehicle to an already-scheduled Service; accepts `overrideNote` when double-booked | **gap identified** — real `AssignCrewDto` has only `crewId`/`vehicleId`, no `overrideNote` field, no server-side double-booking check |
 | `POST /services/:id/start` | Crew Leader of the assigned crew | Only the assigned crew; allowed outside window (flagged, not blocked); 409 without an assigned crew, or without a vehicle if the `ServiceType` requires one | confirmed |
@@ -99,12 +96,12 @@ Drawn directly from [#10](https://github.com/hllous/Frontend-M6-DAPS2/issues/10)
 | `POST /services/:id/complete` | Crew Leader of the assigned crew | Takes **no request body**. 409 if any of the Service's zones (ROUTE's several, or POINT's one) is missing its ZoneResult. `COMPLETED` if every ZoneResult is `SERVICED`, else `PARTIALLY_COMPLETED` — computed server-side, never chosen by the caller | **corrected** — the original hypothesis split this into a separate POINT-only shape; the real backend uses one uniform action for both modes |
 | `POST /services/:id/suspend` | Crew Leader of the assigned crew | `IN_PROGRESS → SUSPENDED`. `reason` required (`StatusChangeDto`) | confirmed |
 | `POST /services/:id/resume` | Crew Leader of the assigned crew | `SUSPENDED → IN_PROGRESS`. Field self-resume for transient causes; clears the prior reason | confirmed |
-| `POST /services/:id/cancel` | `service:cancel` | `SCHEDULED`, `RESCHEDULED` **or** `SUSPENDED` → `CANCELLED`. `reason` required. Not reachable directly from `IN_PROGRESS` — an in-progress Service must be suspended first | **corrected** — cancellation is also valid directly from `RESCHEDULED`; the Office flow must show cancel without inventing a replacement date |
+| `POST /services/:id/cancel` | `service:cancel` | Backend currently accepts `SCHEDULED` or `SUSPENDED` → `CANCELLED`; `reason` is required. It rejects `RESCHEDULED` and direct cancellation from `IN_PROGRESS` with 409. The frontend currently shows a cancel action for `RESCHEDULED`, so that path is a known frontend/backend mismatch. | Backend behavior confirmed; reconcile the workflow with Backend issue #114 before treating cancellation from `RESCHEDULED` as supported |
 | `POST /services/:id/reschedule` + `POST /services/:id/confirm-reschedule` | `service:reschedule` | `SCHEDULED → RESCHEDULED` with `reason`, then `RESCHEDULED → SCHEDULED` with the new date/window via a second call. Preserves the existing `zoneIds` snapshot verbatim — neither call touches it | confirmed (as two calls, not one) |
 | — | Crew Leader of the assigned crew | Delayed notice (field-raised badge: note + revised ETA) | **no real endpoint** — `DELAYED` exists only as an internal, non-persisted fact per `docs/backend-context/entidades/service.md`; nothing in the 130 routes exposes writing one, and Backend has finished its plan, so this is a permanent gap unless it's raised as a change |
 | `POST /evidence` (`ownerType=SERVICE` / `ZONE_RESULT`) | Crew Leader of the assigned crew | Evidence upload, attached by reference to a Service or ZoneResult outcome | **confirmed** — the generic endpoint covers both owner types; see the Evidence/upload section above. Uploaded as a separate call after the outcome record exists, so a mandatory-evidence exception outcome is two calls, not one |
 
-**Corrections against the real backend (`docs/backend-context/`, refreshed 2026-09-04, commit `f497d6c`):** the original table modeled ROUTE and POINT as needing two different completion mechanisms (per-zone ZoneResults vs. a single Service-level outcome). The real backend doesn't draw that line — every Service, POINT included, carries a non-empty `zoneIds[]` and needs a ZoneResult per zone before `POST /services/:id/complete` will succeed; POINT just always has exactly one. Evidence upload is now confirmed against the generic `POST /evidence`. The cancellation state machine also includes `RESCHEDULED → CANCELLED` with a required reason. Delayed notice is the one row with no endpoint left, and since Backend closed its plan it won't get one on its own — it's a change request, not a pending phase. Not reopening #10 over any of this: the actor-facing workflow it resolved (who can do what, when) still holds; only this table's endpoint-level shape needed correcting.
+**Corrections against Backend's implementation (mirror refreshed 2026-09-30 from `develop` commit `eda505f`):** every Service, including POINT, carries a non-empty `zoneIds[]` and needs a ZoneResult for each zone before `POST /services/:id/complete` succeeds; POINT has exactly one zone. Evidence upload uses the generic `POST /evidence`. Backend's current cancel transition accepts `SCHEDULED` and `SUSPENDED`, but not `RESCHEDULED`; the frontend currently exposes that action anyway, so the path can fail with 409 and remains a cross-repo reconciliation item. Delayed notice still has no write endpoint and is outside the shipped backend contract.
 
 ## Worked example: Zones, Routes and Service Frequencies
 
@@ -117,7 +114,7 @@ Drawn from [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36). `Zone` 
 | `GET /zones/:id` | — | Detail, with assigned neighborhoods | confirmed |
 | `PATCH /zones/:id` | `zone:manage` | Update `name`, `active`. `code` is **immutable after creation** | confirmed immutability rule, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
 | `DELETE /zones/:id` | `zone:manage` | Logical delete. Backend performs **no referential check** — a Zone still listed in an active Route's stops, or still carrying Containers/Trees/GreenSpaces, deactivates without complaint | **gap identified** — frontend adds its own warn-but-allow confirmation (lists what still references the Zone) before submitting; backend itself has no guard, see `zones.service.ts` |
-| `POST /zones/:id/neighborhoods` | `zone:manage` | Assign one or more M9 neighborhoods (`neighborhoodIds[]`); duplicates silently ignored | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md) — but the neighborhood **picker itself has no real data source**: M9's neighborhood catalog is an unpublished 🔴 blocker (`docs/backend-context/bloqueantes.md`). Frontend hypothesizes a separate adapter to M9's catalog (search + id→name resolution), mocked via fixtures, same posture as the M1 identity hypothesis |
+| `POST /zones/:id/neighborhoods` | `zone:manage` | Assign one or more M9 neighborhoods (`neighborhoodIds[]`); duplicates silently ignored | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md) — but the neighborhood **picker itself has no real data source**: M9's neighborhood catalog remains unpublished ([Backend integration blockers](https://github.com/hllous/Backend-M6-DAPS2/blob/develop/docs/bloqueantes.md)). Frontend hypothesizes a separate adapter to M9's catalog (search + id→name resolution), mocked via fixtures, same posture as the M1 identity hypothesis |
 | `DELETE /zones/:id/neighborhoods/:neighborhoodId` | `zone:manage` | Remove one neighborhood; 404 if not assigned | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md) |
 | `POST /routes` | `route:manage` | Create — `code`, `name`. Nace sin paradas (no stops) | confirmed route, [endpoints.md](docs/backend-context/api/endpoints.md); capability name is hypothesis |
 | `GET /routes` | — (any authenticated actor; used for Service/ServiceFrequency scheduling forms) | List — paginated, filterable (`active`, `zoneId`, `search`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
@@ -253,14 +250,14 @@ Drawn from [Define the Environmental Control case-file workflow](https://github.
 |---|---|---|---|
 | `POST /environmental-reports` | `environmentalReport:create` | Open a report in `RECEIVED`. M2-origin intake carries `ticketId` and `reporterSnapshot`; an own-initiative detection carries operational location and report details. | confirmed route and initial state, [endpoints.md](docs/backend-context/api/endpoints.md); exact create DTO constraints are not fully exposed in the mirror |
 | `GET /environmental-reports` | `environmentalReport:view` | Paginated list, filterable by `status`, `reportType`, `priority`, `ticketId`, and `search`. Office sees the case queue; Field receives only assigned operational context. | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md); actor scoping is a frontend/backend authorization hypothesis |
-| `GET /environmental-reports/:id` | `environmentalReport:view` | Tier 2 case-file detail: `id`, `reportType`, `address`/`lat`/`lng`, `ticketId`, `status`, `priority`, `deadlineAt`, `createdAt`, and `updatedAt`. `lat`/`lng` are `number \| null`: since M2 contract v1.6 dropped coordinates from its `location` payload, every ticket-originated report (`ticketId` present) now carries `lat: null, lng: null`; only own-initiative (officer-detected) reports carry real coordinates. The UI must never assume coordinates are present — treat `address` as the only guaranteed location signal. M2-owned `escalated` and `citizenResponse` are accepted as late integration data when the read model exposes them; they are not frontend mutations. | confirmed REST response fields and lifecycle against Backend `f497d6c`; `lat`/`lng` nullability confirmed via [issue #191](https://github.com/hllous/Frontend-M6-DAPS2/issues/191) (M2 v1.6 / Backend #128); relationship expansion remains a response-shape gap |
+| `GET /environmental-reports/:id` | `environmentalReport:view` | Tier 2 case-file detail: `id`, `reportType`, `address`/`lat`/`lng`, `ticketId`, `status`, `priority`, `deadlineAt`, `createdAt`, and `updatedAt`. `lat`/`lng` are `number \| null`: ticket-originated reports can have no coordinates, so the UI must treat `address` as the only guaranteed location signal. M2-owned `escalated` and `citizenResponse` are accepted as late integration data when the read model exposes them; they are not frontend mutations. | REST shape confirmed against Backend `eda505f`; `lat`/`lng` nullability confirmed via [issue #191](https://github.com/hllous/Frontend-M6-DAPS2/issues/191) (M2 v1.6 / Backend #128); relationship expansion remains a response-shape gap |
 | `POST /environmental-reports/:id/start-review` | `environmentalReport:review` | `RECEIVED -> UNDER_REVIEW`. Explicit Office action. | confirmed route and transition; capability name is hypothesis |
 | `POST /environmental-reports/:id/forward` | `environmentalReport:review` | `UNDER_REVIEW -> FORWARDED`; if `ticketId` exists, the M2 projection is `RETURNED`, not `REJECTED`. | confirmed route and transition |
 | `POST /environmental-reports/:id/dismiss` | `environmentalReport:review` | `UNDER_REVIEW -> DISMISSED`; if `ticketId` exists, the M2 projection is `REJECTED`. | confirmed route and transition |
 | `POST /environmental-reports/:id/close` | `environmentalReport:close` | Manual close for terminal workflow paths such as `FORWARDED`, `DISMISSED`, `NO_VIOLATION`, or `SANCTIONED`. | confirmed route; exact close preconditions and request body are not documented in the mirror |
 | - (system-driven) | - | `NOTICE_ISSUED -> CLOSED` after `deadlineAt` and `SANCTION_DEADLINE_DAYS`. No frontend CTA or mutation is exposed. | confirmed design; automatic transition has no endpoint |
 
-The frontend preserves all eleven backend statuses and groups them only for presentation. For an existing report, `ESCALATION_CHANGED`, `INFORMATION_PROVIDED`, and `PRIORITY_CHANGED` are accepted even when the report is `CLOSED`; they update the corresponding data without changing lifecycle state. `REOPENED` changes `CLOSED` back to `UNDER_REVIEW` after a fresh read. `SANCTIONED` is terminal and never reopens. Priority is immutable through REST; M2 is the source of late priority changes. `updatedAt` provides row-level freshness only: do not promise `updatedBy`, field-level audit history, or a client-side audit log. This reconciles the frontend decision with [Confirm EnvironmentalReport priority, audit, and late ticketUpdated contract](https://github.com/hllous/Backend-M6-DAPS2/issues/104), whose answer is adopted from Backend `f497d6c`.
+The frontend preserves all eleven backend statuses and groups them only for presentation. For an existing report, `ESCALATION_CHANGED`, `INFORMATION_PROVIDED`, and `PRIORITY_CHANGED` are accepted even when the report is `CLOSED`; they update the corresponding data without changing lifecycle state. `REOPENED` changes `CLOSED` back to `UNDER_REVIEW` after a fresh read. `SANCTIONED` is terminal and never reopens. Priority is immutable through REST; M2 is the source of late priority changes. `updatedAt` provides row-level freshness only: do not promise `updatedBy`, field-level audit history, or a client-side audit log. This follows [Backend issue #104](https://github.com/hllous/Backend-M6-DAPS2/issues/104) and the current mirrored backend contract.
 
 ### EnvironmentalInspection and ViolationNotice
 
@@ -333,14 +330,14 @@ Drawn from [Prototype the operational indicator dashboards](https://github.com/h
 
 ## Frontend implementation and acceptance requirements
 
-This repository currently contains the contract and prototype layers, not the production adapters or workflows. The following requirements are binding when those layers are implemented. Keep the adapter boundary and Zod validation stable; only the response and validation details above should change when the implementation is added.
+The main adapters and Office/Field workflows described here are implemented in `src/lib/`, `src/app/api/`, and `src/app/app/`. The rules below are the integration contract and regression criteria for those workflows; keep them aligned with Backend and the corresponding tests under `src/` and `e2e/`.
 
 ### Service workflow
 
-- The Office cancellation action is available for `SCHEDULED`, `RESCHEDULED`, and `SUSPENDED`.
-- Cancellation requires a non-empty reason and submits it in the backend request body.
-- A `RESCHEDULED` Service can be cancelled without choosing or submitting a replacement date.
-- Direct `IN_PROGRESS → CANCELLED` remains blocked; suspension is required first.
+- The current frontend shows Office a cancellation action for `SCHEDULED`, `RESCHEDULED`, and `SUSPENDED`; Backend currently accepts only `SCHEDULED` and `SUSPENDED`.
+- For supported transitions, cancellation requires a non-empty reason and submits it in the backend request body.
+- The `RESCHEDULED` UI path currently receives a backend 409; keep it recorded as a mismatch until Backend and frontend reconcile issue #114.
+- Direct `IN_PROGRESS → CANCELLED` is rejected; suspension is required first.
 
 ### EnvironmentalReport workflow
 
@@ -350,20 +347,20 @@ This repository currently contains the contract and prototype layers, not the pr
 
 ### Evidence workflow
 
-- Drafts and upload-progress rows retain the user-selected filename locally. After success, the Backend-returned sanitized `filename` becomes the canonical display name.
-- MIME/content mismatches and size violations are handled as Backend 400 responses, in addition to the frontend's pre-submit checks. A PDF is accepted as unsanitized; the frontend must not claim malware scanning or PDF metadata removal.
+- Drafts and upload-progress rows retain the user-selected filename locally. After success, display Backend's generated UUID-based `filename` as the canonical stored name; it is not the original filename.
+- The browser checks selected file types and size before upload, but Backend currently trusts the declared MIME value and does not inspect file signatures or strip image metadata. Do not document these client checks as server-side protection. Malware scanning remains unavailable; a PDF is stored unchanged.
 - Inspection evidence is uploaded before issuing a violation notice. Each upload attempt has one idempotency key, and retrying that attempt reuses the same key. Failed uploads retain their local draft.
 - Evidence owners are limited to `SERVICE`, `ZONE_RESULT`, `INSPECTION`, and `CONTAINER`; the frontend never creates a `VIOLATION_NOTICE` evidence owner.
 
 ### Required contract and workflow coverage
 
-The shared fixtures/handlers and adapter tests must cover:
+The shared fixtures/handlers and adapter tests cover or should preserve:
 
-- cancellation from `SCHEDULED`, `RESCHEDULED`, and `SUSPENDED`, including reason preservation;
+- cancellation from `SCHEDULED` and `SUSPENDED`, including reason preservation, plus the known `RESCHEDULED` mismatch until issue #114 is resolved;
 - rejection of direct cancellation from `IN_PROGRESS`;
 - reopening a `CLOSED` report from `REOPENED`, accepting late non-state-changing M2 updates, and keeping `SANCTIONED` closed;
-- sanitized local filenames and Backend-returned canonical filenames;
-- MIME spoof rejection, image metadata removal, and PDF upload behavior as unsanitized;
+- local filenames for draft/progress rows and Backend-returned UUID-based filenames after success;
+- client-side type/size validation, while keeping the missing server-side magic-byte validation and image metadata removal visible as Backend issue #90 release requirements;
 - retrying one evidence upload with the same idempotency key and preserving the draft through upload/network failures;
 - inspection evidence appearing in the M4 event contract as `{ url, mimeType }`, with no `VIOLATION_NOTICE` owner.
 
@@ -371,12 +368,12 @@ The shared fixtures/handlers and adapter tests must cover:
 
 These controls remain Backend-owned release gates; frontend checks are defense in depth and do not close them:
 
-- Backend security work tracked from Issue #90: authoritative malware scanning for `/evidence`, Tier-2 read auditing, and server-side export allowlists.
-- Backend Issue #114: update the API/Swagger documentation to reflect the synchronized contract before treating the contract reconciliation as complete.
+- Backend security work tracked from Issue #90: verify file contents independently of the declared MIME, remove image metadata, scan uploads for malware, audit Tier-2 reads, and apply server-side export allowlists. Current `POST /evidence` checks the declared MIME and size only.
+- Backend issue #114: reconcile Service cancellation from `RESCHEDULED` across the transition implementation, API documentation, and frontend flow. Backend currently rejects that transition while the frontend offers it.
 
-## Shipped by Backend, not yet drafted here
+## Backend API outside the frontend contract surface
 
-These resources exist on the backend and are mirrored in [`docs/backend-context/api/endpoints.md`](docs/backend-context/api/endpoints.md), but are outside the contract-consolidation scope of this ticket. The tables above cover the remaining frontend-facing resources.
+These resources exist in Backend and are mirrored in [`docs/backend-context/api/endpoints.md`](docs/backend-context/api/endpoints.md), but the current internal frontend does not consume them.
 
 | Tag | What it covers | Worth knowing before the ticket opens |
 |---|---|---|
