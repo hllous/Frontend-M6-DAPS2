@@ -1,6 +1,7 @@
 import { crewsAdapter } from "./crews";
 import { serviceTypesAdapter, type ServiceTypeCategory } from "./service-types";
 import { zonesAdapter } from "./zones";
+import { vehiclesAdapter } from "./vehicles";
 
 /**
  * El backend no devuelve un título de servicio ni nombres de zona o de cuadrilla:
@@ -17,12 +18,13 @@ type Catalogo = {
   serviceTypes: Map<string, { name: string; category: ServiceTypeCategory }>;
   zones: Map<string, string>;
   crews: Map<string, string>;
+  vehicles: Map<string, string>;
 };
 
 let catalogoPendiente: Promise<Catalogo> | null = null;
 
 async function cargarCatalogo(): Promise<Catalogo> {
-  const [serviceTypes, zones, crews] = await Promise.all([
+  const [serviceTypes, zones, crews, vehicles] = await Promise.all([
     serviceTypesAdapter
       .list({ pageSize: 100 })
       .then((page) => new Map(page.serviceTypes.map((item) => [item.id, { name: item.name, category: item.category }])))
@@ -35,8 +37,12 @@ async function cargarCatalogo(): Promise<Catalogo> {
       .list({ pageSize: 100 })
       .then((page) => new Map(page.crews.map((crew) => [crew.id, crew.name])))
       .catch(() => new Map<string, string>()),
+    vehiclesAdapter
+      .list({ pageSize: 100 })
+      .then((page) => new Map(page.vehicles.map((vehicle) => [vehicle.id, vehicle.plate])))
+      .catch(() => new Map<string, string>()),
   ]);
-  return { serviceTypes, zones, crews };
+  return { serviceTypes, zones, crews, vehicles };
 }
 
 export function catalogoDeEtiquetas(): Promise<Catalogo> {
