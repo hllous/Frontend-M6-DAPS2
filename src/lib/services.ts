@@ -1113,6 +1113,34 @@ export const servicesAdapter = {
     return parsed.data;
   },
 
+  // Zone-result attachments are listed separately from GET /services/:id/zone-results.
+  async getZoneResultEvidence(zoneResultId: string): Promise<Attachment[]> {
+    const response = await authenticatedFetch(
+      `/api/evidence?ownerType=ZONE_RESULT&ownerId=${encodeURIComponent(zoneResultId)}`,
+    );
+    const payload = await readJsonBody(response);
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError("La respuesta de error de evidencia no respeta el contrato.", {
+          cause: parsedError.error,
+        });
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ") : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+    const parsed = z.array(attachmentSchema).safeParse(payload);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError("La lista de evidencia de zona no respeta el contrato.", {
+        cause: parsed.error,
+      });
+    }
+    return parsed.data;
+  },
+
   async uploadEvidence(params: {
     file: File;
     ownerType: EvidenceOwnerType;
