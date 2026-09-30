@@ -39,7 +39,7 @@ describe("/api/service-frequencies/:id", () => {
     const servicesBefore = serviceFrequencyFixtures.map((frequency) => frequency.id);
     const response = await DELETE(new Request("http://localhost/api/service-frequencies/freq-2", { method: "DELETE", headers: { cookie } }), { params: Promise.resolve({ id: "freq-2" }) });
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ id: "freq-2", validFrom: "2026-09-10", validTo: "2026-09-10" });
+    expect(await response.json()).toMatchObject({ id: "freq-2", validFrom: "2026-09-10T00:00:00.000Z", validTo: "2026-09-10T00:00:00.000Z" });
     expect(serviceFrequencyFixtures.map((frequency) => frequency.id)).toEqual(servicesBefore);
   });
 });

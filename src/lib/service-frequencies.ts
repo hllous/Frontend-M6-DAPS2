@@ -7,6 +7,8 @@ export const serviceFrequencyShiftSchema = z.enum(["MORNING", "AFTERNOON", "NIGH
 export type ServiceFrequencyShift = z.infer<typeof serviceFrequencyShiftSchema>;
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener el formato AAAA-MM-DD");
+// Las respuestas serializan Date como ISO; la UI trabaja con días calendario.
+const responseDateSchema = z.union([dateSchema, z.iso.datetime()]).transform((value) => value.slice(0, 10));
 
 export const serviceFrequencySchema = z.object({
   id: z.string(),
@@ -14,8 +16,8 @@ export const serviceFrequencySchema = z.object({
   routeId: z.string(),
   weekdays: z.array(z.number().int().min(1).max(7)).min(1),
   shift: serviceFrequencyShiftSchema,
-  validFrom: dateSchema,
-  validTo: dateSchema.nullable(),
+  validFrom: responseDateSchema,
+  validTo: responseDateSchema.nullable(),
 });
 export type ServiceFrequency = z.infer<typeof serviceFrequencySchema>;
 
