@@ -71,6 +71,102 @@ const mockPointService: Service = {
 };
 
 describe("ZoneExecutionPanel component", () => {
+  // GET /evidence: bare Attachment[] (CONTRACTS.md, backend api/endpoints.md).
+  it.each([true, false])("loads persisted zone evidence after reload (canExecute=%s)", async (canExecute) => {
+    const requests: string[] = [];
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-PERSISTED-316", serviceId: mockPointService.id, zoneId: "zone-3",
+        status: "NOT_SERVICED", reason: "BLOCKED_ACCESS", notes: null,
+        recordedAt: "2026-09-22T10:15:00.000Z",
+      }])),
+      http.get("*/api/evidence", ({ request }) => {
+        requests.push(new URL(request.url).search);
+        return HttpResponse.json([{
+          id: "att-persisted-316", url: "https://evidence.example.com/acceso.jpg",
+          filename: "acceso.jpg", contentType: "image/jpeg",
+          uploadedAt: "2026-09-22T10:16:00.000Z",
+        }]);
+      }),
+    );
+    render(<ZoneExecutionPanel service={mockPointService} canExecute={canExecute} />);
+    expect(await screen.findByText("Evidencia adjunta (1):")).toBeVisible();
+    expect(screen.getByText("acceso.jpg")).toBeVisible();
+    expect(requests).toEqual(["?ownerType=ZONE_RESULT&ownerId=ZR-PERSISTED-316"]);
+  });
+
+  it("keeps the empty evidence state for a recorded zone without files", async () => {
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-EMPTY-316", serviceId: mockPointService.id, zoneId: "zone-3",
+        status: "SERVICED", reason: null, notes: null,
+        recordedAt: "2026-09-22T10:15:00.000Z",
+      }])),
+      http.get("*/api/evidence", () => HttpResponse.json([])),
+    );
+    render(<ZoneExecutionPanel service={mockPointService} />);
+    expect(await screen.findByText("Sin archivos adjuntos.")).toBeVisible();
+    expect(screen.getByText("Evidencia adjunta (0):")).toBeVisible();
+  });
+
+  it("merges embedded and fetched evidence by ID while retaining files with the same name", async () => {
+    const attachment = {
+      id: "att-316-a", url: "https://evidence.example.com/a/acceso.jpg",
+      filename: "acceso.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-22T10:16:00.000Z",
+    };
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-316", serviceId: mockPointService.id, zoneId: "zone-3",
+        status: "SERVICED", reason: null, notes: null, attachments: [attachment],
+        recordedAt: "2026-09-22T10:15:00.000Z",
+      }])),
+      http.get("*/api/evidence", () => HttpResponse.json([
+        attachment, { ...attachment, id: "att-316-b", url: "https://evidence.example.com/b/acceso.jpg" },
+      ])),
+    );
+    render(<ZoneExecutionPanel service={mockPointService} />);
+    expect(await screen.findByText("Evidencia adjunta (2):")).toBeVisible();
+    expect(screen.getAllByText("acceso.jpg")).toHaveLength(2);
+  });
+
+  it("shows a loading failure instead of claiming there are no attachments", async () => {
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-316", serviceId: mockPointService.id, zoneId: "zone-3",
+        status: "SERVICED", reason: null, notes: null, recordedAt: "2026-09-22T10:15:00.000Z",
+      }])),
+      http.get("*/api/evidence", () => HttpResponse.error()),
+    );
+    render(<ZoneExecutionPanel service={mockPointService} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo cargar la evidencia.");
+    expect(screen.queryByText("Sin archivos adjuntos.")).not.toBeInTheDocument();
+  });
+
+  it("fetches the newly selected result without showing evidence from the previous zone", async () => {
+    const owners: string[] = [];
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([
+        { id: "ZR-CENTRO-316", serviceId: mockRouteService.id, zoneId: "zone-3", status: "SERVICED", recordedAt: "2026-09-22T10:15:00.000Z" },
+        { id: "ZR-NORTE-316", serviceId: mockRouteService.id, zoneId: "zone-1", status: "SERVICED", recordedAt: "2026-09-22T10:17:00.000Z" },
+      ])),
+      http.get("*/api/evidence", ({ request }) => {
+        const owner = new URL(request.url).searchParams.get("ownerId")!;
+        owners.push(owner);
+        return HttpResponse.json(owner === "ZR-CENTRO-316" ? [{
+          id: "att-centro-316", url: "https://evidence.example.com/centro.jpg",
+          filename: "centro.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-22T10:16:00.000Z",
+        }] : []);
+      }),
+    );
+    const user = userEvent.setup();
+    render(<ZoneExecutionPanel service={mockRouteService} />);
+    expect(await screen.findByText("centro.jpg")).toBeVisible();
+    await user.click(screen.getAllByRole("button", { name: /zona norte/i })[0]);
+    expect(await screen.findByText("Sin archivos adjuntos.")).toBeVisible();
+    expect(screen.queryByText("centro.jpg")).not.toBeInTheDocument();
+    expect(owners).toEqual(["ZR-CENTRO-316", "ZR-NORTE-316"]);
+  });
+
   it("renders desktop zone navigation with descriptive tags in one uninterrupted form", () => {
     render(
       <ZoneExecutionPanel service={mockRouteService} canExecute={true} />,
@@ -310,6 +406,7 @@ describe("ZoneExecutionPanel component", () => {
     // Idempotency key reused
     expect(capturedIdempotencyKeys.length).toBe(2);
     expect(capturedIdempotencyKeys[0]).toBe(capturedIdempotencyKeys[1]);
+    expect(screen.getByText("Evidencia adjunta (1):")).toBeVisible();
   });
 
   it("keeps completion button disabled until all zones are recorded, then invokes complete with no request body", async () => {

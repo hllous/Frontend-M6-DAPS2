@@ -879,6 +879,36 @@ describe("services adapter", () => {
   });
 
   describe("servicesAdapter zone results and completion", () => {
+    it("reads the documented bare GET /evidence array using the zone result ID", async () => {
+      // docs/backend-context/api/endpoints.md: {id,url,filename,contentType,uploadedAt}.
+      server.use(http.get("*/api/evidence", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("ownerType")).toBe("ZONE_RESULT");
+        expect(url.searchParams.get("ownerId")).toBe("resultado/316");
+        return HttpResponse.json([{
+          id: "att-316", url: "https://evidence.example.com/acceso.jpg",
+          filename: "acceso.jpg", contentType: "image/jpeg",
+          uploadedAt: "2026-09-22T10:16:00.000Z",
+        }]);
+      }));
+      expect(await servicesAdapter.getZoneResultEvidence("resultado/316")).toEqual([{
+        id: "att-316", url: "https://evidence.example.com/acceso.jpg",
+        filename: "acceso.jpg", contentType: "image/jpeg",
+        uploadedAt: "2026-09-22T10:16:00.000Z",
+      }]);
+    });
+
+    it("rejects a paginated evidence envelope instead of the documented array", async () => {
+      server.use(http.get("*/api/evidence", () => HttpResponse.json({ data: [], total: 0 })));
+      await expect(servicesAdapter.getZoneResultEvidence("ZR-316")).rejects.toBeInstanceOf(ServiceContractError);
+    });
+
+    it("filters mock evidence by zone result and rejects a zone ID as owner", async () => {
+      expect(await servicesAdapter.getZoneResultEvidence("ZR-1061-1"))
+        .toEqual([expect.objectContaining({ id: "att-1061-1", filename: "calzada_bloqueada.jpg" })]);
+      await expect(servicesAdapter.getZoneResultEvidence("zone-2")).rejects.toMatchObject({ status: 404 });
+    });
+
     it("fetches recorded zone results via servicesAdapter.getZoneResults", async () => {
       server.use(
         http.get("*/api/services/:serviceId/zone-results", () => {
