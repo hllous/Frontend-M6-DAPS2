@@ -2501,6 +2501,17 @@ export const handlers = [
     if (ownerType === "CONTAINER") {
       return HttpResponse.json(getContainerAttachments(ownerId));
     }
+    // Zone-result evidence (#316), using the result ID rather than the zone ID.
+    if (ownerType === "ZONE_RESULT") {
+      const result = zoneResultFixtures.find((item) => item.id === ownerId);
+      if (!result) {
+        return HttpResponse.json(
+          { statusCode: 404, message: "Resultado de zona no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/evidence" },
+          { status: 404 },
+        );
+      }
+      return HttpResponse.json(result.attachments);
+    }
     if (ownerType === "INSPECTION") {
       const attachments = getInspectionAttachments(ownerId);
       if (!attachments) {
