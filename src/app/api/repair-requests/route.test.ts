@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
 import { resetEnvironmentalInspectionFixtures } from "@/lib/environmental-report-fixtures";
@@ -12,14 +12,16 @@ beforeEach(() => {
   resetServiceFixtures();
 });
 afterEach(() => {
+  vi.restoreAllMocks();
+  delete process.env.M6_DEV_JWT;
   delete process.env.M6_AUTH_MODE;
   resetEnvironmentalInspectionFixtures();
   resetServiceFixtures();
   delete process.env.M6_BACKEND_ORIGIN;
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
+async function authenticatedCookie(scenarioId: string, mode = "mock") {
+  process.env.M6_AUTH_MODE = mode;
   const response = await login(new Request("http://localhost/api/session/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -37,6 +39,88 @@ function createRequest(cookie: string, body: unknown) {
 }
 
 describe("repair request BFF collection routes", () => {
+  it("permite consultar derivaciones de un servicio real de la cuadrilla de Campo", async () => {
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ data: [{
+        id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516",
+        name: "Cuadrilla Belgrano — Recolección",
+      }] }))
+      .mockResolvedValueOnce(Response.json({
+        id: "ceec08ae-67e7-4739-9677-150f5085bb1a",
+        serviceTypeId: "6e704e6e-8884-48f3-a930-4138703613c0",
+        mode: "ROUTE", status: "COMPLETED", origin: "PLANNED",
+        scheduledDate: "2026-09-22T00:00:00.000Z",
+        crewId: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516",
+        vehicleId: null, windowFrom: "08:00", windowTo: "12:00",
+      }))
+      .mockResolvedValueOnce(Response.json({ data: [], meta: { total: 0, page: 1, pageSize: 20 } }));
+    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+
+    const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: [], meta: { total: 0, page: 1, pageSize: 20 } });
+    expect(String(backendFetch.mock.calls[1]?.[0])).toBe("https://backend.internal/services/ceec08ae-67e7-4739-9677-150f5085bb1a");
+    expect(String(backendFetch.mock.calls[2]?.[0])).toBe("https://backend.internal/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a");
+    expect(new Headers(backendFetch.mock.calls[1]?.[1]?.headers).get("authorization")).toMatch(/^Bearer /);
+  });
+
+  it.each(["901159c1-3230-440a-ba3d-d7baf55fab24", "crew-b", null])(
+    "rechaza servicios reales sin la cuadrilla de la sesión (%s)", async (crewId) => {
+      process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+      process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+      const backendFetch = vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(Response.json({ data: [{
+          id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516",
+          name: "Cuadrilla Belgrano — Recolección",
+        }] }))
+        .mockResolvedValueOnce(Response.json({ id: "ceec08ae-67e7-4739-9677-150f5085bb1a", crewId }));
+      const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+
+      const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
+
+      expect(response.status).toBe(403);
+      expect((await response.json()).message).toBe("Solo puede consultar derivaciones de su cuadrilla.");
+      expect(backendFetch).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it.each([401, 404, 503])("conserva el error %s al consultar el servicio real", async (status) => {
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const error = { statusCode: status, message: "No se pudo consultar el servicio." };
+    const backendFetch = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ data: [{
+        id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516",
+        name: "Cuadrilla Belgrano — Recolección",
+      }] }))
+      .mockResolvedValueOnce(Response.json(error, { status }));
+    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+
+    const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual(error);
+    expect(backendFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("Oficina consulta el backend sin validar la cuadrilla del servicio", async () => {
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const payload = { data: [{ id: "derivacion-real", detectedInId: "servicio-real" }], meta: { total: 1 } };
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(payload));
+    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+
+    const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=servicio-real", { headers: { cookie } }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(payload);
+    expect(backendFetch).toHaveBeenCalledTimes(1);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/repair-requests?detectedInId=servicio-real");
+  });
+
   it("requires a session", async () => {
     const response = await GET(new Request("http://localhost/api/repair-requests"));
     expect(response.status).toBe(401);

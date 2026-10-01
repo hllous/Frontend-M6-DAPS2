@@ -1,14 +1,14 @@
 # M6 Frontend Implementation Roadmap
 
-This is the capability- and dependency-based implementation roadmap for the M6 Environment, Hygiene and Urban Services frontend, produced by [Produce the capability- and dependency-based implementation roadmap](https://github.com/hllous/Frontend-M6-DAPS2/issues/67), the final ticket on the [Wayfinder map](https://github.com/hllous/Frontend-M6-DAPS2/issues/6).
+This roadmap records the capability and dependency sequence for the M6 Environment, Hygiene and Urban Services frontend, originally produced by [issue #67](https://github.com/hllous/Frontend-M6-DAPS2/issues/67) on the [Wayfinder map](https://github.com/hllous/Frontend-M6-DAPS2/issues/6). Its phases and acceptance criteria preserve the original implementation plan; the status snapshot below describes the repository now. Backend-facing contract and security claims in this snapshot were checked against `Backend-M6-DAPS2` `develop` at `30d49ea1d56f735a124ae9260cafefff095e07b6` on 2026-10-01 (134 OpenAPI operations in 23 tags).
 
 Phasing is capability- and dependency-based, not calendar- or team-size-based: a phase is ready to start the moment its prerequisites close, regardless of who is available. Sequence numbers describe dependency order, not a fixed schedule — a team could run Phase 7's fixture-based work alongside Phase 2 once Phase 1 lands, for example.
 
 ## Source-of-truth boundaries
 
 - The [Wayfinder map](https://github.com/hllous/Frontend-M6-DAPS2/issues/6) records *why* each decision was made — context, alternatives, open questions — one decision per linked ticket, gisted once in the map's Decisions-so-far.
-- [`PRODUCT.md`](PRODUCT.md) records product evidence (prototypes, validated directions) and links here for sequencing.
-- **This document** records sequencing, dependency edges, typed gates, and implementation acceptance evidence. It does not restate a decision's reasoning — it cites the decision and says what building it requires and how to know it's done.
+- [`PRODUCT.md`](PRODUCT.md) records current product scope and evidence.
+- **This document** records the original sequencing and acceptance criteria, plus the current implementation status and remaining release gates.
 - [`CONTRACTS.md`](CONTRACTS.md) owns resource- and wire-level contract detail (request/response shapes, adapter seams, per-resource acceptance requirements). Phases below cite `CONTRACTS.md` sections rather than repeating their content.
 - [`DESIGN.md`](DESIGN.md) owns the visual/interaction standard every phase builds against.
 
@@ -20,27 +20,42 @@ Each phase states:
 - **Depends on** — prior phases and/or closed decisions required before the outcome is meaningful.
 - **Acceptance evidence** — what a reviewer checks to call the phase done; links to `CONTRACTS.md` where that detail already exists rather than duplicating it.
 - **Unblocks** — what becomes buildable once this phase's outcome exists.
-- **Specification status** / **Implementation status** — kept as two separate axes per the ticket's own distinction: a phase can be fully specified (every dependency, gate, and acceptance criterion is written down, ready to hand to `/to-spec`) while still blocked on a prior phase or an external gate for implementation to actually start.
+- Current status is summarized separately from the phase definitions. A feature present in source is not, by itself, evidence that an external integration or production gate has passed.
 
-Every phase in this document is **specification-ready** as of this document landing — the tables below are complete. **Implementation-unblocked** status differs per phase; see each phase's "Depends on."
+## Estado de implementación
+
+Revisión del árbol de trabajo al **01/10/2026**. Las fases 0–7 tienen pantallas, adaptadores y recorridos de prueba en el repositorio. Este estado se basa en la presencia y revisión de esos archivos; las suites no se ejecutaron para esta actualización documental.
+
+| Fase | Estado en el frontend | Referencias |
+|---|---|---|
+| 0 — Foundation | Implementada en modo mock y `backend-development`. El inicio de sesión real de M1 sigue bloqueado. | [sesión BFF](src/app/api/session/login/route.ts), [ingreso y actores](e2e/entry-and-roles.spec.ts) |
+| 1 — Service core loop | Implementada; Oficina puede cancelar directamente desde `RESCHEDULED` con un motivo, de acuerdo con Backend (#114, completado). | [workspace de Servicios](src/components/services/services-workspace.tsx), [journeys](e2e/services.spec.ts) |
+| 2a–2d — Catálogos | Implementadas las vistas de catálogos y sus adaptadores. La fuente real del catálogo externo de barrios continúa pendiente. | [catálogos](src/app/app/catalog/page.tsx), [zonas](e2e/zones-catalog.spec.ts) |
+| 3 — Derivaciones | Implementadas las solicitudes de reparación y de corte, con conciliación manual y anomalías visibles. | [derivaciones](e2e/referrals.spec.ts) |
+| 4 — Contenedores | Implementados los reportes y las acciones de Oficina. | [ciclo de contenedores](e2e/container-repair-removal.spec.ts) |
+| 5 — Arbolado | Implementados el censo, los relevamientos y las intervenciones. | [arbolado](e2e/tree-interventions.spec.ts) |
+| 6 — Control ambiental | Implementados los expedientes, inspecciones, evidencia y actas; el directorio real de establecimientos de M4 sigue pendiente. | [expedientes](e2e/environmental-reports.spec.ts), [inspecciones](e2e/inspection-execution.spec.ts) |
+| 7 — Indicadores | Implementado el tablero con validación Zod; algunos esquemas frontend aún requieren conciliación con el OpenAPI publicado. | [tablero](e2e/indicator-dashboard.spec.ts) |
+| 8 — Preparación de producción | En progreso. Faltan el contrato e integración reales de M1, las decisiones pendientes sobre límites de seguridad/evidencia y las verificaciones de release. Backend ya valida bytes y limpia metadatos de imágenes reconocidas; PDFs y malware siguen sin esos controles. | [gates](#typed-external-and-cross-cutting-gates), [contratos](CONTRACTS.md#release-dependencies) |
 
 ## Typed external and cross-cutting gates
 
-None of these block writing this roadmap (confirmed when ticket #67 was claimed: the contract-reconciliation prerequisites it listed are closed via [PR #70](https://github.com/hllous/Frontend-M6-DAPS2/pull/70)). They gate specific phases at build or release time.
+Estado revisado el 01/10/2026 contra el código frontend y Backend `develop` `30d49ea1d56f735a124ae9260cafefff095e07b6`. La tabla reúne dependencias, límites y decisiones con su estado individual, aunque las pantallas de sus fases ya estén implementadas.
 
 | Gate | Type | Affects | Tracking |
 |---|---|---|---|
-| M1's OAuth2/OIDC contract (JWKS, algorithm, issuer/audience, claims shape, refresh rotation) is unpublished | Blocks production readiness | Phase 0 (real-JWT mode), Phase 8 | [#17](https://github.com/hllous/Frontend-M6-DAPS2/issues/17), [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md) |
-| M1's role → Capability claims mapping is unconfirmed | Unresolved hypothesis | Every phase's capability gating | [#8](https://github.com/hllous/Frontend-M6-DAPS2/issues/8), `CONTEXT.md`'s `Capability` term |
-| Backend's deployed JWT verifier is an HS256 stopgap, not M1's real contract | Unresolved hypothesis (interim only) | Phase 0's dev-JWT mode | ADR-0004 note (2026-09-02) |
-| M9's neighborhood catalog is unpublished; Zone↔Neighborhood assignment is a hypothesized adapter | Blocks implementation (of neighborhood assignment specifically) | Phase 2c | [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36) |
-| M4's establishment-lookup contract is unpublished | Blocks implementation (of establishment lookup specifically) | Phase 6 | `CONTRACTS.md` → Remaining contract gaps |
-| Backend #114: Swagger docs don't yet reflect `RESCHEDULED → CANCELLED` | Blocks production readiness | Phase 1 | [Backend#114](https://github.com/hllous/Backend-M6-DAPS2/issues/114) |
-| Backend #90: authoritative malware scanning, Tier-2 read audit, server-side export allowlists remain undone | Blocks production readiness | Phase 8 (closing gate); Phases 1, 4, 5, 6 ship defense-in-depth controls only until then | [Backend#90](https://github.com/hllous/Backend-M6-DAPS2/issues/90), [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md) |
-| M2's visible-to-citizen attachment policy and event shape are unresolved | Unresolved hypothesis | Phase 8 | `CONTRACTS.md` → Remaining contract gaps |
-| Better Auth remains conditional on a compatible M1 OIDC contract | Unresolved hypothesis | Phase 0 / Phase 8 architecture choice | [#17](https://github.com/hllous/Frontend-M6-DAPS2/issues/17), [#18](https://github.com/hllous/Frontend-M6-DAPS2/issues/18) |
-| Route stop-sequence `PUT` has no server-side concurrency guard | Unresolved hypothesis (documented backend limitation; frontend ships an advisory-only precheck) | Phase 2c | [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36) |
-| TreeSurvey → TreeIntervention has no foreign key; the link is UI convention only | Unresolved hypothesis | Phase 5 | [#38](https://github.com/hllous/Frontend-M6-DAPS2/issues/38) |
+| M1's token verification and refresh contract (JWKS/keys, algorithm, issuer/audience, claims, TTL and rotation) is unpublished; real-M1 login fails closed in the frontend | Blocks production authentication | Phase 0 / Phase 8 | [#17](https://github.com/hllous/Frontend-M6-DAPS2/issues/17), [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md) |
+| M1 role-to-Capability mapping is unconfirmed; Backend has no domain `@Roles()` restrictions in use | Unresolved authorization hypothesis | Every phase's capability gating; production readiness | [#8](https://github.com/hllous/Frontend-M6-DAPS2/issues/8), `CONTEXT.md`'s `Capability` term |
+| Backend's development JWT verifier uses an HS256 stopgap, not M1's final contract | Development integration only | Phase 0 `backend-development` mode | [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md) |
+| M9's neighborhood catalog is unpublished; the frontend adapter still uses replaceable data | External data source pending | Phase 2c neighborhood assignment | [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36) |
+| M4's establishment lookup contract is unpublished; frontend uses a local adapter | External data source pending | Phase 6 notice issuance | `CONTRACTS.md` → Remaining contract gaps |
+| Backend validates evidence bytes, enforces the 10 MB cap, and strips Exif/XMP/comments from understood JPEG, PNG, and WebP files; PDFs and unrecognized image structures pass unchanged, and malware scanning is absent | Partial control; confirm exclusions before production sign-off | Phase 8; see `CONTRACTS.md` and ADR-0006 | [Backend #90](https://github.com/hllous/Backend-M6-DAPS2/issues/90) (closed as NOT_PLANNED), [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md) |
+| Tier-2 read/write audit is absent; Backend explicitly deferred it outside the current TPO delivery | Deferred security decision; do not promise record-view history and reconfirm the gate before general availability | Phase 8 | [Backend #90](https://github.com/hllous/Backend-M6-DAPS2/issues/90) (closure comment), [#16](https://github.com/hllous/Frontend-M6-DAPS2/issues/16), [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md) |
+| No bulk/file export endpoint exists; aggregate indicators are read APIs rather than record exports | Not applicable to current API; apply the explicit server-side field projection policy if an export surface is added | Any future export surface | [Backend #90](https://github.com/hllous/Backend-M6-DAPS2/issues/90) (closure comment), [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md) |
+| M2's citizen-visible evidence policy and event payload remain unresolved | Unresolved external contract | Phase 8 integration | `CONTRACTS.md` → Remaining contract gaps |
+| Better Auth remains conditional on a compatible M1 OIDC contract | Deferred architecture option | Phase 8 authentication choice | [#17](https://github.com/hllous/Frontend-M6-DAPS2/issues/17), [#18](https://github.com/hllous/Frontend-M6-DAPS2/issues/18) |
+| Route stop-sequence replacement has no backend concurrency guard; frontend check is advisory | Known backend limitation | Phase 2c concurrent editing | [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36) |
+| TreeSurvey → TreeIntervention has no backend foreign key; relation is a frontend convention | Known data-model limitation | Phase 5 traceability | [#38](https://github.com/hllous/Frontend-M6-DAPS2/issues/38) |
 
 ## Phase 0 — Foundation
 
@@ -52,7 +67,7 @@ None of these block writing this roadmap (confirmed when ticket #67 was claimed:
 
 **Acceptance evidence**:
 - Shell renders the capability-gated nav (Mi Trabajo / Servicios / Inventario / Control Ambiental / Mapa / Catálogo / Tableros) per #7, hiding items the mock actor's Capabilities don't grant.
-- Login works in both mock and dev-JWT modes; production/real-JWT mode is not implemented yet and fails closed if attempted.
+- Login works in mock and `backend-development` modes; real-M1 mode is not implemented yet and fails closed if attempted.
 - One resource's adapter (any) round-trips through Zod validation against an MSW fixture with no network call reaching a real host.
 - Design tokens, breakpoints (760px/1024px), and the collapsible sidebar / mobile nav from `DESIGN.md` render correctly.
 
@@ -199,8 +214,8 @@ A vertical slice attached to Phase 1, not a horizontal sweep across every domain
 
 **Acceptance evidence**:
 - Production mode uses M1's real JWT exclusively; mock and dev-JWT modes are disabled or unreachable outside development.
-- Backend #90's malware scanning, Tier-2 read auditing, and server-side export allowlists are confirmed live; frontend controls are verified as defense-in-depth only, per ADR-0006.
-- Backend #114's Swagger documentation reflects the reconciled `RESCHEDULED → CANCELLED` contract.
+- Backend verifies evidence magic bytes, enforces the 10 MB cap, and strips supported image metadata; production sign-off still needs an explicit disposition for PDFs stored unchanged, parser fallbacks stored unchanged, and absent malware scanning. Tier-2 auditing remains deferred from the current delivery; do not describe it as implemented. There is no export endpoint, so no current export allowlist is exercised; any future export must use a server-side explicit projection.
+- Backend and frontend both support `SCHEDULED`, `RESCHEDULED`, or `SUSPENDED → CANCELLED` with a required reason; direct `IN_PROGRESS → CANCELLED` remains rejected. Backend #114 is completed, so cancellation is no longer a Phase 1 mismatch.
 - M2's visible-to-citizen attachment policy is confirmed and the `{ attachmentId, fileName, contentType, url, sizeBytes }` projection is verified end-to-end.
 - Performance, observability, and rollback gates from #64/#15/#19 pass under real load.
 
@@ -215,20 +230,4 @@ A vertical slice attached to Phase 1, not a horizontal sweep across every domain
 - Splitting Phase 1 into separate "schedule+assign" and "execute+complete" increments was considered and set aside — a single Service-loop phase was judged to better prove the map/table workspace and operational-form patterns end-to-end in one pass. Revisit if Phase 1 proves too large for one implementation pass in practice.
 - Phase 5 and Phase 6 have no dependency on each other and may run in either order or in parallel; both were sequenced before Phase 7 only because Phase 7 needs their data.
 
-## Readiness for `/to-spec`
-
-`/to-spec` is invoked **per phase**, not once for the whole document: a phase is specification-ready the moment its own dependency, gate, and acceptance-evidence entries above are complete — which is true for every phase in this document as written. A phase is additionally **implementation-unblocked** once its "Depends on" phases and any "blocks implementation" gates affecting it are closed. As of this document landing:
-
-| Phase | Specification-ready | Implementation-unblocked |
-|---|---|---|
-| 0 | Yes | Yes |
-| 1 | Yes | Once Phase 0 ships |
-| 2a–2d | Yes | Once Phase 1 ships |
-| 3 | Yes | Once Phase 1 ships |
-| 4 | Yes | Once Phase 1 ships |
-| 5 | Yes | Once Phases 1, 3 ship |
-| 6 | Yes | Once Phases 1, 3 ship (M4 gate permitting) |
-| 7 | Yes | Once Phase 1 ships (acceptance gate waits on Phases 1–6) |
-| 8 | Yes | Once Phases 1–7 ship and all "blocks production readiness" gates close |
-
-With this document landed, the [Wayfinder map](https://github.com/hllous/Frontend-M6-DAPS2/issues/6) has no open child tickets: the blueprint is decision-complete.
+The plan's phase sequence remains useful for understanding dependencies, but phases 0–7 are now represented in the application source. Only phase 8 and the open external gates above describe work that still prevents a production-ready release. The [Wayfinder map](https://github.com/hllous/Frontend-M6-DAPS2/issues/6) remains the historical record for the original decisions; this roadmap and the linked code/tests describe the current project state.

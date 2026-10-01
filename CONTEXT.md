@@ -1,161 +1,161 @@
-# M6 Environment, Hygiene and Urban Services Frontend
+# M6 Environment, Hygiene and Urban Services
 
-Internal frontend for planning, assigning, and field-executing Environment, Hygiene and Urban Services operations — collection routes and point-based interventions — for office supervisors and field personnel.
+Vocabulario común para las operaciones municipales de Ambiente, Higiene y Servicios Urbanos.
 
 ## Language
 
 **Service**:
-A schedulable unit of operational work — a ROUTE (an ordered sequence of zones) or a POINT (a single inventory item or location) — tracked through a status lifecycle from scheduling to completion. Canonical shape is Backend-owned; see `docs/backend-context/entidades/service.md`.
+Unidad de trabajo municipal programable, de tipo ROUTE (recorrido por zonas) o POINT (intervención sobre un objetivo puntual), que avanza desde su planificación hasta un resultado operativo.
 _Avoid_: Job, task, work order
 
 **Assignment**:
-The act of attaching a crew and vehicle to an already-scheduled Service. A distinct step from scheduling: a Service can exist scheduled but unassigned.
+Asociación de una cuadrilla y un vehículo con un Service ya programado. Asignar es una decisión distinta de programar.
 _Avoid_: Staffing, dispatch
 
 **Zone (M6)**:
-An M6 operational grouping of one or more M9 Neighborhoods, used to compose Routes and assign Crews. It is not M9's own "zona" concept. This cross-module naming collision remains unresolved; M6's term will be renamed if M9 retains ownership of "Zone". Neighborhoods are assigned to and removed from a Zone through a hypothesized adapter to M9's own, still-unpublished neighborhood catalog.
-_Avoid_: M9 zone, neighborhood (the M9-owned unit a Zone groups, not a Zone itself)
+Agrupación operativa de barrios usada para componer Routes y organizar Services. Es distinta de los conceptos llamados “zona” en otros módulos.
+_Avoid_: M9 zone, neighborhood (the unit a Zone groups)
 
 **Validity (ServiceFrequency)**:
-The date window in which a ServiceFrequency rule applies. Closing a Frequency ends that window by setting `validTo`; it is not a deactivation and does not alter Services already generated from the rule. Zone and Route deactivation, by contrast, is their catalog active/inactive state.
+Período durante el cual una regla de ServiceFrequency está vigente. Su finalización no cambia los Services que ya se generaron con esa regla.
 _Avoid_: Frequency deactivation, generic close
 
 **ZoneResult**:
-The recorded outcome (serviced / partial / not-serviced) for one zone within a ROUTE Service.
+Resultado registrado para una zona de un Service, sea ROUTE o POINT: serviced, partial o not-serviced.
 _Avoid_: Zone status, stop result
 
 **Delayed notice**:
-An ambient, field-crew-raised flag on an in-progress Service (a note plus a revised ETA) surfaced on the office view. Not a status change, and not a push notification.
+Aviso de Campo sobre una demora en un Service, con una nota y una estimación revisada. No cambia el estado del Service.
 _Avoid_: Delay status, alert
 
 **Local draft**:
-Form state for a field action (evidence, notes, chosen reason) held on-device when composed without connectivity. Never auto-synced; the crew must manually resubmit once reconnected.
+Datos todavía no enviados de un formulario de Campo, conservados cuando no hay conectividad para que una persona pueda retomarlos y enviarlos después.
 _Avoid_: Offline queue, pending sync, cached submission
 
-**Conflict** (Service):
-The state where a field crew's manually resubmitted local draft can't be applied because the Service changed server-side (reassigned, cancelled, rescheduled) while the crew was working it offline. Always surfaced explicitly to a human; never resolved by last-write-wins.
+**Conflict (Service)**:
+Situación en la que un envío de Campo ya no coincide con el Service porque otra decisión lo reasignó, canceló o reprogramó. Requiere resolución explícita y no se decide sobrescribiendo el dato más reciente.
 _Avoid_: Sync error, merge conflict
 
 **Evidence**:
-A reason, a note, and a photo (where feasible), uploaded separately and attached by reference to a Service outcome or another resource's report/decision action (e.g. a Container overflow report, damage report, removal, or standalone repair completion — see that resource's `CONTRACTS.md` entry for which actions require it). Mandatory on every Service exception outcome (`PARTIALLY_COMPLETED`, any `PARTIAL`/`NOT_SERVICED` zone, `CANCELLED`, `SUSPENDED`); optional on a clean completion. For a non-Service action, an outcome reached *through* a linked Service uses that Service's own Evidence rather than a second, separate one. Backend attaches Evidence to a **resource**, not to the individual action: `POST /evidence` accepts exactly four owner types — `SERVICE`, `ZONE_RESULT`, `INSPECTION`, `CONTAINER` — so a tree, a tree survey and a tree intervention cannot carry Evidence at all, and a Container's photos are a flat list across all its reports.
+Material que respalda un reporte, inspección o resultado operativo: motivo, observaciones y, cuando está disponible, una imagen o documento. La evidencia queda asociada al registro que documenta, no a una acción aislada.
 _Avoid_: Attachment, proof, documentation
 
 **Office**:
-An M6 actor that schedules and assigns Services, configures catalogs, and holds every elevated capability — Service reschedule/cancellation, ViolationNotice issuance, TreeIntervention authorization. Mutually exclusive with Field; see [ADR-0002](docs/adr/0002-office-and-field-actors-are-mutually-exclusive.md).
+Actor de M6 responsable de planificar Services, organizar catálogos y tomar decisiones administrativas como reprogramar trabajo, autorizar intervenciones o emitir actas. Es distinto de Field.
 _Avoid_: Supervisor, admin, back-office
 
 **Field**:
-An M6 actor that executes an assigned Service, including running environmental inspections — "Inspector" is not a distinct actor kind, just a Field actor whose current Service is an inspection. Splits into Crew Leader and Crew Member. Mutually exclusive with Office; see [ADR-0002](docs/adr/0002-office-and-field-actors-are-mutually-exclusive.md).
-_Avoid_: Crew (the team a Field actor belongs to, not the actor itself), worker, inspector (as a separate actor kind)
+Actor de M6 que ejecuta Services asignados en territorio y puede realizar inspecciones ambientales. Comprende Crew Leaders y Crew Members; es distinto de Office.
+_Avoid_: Crew (the team a Field actor belongs to), worker, inspector (as a separate actor kind)
 
 **Crew Leader**:
-The Field actor within a Crew authorized to perform state-changing actions on its assigned Service — start, suspend, resume, submit results and evidence. Corresponds to a Crew's `leaderUserId`.
+Integrante de Campo responsable de conducir la ejecución de una asignación y registrar sus resultados.
 _Avoid_: Foreman, crew lead
 
 **Crew Member**:
-A Field actor belonging to a Crew who can view but not act on the Crew's assigned Service; only that Crew's Leader may submit outcomes.
+Integrante de una Crew que participa de la ejecución y consulta el trabajo asignado; el Crew Leader registra sus resultados.
 _Avoid_: Worker, staff
 
 **Capability**:
-The atomic unit of M6 authorization — a named permission (e.g. `service:schedule`, `violationNotice:issue`, `treeIntervention:authorize`) granted to an actor, resolved from M1 identity roles/claims through a versioned M6 mapping layer. M1 confirmed its roles but has not yet published the JWT claims contract, so the exact extraction remains a hypothesis. Optimistic at the frontend — UI-only; M6 Backend is the sole authorizing authority, see [ADR-0005](docs/adr/0005-m6-backend-is-the-sole-authorization-authority.md).
+Acción específica de M6 que un actor puede realizar, como programar un Service, emitir un acta o autorizar una TreeIntervention. Una Capability es más acotada que un rol.
 _Avoid_: Role, permission, scope
 
 **My Work**:
-The capability-scoped landing view every actor sees on entry. For Field, it's their assigned Services; for Office, it's a personal action queue — items waiting on that specific Office actor, such as an unassigned Service. Never a cross-team or cross-zone summary; that belongs to a dashboard, not to My Work.
+Lista personal de trabajo pendiente para un actor. Para Field muestra Services asignados; para Office, acciones que requieren su intervención, no un resumen de todo un equipo o zona.
 _Avoid_: Home, Inbox, Dashboard (as a synonym for this view)
 
 **Sensitivity Tier**:
-A three-level classification (Tier 0 operational/catalog data, Tier 1 internal-operational/identity-adjacent data, Tier 2 regulated third-party data — a citizen's identity on an EnvironmentalReport, inspector findings, ViolationNotice/SanctionOutcome detail) that drives client storage, export, and audit rules everywhere in M6. Capability-gating stays per-resource (see Capability); Tier is a separate, orthogonal axis about how the data itself must be handled once an actor is authorized to see it. See [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md).
+Clasificación de datos según su impacto de privacidad: Tier 0 (operativos y catálogos), Tier 1 (internos o vinculados a identidad) y Tier 2 (identidad de denunciantes, hallazgos de inspección y detalle de actas o sanciones). Es independiente de las acciones permitidas a un actor.
 _Avoid_: PII flag, confidential, sensitive (as an undefined adjective)
 
 **RepairRequest**:
-An M6 tracking record for infrastructure damage detected through a Service or EnvironmentalInspection and explicitly referred to M3. It follows the external repair request, not the M3 work order itself; Office sees all records, while Field sees only records related to its assigned work. `publicSafetyRisk` is an explicit fact separate from `severity`. A Container damage path that emits `containerDamaged` is not a RepairRequest.
+Registro de M6 que deriva a M3 un daño de infraestructura detectado durante un Service o EnvironmentalInspection. Sigue la solicitud externa, no la orden de trabajo de M3; `publicSafetyRisk` es un hecho distinto de `severity`.
 _Avoid_: work order, repair task
 
 **StreetClosureRequest**:
-An M6 tracking record for a street closure explicitly requested from M7 on behalf of a Service or an authorized TreeIntervention. Its response can affect whether the related work may proceed: a pending request blocks the Service from starting. It is created by Office; Field sees only the request context attached to its assigned Service.
+Registro de M6 que solicita a M7 el cierre de una calle para ejecutar un Service o una TreeIntervention autorizada. La respuesta de M7 puede determinar si el trabajo relacionado puede avanzar.
 _Avoid_: traffic ticket, closure status (when referring to the M7 response)
 
 **Stale external referral**:
-An operational warning that a pending RepairRequest or StreetClosureRequest has exceeded its expected response window without a corresponding external update. It is not a new domain status and never changes the referral automatically.
+Aviso de que una RepairRequest o StreetClosureRequest sigue esperando una respuesta externa más allá del plazo previsto. No es un estado nuevo ni modifica la derivación.
 _Avoid_: failed referral, timed-out request
 
 **Manual referral recovery**:
-An explicit Office-only action used when an expected external event has not arrived, invoking the available transition after review and confirmation. It is exceptional reconciliation, not the normal way a referral changes state.
+Revisión explícita de Office para reconciliar una derivación cuando no llegó la respuesta externa esperada. Es excepcional y no reemplaza el flujo normal de respuesta.
 _Avoid_: manual status edit, force transition
 
 **Street-closure dependency**:
-The operational dependency between a StreetClosureRequest and its source Service: a pending request prevents that Service from starting, approval permits execution, rejection requires an Office reschedule-or-cancel decision, and ending the closure releases the dependency. It is not a new Service status.
+Dependencia entre una StreetClosureRequest y el Service de origen: la solicitud pendiente impide iniciar el Service, su aprobación permite avanzar, el rechazo requiere que Office reprograme o cancele, y el fin del cierre libera la dependencia.
 _Avoid_: blocked Service status, traffic approval
 
 **Referral context**:
-The source reference that explains why a RepairRequest or StreetClosureRequest exists. The reference is canonical; the interface may show a readable summary and navigation back to the source, but it does not create a second authoritative copy of the source.
+Referencia que identifica el registro de origen de una RepairRequest o StreetClosureRequest y explica por qué se creó.
 _Avoid_: copied source, external work order
 
 **Duplicate referral candidate**:
-An existing active referral with the same source, referral kind, damage type when applicable, and location. It is a warning for human review, not an automatic merge or a guaranteed duplicate.
+Derivación activa que coincide con otra por registro de origen, tipo de solicitud, clase de daño cuando corresponda y ubicación. Es un indicio para revisión humana, no una duplicación confirmada.
 _Avoid_: duplicate by text, automatic merge
 
 **Referral reconciliation**:
-An Office review of a referral whose source changed, whose external response is missing or out of order, or whose submission result is uncertain. Reconciliation preserves the recorded facts and never lets a local state overwrite an external decision.
+Revisión de Office de una derivación cuyo origen cambió, cuya respuesta externa falta o llegó fuera de orden, o cuyo envío quedó incierto. Conserva los hechos registrados y no reemplaza una decisión externa.
 _Avoid_: force sync, last-write-wins
 
 **Uncorrelated external response**:
-An external response that cannot be matched confidently to the referral and source it claims to update. It is retained for review without changing the M6 referral or reopening its Service.
+Respuesta externa que no puede vincularse con certeza a la derivación y al origen que declara actualizar. Requiere revisión antes de cambiar el registro de M6.
 _Avoid_: orphan event, automatic recovery
 
 **Unsent referral**:
-An attempted referral for which M6 has no created tracking record because submission failed before creation. It is distinct from a pending referral, which has a created record and is awaiting the external module.
+Intento de derivación que no llegó a crear un registro en M6. Se diferencia de una derivación pendiente, que ya tiene registro y espera una respuesta externa.
 _Avoid_: failed status, pending request
 
 **Weather-triggered Service response**:
-An office decision applied to an existing Service whose origin is `WEATHER_ALERT`; it is handled per Service rather than as a shared batch state.
+Decisión de Office sobre un Service existente cuyo origen es `WEATHER_ALERT`. Se resuelve para cada Service, no como un estado común a varios trabajos.
 _Avoid_: Weather cancellation, weather batch
 
 **Inspection follow-up**:
-An operational Service scheduled after an EnvironmentalInspection to address a finding. The finding is not itself a scheduled Service and does not automatically produce a set of Services.
+Service programado después de una EnvironmentalInspection para atender un hallazgo. El hallazgo no es en sí mismo un Service.
 _Avoid_: Inspection batch, finding task
 
 **EnvironmentalReport**:
-The M6 environmental case file for a report or own-initiative detection, progressing through the eleven operational statuses from receipt to closure. It is distinct from M1's digital `caseFile`.
+Expediente ambiental de M6 asociado a una denuncia ciudadana o a una detección propia, que avanza desde su recepción hasta su cierre. Es distinto del `caseFile` de M1.
 _Avoid_: caseFile, ticket (when referring to the M6 case file)
 
 **Own-initiative detection**:
-An environmental situation observed by a Field actor outside an M2 citizen ticket, entering the received intake for Office triage.
+Situación ambiental observada por Field fuera de una denuncia ciudadana de M2, que ingresa al circuito de revisión de Office.
 _Avoid_: ticket, complaint
 
 **Triage**:
-The Office review of a received EnvironmentalReport that determines whether M6 proceeds with inspection, returns it to M2, or dismisses it.
+Revisión de Office de un EnvironmentalReport recibido para decidir si corresponde inspeccionar, devolver el caso a M2 o descartarlo.
 _Avoid_: dispatch, approval
 
 **EnvironmentalInspection**:
-The inspection record attached to an EnvironmentalReport and executed through a POINT Service. It contains the checklist, findings, evidence, and inspection outcome.
+Registro de una inspección vinculada a un EnvironmentalReport, con lista de verificación, hallazgos y resultado.
 _Avoid_: inspection task, finding task
 
 **Inspection checklist**:
-A versioned set of checks that must be completed as part of an EnvironmentalInspection before its outcome is recorded.
+Conjunto de verificaciones aplicables a una EnvironmentalInspection que debe completarse antes de registrar su resultado.
 _Avoid_: inspection form, task list
 
 **Reinspection**:
-A new EnvironmentalInspection scheduled after an inconclusive inspection; the previous inspection remains part of the case history.
+Nueva EnvironmentalInspection programada después de una inspección inconclusa. La inspección anterior permanece en la historia del expediente.
 _Avoid_: repeat inspection, inspection retry
 
 **ViolationNotice**:
-The formal, immutable act issued by Office after an inspection finds a violation. It may be recorded without being referred to M4 when no establishment can be identified.
+Acta formal e inmutable emitida por Office después de constatar una infracción. Puede quedar registrada sin derivación a M4 cuando no se identifica un establecimiento.
 _Avoid_: sanction, fine, warning
 
 **Non-forwarded notice**:
-A recorded ViolationNotice that cannot be sent to M4 because no establishment was identified; it closes the M6 case without claiming an external sanctioning action.
+ViolationNotice que no puede enviarse a M4 porque no se identificó un establecimiento. Su registro no implica una sanción externa.
 _Avoid_: failed notice, pending notice
 
 **SanctionOutcome**:
-The read-only M4 resolution associated with a ViolationNotice, representing the external decision that completes the sanctioning path.
+Resolución de M4 asociada a una ViolationNotice, que representa la decisión externa sobre la sanción.
 _Avoid_: internal resolution, notice status
 
 **Deadline closure**:
-The automatic closure of a case after the M4 response deadline expires, distinct from a sanction decision or an explicit dismissal by M4.
+Cierre automático de un expediente cuando vence el plazo para recibir una resolución de M4. Es distinto de una decisión sancionatoria o de un rechazo explícito.
 _Avoid_: timeout dismissal, automatic rejection
 
 **Bulk Service operation**:
-A coordinated action intended to mutate multiple Services as one operational decision. It is outside the initial M6 blueprint until its backend authorization, audit, and partial-failure contract is defined.
+Decisión coordinada que modifica varios Services como una sola operación.
 _Avoid_: Mass action, bulk edit

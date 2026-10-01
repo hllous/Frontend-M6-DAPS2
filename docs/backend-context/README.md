@@ -1,55 +1,19 @@
-> **Espejo de solo lectura**, actualizado desde `Backend/docs/` el 2026-09-04 (rama `develop`, commit `f497d6c`). Mantenido acá para tener el modelo de dominio y el estándar de API como contexto en el frontend. El backend cerró las siete fases de su plan: `api/endpoints.md` lista 130 rutas reales en 23 tags de Swagger, y ya incluye lo que en el espejo anterior figuraba como no implementado — `environmental-reports`, `environmental-inspections`, `repair-requests`, `street-closure-requests`, `evidence` (subida genérica a Cloudflare R2 con `Idempotency-Key`), `indicators` (las cuatro familias del tablero) y `citizen-portal` (`/public/*`, los únicos endpoints sin JWT). Lo único pendiente sigue siendo el envío de `evidence` hacia M2. Ante cualquier discrepancia, el original en el repo `Backend` es la fuente de verdad — no editar este archivo para cambiar el contrato: corregir en `Backend` y volver a copiar.
->
-> Fuera de este espejo (no migrado, son de integración backend-a-backend vía bus de eventos, no algo que el frontend consuma): `docs/eventos/`, `docs/bloqueantes.md`, `Acuerdo-Eventos-M6.md`, `Cruce-Eventos-M6.md`. Los links de este archivo hacia esas rutas no resuelven acá.
+# Contexto del backend M6
 
-# Módulo 6 — Ambiente, Higiene y Servicios Urbanos
+Esta carpeta contiene un espejo de referencia del contrato HTTP y del modelo de dominio del backend. Se copió desde `Backend-M6-DAPS2`, rama `develop`, commit `30d49ea1d56f735a124ae9260cafefff095e07b6`, el 01/10/2026. Ese snapshot documenta 134 rutas REST distribuidas en 23 tags de Swagger.
 
-> Fuente original: `fuentes/alcance-entregable.md` §1-2, en el repositorio de documentación. Esta versión es la que se mantiene viva; el entregable formal se sigue generando de la fuente original hasta que se unifique el pipeline (ver [bloqueantes.md](bloqueantes.md)).
+## Contenido
 
-Módulo operativo de campo de la higiene urbana y el control ambiental. Planifica y ejecuta los servicios de recolección, limpieza, arbolado y espacios verdes; administra el inventario urbano ambiental; y tramita las denuncias ambientales hasta el acta de constatación, registrando después la resolución sancionatoria que devuelve M4.
+- [`api/endpoints.md`](api/endpoints.md): catálogo de rutas, filtros y semántica.
+- [`api/estandar-swagger.md`](api/estandar-swagger.md): formato y convenciones de la API.
+- [`entidades/`](entidades/): recursos y sus estados.
+- [`enumeraciones.md`](enumeraciones.md): valores cerrados del dominio.
+- [`DER.md`](DER.md): modelo relacional.
 
-## Qué hace el módulo
+## Fuente de verdad y actualización
 
-| Área | Responsabilidad |
-|---|---|
-| **Configuración de catálogos** | Tipos de servicio, zonas operativas, frecuencias y recorridos |
-| **Programación de servicios** | Agenda sobre recorridos u objetivos puntuales; reprogramación y cancelación |
-| **Ejecución en campo** | Inicio, avance, suspensión y cierre; registro de lo que quedó sin atender y por qué |
-| **Residuos** | Recolección domiciliaria, de reciclables, de voluminosos y de verdes; volumen, peso y destino final |
-| **Limpieza viaria** | Barrido manual y mecánico, y lavado de calles, como servicio programable sobre recorrido |
-| **Contenedores y puntos verdes** | Alta, ubicación, capacidad, desborde, daño, vaciado, reparación y reubicación. Puntos verdes de entrega voluntaria |
-| **Arbolado** | Censo con historial de relevamientos; poda, extracción, plantación y tratamiento |
-| **Espacios verdes** | Plazas y parques, con riego y corte de césped |
-| **Control ambiental** | Denuncias ambientales —ruidos, vertidos, microbasurales, emisiones—, inspección, acta de constatación y violación constatada |
-| **Seguimiento del ciudadano** | Publicamos el avance de la inspección para que M2 lo muestre, y servimos sin token la consulta complementaria bajo `/public`: seguimiento de la denuncia, cuándo pasa el servicio y dónde están los puntos verdes |
+El repositorio Backend es la fuente de verdad. Este espejo es de solo lectura: cuando cambie un contrato, actualizá el original en Backend y luego volvé a copiar las páginas correspondientes; no corrijas aquí una diferencia.
 
-Detalle funcional de cada área (qué se puede hacer, no solo el título): ver `fuentes/alcance-entregable.md` §3, en el repositorio de documentación. No se migró acá porque cambia poco y no es algo que otro módulo necesite consultar — si empieza a cambiar seguido, se trocea.
+El artefacto OpenAPI versionado de este snapshot se encuentra disponible en [Backend `docs/api/openapi.json`](https://github.com/hllous/Backend-M6-DAPS2/blob/30d49ea1d56f735a124ae9260cafefff095e07b6/docs/api/openapi.json); este espejo no lo duplica.
 
-## Glosario
-
-| Término | Qué es en M6 |
-|---|---|
-| **Zona operativa** (`Zone`) | Agrupación propia que junta uno o más barrios para armar recorridos y asignar cuadrillas. No confundir con "zona" en el sentido de M9 — ver [bloqueantes.md](bloqueantes.md) |
-| **Servicio** (`Service`) | Unidad de trabajo programable: tipo, fecha, cuadrilla y estado. Puede ser `ROUTE` o `POINT`. Ver [entidades/service.md](entidades/service.md) |
-| **Ticket** | El reclamo que el vecino presenta en M2, dueño del registro. Se llamaba `complaint` en los documentos viejos de este módulo — **migrado a `ticket`**, que es el nombre que usa toda la cohorte, antes de la primera entrega para no arrastrar un rename de esquema después |
-| **Acta** (`ViolationNotice`) | Lo que emitimos al constatar una violación. Inmutable una vez emitida. Ver [entidades/control-ambiental.md](entidades/control-ambiental.md) |
-| **Cuadrilla** (`Crew`) | Equipo de trabajo, municipal o de cooperativa, que ejecuta servicios |
-
-## Tablero de indicadores
-
-Cuatro familias, una por endpoint bajo `/indicators` — ver [api/endpoints.md](api/endpoints.md).
-
-- **Cobertura**: objetivos atendidos sobre programados, por período, zona y tipo de servicio.
-- **Cumplimiento**: servicios finalizados en término, demorados, y ranking de zonas no atendidas con sus motivos.
-- **Incidencias**: contenedores desbordados y dañados por zona, árboles por nivel de riesgo, denuncias por tipo y estado, y tiempo medio de resolución.
-- **Residuos**: kilos y metros cúbicos por tipo y destino, y porcentaje desviado a reciclaje.
-
-**El objetivo es el par (servicio, zona), no el servicio.** Un recorrido que pasa por cuatro zonas y atiende tres son tres objetivos cumplidos y uno no; medirlo por servicio perdería justamente la zona que quedó sin atender.
-
-## Mapa de esta carpeta
-
-- [entidades/](entidades/) — modelo de datos y estados
-- [eventos/publicados/](eventos/publicados/) — lo que este módulo emite
-- [eventos/consumidos/](eventos/consumidos/) — lo que este módulo escucha
-- [bloqueantes.md](bloqueantes.md) — estado vivo de la integración
-- [enumeraciones.md](enumeraciones.md) — catálogo de valores cerrados
+El espejo cubre el dominio y la API que consume el frontend. No incluye `eventos/`, `bloqueantes.md`, el despliegue ni los acuerdos de integración backend-a-backend; por eso, algunos enlaces relativos heredados de las páginas copiadas pueden apuntar fuera de este espejo. Para las hipótesis y los flujos del frontend, consultá [`CONTRACTS.md`](../../CONTRACTS.md); para el estado general del proyecto, [`ROADMAP.md`](../../ROADMAP.md). Los bloqueantes completos están en el [repositorio Backend](https://github.com/hllous/Backend-M6-DAPS2/blob/develop/docs/bloqueantes.md).

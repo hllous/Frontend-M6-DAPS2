@@ -13,7 +13,7 @@ web
 
 ## Product Purpose
 
-M6 supports the Municipality's internal Environment, Hygiene, and Urban Services operation. It brings service planning, field execution, territorial context, urban inventory, and environmental control into one capability-gated application.
+M6 supports the Municipality's internal Environment, Hygiene, and Urban Services operation. The frontend brings service planning, field execution, territorial context, urban inventory, and environmental control into one application for Office and Field personnel.
 
 ## Positioning
 
@@ -21,24 +21,26 @@ The application joins operational records to their territorial context: map-firs
 
 ## Operating Context
 
-The product is online-first. Field work must preserve drafts, expose synchronization state, and make retries explicit without pretending that unsupported offline synchronization exists. Office workflows favor scanability and density; field workflows favor a clear current task and safe evidence capture.
+The product is online-first. Field forms preserve local drafts and make manual retry explicit; they do not silently synchronize an offline queue. Office workflows favor scanability and density; field workflows favor a clear current task and safe evidence capture.
 
 ## Capabilities and Constraints
 
 - M1 owns users, organizations, and JWT issuance; M6 must not introduce competing identity concepts.
-- Backend finished its implementation plan on 2026-09-03: 130 REST routes, mirrored in `docs/backend-context/api/endpoints.md`. Endpoint shapes in `CONTRACTS.md` are now checked against it; what stays hypothesis is narrower (capability names, M1's JWT claims, client-side-only rules). Adapters remain typed and replaceable, and the Zod validation layer stays permanently — a shipped backend is not a verified one.
-- Role-based authorization does not exist server-side: any authenticated user can call any endpoint until M1 publishes its role taxonomy. Frontend capability gating shapes the UI; it is not a security boundary today.
+- Backend's seven implementation phases are complete. The current API snapshot is `Backend-M6-DAPS2` `develop` commit `30d49ea1d56f735a124ae9260cafefff095e07b6` (checked 2026-10-01): 134 OpenAPI operations in 23 Swagger tags. `CONTRACTS.md` distinguishes confirmed backend behavior from frontend reconciliation work and external hypotheses.
+- The frontend has implemented the main Office and Field workflows, typed adapters, Zod validation, and a same-origin Next.js BFF. Local scenarios use mock mode; backend integration uses a server-side development JWT. Real M1 authentication is not available until M1 publishes a verifiable token contract.
+- Backend authenticates protected requests but currently applies no role restrictions to domain endpoints. Frontend capability checks shape the UI and are not an authorization boundary. Backend now checks evidence magic bytes, enforces a 10 MB limit, and removes metadata from understood JPEG/PNG/WebP files; PDF cleanup and malware scanning are absent, Tier-2 auditing was deferred outside the current TPO delivery, and there is no export endpoint. Backend issue #90 closed as `NOT_PLANNED`; its closure does not mean these exclusions were implemented. See [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md) for the separate release decisions.
 - Product terminology follows `CONTEXT.md` and `docs/backend-context/`.
 - The application information architecture and core Service workflow are recorded in the Wayfinder map and its linked decisions.
 - Spanish is the product language.
 
 ## Evidence on Hand
 
-- Validated map/table workspace prototype: `prototype/map-table-workspace`.
-- Validated complex operational-form prototype: `prototype/complex-operational-form`.
-- Civic operations and accessibility research: `docs/011-research-geospatial-platform` and `docs/013-research-civic-visual-accessibility`.
-- No production brand assets or approved municipal seal are present; future design work must not fabricate them.
-- The capability- and dependency-based implementation sequence, its typed gates, and phase acceptance evidence are recorded in `ROADMAP.md`.
+- The current user-facing implementation lives under `src/app/app/`, with BFF handlers under `src/app/api/` and typed adapters under `src/lib/`.
+- Browser journeys and accessibility checks are maintained in `e2e/`; their presence documents coverage, not a test run for this documentation update.
+- Visual explorations are kept under `src/app/prototype/`. The approved visual and interaction rules are in `DESIGN.md`; examples are indexed in `docs/design/examples/`.
+- The Wayfinder issue map records the original product decisions. Current domain vocabulary and durable technical decisions live in `CONTEXT.md` and `docs/adr/`.
+- No approved municipal seal or production brand asset is maintained in this repository; future design work must not fabricate one.
+- Implementation status and the remaining release gates are recorded in `ROADMAP.md`.
 
 ## Product Principles
 

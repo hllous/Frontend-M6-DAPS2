@@ -76,7 +76,7 @@ import { addDisposalSiteFixture, disposalSiteFixtures, filterDisposalSiteFixture
 import { disposalSiteCreateInputSchema, disposalSiteTypeSchema, disposalSiteUpdateInputSchema, type DisposalSiteQuery } from "@/lib/disposal-sites";
 import { addServiceTypeFixture, filterServiceTypeFixtures, paginateServiceTypeFixtures, serviceTypeFixtures, updateServiceTypeFixture } from "@/lib/service-type-fixtures";
 import { serviceTypeCategorySchema, serviceTypeCreateInputSchema, serviceTypeModeSchema, serviceTypeUpdateInputSchema, type ServiceTypeQuery } from "@/lib/service-types";
-import { addServiceFrequencyFixture, closeServiceFrequencyFixture, filterServiceFrequencyFixtures, paginateServiceFrequencyFixtures, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
+import { serviceFrequencyResponseFixture, addServiceFrequencyFixture, closeServiceFrequencyFixture, filterServiceFrequencyFixtures, paginateServiceFrequencyFixtures, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
 import { serviceFrequencyCreateInputSchema, serviceFrequencyShiftSchema, serviceFrequencyUpdateInputSchema, type ServiceFrequencyQuery } from "@/lib/service-frequencies";
 import { createVehicleInputSchema, updateVehicleInputSchema, type VehicleQuery } from "@/lib/vehicles";
 import { addVehicleFixture, filterVehicleFixtures, paginateVehicleFixtures, vehicleFixtures } from "@/lib/vehicles-fixtures";
@@ -924,7 +924,7 @@ export const handlers = [
   }),
   http.get("*/api/service-frequencies/:serviceFrequencyId", ({ params }) => {
     const item = serviceFrequencyFixtures.find((candidate) => candidate.id === params.serviceFrequencyId);
-    return item ? HttpResponse.json(item) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
+    return item ? HttpResponse.json(serviceFrequencyResponseFixture(item)) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
   }),
   http.post("*/api/service-frequencies", async ({ request }) => {
     const parsed = serviceFrequencyCreateInputSchema.safeParse(await request.json());
@@ -933,17 +933,17 @@ export const handlers = [
     if (!serviceType || serviceType.mode !== "ROUTE") return HttpResponse.json({ statusCode: 400, message: "El tipo de servicio debe ser de modo ROUTE.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
     const created = { id: `freq-${Date.now()}`, ...parsed.data, validTo: parsed.data.validTo ?? null };
     addServiceFrequencyFixture(created);
-    return HttpResponse.json(created, { status: 201 });
+    return HttpResponse.json(serviceFrequencyResponseFixture(created), { status: 201 });
   }),
   http.patch("*/api/service-frequencies/:serviceFrequencyId", async ({ params, request }) => {
     const parsed = serviceFrequencyUpdateInputSchema.safeParse(await request.json());
     if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
     const updated = updateServiceFrequencyFixture(params.serviceFrequencyId as string, parsed.data);
-    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
+    return updated ? HttpResponse.json(serviceFrequencyResponseFixture(updated)) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
   }),
   http.delete("*/api/service-frequencies/:serviceFrequencyId", ({ params }) => {
     const updated = closeServiceFrequencyFixture(params.serviceFrequencyId as string, "2026-09-06");
-    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
+    return updated ? HttpResponse.json(serviceFrequencyResponseFixture(updated)) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
   }),
   http.get("*/api/vehicles", ({ request }) => HttpResponse.json(paginateVehicleFixtures(filterVehicleFixtures(vehicleQueryFromUrl(request.url))))),
   http.get("*/api/vehicles/:vehicleId", ({ params }) => {
@@ -2500,6 +2500,17 @@ export const handlers = [
     }
     if (ownerType === "CONTAINER") {
       return HttpResponse.json(getContainerAttachments(ownerId));
+    }
+    // Zone-result evidence (#316), using the result ID rather than the zone ID.
+    if (ownerType === "ZONE_RESULT") {
+      const result = zoneResultFixtures.find((item) => item.id === ownerId);
+      if (!result) {
+        return HttpResponse.json(
+          { statusCode: 404, message: "Resultado de zona no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/evidence" },
+          { status: 404 },
+        );
+      }
+      return HttpResponse.json(result.attachments);
     }
     if (ownerType === "INSPECTION") {
       const attachments = getInspectionAttachments(ownerId);

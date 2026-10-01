@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { closeServiceFrequencyFixture, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
+import { serviceFrequencyResponseFixture, closeServiceFrequencyFixture, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
 import { serviceFrequencyUpdateInputSchema } from "@/lib/service-frequencies";
 import { fetchBackend } from "@/lib/bff-backend";
 import { getScenario } from "@/lib/scenarios";
@@ -19,7 +19,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const id = await targetId(context);
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) { const response = await fetchBackend(request, `/service-frequencies/${id}`); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
     const item = serviceFrequencyFixtures.find((candidate) => candidate.id === id);
-    return item ? NextResponse.json(item) : errorResponse(404, "Frecuencia no encontrada.", path);
+    return item ? NextResponse.json(serviceFrequencyResponseFixture(item)) : errorResponse(404, "Frecuencia no encontrada.", path);
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
@@ -38,7 +38,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) { const response = await fetchBackend(request, `/service-frequencies/${id}`, "serviceFrequency:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
     const updated = updateServiceFrequencyFixture(id, parsed.data);
-    return updated ? NextResponse.json(updated) : errorResponse(404, "Frecuencia no encontrada.", path);
+    return updated ? NextResponse.json(serviceFrequencyResponseFixture(updated)) : errorResponse(404, "Frecuencia no encontrada.", path);
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
@@ -54,7 +54,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const id = await targetId(context);
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) { const response = await fetchBackend(request, `/service-frequencies/${id}`, "serviceFrequency:manage", { method: "DELETE" }); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
     const updated = closeServiceFrequencyFixture(id);
-    return updated ? NextResponse.json(updated) : errorResponse(404, "Frecuencia no encontrada.", path);
+    return updated ? NextResponse.json(serviceFrequencyResponseFixture(updated)) : errorResponse(404, "Frecuencia no encontrada.", path);
   } catch (error) {
     if (error instanceof InvalidSessionError) { recordTelemetryEvent({ name: "auth_session_expired", status: 401 }); return errorResponse(401, "La sesión no está activa.", path); }
     if (error instanceof ForbiddenSessionError) { recordTelemetryEvent({ name: "auth_forbidden", status: 403 }); return errorResponse(403, error.message, path); }

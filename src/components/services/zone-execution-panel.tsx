@@ -22,6 +22,7 @@ import {
   Service,
   ServiceRequestError,
   containerLocationSchema,
+  type Attachment,
   type ContainerLocation,
   type CompleteServiceInput,
   servicesAdapter,
@@ -48,6 +49,7 @@ interface QueuedEvidenceFile {
   idempotencyKey: string;
   status: "pending" | "uploading" | "success" | "error";
   canonicalFilename?: string;
+  attachmentId?: string;
   error?: string;
 }
 
@@ -101,6 +103,11 @@ export function ZoneExecutionPanel({
     composedAgainst: FieldDraftServiceSnapshot;
   } | null>(null);
   const [queuedFiles, setQueuedFiles] = useState<QueuedEvidenceFile[]>([]);
+  const [evidence, setEvidence] = useState<{
+    ownerId: string;
+    attachments: Attachment[];
+    error?: string;
+  } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -171,6 +178,28 @@ export function ZoneExecutionPanel({
   };
 
   const selectedZoneResult = zoneResults.find((r) => r.zoneId === selectedZoneId);
+  // Both Campo and Oficina read evidence from the persisted ZoneResult owner.
+  useEffect(() => {
+    if (!selectedZoneResult) return;
+    let isCurrent = true;
+    const ownerId = selectedZoneResult.id;
+    void servicesAdapter.getZoneResultEvidence(ownerId)
+      .then((attachments) => {
+        if (isCurrent) setEvidence({ ownerId, attachments });
+      })
+      .catch(() => {
+        if (isCurrent) setEvidence({
+          ownerId, attachments: [],
+          error: "No se pudo cargar la evidencia. Recargue el servicio para reintentar.",
+        });
+      });
+    return () => { isCurrent = false; };
+  }, [selectedZoneResult]);
+  const currentEvidence = evidence?.ownerId === selectedZoneResult?.id ? evidence : null;
+  const persistedAttachments = [...new Map([
+    ...(selectedZoneResult?.attachments ?? []),
+    ...(currentEvidence?.attachments ?? []),
+  ].map((attachment) => [attachment.id, attachment])).values()];
   const selectedZoneIndex = service.zoneIds.indexOf(selectedZoneId);
   const selectedZoneName =
     selectedZoneIndex >= 0 && service.zoneNames[selectedZoneIndex]
@@ -217,6 +246,11 @@ export function ZoneExecutionPanel({
         idempotencyKey: item.idempotencyKey,
       });
 
+      setEvidence((prev) => ({
+        ownerId: zoneResultId,
+        attachments: [...(prev?.ownerId === zoneResultId ? prev.attachments : []), att],
+      }));
+
       setQueuedFiles((prev) =>
         prev.map((f) =>
           f.id === item.id
@@ -224,6 +258,7 @@ export function ZoneExecutionPanel({
                 ...f,
                 status: "success",
                 canonicalFilename: att.filename,
+                attachmentId: att.id,
               }
             : f,
         ),
@@ -753,25 +788,31 @@ export function ZoneExecutionPanel({
                 {(() => {
                   const queuedToDisplay = queuedFiles.filter(
                     (q) =>
-                      !selectedZoneResult.attachments.some(
+                      !persistedAttachments.some(
                         (att) =>
-                          att.filename === q.canonicalFilename || att.filename === q.localFilename,
+                          att.id === q.attachmentId,
                       ),
                   );
-                  const totalCount = selectedZoneResult.attachments.length + queuedToDisplay.length;
+                  const totalCount = persistedAttachments.length + queuedToDisplay.length;
 
                   return (
                     <>
                       <span className="font-semibold text-[var(--color-text-secondary)] block mb-2">
                         Evidencia adjunta ({totalCount}):
                       </span>
-                      {totalCount === 0 ? (
+                      {!currentEvidence && (
+                        <p role="status" className="text-[var(--color-text-secondary)]">Cargando evidencia...</p>
+                      )}
+                      {currentEvidence?.error && (
+                        <p role="alert" className="text-[var(--color-danger)]">{currentEvidence.error}</p>
+                      )}
+                      {totalCount === 0 && currentEvidence && !currentEvidence.error ? (
                         <p className="text-[var(--color-text-secondary)] italic">
                           Sin archivos adjuntos.
                         </p>
                       ) : (
                         <ul className="space-y-1.5" role="list">
-                          {selectedZoneResult.attachments.map((att) => (
+                          {persistedAttachments.map((att) => (
                             <li
                               key={att.id}
                               className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs"
