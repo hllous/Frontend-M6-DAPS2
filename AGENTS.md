@@ -2,7 +2,7 @@
 
 ## Contexto de dominio (backend)
 
-Backend has finished all seven phases of its plan: 130 REST routes in 23 Swagger tags, documented at `/api/docs`. [`docs/backend-context/`](docs/backend-context/) mirrors Backend's domain model, API standard and endpoint catalogue (entities, enums, DER, Swagger convention, `api/endpoints.md`) — read-only, refreshed 2026-09-30 from `develop` commit `eda505f`; it diverges from `Backend/docs/` over time, so re-copy rather than edit. Event/integration docs (`eventos/`, `bloqueantes.md`) aren't mirrored: they describe backend-to-backend traffic, not the frontend-facing API.
+Backend has finished all seven phases of its plan: 134 REST routes in 23 Swagger tags, documented at `/api/docs`. [`docs/backend-context/`](docs/backend-context/) mirrors Backend's domain model, API standard and endpoint catalogue (entities, enums, DER, Swagger convention, `api/endpoints.md`) — read-only, refreshed 2026-10-01 from `develop` commit `30d49ea1d56f735a124ae9260cafefff095e07b6`; it diverges from `Backend/docs/` over time, so re-copy rather than edit. Event/integration docs (`eventos/`, `bloqueantes.md`) aren't mirrored: they describe backend-to-backend traffic, not the frontend-facing API.
 
 `CONTRACTS.md` reads endpoint shapes off that mirror. Anything still marked `hypothesis` there is genuinely unconfirmed (capability names, M1's JWT claims, client-side-only rules) — not "Backend hasn't built it yet."
 

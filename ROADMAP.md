@@ -1,6 +1,6 @@
 # M6 Frontend Implementation Roadmap
 
-This roadmap records the capability and dependency sequence for the M6 Environment, Hygiene and Urban Services frontend, originally produced by [issue #67](https://github.com/hllous/Frontend-M6-DAPS2/issues/67) on the [Wayfinder map](https://github.com/hllous/Frontend-M6-DAPS2/issues/6). Its phases and acceptance criteria preserve the original implementation plan; the status snapshot below describes the repository now.
+This roadmap records the capability and dependency sequence for the M6 Environment, Hygiene and Urban Services frontend, originally produced by [issue #67](https://github.com/hllous/Frontend-M6-DAPS2/issues/67) on the [Wayfinder map](https://github.com/hllous/Frontend-M6-DAPS2/issues/6). Its phases and acceptance criteria preserve the original implementation plan; the status snapshot below describes the repository now. Backend-facing contract and security claims in this snapshot were checked against `Backend-M6-DAPS2` `develop` at `30d49ea1d56f735a124ae9260cafefff095e07b6` on 2026-10-01 (134 OpenAPI operations in 23 tags).
 
 Phasing is capability- and dependency-based, not calendar- or team-size-based: a phase is ready to start the moment its prerequisites close, regardless of who is available. Sequence numbers describe dependency order, not a fixed schedule — a team could run Phase 7's fixture-based work alongside Phase 2 once Phase 1 lands, for example.
 
@@ -24,23 +24,23 @@ Each phase states:
 
 ## Estado de implementación
 
-Revisión del árbol de trabajo al **30/09/2026**. Las fases 0–7 tienen pantallas, adaptadores y recorridos de prueba en el repositorio. Este estado se basa en la presencia y revisión de esos archivos; las suites no se ejecutaron para esta actualización documental.
+Revisión del árbol de trabajo al **01/10/2026**. Las fases 0–7 tienen pantallas, adaptadores y recorridos de prueba en el repositorio. Este estado se basa en la presencia y revisión de esos archivos; las suites no se ejecutaron para esta actualización documental.
 
 | Fase | Estado en el frontend | Referencias |
 |---|---|---|
 | 0 — Foundation | Implementada en modo mock y `backend-development`. El inicio de sesión real de M1 sigue bloqueado. | [sesión BFF](src/app/api/session/login/route.ts), [ingreso y actores](e2e/entry-and-roles.spec.ts) |
-| 1 — Service core loop | Implementada; la cancelación desde `RESCHEDULED` sigue en discrepancia con Backend (#114). | [workspace de Servicios](src/components/services/services-workspace.tsx), [journeys](e2e/services.spec.ts) |
+| 1 — Service core loop | Implementada; Oficina puede cancelar directamente desde `RESCHEDULED` con un motivo, de acuerdo con Backend (#114, completado). | [workspace de Servicios](src/components/services/services-workspace.tsx), [journeys](e2e/services.spec.ts) |
 | 2a–2d — Catálogos | Implementadas las vistas de catálogos y sus adaptadores. La fuente real del catálogo externo de barrios continúa pendiente. | [catálogos](src/app/app/catalog/page.tsx), [zonas](e2e/zones-catalog.spec.ts) |
 | 3 — Derivaciones | Implementadas las solicitudes de reparación y de corte, con conciliación manual y anomalías visibles. | [derivaciones](e2e/referrals.spec.ts) |
 | 4 — Contenedores | Implementados los reportes y las acciones de Oficina. | [ciclo de contenedores](e2e/container-repair-removal.spec.ts) |
 | 5 — Arbolado | Implementados el censo, los relevamientos y las intervenciones. | [arbolado](e2e/tree-interventions.spec.ts) |
 | 6 — Control ambiental | Implementados los expedientes, inspecciones, evidencia y actas; el directorio real de establecimientos de M4 sigue pendiente. | [expedientes](e2e/environmental-reports.spec.ts), [inspecciones](e2e/inspection-execution.spec.ts) |
-| 7 — Indicadores | Implementado el tablero; la forma exacta de algunas respuestas sigue siendo hipótesis validada en adaptadores. | [tablero](e2e/indicator-dashboard.spec.ts) |
-| 8 — Preparación de producción | En progreso. Faltan el contrato e integración reales de M1 y los controles de seguridad y evidencia del backend, además de las verificaciones de release. | [gates](#typed-external-and-cross-cutting-gates), [contratos](CONTRACTS.md#release-dependencies) |
+| 7 — Indicadores | Implementado el tablero con validación Zod; algunos esquemas frontend aún requieren conciliación con el OpenAPI publicado. | [tablero](e2e/indicator-dashboard.spec.ts) |
+| 8 — Preparación de producción | En progreso. Faltan el contrato e integración reales de M1, las decisiones pendientes sobre límites de seguridad/evidencia y las verificaciones de release. Backend ya valida bytes y limpia metadatos de imágenes reconocidas; PDFs y malware siguen sin esos controles. | [gates](#typed-external-and-cross-cutting-gates), [contratos](CONTRACTS.md#release-dependencies) |
 
 ## Typed external and cross-cutting gates
 
-Estado revisado el 30/09/2026 contra el código y la documentación disponible en ambos repositorios. Estas dependencias siguen abiertas aunque las pantallas de sus fases ya estén implementadas.
+Estado revisado el 01/10/2026 contra el código frontend y Backend `develop` `30d49ea1d56f735a124ae9260cafefff095e07b6`. La tabla reúne dependencias, límites y decisiones con su estado individual, aunque las pantallas de sus fases ya estén implementadas.
 
 | Gate | Type | Affects | Tracking |
 |---|---|---|---|
@@ -49,8 +49,9 @@ Estado revisado el 30/09/2026 contra el código y la documentación disponible e
 | Backend's development JWT verifier uses an HS256 stopgap, not M1's final contract | Development integration only | Phase 0 `backend-development` mode | [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md) |
 | M9's neighborhood catalog is unpublished; the frontend adapter still uses replaceable data | External data source pending | Phase 2c neighborhood assignment | [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36) |
 | M4's establishment lookup contract is unpublished; frontend uses a local adapter | External data source pending | Phase 6 notice issuance | `CONTRACTS.md` → Remaining contract gaps |
-| Backend rejects `RESCHEDULED → CANCELLED`; frontend currently offers this action | Contract and implementation mismatch | Phase 1; blocks treating that workflow as complete | [Backend #114](https://github.com/hllous/Backend-M6-DAPS2/issues/114) |
-| Backend does not yet verify evidence magic bytes, strip image metadata, scan for malware, audit Tier-2 reads, or enforce export allowlists server-side | Blocks production security sign-off | Phase 8; see `CONTRACTS.md` and ADR-0006 | [Backend #90](https://github.com/hllous/Backend-M6-DAPS2/issues/90), [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md) |
+| Backend validates evidence bytes, enforces the 10 MB cap, and strips Exif/XMP/comments from understood JPEG, PNG, and WebP files; PDFs and unrecognized image structures pass unchanged, and malware scanning is absent | Partial control; confirm exclusions before production sign-off | Phase 8; see `CONTRACTS.md` and ADR-0006 | [Backend #90](https://github.com/hllous/Backend-M6-DAPS2/issues/90) (closed as NOT_PLANNED), [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md) |
+| Tier-2 read/write audit is absent; Backend explicitly deferred it outside the current TPO delivery | Deferred security decision; do not promise record-view history and reconfirm the gate before general availability | Phase 8 | [Backend #90](https://github.com/hllous/Backend-M6-DAPS2/issues/90) (closure comment), [#16](https://github.com/hllous/Frontend-M6-DAPS2/issues/16), [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md) |
+| No bulk/file export endpoint exists; aggregate indicators are read APIs rather than record exports | Not applicable to current API; apply the explicit server-side field projection policy if an export surface is added | Any future export surface | [Backend #90](https://github.com/hllous/Backend-M6-DAPS2/issues/90) (closure comment), [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md) |
 | M2's citizen-visible evidence policy and event payload remain unresolved | Unresolved external contract | Phase 8 integration | `CONTRACTS.md` → Remaining contract gaps |
 | Better Auth remains conditional on a compatible M1 OIDC contract | Deferred architecture option | Phase 8 authentication choice | [#17](https://github.com/hllous/Frontend-M6-DAPS2/issues/17), [#18](https://github.com/hllous/Frontend-M6-DAPS2/issues/18) |
 | Route stop-sequence replacement has no backend concurrency guard; frontend check is advisory | Known backend limitation | Phase 2c concurrent editing | [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36) |
@@ -213,8 +214,8 @@ A vertical slice attached to Phase 1, not a horizontal sweep across every domain
 
 **Acceptance evidence**:
 - Production mode uses M1's real JWT exclusively; mock and dev-JWT modes are disabled or unreachable outside development.
-- Backend issue #90's upload validation, malware scanning, Tier-2 read auditing, and server-side export allowlists are implemented and verified; frontend controls remain defense in depth, per ADR-0006.
-- Backend and frontend agree on whether `RESCHEDULED → CANCELLED` is supported; the transition implementation, Swagger documentation, and UI expose the same behavior.
+- Backend verifies evidence magic bytes, enforces the 10 MB cap, and strips supported image metadata; production sign-off still needs an explicit disposition for PDFs stored unchanged, parser fallbacks stored unchanged, and absent malware scanning. Tier-2 auditing remains deferred from the current delivery; do not describe it as implemented. There is no export endpoint, so no current export allowlist is exercised; any future export must use a server-side explicit projection.
+- Backend and frontend both support `SCHEDULED`, `RESCHEDULED`, or `SUSPENDED → CANCELLED` with a required reason; direct `IN_PROGRESS → CANCELLED` remains rejected. Backend #114 is completed, so cancellation is no longer a Phase 1 mismatch.
 - M2's visible-to-citizen attachment policy is confirmed and the `{ attachmentId, fileName, contentType, url, sizeBytes }` projection is verified end-to-end.
 - Performance, observability, and rollback gates from #64/#15/#19 pass under real load.
 
