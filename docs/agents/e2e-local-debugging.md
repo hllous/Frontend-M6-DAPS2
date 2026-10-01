@@ -14,13 +14,13 @@ where you're pointing it at a server you started by hand. Without them,
 `/api/session/login` 404s and every spec fails on session seeding, reading
 like a broken environment rather than a missing flag:
 
-```
+```bash
 M6_AUTH_MODE=mock NEXT_PUBLIC_DISABLE_MSW=true PLAYWRIGHT_BASE_URL=http://127.0.0.1:<port> npm run dev -- --port <port>
 ```
 
 Confirm the server is actually up before trusting a test run against it:
 
-```
+```bash
 curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:<port>/api/session/login -H "content-type: application/json" -d '{"scenarioId":"office-duty-queue"}'
 ```
 
@@ -36,7 +36,7 @@ process (serving whatever build and env it started with, including
 accumulated in-memory mock-fixture state from earlier test runs). Before
 starting a server on a port you've used already:
 
-```
+```bash
 netstat -ano | grep ":<port>" | grep LISTENING
 taskkill //PID <pid> //F
 ```
