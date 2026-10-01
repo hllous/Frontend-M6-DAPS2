@@ -21,6 +21,20 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("service frequencies adapter", () => {
+  it("normaliza las fechas ISO del listado real sin desplazar el día de vigencia", async () => {
+    server.use(http.get("*/api/service-frequencies", () => HttpResponse.json({
+      data: [{
+        id: "freq-backend", serviceTypeId: "st-waste-route", routeId: "route-1",
+        weekdays: [1, 3, 5], shift: "MORNING",
+        validFrom: "2026-09-05T00:00:00.000Z", validTo: "2026-09-30T00:00:00.000Z",
+      }],
+      meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    const page = await serviceFrequenciesAdapter.list();
+    expect(page.serviceFrequencies[0]).toMatchObject({ validFrom: "2026-09-05", validTo: "2026-09-30" });
+  });
+
   it("normalizes the confirmed paginated contract and query filters", async () => {
     const page = await serviceFrequenciesAdapter.list({ routeId: "route-1", shift: "MORNING", weekday: 3, validOn: "2026-09-03" });
 
@@ -42,7 +56,7 @@ describe("service frequencies adapter", () => {
     let requestBody: unknown;
     server.use(http.post("*/api/service-frequencies", async ({ request }) => {
       requestBody = await request.json();
-      return HttpResponse.json({ id: "freq-new", ...requestBody as object, validTo: null }, { status: 201 });
+      return HttpResponse.json({ id: "freq-new", ...requestBody as object, validFrom: "2026-09-07T00:00:00.000Z", validTo: null }, { status: 201 });
     }));
 
     const created = await serviceFrequenciesAdapter.create({
@@ -60,7 +74,7 @@ describe("service frequencies adapter", () => {
       shift: "AFTERNOON",
       validFrom: "2026-09-07",
     });
-    expect(created).toMatchObject({ id: "freq-new", validTo: null });
+    expect(created).toMatchObject({ id: "freq-new", validFrom: "2026-09-07", validTo: null });
   });
 
   it("uses PATCH for editable fields only and DELETE for Cerrar vigencia", async () => {
@@ -69,20 +83,37 @@ describe("service frequencies adapter", () => {
     server.use(
       http.patch("*/api/service-frequencies/:id", async ({ request }) => {
         patchBody = await request.json();
-        return HttpResponse.json({ ...serviceFrequencyFixtures[0], ...(patchBody as object) });
+        return HttpResponse.json({ ...serviceFrequencyFixtures[0], ...(patchBody as object), validFrom: "2026-09-02T00:00:00.000Z" });
       }),
       http.delete("*/api/service-frequencies/:id", ({ request }) => {
         deleteMethod = request.method;
-        return HttpResponse.json({ ...serviceFrequencyFixtures[0], validTo: "2026-09-06" });
+        return HttpResponse.json({ ...serviceFrequencyFixtures[0], validFrom: "2026-09-02T00:00:00.000Z", validTo: "2026-09-06T00:00:00.000Z" });
       }),
     );
 
-    await serviceFrequenciesAdapter.update("freq-1", { weekdays: [2, 4], shift: "NIGHT", validFrom: "2026-09-02", validTo: null });
+    const updated = await serviceFrequenciesAdapter.update("freq-1", { weekdays: [2, 4], shift: "NIGHT", validFrom: "2026-09-02", validTo: null });
     const closed = await serviceFrequenciesAdapter.close("freq-1");
 
     expect(patchBody).toEqual({ weekdays: [2, 4], shift: "NIGHT", validFrom: "2026-09-02", validTo: null });
     expect(deleteMethod).toBe("DELETE");
+    expect(updated).toMatchObject({ validFrom: "2026-09-02", validTo: null });
     expect(closed.validTo).toBe("2026-09-06");
+  });
+
+  it("normaliza el detalle ISO y mantiene estrictas las fechas de escritura", async () => {
+    expect(await serviceFrequenciesAdapter.get("freq-1")).toMatchObject({ validFrom: "2026-09-01", validTo: null });
+    await expect(serviceFrequenciesAdapter.create({
+      serviceTypeId: "st-waste-route", routeId: "route-1", weekdays: [1], shift: "MORNING",
+      validFrom: "2026-09-05T00:00:00.000Z",
+    })).rejects.toBeInstanceOf(ServiceFrequencyContractError);
+    await expect(serviceFrequenciesAdapter.update("freq-1", { validTo: "2026-09-30T00:00:00.000Z" })).rejects.toBeInstanceOf(ServiceFrequencyContractError);
+  });
+
+  it("rechaza fechas de respuesta que no son ISO válidas", async () => {
+    server.use(http.get("*/api/service-frequencies/:id", () => HttpResponse.json({
+      ...serviceFrequencyFixtures[0], validFrom: "2026-09-05Tfecha-inválida",
+    })));
+    await expect(serviceFrequenciesAdapter.get("freq-1")).rejects.toBeInstanceOf(ServiceFrequencyContractError);
   });
 
   it("rejects malformed success and error payloads explicitly", async () => {

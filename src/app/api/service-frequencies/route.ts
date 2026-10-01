@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
-import { addServiceFrequencyFixture, filterServiceFrequencyFixtures, paginateServiceFrequencyFixtures } from "@/lib/service-frequency-fixtures";
+import { serviceFrequencyResponseFixture, addServiceFrequencyFixture, filterServiceFrequencyFixtures, paginateServiceFrequencyFixtures } from "@/lib/service-frequency-fixtures";
 import { serviceFrequencyCreateInputSchema, serviceFrequencyShiftSchema, type ServiceFrequencyQuery } from "@/lib/service-frequencies";
 import { serviceTypeFixtures } from "@/lib/service-type-fixtures";
 import { getScenario } from "@/lib/scenarios";
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     if (!serviceType || serviceType.mode !== "ROUTE") return errorResponse(400, "El tipo de servicio debe ser de modo ROUTE.", path);
     const created = { id: `freq-${Date.now()}`, ...parsed.data, validTo: parsed.data.validTo ?? null };
     addServiceFrequencyFixture(created);
-    return NextResponse.json(created, { status: 201 });
+    return NextResponse.json(serviceFrequencyResponseFixture(created), { status: 201 });
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);

@@ -531,7 +531,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
  * el mismo título y no se degrada después de una acción.
  */
 async function completarEtiquetas(wire: z.infer<typeof serviceWireSchema>): Promise<Service> {
-  const { serviceTypes, zones, crews } = await catalogoDeEtiquetas();
+  const { serviceTypes, zones, crews, vehicles } = await catalogoDeEtiquetas();
   const nombresDeZona = wire.zoneIds.map((zoneId) => zones.get(zoneId)).filter((nombre): nombre is string => Boolean(nombre));
   const tipo = serviceTypes.get(wire.serviceTypeId);
   const nombreDeTipo = tipo?.name;
@@ -541,6 +541,7 @@ async function completarEtiquetas(wire: z.infer<typeof serviceWireSchema>): Prom
     serviceTypeCategory: tipo?.category ?? wire.serviceTypeCategory,
     zoneNames: wire.zoneNames.length > 0 ? wire.zoneNames : nombresDeZona,
     crewName: wire.crewName ?? (wire.crewId ? crews.get(wire.crewId) ?? null : null),
+    vehiclePlate: wire.vehiclePlate ?? (wire.vehicleId ? vehicles.get(wire.vehicleId) ?? null : null),
     title: wire.title ?? componerTituloDeServicio(wire, { serviceType: nombreDeTipo, zones: nombresDeZona }),
   };
 }
@@ -1109,6 +1110,34 @@ export const servicesAdapter = {
       );
     }
 
+    return parsed.data;
+  },
+
+  // Zone-result attachments are listed separately from GET /services/:id/zone-results.
+  async getZoneResultEvidence(zoneResultId: string): Promise<Attachment[]> {
+    const response = await authenticatedFetch(
+      `/api/evidence?ownerType=ZONE_RESULT&ownerId=${encodeURIComponent(zoneResultId)}`,
+    );
+    const payload = await readJsonBody(response);
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError("La respuesta de error de evidencia no respeta el contrato.", {
+          cause: parsedError.error,
+        });
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ") : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+    const parsed = z.array(attachmentSchema).safeParse(payload);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError("La lista de evidencia de zona no respeta el contrato.", {
+        cause: parsed.error,
+      });
+    }
     return parsed.data;
   },
 

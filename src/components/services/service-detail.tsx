@@ -487,7 +487,7 @@ export function ServiceDetail({
                 {service.vehiclePlate ?? "Sin vehículo"}
               </div>
               <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                {service.vehicleId ? `ID: ${service.vehicleId}` : "Sin requerimiento especial"}
+                {service.vehicleId ? (service.vehiclePlate ? "Vehículo asignado" : "Patente no disponible") : "Sin requerimiento especial"}
               </div>
             </div>
           </div>
