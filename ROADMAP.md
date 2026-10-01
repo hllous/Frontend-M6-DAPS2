@@ -35,12 +35,12 @@ Revisión del árbol de trabajo al **01/10/2026**. Las fases 0–7 tienen pantal
 | 4 — Contenedores | Implementados los reportes y las acciones de Oficina. | [ciclo de contenedores](e2e/container-repair-removal.spec.ts) |
 | 5 — Arbolado | Implementados el censo, los relevamientos y las intervenciones. | [arbolado](e2e/tree-interventions.spec.ts) |
 | 6 — Control ambiental | Implementados los expedientes, inspecciones, evidencia y actas; el directorio real de establecimientos de M4 sigue pendiente. | [expedientes](e2e/environmental-reports.spec.ts), [inspecciones](e2e/inspection-execution.spec.ts) |
-| 7 — Indicadores | Implementado el tablero; la forma exacta de algunas respuestas sigue siendo hipótesis validada en adaptadores. | [tablero](e2e/indicator-dashboard.spec.ts) |
+| 7 — Indicadores | Implementado el tablero con validación Zod; algunos esquemas frontend aún requieren conciliación con el OpenAPI publicado. | [tablero](e2e/indicator-dashboard.spec.ts) |
 | 8 — Preparación de producción | En progreso. Faltan el contrato e integración reales de M1, las decisiones pendientes sobre límites de seguridad/evidencia y las verificaciones de release. Backend ya valida bytes y limpia metadatos de imágenes reconocidas; PDFs y malware siguen sin esos controles. | [gates](#typed-external-and-cross-cutting-gates), [contratos](CONTRACTS.md#release-dependencies) |
 
 ## Typed external and cross-cutting gates
 
-Estado revisado el 01/10/2026 contra el código frontend y Backend `develop` `30d49ea1d56f735a124ae9260cafefff095e07b6`. Estas dependencias siguen abiertas aunque las pantallas de sus fases ya estén implementadas.
+Estado revisado el 01/10/2026 contra el código frontend y Backend `develop` `30d49ea1d56f735a124ae9260cafefff095e07b6`. La tabla reúne dependencias, límites y decisiones con su estado individual, aunque las pantallas de sus fases ya estén implementadas.
 
 | Gate | Type | Affects | Tracking |
 |---|---|---|---|
