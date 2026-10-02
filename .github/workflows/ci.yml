@@ -5,8 +5,11 @@
 # IMPORTANTE: los jobs "build" y "test" mantienen sus nombres para
 # preservar la convención de branch protection compartida con el
 # backend. "e2e" y "security" son gates nuevos (#88): ninguno se
-# ignora de forma permanente. "docs" (#348) valida la documentación;
-# no es un check requerido hasta agregarlo a branch protection.
+# ignora de forma permanente. "docs" (#348) valida la documentación y
+# es un check requerido una vez aplicadas las reglas de
+# .github/branch-protection-rules.json; el backend no tiene un job
+# "docs", así que los rule sets de ambos repos ahora difieren. El job
+# no lleva filtro de paths: un check requerido sin reportar bloquea el merge.
 # ──────────────────────────────────────────────────────────────
 
 name: CI
