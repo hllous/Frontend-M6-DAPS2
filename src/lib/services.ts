@@ -157,6 +157,8 @@ export const createServiceInputSchema = z
     targetType: z.enum(["CONTAINER", "TREE", "GREEN_SPACE", "GREEN_POINT"]).optional(),
     targetId: z.string().optional(),
     targetRef: z.string().optional(),
+    crewId: z.string().optional(),
+    vehicleId: z.string().optional(),
     scheduledDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
@@ -232,6 +234,8 @@ export function toCreateServiceBackendInput(input: CreateServiceInput) {
     targetType: hasTarget ? input.targetType : undefined,
     targetId: hasTarget ? input.targetId : undefined,
     ...(!zoneIsDerived ? { zoneId: input.zoneIds[0] } : {}),
+    crewId: input.crewId || undefined,
+    vehicleId: input.vehicleId || undefined,
     windowFrom: input.timeWindow.start,
     windowTo: input.timeWindow.end,
     ticketId: input.ticketId,
