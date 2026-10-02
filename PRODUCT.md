@@ -37,7 +37,7 @@ The product is online-first. Field forms preserve local drafts and make manual r
 
 - The current user-facing implementation lives under `src/app/app/`, with BFF handlers under `src/app/api/` and typed adapters under `src/lib/`.
 - Browser journeys and accessibility checks are maintained in `e2e/`; their presence documents coverage, not a test run for this documentation update.
-- The throwaway visual explorations that led to the design standard are archived in git under the tag `archive/visual-system-prototypes`; only `src/app/prototype/shell-examples/` remains, as the shell's stable review surface. The approved visual and interaction rules are in `DESIGN.md`; examples are indexed in `docs/design/examples/`.
+- The throwaway visual explorations that led to the design standard are archived in git under the tag `archive/visual-system-prototypes`; only `src/app/prototype/shell-examples/` remains, as the shell's stable review surface (available outside production only: it returns 404 in production builds). The approved visual and interaction rules are in `DESIGN.md`; examples are indexed in `docs/design/examples/`.
 - The Wayfinder issue map records the original product decisions. Current domain vocabulary and durable technical decisions live in `CONTEXT.md` and `docs/adr/`.
 - No approved municipal seal or production brand asset is maintained in this repository; future design work must not fabricate one.
 - Implementation status and the remaining release gates are recorded in `ROADMAP.md`.

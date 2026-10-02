@@ -8,7 +8,9 @@ The checklist lives in the PR template, [`.github/PULL_REQUEST_TEMPLATE.md`](../
 
 ## Branch protection
 
-Identical rules on `Backend-M6-DAPS2` and `Frontend-M6-DAPS2` — required `build`+`test` checks, linear history, no force-push, no deletion — already applied via GitHub API to `main`/`test`/`develop` on both repos. Reference: [`.github/branch-protection-rules.json`](../../.github/branch-protection-rules.json). Re-apply (idempotent) with [`.github/scripts/apply-branch-protection.ps1`](../../.github/scripts/apply-branch-protection.ps1) (needs `pwsh` + `gh` logged in as an admin).
+Rules on `main`/`test`/`develop`: required `build`+`test`+`docs` checks, linear history, no force-push, no deletion. `Backend-M6-DAPS2` has no `docs` job, so its rule sets require only `build`+`test` and the two repos' rules now differ. The `docs` job has no path filter on purpose: a required check that never reports blocks the merge. Reference: [`.github/branch-protection-rules.json`](../../.github/branch-protection-rules.json).
+
+`docs` is required only once the rules are applied. The reference file changes first; an admin then applies it (idempotent) with [`.github/scripts/apply-branch-protection.ps1`](../../.github/scripts/apply-branch-protection.ps1) (needs `pwsh` + `gh` logged in as an admin).
 
 ## `hotfix/*` exception
 
