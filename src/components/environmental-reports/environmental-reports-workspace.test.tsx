@@ -5,7 +5,7 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
-import { ingestSanctionOutcomeFixture, resetEnvironmentalReportFixtures, updateEnvironmentalInspectionFixture, updateEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
+import { environmentalReportFixtures, ingestSanctionOutcomeFixture, paginateEnvironmentalReportFixtures, resetEnvironmentalReportFixtures, updateEnvironmentalInspectionFixture, updateEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
 import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { environmentalReportsAdapter } from "@/lib/environmental-reports";
 import { repairRequestsAdapter } from "@/lib/repair-requests";
@@ -107,6 +107,51 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(detail).getByRole("button", { name: "Desestimar expediente" })).toBeVisible();
   });
 
+  it("pide al backend el filtro de prioridad y lo deja en la URL (#332)", async () => {
+    const user = userEvent.setup();
+    const requested: URLSearchParams[] = [];
+    server.use(http.get("*/api/environmental-reports", ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      requested.push(params);
+      const items = environmentalReportFixtures.filter((report) => !params.get("priority") || report.priority === params.get("priority"));
+      return HttpResponse.json({ ...paginateEnvironmentalReportFixtures(items, 1, 25), sanctionOutcomeIntegrationExceptions: [] });
+    }));
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    expect(within(list).getByRole("button", { name: /ER-1004/ })).toBeVisible();
+
+    await user.selectOptions(screen.getByLabelText("Prioridad"), "CRITICAL");
+
+    await waitFor(() => expect(requested.at(-1)?.get("priority")).toBe("CRITICAL"));
+    expect(requested.at(-1)?.get("pageSize")).toBe("25");
+    await waitFor(() => expect(screen.queryByRole("button", { name: /ER-1004/ })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /ER-1005/ })).toBeVisible();
+    expect(new URLSearchParams(window.location.search).get("priority")).toBe("CRITICAL");
+  });
+
+  it("recorre las páginas del backend y restaura la página desde la URL (#332)", async () => {
+    const user = userEvent.setup();
+    const pages: string[] = [];
+    server.use(http.get("*/api/environmental-reports", ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get("page") ?? 1);
+      pages.push(String(page));
+      return HttpResponse.json({
+        data: [{ ...environmentalReportFixtures[page - 1] }],
+        meta: { total: 3, page, pageSize: 1, totalPages: 3 },
+        sanctionOutcomeIntegrationExceptions: [],
+      });
+    }));
+    window.history.replaceState(null, "", "/app?destination=environment&page=2");
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByText("Página 2 de 3 · 3 expedientes")).toBeVisible();
+    expect(pages).toEqual(["2"]);
+    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    expect(await screen.findByText("Página 3 de 3 · 3 expedientes")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+    expect(new URLSearchParams(window.location.search).get("page")).toBe("3");
+  });
+
   it("asks for a reason before forwarding and sends it to the backend", async () => {
     const user = userEvent.setup();
     const forward = vi.spyOn(environmentalReportsAdapter, "forward");
@@ -136,9 +181,9 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     await user.type(search, "TK-2026-091");
 
+    await waitFor(() => expect(screen.queryByRole("button", { name: /ER-1003/ })).not.toBeInTheDocument());
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     expect(within(list).getByRole("button", { name: /ER-1002/ })).toBeVisible();
-    expect(within(list).queryByRole("button", { name: /ER-1003/ })).not.toBeInTheDocument();
 
     await user.click(within(list).getByRole("button", { name: /ER-1002/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1002" });
