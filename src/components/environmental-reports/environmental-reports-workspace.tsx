@@ -98,7 +98,7 @@ const statusGroups = [
   { label: "Ingreso y revisión", statuses: ["RECEIVED", "UNDER_REVIEW"] as const },
   { label: "Derivación", statuses: ["FORWARDED", "DISMISSED"] as const },
   { label: "Inspección y resultado", statuses: ["INSPECTION_SCHEDULED", "INSPECTED", "NO_VIOLATION", "VIOLATION_FOUND"] as const },
-  { label: "Acta y cierre", statuses: ["NOTICE_ISSUED", "SANCTIONED", "CLOSED", "REOPENED"] as const },
+  { label: "Acta y cierre", statuses: ["NOTICE_ISSUED", "SANCTIONED", "CLOSED"] as const },
 ];
 
 const statusIcon: Record<EnvironmentalReport["status"], typeof Clock3> = {
@@ -113,7 +113,6 @@ const statusIcon: Record<EnvironmentalReport["status"], typeof Clock3> = {
   NOTICE_ISSUED: FilePlus2,
   SANCTIONED: ShieldAlert,
   CLOSED: CircleCheck,
-  REOPENED: RefreshCw,
 };
 
 const statusTone: Record<EnvironmentalReport["status"], string> = {
@@ -128,7 +127,6 @@ const statusTone: Record<EnvironmentalReport["status"], string> = {
   NOTICE_ISSUED: "border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]",
   SANCTIONED: "border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] text-[var(--color-danger)]",
   CLOSED: "border-[var(--color-border-strong)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]",
-  REOPENED: "border-[var(--color-info-line)] bg-[var(--color-info-fill)] text-[var(--color-info)]",
 };
 
 function visibleToScenario(report: EnvironmentalReport, scenario: OperationalScenario) {

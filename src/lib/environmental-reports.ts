@@ -29,7 +29,6 @@ export const environmentalReportStatusSchema = z.enum([
   "NOTICE_ISSUED",
   "SANCTIONED",
   "CLOSED",
-  "REOPENED",
 ]);
 export type EnvironmentalReportStatus = z.infer<typeof environmentalReportStatusSchema>;
 
@@ -375,7 +374,6 @@ export const ENVIRONMENTAL_REPORT_STATUS_LABELS: Record<EnvironmentalReportStatu
   NOTICE_ISSUED: "Acta emitida",
   SANCTIONED: "Sancionado",
   CLOSED: "Cerrado",
-  REOPENED: "Reabierto · en revisión",
 };
 
 export const ENVIRONMENTAL_REPORT_PRIORITY_LABELS: Record<EnvironmentalReportPriority, string> = {
