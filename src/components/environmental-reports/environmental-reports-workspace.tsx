@@ -21,7 +21,7 @@ import {
   X,
   Wrench,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -41,6 +41,8 @@ import {
   type EnvironmentalInspection,
   type EnvironmentalInspectionScheduleInput,
   type EnvironmentalReport,
+  type EnvironmentalReportPriority,
+  type EnvironmentalReportStatus,
   type EnvironmentalReportType,
   type SanctionOutcomeIntegrationException,
   type ViolationNotice,
@@ -62,11 +64,26 @@ import { MAX_SEARCH_LENGTH, parseCoordinateField } from "@/lib/input-limits";
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; reports: EnvironmentalReport[]; total: number; sanctionOutcomeIntegrationExceptions: SanctionOutcomeIntegrationException[] };
+  | { status: "ready"; reports: EnvironmentalReport[]; total: number; totalPages: number; sanctionOutcomeIntegrationExceptions: SanctionOutcomeIntegrationException[] };
 
 type Action = "start-review" | "forward" | "dismiss" | "close";
 
 const reportTypes = environmentalReportTypeSchema.options;
+const reportPriorities = Object.keys(ENVIRONMENTAL_REPORT_PRIORITY_LABELS) as EnvironmentalReportPriority[];
+const QUEUE_PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
+
+function initialQueueParams() {
+  const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
+  const page = Number(params.get("page"));
+  return {
+    status: params.get("status") ?? "",
+    type: params.get("type") ?? "",
+    priority: params.get("priority") ?? "",
+    search: params.get("q") ?? "",
+    page: Number.isInteger(page) && page > 0 ? page : 1,
+  };
+}
 const inspectionChecklistVersions = [
   { value: "ambiental-v1", label: "Checklist ambiental v1" },
   { value: "ambiental-v2", label: "Checklist ambiental v2 (actualizado)" },
@@ -172,28 +189,46 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
   const [selectedId, setSelectedId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("detail"));
   const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("inspectionId"));
   const [createOpen, setCreateOpen] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<string>("");
-  const [filterType, setFilterType] = useState<string>("");
-  const [search, setSearch] = useState("");
+  const [initialParams] = useState(initialQueueParams);
+  const [filterStatus, setFilterStatus] = useState<string>(initialParams.status);
+  const [filterType, setFilterType] = useState<string>(initialParams.type);
+  const [filterPriority, setFilterPriority] = useState<string>(initialParams.priority);
+  const [search, setSearch] = useState(initialParams.search);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialParams.search.trim());
+  const [queuePage, setQueuePage] = useState(initialParams.page);
   const [announcement, setAnnouncement] = useState("");
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // El filtrado y la paginación los resuelve el backend; el navegador sólo recorta por escenario (Field).
   const fetchReports = useCallback(async () => {
-    const page = await environmentalReportsAdapter.list({ page: 1, pageSize: 100 });
+    const page = await environmentalReportsAdapter.list({
+      page: queuePage,
+      pageSize: QUEUE_PAGE_SIZE,
+      status: (filterStatus || undefined) as EnvironmentalReportStatus | undefined,
+      reportType: (filterType || undefined) as EnvironmentalReportType | undefined,
+      priority: (filterPriority || undefined) as EnvironmentalReportPriority | undefined,
+      search: debouncedSearch || undefined,
+    });
     return {
       reports: page.environmentalReports.filter((report) => visibleToScenario(report, scenario)),
       total: page.total,
+      totalPages: page.totalPages,
       sanctionOutcomeIntegrationExceptions: page.sanctionOutcomeIntegrationExceptions,
     };
-  }, [scenario]);
+  }, [scenario, queuePage, filterStatus, filterType, filterPriority, debouncedSearch]);
 
   const loadReports = useCallback(() => {
     setLoadState({ status: "loading" });
-    void fetchReports().then(({ reports, total, sanctionOutcomeIntegrationExceptions }) => setLoadState({ status: "ready", reports, total, sanctionOutcomeIntegrationExceptions })).catch((error: unknown) => setLoadState({ status: "error", message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes." }));
+    void fetchReports().then((result) => setLoadState({ status: "ready", ...result })).catch((error: unknown) => setLoadState({ status: "error", message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes." }));
   }, [fetchReports]);
 
   useEffect(() => {
     let current = true;
-    void fetchReports().then(({ reports, total, sanctionOutcomeIntegrationExceptions }) => { if (current) setLoadState({ status: "ready", reports, total, sanctionOutcomeIntegrationExceptions }); }).catch((error: unknown) => { if (current) setLoadState({ status: "error", message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes." }); });
+    void fetchReports().then((result) => { if (current) setLoadState({ status: "ready", ...result }); }).catch((error: unknown) => { if (current) setLoadState({ status: "error", message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes." }); });
     return () => { current = false; };
   }, [fetchReports]);
 
@@ -202,18 +237,12 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
     const url = new URL(window.location.href);
     if (selectedId) url.searchParams.set("detail", selectedId); else url.searchParams.delete("detail");
     if (selectedInspectionId) url.searchParams.set("inspectionId", selectedInspectionId); else url.searchParams.delete("inspectionId");
+    const queue: [string, string][] = [["status", filterStatus], ["type", filterType], ["priority", filterPriority], ["q", debouncedSearch], ["page", queuePage > 1 ? String(queuePage) : ""]];
+    for (const [key, value] of queue) { if (value) url.searchParams.set(key, value); else url.searchParams.delete(key); }
     window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`.replace(/\?$/, ""));
-  }, [selectedId, selectedInspectionId]);
+  }, [selectedId, selectedInspectionId, filterStatus, filterType, filterPriority, debouncedSearch, queuePage]);
 
-  const filteredReports = useMemo(() => {
-    if (loadState.status !== "ready") return [];
-    const normalized = search.trim().toLowerCase();
-    return loadState.reports.filter((report) =>
-      (!filterStatus || report.status === filterStatus) &&
-      (!filterType || report.reportType === filterType) &&
-      (!normalized || [report.id, reportAddress(report), reportDetails(report), report.publicId ?? "", report.ticketId ?? ""].some((value) => value.toLowerCase().includes(normalized))),
-    );
-  }, [filterStatus, filterType, loadState, search]);
+  const filteredReports = loadState.status === "ready" ? loadState.reports : [];
 
   const selectedReport = loadState.status === "ready" && selectedId ? loadState.reports.find((report) => report.id === selectedId) ?? null : null;
 
@@ -270,12 +299,13 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:p-6 lg:p-8">
         <p className="sr-only" aria-live="polite">{announcement}</p>
-        {scenario.actor.kind === "OFFICE" && <QueueFilters filterStatus={filterStatus} filterType={filterType} search={search} onStatus={setFilterStatus} onType={setFilterType} onSearch={setSearch} />}
+        {scenario.actor.kind === "OFFICE" && <QueueFilters filterStatus={filterStatus} filterType={filterType} filterPriority={filterPriority} search={search} onStatus={(value) => { setFilterStatus(value); setQueuePage(1); }} onType={(value) => { setFilterType(value); setQueuePage(1); }} onPriority={(value) => { setFilterPriority(value); setQueuePage(1); }} onSearch={(value) => { setSearch(value); setQueuePage(1); }} />}
         {loadState.status === "ready" && scenario.actor.kind === "OFFICE" && loadState.sanctionOutcomeIntegrationExceptions.length > 0 && <SanctionOutcomeIntegrationExceptionsPanel exceptions={loadState.sanctionOutcomeIntegrationExceptions} />}
         {loadState.status === "loading" && <LoadingState />}
         {loadState.status === "error" && <ErrorState message={loadState.message} onRetry={loadReports} />}
-        {loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={Boolean(filterStatus || filterType || search)} onClear={() => { setFilterStatus(""); setFilterType(""); setSearch(""); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}
+        {loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={Boolean(filterStatus || filterType || filterPriority || search)} onClear={() => { setFilterStatus(""); setFilterType(""); setFilterPriority(""); setSearch(""); setQueuePage(1); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}
         {loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"} aria-describedby="environmental-scope-note"><p id="environmental-scope-note" className="sr-only">Seleccione un expediente para consultar su detalle. Los estados representan el ciclo completo del expediente ambiental.</p><ul className="grid gap-3" role="list">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => { setSelectedId(report.id); setSelectedInspectionId(null); }} />)}</ul></section>}
+        {loadState.status === "ready" && loadState.totalPages > 1 && <QueuePagination page={queuePage} totalPages={loadState.totalPages} total={loadState.total} onPage={setQueuePage} />}
       </main>
 
       <CreateReportDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={handleCreated} />
@@ -283,8 +313,12 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
   );
 }
 
-function QueueFilters({ filterStatus, filterType, search, onStatus, onType, onSearch }: { filterStatus: string; filterType: string; search: string; onStatus: (value: string) => void; onType: (value: string) => void; onSearch: (value: string) => void }) {
-  return <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4" aria-label="Filtros de la cola"><div className="flex flex-col gap-3 lg:flex-row lg:items-end"><Field className="flex-1"><FieldLabel htmlFor="environmental-search">Buscar expediente</FieldLabel><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden /><input id="environmental-search" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => onSearch(event.target.value)} placeholder="ID, dirección o ticket" className="h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] pl-9 pr-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></div></Field><Field className="lg:w-64"><FieldLabel htmlFor="environmental-status">Estado</FieldLabel><select id="environmental-status" value={filterStatus} onChange={(event) => onStatus(event.target.value)} className="h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Todos los estados</option>{statusGroups.map((group) => <optgroup key={group.label} label={group.label}>{group.statuses.map((status) => <option key={status} value={status}>{ENVIRONMENTAL_REPORT_STATUS_LABELS[status]}</option>)}</optgroup>)}</select></Field><Field className="lg:w-64"><FieldLabel htmlFor="environmental-type">Tipo de hallazgo</FieldLabel><select id="environmental-type" value={filterType} onChange={(event) => onType(event.target.value)} className="h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Todos los tipos</option>{reportTypes.map((type) => <option key={type} value={type}>{ENVIRONMENTAL_REPORT_TYPE_LABELS[type]}</option>)}</select></Field></div></section>;
+function QueuePagination({ page, totalPages, total, onPage }: { page: number; totalPages: number; total: number; onPage: (page: number) => void }) {
+  return <nav className="flex items-center justify-between gap-3" aria-label="Paginación de la cola"><p className="text-sm text-[var(--color-text-secondary)]">Página {page} de {totalPages} · {total} expedientes</p><div className="flex gap-2"><Button variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>Anterior</Button><Button variant="outline" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>Siguiente</Button></div></nav>;
+}
+
+function QueueFilters({ filterStatus, filterType, filterPriority, search, onStatus, onType, onPriority, onSearch }: { filterStatus: string; filterType: string; filterPriority: string; search: string; onStatus: (value: string) => void; onType: (value: string) => void; onPriority: (value: string) => void; onSearch: (value: string) => void }) {
+  return <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4" aria-label="Filtros de la cola"><div className="flex flex-col gap-3 lg:flex-row lg:items-end"><Field className="flex-1"><FieldLabel htmlFor="environmental-search">Buscar expediente</FieldLabel><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden /><input id="environmental-search" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => onSearch(event.target.value)} placeholder="ID, dirección o ticket" className="h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] pl-9 pr-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" /></div></Field><Field className="lg:w-64"><FieldLabel htmlFor="environmental-status">Estado</FieldLabel><select id="environmental-status" value={filterStatus} onChange={(event) => onStatus(event.target.value)} className="h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Todos los estados</option>{statusGroups.map((group) => <optgroup key={group.label} label={group.label}>{group.statuses.map((status) => <option key={status} value={status}>{ENVIRONMENTAL_REPORT_STATUS_LABELS[status]}</option>)}</optgroup>)}</select></Field><Field className="lg:w-64"><FieldLabel htmlFor="environmental-type">Tipo de hallazgo</FieldLabel><select id="environmental-type" value={filterType} onChange={(event) => onType(event.target.value)} className="h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Todos los tipos</option>{reportTypes.map((type) => <option key={type} value={type}>{ENVIRONMENTAL_REPORT_TYPE_LABELS[type]}</option>)}</select></Field><Field className="lg:w-48"><FieldLabel htmlFor="environmental-priority">Prioridad</FieldLabel><select id="environmental-priority" value={filterPriority} onChange={(event) => onPriority(event.target.value)} className="h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"><option value="">Todas las prioridades</option>{reportPriorities.map((priority) => <option key={priority} value={priority}>{ENVIRONMENTAL_REPORT_PRIORITY_LABELS[priority]}</option>)}</select></Field></div></section>;
 }
 
 function ReportRow({ report, onOpen }: { report: EnvironmentalReport; onOpen: () => void }) {
