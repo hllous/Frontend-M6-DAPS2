@@ -24,10 +24,11 @@ Los documentos centrales están en la raíz. En particular, el dominio sigue la 
 ## Dónde agregar documentación
 
 - Vocabulario del dominio: `CONTEXT.md`.
-- Decisión técnica difícil de revertir: `docs/adr/`.
+- Decisión técnica difícil de revertir: `docs/adr/`, a partir de la [plantilla](adr/0000-template.md).
 - Contratos y reglas de integración del frontend: `CONTRACTS.md`.
 - Reglas visuales: `DESIGN.md`; ejemplos verificables, `docs/design/examples/`.
 - Procedimientos de contribución y operación: `docs/agents/` y `docs/operations/`.
+- Diagramas: Mermaid en el documento que explica la decisión (ADR-0002, 0004, 0007 y los estados de Service en `CONTRACTS.md`), nunca en una carpeta aparte. Solo diagramas de decisiones estables: nada verifica un diagrama contra el código.
 - Lista de verificación de PR: [`.github/PULL_REQUEST_TEMPLATE.md`](../.github/PULL_REQUEST_TEMPLATE.md), que GitHub completa en cada PR.
 
 ## Verificación de la documentación
