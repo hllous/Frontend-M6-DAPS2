@@ -179,10 +179,58 @@ export function resolveIndicatorQuery(query: IndicatorQuery = {}, now = new Date
   return { ...defaults, ...parsed.data };
 }
 
+export const INDICATOR_FAMILIES = ["coverage", "compliance", "incidents", "waste"] as const;
+export type IndicatorFamily = (typeof INDICATOR_FAMILIES)[number];
+
+// openapi.json del backend: sólo coverage y compliance reciben zoneId/serviceTypeId;
+// incidents y waste aceptan únicamente from/to.
+export function familyAppliesCatalogFilters(family: string) {
+  return family === "coverage" || family === "compliance";
+}
+
+export type IndicatorUrlState = {
+  query: ResolvedIndicatorQuery;
+  family: IndicatorFamily;
+  view: "bars" | "table";
+  /** Señal elegida: `breakdownId:pointId`. */
+  signal?: { breakdownId: string; pointId: string };
+};
+
+/** Estado del tablero desde la URL; lo inválido cae al valor por defecto, sin lanzar. */
+export function parseIndicatorUrlState(params: { get(name: string): string | null }, now = new Date()): IndicatorUrlState {
+  const raw = Object.fromEntries(["from", "to", "zoneId", "serviceTypeId"].flatMap((key) => params.get(key) ? [[key, params.get(key)]] : []));
+  const parsed = indicatorQuerySchema.safeParse(raw);
+  const query = { ...defaultIndicatorQuery(now), ...(parsed.success ? parsed.data : {}) };
+  const family = params.get("family");
+  const separator = params.get("signal")?.indexOf(":") ?? -1;
+  const signal = params.get("signal");
+  return {
+    query,
+    family: INDICATOR_FAMILIES.find((item) => item === family) ?? "coverage",
+    view: params.get("view") === "table" ? "table" : "bars",
+    signal: signal && separator > 0 ? { breakdownId: signal.slice(0, separator), pointId: signal.slice(separator + 1) } : undefined,
+  };
+}
+
+/** Copia `base` (conserva p. ej. `destination`) y pisa los parámetros del tablero. */
+export function serializeIndicatorUrlState(state: Omit<IndicatorUrlState, "query"> & { query: IndicatorQuery }, base = ""): string {
+  const params = new URLSearchParams(base);
+  for (const key of ["from", "to", "zoneId", "serviceTypeId", "family", "view", "signal"]) params.delete(key);
+  const { query } = state;
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
+  if (query.zoneId) params.set("zoneId", query.zoneId);
+  if (query.serviceTypeId) params.set("serviceTypeId", query.serviceTypeId);
+  params.set("family", state.family);
+  if (state.view === "table") params.set("view", "table");
+  if (state.signal) params.set("signal", `${state.signal.breakdownId}:${state.signal.pointId}`);
+  return params.toString();
+}
+
 function queryString(query: IndicatorQuery, family: string) {
   const resolved = resolveIndicatorQuery(query);
   const params = new URLSearchParams({ from: resolved.from, to: resolved.to });
-  if (family === "coverage" || family === "compliance") {
+  if (familyAppliesCatalogFilters(family)) {
     if (resolved.zoneId) params.set("zoneId", resolved.zoneId);
     if (resolved.serviceTypeId) params.set("serviceTypeId", resolved.serviceTypeId);
   }
