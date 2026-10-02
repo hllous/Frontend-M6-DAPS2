@@ -4,9 +4,7 @@ Skeleton lives in `AGENTS.md`. This is the reference for the cases that come up 
 
 ## PR checklist
 
-- Compiles, tests pass, docs updated, no conflicts with `develop`.
-- Description: what and why, Issue #XXX, changes, evidence.
-- Contract changes (endpoints consumed from the M6 backend, shared types): notify the team, update docs, keep backwards compatibility when possible.
+The checklist lives in the PR template, [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md), and GitHub pre-fills it on every PR. Edit the template, not a copy of it here.
 
 ## Branch protection
 

@@ -1,0 +1,25 @@
+// Style and structure checks for the repository's own documentation (#348).
+// Run locally: npx --yes markdownlint-cli2@0.23.3   (needs Node 22+)
+{
+  "globs": ["*.md", "docs/**/*.md", ".github/*.md"],
+  "ignores": [
+    // Read-only mirror of Backend docs: fix Backend and re-copy, never edit or lint here.
+    "docs/backend-context/**",
+    // Vendored skills and tool output are not project documentation.
+    "node_modules/**"
+  ],
+  "config": {
+    "default": true,
+    // Prose is written one paragraph per line, and tables are not column-aligned.
+    "MD013": false,
+    "MD060": false,
+    // Bold labels followed by lists/pairs are used deliberately (DESIGN.md, ROADMAP.md).
+    "MD036": false,
+    "MD032": false,
+    // AGENTS.md carries a block that `next dev` rewrites (its own H1 and emphasis style).
+    "MD025": false,
+    "MD049": false,
+    // The PR template is pasted into a PR body, so it does not open with a heading.
+    "MD041": false
+  }
+}
