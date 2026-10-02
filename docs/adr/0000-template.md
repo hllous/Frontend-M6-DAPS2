@@ -2,8 +2,8 @@
 
 - **Estado:** propuesta | aceptada | reemplazada
 - **Fecha:** AAAA-MM-DD
-- **Reemplaza a:** [ADR-XXXX](XXXX-nombre.md), o "ninguno"
-- **Reemplazada por:** [ADR-XXXX](XXXX-nombre.md), o "ninguno"
+- **Reemplaza a:** `ADR-XXXX`, o "ninguno"
+- **Reemplazada por:** `ADR-XXXX`, o "ninguno"
 
 ## Contexto
 
