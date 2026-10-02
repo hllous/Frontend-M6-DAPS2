@@ -31,6 +31,7 @@ test.describe("Tree catalog management #126", () => {
     await expect(page.getByRole("dialog").getByLabel("Código de relevamiento")).toBeDisabled();
     await page.getByRole("dialog").getByRole("button", { name: "Cancelar" }).click();
     await row.getByRole("button", { name: "Dar de baja" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Confirmar baja" }).click();
     await expect(page.getByText("Árbol dado de baja")).toBeVisible();
     await page.getByLabel("Filtrar árboles por estado").selectOption("false");
     await expect(page.getByRole("cell", { name: /ARB-E2E-/ })).toBeVisible();
