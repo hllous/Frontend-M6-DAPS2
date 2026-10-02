@@ -342,7 +342,7 @@ The main adapters and Office/Field workflows described here are implemented in `
 
 ### EnvironmentalReport workflow
 
-- After a fresh read, `CLOSED` is potentially reopenable. `REOPENED` renders as active case work (`UNDER_REVIEW`) again.
+- After a fresh read, `CLOSED` is potentially reopenable. A reopen event returns the report to `UNDER_REVIEW`; `REOPENED` is an event type, not a report status.
 - Late `ESCALATION_CHANGED`, `INFORMATION_PROVIDED`, and `PRIORITY_CHANGED` data is displayed, including on a `CLOSED` report, without inventing a new frontend mutation or changing lifecycle state.
 - `SANCTIONED` remains terminal. No priority editor, `updatedBy` field, or field-level audit-history UI is added.
 
@@ -359,7 +359,7 @@ The shared fixtures/handlers and adapter tests cover or should preserve:
 
 - cancellation from `SCHEDULED`, `RESCHEDULED`, and `SUSPENDED`, including reason preservation;
 - rejection of direct cancellation from `IN_PROGRESS`;
-- reopening a `CLOSED` report from `REOPENED`, accepting late non-state-changing M2 updates, and keeping `SANCTIONED` closed;
+- reopening a `CLOSED` report via the `REOPENED` event, accepting late non-state-changing M2 updates, and keeping `SANCTIONED` closed;
 - local filenames for draft/progress rows and Backend-returned sanitized filenames after success;
 - client-side type/size UX checks and the Backend's authoritative magic-byte/image metadata handling, while preserving the PDF, parser-fallback, and malware-scan exclusions from issue #90;
 - retrying one evidence upload with the same idempotency key and preserving the draft through upload/network failures;
