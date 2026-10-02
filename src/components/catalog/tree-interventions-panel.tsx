@@ -13,9 +13,14 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateStreetClosureRequestDialog } from "@/components/services/create-street-closure-request-dialog";
+import Link from "next/link";
 import { servicesAdapter, type CreateServiceInput } from "@/lib/services";
 import { resolveServiceType, TREE_PRUNING_SERVICE_TYPE_RULE } from "@/lib/service-types";
-import { treeInterventionCreateInputSchema, treeInterventionsAdapter, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
+import { treeInterventionCreateInputSchema, treeInterventionsAdapter, TreeInterventionRequestError, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
+import { crewsAdapter, type Crew } from "@/lib/crews";
+import { vehiclesAdapter, type Vehicle } from "@/lib/vehicles";
+import { todayInArgentina } from "@/lib/argentina-date";
+import { serviceSourceHref } from "@/lib/referrals";
 import type { OperationalScenario } from "@/lib/scenarios";
 import type { Tree } from "@/lib/trees";
 
@@ -97,8 +102,15 @@ function dateTimeLabel(value?: string | null) {
   return value ? new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "No registrada";
 }
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
+const emptySchedule = () => ({ scheduledDate: todayInArgentina(), windowFrom: "08:00", windowTo: "12:00", crewId: "", vehicleId: "" });
+
+// El servicio creado pero sin vincular sobrevive a una recarga: se guarda por intervención.
+const unsyncedKey = (interventionId: string) => `tree-intervention-unsynced-service:${interventionId}`;
+function readUnsynced(interventionId: string): string | null {
+  try { return window.localStorage.getItem(unsyncedKey(interventionId)); } catch { return null; }
+}
+function writeUnsynced(interventionId: string, serviceId: string | null) {
+  try { if (serviceId) window.localStorage.setItem(unsyncedKey(interventionId), serviceId); else window.localStorage.removeItem(unsyncedKey(interventionId)); } catch { /* sin storage: queda sólo en memoria */ }
 }
 
 function treeTargetRef(trees: Tree[], treeIds: string[]) {
@@ -218,7 +230,8 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [activeAction, setActiveAction] = useState<"submit" | "authorize" | "reject" | "schedule" | "retry-link" | null>(null);
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({ scheduledDate: today(), windowFrom: "08:00", windowTo: "12:00" });
+  const [scheduleForm, setScheduleForm] = useState(emptySchedule);
+  const [resources, setResources] = useState<{ crews: Crew[]; vehicles: Vehicle[] } | "error" | null>(null);
   const [unsyncedServiceId, setUnsyncedServiceId] = useState<string | null>(null);
   const [streetClosureIntervention, setStreetClosureIntervention] = useState<TreeInterventionDetail | null>(null);
   const detailOpenedFromUrl = useRef(false);
@@ -241,10 +254,28 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     return () => { current = false; };
   }, [query, requestVersion]);
 
+  useEffect(() => {
+    if (!scheduleOpen) return;
+    let current = true;
+    void Promise.all([crewsAdapter.list({ active: true, pageSize: 100 }), vehiclesAdapter.list({ active: true, pageSize: 100 })])
+      .then(([crewsPage, vehiclesPage]) => { if (current) setResources({ crews: crewsPage.crews, vehicles: vehiclesPage.vehicles }); })
+      .catch(() => { if (current) setResources("error"); });
+    return () => { current = false; };
+  }, [scheduleOpen]);
+
   const openRequest = (prefill: Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification"> = {}) => { setRequestPrefill(prefill); setRequestOpen(true); setNotice(null); };
   const openDetail = useCallback(async (intervention: TreeIntervention) => {
     setDetail(intervention); setDetailError(null); setActionError(null); setScheduleOpen(false); setUnsyncedServiceId(null); setDetailLoading(true);
-    try { setDetail(await treeInterventionsAdapter.get(intervention.id)); } catch (caught) { setDetailError(caught instanceof Error ? caught.message : "No se pudo cargar el detalle de la intervención."); } finally { setDetailLoading(false); }
+    try {
+      const loaded = await treeInterventionsAdapter.get(intervention.id);
+      setDetail(loaded);
+      const pending = loaded.serviceId ? null : readUnsynced(loaded.id);
+      if (loaded.serviceId) writeUnsynced(loaded.id, null);
+      if (pending && loaded.status === "AUTHORIZED") {
+        setUnsyncedServiceId(pending);
+        setActionError(`El Servicio ${pending} fue creado, pero no quedó vinculado a la intervención. Puede reintentar la vinculación sin crear otro servicio.`);
+      }
+    } catch (caught) { setDetailError(caught instanceof Error ? caught.message : "No se pudo cargar el detalle de la intervención."); } finally { setDetailLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -255,7 +286,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     void Promise.resolve().then(() => openDetail(intervention));
   }, [state, initialDetailId, detail, openDetail]);
   const treeById = (id: string) => trees.find((tree) => tree.id === id);
-  const runAction = async (action: "submit" | "authorize" | "reject" | "schedule", input?: typeof scheduleForm) => {
+  const runAction = async (action: "submit" | "authorize" | "reject" | "schedule", input?: ReturnType<typeof emptySchedule>) => {
     if (!detail) return;
     setActionError(null); setActiveAction(action);
     try {
@@ -276,18 +307,21 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           targetId: firstTree.id,
           targetRef: treeTargetRef(treesForService, detail.treeIds),
           scheduledDate: input.scheduledDate,
+          crewId: input.crewId || undefined,
+          vehicleId: input.vehicleId || undefined,
           timeWindow: { start: input.windowFrom, end: input.windowTo },
           notes: `Intervención de arbolado ${detail.id}.`,
         };
         const createdService = await servicesAdapter.create(serviceInput);
         try {
-          const updated = await treeInterventionsAdapter.assignService(detail.id, { serviceId: createdService.id });
+          const { detail: updated, linkedTo } = await linkService(detail.id, createdService.id);
           setDetail(updated);
           setUnsyncedServiceId(null);
           setScheduleOpen(false);
           setRequestVersion((version) => version + 1);
-          setNotice(`Intervención programada. Servicio ${createdService.id} vinculado correctamente.`);
+          setNotice(linkNotice(createdService.id, linkedTo));
         } catch (caught) {
+          writeUnsynced(detail.id, createdService.id);
           setUnsyncedServiceId(createdService.id);
           setScheduleOpen(false);
           setActionError(`El Servicio ${createdService.id} fue creado, pero no pudo vincularse a la intervención. La operación quedó sin sincronizarse; puede reintentar la vinculación sin crear otro servicio. ${caught instanceof Error ? caught.message : ""}`.trim());
@@ -310,16 +344,32 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     } finally { setActiveAction(null); }
   };
 
+  // Tras un 409 el vínculo puede existir igual (reintento duplicado, otra pestaña): se relee antes de dar error.
+  const linkService = async (interventionId: string, serviceId: string) => {
+    try {
+      return { detail: await treeInterventionsAdapter.assignService(interventionId, { serviceId }), linkedTo: serviceId };
+    } catch (caught) {
+      if (!(caught instanceof TreeInterventionRequestError && caught.status === 409)) throw caught;
+      const current = await treeInterventionsAdapter.get(interventionId).catch(() => null);
+      if (!current?.serviceId) throw caught;
+      return { detail: current, linkedTo: current.serviceId };
+    }
+  };
+  const linkNotice = (serviceId: string, linkedTo: string) => linkedTo === serviceId
+    ? `Intervención programada. Servicio ${serviceId} vinculado correctamente.`
+    : `La intervención ya estaba vinculada al servicio ${linkedTo}. El servicio ${serviceId} quedó creado sin vincular: cancélelo desde Servicios.`;
+
   const retryServiceLink = async () => {
     if (!detail || !unsyncedServiceId) return;
     setActionError(null);
     setActiveAction("retry-link");
     try {
-      const updated = await treeInterventionsAdapter.assignService(detail.id, { serviceId: unsyncedServiceId });
+      const { detail: updated, linkedTo } = await linkService(detail.id, unsyncedServiceId);
       setDetail(updated);
+      writeUnsynced(detail.id, null);
       setUnsyncedServiceId(null);
       setRequestVersion((version) => version + 1);
-      setNotice(`Intervención programada. Servicio ${unsyncedServiceId} vinculado correctamente.`);
+      setNotice(linkNotice(unsyncedServiceId, linkedTo));
     } catch (caught) {
       setActionError(`El Servicio ${unsyncedServiceId} sigue sin vincularse. Revise el estado antes de volver a intentar. ${caught instanceof Error ? caught.message : ""}`.trim());
     } finally {
@@ -410,9 +460,9 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                     Solicitar corte de calle
                   </Button>
                 ) : null}
-                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <span className="font-mono font-semibold">{detail.serviceId}</span>.</AlertDescription></Alert> : null}
-                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !scheduleOpen ? <Button type="button" variant="default" disabled={activeAction !== null} onClick={() => { setScheduleForm({ scheduledDate: today(), windowFrom: "08:00", windowTo: "12:00" }); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
-                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && scheduleOpen ? (
+                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className="font-mono font-semibold underline" href={serviceSourceHref(detail.serviceId)}>{detail.serviceId}</Link>.</AlertDescription></Alert> : null}
+                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedServiceId && !scheduleOpen ? <Button type="button" variant="default" disabled={activeAction !== null} onClick={() => { setScheduleForm(emptySchedule()); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
+                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedServiceId && scheduleOpen ? (
                   <form
                     aria-label="Programar servicio para la intervención"
                     className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"
@@ -434,6 +484,23 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                       <Field>
                         <FieldLabel htmlFor="tree-service-to">Hasta</FieldLabel>
                         <input id="tree-service-to" type="time" required className={formControlClass} value={scheduleForm.windowTo} onChange={(event) => setScheduleForm({ ...scheduleForm, windowTo: event.target.value })} />
+                      </Field>
+                    </FieldGroup>
+                    <FieldGroup className="grid gap-3 sm:grid-cols-2">
+                      <Field>
+                        <FieldLabel htmlFor="tree-service-crew">Cuadrilla (opcional)</FieldLabel>
+                        <select id="tree-service-crew" className={formControlClass} value={scheduleForm.crewId} disabled={!resources || resources === "error"} onChange={(event) => setScheduleForm({ ...scheduleForm, crewId: event.target.value })}>
+                          <option value="">Sin asignar</option>
+                          {resources && resources !== "error" ? resources.crews.map((crew) => <option key={crew.id} value={crew.id}>{crew.name}</option>) : null}
+                        </select>
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="tree-service-vehicle">Vehículo (opcional)</FieldLabel>
+                        <select id="tree-service-vehicle" className={formControlClass} value={scheduleForm.vehicleId} disabled={!resources || resources === "error"} onChange={(event) => setScheduleForm({ ...scheduleForm, vehicleId: event.target.value })}>
+                          <option value="">Sin asignar</option>
+                          {resources && resources !== "error" ? resources.vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.plate}</option>) : null}
+                        </select>
+                        {resources === "error" ? <FieldDescription>No se pudieron cargar cuadrillas y vehículos; puede asignarlos después desde Servicios.</FieldDescription> : null}
                       </Field>
                     </FieldGroup>
                     <p className="text-xs text-muted-foreground">{"Se crear\u00e1 un Service POINT con el primer \u00e1rbol como objetivo t\u00e9cnico y el listado completo de \u00e1rboles como contexto relacionado."}</p>

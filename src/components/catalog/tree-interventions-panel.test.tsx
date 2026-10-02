@@ -1,11 +1,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
-import { resetTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
+import { resetTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 import { resetServiceFixtures, serviceFixtures } from "@/lib/services-fixtures";
 import { scenarios } from "@/lib/scenarios";
 import { servicesAdapter } from "@/lib/services";
@@ -17,6 +17,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
   resetTreeInterventionFixtures();
   resetServiceFixtures();
+  window.localStorage.clear();
 });
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
@@ -190,6 +191,63 @@ describe("TreeInterventionsPanel", () => {
     expect(await within(detail).findByRole("alert")).toHaveTextContent(/creado.*no pudo vincularse|sincronizar/i);
     expect(within(detail).getByRole("button", { name: "Reintentar vinculación" })).toBeVisible();
     expect(within(detail).queryByText(/La intervención fue programada/)).not.toBeInTheDocument();
+  });
+
+  async function openScheduleForm(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    await user.click(await within(detail).findByRole("button", { name: "Programar servicio" }));
+    return { detail, form: within(detail).getByRole("form", { name: "Programar servicio para la intervención" }) };
+  }
+
+  it("assigns the chosen crew and vehicle when it creates the Service", async () => {
+    const user = userEvent.setup();
+    const { detail, form } = await openScheduleForm(user, /intervention-2|Tratamiento/i);
+    await within(form).findByRole("option", { name: "Cuadrilla A · López" });
+    await user.selectOptions(within(form).getByLabelText(/Cuadrilla/), "crew-a");
+    await user.selectOptions(within(form).getByLabelText(/Vehículo/), "vehicle-1");
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+
+    const serviceId = (await within(detail).findByRole("link", { name: /SVC-\d+/ })).textContent;
+    expect(serviceFixtures.find((service) => service.id === serviceId)).toMatchObject({ crewId: "crew-a", vehicleId: "vehicle-1" });
+    expect(within(detail).getByRole("link", { name: /SVC-\d+/ })).toHaveAttribute("href", expect.stringContaining(`detail=${serviceId}`));
+  });
+
+  it("re-reads the intervention after a 409 and treats an existing link as done", async () => {
+    server.use(
+      http.post("*/api/tree-interventions/:interventionId/assign-service", ({ params }) => {
+        updateTreeInterventionFixture(params.interventionId as string, { serviceId: "SVC-7777" });
+        return HttpResponse.json({ statusCode: 409, message: "La intervención ya tiene un servicio asociado.", error: "Conflict", timestamp: new Date().toISOString(), path: "/" }, { status: 409 });
+      }),
+    );
+    const user = userEvent.setup();
+    const { detail, form } = await openScheduleForm(user, /intervention-2|Tratamiento/i);
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+
+    expect(await within(detail).findByRole("link", { name: "SVC-7777" })).toBeVisible();
+    expect(within(detail).queryByRole("button", { name: "Reintentar vinculación" })).not.toBeInTheDocument();
+  });
+
+  it("keeps an unlinked Service across a reload and resumes the link", async () => {
+    server.use(
+      http.post("*/api/tree-interventions/:interventionId/assign-service", () => HttpResponse.json({ statusCode: 409, message: "La intervención no está autorizada.", error: "Conflict", timestamp: new Date().toISOString(), path: "/" }, { status: 409 })),
+    );
+    const user = userEvent.setup();
+    const first = await openScheduleForm(user, /intervention-2|Tratamiento/i);
+    await user.click(within(first.form).getByRole("button", { name: "Programar servicio de intervención" }));
+    await within(first.detail).findByRole("button", { name: "Reintentar vinculación" });
+    cleanup();
+    server.resetHandlers();
+
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name: /intervention-2|Tratamiento/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    await user.click(await within(detail).findByRole("button", { name: "Reintentar vinculación" }));
+    expect(await within(detail).findByRole("link", { name: /SVC-\d+/ })).toBeVisible();
+    expect(window.localStorage.length).toBe(0);
   });
 
   it("keeps the schedule error recoverable when Service creation fails", async () => {
