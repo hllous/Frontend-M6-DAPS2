@@ -17,6 +17,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
   vi.unstubAllGlobals();
+  window.history.replaceState(null, "", "/"); // el tablero escribe su estado en la URL
   olvidarCatalogoDeEtiquetas();
 });
 afterAll(() => server.close());
