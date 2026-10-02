@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+
 import { appShellExamples, shellStateExamples } from "@/components/shell/app-shell.examples";
 
 const shellVariantLabels: Record<keyof typeof appShellExamples, string> = {
@@ -18,8 +20,15 @@ const shellStateLabels: Record<keyof typeof shellStateExamples, string> = {
  * Stable review surface for the shell's approved tokens, navigation, and shared state
  * primitives (acceptance criterion of #88). Not linked from the operational app; opened
  * directly for design/accessibility review and by the Playwright accessibility suite.
+ * Available outside production only: it returns 404 when NODE_ENV is "production" (this
+ * also covers Vercel previews). `proxy.ts` guards only `/app/*`, so this check is what
+ * keeps the page out of production.
  */
 export default function ShellExamplesPage() {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+
   return (
     <main className="flex flex-col gap-16 p-8">
       <header className="flex flex-col gap-4">
