@@ -38,6 +38,10 @@ Default canonical labels: needs-triage, needs-info, ready-for-agent, ready-for-h
 
 Single-context layout (CONTEXT.md + docs/adr/ at repo root). See `docs/agents/domain.md`.
 
+## Verify docs
+
+Changing a `.md` file: run `npx --yes markdownlint-cli2@0.23.3` (Node 22+) and `lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'`; CI runs both in the `docs` job. Details: [`docs/README.md`](docs/README.md).
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

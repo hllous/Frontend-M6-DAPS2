@@ -9,3 +9,5 @@ Estos registros documentan decisiones técnicas que afectan la arquitectura o lo
 - [ADR-0005 — M6 Backend is the sole authorization authority](0005-m6-backend-is-the-sole-authorization-authority.md)
 - [ADR-0006 — Frontend security controls are defense-in-depth only](0006-frontend-security-controls-are-defense-in-depth-only.md)
 - [ADR-0007 — Explicit external referrals and Office reconciliation](0007-explicit-external-referrals-and-office-reconciliation.md)
+
+Para registrar una decisión nueva, copiá la [plantilla](0000-template.md).

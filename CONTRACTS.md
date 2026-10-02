@@ -102,6 +102,23 @@ Drawn directly from [#10](https://github.com/hllous/Frontend-M6-DAPS2/issues/10)
 | `POST /services/:id/delay-notices` + `GET /services/:id/delay-notices` | — (frontend flow not implemented) | Create a delay notice without changing Service status, then read its newest-first history. The `START`/`DURATION` kind must match the current execution stage; a new notice replaces the active one | **confirmed** in the pinned OpenAPI and implementation. The frontend has no adapter or Route Handler for these endpoints yet |
 | `POST /evidence` (`ownerType=SERVICE` / `ZONE_RESULT`) | Crew Leader of the assigned crew | Evidence upload, attached by reference to a Service or ZoneResult outcome | **confirmed** — the generic endpoint covers both owner types; see the Evidence/upload section above. Uploaded as a separate call after the outcome record exists, so a mandatory-evidence exception outcome is two calls, not one |
 
+Service states as the frontend uses them (the table above is the source of truth; `PARTIALLY_COMPLETED` is computed by Backend on `complete`):
+
+```mermaid
+stateDiagram-v2
+    [*] --> SCHEDULED
+    SCHEDULED --> RESCHEDULED: reschedule
+    RESCHEDULED --> SCHEDULED: confirm-reschedule
+    SCHEDULED --> IN_PROGRESS: start
+    IN_PROGRESS --> SUSPENDED: suspend
+    SUSPENDED --> IN_PROGRESS: resume
+    IN_PROGRESS --> COMPLETED: complete, all zones SERVICED
+    IN_PROGRESS --> PARTIALLY_COMPLETED: complete, otherwise
+    SCHEDULED --> CANCELLED: cancel
+    RESCHEDULED --> CANCELLED: cancel
+    SUSPENDED --> CANCELLED: cancel
+```
+
 **Corrections against Backend's implementation (current `develop` snapshot `30d49ea1d56f735a124ae9260cafefff095e07b6`, checked 2026-10-01):** every Service, including POINT, carries a non-empty `zoneIds[]` and needs a ZoneResult for each zone before `POST /services/:id/complete` succeeds; POINT has exactly one zone. Evidence upload uses generic `POST /evidence` and now verifies magic bytes and strips supported image metadata. Cancellation from `RESCHEDULED` is supported by Backend and Frontend; Backend issue #114 records the documentation fix in #117, and earlier frontend claims that the transition was rejected were stale. Delay notices now have `POST` and `GET` endpoints, but the frontend has no adapter for them. See the pinned OpenAPI document for the full DTO shapes.
 
 ## Worked example: Zones, Routes and Service Frequencies

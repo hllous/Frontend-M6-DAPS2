@@ -13,3 +13,16 @@ Considered Options:
 - Adopt Better Auth now against a best-guess OIDC configuration — rejected: there is no discoverable OIDC/OAuth2 metadata to configure against, and it would mean building against a protocol M1 has never committed to.
 - Keep the raw JWT reachable from browser JavaScript (e.g. `localStorage`) so the client attaches it itself — rejected: an unnecessary XSS exposure once a BFF exists to hold the token server-side instead.
 - Stand up Redis now for a stateful, revocable session store — rejected as premature infrastructure for a Vercel free-tier deployment; deferred until a real M1 contract demands revocation or refresh semantics a stateless sealed cookie can't provide.
+
+## Diagram
+
+Request path for a domain call. The M1 JWT only exists inside the sealed cookie and the server-side hops.
+
+```mermaid
+flowchart LR
+    B[Browser] -->|"m6_session cookie (sealed, httpOnly)"| R[Next Route Handler / BFF]
+    R -->|"unseals cookie, adds Authorization: Bearer M1 JWT"| API[M6 Backend]
+    API -->|"verifies the JWT, final authorization"| R
+    R -->|"JSON only, no token"| B
+    API -.->|"login, refresh, logout (server to server)"| M1[M1]
+```
