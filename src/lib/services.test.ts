@@ -63,6 +63,11 @@ describe("service backend input mapping", () => {
     });
   });
 
+  it("forwards crew and overrideNote so an inspection Service is created and assigned in one write (#320)", () => {
+    expect(toCreateServiceBackendInput({ ...baseInput, origin: "INSPECTION", inspectionId: "inspection-1", crewId: "crew-1", overrideNote: "Coordinado con el jefe." }))
+      .toMatchObject({ origin: "INSPECTION", inspectionId: "inspection-1", crewId: "crew-1", overrideNote: "Coordinado con el jefe." });
+  });
+
   it("sends each link only with its own origin, trimmed (#289)", () => {
     const links = { inspectionId: " 3f2b8c1e-4d5a-4e6f-8a9b-0c1d2e3f4a5b ", weatherAlertId: " ALERT-7 " };
     const byOrigin = (origin: "INSPECTION" | "WEATHER_ALERT" | "PLANNED") => {
