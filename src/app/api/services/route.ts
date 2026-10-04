@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
+import { crewFixtures } from "@/lib/crew-fixtures";
+import { vehicleFixtures } from "@/lib/vehicles-fixtures";
 import { linkEnvironmentalInspectionService } from "@/lib/environmental-report-fixtures";
 import {
   addServiceFixture,
@@ -205,10 +207,11 @@ export async function POST(request: Request) {
       scheduledDate: input.scheduledDate,
       windowFrom: input.timeWindow.start,
       windowTo: input.timeWindow.end,
-      crewId: null,
-      crewName: null,
-      vehicleId: null,
-      vehiclePlate: null,
+      // Como el backend: la cuadrilla y el vehículo se pueden asignar en el mismo alta.
+      crewId: input.crewId ?? null,
+      crewName: crewFixtures.find((crew) => crew.id === input.crewId)?.name ?? null,
+      vehicleId: input.vehicleId ?? null,
+      vehiclePlate: vehicleFixtures.find((vehicle) => vehicle.id === input.vehicleId)?.plate ?? null,
       ticketId: input.origin === "TICKET" ? (input.ticketId ?? null) : null,
       inspectionId: input.origin === "INSPECTION" ? (input.inspectionId ?? null) : null,
       weatherAlertId: input.origin === "WEATHER_ALERT" ? (input.weatherAlertId ?? null) : null,
