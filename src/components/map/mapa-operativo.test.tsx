@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -52,6 +52,27 @@ describe("MapaOperativo", () => {
 
     expect(screen.queryByText("CONT-002")).not.toBeInTheDocument();
     expect(screen.getByText("Punto verde Plaza Mitre")).toBeInTheDocument();
+  });
+
+  it("keeps the selected tree in the URL and links its catalog detail", async () => {
+    window.history.replaceState(null, "", "/app?destination=map&tree=tree-1");
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    const list = within(await screen.findByRole("region", { name: "Elementos visibles" }));
+    const selected = list.getByRole("button", { name: /ARB-00442/ });
+    expect(selected).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("link", { name: "Ver ficha del árbol ARB-00442" })).toHaveAttribute("href", "/app/catalog/trees?tree=tree-1&detail=tree-1");
+
+    await user.click(list.getByRole("button", { name: /ARB-00443/ }));
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("tree")).toBe("tree-2");
+    expect(params.get("destination")).toBe("map");
+    expect(list.getByRole("button", { name: /ARB-00442/ })).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(list.getByRole("button", { name: /ARB-00443/ }));
+    expect(new URLSearchParams(window.location.search).has("tree")).toBe(false);
+    window.history.replaceState(null, "", "/");
   });
 
   it("explains how to recover when territorial data cannot be loaded", async () => {

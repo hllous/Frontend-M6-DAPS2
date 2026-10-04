@@ -87,6 +87,11 @@
   outline-color: var(--color-accent);
 }
 
+.markerSelected {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 .action { background: var(--color-action); }
 .info { background: var(--color-info); }
 .success { background: var(--color-success); }

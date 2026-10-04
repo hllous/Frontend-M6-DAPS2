@@ -35,6 +35,16 @@ export const treeSchema = z.object({
 });
 export type Tree = z.infer<typeof treeSchema>;
 
+// El árbol seleccionado viaja en `tree` entre el catálogo y el mapa; `detail` abre la ficha.
+export function treeCatalogHref(treeId: string): string {
+  const id = encodeURIComponent(treeId);
+  return `/app/catalog/trees?tree=${id}&detail=${id}`;
+}
+
+export function treeMapHref(treeId: string): string {
+  return `/app?destination=map&tree=${encodeURIComponent(treeId)}`;
+}
+
 const heightInput = boundedDecimalInput("La altura", MAX_TREE_HEIGHT_M, { positive: true });
 const diameterInput = boundedDecimalInput("El diámetro", MAX_TREE_DIAMETER_CM, { positive: true });
 

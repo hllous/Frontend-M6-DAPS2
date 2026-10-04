@@ -98,6 +98,45 @@ describe("TreeCatalogPanel", () => {
     expect(params.has("page")).toBe(false);
   });
 
+  it("opens the detail from the list, selects the tree in the URL and links surveys, map and interventions", async () => {
+    render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /ARB-00442/ });
+    fireEvent.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("tree")).toBe("tree-1");
+    expect(params.get("detail")).toBe("tree-1");
+
+    const dialog = await screen.findByRole("dialog", { name: /Detalle del árbol ARB-00442/ });
+    expect(await within(dialog).findByText("Riesgo medio")).toBeVisible();
+    expect(within(dialog).getByText(/1 relevamiento,/)).toBeVisible();
+    expect(within(dialog).getByRole("link", { name: "Ver en el mapa" })).toHaveAttribute("href", "/app?destination=map&tree=tree-1");
+    expect(within(dialog).getByRole("link", { name: "Ir a intervenciones de arbolado" })).toHaveAttribute("href", "/app/catalog/tree-interventions");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cerrar detalle" }));
+    const after = new URLSearchParams(window.location.search);
+    expect(after.has("detail")).toBe(false);
+    expect(after.get("tree")).toBe("tree-1");
+    expect(await screen.findByRole("row", { name: /ARB-00442/ })).toHaveAttribute("aria-current", "true");
+  });
+
+  it("restores the detail opened from the map link and opens the survey history from it", async () => {
+    window.history.replaceState(null, "", "/app/catalog/trees?tree=tree-1&detail=tree-1");
+    render(<TreeCatalogPanel scenario={scenarios.fieldCrewLeader} />);
+    const dialog = await screen.findByRole("dialog", { name: /Detalle del árbol ARB-00442/ });
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Ver historial de relevamientos" }));
+    expect(await screen.findByRole("heading", { name: "Historial de relevamientos · ARB-00442" })).toBeVisible();
+    expect(new URLSearchParams(window.location.search).has("detail")).toBe(false);
+  });
+
+  it("keeps the tree detail when surveys fail and says so", async () => {
+    window.history.replaceState(null, "", "/app/catalog/trees?tree=tree-1&detail=tree-1");
+    server.use(http.get("*/api/trees/:treeId/surveys", () => HttpResponse.json({ statusCode: 503, message: "No disponible", error: "Service Unavailable" }, { status: 503 })));
+    render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const dialog = await screen.findByRole("dialog", { name: /Detalle del árbol/ });
+    expect(await within(dialog).findByText("No se pudieron cargar los relevamientos.")).toBeVisible();
+    expect(within(dialog).getByText("Jacarandá")).toBeVisible();
+  });
+
   it("requests the page from the URL with the backend default page size and paginates", async () => {
     window.history.replaceState(null, "", "/app/catalog/trees?page=2");
     const seen: Array<{ page: string | null; pageSize: string | null }> = [];
