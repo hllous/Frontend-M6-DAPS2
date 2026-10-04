@@ -106,7 +106,10 @@ export const serviceSchema = z.object({
   targetRef: z.string().nullable().optional(),
   inspectionId: z.string().nullable().optional(),
   weatherAlertId: z.string().nullable().optional(),
-  scheduledDate: z.string(),
+  // El backend la serializa como ISO a medianoche UTC (`2026-12-07T00:00:00.000Z`); se
+  // guarda como día (YYYY-MM-DD), que es lo que comparan los filtros, los choques de
+  // agenda y la ventana horaria, y lo que se manda al reprogramar.
+  scheduledDate: z.string().transform((value) => value.slice(0, 10)),
   windowFrom: z.string().nullable().optional(),
   windowTo: z.string().nullable().optional(),
   crewId: z.string().nullable().optional(),

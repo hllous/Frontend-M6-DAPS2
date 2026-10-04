@@ -166,6 +166,31 @@ export const environmentalInspectionSuggestedActionSchema = z.enum([
 ]);
 export type EnvironmentalInspectionSuggestedAction = z.infer<typeof environmentalInspectionSuggestedActionSchema>;
 
+// Una sola fuente de etiquetas: la inspección y el acta muestran los mismos valores.
+export const ENVIRONMENTAL_VIOLATION_TYPE_LABELS: Record<EnvironmentalInspectionViolationType, string> = {
+  NOISE_LIMIT: "Exceso de ruido",
+  ILLEGAL_DUMPING: "Vertido ilegal",
+  UNTREATED_DISCHARGE: "Descarga sin tratamiento",
+  HAZARDOUS_WASTE: "Residuos peligrosos",
+  AIR_EMISSION: "Emisión al aire",
+  NO_WASTE_MANAGEMENT: "Falta de gestión de residuos",
+  INSPECTION_OBSTRUCTION: "Obstrucción de la inspección",
+};
+
+export const ENVIRONMENTAL_SEVERITY_LABELS: Record<EnvironmentalInspectionSeverity, string> = {
+  LOW: "Baja",
+  MEDIUM: "Media",
+  HIGH: "Alta",
+  CRITICAL: "Crítica",
+};
+
+export const ENVIRONMENTAL_SUGGESTED_ACTION_LABELS: Record<EnvironmentalInspectionSuggestedAction, string> = {
+  WARNING: "Advertencia",
+  FORMAL_NOTICE: "Aviso formal",
+  FINE: "Multa",
+  CLOSURE: "Clausura",
+};
+
 // Hypothesis: the backend has not published the exact checklist DTO yet.
 export const environmentalInspectionChecklistItemSchema = z.object({
   id: z.string().min(1),

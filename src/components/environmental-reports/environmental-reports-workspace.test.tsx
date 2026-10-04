@@ -342,7 +342,9 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     const item = (await within(detail).findByText("INS-1005")).closest("li")!;
     expect(within(item).getByText("Resultado: Infracción constatada")).toBeVisible();
-    expect(await within(item).findByText(/^2026-09-05 · 13:00–16:00 ·/)).toBeVisible();
+    // #321: fecha legible, sin el ISO del backend ni una versión de checklist que no existe.
+    expect(await within(item).findByText(/^5 sept 2026 · 13:00–16:00$/)).toBeVisible();
+    expect(item).not.toHaveTextContent("ambiental-v");
     expect(within(item).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
     expect(item).not.toHaveTextContent("crew-c");
     expect(item).not.toHaveTextContent("VIOLATION_FOUND");
