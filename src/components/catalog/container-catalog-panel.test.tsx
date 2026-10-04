@@ -51,6 +51,16 @@ describe("ContainerCatalogPanel", () => {
     expect(screen.queryByText("CONT-001")).not.toBeInTheDocument();
   });
 
+  it("opens the Container named by ?detail= in the URL", async () => {
+    window.history.replaceState(null, "", "/app/catalog/containers?detail=cont-3");
+    try {
+      render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      expect(await screen.findByRole("dialog", { name: /Detalle del contenedor CONT-003/ })).toBeVisible();
+    } finally {
+      window.history.replaceState(null, "", "/");
+    }
+  });
+
   it("allows any actor to view Container detail including damage information", async () => {
     const user = userEvent.setup();
     render(<ContainerCatalogPanel scenario={scenarios.fieldCrewMember} />);
