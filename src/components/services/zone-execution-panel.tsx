@@ -31,6 +31,7 @@ import {
   ZoneResult,
   ZoneResultStatus,
 } from "@/lib/services";
+import { formatArgentinaDateTime } from "@/lib/argentina-date";
 import { containersAdapter } from "@/lib/containers";
 import { getZoneResultsByServiceId } from "@/lib/services-fixtures";
 import {
@@ -748,7 +749,7 @@ export function ZoneExecutionPanel({
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-5 space-y-4">
               <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-success)]">
                 <FileCheck className="h-4 w-4" aria-hidden />
-                <span>Resultado registrado el {selectedZoneResult.recordedAt}</span>
+                <span>Resultado registrado el {formatArgentinaDateTime(selectedZoneResult.recordedAt)}</span>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 text-xs">

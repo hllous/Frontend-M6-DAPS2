@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CloudOff, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { formatCalendarDay } from "@/lib/argentina-date";
 import { CreateRepairRequestDialog } from "./create-repair-request-dialog";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
@@ -313,7 +314,7 @@ export function FieldWorkPanel({
                         </span>
                         <span>·</span>
                         <span className="tabular-nums">
-                          {service.scheduledDate} ({service.windowFrom ?? "—"} – {service.windowTo ?? "—"})
+                          {formatCalendarDay(service.scheduledDate)} ({service.windowFrom ?? "—"} – {service.windowTo ?? "—"})
                         </span>
                         <span>·</span>
                         <span>

@@ -28,6 +28,7 @@ import {
   REPAIR_SEVERITY_LABEL,
   type RepairRequest,
 } from "@/lib/repair-requests";
+import { formatCalendarDay } from "@/lib/argentina-date";
 import { checkServiceWindowTiming, type Service } from "@/lib/services";
 import type { StreetClosureDependency } from "@/lib/street-closure-requests";
 import { StatusBadge } from "./status-badge";
@@ -96,6 +97,9 @@ export function ServiceDetail({
 }) {
   const windowTiming = checkServiceWindowTiming(service);
   const isEnvironmentalInspectionService = service.origin === "INSPECTION" && service.serviceTypeCategory === "ENVIRONMENTAL_CONTROL";
+  // Sólo consulta = quien mira no puede cambiar el estado del servicio. Oficina no lo
+  // ejecuta, pero lo reprograma, lo cancela o le asigna cuadrilla.
+  const isReadOnly = !canStartService && !onAssignCrew && !onReschedule && !onConfirmReschedule && !onCancelService;
 
   return (
     <div className="flex h-full flex-col bg-[var(--color-surface)] overflow-hidden" role="region" aria-label={`Detalle completo de ${service.id}`}>
@@ -219,7 +223,7 @@ export function ServiceDetail({
                 <span>Solicitar corte de calle</span>
               </Button>
             )}
-          {!canStartService && (
+          {isReadOnly && (
             <span className="text-xs font-medium text-[var(--color-text-secondary)]">
               Solo consulta
             </span>
@@ -470,7 +474,7 @@ export function ServiceDetail({
                 Programación
               </div>
               <div className="mt-2 text-sm font-bold text-[var(--color-text)] tabular-nums">
-                {service.scheduledDate}
+                {formatCalendarDay(service.scheduledDate)}
               </div>
               <div className="mt-1 flex items-center gap-1 text-xs text-[var(--color-text-secondary)] tabular-nums">
                 <Clock className="h-3.5 w-3.5" aria-hidden />
@@ -593,6 +597,7 @@ export function ServiceDetail({
               <InspectionExecutionPanel
                 service={service}
                 canExecute={canStartService && service.status === "IN_PROGRESS"}
+                waitingForStart={canStartService && (service.status === "SCHEDULED" || service.status === "RESCHEDULED")}
                 onServiceUpdated={onServiceUpdated}
               />
             ) : (

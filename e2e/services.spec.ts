@@ -641,7 +641,7 @@ test.describe("Office two-step Service reschedule flow @smoke", () => {
 
     // Back to SCHEDULED with the new date, zones preserved verbatim
     await expect(detailRegion.getByText("Programado").first()).toBeVisible();
-    await expect(detailRegion.getByText("2099-09-13")).toBeVisible();
+    await expect(detailRegion.getByText("13 sept 2099", { exact: true })).toBeVisible();
     await expect(detailRegion.getByText("Zona Sur").first()).toBeVisible();
   });
 
@@ -712,7 +712,7 @@ test.describe("Office cancels a Service @smoke", () => {
 
     await expect(detailRegion.getByText("Cancelado").first()).toBeVisible();
     // scheduledDate snapshot is left untouched by cancellation
-    await expect(detailRegion.getByText("2026-09-06")).toBeVisible();
+    await expect(detailRegion.getByText("6 sept 2026", { exact: true })).toBeVisible();
   });
 
   test("Office cancels a SUSPENDED service", async ({ page }) => {

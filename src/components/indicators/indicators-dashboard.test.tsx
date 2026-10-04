@@ -176,8 +176,10 @@ describe("IndicatorsDashboard", () => {
     await user.click(await screen.findByRole("button", { name: /Centro.*89,7/i }));
 
     const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
-    expect(within(recordsRegion).getByRole("row", { name: /SVC-1042/ })).toBeVisible();
-    expect(within(recordsRegion).getByRole("link", { name: "SVC-1042" })).toHaveAttribute("href", "/app?destination=services&detail=SVC-1042");
+    // La fila se nombra con el título del servicio, no con su identificador.
+    const serviceLink = () => within(recordsRegion).getAllByRole("link", { name: "Recolección de residuos — Recorrido 4" }).find((link) => link.getAttribute("href") === "/app?destination=services&detail=SVC-1042");
+    expect(serviceLink()).toBeVisible();
+    expect(within(recordsRegion).queryByText("SVC-1042")).not.toBeInTheDocument();
     expect(recordsRegion).toHaveTextContent(/Filtro activo:.*Centro/i);
     expect(recordsRegion).toHaveTextContent(/Cobertura por zona/i);
     expect(screen.getByRole("link", { name: /Abrir Servicios/i })).toHaveAttribute("href", "/app?destination=services");
@@ -185,7 +187,7 @@ describe("IndicatorsDashboard", () => {
     await user.click(screen.getByRole("button", { name: "Quitar filtro de señal" }));
 
     expect(recordsRegion).toHaveTextContent(/Sin filtro de señal/);
-    expect(within(recordsRegion).getByRole("row", { name: /SVC-1042/ })).toBeVisible();
+    expect(serviceLink()).toBeVisible();
   });
 
   it("traces container incidents to the container catalog without adding record mutations", async () => {

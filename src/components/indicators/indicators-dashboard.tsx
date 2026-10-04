@@ -11,6 +11,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatCalendarDay } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
 import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
 import { serviceSourceHref } from "@/lib/referrals";
@@ -103,12 +104,13 @@ function signalTracePlan(data: IndicatorData, breakdown: IndicatorBreakdown, poi
   };
 }
 
+// El servicio no tiene código legible: la fila se nombra con su título y su agenda.
 function serviceToTraceRecord(service: Service): TraceRecord {
   return {
     id: service.id,
     href: serviceSourceHref(service.id),
     title: service.title,
-    detail: service.serviceTypeName ?? "Servicio urbano",
+    detail: `${formatCalendarDay(service.scheduledDate)}${service.windowFrom ? ` · ${service.windowFrom}–${service.windowTo ?? ""}` : ""}`,
     zone: service.zoneNames.length > 0 ? service.zoneNames.join(" · ") : "Sin zona informada",
     status: STATUS_LABEL[service.status],
   };
@@ -502,7 +504,7 @@ function AccessibleRecords({ family, plan, selection, breakdown, point, records,
 }
 
 function TraceRecordsTable({ plan, records }: { plan: TracePlan; records: TraceRecord[] }) {
-  return <div className={styles.recordsTableWrap}><table className={styles.recordsTable}><caption>Registros accesibles de {plan.title}</caption><thead><tr><th scope="col">Identificador</th><th scope="col">Registro</th><th scope="col">Zona operativa</th><th scope="col">Estado</th></tr></thead><tbody>{records.length > 0 ? records.map((record) => <tr key={record.id}><td className={styles.value}><Link className={styles.recordsLink} href={record.href}>{record.id}</Link></td><td><span>{record.title}</span><span className={styles.note}>{record.detail}</span></td><td>{record.zone}</td><td>{record.status}</td></tr>) : <tr><td colSpan={4}>No hay registros accesibles para este filtro.</td></tr>}</tbody></table></div>;
+  return <div className={styles.recordsTableWrap}><table className={styles.recordsTable}><caption>Registros accesibles de {plan.title}</caption><thead><tr><th scope="col">Registro</th><th scope="col">Zona operativa</th><th scope="col">Estado</th></tr></thead><tbody>{records.length > 0 ? records.map((record) => <tr key={record.id}><td><Link className={styles.recordsLink} href={record.href}>{record.title}</Link><span className={styles.note}>{record.detail}</span></td><td>{record.zone}</td><td>{record.status}</td></tr>) : <tr><td colSpan={3}>No hay registros accesibles para este filtro.</td></tr>}</tbody></table></div>;
 }
 
 function BreakdownView({ breakdown, viewMode, selectedId: controlledSelectedId, onSelect }: { breakdown: IndicatorBreakdown; viewMode: ViewMode; selectedId?: string; onSelect: (pointId: string) => void }) {

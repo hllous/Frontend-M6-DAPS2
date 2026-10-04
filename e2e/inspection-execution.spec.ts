@@ -13,7 +13,7 @@ test.describe.serial("Environmental inspection execution #134", () => {
 
     const inspection = page.getByRole("region", { name: /Ejecuci/ });
     await expect(inspection).toBeVisible();
-    await expect(inspection.getByText(/solo consulta para integrantes/)).toBeVisible();
+    await expect(inspection.getByText(/La persona responsable de la cuadrilla registra el resultado/)).toBeVisible();
     await expect(inspection.getByRole("button", { name: /Completar inspecci/ })).toHaveCount(0);
   });
 

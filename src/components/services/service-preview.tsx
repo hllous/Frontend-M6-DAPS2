@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { formatCalendarDay } from "@/lib/argentina-date";
 import type { Service } from "@/lib/services";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
@@ -113,7 +114,7 @@ export function ServicePreview({
               Fecha
             </dt>
             <dd className="mt-0.5 font-semibold text-[var(--color-text)] tabular-nums">
-              {service.scheduledDate}
+              {formatCalendarDay(service.scheduledDate)}
             </dd>
           </div>
           <div>

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { formatCalendarDay } from "@/lib/argentina-date";
 import type { Service, ServiceStatus } from "@/lib/services";
 import { STATUS_LABEL, STATUS_ORDER } from "@/lib/services";
 import { cn } from "@/lib/utils";
@@ -427,7 +428,7 @@ export function ServicesTable({
                   )}
 
                   <td className="p-3 text-[var(--color-text)] tabular-nums whitespace-nowrap">
-                    <div>{service.scheduledDate}</div>
+                    <div>{formatCalendarDay(service.scheduledDate)}</div>
                     {service.windowFrom && (
                       <div className="text-[11px] text-[var(--color-text-secondary)]">
                         {service.windowFrom} – {service.windowTo ?? ""}

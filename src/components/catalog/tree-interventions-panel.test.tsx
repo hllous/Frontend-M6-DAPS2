@@ -44,6 +44,17 @@ describe("TreeInterventionsPanel", () => {
     expect(screen.queryByRole("article", { name: /intervention-1|Poda de seguridad/i })).not.toBeInTheDocument();
   });
 
+  it("names each card by its trees, never by the request id, and falls back to the tree address", async () => {
+    updateTreeInterventionFixture("intervention-3", { address: null });
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+
+    const request = await screen.findByRole("article", { name: "Poda de seguridad · ARB-00443, ARB-00445" });
+    expect(within(request).getByText("ARB-00443, ARB-00445")).toBeVisible();
+    expect(screen.queryByText("intervention-1")).not.toBeInTheDocument();
+    const removal = await screen.findByRole("article", { name: "Extracción · ARB-00445" });
+    expect(within(removal).getByText("Av. Las Heras 2100")).toBeVisible();
+  });
+
   it("offers a street closure request only from an authorized intervention", async () => {
     const user = userEvent.setup();
     render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
