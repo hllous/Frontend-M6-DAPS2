@@ -5,7 +5,7 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
-import { environmentalReportFixtures, ingestSanctionOutcomeFixture, paginateEnvironmentalReportFixtures, resetEnvironmentalReportFixtures, updateEnvironmentalInspectionFixture, updateEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
+import { addEnvironmentalInspectionFixture, environmentalReportFixtures, ingestSanctionOutcomeFixture, paginateEnvironmentalReportFixtures, resetEnvironmentalReportFixtures, updateEnvironmentalInspectionFixture, updateEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
 import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { environmentalReportsAdapter } from "@/lib/environmental-reports";
 import { repairRequestsAdapter } from "@/lib/repair-requests";
@@ -210,6 +210,8 @@ describe("EnvironmentalReportsWorkspace", () => {
 
   it("lets Office schedule and assign an inspection from a report under review", async () => {
     const user = userEvent.setup();
+    const create = vi.spyOn(servicesAdapter, "create");
+    const assignCrew = vi.spyOn(servicesAdapter, "assignCrew");
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: /ER-1002/ }));
@@ -225,6 +227,81 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(await within(detail).findByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();
     expect(within(detail).getByText(/^SVC-/)).toBeVisible();
     expect(within(detail).getByText(/Cuadrilla A/)).toBeVisible();
+    // #320: dos escrituras; la cuadrilla viaja en el alta del servicio, sin assign-crew aparte.
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ origin: "INSPECTION", inspectionId: expect.any(String), crewId: "crew-a", zoneIds: ["zone-1"], scheduledDate: "2026-09-10" }));
+    expect(assignCrew).not.toHaveBeenCalled();
+    expect(within(detail).queryByRole("button", { name: "Programar servicio" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the inspection and offers to retry only the Service when its creation fails (#320)", async () => {
+    const user = userEvent.setup();
+    const schedule = vi.spyOn(environmentalReportsAdapter, "schedule");
+    const create = vi.spyOn(servicesAdapter, "create");
+    server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 500, message: "Error interno.", error: "Internal Server Error", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 500 }), { once: true }));
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1002/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1002" });
+    await user.click(within(detail).getByRole("button", { name: "Programar inspección" }));
+
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Fecha de inspección"), "2026-09-10");
+    await user.selectOptions(within(dialog).getByLabelText("Zona operativa"), "zone-1");
+    await user.selectOptions(within(dialog).getByLabelText("Cuadrilla"), "crew-a");
+    await user.click(within(dialog).getByRole("button", { name: "Programar inspección" }));
+
+    expect(await within(detail).findByText(/La inspección quedó programada, pero no se pudo crear el Servicio POINT/)).toBeVisible();
+    expect(await within(detail).findByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("button", { name: "Programar inspección" })).not.toBeInTheDocument();
+    expect(within(detail).getByText(/quedó registrada sin Servicio POINT/)).toBeVisible();
+
+    await user.click(within(detail).getByRole("button", { name: "Programar servicio" }));
+    const retry = await screen.findByRole("dialog", { name: "Programar servicio" });
+    // El reintento conserva lo que se cargó y sólo vuelve a dar de alta el servicio.
+    expect(within(retry).getByLabelText("Fecha de inspección")).toHaveValue("2026-09-10");
+    expect(within(retry).getByLabelText("Cuadrilla")).toHaveValue("crew-a");
+    await user.click(within(retry).getByRole("button", { name: "Programar servicio" }));
+
+    expect(await within(detail).findByText(/^SVC-/)).toBeVisible();
+    expect(within(detail).getByText(/Cuadrilla A/)).toBeVisible();
+    expect(schedule).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[1][0].inspectionId).toBe(create.mock.calls[0][0].inspectionId);
+    expect(within(detail).queryByRole("button", { name: "Programar servicio" })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("offers to schedule the Service of an open inspection left without one and justifies an overlap (#320)", async () => {
+    const inspectionId = "3f1c2b4a-5d6e-4f70-8a9b-0c1d2e3f4a5b";
+    updateEnvironmentalReportFixture("ER-1002", { status: "INSPECTION_SCHEDULED" });
+    addEnvironmentalInspectionFixture({ id: inspectionId, reportId: "ER-1002", serviceId: null, inspectedAt: null, checklistVersion: "ambiental-v1", checklist: [], attachments: [], findings: null, outcome: null, nextStep: null, notes: null, createdAt: "2026-09-06T11:00:00.000Z", updatedAt: "2026-09-06T11:00:00.000Z" });
+    const create = vi.spyOn(servicesAdapter, "create");
+    server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla ya está tomada en esa franja.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 }), { once: true }));
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1002/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1002" });
+
+    await user.click(await within(detail).findByRole("button", { name: "Programar servicio" }));
+    const dialog = await screen.findByRole("dialog", { name: "Programar servicio" });
+    expect(within(dialog).queryByLabelText("Versión del checklist")).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Fecha de inspección"), "2026-09-12");
+    await user.selectOptions(within(dialog).getByLabelText("Zona operativa"), "zone-1");
+    await user.selectOptions(within(dialog).getByLabelText("Cuadrilla"), "crew-a");
+    await user.click(within(dialog).getByRole("button", { name: "Programar servicio" }));
+
+    const note = await within(dialog).findByLabelText("Justificación del solapamiento");
+    expect(within(dialog).getByText(/La cuadrilla ya está tomada en esa franja/)).toBeVisible();
+    await user.type(note, "La otra parada termina antes.");
+    await user.click(within(dialog).getByRole("button", { name: "Programar servicio" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ origin: "INSPECTION", inspectionId, crewId: "crew-a", overrideNote: "La otra parada termina antes." }));
+    expect(await within(detail).findByText(/^SVC-/)).toBeVisible();
+    expect(within(detail).queryByRole("button", { name: "Programar servicio" })).not.toBeInTheDocument();
   });
 
   it("reprograms a scheduled inspection through its linked Service instead of creating another inspection (#294)", async () => {

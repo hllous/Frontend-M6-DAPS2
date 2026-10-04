@@ -144,6 +144,18 @@ const serviceWireSchema = z.preprocess((value) => {
   return { ...rest, zoneIds: ordenadas.map((zona) => zona?.zoneId), zoneResults };
 }, serviceSchema.extend({ title: z.string().optional() }));
 
+export const OVERRIDE_NOTE_MIN = 10;
+export const OVERRIDE_NOTE_MAX = 500;
+
+// El backend la exige cuando la cuadrilla o el vehículo ya están tomados en esa franja (409 sin ella),
+// tanto al programar con cuadrilla como en assign-crew.
+const overrideNoteSchema = z
+  .string()
+  .trim()
+  .min(OVERRIDE_NOTE_MIN, `La justificación debe tener al menos ${OVERRIDE_NOTE_MIN} caracteres.`)
+  .max(OVERRIDE_NOTE_MAX, `La justificación admite hasta ${OVERRIDE_NOTE_MAX} caracteres.`)
+  .optional();
+
 export const createServiceInputSchema = z
   .object({
     title: z.string().optional(),
@@ -167,6 +179,7 @@ export const createServiceInputSchema = z
       end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
     }),
     notes: z.string().max(MAX_NOTES_LENGTH, `Las notas no pueden superar los ${MAX_NOTES_LENGTH} caracteres.`).optional(),
+    overrideNote: overrideNoteSchema,
   })
   .superRefine((data, ctx) => {
     if (data.origin === "TICKET" && (!data.ticketId || !data.ticketId.trim())) {
@@ -243,6 +256,7 @@ export function toCreateServiceBackendInput(input: CreateServiceInput) {
     inspectionId: input.origin === "INSPECTION" ? input.inspectionId?.trim() || undefined : undefined,
     weatherAlertId: input.origin === "WEATHER_ALERT" ? input.weatherAlertId?.trim() || undefined : undefined,
     notes,
+    overrideNote: input.overrideNote,
   };
 }
 
@@ -294,19 +308,10 @@ export const ROUTE_CATALOG: RouteCatalogItem[] = [
   { id: "route-4", code: "R-04", name: "Recorrido 4 Norte", zoneIds: ["zone-1"], zoneNames: ["Zona Norte"] },
 ];
 
-export const OVERRIDE_NOTE_MIN = 10;
-export const OVERRIDE_NOTE_MAX = 500;
-
 export const assignCrewInputSchema = z.object({
   crewId: z.string().min(1, "Debe seleccionar una cuadrilla"),
   vehicleId: z.string().nullable().optional(),
-  // El backend la exige cuando la cuadrilla o el vehículo ya están tomados en esa franja (409 sin ella).
-  overrideNote: z
-    .string()
-    .trim()
-    .min(OVERRIDE_NOTE_MIN, `La justificación debe tener al menos ${OVERRIDE_NOTE_MIN} caracteres.`)
-    .max(OVERRIDE_NOTE_MAX, `La justificación admite hasta ${OVERRIDE_NOTE_MAX} caracteres.`)
-    .optional(),
+  overrideNote: overrideNoteSchema,
 });
 
 export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
