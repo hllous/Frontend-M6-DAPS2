@@ -2,6 +2,8 @@
 
 import { Activity, AlertTriangle, Boxes, MapPinned, RefreshCw, Route as RouteIcon } from "lucide-react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -40,6 +42,7 @@ import { routesAdapter, type Route } from "@/lib/routes";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { ZONE_RESULT_STATUS_LABEL } from "@/lib/services";
 import type { RiskLevel } from "@/lib/tree-surveys";
+import { treeCatalogHref } from "@/lib/trees";
 
 import type { OperationalMapView } from "./operational-map-canvas";
 import styles from "./mapa-operativo.module.css";
@@ -252,6 +255,17 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
   const [isCoverageLoading, setIsCoverageLoading] = useState(false);
   const [selectedStopSequence, setSelectedStopSequence] = useState<number | null>(null);
   const [selectedZoneCode, setSelectedZoneCode] = useState<string | null>(null);
+  // El árbol seleccionado vive en la URL (`tree`), igual que en el catálogo de arbolado.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedTreeId = searchParams.get("tree");
+  const selectTree = (treeId: string | null) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (treeId) next.set("tree", treeId); else next.delete("tree");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  };
   const availableMapViews = mapViews.filter(
     (option) => option.id !== "coverage" || scenario.capabilities.includes("indicator:view"),
   );
@@ -521,6 +535,8 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
               onSelectStop={setSelectedStopSequence}
               selectedZoneCode={selectedZoneCode}
               onSelectZone={setSelectedZoneCode}
+              selectedMarkerKey={selectedTreeId ? `trees-${selectedTreeId}` : null}
+              onSelectMarker={(marker) => { if (marker.layer === "trees") selectTree(marker.id); }}
             />
           </div>
 
@@ -530,6 +546,8 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                 items={items}
                 locatedItems={locatedItems}
                 unlocatedCount={unlocatedCount}
+                selectedTreeId={selectedTreeId}
+                onSelectTree={selectTree}
                 enabledLayers={enabledLayers}
                 onLayerChange={(layer, checked) => {
                   setEnabledLayers((current) => ({ ...current, [layer]: checked }));
@@ -592,12 +610,16 @@ function InventoryPanel({
   items,
   locatedItems,
   unlocatedCount,
+  selectedTreeId,
+  onSelectTree,
   enabledLayers,
   onLayerChange,
 }: {
   items: MapListItem[];
   locatedItems: (MapListItem & { lat: number; lng: number })[];
   unlocatedCount: number;
+  selectedTreeId: string | null;
+  onSelectTree: (treeId: string | null) => void;
   enabledLayers: Record<LayerId, boolean>;
   onLayerChange: (layer: LayerId, checked: boolean) => void;
 }) {
@@ -632,15 +654,33 @@ function InventoryPanel({
         ) : null}
         {locatedItems.length > 0 ? (
           <ul>
-            {locatedItems.map((item) => (
-              <li key={`${item.layer}-${item.id}`}>
-                <span className={`${styles.listMarker} ${styles[item.markerTone]}`} aria-hidden />
-                <span>
-                  <strong>{item.title}</strong>
-                  <small>{item.description}</small>
-                </span>
-              </li>
-            ))}
+            {locatedItems.map((item) => {
+              const isSelectedTree = item.layer === "trees" && item.id === selectedTreeId;
+              return (
+                <li key={`${item.layer}-${item.id}`} className={isSelectedTree ? styles.selected : undefined}>
+                  <span className={`${styles.listMarker} ${styles[item.markerTone]}`} aria-hidden />
+                  {item.layer === "trees" ? (
+                    <span>
+                      <button
+                        type="button"
+                        className={styles.itemButton}
+                        aria-pressed={isSelectedTree}
+                        onClick={() => onSelectTree(isSelectedTree ? null : item.id)}
+                      >
+                        <strong>{item.title}</strong>
+                        <small>{item.description}</small>
+                      </button>
+                      {isSelectedTree ? <Link className={styles.itemLink} href={treeCatalogHref(item.id)}>Ver ficha del árbol {item.title}</Link> : null}
+                    </span>
+                  ) : (
+                    <span>
+                      <strong>{item.title}</strong>
+                      <small>{item.description}</small>
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <Empty className={styles.emptyState}>
