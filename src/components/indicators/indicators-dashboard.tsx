@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
 import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
+import { serviceSourceHref } from "@/lib/referrals";
 import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -39,6 +40,8 @@ type UnsupportedTrace = { resource: null; reason: string };
 type RecordPlan = TracePlan | UnsupportedTrace;
 type TraceRecord = {
   id: string;
+  /** Pantalla del registro en el shell (`detail=<UUID>`). */
+  href: string;
   title: string;
   detail: string;
   zone: string;
@@ -103,6 +106,7 @@ function signalTracePlan(data: IndicatorData, breakdown: IndicatorBreakdown, poi
 function serviceToTraceRecord(service: Service): TraceRecord {
   return {
     id: service.id,
+    href: serviceSourceHref(service.id),
     title: service.title,
     detail: service.serviceTypeName ?? "Servicio urbano",
     zone: service.zoneNames.length > 0 ? service.zoneNames.join(" · ") : "Sin zona informada",
@@ -113,6 +117,7 @@ function serviceToTraceRecord(service: Service): TraceRecord {
 function containerToTraceRecord(container: Container, zones: Map<string, string>): TraceRecord {
   return {
     id: container.code,
+    href: `/app/catalog/containers?detail=${encodeURIComponent(container.id)}`,
     title: container.code,
     detail: container.address ?? "Sin dirección registrada",
     zone: zones.get(container.zoneId) ?? "Sin zona informada",
@@ -497,7 +502,7 @@ function AccessibleRecords({ family, plan, selection, breakdown, point, records,
 }
 
 function TraceRecordsTable({ plan, records }: { plan: TracePlan; records: TraceRecord[] }) {
-  return <div className={styles.recordsTableWrap}><table className={styles.recordsTable}><caption>Registros accesibles de {plan.title}</caption><thead><tr><th scope="col">Identificador</th><th scope="col">Registro</th><th scope="col">Zona operativa</th><th scope="col">Estado</th></tr></thead><tbody>{records.length > 0 ? records.map((record) => <tr key={record.id}><td className={styles.value}><strong>{record.id}</strong></td><td><span>{record.title}</span><span className={styles.note}>{record.detail}</span></td><td>{record.zone}</td><td>{record.status}</td></tr>) : <tr><td colSpan={4}>No hay registros accesibles para este filtro.</td></tr>}</tbody></table></div>;
+  return <div className={styles.recordsTableWrap}><table className={styles.recordsTable}><caption>Registros accesibles de {plan.title}</caption><thead><tr><th scope="col">Identificador</th><th scope="col">Registro</th><th scope="col">Zona operativa</th><th scope="col">Estado</th></tr></thead><tbody>{records.length > 0 ? records.map((record) => <tr key={record.id}><td className={styles.value}><Link className={styles.recordsLink} href={record.href}>{record.id}</Link></td><td><span>{record.title}</span><span className={styles.note}>{record.detail}</span></td><td>{record.zone}</td><td>{record.status}</td></tr>) : <tr><td colSpan={4}>No hay registros accesibles para este filtro.</td></tr>}</tbody></table></div>;
 }
 
 function BreakdownView({ breakdown, viewMode, selectedId: controlledSelectedId, onSelect }: { breakdown: IndicatorBreakdown; viewMode: ViewMode; selectedId?: string; onSelect: (pointId: string) => void }) {

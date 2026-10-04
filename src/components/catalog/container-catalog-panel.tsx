@@ -238,6 +238,26 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
     };
   }, [query, requestVersion]);
 
+  // `?detail=<UUID>` (p. ej. desde el tablero de indicadores) abre ese contenedor;
+  // se pide por id porque el listado trae sólo la primera página.
+  useEffect(() => {
+    const detailId = new URLSearchParams(window.location.search).get("detail");
+    if (!detailId) return;
+    let isCurrent = true;
+    containersAdapter
+      .get(encodeURIComponent(detailId))
+      .then((container) => {
+        if (!isCurrent) return;
+        setDetailEvidence([]);
+        setIsLoadingEvidence(true);
+        setDetailContainer(container);
+      })
+      .catch(() => undefined);
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
   function openCreate() {
     setEditingContainer(null);
     setForm({ ...emptyForm, zoneId: zones[0]?.id ?? "" });

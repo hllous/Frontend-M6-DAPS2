@@ -177,6 +177,7 @@ describe("IndicatorsDashboard", () => {
 
     const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
     expect(within(recordsRegion).getByRole("row", { name: /SVC-1042/ })).toBeVisible();
+    expect(within(recordsRegion).getByRole("link", { name: "SVC-1042" })).toHaveAttribute("href", "/app?destination=services&detail=SVC-1042");
     expect(recordsRegion).toHaveTextContent(/Filtro activo:.*Centro/i);
     expect(recordsRegion).toHaveTextContent(/Cobertura por zona/i);
     expect(screen.getByRole("link", { name: /Abrir Servicios/i })).toHaveAttribute("href", "/app?destination=services");
@@ -197,6 +198,8 @@ describe("IndicatorsDashboard", () => {
 
     const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
     expect(within(recordsRegion).getByRole("row", { name: /CONT-001/ })).toBeVisible();
+    // Se muestra el código, pero el enlace usa el UUID que `GET /containers/:id` espera.
+    expect(within(recordsRegion).getByRole("link", { name: "CONT-001" })).toHaveAttribute("href", "/app/catalog/containers?detail=cont-1");
     expect(screen.getByRole("link", { name: /Abrir catálogo de contenedores/i })).toHaveAttribute("href", "/app/catalog/containers");
     expect(screen.queryByRole("button", { name: /Editar|Eliminar|Dar de baja/i })).not.toBeInTheDocument();
   });
