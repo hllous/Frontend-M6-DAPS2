@@ -38,7 +38,23 @@ type OperationalMapCanvasProps = {
   onSelectStop?: (sequence: number) => void;
   selectedZoneCode?: string | null;
   onSelectZone?: (code: string) => void;
+  selectedMarkerKey?: string | null;
+  onSelectMarker?: (marker: OperationalMapMarker) => void;
 };
+
+const markerKey = (marker: OperationalMapMarker) => `${marker.layer}-${marker.id}`;
+
+// Centra el mapa en el marcador seleccionado con zoom suficiente para sacarlo del cluster.
+function FocusMarker({ lat, lng }: { lat?: number; lng?: number }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (lat === undefined || lng === undefined) return;
+    map.setView([lat, lng], Math.max(map.getZoom(), 17));
+  }, [map, lat, lng]);
+
+  return null;
+}
 
 const todayStatusPathOptions = {
   PENDING: { color: "var(--color-info)", fillColor: "var(--color-info-fill)" },
@@ -133,7 +149,11 @@ export function OperationalMapCanvas({
   onSelectStop,
   selectedZoneCode = null,
   onSelectZone,
+  selectedMarkerKey = null,
+  onSelectMarker,
 }: OperationalMapCanvasProps) {
+  const selectedMarker = markers.find((marker) => markerKey(marker) === selectedMarkerKey);
+
   const mapLabel =
     view === "zones"
       ? "Mapa geográfico de zonas operativas"
@@ -172,17 +192,18 @@ export function OperationalMapCanvas({
           >
             {markers.map((marker) => (
               <Marker
-                key={`${marker.layer}-${marker.id}`}
+                key={markerKey(marker)}
                 position={[marker.lat, marker.lng]}
                 title={`${marker.title}. ${marker.description}`}
                 alt={`${marker.title}. ${marker.description}`}
                 icon={divIcon({
                   className: styles.marker,
-                  html: `<span class="${styles.markerPin} ${styles[marker.markerTone]}"><span>${marker.markerSymbol}</span></span>`,
+                  html: `<span class="${styles.markerPin} ${styles[marker.markerTone]} ${marker === selectedMarker ? styles.markerSelected : ""}"><span>${marker.markerSymbol}</span></span>`,
                   iconSize: [36, 42],
                   iconAnchor: [18, 40],
                   popupAnchor: [0, -38],
                 })}
+                eventHandlers={onSelectMarker ? { click: () => onSelectMarker(marker) } : undefined}
               >
                 <Popup>
                   <strong>{marker.title}</strong>
@@ -192,6 +213,7 @@ export function OperationalMapCanvas({
             ))}
             <ClusterAccessibility />
           </MarkerClusterGroupComponent>
+          <FocusMarker lat={selectedMarker?.lat} lng={selectedMarker?.lng} />
         </>
       ) : null}
 

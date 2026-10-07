@@ -17,8 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { NetworkFailureError } from "@/lib/authenticated-fetch";
+import { formatCalendarDay } from "@/lib/argentina-date";
 import {
   ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS,
+  ENVIRONMENTAL_SEVERITY_LABELS as SEVERITY_LABELS,
+  ENVIRONMENTAL_SUGGESTED_ACTION_LABELS as SUGGESTED_ACTION_LABELS,
+  ENVIRONMENTAL_VIOLATION_TYPE_LABELS as VIOLATION_TYPE_LABELS,
   environmentalInspectionCompleteInputSchema,
   environmentalInspectionOutcomeSchema,
   environmentalInspectionSeveritySchema,
@@ -64,30 +68,6 @@ const NEXT_STEP_LABELS: Record<NonNullable<EnvironmentalInspection["nextStep"]>,
   CASE_CLOSED: "Cierre del expediente",
 };
 
-const VIOLATION_TYPE_LABELS: Record<EnvironmentalInspectionCompleteInput["violationType"] & string, string> = {
-  NOISE_LIMIT: "Exceso de ruido",
-  ILLEGAL_DUMPING: "Vertido ilegal",
-  UNTREATED_DISCHARGE: "Descarga sin tratamiento",
-  HAZARDOUS_WASTE: "Residuos peligrosos",
-  AIR_EMISSION: "Emisión al aire",
-  NO_WASTE_MANAGEMENT: "Falta de gestión de residuos",
-  INSPECTION_OBSTRUCTION: "Obstrucción de la inspección",
-};
-
-const SEVERITY_LABELS: Record<EnvironmentalInspectionCompleteInput["severity"] & string, string> = {
-  LOW: "Baja",
-  MEDIUM: "Media",
-  HIGH: "Alta",
-  CRITICAL: "Crítica",
-};
-
-const SUGGESTED_ACTION_LABELS: Record<EnvironmentalInspectionCompleteInput["suggestedAction"] & string, string> = {
-  WARNING: "Advertencia",
-  FORMAL_NOTICE: "Aviso formal",
-  FINE: "Multa",
-  CLOSURE: "Clausura",
-};
-
 function randomIdempotencyKey() {
   return typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
@@ -131,10 +111,13 @@ function resultPayload(
 export function InspectionExecutionPanel({
   service,
   canExecute = false,
+  waitingForStart = false,
   onServiceUpdated,
 }: {
   service: Service;
   canExecute?: boolean;
+  /** Quien ejecuta el servicio lo ve antes de iniciarlo: no es sólo consulta, falta iniciar. */
+  waitingForStart?: boolean;
   onServiceUpdated?: (updated: Service) => void;
 }) {
   const inputId = useId();
@@ -316,13 +299,14 @@ export function InspectionExecutionPanel({
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-action)]"><FileCheck aria-hidden />Control ambiental</div>
           <h2 id={`inspection-execution-heading-${inputId}`} className="mt-1 text-lg font-bold text-[var(--color-text)]">Ejecución de inspección ambiental</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · Checklist {inspection.checklistVersion ?? "—"} · {service.scheduledDate.slice(0, 10)} · {service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "—"}</p>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · {formatCalendarDay(service.scheduledDate)} · {service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "—"}</p>
         </div>
         <span className="rounded-lg bg-[var(--color-info-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-info)]">Punto asignado</span>
       </div>
 
-      {!canExecute && !completed && (
-        <Alert className="mt-4" role="status"><CloudOff aria-hidden /><AlertTitle>Modo de solo consulta</AlertTitle><AlertDescription>Esta inspección se encuentra en modo de solo consulta para integrantes de la cuadrilla.</AlertDescription></Alert>
+      {!canExecute && !completed && (waitingForStart
+        ? <Alert className="mt-4" role="status"><AlertTriangle aria-hidden /><AlertTitle>El servicio todavía no está en curso</AlertTitle><AlertDescription>El resultado y la evidencia de la inspección se registran con el servicio en curso. Inícielo para habilitar el formulario.</AlertDescription></Alert>
+        : <Alert className="mt-4" role="status"><CloudOff aria-hidden /><AlertTitle>Solo consulta</AlertTitle><AlertDescription>La persona responsable de la cuadrilla registra el resultado y la evidencia de esta inspección.</AlertDescription></Alert>
       )}
 
       {!canExecute && !completed ? (
@@ -408,7 +392,7 @@ function ServiceClosureGuide({ service, canExecute, onServiceUpdated }: { servic
 }
 
 function ReadOnlyInspection({ inspection }: { inspection: EnvironmentalInspection }) {
-  return <div className="mt-5 flex flex-col gap-4"><h3 className="text-sm font-bold text-[var(--color-text)]">Checklist asignado</h3><ul className="flex flex-col gap-2" aria-label="Checklist de inspección en solo consulta">{inspectionChecklist(inspection).map((item) => <li key={item.id} className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 text-sm text-[var(--color-text)]"><span aria-hidden="true" className="size-3 rounded-full border border-[var(--color-border-strong)]" />{item.label}{item.required ? <span className="text-xs text-[var(--color-text-secondary)]">(obligatorio)</span> : null}</li>)}</ul><p className="text-xs text-[var(--color-text-secondary)]">La persona responsable de la cuadrilla registra el resultado y la evidencia de esta inspección.</p></div>;
+  return <div className="mt-5 flex flex-col gap-4"><h3 className="text-sm font-bold text-[var(--color-text)]">Checklist asignado</h3><ul className="flex flex-col gap-2" aria-label="Checklist asignado">{inspectionChecklist(inspection).map((item) => <li key={item.id} className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 text-sm text-[var(--color-text)]"><span aria-hidden="true" className="size-3 rounded-full border border-[var(--color-border-strong)]" />{item.label}{item.required ? <span className="text-xs text-[var(--color-text-secondary)]">(obligatorio)</span> : null}</li>)}</ul></div>;
 }
 
 function EvidenceQueue({ queuedFiles, fileValidationError, onFileSelect, onRemoveFile, onRetryFile, disabled, existingCount }: { queuedFiles: QueuedEvidenceFile[]; fileValidationError: string | null; onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void; onRemoveFile: (id: string) => void; onRetryFile: (file: QueuedEvidenceFile) => void; disabled: boolean; existingCount: number }) {

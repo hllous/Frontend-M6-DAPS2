@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Activity, CheckCheck, Database, RefreshCw, Recycle, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -10,8 +11,10 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatCalendarDay } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
-import { defaultIndicatorQuery, indicatorQueryErrorMessage, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
+import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
+import { serviceSourceHref } from "@/lib/referrals";
 import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -38,6 +41,8 @@ type UnsupportedTrace = { resource: null; reason: string };
 type RecordPlan = TracePlan | UnsupportedTrace;
 type TraceRecord = {
   id: string;
+  /** Pantalla del registro en el shell (`detail=<UUID>`). */
+  href: string;
   title: string;
   detail: string;
   zone: string;
@@ -99,11 +104,13 @@ function signalTracePlan(data: IndicatorData, breakdown: IndicatorBreakdown, poi
   };
 }
 
+// El servicio no tiene código legible: la fila se nombra con su título y su agenda.
 function serviceToTraceRecord(service: Service): TraceRecord {
   return {
     id: service.id,
+    href: serviceSourceHref(service.id),
     title: service.title,
-    detail: service.serviceTypeName ?? "Servicio urbano",
+    detail: `${formatCalendarDay(service.scheduledDate)}${service.windowFrom ? ` · ${service.windowFrom}–${service.windowTo ?? ""}` : ""}`,
     zone: service.zoneNames.length > 0 ? service.zoneNames.join(" · ") : "Sin zona informada",
     status: STATUS_LABEL[service.status],
   };
@@ -112,6 +119,7 @@ function serviceToTraceRecord(service: Service): TraceRecord {
 function containerToTraceRecord(container: Container, zones: Map<string, string>): TraceRecord {
   return {
     id: container.code,
+    href: `/app/catalog/containers?detail=${encodeURIComponent(container.id)}`,
     title: container.code,
     detail: container.address ?? "Sin dirección registrada",
     zone: zones.get(container.zoneId) ?? "Sin zona informada",
@@ -210,12 +218,16 @@ function ModuleState({ label, status, onRetry, children }: { label: string; stat
 
 export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenario }) {
   const canView = scenario.capabilities.includes("indicator:view");
-  const [query, setQuery] = useState<IndicatorQuery>(() => defaultIndicatorQuery());
-  const [appliedQuery, setAppliedQuery] = useState<IndicatorQuery>(() => defaultIndicatorQuery());
+  const searchParams = useSearchParams();
+  // El estado inicial sale de la URL una sola vez; después la URL sólo se escribe.
+  const [initialUrlState] = useState(() => parseIndicatorUrlState(searchParams ?? new URLSearchParams()));
+  const pendingSignal = useRef(initialUrlState.signal);
+  const [query, setQuery] = useState<IndicatorQuery>(initialUrlState.query);
+  const [appliedQuery, setAppliedQuery] = useState<IndicatorQuery>(initialUrlState.query);
   const [filterError, setFilterError] = useState<string | null>(null);
   const [familyStates, setFamilyStates] = useState<Record<FamilyKey, FamilyState>>(emptyFamilyState);
-  const [selectedFamily, setSelectedFamily] = useState<FamilyKey>("coverage");
-  const [viewMode, setViewMode] = useState<ViewMode>("bars");
+  const [selectedFamily, setSelectedFamily] = useState<FamilyKey>(initialUrlState.family);
+  const [viewMode, setViewMode] = useState<ViewMode>(initialUrlState.view);
   const [selectedSignal, setSelectedSignal] = useState<SelectedSignal | null>(null);
   const [recordPlan, setRecordPlan] = useState<RecordPlan | null>(null);
   const [records, setRecords] = useState<TraceRecord[]>([]);
@@ -302,6 +314,12 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
   const selectedBreakdown = selectedData?.breakdowns.find((breakdown) => breakdown.id === selectedSignal?.breakdownId);
   const selectedPoint = selectedBreakdown?.points.find((point) => point.id === selectedSignal?.pointId);
+
+  useEffect(() => {
+    if (!canView) return;
+    const search = serializeIndicatorUrlState({ query: appliedQuery, family: selectedFamily, view: viewMode, signal: selectedSignal ?? pendingSignal.current ?? undefined }, window.location.search);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${search}`);
+  }, [appliedQuery, canView, selectedFamily, selectedSignal, viewMode]);
   const trendBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "trend") : [];
   const territoryBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "territory") : [];
   const trendStatus = moduleStatus(selectedFamilyState, selectedFamilyState.data, "trend");
@@ -309,6 +327,8 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   const dashboardStatus = familyOrder.some((family) => familyStates[family].status === "loading")
     ? "loading"
     : familyOrder.every((family) => familyStates[family].status === "error") ? "error" : "ready";
+  const ignoredFilters = familyAppliesCatalogFilters(selectedFamily) ? null
+    : [appliedQuery.zoneId && "Zona", appliedQuery.serviceTypeId && "Tipo de servicio"].filter(Boolean).join(" y ") || null;
   const clearSignal = () => {
     setSelectedSignal(null);
     setRecordPlan((current) => current?.resource ? { ...current, zoneId: undefined } : null);
@@ -316,11 +336,24 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   };
 
   const selectFamily = (family: FamilyKey) => {
+    pendingSignal.current = undefined;
     setSelectedFamily(family);
     setSelectedSignal(null);
     setRecordPlan(null);
     setRecordsStatus("idle");
   };
+
+  useEffect(() => {
+    const signal = pendingSignal.current;
+    if (!signal || !selectedData) return;
+    pendingSignal.current = undefined;
+    const breakdown = selectedData.breakdowns.find((item) => item.id === signal.breakdownId);
+    const point = breakdown?.points.find((item) => item.id === signal.pointId);
+    if (!breakdown || !point) return;
+    setSelectedSignal(signal);
+    setRecordsStatus("loading");
+    setRecordPlan(signalTracePlan(selectedData, breakdown, point));
+  }, [selectedData]);
 
   const retryFamily = (family: FamilyKey) => {
     loadFamily(family, appliedQuery);
@@ -355,12 +388,14 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
         {freshness ? <div className={styles.freshness}><Database size={16} aria-hidden /> Actualizado {formatDateTime(freshness)}</div> : null}
       </div>
 
-      <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); const validation = indicatorQuerySchema.safeParse(query); if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; } setFilterError(null); setSelectedSignal(null); setRecordPlan(null); setRecordsStatus("idle"); setFamilyStates(emptyFamilyState()); setAppliedQuery({ ...query }); }}>
+      <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); pendingSignal.current = undefined; const validation = indicatorQuerySchema.safeParse(query); if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; } setFilterError(null); setSelectedSignal(null); setRecordPlan(null); setRecordsStatus("idle"); setFamilyStates(emptyFamilyState()); setAppliedQuery({ ...query }); }}>
         <div className={styles.field}><label htmlFor="indicator-from">Desde</label><input id="indicator-from" type="date" value={query.from ?? ""} onChange={(event) => { setFilterError(null); setQuery((current) => ({ ...current, from: event.target.value || undefined })); }} /></div>
         <div className={styles.field}><label htmlFor="indicator-to">Hasta</label><input id="indicator-to" type="date" value={query.to ?? ""} aria-invalid={filterError ? true : undefined} aria-describedby={filterError ? "indicator-to-error" : undefined} onChange={(event) => { setFilterError(null); setQuery((current) => ({ ...current, to: event.target.value || undefined })); }} /></div>
+        <div className={styles.field}><label htmlFor="indicator-family">Familia</label><select id="indicator-family" value={selectedFamily} onChange={(event) => selectFamily(event.target.value as FamilyKey)}>{familyOrder.map((family) => <option key={family} value={family}>{familyMeta[family].label}</option>)}</select></div>
         <CatalogFilter id="indicator-zone" label="Zona operativa" allLabel="Todas las zonas" noun="zonas" options={filterCatalog?.zones} value={query.zoneId} onChange={(zoneId) => setQuery((current) => ({ ...current, zoneId }))} />
         <CatalogFilter id="indicator-service-type" label="Tipo de servicio" allLabel="Todos los tipos" noun="tipos de servicio" options={filterCatalog?.serviceTypes} value={query.serviceTypeId} onChange={(serviceTypeId) => setQuery((current) => ({ ...current, serviceTypeId }))} />
         <Button className={styles.filterAction} type="submit" disabled={dashboardStatus === "loading"}><RefreshCw data-icon="inline-start" aria-hidden />{dashboardStatus === "loading" ? "Actualizando…" : "Actualizar"}</Button>
+        {ignoredFilters ? <p role="status" className={styles.note}>Filtros sin efecto en {familyMeta[selectedFamily].label}: {ignoredFilters}. Esta familia sólo se filtra por período, así que se muestra sin filtrar.</p> : null}
         {filterError ? <p id="indicator-to-error" role="alert" className={styles.fieldError}>{filterError}</p> : null}
       </form>
 
@@ -469,7 +504,7 @@ function AccessibleRecords({ family, plan, selection, breakdown, point, records,
 }
 
 function TraceRecordsTable({ plan, records }: { plan: TracePlan; records: TraceRecord[] }) {
-  return <div className={styles.recordsTableWrap}><table className={styles.recordsTable}><caption>Registros accesibles de {plan.title}</caption><thead><tr><th scope="col">Identificador</th><th scope="col">Registro</th><th scope="col">Zona operativa</th><th scope="col">Estado</th></tr></thead><tbody>{records.length > 0 ? records.map((record) => <tr key={record.id}><td className={styles.value}><strong>{record.id}</strong></td><td><span>{record.title}</span><span className={styles.note}>{record.detail}</span></td><td>{record.zone}</td><td>{record.status}</td></tr>) : <tr><td colSpan={4}>No hay registros accesibles para este filtro.</td></tr>}</tbody></table></div>;
+  return <div className={styles.recordsTableWrap}><table className={styles.recordsTable}><caption>Registros accesibles de {plan.title}</caption><thead><tr><th scope="col">Registro</th><th scope="col">Zona operativa</th><th scope="col">Estado</th></tr></thead><tbody>{records.length > 0 ? records.map((record) => <tr key={record.id}><td><Link className={styles.recordsLink} href={record.href}>{record.title}</Link><span className={styles.note}>{record.detail}</span></td><td>{record.zone}</td><td>{record.status}</td></tr>) : <tr><td colSpan={3}>No hay registros accesibles para este filtro.</td></tr>}</tbody></table></div>;
 }
 
 function BreakdownView({ breakdown, viewMode, selectedId: controlledSelectedId, onSelect }: { breakdown: IndicatorBreakdown; viewMode: ViewMode; selectedId?: string; onSelect: (pointId: string) => void }) {

@@ -8,7 +8,8 @@ test.describe("TreeIntervention requests #128", () => {
     await page.goto("/app/catalog/tree-interventions");
     await expect(page.getByRole("heading", { name: "Intervenciones de arbolado" })).toBeVisible();
 
-    const existing = page.getByRole("article", { name: /intervention-1/ });
+    // La tarjeta se nombra por sus árboles: la solicitud no tiene código propio (#321).
+    const existing = page.getByRole("article", { name: "Poda de seguridad · ARB-00443, ARB-00445" }).first();
     await existing.getByRole("button", { name: "Ver detalle" }).click();
     const detail = page.getByRole("dialog", { name: /Detalle de la intervención/ });
     await expect(detail).toContainText("ARB-00443");

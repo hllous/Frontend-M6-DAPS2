@@ -6,7 +6,7 @@ Aplicación web interna para planificar y ejecutar servicios municipales de Ambi
 
 - Next.js 16 (App Router), React 19 y TypeScript
 - Tailwind CSS 4
-- Node.js 20 para CI y la imagen Docker
+- Node.js 22 para CI y la imagen Docker
 - Zod para validar datos en los límites de los adaptadores
 
 ## Funcionalidad

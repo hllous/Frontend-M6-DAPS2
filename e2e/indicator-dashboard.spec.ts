@@ -27,7 +27,7 @@ test.describe("operational indicator dashboard #138", () => {
   test("the dashboard alias opens the same gated Office surface", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/dashboard");
-    await expect(page).toHaveURL(/\/app\?destination=dashboards$/);
+    await expect(page).toHaveURL(/\/app\?destination=dashboards(&|$)/);
     await expect(page.getByRole("heading", { name: "Indicadores operativos" })).toBeVisible();
   });
 

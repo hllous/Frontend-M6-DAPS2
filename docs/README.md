@@ -24,7 +24,27 @@ Los documentos centrales están en la raíz. En particular, el dominio sigue la 
 ## Dónde agregar documentación
 
 - Vocabulario del dominio: `CONTEXT.md`.
-- Decisión técnica difícil de revertir: `docs/adr/`.
+- Decisión técnica difícil de revertir: `docs/adr/`, a partir de la [plantilla](adr/0000-template.md).
 - Contratos y reglas de integración del frontend: `CONTRACTS.md`.
 - Reglas visuales: `DESIGN.md`; ejemplos verificables, `docs/design/examples/`.
 - Procedimientos de contribución y operación: `docs/agents/` y `docs/operations/`.
+- Diagramas: Mermaid en el documento que explica la decisión (ADR-0002, 0004, 0007 y los estados de Service en `CONTRACTS.md`), nunca en una carpeta aparte. Solo diagramas de decisiones estables: nada verifica un diagrama contra el código.
+- Lista de verificación de PR: [`.github/PULL_REQUEST_TEMPLATE.md`](../.github/PULL_REQUEST_TEMPLATE.md), que GitHub completa en cada PR.
+
+## Verificación de la documentación
+
+El job `docs` de CI corre en cada PR y falla si la documentación se rompe:
+
+- `markdownlint-cli2` revisa estilo y estructura. Las reglas están en [`.markdownlint-cli2.jsonc`](../.markdownlint-cli2.jsonc).
+- `lychee`, sin red, comprueba que los enlaces relativos y las anclas (`#seccion`) entre nuestros Markdown existan. Las reglas están en [`lychee.toml`](../lychee.toml). No revisa URLs externas.
+
+Ambos excluyen `docs/backend-context/`: es un espejo de solo lectura y parcial, y sus enlaces se validan en el Backend.
+
+Para correrlos en local:
+
+```bash
+npx --yes markdownlint-cli2@0.23.3
+lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'
+```
+
+`markdownlint-cli2` necesita Node 22 o superior. `lychee` se instala aparte ([instrucciones](https://lychee.cli.rs/installation/)); en CI se usa la versión fijada en `.github/workflows/ci.yml`.

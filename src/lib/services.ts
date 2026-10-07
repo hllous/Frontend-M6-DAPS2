@@ -106,7 +106,10 @@ export const serviceSchema = z.object({
   targetRef: z.string().nullable().optional(),
   inspectionId: z.string().nullable().optional(),
   weatherAlertId: z.string().nullable().optional(),
-  scheduledDate: z.string(),
+  // El backend la serializa como ISO a medianoche UTC (`2026-12-07T00:00:00.000Z`); se
+  // guarda como día (YYYY-MM-DD), que es lo que comparan los filtros, los choques de
+  // agenda y la ventana horaria, y lo que se manda al reprogramar.
+  scheduledDate: z.string().transform((value) => value.slice(0, 10)),
   windowFrom: z.string().nullable().optional(),
   windowTo: z.string().nullable().optional(),
   crewId: z.string().nullable().optional(),
@@ -144,6 +147,18 @@ const serviceWireSchema = z.preprocess((value) => {
   return { ...rest, zoneIds: ordenadas.map((zona) => zona?.zoneId), zoneResults };
 }, serviceSchema.extend({ title: z.string().optional() }));
 
+export const OVERRIDE_NOTE_MIN = 10;
+export const OVERRIDE_NOTE_MAX = 500;
+
+// El backend la exige cuando la cuadrilla o el vehículo ya están tomados en esa franja (409 sin ella),
+// tanto al programar con cuadrilla como en assign-crew.
+const overrideNoteSchema = z
+  .string()
+  .trim()
+  .min(OVERRIDE_NOTE_MIN, `La justificación debe tener al menos ${OVERRIDE_NOTE_MIN} caracteres.`)
+  .max(OVERRIDE_NOTE_MAX, `La justificación admite hasta ${OVERRIDE_NOTE_MAX} caracteres.`)
+  .optional();
+
 export const createServiceInputSchema = z
   .object({
     title: z.string().optional(),
@@ -157,6 +172,8 @@ export const createServiceInputSchema = z
     targetType: z.enum(["CONTAINER", "TREE", "GREEN_SPACE", "GREEN_POINT"]).optional(),
     targetId: z.string().optional(),
     targetRef: z.string().optional(),
+    crewId: z.string().optional(),
+    vehicleId: z.string().optional(),
     scheduledDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
@@ -165,6 +182,7 @@ export const createServiceInputSchema = z
       end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
     }),
     notes: z.string().max(MAX_NOTES_LENGTH, `Las notas no pueden superar los ${MAX_NOTES_LENGTH} caracteres.`).optional(),
+    overrideNote: overrideNoteSchema,
   })
   .superRefine((data, ctx) => {
     if (data.origin === "TICKET" && (!data.ticketId || !data.ticketId.trim())) {
@@ -232,6 +250,8 @@ export function toCreateServiceBackendInput(input: CreateServiceInput) {
     targetType: hasTarget ? input.targetType : undefined,
     targetId: hasTarget ? input.targetId : undefined,
     ...(!zoneIsDerived ? { zoneId: input.zoneIds[0] } : {}),
+    crewId: input.crewId || undefined,
+    vehicleId: input.vehicleId || undefined,
     windowFrom: input.timeWindow.start,
     windowTo: input.timeWindow.end,
     ticketId: input.ticketId,
@@ -239,6 +259,7 @@ export function toCreateServiceBackendInput(input: CreateServiceInput) {
     inspectionId: input.origin === "INSPECTION" ? input.inspectionId?.trim() || undefined : undefined,
     weatherAlertId: input.origin === "WEATHER_ALERT" ? input.weatherAlertId?.trim() || undefined : undefined,
     notes,
+    overrideNote: input.overrideNote,
   };
 }
 
@@ -290,19 +311,10 @@ export const ROUTE_CATALOG: RouteCatalogItem[] = [
   { id: "route-4", code: "R-04", name: "Recorrido 4 Norte", zoneIds: ["zone-1"], zoneNames: ["Zona Norte"] },
 ];
 
-export const OVERRIDE_NOTE_MIN = 10;
-export const OVERRIDE_NOTE_MAX = 500;
-
 export const assignCrewInputSchema = z.object({
   crewId: z.string().min(1, "Debe seleccionar una cuadrilla"),
   vehicleId: z.string().nullable().optional(),
-  // El backend la exige cuando la cuadrilla o el vehículo ya están tomados en esa franja (409 sin ella).
-  overrideNote: z
-    .string()
-    .trim()
-    .min(OVERRIDE_NOTE_MIN, `La justificación debe tener al menos ${OVERRIDE_NOTE_MIN} caracteres.`)
-    .max(OVERRIDE_NOTE_MAX, `La justificación admite hasta ${OVERRIDE_NOTE_MAX} caracteres.`)
-    .optional(),
+  overrideNote: overrideNoteSchema,
 });
 
 export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;

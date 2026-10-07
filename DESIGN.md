@@ -345,7 +345,7 @@ Use the approved **Par canónico y lista de verificación** format to make the r
 
 The canonical pairs live at [`docs/design/examples/index.html`](docs/design/examples/index.html). Open that file directly in a browser; it is self-contained, needs no build step, and carries all seven pairs and all seven checklists on one page. It is versioned with this document, so a change to a rule and a change to its example arrive in the same commit.
 
-The comparison prototype at `src/app/prototype/do-dont/` (`npm run prototype:do-dont`) shows the rejected formats A, B, and C alongside the approved D. It is throwaway history and carries no authority; the examples page is the normative asset.
+The comparison prototype that showed the rejected formats A, B, and C alongside the approved D is archived in git under the tag `archive/visual-system-prototypes` (`src/app/prototype/do-dont/` in that tag). It is throwaway history and carries no authority; the examples page is the normative asset.
 
 | Risk area | Canonical pair | Governing rule |
 | --- | --- | --- |

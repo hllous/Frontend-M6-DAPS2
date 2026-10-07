@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { argentinaDay, todayInArgentina } from "./argentina-date";
+import { argentinaDay, formatArgentinaDateTime, formatCalendarDay, todayInArgentina } from "./argentina-date";
 
 describe("todayInArgentina", () => {
   it("returns the Argentina date even when UTC is already the next day", () => {
@@ -29,5 +29,27 @@ describe("argentinaDay", () => {
 
   it("returns null for values that are not dates", () => {
     expect(argentinaDay("no-es-fecha")).toBeNull();
+  });
+});
+
+describe("formatCalendarDay", () => {
+  it("formats a calendar day without shifting it, from YYYY-MM-DD or the backend's UTC-midnight ISO", () => {
+    expect(formatCalendarDay("2026-12-07")).toBe("7 dic 2026");
+    expect(formatCalendarDay("2026-12-07T00:00:00.000Z")).toBe("7 dic 2026");
+  });
+
+  it("returns values that are not dates untouched", () => {
+    expect(formatCalendarDay("sin fecha")).toBe("sin fecha");
+  });
+});
+
+describe("formatArgentinaDateTime", () => {
+  it("formats an instant in Argentina time", () => {
+    // Intl separa "a. m." con espacios finos (U+202F), de ahí el \s.
+    expect(formatArgentinaDateTime("2026-09-22T13:43:09.525Z")).toMatch(/^22 sept 2026, 10:43\sa\.\sm\.$/);
+  });
+
+  it("returns values that are not dates untouched", () => {
+    expect(formatArgentinaDateTime("sin fecha")).toBe("sin fecha");
   });
 });

@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { handlers } from "@/mocks/handlers";
+import { withNodeFile } from "@/mocks/node-file";
 import { scenarios } from "@/lib/scenarios";
 import { ContainerCatalogPanel } from "./container-catalog-panel";
 
@@ -49,6 +50,16 @@ describe("ContainerCatalogPanel", () => {
     await user.type(screen.getByLabelText("Buscar contenedor"), "Santa Fe");
     expect(await screen.findByText("CONT-002")).toBeVisible();
     expect(screen.queryByText("CONT-001")).not.toBeInTheDocument();
+  });
+
+  it("opens the Container named by ?detail= in the URL", async () => {
+    window.history.replaceState(null, "", "/app/catalog/containers?detail=cont-3");
+    try {
+      render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      expect(await screen.findByRole("dialog", { name: /Detalle del contenedor CONT-003/ })).toBeVisible();
+    } finally {
+      window.history.replaceState(null, "", "/");
+    }
   });
 
   it("allows any actor to view Container detail including damage information", async () => {
@@ -170,7 +181,7 @@ describe("ContainerCatalogPanel", () => {
     const evidenceOwners: string[] = [];
     server.use(
       http.post("*/api/evidence", async ({ request }) => {
-        const formData = await request.formData();
+        const formData = await withNodeFile(() => request.formData());
         evidenceOwners.push(String(formData.get("ownerType")));
         return HttpResponse.json({
           id: "att-repair-1",
@@ -201,7 +212,7 @@ describe("ContainerCatalogPanel", () => {
     const evidenceOwners: string[] = [];
     server.use(
       http.post("*/api/evidence", async ({ request }) => {
-        const formData = await request.formData();
+        const formData = await withNodeFile(() => request.formData());
         evidenceOwners.push(String(formData.get("ownerType")));
         return HttpResponse.json({
           id: "att-removal-1",

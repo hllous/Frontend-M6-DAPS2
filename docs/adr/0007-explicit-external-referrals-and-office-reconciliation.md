@@ -13,3 +13,16 @@ Anomalies stay out of the domain state machine: stale is an operational warning,
 This keeps M6's product state subordinate to M3/M7's external decisions and avoids unsafe automatic retries, merges, or Service reopening. Office receives explicit reconciliation work when integrations are late or ambiguous. The frontend must present source context, timestamps, external identifiers, and the difference between an unsent referral (submission failed before a record was created) and a created-but-pending one. Correlation and machine-readable error details remain backend contract concerns; the frontend must not classify ambiguous free-text errors as duplicates.
 
 No alternatives were recorded in issue #66's resolution.
+
+## Diagram
+
+```mermaid
+flowchart TD
+    S["Source: Service, EnvironmentalInspection or TreeIntervention"] -->|"explicit create"| R[Referral: RepairRequest to M3, StreetClosureRequest to M7]
+    R -->|"external event"| E{External response}
+    E -->|"approved / scheduled / completed"| OK[Referral advances, dependency released]
+    E -->|"rejected"| D["Office decides: reschedule or cancel the Service"]
+    E -->|"late, duplicate or uncertain"| A["Anomaly: warning only, no new state"]
+    A --> REC[Office reconciles by hand, then retries or recovers]
+    REC -->|"manual transition endpoint, Office only"| R
+```

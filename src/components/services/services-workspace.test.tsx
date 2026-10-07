@@ -317,6 +317,8 @@ describe("ServicesWorkspace component", () => {
     await waitFor(() => {
       expect(screen.getByRole("region", { name: "Detalle completo de SVC-1050" })).toBeInTheDocument();
     });
+    // #321: Oficina no ejecuta el servicio, pero tiene acciones: no es sólo consulta.
+    expect(screen.queryByText("Solo consulta")).not.toBeInTheDocument();
 
     // Step 1: reason moves SCHEDULED -> RESCHEDULED
     await user.click(screen.getByRole("button", { name: "Reprogramar" }));
@@ -356,7 +358,7 @@ describe("ServicesWorkspace component", () => {
     await waitFor(() => {
       expect(screen.getByText("Programado")).toBeVisible();
     });
-    expect(screen.getByText("2099-09-12")).toBeVisible();
+    expect(screen.getByText("12 sept 2099")).toBeVisible();
     // zoneIds preserved verbatim
     expect(screen.getByText("Zona Centro")).toBeVisible();
   });

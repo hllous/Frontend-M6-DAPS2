@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse, passthrough } from "msw";
@@ -14,10 +14,16 @@ import { IndicatorsDashboard } from "./indicators-dashboard";
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-04T15:00:00.000Z"));
+});
 afterEach(() => {
   server.resetHandlers();
   vi.unstubAllGlobals();
+  window.history.replaceState(null, "", "/"); // el tablero escribe su estado en la URL
   olvidarCatalogoDeEtiquetas();
+  vi.useRealTimers();
 });
 afterAll(() => server.close());
 
@@ -175,7 +181,10 @@ describe("IndicatorsDashboard", () => {
     await user.click(await screen.findByRole("button", { name: /Centro.*89,7/i }));
 
     const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
-    expect(within(recordsRegion).getByRole("row", { name: /SVC-1042/ })).toBeVisible();
+    // La fila se nombra con el título del servicio, no con su identificador.
+    const serviceLink = () => within(recordsRegion).getAllByRole("link", { name: "Recolección de residuos — Recorrido 4" }).find((link) => link.getAttribute("href") === "/app?destination=services&detail=SVC-1042");
+    expect(serviceLink()).toBeVisible();
+    expect(within(recordsRegion).queryByText("SVC-1042")).not.toBeInTheDocument();
     expect(recordsRegion).toHaveTextContent(/Filtro activo:.*Centro/i);
     expect(recordsRegion).toHaveTextContent(/Cobertura por zona/i);
     expect(screen.getByRole("link", { name: /Abrir Servicios/i })).toHaveAttribute("href", "/app?destination=services");
@@ -183,7 +192,7 @@ describe("IndicatorsDashboard", () => {
     await user.click(screen.getByRole("button", { name: "Quitar filtro de señal" }));
 
     expect(recordsRegion).toHaveTextContent(/Sin filtro de señal/);
-    expect(within(recordsRegion).getByRole("row", { name: /SVC-1042/ })).toBeVisible();
+    expect(serviceLink()).toBeVisible();
   });
 
   it("traces container incidents to the container catalog without adding record mutations", async () => {
@@ -196,6 +205,8 @@ describe("IndicatorsDashboard", () => {
 
     const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
     expect(within(recordsRegion).getByRole("row", { name: /CONT-001/ })).toBeVisible();
+    // Se muestra el código, pero el enlace usa el UUID que `GET /containers/:id` espera.
+    expect(within(recordsRegion).getByRole("link", { name: "CONT-001" })).toHaveAttribute("href", "/app/catalog/containers?detail=cont-1");
     expect(screen.getByRole("link", { name: /Abrir catálogo de contenedores/i })).toHaveAttribute("href", "/app/catalog/containers");
     expect(screen.queryByRole("button", { name: /Editar|Eliminar|Dar de baja/i })).not.toBeInTheDocument();
   });

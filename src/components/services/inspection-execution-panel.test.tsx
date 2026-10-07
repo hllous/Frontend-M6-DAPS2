@@ -6,6 +6,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { handlers } from "@/mocks/handlers";
+import { withNodeFile } from "@/mocks/node-file";
 import { servicesAdapter, type Service } from "@/lib/services";
 import { resetServiceFixtures, resetZoneResultFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { resetEnvironmentalInspectionFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
@@ -116,9 +117,21 @@ describe("InspectionExecutionPanel", () => {
 
     render(<InspectionExecutionPanel service={service} />);
 
-    expect(await screen.findByText("Esta inspección se encuentra en modo de solo consulta para integrantes de la cuadrilla.")).toBeVisible();
+    expect(await screen.findByText("Solo consulta")).toBeVisible();
+    expect(screen.getByText("La persona responsable de la cuadrilla registra el resultado y la evidencia de esta inspección.")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Completar inspección" })).not.toBeInTheDocument();
     expect(screen.getByText("Verificar la fuente observada")).toBeVisible();
+  });
+
+  it("tells the crew lead the service has not started instead of calling it read-only, and shows no checklist version or raw date", async () => {
+    server.use(http.get("*/api/environmental-inspections/INS-TEST-1", () => HttpResponse.json(inspectionResponse())));
+
+    render(<InspectionExecutionPanel service={{ ...service, status: "SCHEDULED", scheduledDate: "2026-12-07" }} waitingForStart />);
+
+    expect(await screen.findByText("El servicio todavía no está en curso")).toBeVisible();
+    expect(screen.queryByText(/solo consulta/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/SVC-INS-1 · 7 dic 2026 · 09:00–11:00/)).toBeVisible();
+    expect(screen.queryByText(/Checklist ambiental-v1|Checklist —/)).not.toBeInTheDocument();
   });
 
   it("uploads inspection evidence before submitting a violation outcome", async () => {
@@ -128,7 +141,7 @@ describe("InspectionExecutionPanel", () => {
     server.use(
       http.get("*/api/environmental-inspections/INS-TEST-1", () => HttpResponse.json(inspectionResponse())),
       http.post("*/api/evidence", async ({ request }) => {
-        const formData = await request.formData();
+        const formData = await withNodeFile(() => request.formData());
         evidenceUploaded = formData.get("ownerType") === "INSPECTION";
         return HttpResponse.json({ id: "att-test-1", url: "/evidence/test.jpg", filename: "test.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-07T12:00:00.000Z" }, { status: 201 });
       }),
@@ -195,7 +208,7 @@ describe("InspectionExecutionPanel", () => {
     expect(await screen.findByText(/Resultado registrado/)).toBeVisible();
     // #295: la agenda sale del servicio (la inspección del backend no la trae) y el
     // resultado muestra los cuatro campos de cierre.
-    expect(screen.getByText(/SVC-INS-1 · Checklist .* · 2026-09-07 · 09:00–11:00/)).toBeVisible();
+    expect(screen.getByText(/SVC-INS-1 · 7 sept 2026 · 09:00–11:00/)).toBeVisible();
     expect(screen.getByText("Humo negro continuo.")).toBeVisible();
     expect(screen.getByText("Emisión al aire")).toBeVisible();
     expect(screen.getByText("Alta")).toBeVisible();
