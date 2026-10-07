@@ -5,7 +5,11 @@
 # IMPORTANTE: los jobs "build" y "test" mantienen sus nombres para
 # preservar la convención de branch protection compartida con el
 # backend. "e2e" y "security" son gates nuevos (#88): ninguno se
-# ignora de forma permanente.
+# ignora de forma permanente. "docs" (#348) valida la documentación y
+# es un check requerido una vez aplicadas las reglas de
+# .github/branch-protection-rules.json; el backend no tiene un job
+# "docs", así que los rule sets de ambos repos ahora difieren. El job
+# no lleva filtro de paths: un check requerido sin reportar bloquea el merge.
 # ──────────────────────────────────────────────────────────────
 
 name: CI
@@ -17,17 +21,18 @@ on:
     branches: [develop, test, main]
 
 jobs:
+  # Todos los jobs usan Ubuntu 24.04 para evitar la migración de ubuntu-latest a Ubuntu 26 el 2026-10-19.
   build:
     name: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -41,15 +46,15 @@ jobs:
 
   test:
     name: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -63,15 +68,15 @@ jobs:
 
   e2e:
     name: e2e
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -88,7 +93,7 @@ jobs:
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report/
@@ -96,19 +101,53 @@ jobs:
 
   security:
     name: security
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
       - name: Dependency vulnerability scan
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
+
+  docs:
+    name: docs
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # markdownlint-cli2 0.23 exige Node 22+; todos los jobs usan Node 22.
+      # Reglas y alcance en .markdownlint-cli2.jsonc.
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Markdown lint
+        run: npx --yes markdownlint-cli2@0.23.3
+
+      # Versión y checksum fijados: se descarga un binario, no una action de terceros.
+      # Reglas y alcance en lychee.toml (offline: solo enlaces y anclas internas).
+      - name: Install lychee
+        env:
+          LYCHEE_TAG: lychee-v0.24.2
+          LYCHEE_SHA256: 1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a
+        run: |
+          asset=lychee-x86_64-unknown-linux-gnu.tar.gz
+          curl -sSfL "https://github.com/lycheeverse/lychee/releases/download/${LYCHEE_TAG}/${asset}" -o "${asset}"
+          echo "${LYCHEE_SHA256}  ${asset}" | sha256sum --check
+          tar -xzf "${asset}" --strip-components=1 "${asset%.tar.gz}/lychee"
+
+      - name: Link check
+        run: ./lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'

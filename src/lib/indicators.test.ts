@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "./indicator-fixtures";
-import { defaultIndicatorQuery, indicatorQueryErrorMessage, indicatorQuerySchema, indicatorsAdapter, IndicatorContractError, INVERTED_RANGE_MESSAGE, resolveIndicatorQuery } from "./indicators";
+import { familyAppliesCatalogFilters, parseIndicatorUrlState, serializeIndicatorUrlState, defaultIndicatorQuery, indicatorQueryErrorMessage, indicatorQuerySchema, indicatorsAdapter, IndicatorContractError, INVERTED_RANGE_MESSAGE, resolveIndicatorQuery } from "./indicators";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -152,5 +152,32 @@ describe("indicatorsAdapter", () => {
   it("rejects a malformed family response at runtime", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ malformed: true }), { status: 200 }));
     await expect(indicatorsAdapter.getCoverage()).rejects.toBeInstanceOf(IndicatorContractError);
+  });
+});
+
+describe("estado de indicadores en la URL (#334)", () => {
+  const now = new Date("2026-10-02T12:00:00Z");
+
+  it("solo coverage y compliance aplican zona y tipo de servicio", () => {
+    expect(["coverage", "compliance", "incidents", "waste"].map(familyAppliesCatalogFilters)).toEqual([true, true, false, false]);
+  });
+
+  it("serializa y vuelve a leer el estado conservando parámetros ajenos", () => {
+    const search = serializeIndicatorUrlState(
+      { query: { from: "2026-09-01", to: "2026-09-30", zoneId: "z1" }, family: "incidents", view: "table", signal: { breakdownId: "containers", pointId: "a:b" } },
+      "destination=dashboards",
+    );
+    expect(new URLSearchParams(search).get("destination")).toBe("dashboards");
+    expect(parseIndicatorUrlState(new URLSearchParams(search), now)).toEqual({
+      query: { from: "2026-09-01", to: "2026-09-30", zoneId: "z1" },
+      family: "incidents",
+      view: "table",
+      signal: { breakdownId: "containers", pointId: "a:b" },
+    });
+  });
+
+  it("ante una URL inválida vuelve a los valores por defecto", () => {
+    const state = parseIndicatorUrlState(new URLSearchParams("from=2026-09-30&to=2026-09-01&family=nada&signal=sin-separador"), now);
+    expect(state).toEqual({ query: defaultIndicatorQuery(now), family: "coverage", view: "bars", signal: undefined });
   });
 });

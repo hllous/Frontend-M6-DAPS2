@@ -102,6 +102,23 @@ Drawn directly from [#10](https://github.com/hllous/Frontend-M6-DAPS2/issues/10)
 | `POST /services/:id/delay-notices` + `GET /services/:id/delay-notices` | — (frontend flow not implemented) | Create a delay notice without changing Service status, then read its newest-first history. The `START`/`DURATION` kind must match the current execution stage; a new notice replaces the active one | **confirmed** in the pinned OpenAPI and implementation. The frontend has no adapter or Route Handler for these endpoints yet |
 | `POST /evidence` (`ownerType=SERVICE` / `ZONE_RESULT`) | Crew Leader of the assigned crew | Evidence upload, attached by reference to a Service or ZoneResult outcome | **confirmed** — the generic endpoint covers both owner types; see the Evidence/upload section above. Uploaded as a separate call after the outcome record exists, so a mandatory-evidence exception outcome is two calls, not one |
 
+Service states as the frontend uses them (the table above is the source of truth; `PARTIALLY_COMPLETED` is computed by Backend on `complete`):
+
+```mermaid
+stateDiagram-v2
+    [*] --> SCHEDULED
+    SCHEDULED --> RESCHEDULED: reschedule
+    RESCHEDULED --> SCHEDULED: confirm-reschedule
+    SCHEDULED --> IN_PROGRESS: start
+    IN_PROGRESS --> SUSPENDED: suspend
+    SUSPENDED --> IN_PROGRESS: resume
+    IN_PROGRESS --> COMPLETED: complete, all zones SERVICED
+    IN_PROGRESS --> PARTIALLY_COMPLETED: complete, otherwise
+    SCHEDULED --> CANCELLED: cancel
+    RESCHEDULED --> CANCELLED: cancel
+    SUSPENDED --> CANCELLED: cancel
+```
+
 **Corrections against Backend's implementation (current `develop` snapshot `30d49ea1d56f735a124ae9260cafefff095e07b6`, checked 2026-10-01):** every Service, including POINT, carries a non-empty `zoneIds[]` and needs a ZoneResult for each zone before `POST /services/:id/complete` succeeds; POINT has exactly one zone. Evidence upload uses generic `POST /evidence` and now verifies magic bytes and strips supported image metadata. Cancellation from `RESCHEDULED` is supported by Backend and Frontend; Backend issue #114 records the documentation fix in #117, and earlier frontend claims that the transition was rejected were stale. Delay notices now have `POST` and `GET` endpoints, but the frontend has no adapter for them. See the pinned OpenAPI document for the full DTO shapes.
 
 ## Worked example: Zones, Routes and Service Frequencies
@@ -228,7 +245,7 @@ Drawn from [#38](https://github.com/hllous/Frontend-M6-DAPS2/issues/38). `Tree` 
 | — (client-side only) | — | "Request intervention" action on a high-risk survey, pre-filling `interventionType` from `suggestedIntervention` and `treeIds` from the tree | **gap identified** — `TreeSurvey.suggestedIntervention` is a bare enum hint, no FK to any `TreeIntervention` it leads to: the frontend supplies a guided action with no backend-tracked relationship. `justification` on the resulting intervention is pre-filled with a free-text reference to the source survey's date/id so the link survives as a readable trail |
 | `POST /tree-interventions` | `treeIntervention:request` | Create — `interventionType`, `treeIds[]` (non-empty), `address`, `requiresStreetClosure`, `priority`, `justification`. Always starts `REQUESTED` regardless of type | confirmed route and validation, [endpoints.md](docs/backend-context/api/endpoints.md) and `create-tree-intervention.dto.ts` |
 | — (client-side only) | — | Require `justification` when `interventionType` is `REMOVAL` | **frontend-enforced, backend doesn't** — documented "obligatorio para REMOVAL, opcional para el resto" (`create-tree-intervention.dto.ts:62`) but decorated only `@IsOptional()`. Frontend blocks submit on a justification-less removal request; backend accepts it |
-| `GET /tree-interventions` | — (any authenticated actor) | List — paginated, filterable (`interventionType`, `status`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md) |
+| `GET /tree-interventions` | — (any authenticated actor) | List — paginated, filterable (`interventionType`, `status`) | confirmed filters, [endpoints.md](docs/backend-context/api/endpoints.md); **gap identified** — no `treeId` filter here and no `targetId` filter on `GET /services`, so the Tree detail (#329) can't list a tree's interventions or Services without pulling every record. It links to the intervention queue instead of filtering client-side |
 | `GET /tree-interventions/:id` | — | Detail, with linked trees | confirmed |
 | `POST /tree-interventions/:id/submit-for-authorization` | `treeIntervention:request` | `REQUESTED → PENDING_AUTHORIZATION`. **REMOVAL only** — 400 for every other `interventionType` | confirmed, `tree-interventions.service.ts` |
 | `POST /tree-interventions/:id/authorize` | `treeIntervention:authorize` | `→ AUTHORIZED`. **Every intervention type must pass through this call**, not REMOVAL alone — REMOVAL from `PENDING_AUTHORIZATION` only (409 if still `REQUESTED`, forcing `submit-for-authorization` first); every other type directly from `REQUESTED`. Sets `authorizedByUserId`/`authorizedAt` on **every** call, not REMOVAL-exclusively | **corrected** — `docs/backend-context/entidades/tree-intervention.md`'s state diagram phrase "el resto se programa directo" reads as "no authorization needed," and the schema comments `// solo REMOVAL` on `authorizedByUserId`/`authorizedAt`/`justification` (`schema.prisma:658-660`) reinforce that misreading. The real `VALID_TRANSITIONS` table and `authorize()` (`tree-interventions.service.ts:27-32`, `138-157`) show authorization is universal; only the extra `PENDING_AUTHORIZATION` checkpoint is REMOVAL-exclusive. UI shows one visible "Authorize" action for every type — see #38's resolution |
@@ -264,7 +281,7 @@ The frontend preserves all eleven backend statuses and groups them only for pres
 
 | Endpoint | Capability | Purpose | Status |
 |---|---|---|---|
-| `POST /environmental-reports/:reportId/inspections` | `environmentalInspection:schedule` | Schedule one inspection and move the report to `INSPECTION_SCHEDULED`. The guided frontend flow then creates/assigns its linked POINT `Service`; the backend does not expose one atomic schedule-and-assign operation. The checklist is versioned at scheduling time. | confirmed route and Service relationship, [endpoints.md](docs/backend-context/api/endpoints.md); exact schedule DTO is a gap |
+| `POST /environmental-reports/:reportId/inspections` | `environmentalInspection:schedule` | Schedule one inspection (body `{}`, no `serviceId`) and move the report to `INSPECTION_SCHEDULED`. The guided frontend flow then makes a second and last write: `POST /services` with `origin=INSPECTION`, `inspectionId`, and `crewId` (plus `overrideNote` after an overlap 409). Backend links the inspection inside that same create transaction, so there is no separate `assign-crew` call and no half-linked Service. If that create fails, the inspection stays open with `serviceId: null`; the detail then offers **Programar servicio**, which retries only `POST /services` for that `inspectionId` ([#320](https://github.com/hllous/Frontend-M6-DAPS2/issues/320)). The checklist is versioned at scheduling time. | confirmed route and Service relationship, [endpoints.md](docs/backend-context/api/endpoints.md); exact schedule DTO is a gap |
 | `GET /environmental-reports/:reportId/inspections` | `environmentalInspection:view` | List the report's inspections, including historical inspections kept when a reinspection is created. | confirmed route; pagination and exact list shape follow the standard unless Swagger says otherwise |
 | `GET /environmental-inspections/:id` | `environmentalInspection:view` | Detail with linked `reportId`, `serviceId`, `inspectedAt`, checklist snapshot, findings, outcome, and next step. `inspectorId` is internal Tier 2 data. | confirmed route and entity fields; exact checklist response nesting is a gap |
 | `POST /environmental-inspections/:id/complete` | `environmentalInspection:execute` | Crew Leader submits the assigned inspection result. `NO_VIOLATION` requires a complete checklist and conclusion; `VIOLATION_FOUND` requires findings, `violationType`, `severity`, `suggestedAction`, and evidence; `INCONCLUSIVE` requires an explanation and evidence. | confirmed workflow and outcome semantics from the decision; exact complete DTO is not fully documented |
@@ -342,7 +359,7 @@ The main adapters and Office/Field workflows described here are implemented in `
 
 ### EnvironmentalReport workflow
 
-- After a fresh read, `CLOSED` is potentially reopenable. `REOPENED` renders as active case work (`UNDER_REVIEW`) again.
+- After a fresh read, `CLOSED` is potentially reopenable. A reopen event returns the report to `UNDER_REVIEW`; `REOPENED` is an event type, not a report status.
 - Late `ESCALATION_CHANGED`, `INFORMATION_PROVIDED`, and `PRIORITY_CHANGED` data is displayed, including on a `CLOSED` report, without inventing a new frontend mutation or changing lifecycle state.
 - `SANCTIONED` remains terminal. No priority editor, `updatedBy` field, or field-level audit-history UI is added.
 
@@ -359,7 +376,7 @@ The shared fixtures/handlers and adapter tests cover or should preserve:
 
 - cancellation from `SCHEDULED`, `RESCHEDULED`, and `SUSPENDED`, including reason preservation;
 - rejection of direct cancellation from `IN_PROGRESS`;
-- reopening a `CLOSED` report from `REOPENED`, accepting late non-state-changing M2 updates, and keeping `SANCTIONED` closed;
+- reopening a `CLOSED` report via the `REOPENED` event, accepting late non-state-changing M2 updates, and keeping `SANCTIONED` closed;
 - local filenames for draft/progress rows and Backend-returned sanitized filenames after success;
 - client-side type/size UX checks and the Backend's authoritative magic-byte/image metadata handling, while preserving the PDF, parser-fallback, and malware-scan exclusions from issue #90;
 - retrying one evidence upload with the same idempotency key and preserving the draft through upload/network failures;

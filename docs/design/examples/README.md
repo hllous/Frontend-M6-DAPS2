@@ -23,4 +23,4 @@ It carries one canonical do/don't pair and one PR review checklist for each of t
 
 An automated design-lint pass is a useful supplement where that tooling is available locally, but it lives under `.claude/skills/`, which this repository does not vendor. Do not treat it as a gate.
 
-The comparison prototype that produced this decision is at `src/app/prototype/do-dont/`. It is throwaway history and carries no authority.
+The comparison prototype that produced this decision is archived in git under the tag `archive/visual-system-prototypes` (`src/app/prototype/do-dont/` in that tag). It is throwaway history and carries no authority.

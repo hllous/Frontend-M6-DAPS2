@@ -3,6 +3,7 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
+import { withNodeFile } from "@/mocks/node-file";
 import { NetworkFailureError } from "./authenticated-fetch";
 import {
   ContainerContractError,
@@ -329,7 +330,7 @@ describe("containers adapter", () => {
       server.use(
         http.post("*/api/evidence", async ({ request }) => {
           capturedHeaders = request.headers;
-          const formData = await request.formData();
+          const formData = await withNodeFile(() => request.formData());
           expect(formData.get("ownerType")).toBe("CONTAINER");
           expect(formData.get("ownerId")).toBe("cont-1");
           return HttpResponse.json({

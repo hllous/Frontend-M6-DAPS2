@@ -9,7 +9,10 @@ import {
   zoneResultFixtures,
 } from "@/lib/services-fixtures";
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
-import { GET, POST } from "./route";
+import { withNodeFile } from "@/mocks/node-file";
+import { GET, POST as rawPost } from "./route";
+
+const POST = (request: Request) => withNodeFile(() => rawPost(request));
 
 beforeEach(() => {
   resetServiceFixtures();
