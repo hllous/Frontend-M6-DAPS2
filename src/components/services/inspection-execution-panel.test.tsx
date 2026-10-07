@@ -6,6 +6,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { handlers } from "@/mocks/handlers";
+import { withNodeFile } from "@/mocks/node-file";
 import { servicesAdapter, type Service } from "@/lib/services";
 import { resetServiceFixtures, resetZoneResultFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { resetEnvironmentalInspectionFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
@@ -140,7 +141,7 @@ describe("InspectionExecutionPanel", () => {
     server.use(
       http.get("*/api/environmental-inspections/INS-TEST-1", () => HttpResponse.json(inspectionResponse())),
       http.post("*/api/evidence", async ({ request }) => {
-        const formData = await request.formData();
+        const formData = await withNodeFile(() => request.formData());
         evidenceUploaded = formData.get("ownerType") === "INSPECTION";
         return HttpResponse.json({ id: "att-test-1", url: "/evidence/test.jpg", filename: "test.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-07T12:00:00.000Z" }, { status: 201 });
       }),
