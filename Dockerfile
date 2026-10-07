@@ -4,7 +4,7 @@
 # ──────────────────────────────────────────────────────────────
 
 # ─── Etapa 1: deps (instalación de dependencias) ─────────────
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 # ─── Etapa 2: builder (compilación de Next.js) ───────────────
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -27,7 +27,7 @@ COPY . .
 RUN npm run build
 
 # ─── Etapa 3: runner (imagen final, liviana) ─────────────────
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
