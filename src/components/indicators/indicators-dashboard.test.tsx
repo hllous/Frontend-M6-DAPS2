@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse, passthrough } from "msw";
@@ -14,11 +14,16 @@ import { IndicatorsDashboard } from "./indicators-dashboard";
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-04T15:00:00.000Z"));
+});
 afterEach(() => {
   server.resetHandlers();
   vi.unstubAllGlobals();
   window.history.replaceState(null, "", "/"); // el tablero escribe su estado en la URL
   olvidarCatalogoDeEtiquetas();
+  vi.useRealTimers();
 });
 afterAll(() => server.close());
 
