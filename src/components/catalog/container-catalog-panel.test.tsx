@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { handlers } from "@/mocks/handlers";
+import { withNodeFile } from "@/mocks/node-file";
 import { scenarios } from "@/lib/scenarios";
 import { ContainerCatalogPanel } from "./container-catalog-panel";
 
@@ -180,7 +181,7 @@ describe("ContainerCatalogPanel", () => {
     const evidenceOwners: string[] = [];
     server.use(
       http.post("*/api/evidence", async ({ request }) => {
-        const formData = await request.formData();
+        const formData = await withNodeFile(() => request.formData());
         evidenceOwners.push(String(formData.get("ownerType")));
         return HttpResponse.json({
           id: "att-repair-1",
@@ -211,7 +212,7 @@ describe("ContainerCatalogPanel", () => {
     const evidenceOwners: string[] = [];
     server.use(
       http.post("*/api/evidence", async ({ request }) => {
-        const formData = await request.formData();
+        const formData = await withNodeFile(() => request.formData());
         evidenceOwners.push(String(formData.get("ownerType")));
         return HttpResponse.json({
           id: "att-removal-1",
