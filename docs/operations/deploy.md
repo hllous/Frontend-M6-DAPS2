@@ -35,7 +35,7 @@ No uses `NEXT_PUBLIC_API_URL`: el navegador consume los Route Handlers del BFF d
 
 ## Automatización
 
-- El CI del frontend corre con Node.js 20 y valida tipos, build, lint, pruebas unitarias/componentes, Playwright y auditoría de dependencias. Ver [workflow](../../.github/workflows/ci.yml).
+- El CI del frontend corre con Node.js 22 y valida tipos, build, lint, pruebas unitarias/componentes, Playwright y auditoría de dependencias. Ver [workflow](../../.github/workflows/ci.yml).
 - Vercel está configurado para desplegar los cambios de `develop`; ante un fallo, consultá el estado del proyecto y sus logs en Vercel.
 - El backend usa GitHub Actions y un Deploy Hook de Render según `Backend-M6-DAPS2/docs/deploy.md`. La guía y el CI vigentes del backend son la fuente para su pipeline.
 - Los repositorios tienen pipelines separados; un deploy de frontend no actualiza backend ni al revés.
