@@ -15,7 +15,7 @@ test("groups inventory markers and progressively reveals numbered pins #215", as
 
   const clusters = page.locator('[class*="markerCluster"]:visible');
   await expect(clusters.first()).toBeVisible();
-  await expect(clusters.first()).toHaveAttribute("aria-label", /servicios; acercar para verlos/);
+  await expect(clusters.first()).toHaveAttribute("aria-label", /elementos de inventario; acercar para verlos/);
 
   for (let attempt = 0; attempt < 4 && await clusters.count() > 0; attempt += 1) {
     await clusters.first().click();
