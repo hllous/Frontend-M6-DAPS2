@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
@@ -21,6 +21,7 @@ const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
+  vi.restoreAllMocks();
   localStorage.clear();
 });
 afterAll(() => server.close());
@@ -63,7 +64,7 @@ describe("field-drafts storage primitives", () => {
       savedAt: "2026-09-05T09:00:00.000Z",
     };
 
-    saveFieldDraft(draft);
+    expect(saveFieldDraft(draft)).toBe(true);
     expect(getFieldDraft(service.id, "suspend")).toEqual(draft);
 
     clearFieldDraft(service.id, "suspend");
@@ -145,6 +146,61 @@ describe("submitFieldAction", () => {
     const stored = getFieldDraft(service.id, "suspend");
     expect(stored?.payload).toEqual({ reason: "VEHICLE_BREAKDOWN", note: "no arranca" });
     expect(stored?.composedAgainst.updatedAt).toBe(service.updatedAt);
+  });
+
+  it("reports when localStorage.setItem cannot save the draft", async () => {
+    const service = makeService();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+
+    const outcome = await submitFieldAction({
+      service,
+      actionType: "suspend",
+      payload: { reason: "VEHICLE_BREAKDOWN", note: "no arranca" },
+      submit: async () => {
+        throw new NetworkFailureError();
+      },
+    });
+
+    expect(outcome).toEqual({
+      kind: "error",
+      message: "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.",
+      draftUnsaved: true,
+    });
+  });
+
+  it("reports when reading localStorage itself throws while saving the draft", async () => {
+    const service = makeService();
+    const descriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("Storage access denied", "SecurityError");
+      },
+    });
+    expect(() => window.localStorage).toThrow("Storage access denied");
+
+    let outcome;
+    try {
+      outcome = await submitFieldAction({
+        service,
+        actionType: "suspend",
+        payload: { reason: "VEHICLE_BREAKDOWN", note: "no arranca" },
+        submit: async () => {
+          throw new NetworkFailureError();
+        },
+      });
+    } finally {
+      if (descriptor) Object.defineProperty(window, "localStorage", descriptor);
+      else Reflect.deleteProperty(window, "localStorage");
+    }
+
+    expect(outcome).toEqual({
+      kind: "error",
+      message: "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.",
+      draftUnsaved: true,
+    });
   });
 
   it("surfaces a normal error message for a non-network failure (no draft saved)", async () => {
@@ -245,5 +301,29 @@ describe("resubmitFieldAction / retryFieldDraft", () => {
 
     expect(outcome.kind).toBe("still-offline");
     expect(getFieldDraft(service.id, "resume")).not.toBeNull();
+  });
+
+  it("reports an unsaved draft when an offline resubmit cannot re-save it", async () => {
+    const service = makeService();
+    server.use(http.get("*/api/services/:id", () => HttpResponse.json(service)));
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+
+    const outcome = await resubmitFieldAction({
+      serviceId: service.id,
+      actionType: "resume",
+      composedAgainst: snapshotService(service),
+      payload: null,
+      submit: async () => {
+        throw new NetworkFailureError();
+      },
+    });
+
+    expect(outcome).toEqual({
+      kind: "error",
+      message: "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.",
+      draftUnsaved: true,
+    });
   });
 });
