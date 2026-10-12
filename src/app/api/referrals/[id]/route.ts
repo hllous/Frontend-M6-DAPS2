@@ -20,19 +20,19 @@ export async function GET(
       return errorResponse(403, "Solo Oficina o Campo puede consultar derivaciones.", path);
     }
 
-    let referral = findFixtureReferral(id);
-    if (!referral && session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const endpoint = id.startsWith("RR-") ? `/repair-requests/${encodeURIComponent(id)}` : `/street-closure-requests/${encodeURIComponent(id)}`;
-      const backendResponse = await fetchBackend(request, endpoint);
-      const payload = await backendResponse.text();
-      if (!backendResponse.ok) return new Response(payload, { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
-      const backendPayload = JSON.parse(payload) as unknown;
-      if (id.startsWith("RR-")) {
-        const parsedRepair = repairRequestSchema.safeParse(backendPayload);
-        if (parsedRepair.success) referral = referralFromRepairRequest(parsedRepair.data);
-      } else {
-        const parsedClosure = streetClosureRequestSchema.safeParse(backendPayload);
-        if (parsedClosure.success) referral = referralFromStreetClosureRequest(parsedClosure.data);
+    const useBackend = session.mode === "backend-development" && Boolean(process.env.M6_BACKEND_ORIGIN);
+    let referral = useBackend ? null : findFixtureReferral(id);
+    if (useBackend) {
+      for (const kind of ["repair-requests", "street-closure-requests"] as const) {
+        const backendResponse = await fetchBackend(request, `/${kind}/${encodeURIComponent(id)}`);
+        if (backendResponse.status === 404) continue;
+        const payload = await backendResponse.text();
+        if (!backendResponse.ok) return new Response(payload, { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
+        const backendPayload = JSON.parse(payload) as unknown;
+        referral = kind === "repair-requests"
+          ? referralFromRepairRequest(repairRequestSchema.parse(backendPayload))
+          : referralFromStreetClosureRequest(streetClosureRequestSchema.parse(backendPayload));
+        break;
       }
     }
     if (!referral || !isReferralVisibleToScenario(referral, scenario)) {
