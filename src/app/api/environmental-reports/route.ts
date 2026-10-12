@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -16,14 +16,12 @@ import {
   type EnvironmentalReportQuery,
 } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 409: "Conflict", 503: "Service Unavailable", 500: "Internal Server Error" };
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status });
-}
+
+
 
 function queryFromUrl(url: URL): EnvironmentalReportQuery {
   return {
@@ -52,7 +50,7 @@ export async function GET(request: Request) {
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/environmental-reports${new URL(request.url).search}`, "environmentalReport:view");
-      return new NextResponse(await backendResponse.text(), { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(backendResponse);
     }
 
     const filtered = filterEnvironmentalReportFixtures(query).filter((report) => visibleToField(report, scenario));
@@ -60,7 +58,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof Error && error.name === "ForbiddenSessionError") return errorResponse(403, "La sesión no tiene acceso al control ambiental.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene acceso al control ambiental.", path);
     return errorResponse(500, "No se pudieron cargar los expedientes ambientales.", path);
   }
 }
@@ -78,7 +76,7 @@ export async function POST(request: Request) {
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/environmental-reports", "environmentalReport:create", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
-      return new NextResponse(await backendResponse.text(), { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(backendResponse);
     }
 
     const created = createEnvironmentalReportFixture(parsed.data, scenario.actor.kind === "FIELD" ? scenario.actor.crewId : undefined);
@@ -87,7 +85,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof Error && error.name === "ForbiddenSessionError") return errorResponse(403, "La sesión no tiene permiso para abrir expedientes.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para abrir expedientes.", path);
     return errorResponse(500, "No se pudo abrir el expediente ambiental.", path);
   }
 }

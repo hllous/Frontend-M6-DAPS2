@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse } from "@/lib/bff-route";
 import { getScenario } from "@/lib/scenarios";
 import { fetchBackend } from "@/lib/bff-backend";
 import { repairRequestSchema } from "@/lib/repair-requests";
@@ -6,7 +6,7 @@ import { referralFromBackendRepairRequest, referralFromStreetClosureRequest, isR
 import { streetClosureRequestSchema } from "@/lib/street-closure-requests";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
-import { backendReferralSourceIds, errorResponse, findFixtureReferral } from "../route";
+import { backendReferralSourceIds, findFixtureReferral } from "../route";
 
 export async function GET(
   request: Request,

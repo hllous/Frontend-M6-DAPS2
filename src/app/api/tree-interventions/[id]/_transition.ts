@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -22,28 +22,9 @@ import { recordTelemetryEvent } from "@/lib/telemetry";
 
 export type TreeInterventionTransition = "submit" | "authorize" | "reject";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 function transitionCapability(transition: TreeInterventionTransition) {
   return transition === "submit" ? "treeIntervention:request" as const : "treeIntervention:authorize" as const;
@@ -72,10 +53,7 @@ async function backendTransition(
     transitionCapability(transition),
     init,
   );
-  return new NextResponse(await response.text(), {
-    status: response.status,
-    headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
-  });
+  return forwardResponse(response);
 }
 
 export async function handleTreeInterventionTransition(

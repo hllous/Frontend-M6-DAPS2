@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -19,27 +19,9 @@ import { serviceFixtures } from "@/lib/services-fixtures";
 import { getTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 function requireReadAccess(request: Request, path: string, sourceId?: string) {
   const session = getRequiredSession(request);
@@ -91,10 +73,7 @@ export async function GET(request: Request) {
         request,
         `/street-closure-requests${backendQueryString(queryResult.data)}`,
       );
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     return NextResponse.json(
@@ -132,10 +111,7 @@ export async function POST(request: Request) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     const source = parsed.data.sourceType === "SERVICE"

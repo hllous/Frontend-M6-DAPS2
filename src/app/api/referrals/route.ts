@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -20,20 +20,9 @@ import { streetClosureRequestSchema } from "@/lib/street-closure-requests";
 import { serviceSchema } from "@/lib/services";
 import { getStreetClosureRequestFixture, streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 
-const ERROR_LABELS: Record<number, string> = {
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  500: "Internal Server Error",
-  503: "Service Unavailable",
-};
 
-export function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    { statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path },
-    { status },
-  );
-}
+
+
 
 export function fixtureReferrals(): Referral[] {
   return [

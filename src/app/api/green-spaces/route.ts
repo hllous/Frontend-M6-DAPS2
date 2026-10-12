@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -19,20 +19,9 @@ import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    { statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path },
-    { status },
-  );
-}
+
+
 function parseGreenSpaceQuery(url: URL): GreenSpaceQuery {
   const rawSpaceType = url.searchParams.get("spaceType");
   return {
@@ -70,11 +59,7 @@ export async function GET(request: Request) {
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/green-spaces${backendQueryString(query)}`);
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     return NextResponse.json(paginateGreenSpaceFixtures(filterGreenSpaceFixtures(query), query.page, query.pageSize));
@@ -107,11 +92,7 @@ export async function POST(request: Request) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const greenSpace: GreenSpace = {

@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -9,9 +9,7 @@ import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json({ statusCode: status, message, error: status === 404 ? "Not Found" : status === 403 ? "Forbidden" : status === 401 ? "Unauthorized" : "Error", timestamp: new Date().toISOString(), path }, { status });
-}
+
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
   const { id } = await context.params;
@@ -39,7 +37,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     }
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/repair-requests/${id}`);
-      return new NextResponse(await backendResponse.text(), { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(backendResponse);
     }
     return item ? NextResponse.json(item) : errorResponse(404, `Derivación ${id} no encontrada.`, path);
   } catch (error) {

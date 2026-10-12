@@ -1,12 +1,12 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { getTreeSurveyFixture } from "@/lib/tree-survey-fixtures";
 import { getRequiredSession, InvalidSessionError, AuthUnavailableError } from "@/lib/session";
 
-const ERROR_LABELS: Record<number, string> = { 401: "Unauthorized", 404: "Not Found", 503: "Service Unavailable", 500: "Internal Server Error" };
-function errorResponse(status: number, message: string, path: string) { return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status }); }
+
+
 
 export async function GET(request: Request, context: { params: Promise<{ id: string; surveyId: string }> | { id: string; surveyId: string } }) {
   const path = new URL(request.url).pathname;
@@ -15,7 +15,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const { id, surveyId } = await context.params;
     if (backendMode(session)) {
       const response = await fetchBackend(request, `/trees/${id}/surveys/${surveyId}`);
-      return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(response);
     }
     const survey = getTreeSurveyFixture(id, surveyId);
     return survey ? NextResponse.json(survey) : errorResponse(404, "Relevamiento no encontrado.", path);

@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -12,27 +12,11 @@ import {
 } from "@/lib/environmental-report-fixtures";
 import { issueViolationNoticeInputSchema } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  500: "Internal Server Error",
-  503: "Service Unavailable",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json({
-    statusCode: status,
-    message,
-    error: ERROR_LABELS[status] ?? "Error",
-    timestamp: new Date().toISOString(),
-    path,
-  }, { status });
-}
+
+
 
 type NoticeContext = { params: Promise<{ id: string }> | { id: string } };
 
@@ -48,10 +32,7 @@ export async function GET(request: Request, context: NoticeContext) {
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/environmental-inspections/${encodeURIComponent(id)}/violation-notice`, "violationNotice:view");
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     const notice = getViolationNoticeFixture(id);
@@ -61,7 +42,7 @@ export async function GET(request: Request, context: NoticeContext) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof Error && error.name === "ForbiddenSessionError") return errorResponse(403, "La sesión no tiene permiso para consultar actas.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para consultar actas.", path);
     return errorResponse(500, "No se pudo consultar el acta de infracción.", path);
   }
 }
@@ -86,10 +67,7 @@ export async function POST(request: Request, context: NoticeContext) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       });
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     const inspection = getEnvironmentalInspectionFixture(id);
@@ -106,7 +84,7 @@ export async function POST(request: Request, context: NoticeContext) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof Error && error.name === "ForbiddenSessionError") return errorResponse(403, "La sesión no tiene permiso para emitir actas.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para emitir actas.", path);
     return errorResponse(500, "No se pudo emitir el acta de infracción.", path);
   }
 }

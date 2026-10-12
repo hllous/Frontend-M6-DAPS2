@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -9,25 +9,9 @@ import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { getZoneFixture, getZoneReferences } from "@/lib/zones-fixtures";
 
-const ERROR_LABELS: Record<number, string> = {
-  401: "Unauthorized",
-  404: "Not Found",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 async function targetId(context: { params: Promise<{ id: string }> | { id: string } }) {
   const resolved = await context.params;

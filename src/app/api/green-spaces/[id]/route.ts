@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -8,21 +8,9 @@ import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    { statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path },
-    { status },
-  );
-}
+
+
 async function greenSpaceId(context: { params: Promise<{ id: string }> | { id: string } }) {
   return (await context.params).id;
 }
@@ -40,11 +28,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const session = getRequiredSession(request);
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/green-spaces/${id}`);
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
     const greenSpace = greenSpaceFixtures.find((item) => item.id === id);
     return greenSpace ? NextResponse.json(greenSpace) : errorResponse(404, "Espacio verde no encontrado.", path);
@@ -74,11 +58,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const greenSpace = greenSpaceFixtures.find((item) => item.id === id);
@@ -105,11 +85,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/green-spaces/${id}`, undefined, { method: "DELETE" });
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const greenSpace = greenSpaceFixtures.find((item) => item.id === id);
