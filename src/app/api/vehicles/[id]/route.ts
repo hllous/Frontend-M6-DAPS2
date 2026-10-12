@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -35,7 +35,7 @@ async function forward(request: Request, path: string, capability?: "vehicle:man
 export async function GET(request: Request, context: Context) {
   try {
     const { id, path, session } = await requestContext(request, context);
-    if (backendMode(session)) return forward(request, `/vehicles/${id}`);
+    if (backendMode(session)) return forward(request, `/vehicles/${pathId(id)}`);
     const vehicle = vehicleFixtures.find((item) => item.id === id);
     return vehicle ? NextResponse.json(vehicle) : errorResponse(404, `El vehículo ${id} no existe.`, path);
   } catch (error) {
@@ -55,7 +55,7 @@ export async function PATCH(request: Request, context: Context) {
     const parsed = updateVehicleInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     requireOfficeCapability(session, scenario);
-    if (backendMode(session)) return forward(request, `/vehicles/${id}`, "vehicle:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
+    if (backendMode(session)) return forward(request, `/vehicles/${pathId(id)}`, "vehicle:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
     const vehicle = vehicleFixtures.find((item) => item.id === id);
     if (!vehicle) return errorResponse(404, `El vehículo ${id} no existe.`, path);
     Object.assign(vehicle, parsed.data);
@@ -73,7 +73,7 @@ export async function DELETE(request: Request, context: Context) {
   try {
     const { id, session, scenario } = await requestContext(request, context);
     requireOfficeCapability(session, scenario);
-    if (backendMode(session)) return forward(request, `/vehicles/${id}`, "vehicle:manage", { method: "DELETE" });
+    if (backendMode(session)) return forward(request, `/vehicles/${pathId(id)}`, "vehicle:manage", { method: "DELETE" });
     const vehicle = vehicleFixtures.find((item) => item.id === id);
     if (!vehicle) return errorResponse(404, `El vehículo ${id} no existe.`, path);
     vehicle.active = false;

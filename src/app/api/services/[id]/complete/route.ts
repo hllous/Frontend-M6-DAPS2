@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   getZoneResultsByServiceId,
   serviceFixtures,
@@ -108,7 +108,7 @@ export async function POST(
       }
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/complete`,
+        `/services/${pathId(serviceId)}/complete`,
         undefined,
         backendInit,
       );

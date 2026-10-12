@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   addViolationNoticeFixture,
   createViolationNoticeFixture,
@@ -31,7 +31,7 @@ export async function GET(request: Request, context: NoticeContext) {
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede consultar actas de infracción.", path);
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/environmental-inspections/${encodeURIComponent(id)}/violation-notice`, "violationNotice:view");
+      const backendResponse = await fetchBackend(request, `/environmental-inspections/${pathId(id)}/violation-notice`, "violationNotice:view");
       return forwardResponse(backendResponse);
     }
 
@@ -62,7 +62,7 @@ export async function POST(request: Request, context: NoticeContext) {
     if (!parsedInput.success) return errorResponse(400, parsedInput.error.issues.map((issue) => issue.message).join(" "), path);
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/environmental-inspections/${encodeURIComponent(id)}/violation-notice`, "violationNotice:issue", {
+      const backendResponse = await fetchBackend(request, `/environmental-inspections/${pathId(id)}/violation-notice`, "violationNotice:issue", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),

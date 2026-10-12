@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { greenPointFixtures, updateGreenPointFixture } from "@/lib/green-point-fixtures";
 import { greenPointUpdateInputSchema } from "@/lib/green-points";
 import { getScenario } from "@/lib/scenarios";
@@ -18,7 +18,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const session = getRequiredSession(request);
     const id = await targetId(context);
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/green-points/${id}`);
+      const response = await fetchBackend(request, `/green-points/${pathId(id)}`);
       return forwardResponse(response);
     }
     const item = greenPointFixtures.find((candidate) => candidate.id === id);
@@ -40,7 +40,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const parsed = greenPointUpdateInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/green-points/${id}`, "greenPoint:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
+      const response = await fetchBackend(request, `/green-points/${pathId(id)}`, "greenPoint:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
       return forwardResponse(response);
     }
     const updated = updateGreenPointFixture(id, parsed.data);
@@ -59,7 +59,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const session = requireOffice(request);
     const id = await targetId(context);
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/green-points/${id}`, "greenPoint:manage", { method: "DELETE" });
+      const response = await fetchBackend(request, `/green-points/${pathId(id)}`, "greenPoint:manage", { method: "DELETE" });
       return forwardResponse(response);
     }
     const updated = updateGreenPointFixture(id, { active: false });

@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalReportFixture, transitionEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
 import { reportDecisionInputSchema, type ReportDecisionInput } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
@@ -30,7 +30,7 @@ export async function transitionReport(request: Request, id: string, action: "st
     }
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/environmental-reports/${encodeURIComponent(id)}/${action}`, action === "close" ? "environmentalReport:close" : "environmentalReport:review", decision ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(decision) } : { method: "POST" });
+      const backendResponse = await fetchBackend(request, `/environmental-reports/${pathId(id)}/${action}`, action === "close" ? "environmentalReport:close" : "environmentalReport:review", decision ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(decision) } : { method: "POST" });
       return forwardResponse(backendResponse);
     }
 

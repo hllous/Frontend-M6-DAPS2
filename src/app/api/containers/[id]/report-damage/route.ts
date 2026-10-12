@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getContainerFixture, reportDamageFixture } from "@/lib/containers-fixtures";
 import { reportDamageInputSchema } from "@/lib/containers";
 import { getScenario } from "@/lib/scenarios";
@@ -44,7 +44,7 @@ export async function POST(
     }
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/containers/${id}/report-damage`, "container:report", {
+      const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}/report-damage`, "container:report", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),

@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   addEnvironmentalInspectionFixture,
   createEnvironmentalInspectionFixture,
@@ -26,7 +26,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const scenario = getScenario(session.scenarioId);
     if (scenario.actor.kind === "FIELD") return errorResponse(404, "Historia de inspecciones no encontrada.", path);
     if (backendMode(session)) {
-      return withInspectionAttachments(request, await fetchBackend(request, "/environmental-reports/" + encodeURIComponent(id) + "/inspections", "environmentalInspection:view"));
+      return withInspectionAttachments(request, await fetchBackend(request, "/environmental-reports/" + pathId(id) + "/inspections", "environmentalInspection:view"));
     }
     if (!getEnvironmentalReportFixture(id)) return errorResponse(404, "Expediente ambiental no encontrado.", path);
     return NextResponse.json(listEnvironmentalInspectionFixtures(id));
@@ -54,7 +54,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       // El backend solo acepta serviceId/inspectorId al programar (CreateInspectionDto
       // con forbidNonWhitelisted): la fecha, la ventana, el checklist y la zona van al
       // Service, no a la inspección.
-      const response = await fetchBackend(request, "/environmental-reports/" + encodeURIComponent(id) + "/inspections", "environmentalInspection:schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) });
+      const response = await fetchBackend(request, "/environmental-reports/" + pathId(id) + "/inspections", "environmentalInspection:schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) });
       return forwardResponse(response);
     }
     const report = getEnvironmentalReportFixture(id);

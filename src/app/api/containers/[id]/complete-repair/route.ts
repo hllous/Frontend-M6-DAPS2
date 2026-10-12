@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { completeRepairFixture, getContainerFixture } from "@/lib/containers-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
@@ -31,7 +31,7 @@ export async function POST(
     }
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/containers/${id}/complete-repair`, "container:manage", {
+      const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}/complete-repair`, "container:manage", {
         method: "POST",
       });
             return forwardResponse(backendResponse);

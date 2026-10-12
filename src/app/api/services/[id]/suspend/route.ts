@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   serviceFixtures,
   updateServiceFixture,
@@ -61,7 +61,7 @@ export async function POST(
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/suspend`,
+        `/services/${pathId(serviceId)}/suspend`,
         undefined,
         {
           method: "POST",

@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
@@ -24,7 +24,7 @@ export async function GET(
     const scenario = getScenario(session);
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/services/${serviceId}`);
+      const backendResponse = await fetchBackend(request, `/services/${pathId(serviceId)}`);
             return forwardResponse(backendResponse);
     }
 

@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
@@ -46,7 +46,7 @@ export async function POST(
     }
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/zones/${id}/neighborhoods`, "zone:manage", {
+      const backendResponse = await fetchBackend(request, `/zones/${pathId(id)}/neighborhoods`, "zone:manage", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),

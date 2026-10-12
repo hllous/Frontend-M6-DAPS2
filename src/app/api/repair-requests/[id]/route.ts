@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { getRepairRequestFixture } from "@/lib/repair-request-fixtures";
@@ -36,7 +36,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       return errorResponse(403, "Solo Oficina o Campo puede consultar derivaciones.", path);
     }
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/repair-requests/${id}`);
+      const backendResponse = await fetchBackend(request, `/repair-requests/${pathId(id)}`);
       return forwardResponse(backendResponse);
     }
     return item ? NextResponse.json(item) : errorResponse(404, `Derivación ${id} no encontrada.`, path);

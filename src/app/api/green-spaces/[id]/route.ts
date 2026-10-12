@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { greenSpaceFixtures } from "@/lib/green-space-fixtures";
 import { updateGreenSpaceInputSchema } from "@/lib/green-spaces";
 import { getScenario } from "@/lib/scenarios";
@@ -27,7 +27,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     const session = getRequiredSession(request);
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/green-spaces/${id}`);
+      const backendResponse = await fetchBackend(request, `/green-spaces/${pathId(id)}`);
             return forwardResponse(backendResponse);
     }
     const greenSpace = greenSpaceFixtures.find((item) => item.id === id);
@@ -53,7 +53,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/green-spaces/${id}`, undefined, {
+      const backendResponse = await fetchBackend(request, `/green-spaces/${pathId(id)}`, undefined, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
@@ -84,7 +84,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     if (!isOffice(request)) return errorResponse(403, "Solo Oficina puede gestionar espacios verdes.", path);
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/green-spaces/${id}`, undefined, { method: "DELETE" });
+      const backendResponse = await fetchBackend(request, `/green-spaces/${pathId(id)}`, undefined, { method: "DELETE" });
             return forwardResponse(backendResponse);
     }
 

@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { crewFixtures } from "@/lib/crew-fixtures";
 import { updateCrewInputSchema } from "@/lib/crews";
 import { getScenario } from "@/lib/scenarios";
@@ -27,7 +27,7 @@ export async function GET(request: Request, routeContext: Context) {
   try {
     const { id, session, scenario } = await context(request, routeContext);
     if (scenario.actor.kind === "FIELD" && scenario.actor.crewId !== id) throw new ForbiddenSessionError("Solo puede consultar su propia cuadrilla.");
-    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${id}`));
+    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}`));
     const crew = crewFixtures.find((item) => item.id === id);
     return crew ? NextResponse.json(crew) : errorResponse(404, `La cuadrilla ${id} no existe.`, path);
   } catch (error) {
@@ -47,7 +47,7 @@ export async function PATCH(request: Request, routeContext: Context) {
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = updateCrewInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${id}`, "crew:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }));
+    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}`, "crew:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }));
     const crew = crewFixtures.find((item) => item.id === id);
     if (!crew) return errorResponse(404, `La cuadrilla ${id} no existe.`, path);
     Object.assign(crew, parsed.data);
@@ -65,7 +65,7 @@ export async function DELETE(request: Request, routeContext: Context) {
   try {
     const { id, session, scenario } = await context(request, routeContext);
     requireOfficeCapability(session, scenario);
-    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${id}`, "crew:manage", { method: "DELETE" }));
+    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}`, "crew:manage", { method: "DELETE" }));
     const crew = crewFixtures.find((item) => item.id === id);
     if (!crew) return errorResponse(404, `La cuadrilla ${id} no existe.`, path);
     crew.active = false;

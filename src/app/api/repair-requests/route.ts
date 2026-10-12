@@ -2,7 +2,7 @@ import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import {
@@ -85,7 +85,7 @@ export async function GET(request: Request) {
         if (!session.crew?.id) {
           return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
         }
-        const serviceResponse = await fetchBackend(request, `/services/${encodeURIComponent(query.detectedInId)}`);
+        const serviceResponse = await fetchBackend(request, `/services/${pathId(query.detectedInId)}`);
         if (!serviceResponse.ok) {
           return forwardResponse(serviceResponse);
         }
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) {
       const sourcePath = parsed.data.detectedInType === "SERVICE" ? "/services" : "/environmental-inspections";
-      const sourceResponse = await fetchBackend(request, `${sourcePath}/${encodeURIComponent(parsed.data.detectedInId)}`);
+      const sourceResponse = await fetchBackend(request, `${sourcePath}/${pathId(parsed.data.detectedInId)}`);
       if (sourceResponse.status === 404) {
         return errorResponse(404, parsed.data.detectedInType === "SERVICE"
           ? `Servicio ${parsed.data.detectedInId} no encontrado.`
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
         }
         let service = source;
         if (parsed.data.detectedInType === "INSPECTION") {
-          const serviceResponse = await fetchBackend(request, `/services/${encodeURIComponent(source.serviceId as string)}`);
+          const serviceResponse = await fetchBackend(request, `/services/${pathId(source.serviceId as string)}`);
           if (!serviceResponse.ok) {
             return forwardResponse(serviceResponse);
           }

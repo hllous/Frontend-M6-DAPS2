@@ -1,7 +1,7 @@
 import { backendMode, errorResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   getEnvironmentalInspectionFixture,
   transitionEnvironmentalReportFixture,
@@ -68,7 +68,7 @@ export async function POST(
       };
       return withInspectionAttachments(request, await fetchBackend(
         request,
-        `/environmental-inspections/${encodeURIComponent(id)}/complete`,
+        `/environmental-inspections/${pathId(id)}/complete`,
         "environmentalInspection:execute",
         {
           method: "POST",

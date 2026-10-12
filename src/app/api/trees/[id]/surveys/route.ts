@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { updateTreeFixture } from "@/lib/tree-fixtures";
 import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures, paginateTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { treeHealthStatusSchema, treeSurveyCreateInputSchema, riskLevelSchema, type TreeSurveyQuery } from "@/lib/tree-surveys";
@@ -31,7 +31,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const id = await treeId(context);
     const query = queryFromUrl(new URL(request.url));
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/trees/${encodeURIComponent(id)}/surveys${queryString(query)}`);
+      const response = await fetchBackend(request, `/trees/${pathId(id)}/surveys${queryString(query)}`);
       return forwardResponse(response);
     }
     return NextResponse.json(paginateTreeSurveyFixtures(filterTreeSurveyFixtures(id, query), query.page, query.pageSize));
@@ -52,7 +52,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const parsed = treeSurveyCreateInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/trees/${encodeURIComponent(id)}/surveys`, "tree:survey", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
+      const response = await fetchBackend(request, `/trees/${pathId(id)}/surveys`, "tree:survey", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
       return forwardResponse(response);
     }
     const created = createTreeSurveyFixture(id, parsed.data, session.scenarioId);
