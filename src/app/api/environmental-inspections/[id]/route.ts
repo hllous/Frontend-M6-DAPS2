@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -27,7 +28,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const session = getRequiredSession(request);
     requireCapability(session, "environmentalInspection:view");
     const scenario = getScenario(session.scenarioId);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/environmental-inspections/" + encodeURIComponent(id), "environmentalInspection:view");
       if (!backendResponse.ok) return withInspectionAttachments(request, backendResponse);
       let payload: unknown;

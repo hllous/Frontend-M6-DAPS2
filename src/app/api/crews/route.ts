@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
   try {
     const session = getRequiredSession(request);
     const query = parseQuery(new URL(request.url));
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) return forwardResponse(await fetchBackend(request, `/crews${queryString(query)}`));
+    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews${queryString(query)}`));
     const scenario = getScenario(session);
     const scopedQuery = scenario.actor.kind === "FIELD" ? { ...query, crewId: scenario.actor.crewId } : query;
     return NextResponse.json(paginateCrewFixtures(filterCrewFixtures(scopedQuery), query.page, query.pageSize));
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = createCrewInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) return forwardResponse(await fetchBackend(request, "/crews", "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }));
+    if (backendMode(session)) return forwardResponse(await fetchBackend(request, "/crews", "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }));
     const crew = { id: `crew-${Date.now()}`, ...parsed.data, memberUserIds: [parsed.data.leaderUserId], active: true };
     addCrewFixture(crew);
     return NextResponse.json(crew, { status: 201 });

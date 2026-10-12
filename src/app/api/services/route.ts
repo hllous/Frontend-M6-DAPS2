@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -108,7 +109,7 @@ export async function GET(request: Request) {
       query.crewId = scenario.actor.crewId;
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/services${backendQueryString(query)}`);
       const body = await backendResponse.text();
       return new NextResponse(body, {
@@ -158,11 +159,12 @@ export async function POST(request: Request) {
 
     const input = parsed.data;
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       let backendInput;
       try {
         backendInput = toCreateServiceBackendInput(input);
       } catch (error) {
+      if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
         if (error instanceof BackendServiceZoneSelectionError) {
           return errorResponse(400, error.message, path);
         }

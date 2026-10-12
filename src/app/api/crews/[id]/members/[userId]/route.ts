@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -29,7 +30,7 @@ export async function DELETE(request: Request, routeContext: Context) {
   const path = new URL(request.url).pathname;
   try {
     const session = requireOfficeCapability(request);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) return forwardResponse(await fetchBackend(request, `/crews/${id}/members/${encodeURIComponent(userId)}`, "crew:manage", { method: "DELETE" }));
+    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${id}/members/${encodeURIComponent(userId)}`, "crew:manage", { method: "DELETE" }));
     const crew = crewFixtures.find((item) => item.id === id);
     if (!crew) return errorResponse(404, `La cuadrilla ${id} no existe.`, path);
     crew.memberUserIds = crew.memberUserIds.filter((memberUserId) => memberUserId !== userId);

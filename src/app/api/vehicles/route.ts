@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
   try {
     const session = getRequiredSession(request);
     const query = parseVehicleQuery(new URL(request.url));
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const response = await fetchBackend(request, `/vehicles${queryString(query)}`);
       return new NextResponse(await response.text(), {
         status: response.status,
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = createVehicleInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const response = await fetchBackend(request, "/vehicles", "vehicle:manage", {
         method: "POST",
         headers: { "content-type": "application/json" },

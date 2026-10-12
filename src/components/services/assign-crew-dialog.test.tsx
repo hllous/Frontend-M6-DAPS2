@@ -221,14 +221,12 @@ describe("AssignCrewDialog", () => {
     expect(bodies).toEqual([{ crewId: OTHER_CREW_ID, vehicleId: null }]);
   });
 
-  it("asks for the justification when the backend reports an overlap the screen did not see (409)", async () => {
+  it("shows a neutral message for a 409 without an advisory overlap", async () => {
     realResources({ requiresVehicle: false });
-    const bodies = captureAssign([
-      {
-        status: 409,
-        body: { statusCode: 409, message: "La asignacion se solapa con 1 servicio/s ya programado/s.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services/x/assign-crew" },
-      },
-    ]);
+    const bodies = captureAssign([{
+      status: 409,
+      body: { statusCode: 409, message: "La asignacion se solapa con 1 servicio/s ya programado/s.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services/x/assign-crew" },
+    }]);
     const onAssigned = vi.fn();
     const user = userEvent.setup();
     renderDialog({ onAssigned });
@@ -237,11 +235,41 @@ describe("AssignCrewDialog", () => {
     await user.selectOptions(screen.getByLabelText(/Cuadrilla asignada/i), CREW_ID);
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
 
-    await user.type(await screen.findByLabelText(/Justificación del solapamiento/i), "Se coordinó con el jefe de cuadrilla.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "El servicio cambió desde que abrió esta ventana. Actualice la lista e intente de nuevo.",
+    );
+    expect(screen.queryByText(/Aviso de superposición horaria/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Justificación del solapamiento/i)).not.toBeInTheDocument();
     expect(onAssigned).not.toHaveBeenCalled();
+    expect(bodies).toEqual([{ crewId: CREW_ID, vehicleId: null }]);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("keeps the overlap UI when the advisory preflight already reported a conflict", async () => {
+    realResources({ requiresVehicle: false });
+    const bodies = captureAssign([{
+      status: 409,
+      body: { statusCode: 409, message: "Conflicto de asignación.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services/x/assign-crew" },
+    }]);
+    const onAssigned = vi.fn();
+    const user = userEvent.setup();
+    renderDialog({ allServices: [overlapping], onAssigned });
+
+    await screen.findByText(/Vehículo opcional/i);
+    await user.selectOptions(screen.getByLabelText(/Cuadrilla asignada/i), CREW_ID);
+    await user.type(
+      screen.getByLabelText(/Justificación del solapamiento/i),
+      "Se coordinó con el jefe de cuadrilla.",
+    );
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
 
-    await waitFor(() => expect(onAssigned).toHaveBeenCalledTimes(1));
-    expect(bodies[1]).toEqual({ crewId: CREW_ID, vehicleId: null, overrideNote: "Se coordinó con el jefe de cuadrilla." });
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    const warning = screen.getByText(/Aviso de superposición horaria$/i).closest("[role=status]") as HTMLElement;
+    expect(within(warning).getByText(overlapping.id)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Justificación del solapamiento/i)).toBeVisible();
+    expect(onAssigned).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    expect(bodies[0]).toEqual({ crewId: CREW_ID, vehicleId: null, overrideNote: "Se coordinó con el jefe de cuadrilla." });
   });
 });

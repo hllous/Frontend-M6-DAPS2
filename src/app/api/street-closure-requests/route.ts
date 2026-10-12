@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -47,7 +48,7 @@ function requireReadAccess(request: Request, path: string, sourceId?: string) {
 
   // Field may read only the dependency context for a Service assigned to its crew.
   // Backend remains authoritative for this scope when the BFF is forwarding.
-  if (sourceId && session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+  if (sourceId && backendMode(session)) {
     return { session, scenario };
   }
   const service = sourceId
@@ -85,7 +86,7 @@ export async function GET(request: Request) {
       return errorResponse(400, "Los filtros de solicitudes de corte de calle son inválidos.", path);
     }
 
-    if (access.session && access.session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (access.session && backendMode(access.session)) {
       const backendResponse = await fetchBackend(
         request,
         `/street-closure-requests${backendQueryString(queryResult.data)}`,
@@ -125,7 +126,7 @@ export async function POST(request: Request) {
       return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     }
 
-    if (session && session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (session && backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/street-closure-requests", undefined, {
         method: "POST",
         headers: { "content-type": "application/json" },
