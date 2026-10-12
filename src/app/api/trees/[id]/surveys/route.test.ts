@@ -1,14 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
 import { resetTreeSurveyFixtures, treeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { GET, POST } from "./route";
 
 beforeEach(() => resetTreeSurveyFixtures());
-afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; });
+afterEach(() => { vi.restoreAllMocks(); delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
+async function authenticatedCookie(scenarioId: string, mode = "mock") {
+  process.env.M6_AUTH_MODE = mode;
   const response = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenarioId }) }));
   return response.headers.get("set-cookie") ?? "";
 }
@@ -23,6 +23,35 @@ const validInput = {
 };
 
 describe("/api/trees/[id]/surveys", () => {
+
+  it.each([
+    ["?pageSize=101", "?pageSize=100"],
+    ["?page=0&pageSize=abc", "?page=1"],
+    ["?healthStatus=HEALTHY&evil=1", "?healthStatus=HEALTHY"],
+  ])("normalises backend list queries %s", async (query, expected) => {
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0 } }));
+    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const response = await GET(new Request(`http://localhost/trees/abc/surveys${query}`, { headers: { cookie } }), { params: { id: "abc" } });
+    expect(response.status).toBe(200);
+    expect(backendFetch).toHaveBeenCalledTimes(1);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/trees/abc/surveys${expected}`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+  });
+
+
+  it.each(["GET", "POST"])("encodes the tree id for backend %s", async (method) => {
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
+    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const request = new Request("http://localhost/api/trees/abc/surveys", { method, headers: { cookie, "content-type": "application/json" }, ...(method === "POST" ? { body: JSON.stringify(validInput) } : {}) });
+    await (method === "GET" ? GET : POST)(request, { params: { id: "abc?x=1" } });
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/trees/abc%3Fx%3D1/surveys");
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe(method);
+  });
+
   it("lists newest-first history with documented filters for any authenticated actor", async () => {
     const cookie = await authenticatedCookie("field-crew-member-route");
     const response = await GET(new Request("http://localhost/api/trees/tree-2/surveys?healthStatus=WEAKENED&riskLevel=HIGH&pageSize=10", { headers: { cookie } }), { params: { id: "tree-2" } });
