@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -8,8 +8,8 @@ import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 409: "Conflict", 503: "Service Unavailable", 500: "Internal Server Error" };
-function errorResponse(status: number, message: string, path: string) { return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status }); }
+
+
 function parseQuery(url: URL): GreenPointQuery {
   const active = url.searchParams.get("active");
   const wasteType = wasteTypeSchema.safeParse(url.searchParams.get("wasteType"));
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     const query = parseQuery(new URL(request.url));
     if (backendMode(session)) {
       const response = await fetchBackend(request, `/green-points${backendQueryString(query)}`);
-      return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(response);
     }
     return NextResponse.json(paginateGreenPointFixtures(filterGreenPointFixtures(query), query.page, query.pageSize));
   } catch (error) {
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) {
       const response = await fetchBackend(request, "/green-points", "greenPoint:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
-      return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(response);
     }
     if (greenPointFixtures.some((item) => item.code.toLowerCase() === parsed.data.code.toLowerCase())) return errorResponse(409, `Ya existe un punto verde con el código '${parsed.data.code}'.`, path);
     const created = { id: `green-point-${Date.now()}`, ...parsed.data, address: parsed.data.address ?? null, lat: parsed.data.lat ?? null, lng: parsed.data.lng ?? null, active: parsed.data.active ?? true };

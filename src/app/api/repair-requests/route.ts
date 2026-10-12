@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -23,19 +23,9 @@ import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status });
-}
+
+
 
 function sessionAndScenario(request: Request) {
   const session = getRequiredSession(request);
@@ -97,10 +87,7 @@ export async function GET(request: Request) {
         }
         const serviceResponse = await fetchBackend(request, `/services/${encodeURIComponent(query.detectedInId)}`);
         if (!serviceResponse.ok) {
-          return new NextResponse(await serviceResponse.text(), {
-            status: serviceResponse.status,
-            headers: { "content-type": serviceResponse.headers.get("content-type") ?? "application/json" },
-          });
+          return forwardResponse(serviceResponse);
         }
         const service = await serviceResponse.json();
         if (service?.crewId !== session.crew.id) {
@@ -115,10 +102,7 @@ export async function GET(request: Request) {
 
     if (useBackend) {
       const backendResponse = await fetchBackend(request, `/repair-requests${new URL(request.url).search}`);
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     return NextResponse.json(paginateRepairRequestFixtures(filterRepairRequestFixtures(query), query.page, query.pageSize));
@@ -150,10 +134,7 @@ export async function POST(request: Request) {
           : `Inspección ${parsed.data.detectedInId} no encontrada.`, path);
       }
       if (!sourceResponse.ok) {
-        return new NextResponse(await sourceResponse.text(), {
-          status: sourceResponse.status,
-          headers: { "content-type": sourceResponse.headers.get("content-type") ?? "application/json" },
-        });
+        return forwardResponse(sourceResponse);
       }
       const sourceSchema = parsed.data.detectedInType === "SERVICE"
         ? z.object({ crewId: z.string().nullable().optional() }).passthrough()
@@ -167,10 +148,7 @@ export async function POST(request: Request) {
         if (parsed.data.detectedInType === "INSPECTION") {
           const serviceResponse = await fetchBackend(request, `/services/${encodeURIComponent(source.serviceId as string)}`);
           if (!serviceResponse.ok) {
-            return new NextResponse(await serviceResponse.text(), {
-              status: serviceResponse.status,
-              headers: { "content-type": serviceResponse.headers.get("content-type") ?? "application/json" },
-            });
+            return forwardResponse(serviceResponse);
           }
           service = z.object({ crewId: z.string().nullable().optional() }).passthrough().parse(await serviceResponse.json());
         }
@@ -183,10 +161,7 @@ export async function POST(request: Request) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     if (parsed.data.detectedInType === "SERVICE" && !serviceFixtures.some((service) => service.id === parsed.data.detectedInId)) {

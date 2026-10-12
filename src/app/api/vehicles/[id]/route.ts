@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -8,11 +8,9 @@ import { recordTelemetryEvent } from "@/lib/telemetry";
 import { updateVehicleInputSchema } from "@/lib/vehicles";
 import { vehicleFixtures } from "@/lib/vehicles-fixtures";
 
-const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 503: "Service Unavailable", 500: "Internal Server Error" };
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status });
-}
+
+
 
 type Context = { params: Promise<{ id: string }> | { id: string } };
 
@@ -31,10 +29,7 @@ function requireOfficeCapability(session: ReturnType<typeof getRequiredSession>,
 
 async function forward(request: Request, path: string, capability?: "vehicle:manage", init?: RequestInit) {
   const response = await fetchBackend(request, path, capability, init);
-  return new NextResponse(await response.text(), {
-    status: response.status,
-    headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
-  });
+  return forwardResponse(response);
 }
 
 export async function GET(request: Request, context: Context) {

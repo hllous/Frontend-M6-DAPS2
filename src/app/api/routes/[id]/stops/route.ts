@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -18,28 +18,9 @@ import {
 import { setRouteStopsInputSchema } from "@/lib/routes";
 import { zoneFixtures } from "@/lib/zones-fixtures";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 export async function PUT(
   request: Request,
@@ -75,11 +56,7 @@ export async function PUT(
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const responseBody = await backendResponse.text();
-      return new NextResponse(responseBody, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const existingRoute = getRouteFixture(id);

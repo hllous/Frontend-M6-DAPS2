@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -9,20 +9,9 @@ import { createVehicleInputSchema, type VehicleQuery, vehicleTypeSchema } from "
 import { addVehicleFixture, filterVehicleFixtures, paginateVehicleFixtures } from "@/lib/vehicles-fixtures";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    { statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path },
-    { status },
-  );
-}
+
+
 
 function parseVehicleQuery(url: URL): VehicleQuery {
   const active = url.searchParams.get("active");
@@ -60,10 +49,7 @@ export async function GET(request: Request) {
     const query = parseVehicleQuery(new URL(request.url));
     if (backendMode(session)) {
       const response = await fetchBackend(request, `/vehicles${queryString(query)}`);
-      return new NextResponse(await response.text(), {
-        status: response.status,
-        headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(response);
     }
     return NextResponse.json(paginateVehicleFixtures(filterVehicleFixtures(query), query.page, query.pageSize));
   } catch (error) {
@@ -90,10 +76,7 @@ export async function POST(request: Request) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      return new NextResponse(await response.text(), {
-        status: response.status,
-        headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(response);
     }
     const vehicle = { id: `vehicle-${Date.now()}`, ...parsed.data, active: true };
     addVehicleFixture(vehicle);

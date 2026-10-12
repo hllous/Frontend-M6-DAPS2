@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -17,28 +17,9 @@ import {
 } from "@/lib/routes-fixtures";
 import { updateRouteInputSchema } from "@/lib/routes";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 export async function GET(
   request: Request,
@@ -52,11 +33,7 @@ export async function GET(
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/routes/${id}`);
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const route = getRouteFixture(id);
@@ -110,11 +87,7 @@ export async function PATCH(
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const responseBody = await backendResponse.text();
-      return new NextResponse(responseBody, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const updated = updateRouteFixture(id, parsed.data);
@@ -158,11 +131,7 @@ export async function DELETE(
       const backendResponse = await fetchBackend(request, `/routes/${id}`, "route:manage", {
         method: "DELETE",
       });
-      const responseBody = await backendResponse.text();
-      return new NextResponse(responseBody, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const updated = updateRouteFixture(id, { active: false });
