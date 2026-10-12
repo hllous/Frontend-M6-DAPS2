@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
@@ -20,6 +21,23 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("RouteCatalogPanel component", () => {
+
+  it("requires acknowledgement when route references cannot be verified", async () => {
+    server.use(http.get("/api/routes/:id/references", () => HttpResponse.json({ message: "No disponible" }, { status: 503 })));
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByTestId("deactivate-route-route-1"));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("No se pudieron verificar las referencias. Si contin\u00faa, la baja puede afectar servicios o elementos que todav\u00eda usan este registro.")).toBeVisible();
+    const confirm = within(dialog).getByTestId("confirm-deactivate-button");
+    expect(confirm).toBeDisabled();
+    await user.click(within(dialog).getByRole("checkbox", { name: "Entiendo que no se verificaron las referencias" }));
+    expect(confirm).toBeEnabled();
+    await user.click(confirm);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(routeFixtures.find((route) => route.id === "route-1")?.active).toBe(false);
+  });
+
   it("renders the routes catalog with heading, search input, filters and table for Office", async () => {
     render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
@@ -204,6 +222,8 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByText(/Turno MAÑANA/i)).toBeInTheDocument();
       expect(screen.getByTestId("confirm-deactivate-button")).toBeInTheDocument();
     });
+
+    expect(screen.queryByRole("checkbox", { name: "Entiendo que no se verificaron las referencias" })).not.toBeInTheDocument();
 
     // Confirm deactivation
     await user.click(screen.getByTestId("confirm-deactivate-button"));

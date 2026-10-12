@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { getEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
@@ -139,17 +140,43 @@ export async function POST(request: Request) {
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = createRepairRequestInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (parsed.data.detectedInType === "SERVICE" && !serviceFixtures.some((service) => service.id === parsed.data.detectedInId)) {
-      return errorResponse(404, `Servicio ${parsed.data.detectedInId} no encontrado.`, path);
-    }
-    if (parsed.data.detectedInType === "INSPECTION" && !getEnvironmentalInspectionFixture(parsed.data.detectedInId)) {
-      return errorResponse(404, `Inspección ${parsed.data.detectedInId} no encontrada.`, path);
-    }
-    if (scenario.actor.kind === "FIELD" && !fieldCanAccessSource(scenario, parsed.data.detectedInId)) {
-      return errorResponse(403, "Solo puede crear derivaciones desde trabajo de su cuadrilla.", path);
-    }
-
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+      const sourcePath = parsed.data.detectedInType === "SERVICE" ? "/services" : "/environmental-inspections";
+      const sourceResponse = await fetchBackend(request, `${sourcePath}/${encodeURIComponent(parsed.data.detectedInId)}`);
+      if (sourceResponse.status === 404) {
+        return errorResponse(404, parsed.data.detectedInType === "SERVICE"
+          ? `Servicio ${parsed.data.detectedInId} no encontrado.`
+          : `Inspección ${parsed.data.detectedInId} no encontrada.`, path);
+      }
+      if (!sourceResponse.ok) {
+        return new NextResponse(await sourceResponse.text(), {
+          status: sourceResponse.status,
+          headers: { "content-type": sourceResponse.headers.get("content-type") ?? "application/json" },
+        });
+      }
+      const sourceSchema = parsed.data.detectedInType === "SERVICE"
+        ? z.object({ crewId: z.string().nullable().optional() }).passthrough()
+        : z.object({ serviceId: z.string() }).passthrough();
+      const source = sourceSchema.parse(await sourceResponse.json());
+      if (scenario.actor.kind === "FIELD") {
+        if (!session.crew?.id) {
+          return errorResponse(403, "Solo puede crear derivaciones desde trabajo de su cuadrilla.", path);
+        }
+        let service = source;
+        if (parsed.data.detectedInType === "INSPECTION") {
+          const serviceResponse = await fetchBackend(request, `/services/${encodeURIComponent(source.serviceId as string)}`);
+          if (!serviceResponse.ok) {
+            return new NextResponse(await serviceResponse.text(), {
+              status: serviceResponse.status,
+              headers: { "content-type": serviceResponse.headers.get("content-type") ?? "application/json" },
+            });
+          }
+          service = z.object({ crewId: z.string().nullable().optional() }).passthrough().parse(await serviceResponse.json());
+        }
+        if (service.crewId !== session.crew.id) {
+          return errorResponse(403, "Solo puede crear derivaciones desde trabajo de su cuadrilla.", path);
+        }
+      }
       const backendResponse = await fetchBackend(request, "/repair-requests", undefined, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -159,6 +186,16 @@ export async function POST(request: Request) {
         status: backendResponse.status,
         headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
       });
+    }
+
+    if (parsed.data.detectedInType === "SERVICE" && !serviceFixtures.some((service) => service.id === parsed.data.detectedInId)) {
+      return errorResponse(404, `Servicio ${parsed.data.detectedInId} no encontrado.`, path);
+    }
+    if (parsed.data.detectedInType === "INSPECTION" && !getEnvironmentalInspectionFixture(parsed.data.detectedInId)) {
+      return errorResponse(404, `Inspección ${parsed.data.detectedInId} no encontrada.`, path);
+    }
+    if (scenario.actor.kind === "FIELD" && !fieldCanAccessSource(scenario, parsed.data.detectedInId)) {
+      return errorResponse(403, "Solo puede crear derivaciones desde trabajo de su cuadrilla.", path);
     }
 
     const service = parsed.data.detectedInType === "SERVICE"
