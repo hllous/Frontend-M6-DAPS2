@@ -197,5 +197,5 @@ export function getScenario(
 }
 
 export function isScenarioId(value: unknown): value is ScenarioId {
-  return typeof value === "string" && value in scenariosById;
+  return typeof value === "string" && Object.hasOwn(scenariosById, value);
 }

@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { getScenario, scenarios } from "./scenarios";
+import { getScenario, isScenarioId, scenarios } from "./scenarios";
 
 describe("operational scenarios", () => {
+  it.each(["constructor", "__proto__", "toString", "hasOwnProperty", "", null, undefined, 42, {}, [], true])(
+    "rejects non-scenario values (%j)", (value) => {
+      expect(isScenarioId(value)).toBe(false);
+    },
+  );
+
+  it.each(Object.values(scenarios).map((scenario) => scenario.id))(
+    "accepts the real scenario %s", (id) => {
+      expect(isScenarioId(id)).toBe(true);
+    },
+  );
+
   it("names Office, Field leader, Field member and capability-limited states", () => {
     expect(Object.values(scenarios).map((scenario) => scenario.actor.kind)).toEqual(
       expect.arrayContaining(["OFFICE", "FIELD"]),
