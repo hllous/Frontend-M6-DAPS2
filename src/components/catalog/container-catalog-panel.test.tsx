@@ -1,5 +1,5 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -8,6 +8,7 @@ import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { handlers } from "@/mocks/handlers";
 import { withNodeFile } from "@/mocks/node-file";
 import { scenarios } from "@/lib/scenarios";
+import type { ContainerStatus } from "@/lib/containers";
 import { ContainerCatalogPanel } from "./container-catalog-panel";
 
 const server = setupServer(...handlers);
@@ -19,6 +20,135 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 afterAll(() => server.close());
+
+describe("Container Service lookup", () => {
+  const containerId = "70423999-647b-4b29-98ce-efcd33b3d7c2";
+  beforeEach(() => {
+    server.use(
+      http.get("*/api/containers", () => HttpResponse.json({
+        data: [{ id: containerId, code: "CONT-REMOTO", containerType: "RECYCLABLE", zoneId: "zone-2", address: "Santa Fe 123", lat: null, lng: null, capacityLiters: 2400, status: "OVERFLOWED" }],
+        meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+      })),
+      http.get(`*/api/containers/${containerId}/evidence`, () => HttpResponse.json({ data: [] })),
+    );
+  });
+
+  it("disables standalone transitions after a failed lookup and enables them after retry", async () => {
+    let failing = true;
+    server.use(http.get("*/api/services", () => failing
+      ? HttpResponse.error()
+      : HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } })));
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
+    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    const dialog = screen.getByRole("dialog");
+    expect(await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.")).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeDisabled();
+    failing = false;
+    await user.click(within(dialog).getByRole("button", { name: "Reintentar" }));
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeEnabled());
+  });
+
+  it("blocks standalone emptying when the linked Service is beyond the first 100 results", async () => {
+    const requestedPages: number[] = [];
+    const service = {
+      id: "48dc03df-65b5-4530-8013-d5072e970170",
+      title: "Vaciado remoto", serviceTypeId: "st-container-repair",
+      serviceTypeName: "Vaciado de contenedor", mode: "POINT", status: "IN_PROGRESS",
+      origin: "MANUAL", zoneIds: ["zone-2"], targetType: "CONTAINER",
+      targetId: containerId, scheduledDate: "2026-09-06",
+    };
+    server.use(http.get("*/api/services", ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get("page") ?? 1);
+      requestedPages.push(page);
+      return HttpResponse.json({
+        data: page === 1 ? Array.from({ length: 100 }, (_, index) => ({ ...service, id: `other-${index}`, targetId: "another-container" })) : [service],
+        meta: { total: 101, page, pageSize: 100, totalPages: 2 },
+      });
+    }));
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
+    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    const dialog = screen.getByRole("dialog");
+    expect(await within(dialog).findByText(`Servicio en curso (${service.id})`)).toBeVisible();
+    expect(within(dialog).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
+    expect(requestedPages).toContain(2);
+  });
+
+  it("keeps actions disabled when the lookup exceeds its twenty-page limit", async () => {
+    const requestedPages: number[] = [];
+    server.use(http.get("*/api/services", ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get("page") ?? 1);
+      requestedPages.push(page);
+      return HttpResponse.json({ data: [], meta: { total: 2001, page, pageSize: 100, totalPages: 21 } });
+    }));
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
+    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    const dialog = screen.getByRole("dialog");
+    expect(await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.")).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeDisabled();
+    expect(requestedPages.slice(-20)).toEqual(Array.from({ length: 20 }, (_, index) => index + 1));
+    expect(requestedPages).not.toContain(21);
+  });
+
+  it("does not treat an incomplete result as absence of a linked Service", async () => {
+    server.use(http.get("*/api/services", () => HttpResponse.json({
+      data: [], meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+    })));
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
+    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    const dialog = screen.getByRole("dialog");
+    expect(await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.")).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeDisabled();
+  });
+
+  it("offers standalone emptying when no Service exists and refreshes verification when opening detail", async () => {
+    let lookups = 0;
+    server.use(http.get("*/api/services", () => {
+      lookups += 1;
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } });
+    }));
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
+    await waitFor(() => expect(within(row).getByRole("button", { name: "Vaciar contenedor" })).toBeEnabled());
+    const previousLookups = lookups;
+    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    await waitFor(() => expect(lookups).toBeGreaterThan(previousLookups));
+    const dialog = screen.getByRole("dialog");
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeEnabled());
+    expect(within(dialog).queryByText(/Servicio en curso/)).not.toBeInTheDocument();
+  });
+
+  it.each<[ContainerStatus, string]>([
+    ["OVERFLOWED", "Vaciar contenedor"],
+    ["UNDER_REPAIR", "Completar reparación independiente"],
+    ["RELOCATING", "Confirmar ubicación"],
+    ["DAMAGED", "Retirar contenedor"],
+  ])("disables the %s standalone transition when verification fails", async (status, action) => {
+    server.use(
+      http.get("*/api/containers", () => HttpResponse.json({
+        data: [{ id: containerId, code: "CONT-REMOTO", containerType: "RECYCLABLE", zoneId: "zone-2", address: "Santa Fe 123", lat: null, lng: null, capacityLiters: 2400, status }],
+        meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+      })),
+      http.get("*/api/services", () => HttpResponse.error()),
+    );
+    const user = userEvent.setup();
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
+    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    const dialog = screen.getByRole("dialog");
+    await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.");
+    expect(within(dialog).getByRole("button", { name: action })).toBeDisabled();
+    expect(within(row).getByRole("button", { name: action, hidden: true })).toBeDisabled();
+  });
+});
 
 describe("ContainerCatalogPanel", () => {
   it("lists Containers and filters them by status, type, zone, and search", async () => {
