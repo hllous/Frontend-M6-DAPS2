@@ -173,6 +173,8 @@ export function ServicesWorkspace({
 
   // Suspend modal state (Field crew leader)
   const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
+  const [startingId, setStartingId] = useState<string | null>(null);
+  const [startErrors, setStartErrors] = useState<Record<string, string>>({});
   const [resumingId, setResumingId] = useState<string | null>(null);
   const [resumeErrors, setResumeErrors] = useState<Record<string, string>>({});
 
@@ -458,6 +460,11 @@ export function ServicesWorkspace({
     setSelectedId((prev) => (prev === id ? null : id));
   }, []);
 
+  const handleOpenDetail = useCallback((id: string) => {
+    setStartErrors({});
+    setDetailId(id);
+  }, []);
+
   const handleSortChange = useCallback((key: SortKey) => {
     setSortKey((prevKey) => {
       if (prevKey === key) {
@@ -558,6 +565,8 @@ export function ServicesWorkspace({
       : { serviceId: null, dependency: null, error: null };
 
   const handleStartService = useCallback(async (service: Service) => {
+    setStartingId(service.id);
+    setStartErrors((prev) => ({ ...prev, [service.id]: "" }));
     try {
       const updated = await servicesAdapter.start(service.id);
       setLoadState((prev) => {
@@ -567,8 +576,14 @@ export function ServicesWorkspace({
           services: prev.services.map((s) => (s.id === updated.id ? updated : s)),
         };
       });
-    } catch {
-      // Handled in dialog or caller
+    } catch (cause) {
+      const msg =
+        cause instanceof ServiceRequestError
+          ? cause.message
+          : "No se pudo registrar el inicio del servicio.";
+      setStartErrors((prev) => ({ ...prev, [service.id]: msg }));
+    } finally {
+      setStartingId((current) => (current === service.id ? null : current));
     }
   }, []);
 
@@ -699,6 +714,8 @@ export function ServicesWorkspace({
           onCreateStreetClosureRequest={canCreateStreetClosureRequest ? (s) => setStreetClosureServiceId(s.id) : undefined}
           onServiceUpdated={handleServiceUpdated}
           canStartService={canExecuteService}
+          isStarting={startingId === detailService.id}
+          startError={startErrors[detailService.id] ?? null}
           isResuming={resumingId === detailService.id}
           resumeError={resumeErrors[detailService.id] ?? null}
           streetClosureDependency={displayedStreetClosureState.dependency}
@@ -987,7 +1004,7 @@ export function ServicesWorkspace({
                   <div className="absolute inset-x-0 bottom-0 z-40 max-h-[75%] rounded-t-2xl border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl">
                     <ServicePreview
                       service={selectedService}
-                      onOpenDetail={(id) => setDetailId(id)}
+                      onOpenDetail={handleOpenDetail}
                       onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
                       onClose={() => setSelectedId(null)}
                     />
@@ -1100,7 +1117,7 @@ export function ServicesWorkspace({
                   <div className="absolute inset-y-0 right-0 z-30 w-80 md:w-96 shadow-2xl transition-transform duration-300">
                     <ServicePreview
                       service={selectedService}
-                      onOpenDetail={(id) => setDetailId(id)}
+                      onOpenDetail={handleOpenDetail}
                       onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
                       onClose={() => setSelectedId(null)}
                     />
