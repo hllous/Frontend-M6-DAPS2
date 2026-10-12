@@ -71,6 +71,10 @@ describe("session route handlers", () => {
     process.env.M6_AUTH_MODE = "backend-development";
     const token = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_DEV_JWT = token;
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(backendCrews([
+      { id: REAL_CREW_ID, name: "Cuadrilla Belgrano — Recolección" },
+    ]));
     const response = await login(loginRequest("field-crew-leader-route"));
     const cookie = response.headers.get("set-cookie") ?? "";
     const body = await response.json();

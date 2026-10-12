@@ -57,6 +57,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const session = createSession("field-crew-leader-route", {
       mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      backendOrigin: process.env.M6_BACKEND_ORIGIN,
     });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(inspection));
     const response = await detail(`${AUTH_COOKIE_NAME}=${sealSession(session)}`);

@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
   try {
     const session = getRequiredSession(request);
     const query = queryFromUrl(new URL(request.url));
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const response = await fetchBackend(request, `/tree-interventions${queryString(query)}`);
       return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
     }
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     requireCapability(session, "treeIntervention:request");
     const parsed = treeInterventionCreateInputSchema.safeParse(await request.json().catch(() => undefined));
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const response = await fetchBackend(request, "/tree-interventions", "treeIntervention:request", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
       return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
     }

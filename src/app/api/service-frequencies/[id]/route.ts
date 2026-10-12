@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { serviceFrequencyResponseFixture, closeServiceFrequencyFixture, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
@@ -17,7 +18,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     const session = getRequiredSession(request);
     const id = await targetId(context);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) { const response = await fetchBackend(request, `/service-frequencies/${id}`); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
+    if (backendMode(session)) { const response = await fetchBackend(request, `/service-frequencies/${id}`); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
     const item = serviceFrequencyFixtures.find((candidate) => candidate.id === id);
     return item ? NextResponse.json(serviceFrequencyResponseFixture(item)) : errorResponse(404, "Frecuencia no encontrada.", path);
   } catch (error) {
@@ -36,7 +37,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = serviceFrequencyUpdateInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) { const response = await fetchBackend(request, `/service-frequencies/${id}`, "serviceFrequency:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
+    if (backendMode(session)) { const response = await fetchBackend(request, `/service-frequencies/${id}`, "serviceFrequency:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
     const updated = updateServiceFrequencyFixture(id, parsed.data);
     return updated ? NextResponse.json(serviceFrequencyResponseFixture(updated)) : errorResponse(404, "Frecuencia no encontrada.", path);
   } catch (error) {
@@ -52,7 +53,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     const session = requireOfficeCapability(request);
     const id = await targetId(context);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) { const response = await fetchBackend(request, `/service-frequencies/${id}`, "serviceFrequency:manage", { method: "DELETE" }); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
+    if (backendMode(session)) { const response = await fetchBackend(request, `/service-frequencies/${id}`, "serviceFrequency:manage", { method: "DELETE" }); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
     const updated = closeServiceFrequencyFixture(id);
     return updated ? NextResponse.json(serviceFrequencyResponseFixture(updated)) : errorResponse(404, "Frecuencia no encontrada.", path);
   } catch (error) {

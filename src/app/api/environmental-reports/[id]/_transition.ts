@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -30,7 +31,7 @@ export async function transitionReport(request: Request, id: string, action: "st
       decision = parsed.data;
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/environmental-reports/${encodeURIComponent(id)}/${action}`, action === "close" ? "environmentalReport:close" : "environmentalReport:review", decision ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(decision) } : { method: "POST" });
       return new NextResponse(await backendResponse.text(), { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
     }
