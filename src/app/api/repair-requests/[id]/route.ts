@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -36,7 +37,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     } else if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, "Solo Oficina o Campo puede consultar derivaciones.", path);
     }
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/repair-requests/${id}`);
       return new NextResponse(await backendResponse.text(), { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
     }

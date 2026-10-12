@@ -1,3 +1,4 @@
+import { backendMode } from "./bff-route";
 import {
   AuthUnavailableError,
   BackendUnavailableError,
@@ -17,7 +18,7 @@ export async function loadAuthorizedScenario(
   if (session.scenarioId !== scenarioId) throw new ForbiddenSessionError();
   requireCapability(session, "service:view");
 
-  if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+  if (backendMode(session)) {
     let backendResponse: Response;
     try {
       backendResponse = await fetchBackend(request, "/service-types", "service:view");

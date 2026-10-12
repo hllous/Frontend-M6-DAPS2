@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -54,7 +55,7 @@ export async function GET(
     const session = getRequiredSession(request);
     const id = await targetId(context);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/zones/${id}`);
       const body = await backendResponse.text();
       return new NextResponse(body, {
@@ -110,7 +111,7 @@ export async function PATCH(
       return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/zones/${id}`, "zone:manage", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -164,7 +165,7 @@ export async function DELETE(
 
     const id = await targetId(context);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/zones/${id}`, "zone:manage", {
         method: "DELETE",
       });

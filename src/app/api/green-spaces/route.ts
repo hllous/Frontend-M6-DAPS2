@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
     const session = getRequiredSession(request);
     const query = parseGreenSpaceQuery(new URL(request.url));
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/green-spaces${backendQueryString(query)}`);
       const body = await backendResponse.text();
       return new NextResponse(body, {
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
       return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/green-spaces", undefined, {
         method: "POST",
         headers: { "content-type": "application/json" },

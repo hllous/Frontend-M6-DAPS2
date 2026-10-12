@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -62,7 +63,7 @@ export async function POST(
       return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/zones/${id}/neighborhoods`, "zone:manage", {
         method: "POST",
         headers: { "content-type": "application/json" },
