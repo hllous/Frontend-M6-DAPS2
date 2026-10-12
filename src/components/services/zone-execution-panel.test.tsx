@@ -409,6 +409,86 @@ describe("ZoneExecutionPanel component", () => {
     expect(screen.getByText("Evidencia adjunta (1):")).toBeVisible();
   });
 
+  it("keeps each zone's evidence queue and retry state when switching zones", async () => {
+    const user = userEvent.setup();
+    let uploadAttempts = 0;
+    let recordedResults: any[] = [];
+    const uploadedAttachment = {
+      id: "att-zone-a-success-398",
+      url: "/mock/evidence/zona-a-subida.jpg",
+      filename: "zona-a-subida.jpg",
+      contentType: "image/jpeg",
+      uploadedAt: "2026-09-05 10:22",
+    };
+
+    server.use(
+      http.post("*/api/services/:serviceId/zone-results", async ({ request }) => {
+        const body = (await request.json()) as any;
+        const result = {
+          id: "ZR-QUEUE-PER-ZONE-398",
+          serviceId: mockRouteService.id,
+          zoneId: body.zoneId,
+          status: body.status,
+          reason: body.reason,
+          notes: body.notes,
+          attachments: [],
+          recordedAt: "2026-09-05 10:20",
+        };
+        recordedResults = [result];
+        return HttpResponse.json(result);
+      }),
+      http.post("*/api/evidence", () => {
+        uploadAttempts += 1;
+        if (uploadAttempts === 1) return HttpResponse.json(uploadedAttachment);
+        return HttpResponse.json(
+          {
+            statusCode: 500,
+            message: "Falló la carga de esta evidencia.",
+            error: "Internal Server Error",
+            timestamp: "2026-09-05T10:22:00.000Z",
+            path: "/api/evidence",
+          },
+          { status: 500 },
+        );
+      }),
+      http.get("*/api/services/:serviceId/zone-results", () =>
+        HttpResponse.json(
+          recordedResults.map((result) => ({
+            ...result,
+            attachments: uploadAttempts > 0 ? [uploadedAttachment] : [],
+          })),
+        ),
+      ),
+      http.get("*/api/evidence", () => HttpResponse.json([uploadedAttachment])),
+    );
+
+    render(<ZoneExecutionPanel service={mockRouteService} canExecute />);
+    await user.click(screen.getByLabelText("Parcial"));
+    await user.selectOptions(screen.getByLabelText(/motivo de la excepción/i), "BLOCKED_ACCESS");
+    await user.upload(document.querySelector("#evidence-input") as HTMLInputElement, [
+      new File(["primera"], "zona-a-local.jpg", { type: "image/jpeg" }),
+      new File(["segunda"], "zona-a-reintentar.jpg", { type: "image/jpeg" }),
+    ]);
+    await user.click(screen.getByRole("button", { name: /guardar resultado de zona/i }));
+
+    expect(await screen.findByRole("button", { name: "Reintentar" })).toBeVisible();
+    expect(await screen.findByText("zona-a-subida.jpg")).toBeVisible();
+    expect(screen.getByText("zona-a-reintentar.jpg")).toBeVisible();
+    expect(screen.getByText("Falló la carga de esta evidencia.")).toBeVisible();
+
+    await user.click(screen.getAllByRole("button", { name: /zona norte/i })[0]);
+    expect(await screen.findByRole("heading", { name: "Zona Norte" })).toBeVisible();
+    expect(screen.queryByText("zona-a-subida.jpg")).not.toBeInTheDocument();
+    expect(screen.queryByText("zona-a-reintentar.jpg")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /zona centro/i }));
+    expect(await screen.findByText("zona-a-subida.jpg")).toBeVisible();
+    expect(screen.getByText("zona-a-reintentar.jpg")).toBeVisible();
+    expect(screen.getByText("Falló la carga de esta evidencia.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeVisible();
+  });
+
   it("keeps completion button disabled until all zones are recorded, then invokes complete with no request body", async () => {
     const user = userEvent.setup();
     const handleServiceUpdated = vi.fn();
