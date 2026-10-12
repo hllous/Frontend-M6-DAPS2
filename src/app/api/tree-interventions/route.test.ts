@@ -1,14 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
 import { resetTreeInterventionFixtures, treeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
 import { GET, POST } from "./route";
 
 beforeEach(() => resetTreeInterventionFixtures());
-afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; });
+afterEach(() => { vi.restoreAllMocks(); delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
+async function authenticatedCookie(scenarioId: string, mode = "mock") {
+  process.env.M6_AUTH_MODE = mode;
   const response = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenarioId }) }));
   return response.headers.get("set-cookie") ?? "";
 }
@@ -23,6 +23,24 @@ const validInput = {
 };
 
 describe("/api/tree-interventions", () => {
+
+  it.each([
+    ["?pageSize=101", "?pageSize=100"],
+    ["?page=0&pageSize=abc", "?page=1"],
+    ["?status=APPROVED&evil=1", ""],
+    ["?status=AUTHORIZED&evil=1", "?status=AUTHORIZED"],
+  ])("normalises backend list queries %s", async (query, expected) => {
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0 } }));
+    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const response = await GET(new Request(`http://localhost/tree-interventions${query}`, { headers: { cookie } }));
+    expect(response.status).toBe(200);
+    expect(backendFetch).toHaveBeenCalledTimes(1);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/tree-interventions${expected}`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+  });
+
   it("lists filtered requests for any authenticated actor", async () => {
     const cookie = await authenticatedCookie("field-crew-member-route");
     const response = await GET(new Request("http://localhost/api/tree-interventions?interventionType=SAFETY_PRUNING&status=REQUESTED&pageSize=10", { headers: { cookie } }));
