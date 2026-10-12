@@ -14,7 +14,7 @@ import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateStreetClosureRequestDialog } from "@/components/services/create-street-closure-request-dialog";
 import Link from "next/link";
-import { servicesAdapter, type CreateServiceInput } from "@/lib/services";
+import { servicesAdapter, type CreateServiceInput, type Service } from "@/lib/services";
 import { resolveServiceType, TREE_PRUNING_SERVICE_TYPE_RULE } from "@/lib/service-types";
 import { treeInterventionCreateInputSchema, treeInterventionsAdapter, TreeInterventionRequestError, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
 import { crewsAdapter, type Crew } from "@/lib/crews";
@@ -57,6 +57,9 @@ type LoadState =
   | { status: "loading" }
   | { status: "ready"; page: { interventions: TreeIntervention[]; page: number; pageSize: number; total: number; totalPages: number } }
   | { status: "error"; message: string };
+
+type PendingServiceLink = { id: string; title: string | null };
+type ServiceLookupStatus = "idle" | "loading" | "ready" | "error";
 
 type RequestForm = {
   interventionType: TreeInterventionType | "";
@@ -103,6 +106,8 @@ function dateTimeLabel(value?: string | null) {
 }
 
 const emptySchedule = () => ({ scheduledDate: todayInArgentina(), windowFrom: "08:00", windowTo: "12:00", crewId: "", vehicleId: "" });
+const SERVICE_LOOKUP_FAILURE = "No se pudo verificar si ya existe un servicio para esta intervención. Reintente.";
+const SERVICE_LOOKUP_PAGE_LIMIT = 20;
 
 // El servicio creado pero sin vincular sobrevive a una recarga: se guarda por intervención.
 const unsyncedKey = (interventionId: string) => `tree-intervention-unsynced-service:${interventionId}`;
@@ -232,7 +237,9 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState(emptySchedule);
   const [resources, setResources] = useState<{ crews: Crew[]; vehicles: Vehicle[] } | "error" | null>(null);
-  const [unsyncedServiceId, setUnsyncedServiceId] = useState<string | null>(null);
+  const [unsyncedService, setUnsyncedService] = useState<PendingServiceLink | null>(null);
+  const [serviceLookupStatus, setServiceLookupStatus] = useState<ServiceLookupStatus>("idle");
+  const serviceLookupRequest = useRef(0);
   const [streetClosureIntervention, setStreetClosureIntervention] = useState<TreeInterventionDetail | null>(null);
   const detailOpenedFromUrl = useRef(false);
   const [initialDetailId] = useState<string | null>(() => {
@@ -264,19 +271,69 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   }, [scheduleOpen]);
 
   const openRequest = (prefill: Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification"> = {}) => { setRequestPrefill(prefill); setRequestOpen(true); setNotice(null); };
+  const verifyExistingService = useCallback(async (intervention: TreeInterventionDetail) => {
+    const requestId = ++serviceLookupRequest.current;
+    setServiceLookupStatus("loading");
+
+    try {
+      const targetTreeId = intervention.treeIds[0];
+      if (!targetTreeId) {
+        setServiceLookupStatus("ready");
+        return;
+      }
+
+      let page = 1;
+      let totalPages = 1;
+      let total = 0;
+      let loaded = 0;
+      do {
+        const result = await servicesAdapter.list({ page, pageSize: 100 });
+        if (requestId !== serviceLookupRequest.current) return;
+        if (result.page !== page) throw new Error(SERVICE_LOOKUP_FAILURE);
+
+        const matchingService = result.services.find((service: Service) =>
+          service.targetType === "TREE"
+          && service.targetId === targetTreeId
+          && service.notes === `Intervención de arbolado ${intervention.id}.`,
+        );
+        if (matchingService) {
+          writeUnsynced(intervention.id, matchingService.id);
+          setUnsyncedService({ id: matchingService.id, title: matchingService.title });
+          setServiceLookupStatus("ready");
+          return;
+        }
+
+        loaded += result.services.length;
+        total = result.total;
+        totalPages = result.totalPages;
+        page += 1;
+      } while (page <= totalPages && page <= SERVICE_LOOKUP_PAGE_LIMIT);
+
+      if (totalPages >= SERVICE_LOOKUP_PAGE_LIMIT || loaded < total) {
+        throw new Error(SERVICE_LOOKUP_FAILURE);
+      }
+      setServiceLookupStatus("ready");
+    } catch {
+      if (requestId === serviceLookupRequest.current) setServiceLookupStatus("error");
+    }
+  }, []);
+
   const openDetail = useCallback(async (intervention: TreeIntervention) => {
-    setDetail(intervention); setDetailError(null); setActionError(null); setScheduleOpen(false); setUnsyncedServiceId(null); setDetailLoading(true);
+    serviceLookupRequest.current += 1;
+    setDetail(intervention); setDetailError(null); setActionError(null); setScheduleOpen(false); setUnsyncedService(null); setServiceLookupStatus("idle"); setDetailLoading(true);
     try {
       const loaded = await treeInterventionsAdapter.get(intervention.id);
       setDetail(loaded);
       const pending = loaded.serviceId ? null : readUnsynced(loaded.id);
       if (loaded.serviceId) writeUnsynced(loaded.id, null);
-      if (pending && loaded.status === "AUTHORIZED") {
-        setUnsyncedServiceId(pending);
-        setActionError(`El Servicio ${pending} fue creado, pero no quedó vinculado a la intervención. Puede reintentar la vinculación sin crear otro servicio.`);
+      if (pending && !loaded.serviceId) setUnsyncedService({ id: pending, title: null });
+      if (loaded.status === "AUTHORIZED" && !loaded.serviceId) {
+        void verifyExistingService(loaded);
+      } else {
+        setServiceLookupStatus("ready");
       }
     } catch (caught) { setDetailError(caught instanceof Error ? caught.message : "No se pudo cargar el detalle de la intervención."); } finally { setDetailLoading(false); }
-  }, []);
+  }, [verifyExistingService]);
 
   useEffect(() => {
     if (state.status !== "ready" || !initialDetailId || detail || detailOpenedFromUrl.current) return;
@@ -316,15 +373,15 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         try {
           const { detail: updated, linkedTo } = await linkService(detail.id, createdService.id);
           setDetail(updated);
-          setUnsyncedServiceId(null);
+          setUnsyncedService(null);
           setScheduleOpen(false);
           setRequestVersion((version) => version + 1);
           setNotice(linkNotice(createdService.id, linkedTo));
         } catch (caught) {
           writeUnsynced(detail.id, createdService.id);
-          setUnsyncedServiceId(createdService.id);
+          setUnsyncedService({ id: createdService.id, title: createdService.title });
           setScheduleOpen(false);
-          setActionError(`El Servicio ${createdService.id} fue creado, pero no pudo vincularse a la intervención. La operación quedó sin sincronizarse; puede reintentar la vinculación sin crear otro servicio. ${caught instanceof Error ? caught.message : ""}`.trim());
+          setActionError(caught instanceof Error ? caught.message : "No se pudo vincular el servicio.");
         }
         return;
       }
@@ -360,18 +417,18 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     : `La intervención ya estaba vinculada al servicio ${linkedTo}. El servicio ${serviceId} quedó creado sin vincular: cancélelo desde Servicios.`;
 
   const retryServiceLink = async () => {
-    if (!detail || !unsyncedServiceId) return;
+    if (!detail || !unsyncedService) return;
     setActionError(null);
     setActiveAction("retry-link");
     try {
-      const { detail: updated, linkedTo } = await linkService(detail.id, unsyncedServiceId);
+      const { detail: updated, linkedTo } = await linkService(detail.id, unsyncedService.id);
       setDetail(updated);
       writeUnsynced(detail.id, null);
-      setUnsyncedServiceId(null);
+      setUnsyncedService(null);
       setRequestVersion((version) => version + 1);
-      setNotice(linkNotice(unsyncedServiceId, linkedTo));
+      setNotice(linkNotice(unsyncedService.id, linkedTo));
     } catch (caught) {
-      setActionError(`El Servicio ${unsyncedServiceId} sigue sin vincularse. Revise el estado antes de volver a intentar. ${caught instanceof Error ? caught.message : ""}`.trim());
+      setActionError(caught instanceof Error ? caught.message : "No se pudo vincular el servicio.");
     } finally {
       setActiveAction(null);
     }
@@ -438,7 +495,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           }}
         />
       ) : null}
-      <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { setDetail(null); setRejectConfirmOpen(false); } }}>
+      <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { serviceLookupRequest.current += 1; setDetail(null); setUnsyncedService(null); setServiceLookupStatus("idle"); setRejectConfirmOpen(false); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle><DialogDescription>Consulte los datos de la solicitud y, según su estado y permisos, registre una decisión de autorización.</DialogDescription></DialogHeader>
           {detailLoading ? <p role="status">Cargando detalle…</p> : null}
@@ -446,7 +503,10 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : PRIORITY_LABELS[detail.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ul className="flex flex-col gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <li key={tree?.id ?? detail.treeIds[index]} className="rounded-xl border border-border bg-muted px-3 py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</li>)}</ul></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
           {detail && !detailLoading && !detailError ? (
             <>
-              {actionError ? <Alert variant="destructive"><AlertDescription className="flex flex-col gap-3"><span>{actionError}</span>{unsyncedServiceId ? <Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "retry-link"} onClick={() => void retryServiceLink()}><RefreshCw data-icon="inline-start" aria-hidden />{activeAction === "retry-link" ? "Reintentando vinculación…" : "Reintentar vinculación"}</Button> : null}</AlertDescription></Alert> : null}
+              {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
+              {unsyncedService ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>El Servicio {unsyncedService.id}{unsyncedService.title ? ` — ${unsyncedService.title}` : ""} fue creado, pero quedó sin vincular. La vinculación quedó pendiente. Complétela antes de salir de esta página.</span><Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "retry-link"} onClick={() => void retryServiceLink()}><RefreshCw data-icon="inline-start" aria-hidden />{activeAction === "retry-link" ? "Reintentando vinculación…" : "Reintentar vinculación"}</Button></AlertDescription></Alert> : null}
+              {canSchedule && detail.status === "AUTHORIZED" && serviceLookupStatus === "loading" ? <p role="status" className="text-sm text-muted-foreground">Verificando si ya existe un servicio para esta intervención…</p> : null}
+              {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && serviceLookupStatus === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{SERVICE_LOOKUP_FAILURE}</span><Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => void verifyExistingService(detail)}>Reintentar</Button></AlertDescription></Alert> : null}
               <div className="flex flex-col gap-3 border-t border-[var(--color-border)] pt-4">
                 {detail.status === "AUTHORIZED" ? (
                   <dl aria-label="Registro de autorización" className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-sm sm:grid-cols-2">
@@ -467,8 +527,8 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                   </Button>
                 ) : null}
                 {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className="font-mono font-semibold underline" href={serviceSourceHref(detail.serviceId)}>{detail.serviceId}</Link>.</AlertDescription></Alert> : null}
-                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedServiceId && !scheduleOpen ? <Button type="button" variant="default" disabled={activeAction !== null} onClick={() => { setScheduleForm(emptySchedule()); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
-                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedServiceId && scheduleOpen ? (
+                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && !scheduleOpen ? <Button type="button" variant="default" disabled={activeAction !== null} onClick={() => { setScheduleForm(emptySchedule()); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
+                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && scheduleOpen ? (
                   <form
                     aria-label="Programar servicio para la intervención"
                     className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"

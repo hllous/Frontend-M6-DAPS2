@@ -19,7 +19,10 @@ beforeEach(() => {
   resetServiceFixtures();
   window.localStorage.clear();
 });
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+});
 afterAll(() => server.close());
 
 describe("TreeInterventionsPanel", () => {
@@ -199,9 +202,101 @@ describe("TreeInterventionsPanel", () => {
     const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
 
-    expect(await within(detail).findByRole("alert")).toHaveTextContent(/creado.*no pudo vincularse|sincronizar/i);
+    expect(await within(detail).findByText(/La vinculación quedó pendiente/)).toHaveTextContent(/SVC-\d+.*Tratamiento/);
     expect(within(detail).getByRole("button", { name: "Reintentar vinculación" })).toBeVisible();
     expect(within(detail).queryByText(/La intervención fue programada/)).not.toBeInTheDocument();
+  });
+
+  it("recovers an unlinked Service after storage fails, including from page two after reload", async () => {
+    server.use(
+      http.post("*/api/tree-interventions/:interventionId/assign-service", () => HttpResponse.json({
+        statusCode: 500,
+        message: "No se pudo vincular el servicio.",
+        error: "Internal Server Error",
+        timestamp: new Date().toISOString(),
+        path: "/api/tree-interventions/intervention-2/assign-service",
+      }, { status: 500 })),
+    );
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+    const user = userEvent.setup();
+    const first = await openScheduleForm(user, /intervention-2|Tratamiento/i);
+    await user.click(within(first.form).getByRole("button", { name: "Programar servicio de intervención" }));
+
+    const pendingWarning = await within(first.detail).findByText(/La vinculación quedó pendiente/);
+    expect(pendingWarning).toHaveTextContent(/SVC-\d+/);
+    expect(pendingWarning).toHaveTextContent("Tratamiento · Av. Mitre 1140");
+    expect(pendingWarning).toHaveTextContent("antes de salir de esta página");
+    const createdService = serviceFixtures.find((service) => service.notes === "Intervención de arbolado intervention-2.");
+    expect(createdService).toBeDefined();
+
+    cleanup();
+    server.resetHandlers();
+    const requestedPages: number[] = [];
+    const fillerServices = Array.from({ length: 100 }, (_, index) => ({
+      ...createdService!,
+      id: `SVC-FILLER-${index}`,
+      targetId: `tree-filler-${index}`,
+      notes: "Otro servicio",
+    }));
+    server.use(http.get("*/api/services", ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get("page"));
+      requestedPages.push(page);
+      return HttpResponse.json({
+        data: page === 1 ? fillerServices : [createdService],
+        meta: { total: 101, page, pageSize: 100, totalPages: 2 },
+      });
+    }));
+
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name: /intervention-2|Tratamiento/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    await within(detail).findByRole("button", { name: "Reintentar vinculación" });
+
+    expect(requestedPages).toEqual([1, 2]);
+    expect(within(detail).queryByRole("button", { name: "Programar servicio" })).not.toBeInTheDocument();
+    expect(within(detail).getByText(/La vinculación quedó pendiente/)).toHaveTextContent(createdService!.title);
+  });
+
+  it("keeps scheduling unavailable when the Service lookup fails and retries the lookup", async () => {
+    server.use(http.get("*/api/services", () => HttpResponse.json({
+      statusCode: 500,
+      message: "Error de lectura.",
+      error: "Internal Server Error",
+      timestamp: new Date().toISOString(),
+      path: "/api/services",
+    }, { status: 500 })));
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name: /intervention-2|Tratamiento/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+
+    expect(await within(detail).findByText("No se pudo verificar si ya existe un servicio para esta intervención. Reintente.")).toBeVisible();
+    expect(within(detail).queryByRole("button", { name: "Programar servicio" })).not.toBeInTheDocument();
+    server.resetHandlers();
+    await user.click(within(detail).getByRole("button", { name: "Reintentar" }));
+
+    expect(await within(detail).findByRole("button", { name: "Programar servicio" })).toBeVisible();
+    expect(within(detail).queryByText("No se pudo verificar si ya existe un servicio para esta intervención. Reintente.")).not.toBeInTheDocument();
+  });
+
+  it("offers scheduling after the backend confirms there is no Service for the intervention", async () => {
+    const requestedUrls: string[] = [];
+    server.use(http.get("*/api/services", ({ request }) => {
+      requestedUrls.push(request.url);
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 } });
+    }));
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name: /intervention-2|Tratamiento/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+
+    expect(await within(detail).findByRole("button", { name: "Programar servicio" })).toBeVisible();
+    expect(new URL(requestedUrls[0]).searchParams.get("pageSize")).toBe("100");
   });
 
   async function openScheduleForm(user: ReturnType<typeof userEvent.setup>, name: RegExp) {

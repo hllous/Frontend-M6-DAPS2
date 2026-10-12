@@ -36,6 +36,7 @@ export interface FieldDraft<TPayload = unknown> {
 }
 
 const STORAGE_PREFIX = "m6:field-draft:";
+const DRAFT_UNSAVED_MESSAGE = "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.";
 
 function draftKey(serviceId: string, actionType: FieldDraftActionType, scope?: string): string {
   return `${STORAGE_PREFIX}${serviceId}:${actionType}${scope ? `:${scope}` : ""}`;
@@ -56,14 +57,16 @@ export function snapshotService(service: Service): FieldDraftServiceSnapshot {
   };
 }
 
-export function saveFieldDraft<TPayload>(draft: FieldDraft<TPayload>): void {
+export function saveFieldDraft<TPayload>(draft: FieldDraft<TPayload>): boolean {
   try {
     localStorage.setItem(
       draftKey(draft.serviceId, draft.actionType, draft.scope),
       JSON.stringify(draft),
     );
+    return true;
   } catch {
     // Best-effort: if storage is unavailable, the draft simply isn't retained on-device.
+    return false;
   }
 }
 
@@ -104,7 +107,7 @@ export function hasServiceDrifted(
 export type FieldActionOutcome<TPayload, TResult = Service> =
   | { kind: "success"; result: TResult }
   | { kind: "draft-saved"; draft: FieldDraft<TPayload> }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; draftUnsaved?: true };
 
 /**
  * First attempt at a field action. On a real network failure the input is
@@ -140,7 +143,9 @@ export async function submitFieldAction<TPayload, TResult = Service>({
         composedAgainst: snapshotService(service),
         savedAt: new Date().toISOString(),
       };
-      saveFieldDraft(draft);
+      if (!saveFieldDraft(draft)) {
+        return { kind: "error", message: DRAFT_UNSAVED_MESSAGE, draftUnsaved: true };
+      }
       return { kind: "draft-saved", draft };
     }
     const message = cause instanceof Error ? cause.message : "Ocurrió un error inesperado.";
@@ -152,7 +157,7 @@ export type FieldActionResubmitOutcome<TResult = Service> =
   | { kind: "success"; result: TResult }
   | { kind: "conflict"; current: Service; composedAgainst: FieldDraftServiceSnapshot }
   | { kind: "still-offline" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; draftUnsaved?: true };
 
 /**
  * Manual resubmission of a local draft: fetches the Service's current state
@@ -197,7 +202,7 @@ export async function resubmitFieldAction<TPayload, TResult = Service>({
   } catch (cause) {
     if (cause instanceof NetworkFailureError) {
       // Still offline: keep the (possibly edited) draft pending, anchor unchanged.
-      saveFieldDraft({
+      const saved = saveFieldDraft({
         serviceId,
         actionType,
         scope,
@@ -205,6 +210,9 @@ export async function resubmitFieldAction<TPayload, TResult = Service>({
         composedAgainst,
         savedAt: new Date().toISOString(),
       });
+      if (!saved) {
+        return { kind: "error", message: DRAFT_UNSAVED_MESSAGE, draftUnsaved: true };
+      }
       return { kind: "still-offline" };
     }
     return {

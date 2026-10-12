@@ -183,8 +183,16 @@ function AssignCrewForm({
       onAssigned(updated);
       onOpenChange(false);
     } catch (cause) {
-      if (cause instanceof ServiceRequestError && cause.status === 409 && !needsOverrideNote) {
-        setBackendConflict(cause.message);
+      if (cause instanceof ServiceRequestError && cause.status === 409) {
+        const hasAdvisoryOverlap = Boolean(conflicts.crewConflict || conflicts.vehicleConflict);
+        if (hasAdvisoryOverlap) {
+          setBackendConflict(cause.message);
+        } else {
+          setBackendConflict(null);
+          setErrorMessage(
+            "El servicio cambió desde que abrió esta ventana. Actualice la lista e intente de nuevo.",
+          );
+        }
         return;
       }
       const msg =
