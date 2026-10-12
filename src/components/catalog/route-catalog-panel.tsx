@@ -21,6 +21,8 @@ import {
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -86,6 +88,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   // Deactivate confirmation state
   const [deactivatingRoute, setDeactivatingRoute] = useState<Route | null>(null);
   const [referencesReport, setReferencesReport] = useState<RouteReferenceReport | null>(null);
+  const [referencesUnavailable, setReferencesUnavailable] = useState(false);
+  const [referencesAcknowledged, setReferencesAcknowledged] = useState(false);
   const [isLoadingReferences, setIsLoadingReferences] = useState(false);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
 
@@ -237,23 +241,22 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
   async function handleOpenDeactivate(route: Route) {
     setDeactivatingRoute(route);
+    setReferencesReport(null);
+    setReferencesUnavailable(false);
+    setReferencesAcknowledged(false);
     setIsLoadingReferences(true);
     try {
       const report = await routesAdapter.checkReferences(route.id);
       setReferencesReport(report);
     } catch {
-      setReferencesReport({
-        routeId: route.id,
-        activeServiceFrequencies: [],
-        totalReferences: 0,
-      });
+      setReferencesUnavailable(true);
     } finally {
       setIsLoadingReferences(false);
     }
   }
 
   async function handleConfirmDeactivate() {
-    if (!deactivatingRoute) return;
+    if (!deactivatingRoute || isLoadingReferences || (referencesUnavailable && !referencesAcknowledged)) return;
     setIsSubmittingDeactivate(true);
     try {
       const updated = await routesAdapter.delete(deactivatingRoute.id);
@@ -1261,6 +1264,21 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Verificando referencias a frecuencias de servicio...
             </div>
+          ) : referencesUnavailable ? (
+            <div className="flex flex-col gap-3">
+              <Alert className="border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
+                <AlertTriangle aria-hidden="true" />
+                <AlertDescription className="text-[var(--color-warning)]">
+                  No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
+                </AlertDescription>
+              </Alert>
+              <Field>
+                <FieldLabel className="flex min-h-10 cursor-pointer items-center gap-3 [@media(max-width:760px)]:min-h-12">
+                  <Checkbox checked={referencesAcknowledged} onCheckedChange={setReferencesAcknowledged} disabled={isSubmittingDeactivate} />
+                  Entiendo que no se verificaron las referencias
+                </FieldLabel>
+              </Field>
+            </div>
           ) : (
             referencesReport && (
               <div className="space-y-3">
@@ -1314,7 +1332,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               type="button"
               variant="destructive"
               onClick={handleConfirmDeactivate}
-              disabled={isSubmittingDeactivate || isLoadingReferences}
+              disabled={isSubmittingDeactivate || isLoadingReferences || (referencesUnavailable && !referencesAcknowledged)}
               data-testid="confirm-deactivate-button"
             >
               {isSubmittingDeactivate && (

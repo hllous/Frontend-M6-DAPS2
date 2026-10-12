@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { fetchBackend } from "@/lib/bff-backend";
+import type { ZoneReferenceReport } from "@/lib/zones";
 
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -36,8 +40,51 @@ export async function GET(
   const path = new URL(request.url).pathname;
 
   try {
-    getRequiredSession(request);
+    const session = getRequiredSession(request);
     const id = await targetId(context);
+
+    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+      const detail = await fetchBackend(request, `/zones/${encodeURIComponent(id)}`);
+      if (detail.status === 404) return errorResponse(404, `Zona operativa ${id} no encontrada.`, path);
+      if (!detail.ok) throw new AuthUnavailableError("No se pudo consultar la zona.");
+      z.object({ id: z.literal(id) }).parse(await detail.json());
+
+      const routesPageSchema = z.object({
+        data: z.array(z.object({
+          id: z.string(), code: z.string(), name: z.string(), active: z.boolean(),
+          stops: z.array(z.object({ zoneId: z.string() })),
+        })),
+        meta: z.object({ totalPages: z.number().int().nonnegative() }),
+      });
+      const activeRoutes: ZoneReferenceReport["activeRoutes"] = [];
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const response = await fetchBackend(request, `/routes?active=true&page=${page}&pageSize=100`);
+        if (!response.ok) throw new AuthUnavailableError("No se pudieron verificar los recorridos.");
+        const payload = routesPageSchema.parse(await response.json());
+        totalPages = payload.meta.totalPages;
+        activeRoutes.push(...payload.data
+          .filter((route) => route.active && route.stops.some((stop) => stop.zoneId === id))
+          .map(({ id: routeId, code, name }) => ({ id: routeId, code, name })));
+        page += 1;
+      } while (page <= totalPages);
+
+      const countSchema = z.object({ meta: z.object({ total: z.number().int().nonnegative() }) });
+      async function count(resource: string) {
+        const query = new URLSearchParams({ zoneId: id, pageSize: "1" });
+        const response = await fetchBackend(request, `/${resource}?${query}`);
+        if (!response.ok) throw new AuthUnavailableError("No se pudieron verificar los elementos de la zona.");
+        return countSchema.parse(await response.json()).meta.total;
+      }
+      const containersCount = await count("containers");
+      const treesCount = await count("trees");
+      const greenSpacesCount = await count("green-spaces");
+      return NextResponse.json({
+        zoneId: id, activeRoutes, containersCount, treesCount, greenSpacesCount,
+        totalReferences: activeRoutes.length + containersCount + treesCount + greenSpacesCount,
+      });
+    }
 
     const zone = getZoneFixture(id);
     if (!zone) {
