@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -84,7 +85,7 @@ export async function GET(request: Request) {
   try {
     const { session, scenario } = sessionAndScenario(request);
     const query = queryFromUrl(new URL(request.url));
-    const useBackend = session.mode === "backend-development" && Boolean(process.env.M6_BACKEND_ORIGIN);
+    const useBackend = backendMode(session);
 
     if (scenario.actor.kind === "FIELD") {
       if (!query.detectedInId) {
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = createRepairRequestInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const sourcePath = parsed.data.detectedInType === "SERVICE" ? "/services" : "/environmental-inspections";
       const sourceResponse = await fetchBackend(request, `${sourcePath}/${encodeURIComponent(parsed.data.detectedInId)}`);
       if (sourceResponse.status === 404) {

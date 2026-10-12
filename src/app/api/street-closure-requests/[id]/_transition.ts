@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -53,7 +54,7 @@ export async function handleStreetClosureTransition(
       body = parsed.data;
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/street-closure-requests/${id}/${transition}`, undefined, {
         method: "POST",
         headers: transition === "approve" ? { "content-type": "application/json" } : undefined,

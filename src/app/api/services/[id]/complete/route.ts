@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -117,7 +118,7 @@ export async function POST(
       completionInput = parsedInput.data;
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendInit: RequestInit = { method: "POST" };
       if (requestBody.trim()) {
         backendInit.headers = { "content-type": "application/json" };
@@ -181,6 +182,7 @@ export async function POST(
       try {
         transitionTargetContainer(service, completionInput);
       } catch (error) {
+      if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
         if (error instanceof Error && error.message === "CONTAINER_LOCATION_REQUIRED") {
           return errorResponse(400, "La nueva ubicación del contenedor es obligatoria para completar la reubicación.", path);
         }

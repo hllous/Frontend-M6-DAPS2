@@ -69,6 +69,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
   // Selected route for Detail View
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
+  const selectedRouteId = selectedRoute?.id;
 
   // Create state
   const [showCreate, setShowCreate] = useState(false);
@@ -146,8 +147,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         if (isCurrent) {
           setState({ status: "ready", items: page.routes });
           // If a route is currently selected, keep its reference fresh
-          if (selectedRoute) {
-            const fresh = page.routes.find((r) => r.id === selectedRoute.id);
+          if (selectedRouteId) {
+            const fresh = page.routes.find((r) => r.id === selectedRouteId);
             if (fresh) {
               setSelectedRoute(fresh);
             }
@@ -168,7 +169,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     return () => {
       isCurrent = false;
     };
-  }, [search, activeFilter, zoneFilter, requestVersion, selectedRoute]);
+  }, [search, activeFilter, zoneFilter, requestVersion, selectedRouteId]);
 
   async function handleCreateSubmit(event: React.FormEvent) {
     event.preventDefault();

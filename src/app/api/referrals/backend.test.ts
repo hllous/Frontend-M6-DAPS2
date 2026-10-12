@@ -99,6 +99,7 @@ describe("referrals against the backend", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch");
     const session = createSession("field-crew-leader-route", {
       mode: "backend-development", devJwt: process.env.M6_DEV_JWT,
+      backendOrigin: process.env.M6_BACKEND_ORIGIN,
     });
     const cookie = `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
     expect((await list(new Request("http://localhost/api/referrals", { headers: { cookie } }))).status).toBe(403);

@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
     const session = getRequiredSession(request);
     const query = parseContainerQuery(new URL(request.url));
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/containers${backendQueryString(query)}`);
       const body = await backendResponse.text();
       return new NextResponse(body, {
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
       return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/containers", "container:manage", {
         method: "POST",
         headers: { "content-type": "application/json" },

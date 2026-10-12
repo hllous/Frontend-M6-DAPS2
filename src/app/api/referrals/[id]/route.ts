@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { getScenario } from "@/lib/scenarios";
 import { fetchBackend } from "@/lib/bff-backend";
 import { repairRequestSchema } from "@/lib/repair-requests";
@@ -20,7 +21,7 @@ export async function GET(
       return errorResponse(403, "Solo Oficina o Campo puede consultar derivaciones.", path);
     }
 
-    const useBackend = session.mode === "backend-development" && Boolean(process.env.M6_BACKEND_ORIGIN);
+    const useBackend = backendMode(session);
     if (useBackend && scenario.actor.kind === "FIELD" && !session.crew?.id) {
       return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
     }
