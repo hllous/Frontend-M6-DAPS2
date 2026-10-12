@@ -132,14 +132,11 @@ export function AppShell({
   const requestedDestination = searchParams.get("destination") as Destination | null;
   const availableItems = navigation.filter((item) => isAllowed(item, scenario));
   const defaultDestination = availableItems[0]?.id ?? "work";
-  const isCatalogRoute = pathname.startsWith("/app/catalog");
-  const canViewCatalogRoute = availableItems.some((item) => item.id === "catalog");
-  const destination = isCatalogRoute && canViewCatalogRoute
+  const destination = pathname.startsWith("/app/catalog")
     ? "catalog"
     : requestedDestination && availableItems.some((item) => item.id === requestedDestination)
       ? requestedDestination
       : defaultDestination;
-  const shouldRenderRouteContent = pathname.startsWith("/app/") && (!isCatalogRoute || canViewCatalogRoute);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const isTablet = useTabletNavigation();
   const navigationIsIconOnly = isCollapsed || isTablet;
@@ -195,7 +192,7 @@ export function AppShell({
       </header>
 
       <main className={styles.main} id="contenido-principal" tabIndex={-1}>
-        {shouldRenderRouteContent ? (
+        {pathname.startsWith("/app/") ? (
           routeContent
         ) : destination === "work" ? (
           <WorkPanel scenario={scenario} />

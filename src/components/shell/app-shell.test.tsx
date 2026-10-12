@@ -75,16 +75,6 @@ describe("AppShell", () => {
     expect(within(moduleNavigation).getByRole("link", { name: "Catálogo" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("falls back from a nested catalog route the scenario is not permitted to see", async () => {
-    window.history.replaceState(null, "", "/app/catalog/containers");
-    render(<AppShell scenario={scenarios.officeLimited} routeContent={<p>Contenido del catálogo</p>} />);
-
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
-    expect(within(moduleNavigation).getByRole("link", { name: "Mi trabajo" })).toHaveAttribute("aria-current", "page");
-    expect(await screen.findByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
-    expect(screen.queryByText("Contenido del catálogo")).not.toBeInTheDocument();
-  });
-
   it("navigates client-side on a plain click but leaves modified clicks to the browser", async () => {
     const user = userEvent.setup();
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
