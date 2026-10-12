@@ -39,6 +39,138 @@ function createRequest(cookie: string, body: unknown) {
 }
 
 describe("repair request BFF collection routes", () => {
+  describe("creación desde orígenes reales", () => {
+    const serviceId = "ceec08ae-67e7-4739-9677-150f5085bb1a";
+    const inspectionId = "4d5683b8-d493-43bb-83ce-071bd074fe19";
+    const crewId = "c1ba1a57-6f23-4871-b6b3-1d7ce231a516";
+    const body = {
+      damageType: "BROKEN_SIDEWALK", address: "Av. Rivadavia 2200", severity: "LOW",
+      publicSafetyRisk: true, detectedInType: "SERVICE", detectedInId: serviceId,
+    };
+
+    beforeEach(() => {
+      process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+      process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    });
+
+    it.each(["SERVICE", "INSPECTION"])("conserva el 404 local para un origen %s desconocido", async (detectedInType) => {
+      const backendFetch = vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(Response.json({ message: "Not found" }, { status: 404 }));
+      const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+      const response = await POST(createRequest(cookie, { ...body, detectedInType }));
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({
+        statusCode: 404, error: "Not Found", path: "/api/repair-requests",
+        message: detectedInType === "SERVICE" ? `Servicio ${serviceId} no encontrado.` : `Inspección ${serviceId} no encontrada.`,
+      });
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+      expect(String(backendFetch.mock.calls[0]?.[0])).toBe(
+        `https://backend.internal/${detectedInType === "SERVICE" ? "services" : "environmental-inspections"}/${serviceId}`,
+      );
+    });
+
+    it.each([401, 403, 500, 503])("conserva el error %s del origen sin crear la derivación", async (status) => {
+      const error = { statusCode: status, message: "No se pudo consultar el origen." };
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(error, { status }));
+      const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+      const response = await POST(createRequest(cookie, body));
+
+      expect(response.status).toBe(status);
+      expect(await response.json()).toEqual(error);
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+      expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    });
+
+    it("rechaza payloads del origen sin el contrato mínimo", async () => {
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ crewId: 42 }));
+      const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+      const response = await POST(createRequest(cookie, body));
+
+      expect(response.status).toBe(500);
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("Campo sin cuadrilla en la sesión no crea la derivación", async () => {
+      delete process.env.M6_BACKEND_ORIGIN;
+      const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+      process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ crewId }));
+      const response = await POST(createRequest(cookie, body));
+
+      expect(response.status).toBe(403);
+      expect((await response.json()).message).toBe("Solo puede crear derivaciones desde trabajo de su cuadrilla.");
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("Campo resuelve la cuadrilla de una inspección mediante su servicio real", async () => {
+      const backendFetch = vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: "Cuadrilla Belgrano — Recolección" }] }));
+      const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+      backendFetch.mockClear();
+      backendFetch.mockResolvedValueOnce(Response.json({ serviceId }))
+        .mockResolvedValueOnce(Response.json({ crewId }))
+        .mockResolvedValueOnce(Response.json({ id: "derivacion-real" }, { status: 201 }));
+
+      const response = await POST(createRequest(cookie, { ...body, detectedInType: "INSPECTION", detectedInId: inspectionId }));
+
+      expect(response.status).toBe(201);
+      expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual([
+        [`https://backend.internal/environmental-inspections/${inspectionId}`, "GET"],
+        [`https://backend.internal/services/${serviceId}`, "GET"],
+        ["https://backend.internal/repair-requests", "POST"],
+      ]);
+    });
+
+    it.each([crewId, "901159c1-3230-440a-ba3d-d7baf55fab24", null])(
+      "Campo solo crea desde servicios de su cuadrilla (%s)", async (sourceCrewId) => {
+        const backendFetch = vi.spyOn(globalThis, "fetch")
+          .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: "Cuadrilla Belgrano — Recolección" }] }));
+        const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+        backendFetch.mockClear();
+        backendFetch.mockResolvedValueOnce(Response.json({ crewId: sourceCrewId }))
+          .mockResolvedValueOnce(Response.json({ id: "derivacion-real" }, { status: 201 }));
+
+        const response = await POST(createRequest(cookie, body));
+
+        expect(response.status).toBe(sourceCrewId === crewId ? 201 : 403);
+        if (sourceCrewId !== crewId) {
+          expect((await response.json()).message).toBe("Solo puede crear derivaciones desde trabajo de su cuadrilla.");
+        }
+        expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual(
+          sourceCrewId === crewId ? [
+            [`https://backend.internal/services/${serviceId}`, "GET"],
+            ["https://backend.internal/repair-requests", "POST"],
+          ] : [[`https://backend.internal/services/${serviceId}`, "GET"]],
+        );
+      },
+    );
+  });
+
+  it("Oficina crea una derivación desde un servicio real tras consultar su origen", async () => {
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const body = {
+      damageType: "BROKEN_SIDEWALK", address: "Av. Rivadavia 2200", severity: "LOW",
+      publicSafetyRisk: true, detectedInType: "SERVICE",
+      detectedInId: "ceec08ae-67e7-4739-9677-150f5085bb1a",
+    };
+    const backendFetch = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ crewId: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516" }))
+      .mockResolvedValueOnce(Response.json({ id: "derivacion-real", ...body }, { status: 201 }));
+    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+
+    const response = await POST(createRequest(cookie, { ...body, ignored: "not forwarded" }));
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ id: "derivacion-real", ...body });
+    expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual([
+      ["https://backend.internal/services/ceec08ae-67e7-4739-9677-150f5085bb1a", "GET"],
+      ["https://backend.internal/repair-requests", "POST"],
+    ]);
+    expect(JSON.parse(String(backendFetch.mock.calls[1]?.[1]?.body))).toEqual(body);
+  });
+
   it("permite consultar derivaciones de un servicio real de la cuadrilla de Campo", async () => {
     process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
