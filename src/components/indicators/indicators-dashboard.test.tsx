@@ -173,6 +173,60 @@ describe("IndicatorsDashboard", () => {
     expect(within(wasteTable).getAllByText("62,8 m³")[0]).toBeVisible();
   });
 
+  it("shows fractional mean resolution days without rounding them away (#421)", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+    expect((await screen.findAllByText("2,4 días"))[0]).toBeVisible();
+  });
+
+  it("does not add a trailing decimal to whole mean resolution days (#421)", async () => {
+    server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json({
+      ...incidentsIndicatorFixture,
+      reports: { ...incidentsIndicatorFixture.reports, avgResolutionDays: 2 },
+    })));
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+    expect((await screen.findAllByText("2 días"))[0]).toBeVisible();
+    expect(screen.queryByText("2,0 días")).not.toBeInTheDocument();
+  });
+
+  it("unions compliance detail columns across zones and leaves missing details empty (#421)", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
+    await screen.findByRole("heading", { name: "Cumplimiento" });
+    await user.click(screen.getByRole("button", { name: "Tabla" }));
+
+    const tablesRegion = screen.getByRole("region", { name: "Tabla de datos de Cumplimiento" });
+    const zonesTable = within(tablesRegion).getByRole("table", { name: "Valores exactos de zonas sin atención" });
+    const headers = within(zonesTable).getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers).toEqual([
+      "Categoría",
+      "Cuadrilla no disponible",
+      "Condición meteorológica",
+      "Desperfecto vehicular",
+      "Acceso bloqueado",
+      "Corte de calle / Obra",
+      "Objetivos",
+    ]);
+
+    const costera = within(zonesTable).getByRole("row", { name: /Costera/ });
+    expect(within(costera).getByRole("cell", { name: "5 objetivos" })).toBeVisible();
+    expect(within(costera).getByRole("cell", { name: "3 objetivos" })).toBeVisible();
+    const norte = within(zonesTable).getByRole("row", { name: /Norte/ });
+    expect(within(norte).getByRole("cell", { name: "7 objetivos" })).toBeVisible();
+    expect(within(norte).getByRole("cell", { name: "5 objetivos" })).toBeVisible();
+    expect(within(norte).getAllByRole("cell").filter((cell) => cell.textContent === "")).toHaveLength(3);
+  });
+
   it("traces a selected zone to services and restores the unfiltered records view", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
