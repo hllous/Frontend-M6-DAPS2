@@ -1,11 +1,11 @@
 import { getScenario } from "@/lib/scenarios";
 import { fetchBackend } from "@/lib/bff-backend";
 import { repairRequestSchema } from "@/lib/repair-requests";
-import { referralFromRepairRequest, referralFromStreetClosureRequest, isReferralVisibleToScenario } from "@/lib/referrals";
+import { referralFromBackendRepairRequest, referralFromStreetClosureRequest, isReferralVisibleToScenario, isReferralVisibleToBackendSources } from "@/lib/referrals";
 import { streetClosureRequestSchema } from "@/lib/street-closure-requests";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
-import { errorResponse, findFixtureReferral } from "../route";
+import { backendReferralSourceIds, errorResponse, findFixtureReferral } from "../route";
 
 export async function GET(
   request: Request,
@@ -21,6 +21,9 @@ export async function GET(
     }
 
     const useBackend = session.mode === "backend-development" && Boolean(process.env.M6_BACKEND_ORIGIN);
+    if (useBackend && scenario.actor.kind === "FIELD" && !session.crew?.id) {
+      return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
+    }
     let referral = useBackend ? null : findFixtureReferral(id);
     if (useBackend) {
       for (const kind of ["repair-requests", "street-closure-requests"] as const) {
@@ -30,12 +33,18 @@ export async function GET(
         if (!backendResponse.ok) return new Response(payload, { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
         const backendPayload = JSON.parse(payload) as unknown;
         referral = kind === "repair-requests"
-          ? referralFromRepairRequest(repairRequestSchema.parse(backendPayload))
+          ? referralFromBackendRepairRequest(repairRequestSchema.parse(backendPayload))
           : referralFromStreetClosureRequest(streetClosureRequestSchema.parse(backendPayload));
         break;
       }
     }
-    if (!referral || !isReferralVisibleToScenario(referral, scenario)) {
+    const sourceIds = useBackend && referral && scenario.actor.kind === "FIELD"
+      ? await backendReferralSourceIds(request, session.crew!.id)
+      : undefined;
+    const visible = referral && (useBackend
+      ? isReferralVisibleToBackendSources(referral, sourceIds)
+      : isReferralVisibleToScenario(referral, scenario));
+    if (!referral || !visible) {
       return errorResponse(404, "La derivación no existe o no está disponible para esta sesión.", path);
     }
     return Response.json(referral);

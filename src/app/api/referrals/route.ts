@@ -6,7 +6,9 @@ import { getRepairRequestFixture, repairRequestFixtures } from "@/lib/repair-req
 import {
   getReferralSourceServiceIds,
   isReferralVisibleToScenario,
+  isReferralVisibleToBackendSources,
   referralFromRepairRequest,
+  referralFromBackendRepairRequest,
   referralFromStreetClosureRequest,
   type Referral,
 } from "@/lib/referrals";
@@ -14,6 +16,7 @@ import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { repairRequestSchema } from "@/lib/repair-requests";
 import { streetClosureRequestSchema } from "@/lib/street-closure-requests";
+import { serviceSchema } from "@/lib/services";
 import { getStreetClosureRequestFixture, streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 
 const ERROR_LABELS: Record<number, string> = {
@@ -69,25 +72,36 @@ export async function backendCollection<T>(request: Request, path: string, recor
   throw new Error("La consulta de derivaciones superó el límite de páginas.");
 }
 
-async function backendReferralCollection(request: Request, scenario: ReturnType<typeof getScenario>): Promise<Referral[]> {
-  const serviceIds = getReferralSourceServiceIds(scenario);
-  const paths = serviceIds === undefined
-    ? [
-        { kind: "REPAIR_REQUEST" as const, path: "/repair-requests" },
-        { kind: "STREET_CLOSURE_REQUEST" as const, path: "/street-closure-requests" },
-      ]
-    : serviceIds.flatMap((serviceId) => [
-        { kind: "REPAIR_REQUEST" as const, path: `/repair-requests?detectedInId=${encodeURIComponent(serviceId)}` },
-        { kind: "STREET_CLOSURE_REQUEST" as const, path: `/street-closure-requests?sourceId=${encodeURIComponent(serviceId)}` },
-      ]);
+const referralServiceSchema = serviceSchema.pick({ id: true, crewId: true, origin: true, inspectionId: true });
 
-  const collections = await Promise.all(paths.map(async ({ kind, path }) => {
-    return kind === "REPAIR_REQUEST"
-      ? (await backendCollection(request, path, repairRequestSchema)).map(referralFromRepairRequest)
-      : (await backendCollection(request, path, streetClosureRequestSchema)).map(referralFromStreetClosureRequest);
-  }));
+export async function backendReferralSourceIds(request: Request, crewId: string): Promise<ReadonlySet<string>> {
+  const services = await backendCollection(request, `/services?crewId=${encodeURIComponent(crewId)}`, referralServiceSchema);
+  const sourceIds = new Set<string>();
+  for (const service of services) {
+    if (service.crewId !== crewId) continue;
+    sourceIds.add(service.id);
+    let inspectionId = service.inspectionId;
+    if (inspectionId === undefined && service.origin === "INSPECTION") {
+      const response = await fetchBackend(request, `/services/${encodeURIComponent(service.id)}`);
+      if (!response.ok) throw new Error(`Backend respondió ${response.status} al consultar el servicio.`);
+      const detail = referralServiceSchema.parse(await response.json());
+      if (detail.id === service.id && detail.crewId === crewId) inspectionId = detail.inspectionId;
+    }
+    if (inspectionId) sourceIds.add(inspectionId);
+  }
+  return sourceIds;
+}
 
-  return collections.flat().sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+async function backendReferralCollection(request: Request, sourceIds: ReadonlySet<string> | undefined): Promise<Referral[]> {
+  const [repairs, closures] = await Promise.all([
+    backendCollection(request, "/repair-requests", repairRequestSchema),
+    backendCollection(request, "/street-closure-requests", streetClosureRequestSchema),
+  ]);
+  return [
+    ...repairs.map(referralFromBackendRepairRequest),
+    ...closures.map(referralFromStreetClosureRequest),
+  ].filter((referral) => isReferralVisibleToBackendSources(referral, sourceIds))
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 }
 
 export async function GET(request: Request) {
@@ -99,8 +113,15 @@ export async function GET(request: Request) {
       return errorResponse(403, "Solo Oficina o Campo puede consultar derivaciones.", path);
     }
 
-    const referrals = session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN
-      ? await backendReferralCollection(request, scenario)
+    const useBackend = session.mode === "backend-development" && Boolean(process.env.M6_BACKEND_ORIGIN);
+    if (useBackend && scenario.actor.kind === "FIELD" && !session.crew?.id) {
+      return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
+    }
+    const sourceIds = useBackend && scenario.actor.kind === "FIELD"
+      ? await backendReferralSourceIds(request, session.crew!.id)
+      : undefined;
+    const referrals = useBackend
+      ? await backendReferralCollection(request, sourceIds)
       : referralsForScenario(scenario);
     return NextResponse.json({ data: referrals, meta: { total: referrals.length } });
   } catch (error) {
