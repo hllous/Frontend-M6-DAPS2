@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 
+import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,7 +17,7 @@ import { MAX_DECIMAL_10_2 } from "@/lib/input-limits";
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; greenSpaces: GreenSpace[] };
+  | { status: "ready"; greenSpaces: GreenSpace[]; total: number; totalPages: number };
 
 type GreenSpaceForm = {
   name: string;
@@ -45,6 +46,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
   const [zonesLoaded, setZonesLoaded] = useState(false);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [requestVersion, setRequestVersion] = useState(0);
+  const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<GreenSpace | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<GreenSpaceForm>(emptyForm);
@@ -72,15 +74,20 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
     async function requestGreenSpaces() {
       setState({ status: "loading" });
       try {
-        const page = await greenSpacesAdapter.list(query);
-        if (isCurrent) setState({ status: "ready", greenSpaces: page.greenSpaces });
+        const result = await greenSpacesAdapter.list({ ...query, page, pageSize: 20 });
+        if (!isCurrent) return;
+        if (page > Math.max(1, result.totalPages)) {
+          setPage(Math.max(1, result.totalPages));
+          return;
+        }
+        setState({ status: "ready", greenSpaces: result.greenSpaces, total: result.total, totalPages: result.totalPages });
       } catch (caught) {
         if (isCurrent) setState({ status: "error", message: caught instanceof Error ? caught.message : "No se pudieron cargar los espacios verdes." });
       }
     }
     void requestGreenSpaces();
     return () => { isCurrent = false; };
-  }, [query, requestVersion]);
+  }, [query, requestVersion, page]);
 
   function openCreate() {
     setEditing(null);
@@ -145,20 +152,20 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
       <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-3" aria-label="Filtros de espacios verdes">
         <Field>
           <FieldLabel htmlFor="green-space-active-filter">Estado</FieldLabel>
-          <select id="green-space-active-filter" value={activeFilter} onChange={(event) => setActiveFilter(event.target.value as typeof activeFilter)} className={formControlClass}>
+          <select id="green-space-active-filter" value={activeFilter} onChange={(event) => { setActiveFilter(event.target.value as typeof activeFilter); setPage(1); }} className={formControlClass}>
             <option value="all">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option>
           </select>
         </Field>
         <Field>
           <FieldLabel htmlFor="green-space-type-filter">Tipo de espacio</FieldLabel>
-          <select id="green-space-type-filter" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as GreenSpaceType | "all")} className={formControlClass}>
+          <select id="green-space-type-filter" value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value as GreenSpaceType | "all"); setPage(1); }} className={formControlClass}>
             <option value="all">Todos los tipos</option>
             {spaceTypes.map((type) => <option key={type} value={type}>{spaceTypeLabels[type]}</option>)}
           </select>
         </Field>
         <Field>
           <FieldLabel htmlFor="green-space-zone-filter">Zona</FieldLabel>
-          <select id="green-space-zone-filter" value={zoneFilter} onChange={(event) => setZoneFilter(event.target.value)} className={formControlClass}>
+          <select id="green-space-zone-filter" value={zoneFilter} onChange={(event) => { setZoneFilter(event.target.value); setPage(1); }} className={formControlClass}>
             <option value="all">Todas las zonas</option>
             {zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}
           </select>
@@ -186,6 +193,8 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
           </table>
         </div>
       ) : null}
+
+      {state.status === "ready" ? <CatalogPager page={page} pageSize={20} total={state.total} totalPages={state.totalPages} onPageChange={setPage} label="Paginación de espacios verdes" /> : null}
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent>

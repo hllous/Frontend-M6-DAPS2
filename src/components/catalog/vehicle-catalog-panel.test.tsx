@@ -1,17 +1,18 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
 import type { OperationalScenario } from "@/lib/scenarios";
+import { vehiclesAdapter } from "@/lib/vehicles";
 import { VehicleCatalogPanel } from "./vehicle-catalog-panel";
 
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
+afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
 afterAll(() => server.close());
 
 describe("VehicleCatalogPanel", () => {
@@ -71,4 +72,44 @@ describe("VehicleCatalogPanel", () => {
     expect(await screen.findByRole("heading", { name: "Vehículos" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Registrar vehículo" })).not.toBeInTheDocument();
   });
+});
+
+
+describe("Vehicle catalog pagination", () => {
+  it("pages through backend results and resets the page when filtering", async () => {
+    const list = vi.spyOn(vehiclesAdapter, "list").mockImplementation(async (query) => ({ vehicles: Array.from({ length: 20 }, (_, index) => ({ ...{ id: "a358142e-a427-46b3-8b36-fb13091e023f", plate: "ZZ 999 ZZ", vehicleType: "VAN" as const, capacity: 10, active: true }, id: `remote-${index}` })), page: query?.page ?? 1, pageSize: 20, total: 57, totalPages: 3 }));
+    const user = userEvent.setup();
+    render(<VehicleCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 20 })));
+    expect(await screen.findByText("Mostrando 21–40 de 57")).toBeVisible();
+    for (const [label, value] of [["Estado", "true"], ["Tipo de vehículo", "VAN"]]) {
+      await user.selectOptions(screen.getByLabelText(label), value);
+      await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
+      expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
+      await user.click(screen.getByRole("button", { name: "Siguiente" }));
+      await screen.findByText("Mostrando 21–40 de 57");
+    }
+  });
+});
+
+
+it("clamps the current page after its last active vehicle is deactivated", async () => {
+  const vehicle = { id: "a358142e-a427-46b3-8b36-fb13091e023f", plate: "ZZ 999 ZZ", vehicleType: "VAN" as const, capacity: 10, active: true };
+  let removed = false;
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  vi.spyOn(vehiclesAdapter, "remove").mockImplementation(async () => { removed = true; return { ...vehicle, active: false }; });
+  const list = vi.spyOn(vehiclesAdapter, "list").mockImplementation(async (query) => ({ vehicles: removed && query?.page === 3 ? [] : [vehicle], page: query?.page ?? 1, pageSize: 20, total: removed ? 40 : 41, totalPages: removed ? 2 : 3 }));
+  const user = userEvent.setup();
+  render(<VehicleCatalogPanel scenario={scenarios.officeDutyQueue} />);
+  await screen.findByText("ZZ 999 ZZ");
+  await user.selectOptions(screen.getByLabelText("Estado"), "true");
+  await user.click(await screen.findByRole("button", { name: "Siguiente" }));
+  await screen.findByText("Página 2 de 3");
+  await user.click(screen.getByRole("button", { name: "Siguiente" }));
+  await screen.findByText("Página 3 de 3");
+  await user.click(screen.getByRole("button", { name: "Dar de baja" }));
+  expect(await screen.findByText("Página 2 de 2")).toBeVisible();
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, active: true })));
 });
