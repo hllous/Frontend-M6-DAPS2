@@ -130,16 +130,20 @@ export function AppShell({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedDestination = searchParams.get("destination") as Destination | null;
-  const destination = pathname.startsWith("/app/catalog")
+  const availableItems = navigation.filter((item) => isAllowed(item, scenario));
+  const defaultDestination = availableItems[0]?.id ?? "work";
+  const isCatalogRoute = pathname.startsWith("/app/catalog");
+  const canViewCatalogRoute = availableItems.some((item) => item.id === "catalog");
+  const destination = isCatalogRoute && canViewCatalogRoute
     ? "catalog"
-    : requestedDestination && navigation.some((item) => item.id === requestedDestination)
+    : requestedDestination && availableItems.some((item) => item.id === requestedDestination)
       ? requestedDestination
-      : "work";
+      : defaultDestination;
+  const shouldRenderRouteContent = pathname.startsWith("/app/") && (!isCatalogRoute || canViewCatalogRoute);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const isTablet = useTabletNavigation();
   const navigationIsIconOnly = isCollapsed || isTablet;
   const [isMoreOpen, setIsMoreOpen] = useState(false);
-  const availableItems = navigation.filter((item) => isAllowed(item, scenario));
 
   return (
     <div className={`${styles.shell} ${isCollapsed ? styles.collapsed : ""}`}>
@@ -191,7 +195,7 @@ export function AppShell({
       </header>
 
       <main className={styles.main} id="contenido-principal" tabIndex={-1}>
-        {pathname.startsWith("/app/") ? (
+        {shouldRenderRouteContent ? (
           routeContent
         ) : destination === "work" ? (
           <WorkPanel scenario={scenario} />

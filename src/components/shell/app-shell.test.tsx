@@ -47,12 +47,42 @@ describe("AppShell", () => {
     expect(within(moduleNavigation).getByRole("link", { name: "Mi trabajo" })).not.toHaveAttribute("aria-current");
   });
 
+  it("falls back to the first permitted destination when the requested destination is hidden", async () => {
+    window.history.replaceState(null, "", "/app?destination=dashboards");
+    render(<AppShell scenario={scenarios.officeLimited} />);
+
+    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    expect(within(moduleNavigation).getByRole("link", { name: "Mi trabajo" })).toHaveAttribute("aria-current", "page");
+    expect(within(moduleNavigation).queryByRole("link", { name: "Tableros" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Indicadores operativos" })).not.toBeInTheDocument();
+  });
+
+  it("opens a requested destination that the limited Office scenario may see", async () => {
+    window.history.replaceState(null, "", "/app?destination=services");
+    render(<AppShell scenario={scenarios.officeLimited} />);
+
+    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    expect(within(moduleNavigation).getByRole("link", { name: "Servicios" })).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+  });
+
   it("keeps the catalog destination active on nested catalog routes", () => {
     window.history.replaceState(null, "", "/app/catalog/containers");
     render(<AppShell scenario={scenarios.officeDutyQueue} routeContent={<p>Contenedores</p>} />);
 
     const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
     expect(within(moduleNavigation).getByRole("link", { name: "Catálogo" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("falls back from a nested catalog route the scenario is not permitted to see", async () => {
+    window.history.replaceState(null, "", "/app/catalog/containers");
+    render(<AppShell scenario={scenarios.officeLimited} routeContent={<p>Contenido del catálogo</p>} />);
+
+    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    expect(within(moduleNavigation).getByRole("link", { name: "Mi trabajo" })).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
+    expect(screen.queryByText("Contenido del catálogo")).not.toBeInTheDocument();
   });
 
   it("navigates client-side on a plain click but leaves modified clicks to the browser", async () => {
