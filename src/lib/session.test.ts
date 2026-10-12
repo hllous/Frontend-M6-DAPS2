@@ -62,6 +62,7 @@ describe("owned BFF session", () => {
       mode: "backend-development",
       now,
       devJwt: token,
+      backendOrigin: "https://backend.internal",
     });
     const cookie = sealSession(session, secret);
     const unsealed = getSessionFromCookieValue(cookie, secret, now);
@@ -74,6 +75,14 @@ describe("owned BFF session", () => {
     expect(() => createSession("office-duty-queue", { mode: "real-m1", now })).toThrow(
       /bloqueada|unavailable/i,
     );
+  });
+
+  it("fails closed when backend-development has no backend origin", () => {
+    expect(() => createSession("field-crew-leader-route", {
+      mode: "backend-development",
+      now,
+      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+    })).toThrow("El backend de desarrollo no está configurado.");
   });
 
   it("respects an explicit M6_AUTH_MODE override in production", () => {

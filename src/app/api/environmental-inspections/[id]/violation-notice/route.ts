@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -45,7 +46,7 @@ export async function GET(request: Request, context: NoticeContext) {
     const scenario = getScenario(session.scenarioId);
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede consultar actas de infracción.", path);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/environmental-inspections/${encodeURIComponent(id)}/violation-notice`, "violationNotice:view");
       return new NextResponse(await backendResponse.text(), {
         status: backendResponse.status,
@@ -79,7 +80,7 @@ export async function POST(request: Request, context: NoticeContext) {
     const parsedInput = issueViolationNoticeInputSchema.safeParse(body);
     if (!parsedInput.success) return errorResponse(400, parsedInput.error.issues.map((issue) => issue.message).join(" "), path);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/environmental-inspections/${encodeURIComponent(id)}/violation-notice`, "violationNotice:issue", {
         method: "POST",
         headers: { "content-type": "application/json" },

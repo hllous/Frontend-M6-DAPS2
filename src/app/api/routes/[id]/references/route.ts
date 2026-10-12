@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -46,7 +47,7 @@ export async function GET(
   try {
     const session = getRequiredSession(request);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const detail = await fetchBackend(request, `/routes/${encodeURIComponent(id)}`);
       if (detail.status === 404) return errorResponse(404, "Recorrido no encontrado.", path);
       if (!detail.ok) throw new AuthUnavailableError("No se pudo consultar el recorrido.");

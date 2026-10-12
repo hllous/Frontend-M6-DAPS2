@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -37,7 +38,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
   try {
     const session = getRequiredSession(request);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/green-spaces/${id}`);
       const body = await backendResponse.text();
       return new NextResponse(body, {
@@ -67,7 +68,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const parsed = updateGreenSpaceInputSchema.safeParse(await request.json().catch(() => undefined));
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/green-spaces/${id}`, undefined, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -102,7 +103,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const session = getRequiredSession(request);
     if (!isOffice(request)) return errorResponse(403, "Solo Oficina puede gestionar espacios verdes.", path);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/green-spaces/${id}`, undefined, { method: "DELETE" });
       const body = await backendResponse.text();
       return new NextResponse(body, {
