@@ -28,7 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { referralsAdapter, isReferralVisibleToScenario, referralFromRepairRequest, referralFromStreetClosureRequest, type Referral } from "@/lib/referrals";
+import { referralsAdapter, referralFromRepairRequest, referralFromStreetClosureRequest, type Referral } from "@/lib/referrals";
 import { getReferralAnomalies, type ReferralAnomaly } from "@/lib/referral-anomalies";
 import {
   RepairRequestRequestError,
@@ -224,7 +224,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
 
   const fetchReferrals = useCallback(async () => {
     const page = await referralsAdapter.list();
-    const referrals = page.referrals.filter((referral) => isReferralVisibleToScenario(referral, scenario));
+    const referrals = page.referrals;
     // Inspection-sourced repairs stash the inspection id in sourceServiceId (see referrals.ts) —
     // it isn't a real Service id, so fetching it as one would 404 and misreport as unavailable.
     const sourceIds = [...new Set(referrals
@@ -250,7 +250,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
     }
 
     return { referrals, sources, sourceErrors } satisfies SourceServiceState & { referrals: Referral[] };
-  }, [scenario]);
+  }, []);
 
   useEffect(() => {
     let isCurrent = true;
