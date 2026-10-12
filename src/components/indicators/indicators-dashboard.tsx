@@ -23,6 +23,7 @@ import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 import styles from "./indicators-dashboard.module.css";
 
 type FamilyKey = IndicatorData["family"];
+type IndicatorTone = NonNullable<IndicatorPoint["tone"]>;
 type ViewMode = "bars" | "table";
 type LoadStatus = "loading" | "ready" | "empty" | "error";
 type DashboardModule = "trend" | "territory";
@@ -36,6 +37,13 @@ type TracePlan = {
   title: string;
   href: string;
   linkLabel: string;
+};
+
+const indicatorToneColors: Record<IndicatorTone, string> = {
+  primary: "var(--color-action)",
+  success: "var(--color-success)",
+  warning: "var(--color-warning)",
+  danger: "var(--color-danger)",
 };
 type UnsupportedTrace = { resource: null; reason: string };
 type RecordPlan = TracePlan | UnsupportedTrace;
@@ -563,7 +571,7 @@ function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoi
   };
 
   return <div className={styles.chartView} ref={rootRef}>
-    <ChartContainer className={styles.chart} config={chartConfig} initialDimension={{ width: 480, height: Math.max(220, points.length * 56 + 40) }}><BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 8, right: 24, top: 12, bottom: 8 }} onMouseMove={previewPoint} onMouseLeave={() => { if (!pinnedId) setHoveredId(undefined); }} onClick={(entry) => { const point = pointFromEntry(entry); if (point?.id) pinPoint(point.id); }}><CartesianGrid horizontal={false} stroke="var(--color-border)" /><XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => formatNumber(Number(value), points[0]?.unit ?? "")} /><YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={104} /><ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => <span>{formatNumber(Number(value), points[0]?.unit ?? "")} {points[0]?.unit}</span>} />} /><Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--color-action)" isAnimationActive={false}>{points.map((point) => <Cell key={point.id} fill={point.tone === "success" ? "var(--color-success)" : point.tone === "warning" ? "var(--color-warning)" : "var(--color-action)"} />)}</Bar></BarChart></ChartContainer>
+    <ChartContainer className={styles.chart} config={chartConfig} initialDimension={{ width: 480, height: Math.max(220, points.length * 56 + 40) }}><BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 8, right: 24, top: 12, bottom: 8 }} onMouseMove={previewPoint} onMouseLeave={() => { if (!pinnedId) setHoveredId(undefined); }} onClick={(entry) => { const point = pointFromEntry(entry); if (point?.id) pinPoint(point.id); }}><CartesianGrid horizontal={false} stroke="var(--color-border)" /><XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => formatNumber(Number(value), points[0]?.unit ?? "")} /><YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={104} /><ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => <span>{formatNumber(Number(value), points[0]?.unit ?? "")} {points[0]?.unit}</span>} />} /><Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--color-action)" isAnimationActive={false}>{points.map((point) => <Cell key={point.id} fill={indicatorToneColors[point.tone ?? "primary"]} />)}</Bar></BarChart></ChartContainer>
     <div className={styles.chartDetails} role="list" aria-label={`Valores exactos de ${title.toLowerCase()}`}>
       {points.map((point) => <div key={point.id} role="listitem"><button ref={(element) => { triggerRefs.current[point.id] = element; }} className={styles.chartDetailButton} type="button" aria-pressed={selectedId === point.id} onFocus={() => { if (!pinnedId) setHoveredId(point.id); }} onMouseEnter={() => { if (!pinnedId) setHoveredId(point.id); }} onMouseLeave={() => { if (!pinnedId) setHoveredId(undefined); }} onClick={() => pinPoint(point.id)}><span>{point.label}</span><span>{pointText(point)}</span></button></div>)}
     </div>
