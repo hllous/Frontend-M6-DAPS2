@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -7,8 +7,8 @@ import { treeInterventionCreateInputSchema, treeInterventionStatusSchema, treeIn
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 503: "Service Unavailable", 500: "Internal Server Error" };
-function errorResponse(status: number, message: string, path: string) { return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status }); }
+
+
 function queryFromUrl(url: URL): TreeInterventionQuery {
   return {
     interventionType: treeInterventionTypeSchema.safeParse(url.searchParams.get("interventionType")).data,
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     const query = queryFromUrl(new URL(request.url));
     if (backendMode(session)) {
       const response = await fetchBackend(request, `/tree-interventions${queryString(query)}`);
-      return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(response);
     }
     return NextResponse.json(paginateTreeInterventionFixtures(filterTreeInterventionFixtures(query), query.page, query.pageSize));
   } catch (error) {
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) {
       const response = await fetchBackend(request, "/tree-interventions", "treeIntervention:request", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
-      return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(response);
     }
     const created = createTreeInterventionFixture(parsed.data);
     addTreeInterventionFixture(created);

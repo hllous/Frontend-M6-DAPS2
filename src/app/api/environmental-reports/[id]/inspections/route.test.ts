@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -50,5 +50,38 @@ describe("GET /api/environmental-reports/:id/inspections", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([inspection]);
+  });
+
+  it("keeps the shared 503 and 409 error labels on a route with status-specific envelopes", async () => {
+    const backendSession = await backendCookie();
+    delete process.env.M6_BACKEND_ORIGIN;
+    const unavailable = await GET(
+      new Request("http://localhost/api/environmental-reports/REP-1/inspections", { headers: { cookie: backendSession } }),
+      params,
+    );
+
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toMatchObject({ error: "Service Unavailable" });
+
+    process.env.M6_AUTH_MODE = "mock";
+    const mockLogin = await login(new Request("http://localhost/api/session/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
+    }));
+    const mockCookie = mockLogin.headers.get("set-cookie") ?? "";
+    const conflict = await POST(new Request("http://localhost/api/environmental-reports/ER-1007/inspections", {
+      method: "POST",
+      headers: { cookie: mockCookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        scheduledDate: "2026-10-13",
+        timeWindow: { start: "08:00", end: "12:00" },
+        checklistVersion: "v1",
+        checklist: [{ id: "item-1", label: "Revisar", required: true }],
+      }),
+    }), { params: Promise.resolve({ id: "ER-1007" }) });
+
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ error: "Conflict" });
   });
 });

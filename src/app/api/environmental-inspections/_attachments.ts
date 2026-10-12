@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { forwardResponse } from "@/lib/bff-route";
 import { fetchBackend } from "@/lib/bff-backend";
 
 /**
@@ -9,12 +10,13 @@ import { fetchBackend } from "@/lib/bff-backend";
  * sale igual, sin `attachments`.
  */
 export async function withInspectionAttachments(request: Request, backendResponse: Response): Promise<NextResponse> {
+  if (!backendResponse.ok) return forwardResponse(backendResponse);
+
+  const unparsedResponse = backendResponse.clone();
   const text = await backendResponse.text();
-  const headers = { "content-type": backendResponse.headers.get("content-type") ?? "application/json" };
-  if (!backendResponse.ok) return new NextResponse(text, { status: backendResponse.status, headers });
 
   let payload: unknown;
-  try { payload = JSON.parse(text); } catch { return new NextResponse(text, { status: backendResponse.status, headers }); }
+  try { payload = JSON.parse(text); } catch { return forwardResponse(unparsedResponse); }
 
   const withAttachments = async (inspection: unknown) => {
     if (!inspection || typeof inspection !== "object" || typeof (inspection as { id?: unknown }).id !== "string") return inspection;

@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -8,11 +8,9 @@ import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, Invali
 
 const families = ["coverage", "compliance", "incidents", "waste"] as const;
 type IndicatorFamily = (typeof families)[number];
-const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 503: "Service Unavailable", 500: "Internal Server Error" };
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status });
-}
+
+
 
 function queryString(request: Request, family: IndicatorFamily) {
   const url = new URL(request.url);
@@ -57,7 +55,7 @@ export async function GET(request: Request, context: { params: Promise<{ family:
     if ("error" in query && query.error) return errorResponse(400, query.error, path);
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/indicators/${typedFamily}${query.value}`, "indicator:view");
-      return new NextResponse(await backendResponse.text(), { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(backendResponse);
     }
     return NextResponse.json(fixtureResponse(typedFamily, request));
   } catch (error) {

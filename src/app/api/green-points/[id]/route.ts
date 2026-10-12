@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -7,8 +7,8 @@ import { greenPointUpdateInputSchema } from "@/lib/green-points";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
-const ERROR_LABELS: Record<number, string> = { 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 503: "Service Unavailable", 500: "Internal Server Error" };
-function errorResponse(status: number, message: string, path: string) { return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status }); }
+
+
 async function targetId(context: { params: Promise<{ id: string }> | { id: string } }) { return (await context.params).id; }
 function requireOffice(request: Request) { const session = getRequiredSession(request); const scenario = getScenario(session); if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar puntos verdes."); requireCapability(session, "greenPoint:manage"); return session; }
 
@@ -19,7 +19,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const id = await targetId(context);
     if (backendMode(session)) {
       const response = await fetchBackend(request, `/green-points/${id}`);
-      return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(response);
     }
     const item = greenPointFixtures.find((candidate) => candidate.id === id);
     return item ? NextResponse.json(item) : errorResponse(404, `Punto verde ${id} no encontrado.`, path);
@@ -41,7 +41,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) {
       const response = await fetchBackend(request, `/green-points/${id}`, "greenPoint:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
-      return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(response);
     }
     const updated = updateGreenPointFixture(id, parsed.data);
     return updated ? NextResponse.json(updated) : errorResponse(404, `Punto verde ${id} no encontrado.`, path);
@@ -60,7 +60,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const id = await targetId(context);
     if (backendMode(session)) {
       const response = await fetchBackend(request, `/green-points/${id}`, "greenPoint:manage", { method: "DELETE" });
-      return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+      return forwardResponse(response);
     }
     const updated = updateGreenPointFixture(id, { active: false });
     return updated ? new NextResponse(null, { status: 204 }) : errorResponse(404, `Punto verde ${id} no encontrado.`, path);
