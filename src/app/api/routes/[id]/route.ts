@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -49,7 +49,7 @@ export async function GET(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo cargar el recorrido.", path);
+    return mapSessionError(error, path, "No se pudo cargar el recorrido.");
   }
 }
 
@@ -107,7 +107,7 @@ export async function PATCH(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo editar el recorrido.", path);
+    return mapSessionError(error, path, "No se pudo editar el recorrido.");
   }
 }
 
@@ -151,6 +151,6 @@ export async function DELETE(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo desactivar el recorrido.", path);
+    return mapSessionError(error, path, "No se pudo desactivar el recorrido.");
   }
 }

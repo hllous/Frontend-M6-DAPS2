@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -25,7 +25,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo cargar el tipo de servicio.", path);
+    return mapSessionError(error, path, "No se pudo cargar el tipo de servicio.");
   }
 }
 
@@ -51,7 +51,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo actualizar el tipo de servicio.", path);
+    return mapSessionError(error, path, "No se pudo actualizar el tipo de servicio.");
   }
 }
 
@@ -73,6 +73,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo dar de baja el tipo de servicio.", path);
+    return mapSessionError(error, path, "No se pudo dar de baja el tipo de servicio.");
   }
 }

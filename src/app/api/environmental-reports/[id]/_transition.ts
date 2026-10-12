@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -44,6 +44,6 @@ export async function transitionReport(request: Request, id: string, action: "st
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para revisar este expediente.", path);
-    return errorResponse(500, "No se pudo actualizar el expediente ambiental.", path);
+    return mapSessionError(error, path, "No se pudo actualizar el expediente ambiental.");
   }
 }

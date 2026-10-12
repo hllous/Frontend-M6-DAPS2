@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -133,6 +133,6 @@ export async function handleTreeInterventionTransition(
     }
     if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo actualizar la intervención de arbolado.", path);
+    return mapSessionError(error, path, "No se pudo actualizar la intervención de arbolado.");
   }
 }

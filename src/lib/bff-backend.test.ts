@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AUTH_COOKIE_NAME, createSession, sealSession } from "./session";
+import { AUTH_COOKIE_NAME, BackendUnavailableError, createSession, sealSession } from "./session";
 import { fetchBackend, pathId } from "./bff-backend";
 
 const backendOrigin = "https://backend.internal";
@@ -43,5 +43,80 @@ describe("pathId", () => {
       "El recurso backend debe ser una ruta interna.",
     );
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchBackend availability", () => {
+  it("translates network failures into BackendUnavailableError", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+
+    await expect(fetchBackend(backendRequest(), "/services/service-1")).rejects.toMatchObject({
+      name: "BackendUnavailableError",
+      status: 503,
+      message: "El backend no responde. Reintente en unos segundos.",
+    });
+  });
+
+  it("aborts a request at the 15-second default and translates the timeout", async () => {
+    vi.useFakeTimers();
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockImplementation((timeoutMs) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), timeoutMs);
+      return controller.signal;
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
+      const signal = init?.signal;
+      if (!signal) return Promise.reject(new TypeError("missing timeout signal"));
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      });
+    });
+
+    const request = fetchBackend(backendRequest(), "/services/service-1");
+    const rejection = request.then(() => undefined, (error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await rejection).toBeInstanceOf(BackendUnavailableError);
+
+    expect(timeoutSpy).toHaveBeenCalledWith(15_000);
+  });
+
+  it("composes a caller signal with the timeout and preserves caller cancellation", async () => {
+    const caller = new AbortController();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
+      const signal = init?.signal;
+      if (!signal) return Promise.reject(new TypeError("missing timeout signal"));
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      });
+    });
+
+    const response = fetchBackend(backendRequest(), "/services/service-1", undefined, { signal: caller.signal });
+    const rejection = response.then(() => undefined, (error: unknown) => error);
+    caller.abort(new DOMException("Client disconnected", "AbortError"));
+
+    expect(await rejection).toMatchObject({ name: "AbortError", message: "Client disconnected" });
+    expect(fetchSpy.mock.calls[0]?.[1]?.signal).not.toBe(caller.signal);
+  });
+
+  it("uses the configured timeout and relays upstream error responses unchanged", async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(AbortSignal.abort());
+    const upstream = new Response("upstream error", {
+      status: 503,
+      headers: { "content-type": "text/plain" },
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(upstream);
+
+    const response = await fetchBackend(
+      backendRequest(),
+      "/evidence",
+      undefined,
+      { method: "POST" },
+      { timeoutMs: 60_000 },
+    );
+
+    expect(timeoutSpy).toHaveBeenCalledWith(60_000);
+    expect(response.status).toBe(503);
+    expect(response.headers.get("content-type")).toBe("text/plain");
+    expect(await response.text()).toBe("upstream error");
   });
 });

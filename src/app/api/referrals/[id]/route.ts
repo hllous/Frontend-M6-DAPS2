@@ -1,4 +1,4 @@
-import { backendMode, errorResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError } from "@/lib/bff-route";
 import { getScenario } from "@/lib/scenarios";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { repairRequestSchema } from "@/lib/repair-requests";
@@ -52,6 +52,6 @@ export async function GET(
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo cargar la derivación.", path);
+    return mapSessionError(error, path, "No se pudo cargar la derivación.");
   }
 }

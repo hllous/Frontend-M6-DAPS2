@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudieron cargar los árboles.", path);
+    return mapSessionError(error, path, "No se pudieron cargar los árboles.");
   }
 }
 
@@ -74,6 +74,6 @@ export async function POST(request: Request) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo crear el árbol.", path);
+    return mapSessionError(error, path, "No se pudo crear el árbol.");
   }
 }

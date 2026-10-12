@@ -1,4 +1,4 @@
-import { errorResponse } from "@/lib/bff-route";
+import { errorResponse, mapSessionError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { loadAuthorizedScenario } from "@/lib/bff-data";
@@ -42,6 +42,6 @@ export async function GET(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo cargar el escenario.", path);
+    return mapSessionError(error, path, "No se pudo cargar el escenario.");
   }
 }

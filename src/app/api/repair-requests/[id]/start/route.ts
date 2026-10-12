@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getRepairRequestFixture, transitionRepairRequestFixture } from "@/lib/repair-request-fixtures";
@@ -22,5 +22,5 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!current) return errorResponse(404, `Derivación ${id} no encontrada.`, path);
     if (current.status !== "REQUESTED") return errorResponse(409, `Solo se puede iniciar una derivación REQUESTED (estado actual: ${current.status}).`, path);
     return NextResponse.json(transitionRepairRequestFixture(id, "IN_PROGRESS", parsed.data));
-  } catch (error) { if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path); if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path); return errorResponse(500, "No se pudo iniciar la derivación.", path); }
+  } catch (error) { if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path); if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path); return mapSessionError(error, path, "No se pudo iniciar la derivación."); }
 }

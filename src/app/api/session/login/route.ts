@@ -4,6 +4,7 @@ import { getScenario, isScenarioId, type ScenarioCrew } from "@/lib/scenarios";
 import {
   AUTH_COOKIE_NAME,
   AuthUnavailableError,
+  BackendUnavailableError,
   createSession,
   getAuthMode,
   publicSession,
@@ -28,9 +29,10 @@ async function resolveBackendCrew(session: Session, origin: string | undefined):
     // ponytail: una sola página de 100 (el máximo del backend); el seed tiene ~10 cuadrillas.
     response = await fetch(new URL("/crews?active=true&pageSize=100", origin), {
       headers: { Authorization: `Bearer ${session.accessToken}` },
+      signal: AbortSignal.timeout(15_000),
     });
   } catch {
-    throw new CrewResolutionError(unavailable);
+    throw new BackendUnavailableError(503);
   }
   if (!response.ok) throw new CrewResolutionError(`${unavailable} (HTTP ${response.status})`);
   const body = (await response.json().catch(() => null)) as { data?: { id?: unknown; name?: unknown }[] } | null;
@@ -72,7 +74,7 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (error) {
-    if (error instanceof AuthUnavailableError || error instanceof CrewResolutionError) {
+    if (error instanceof AuthUnavailableError || error instanceof CrewResolutionError || error instanceof BackendUnavailableError) {
       return NextResponse.json({ message: error.message }, { status: 503 });
     }
     return NextResponse.json({ message: "No se pudo iniciar la sesión." }, { status: 500 });
