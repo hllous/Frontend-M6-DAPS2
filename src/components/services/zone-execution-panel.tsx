@@ -45,6 +45,7 @@ import { DraftConflictView } from "./draft-conflict-view";
 
 interface QueuedEvidenceFile {
   id: string; // client id
+  zoneId: string;
   file: File;
   localFilename: string;
   idempotencyKey: string;
@@ -103,7 +104,17 @@ export function ZoneExecutionPanel({
     current: Service;
     composedAgainst: FieldDraftServiceSnapshot;
   } | null>(null);
-  const [queuedFiles, setQueuedFiles] = useState<QueuedEvidenceFile[]>([]);
+  const [queuedFilesByZone, setQueuedFilesByZone] = useState<Record<string, QueuedEvidenceFile[]>>({});
+  const queuedFiles = queuedFilesByZone[selectedZoneId] ?? [];
+  const updateQueuedFilesForZone = (
+    zoneId: string,
+    update: (files: QueuedEvidenceFile[]) => QueuedEvidenceFile[],
+  ) => {
+    setQueuedFilesByZone((current) => ({
+      ...current,
+      [zoneId]: update(current[zoneId] ?? []),
+    }));
+  };
   const [evidence, setEvidence] = useState<{
     ownerId: string;
     attachments: Attachment[];
@@ -174,7 +185,6 @@ export function ZoneExecutionPanel({
     setNotes(draft?.payload.notes ?? "");
     setComposedAgainst(draft?.composedAgainst ?? null);
     setConflict(null);
-    setQueuedFiles([]);
     setFormError(null);
   };
 
@@ -214,6 +224,7 @@ export function ZoneExecutionPanel({
 
     const newQueued: QueuedEvidenceFile[] = Array.from(files).map((file) => ({
       id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      zoneId: selectedZoneId,
       file,
       localFilename: file.name,
       idempotencyKey:
@@ -223,20 +234,20 @@ export function ZoneExecutionPanel({
       status: "pending",
     }));
 
-    setQueuedFiles((prev) => [...prev, ...newQueued]);
+    updateQueuedFilesForZone(selectedZoneId, (prev) => [...prev, ...newQueued]);
     // Reset file input value so same file can be re-selected if removed
     e.target.value = "";
   };
 
   const handleRemoveFile = (fileId: string) => {
-    setQueuedFiles((prev) => prev.filter((f) => f.id !== fileId));
+    updateQueuedFilesForZone(selectedZoneId, (prev) => prev.filter((f) => f.id !== fileId));
   };
 
   const uploadSingleFile = async (
     item: QueuedEvidenceFile,
     zoneResultId: string,
   ): Promise<boolean> => {
-    setQueuedFiles((prev) =>
+    updateQueuedFilesForZone(item.zoneId, (prev) =>
       prev.map((f) => (f.id === item.id ? { ...f, status: "uploading", error: undefined } : f)),
     );
     try {
@@ -252,7 +263,7 @@ export function ZoneExecutionPanel({
         attachments: [...(prev?.ownerId === zoneResultId ? prev.attachments : []), att],
       }));
 
-      setQueuedFiles((prev) =>
+      updateQueuedFilesForZone(item.zoneId, (prev) =>
         prev.map((f) =>
           f.id === item.id
             ? {
@@ -267,7 +278,7 @@ export function ZoneExecutionPanel({
       return true;
     } catch (err) {
       const msg = err instanceof ServiceRequestError ? err.message : "Error al subir el archivo";
-      setQueuedFiles((prev) =>
+      updateQueuedFilesForZone(item.zoneId, (prev) =>
         prev.map((f) => (f.id === item.id ? { ...f, status: "error", error: msg } : f)),
       );
       return false;
@@ -276,7 +287,10 @@ export function ZoneExecutionPanel({
 
   const handleRetryUpload = async (item: QueuedEvidenceFile) => {
     if (!selectedZoneResult) return;
-    await uploadSingleFile(item, selectedZoneResult.id);
+    const uploaded = await uploadSingleFile(item, selectedZoneResult.id);
+    const everyFileUploaded =
+      uploaded && queuedFiles.every((file) => file.id === item.id || file.status === "success");
+    if (everyFileUploaded) updateQueuedFilesForZone(item.zoneId, () => []);
     // Refresh zone results to include newly uploaded attachment
     try {
       const refreshed = await servicesAdapter.getZoneResults(service.id);
@@ -298,6 +312,8 @@ export function ZoneExecutionPanel({
         }
       }
     }
+
+    if (!hasUploadErrors) updateQueuedFilesForZone(createdResult.zoneId, () => []);
 
     const refreshed = await servicesAdapter.getZoneResults(service.id);
     setZoneResults(refreshed);

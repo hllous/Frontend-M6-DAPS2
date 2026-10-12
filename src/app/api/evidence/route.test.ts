@@ -36,6 +36,7 @@ async function authenticatedCookie(scenarioId: string, mode = "mock") {
   process.env.M6_AUTH_MODE = mode;
   if (mode === "backend-development") {
     process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
   }
   const response = await login(
     new Request("http://localhost/api/session/login", {
@@ -268,10 +269,13 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("forwards only the UploadEvidenceDto fields to the backend (no fileName or fileSize)", async () => {
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({
+      data: [{ id: "crew-real", name: "Cuadrilla Belgrano — Recolección" }],
+    }));
     const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
-    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    backendFetch.mockClear();
     let sentKeys: string[] = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+    backendFetch.mockImplementation(async (_input, init) => {
       sentKeys = [...(init?.body as FormData).keys()];
       return new Response(JSON.stringify({ id: "att-1" }), { status: 201, headers: { "content-type": "application/json" } });
     });
