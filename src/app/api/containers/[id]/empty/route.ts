@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -48,7 +49,7 @@ export async function POST(
       return errorResponse(403, "No tiene permisos para vaciar contenedores.", path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/containers/${id}/empty`, "container:manage", {
         method: "POST",
       });

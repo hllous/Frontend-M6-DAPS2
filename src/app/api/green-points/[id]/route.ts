@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -16,7 +17,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     const session = getRequiredSession(request);
     const id = await targetId(context);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const response = await fetchBackend(request, `/green-points/${id}`);
       return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
     }
@@ -38,7 +39,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = greenPointUpdateInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const response = await fetchBackend(request, `/green-points/${id}`, "greenPoint:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
       return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
     }
@@ -57,7 +58,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     const session = requireOffice(request);
     const id = await targetId(context);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const response = await fetchBackend(request, `/green-points/${id}`, "greenPoint:manage", { method: "DELETE" });
       return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
     }
