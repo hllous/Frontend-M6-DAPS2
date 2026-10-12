@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
@@ -18,6 +19,24 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("ZoneCatalogPanel component", () => {
+
+  it("requires acknowledgement when zone references cannot be verified", async () => {
+    server.use(http.get("/api/zones/:id/references", () => HttpResponse.json({ message: "No disponible" }, { status: 503 })));
+    const user = userEvent.setup();
+    render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /Z-BEL/ });
+    await user.click(within(row).getByRole("button", { name: "Dar de baja" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("No se pudieron verificar las referencias. Si contin\u00faa, la baja puede afectar servicios o elementos que todav\u00eda usan este registro.")).toBeVisible();
+    const confirm = within(dialog).getByRole("button", { name: "Dar de baja de todas formas" });
+    expect(confirm).toBeDisabled();
+    await user.click(within(dialog).getByRole("checkbox", { name: "Entiendo que no se verificaron las referencias" }));
+    expect(confirm).toBeEnabled();
+    await user.click(confirm);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(zoneFixtures.find((zone) => zone.id === "zone-1")?.active).toBe(false);
+  });
+
   it("renders the zones catalog with heading, search input, and table for Office", async () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
@@ -173,6 +192,8 @@ describe("ZoneCatalogPanel component", () => {
     expect(within(dialog).getByText(/Árboles censados:/i)).toBeInTheDocument();
     expect(within(dialog).getByText(/Espacios verdes:/i)).toBeInTheDocument();
     expect(within(dialog).getByText(/El backend no realiza control de integridad referencial/i)).toBeInTheDocument();
+
+    expect(screen.queryByRole("checkbox", { name: "Entiendo que no se verificaron las referencias" })).not.toBeInTheDocument();
 
     // Confirm deactivation
     const confirmButton = within(dialog).getByRole("button", { name: "Dar de baja de todas formas" });
