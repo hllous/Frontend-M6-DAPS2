@@ -140,6 +140,12 @@ export function isReferralVisibleToScenario(referral: Referral | { sourceService
   return Boolean(sourceServiceId && serviceIds.includes(sourceServiceId));
 }
 
+export function isReferralVisibleToBackendSources(referral: Referral, sourceIds: ReadonlySet<string> | undefined): boolean {
+  if (sourceIds === undefined) return true;
+  if (referral.sourceType === "TREE_INTERVENTION") return false;
+  return sourceIds.has(referral.sourceId);
+}
+
 export function serviceSourceHref(serviceId: string): string {
   return `/app?destination=services&detail=${encodeURIComponent(serviceId)}`;
 }
@@ -156,6 +162,14 @@ export function treeInterventionSourceHref(interventionId: string): string {
 }
 
 export function referralFromRepairRequest(request: RepairRequest): Referral {
+  return mapRepairRequest(request, true);
+}
+
+export function referralFromBackendRepairRequest(request: RepairRequest): Referral {
+  return mapRepairRequest(request, false);
+}
+
+function mapRepairRequest(request: RepairRequest, useFixtures: boolean): Referral {
   const source = request.sourceContext;
   const isInspection = request.detectedInType === "INSPECTION";
   return {
@@ -166,7 +180,9 @@ export function referralFromRepairRequest(request: RepairRequest): Referral {
     sourceId: request.detectedInId,
     sourceServiceId: request.detectedInId,
     sourceLabel: source?.label ?? (isInspection ? `Inspección ambiental ${request.detectedInId}` : `Servicio ${request.detectedInId}`),
-    sourceHref: source?.href ?? (isInspection ? environmentalInspectionSourceHref(request.detectedInId) : serviceSourceHref(request.detectedInId)),
+    sourceHref: source?.href ?? (isInspection
+      ? useFixtures ? environmentalInspectionSourceHref(request.detectedInId) : `/app?destination=environment&inspectionId=${encodeURIComponent(request.detectedInId)}`
+      : serviceSourceHref(request.detectedInId)),
     status: request.status,
     createdAt: request.createdAt ?? request.requestedAt,
     updatedAt: request.updatedAt ?? request.createdAt ?? request.requestedAt,

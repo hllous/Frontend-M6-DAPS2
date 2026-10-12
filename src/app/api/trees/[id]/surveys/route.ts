@@ -13,16 +13,26 @@ function errorResponse(status: number, message: string, path: string) { return N
 async function treeId(context: { params: Promise<{ id: string }> | { id: string } }) { return (await context.params).id; }
 function queryFromUrl(url: URL): TreeSurveyQuery { return { healthStatus: treeHealthStatusSchema.safeParse(url.searchParams.get("healthStatus")).data, riskLevel: riskLevelSchema.safeParse(url.searchParams.get("riskLevel")).data, page: pageParam(url.searchParams), pageSize: pageSizeParam(url.searchParams) }; }
 
+function queryString(query: TreeSurveyQuery) {
+  const params = new URLSearchParams();
+  if (query.healthStatus !== undefined) params.set("healthStatus", String(query.healthStatus));
+  if (query.riskLevel !== undefined) params.set("riskLevel", String(query.riskLevel));
+  if (query.page !== undefined) params.set("page", String(query.page));
+  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  const value = params.toString();
+  return value ? `?${value}` : "";
+}
+
 export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
     const id = await treeId(context);
+    const query = queryFromUrl(new URL(request.url));
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const response = await fetchBackend(request, `/trees/${id}/surveys${new URL(request.url).search}`);
+      const response = await fetchBackend(request, `/trees/${encodeURIComponent(id)}/surveys${queryString(query)}`);
       return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
     }
-    const query = queryFromUrl(new URL(request.url));
     return NextResponse.json(paginateTreeSurveyFixtures(filterTreeSurveyFixtures(id, query), query.page, query.pageSize));
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
@@ -41,7 +51,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const parsed = treeSurveyCreateInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const response = await fetchBackend(request, `/trees/${id}/surveys`, "tree:survey", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
+      const response = await fetchBackend(request, `/trees/${encodeURIComponent(id)}/surveys`, "tree:survey", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
       return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
     }
     const created = createTreeSurveyFixture(id, parsed.data, session.scenarioId);

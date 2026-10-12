@@ -16,6 +16,8 @@ import {
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -74,6 +76,8 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   // Deactivate confirmation state
   const [deactivatingZone, setDeactivatingZone] = useState<Zone | null>(null);
   const [referencesReport, setReferencesReport] = useState<ZoneReferenceReport | null>(null);
+  const [referencesUnavailable, setReferencesUnavailable] = useState(false);
+  const [referencesAcknowledged, setReferencesAcknowledged] = useState(false);
   const [isLoadingReferences, setIsLoadingReferences] = useState(false);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
 
@@ -171,20 +175,15 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   // Start deactivation with reference check
   const handleStartDeactivate = async (zone: Zone) => {
     setDeactivatingZone(zone);
+    setReferencesReport(null);
+    setReferencesUnavailable(false);
+    setReferencesAcknowledged(false);
     setIsLoadingReferences(true);
     try {
       const report = await zonesAdapter.checkReferences(zone.id);
       setReferencesReport(report);
     } catch {
-      // Fallback: report with 0 references
-      setReferencesReport({
-        zoneId: zone.id,
-        activeRoutes: [],
-        containersCount: 0,
-        treesCount: 0,
-        greenSpacesCount: 0,
-        totalReferences: 0,
-      });
+      setReferencesUnavailable(true);
     } finally {
       setIsLoadingReferences(false);
     }
@@ -192,7 +191,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
   // Confirm deactivation
   const handleConfirmDeactivate = async () => {
-    if (!deactivatingZone) return;
+    if (!deactivatingZone || isLoadingReferences || (referencesUnavailable && !referencesAcknowledged)) return;
     setIsSubmittingDeactivate(true);
     try {
       await zonesAdapter.delete(deactivatingZone.id);
@@ -840,6 +839,21 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               <Loader2 className="h-4 w-4 animate-spin" />
               Verificando referencias de la zona...
             </div>
+          ) : referencesUnavailable ? (
+            <div className="flex flex-col gap-3">
+              <Alert className="border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
+                <AlertTriangle aria-hidden="true" />
+                <AlertDescription className="text-[var(--color-warning)]">
+                  No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
+                </AlertDescription>
+              </Alert>
+              <Field>
+                <FieldLabel className="flex min-h-10 cursor-pointer items-center gap-3 [@media(max-width:760px)]:min-h-12">
+                  <Checkbox checked={referencesAcknowledged} onCheckedChange={setReferencesAcknowledged} disabled={isSubmittingDeactivate} />
+                  Entiendo que no se verificaron las referencias
+                </FieldLabel>
+              </Field>
+            </div>
           ) : referencesReport && referencesReport.totalReferences > 0 ? (
             <div className="flex flex-col gap-3 py-2 text-sm">
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
@@ -905,7 +919,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               type="button"
               variant="destructive"
               onClick={handleConfirmDeactivate}
-              disabled={isSubmittingDeactivate || isLoadingReferences}
+              disabled={isSubmittingDeactivate || isLoadingReferences || (referencesUnavailable && !referencesAcknowledged)}
             >
               {isSubmittingDeactivate ? "Dando de baja..." : "Dar de baja de todas formas"}
             </Button>
