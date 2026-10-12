@@ -34,11 +34,15 @@ const dateTimeLabelFormatter = new Intl.DateTimeFormat("es-AR", {
 export function formatCalendarDay(value: string): string {
   const day = value.slice(0, 10);
   const date = new Date(`${day}T00:00:00Z`);
-  return /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(date.getTime()) ? calendarDayLabelFormatter.format(date) : value;
+  const isCalendarDay = /^\d{4}-\d{2}-\d{2}$/.test(day) &&
+    !Number.isNaN(date.getTime()) &&
+    date.toISOString().slice(0, 10) === day;
+  return isCalendarDay ? calendarDayLabelFormatter.format(date) : value;
 }
 
 /** "22 sept 2026, 10:43 a. m." en hora argentina. Si no es una fecha, la devuelve tal cual. */
 export function formatArgentinaDateTime(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return formatCalendarDay(value);
   const instant = new Date(value);
   return Number.isNaN(instant.getTime()) ? value : dateTimeLabelFormatter.format(instant);
 }

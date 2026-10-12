@@ -21,6 +21,7 @@ import { containersAdapter } from "@/lib/containers";
 import { treesAdapter } from "@/lib/trees";
 import { greenSpacesAdapter } from "@/lib/green-spaces";
 import { greenPointsAdapter } from "@/lib/green-points";
+import { todayInArgentina } from "@/lib/argentina-date";
 import { cn } from "@/lib/utils";
 import { MAX_NOTES_LENGTH } from "@/lib/input-limits";
 
@@ -51,6 +52,7 @@ const TARGET_KIND_LABELS: Record<TargetKind, string> = {
 };
 
 const TARGET_PAGE_SIZE = 20;
+const PAST_DATE_ERROR = "La fecha programada debe ser hoy o una fecha posterior en Argentina.";
 
 /** Busca bienes del inventario del tipo pedido y los muestra por código o dirección, nunca por UUID. */
 async function searchTargets(type: InventoryTargetType, search: string): Promise<TargetOption[]> {
@@ -147,9 +149,8 @@ export function ScheduleServiceDialog({
   }
 
   // Scheduling temporal state
-  const [scheduledDate, setScheduledDate] = useState<string>(() => {
-    return new Date().toISOString().slice(0, 10);
-  });
+  const [today] = useState(() => todayInArgentina());
+  const [scheduledDate, setScheduledDate] = useState<string>(() => today);
   const [windowStart, setWindowStart] = useState<string>("08:00");
   const [windowEnd, setWindowEnd] = useState<string>("12:00");
 
@@ -159,6 +160,7 @@ export function ScheduleServiceDialog({
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [scheduledDateError, setScheduledDateError] = useState<string | null>(null);
 
   // Los tipos de servicio, recorridos y zonas son los del backend (UUID): no se pueden fijar en el código.
   useEffect(() => {
@@ -238,6 +240,7 @@ export function ScheduleServiceDialog({
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setErrorMessage(null);
+      setScheduledDateError(null);
       setIsSubmitting(false);
     }
     onOpenChange(nextOpen);
@@ -246,9 +249,15 @@ export function ScheduleServiceDialog({
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setErrorMessage(null);
+    setScheduledDateError(null);
 
     if (catalogs.status !== "ready" || !selectedServiceType) {
       setErrorMessage("No hay un tipo de servicio activo para programar. Cree o active uno en Catálogo > Tipos de servicio.");
+      return;
+    }
+
+    if (scheduledDate < today) {
+      setScheduledDateError(PAST_DATE_ERROR);
       return;
     }
 
@@ -616,16 +625,29 @@ export function ScheduleServiceDialog({
 
           {/* Temporal scheduling: Date & Time window */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Field className="sm:col-span-1">
+            <Field className="sm:col-span-1" data-invalid={Boolean(scheduledDateError)}>
               <FieldLabel htmlFor="scheduled-date">Fecha programada *</FieldLabel>
               <input
                 id="scheduled-date"
                 type="date"
                 value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
+                min={today}
+                aria-invalid={Boolean(scheduledDateError)}
+                aria-describedby={scheduledDateError ? "scheduled-date-error" : undefined}
+                onChange={(event) => {
+                  setScheduledDate(event.target.value);
+                  setScheduledDateError(null);
+                }}
+                onInvalid={(event) => {
+                  if (scheduledDate < today) {
+                    event.preventDefault();
+                    setScheduledDateError(PAST_DATE_ERROR);
+                  }
+                }}
                 required
                 className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
               />
+              {scheduledDateError && <FieldError id="scheduled-date-error">{scheduledDateError}</FieldError>}
             </Field>
 
             <Field className="sm:col-span-1">
