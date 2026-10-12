@@ -61,6 +61,9 @@ import {
   type SortKey,
 } from "./services-table";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
+import { todayInArgentina } from "@/lib/argentina-date";
+
+type Period = "semana" | "mes" | "todo";
 
 type LoadState =
   | { status: "loading" }
@@ -95,6 +98,12 @@ export function ServicesWorkspace({
   // Load state
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [periodChoice, setPeriodChoice] = useState<Period | null>(() => {
+    const value = getParam("periodo");
+    return value === "semana" || value === "mes" || value === "todo" ? value : null;
+  });
+  const [activePeriod, setActivePeriod] = useState<Period>(periodChoice ?? "todo");
+  const [totalServices, setTotalServices] = useState(0);
 
   // Global search
   const [search, setSearch] = useState<string>(() => getParam("q") ?? "");
@@ -135,6 +144,7 @@ export function ServicesWorkspace({
   // Selection & Detail
   const [selectedId, setSelectedId] = useState<string | null>(() => getParam("selected"));
   const [detailId, setDetailId] = useState<string | null>(() => getParam("detail"));
+  const [resolvedDetail, setResolvedDetail] = useState<{ id: string; service: Service | null; error?: string } | null>(null);
 
   // Scheduling modal state
   const [isScheduleOpen, setIsScheduleOpen] = useState<boolean>(() => {
@@ -208,16 +218,46 @@ export function ServicesWorkspace({
     async function load() {
       setLoadState({ status: "loading" });
       try {
-        const query: ServiceQuery = { pageSize: 100 };
+        const base: ServiceQuery = {};
         if (scenario?.actor.kind === "FIELD" && scenario.actor.crewId) {
-          query.crewId = scenario.actor.crewId;
+          base.crewId = scenario.actor.crewId;
+        }
+        const count = await servicesAdapter.list({ ...base, pageSize: 1 });
+        if (!isCurrent) return;
+        const period = periodChoice ?? (count.total > 100 ? "semana" : "todo");
+        setActivePeriod(period);
+        setTotalServices(count.total);
+        const query: ServiceQuery = { ...base, pageSize: 100 };
+        if (period !== "todo") {
+          const today = todayInArgentina();
+          const from = new Date(`${today}T00:00:00Z`);
+          const to = new Date(from);
+          if (period === "semana") {
+            from.setUTCDate(from.getUTCDate() - ((from.getUTCDay() + 6) % 7));
+            to.setTime(from.getTime());
+            to.setUTCDate(to.getUTCDate() + 6);
+          } else {
+            from.setUTCDate(1);
+            to.setUTCMonth(to.getUTCMonth() + 1, 0);
+          }
+          query.scheduledFrom = from.toISOString().slice(0, 10);
+          query.scheduledTo = to.toISOString().slice(0, 10);
         }
         const page = await servicesAdapter.list(query);
-        if (isCurrent) setLoadState({ status: "ready", services: page.services });
+        const services = [...page.services];
+        let totalPages = page.totalPages;
+        for (let nextPage = 2; nextPage <= Math.min(totalPages, 20); nextPage += 1) {
+          if (!isCurrent) return;
+          const next = await servicesAdapter.list({ ...query, page: nextPage });
+          services.push(...next.services);
+          totalPages = next.totalPages;
+        }
+        if (totalPages > 20) throw new RangeError("El período tiene demasiados servicios; acote el período.");
+        if (isCurrent) setLoadState({ status: "ready", services });
       } catch (cause) {
         if (!isCurrent) return;
         const msg =
-          cause instanceof ServiceRequestError
+          cause instanceof RangeError ? cause.message : cause instanceof ServiceRequestError
             ? `Error del servidor (${cause.status}): ${cause.message}`
             : "No se pudieron cargar los servicios operativos.";
         setLoadState({ status: "error", message: msg });
@@ -227,7 +267,7 @@ export function ServicesWorkspace({
     return () => {
       isCurrent = false;
     };
-  }, [reloadVersion, scenario]);
+  }, [reloadVersion, scenario, periodChoice]);
 
   // Compute filter fingerprint to trigger map bounds fit only when filters change
   const filterFingerprint = useMemo(() => {
@@ -253,6 +293,7 @@ export function ServicesWorkspace({
     if (search.trim()) newParams.set("q", search.trim());
     if (selectedId) newParams.set("selected", selectedId);
     if (detailId) newParams.set("detail", detailId);
+    if (periodChoice) newParams.set("periodo", periodChoice);
     if (sortKey !== "status") newParams.set("sort", sortKey);
     if (sortDir !== "asc") newParams.set("dir", sortDir);
     if (mapSide !== "right") newParams.set("mapSide", mapSide);
@@ -282,6 +323,7 @@ export function ServicesWorkspace({
     search,
     selectedId,
     detailId,
+    periodChoice,
     sortKey,
     sortDir,
     mapSide,
@@ -349,10 +391,30 @@ export function ServicesWorkspace({
     return loadState.services.find((s) => s.id === selectedId) ?? null;
   }, [selectedId, loadState]);
 
-  const detailService = useMemo(() => {
+  const windowDetailService = useMemo(() => {
     if (!detailId || loadState.status !== "ready") return null;
     return loadState.services.find((s) => s.id === detailId) ?? null;
   }, [detailId, loadState]);
+
+  useEffect(() => {
+    if (!detailId || loadState.status !== "ready" || windowDetailService) return;
+    let isCurrent = true;
+    void servicesAdapter.get(detailId).then((service) => {
+      if (!isCurrent) return;
+      const allowed = scenario?.actor.kind !== "FIELD" || service.crewId === scenario.actor.crewId;
+      setResolvedDetail({ id: detailId, service: allowed ? service : null });
+    }).catch((cause) => {
+      if (!isCurrent) return;
+      setResolvedDetail({
+        id: detailId, service: null,
+        error: cause instanceof ServiceRequestError && cause.status === 404 ? undefined : "No se pudo cargar el detalle del servicio.",
+      });
+    });
+    return () => { isCurrent = false; };
+  }, [detailId, loadState, windowDetailService, scenario]);
+
+  const outsideDetail = loadState.status === "ready" && resolvedDetail?.id === detailId ? resolvedDetail : null;
+  const detailService = windowDetailService ?? outsideDetail?.service ?? null;
 
   const fieldCanViewRepairRequests = Boolean(
     scenario?.actor.kind === "FIELD" &&
@@ -596,10 +658,33 @@ export function ServicesWorkspace({
     columnFilters.crews.size > 0 ||
     Boolean(columnFilters.timeFrom || columnFilters.timeTo);
 
+  const periodBar = (
+    <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm text-[var(--color-text-secondary)]">
+      <label className="flex items-center gap-2">
+        <span>Período</span>
+        <select
+          value={activePeriod}
+          onChange={(event) => setPeriodChoice(event.target.value as Period)}
+          className="min-h-12 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 text-base md:min-h-10 md:text-sm"
+        >
+          <option value="semana">Esta semana</option>
+          <option value="mes">Este mes</option>
+          <option value="todo">Todo el período</option>
+        </select>
+      </label>
+      {loadState.status === "ready" && (
+        <span aria-live="polite">Mostrando {loadState.services.length} de {totalServices} servicios</span>
+      )}
+    </div>
+  );
+
   // Full detail view (explicit action)
   if (detailService) {
     return (
       <>
+        {!windowDetailService && (
+          <p role="status" className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">Este servicio está fuera del período seleccionado.</p>
+        )}
         <ServiceDetail
           service={detailService}
           onBack={() => setDetailId(null)}
@@ -823,12 +908,22 @@ export function ServicesWorkspace({
         </div>
       )}
 
+      {loadState.status === "error" && periodBar}
+
       {/* Ready State */}
+      {outsideDetail?.error && <p role="alert" className="px-4 py-3 text-sm text-[var(--color-danger)]">{outsideDetail.error}</p>}
       {loadState.status === "ready" && (
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+          {loadState.services.length === 0 && (
+            <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+              <p>No hay servicios en este período.</p>
+              <Button variant="outline" onClick={() => setPeriodChoice("todo")}>Ver todo el período</Button>
+            </div>
+          )}
           {isNarrow ? (
             /* Narrow Screens (< 760px): Focused List/Map Presentation */
             <div className="flex flex-col flex-1 min-h-0">
+              {periodBar}
               <div className="flex border-b border-[var(--color-border)] bg-[var(--color-surface)]">
                 <button
                   type="button"
@@ -903,7 +998,8 @@ export function ServicesWorkspace({
             /* Wide Screens (>= 760px): Resizable, side-swappable split pane with live preview */
             <div className="relative flex flex-1 min-h-0 flex-col">
               {/* Split pane control bar */}
-              <div className="flex items-center justify-end gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]">
+                {periodBar}
                 <button
                   type="button"
                   onClick={() => setMapSide((s) => (s === "right" ? "left" : "right"))}

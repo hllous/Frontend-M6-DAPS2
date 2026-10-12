@@ -1,0 +1,115 @@
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { setupServer } from "msw/node";
+import { handlers } from "@/mocks/handlers";
+import { ServiceRequestError, servicesAdapter } from "@/lib/services";
+import { scenarios } from "@/lib/scenarios";
+import { serviceFixtures } from "@/lib/services-fixtures";
+import { ServicesWorkspace } from "./services-workspace";
+
+const server = setupServer(...handlers);
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterAll(() => server.close());
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  server.resetHandlers();
+  vi.useRealTimers();
+  window.history.replaceState(null, "", "/app");
+});
+
+describe("Services workspace period", () => {
+  it("keeps the whole period for 54 services without sending a date filter", async () => {
+    const services = Array.from({ length: 54 }, (_, i) => ({ ...serviceFixtures[0], id: `service-${i}` }));
+    const list = vi.spyOn(servicesAdapter, "list").mockImplementation(async (query) => ({
+      services: query?.pageSize === 1 ? services.slice(0, 1) : services,
+      total: 54, totalPages: query?.pageSize === 1 ? 54 : 1, page: 1, pageSize: query?.pageSize ?? 100,
+    }));
+    render(<ServicesWorkspace />);
+    expect(await screen.findByText("Mostrando 54 de 54 servicios")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("todo");
+    expect(list.mock.calls).toEqual([[{ pageSize: 1 }], [{ pageSize: 100 }]]);
+  });
+
+  it("defaults to the Argentine week for 240 services, loads every window page and persists a month choice", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-02T01:00:00Z")); // Sunday in Argentina, Monday in UTC.
+    const list = vi.spyOn(servicesAdapter, "list").mockImplementation(async (query) => ({
+      services: query?.pageSize === 1 ? [] : Array.from({ length: query?.page === 2 ? 1 : 20 }, (_, i) => ({
+        ...serviceFixtures[0], id: `${query?.page ?? 1}-${i}`,
+      })),
+      total: query?.pageSize === 1 ? 240 : 21, totalPages: query?.pageSize === 1 ? 240 : 2,
+      page: query?.page ?? 1, pageSize: query?.pageSize ?? 100,
+    }));
+    render(<ServicesWorkspace />);
+    expect(await screen.findByText("Mostrando 21 de 240 servicios")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("semana");
+    expect(list).toHaveBeenCalledWith({ pageSize: 100, scheduledFrom: "2026-10-26", scheduledTo: "2026-11-01" });
+    expect(list).toHaveBeenCalledWith({ pageSize: 100, page: 2, scheduledFrom: "2026-10-26", scheduledTo: "2026-11-01" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Período" }), { target: { value: "mes" } });
+    await screen.findByText("Mostrando 21 de 240 servicios");
+    await waitFor(() => expect(list).toHaveBeenCalledWith({ pageSize: 100, scheduledFrom: "2026-11-01", scheduledTo: "2026-11-30" }));
+    expect(new URLSearchParams(window.location.search).get("periodo")).toBe("mes");
+  });
+
+  it("resolves a detail outside the window through get and displays its notice", async () => {
+    const service = { ...serviceFixtures[0], id: "550e8400-e29b-41d4-a716-446655440921" };
+    window.history.replaceState(null, "", `/app?periodo=semana&detail=${service.id}`);
+    vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 240, totalPages: 1, page: 1, pageSize: 100 });
+    const get = vi.spyOn(servicesAdapter, "get").mockResolvedValue(service);
+    render(<ServicesWorkspace />);
+    expect(await screen.findByText("Este servicio está fuera del período seleccionado.")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: `Detalle completo de ${service.id}` })).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith(service.id);
+  });
+
+  it("offers the whole period when the selected window is empty", async () => {
+    window.history.replaceState(null, "", "/app?periodo=semana");
+    const list = vi.spyOn(servicesAdapter, "list").mockImplementation(async (query) => ({
+      services: query?.scheduledFrom || query?.pageSize === 1 ? [] : [serviceFixtures[0]],
+      total: query?.pageSize === 1 ? 54 : 0, totalPages: 1, page: 1, pageSize: 100,
+    }));
+    render(<ServicesWorkspace />);
+    expect(await screen.findByText("No hay servicios en este período.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ver todo el período" }));
+    expect(await screen.findByText("Mostrando 1 de 54 servicios")).toBeInTheDocument();
+    expect(list).toHaveBeenCalledWith({ pageSize: 100 });
+    expect(new URLSearchParams(window.location.search).get("periodo")).toBe("todo");
+  });
+
+  it("retains the Field crew filter in the count and every window page", async () => {
+    window.history.replaceState(null, "", "/app?periodo=todo");
+    const list = vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 240, totalPages: 3, page: 1, pageSize: 100 });
+    render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
+    await screen.findByText("Mostrando 0 de 240 servicios");
+    expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("todo");
+    expect(list.mock.calls).toEqual([
+      [{ crewId: "crew-b", pageSize: 1 }],
+      [{ crewId: "crew-b", pageSize: 100 }],
+      [{ crewId: "crew-b", pageSize: 100, page: 2 }],
+      [{ crewId: "crew-b", pageSize: 100, page: 3 }],
+    ]);
+  });
+
+  it("stops at twenty pages with an actionable period error", async () => {
+    window.history.replaceState(null, "", "/app?periodo=todo");
+    const list = vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 2100, totalPages: 21, page: 1, pageSize: 100 });
+    render(<ServicesWorkspace />);
+    expect(await screen.findByText("El período tiene demasiados servicios; acote el período.")).toBeInTheDocument();
+    expect(list).toHaveBeenCalledTimes(21); // Count plus twenty result pages.
+    expect(list).not.toHaveBeenCalledWith(expect.objectContaining({ page: 21 }));
+    expect(screen.getByRole("combobox", { name: "Período" })).toBeEnabled();
+  });
+
+  it("ignores an unknown URL period and keeps the list for a genuinely unknown detail", async () => {
+    window.history.replaceState(null, "", "/app?periodo=desconocido&detail=unknown-id");
+    vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 54, totalPages: 1, page: 1, pageSize: 100 });
+    const get = vi.spyOn(servicesAdapter, "get").mockRejectedValue(new ServiceRequestError("No encontrado", 404));
+    render(<ServicesWorkspace />);
+    await screen.findByText("Mostrando 0 de 54 servicios");
+    await waitFor(() => expect(get).toHaveBeenCalledWith("unknown-id"));
+    expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("todo");
+    expect(screen.queryByText("Este servicio está fuera del período seleccionado.")).not.toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).has("periodo")).toBe(false);
+  });
+});
