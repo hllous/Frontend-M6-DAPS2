@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -189,6 +189,6 @@ export async function POST(
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa o es inválida.", path);
     }
-    return errorResponse(500, "Error interno del servidor.", path);
+    return mapSessionError(caught, path, "Error interno del servidor.");
   }
 }

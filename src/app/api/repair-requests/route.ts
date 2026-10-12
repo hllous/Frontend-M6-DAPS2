@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -109,7 +109,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudieron cargar las derivaciones.", path);
+    return mapSessionError(error, path, "No se pudieron cargar las derivaciones.");
   }
 }
 
@@ -186,6 +186,6 @@ export async function POST(request: Request) {
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo crear la derivación.", path);
+    return mapSessionError(error, path, "No se pudo crear la derivación.");
   }
 }

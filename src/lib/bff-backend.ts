@@ -1,5 +1,6 @@
 import {
   AuthUnavailableError,
+  BackendUnavailableError,
   getRequiredSession,
   requireCapability,
 } from "./session";
@@ -8,6 +9,12 @@ import { errorResponse } from "./bff-route";
 
 const INVALID_BACKEND_PATH_ID = "\u0000invalid-backend-path-id\u0000";
 const BACKEND_PATH_ID_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/;
+const DEFAULT_BACKEND_TIMEOUT_MS = 15_000;
+const BACKEND_UNAVAILABLE_MESSAGE = "El backend no responde. Reintente en unos segundos.";
+
+export type FetchBackendOptions = {
+  timeoutMs?: number;
+};
 
 export function pathId(id: string): string {
   if (!BACKEND_PATH_ID_PATTERN.test(id) || id === "." || id === "..") {
@@ -21,6 +28,7 @@ export async function fetchBackend(
   resourcePath: string,
   capability?: Capability,
   init: RequestInit = {},
+  options: FetchBackendOptions = {},
 ): Promise<Response> {
   const session = getRequiredSession(request);
   if (capability) requireCapability(session, capability);
@@ -51,5 +59,12 @@ export async function fetchBackend(
 
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${session.accessToken}`);
-  return fetch(resourceUrl, { ...init, headers });
+  const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_BACKEND_TIMEOUT_MS);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+  try {
+    return await fetch(resourceUrl, { ...init, headers, signal });
+  } catch (error) {
+    if (init.signal?.aborted) throw error;
+    throw new BackendUnavailableError(503, BACKEND_UNAVAILABLE_MESSAGE);
+  }
 }

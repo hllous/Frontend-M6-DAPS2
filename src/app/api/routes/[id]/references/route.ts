@@ -1,4 +1,4 @@
-import { backendMode, errorResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -76,6 +76,6 @@ export async function GET(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudieron obtener las referencias del recorrido.", path);
+    return mapSessionError(error, path, "No se pudieron obtener las referencias del recorrido.");
   }
 }

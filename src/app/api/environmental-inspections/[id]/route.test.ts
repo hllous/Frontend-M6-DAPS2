@@ -131,6 +131,18 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
     expect(backendFetch).toHaveBeenCalledTimes(2);
   });
 
+  it("returns 503 with the shared message when the backend request fails", async () => {
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+    const response = await detail(await backendCookie("office-duty-queue"));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      message: "El backend no responde. Reintente en unos segundos.",
+      error: "Service Unavailable",
+    });
+    expect(backendFetch).toHaveBeenCalledTimes(1);
+  });
+
   it.each(["field-crew-leader-route", "office-duty-queue"])("rechaza un payload inválido para %s", async (scenarioId) => {
     const backendFetch = scenarioId.startsWith("field") ? fieldBackend() : vi.spyOn(globalThis, "fetch");
     backendFetch.mockResolvedValueOnce(Response.json({ ...inspection, reportId: 123 }));

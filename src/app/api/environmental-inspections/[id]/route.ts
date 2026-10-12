@@ -7,7 +7,7 @@ import { environmentalInspectionSchema } from "@/lib/environmental-reports";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { withInspectionAttachments } from "../_attachments";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, BackendUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
 function response(status: number, message: string, path: string) {
   return NextResponse.json({ statusCode: status, message, error: status === 404 ? "Not Found" : status === 403 ? "Forbidden" : status === 401 ? "Unauthorized" : status === 503 ? "Service Unavailable" : "Error", path }, { status });
@@ -64,6 +64,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   } catch (error) {
     if (error instanceof InvalidSessionError) return response(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return response(503, error.message, path);
+    if (error instanceof BackendUnavailableError) return response(503, error.message, path);
     if (error instanceof ForbiddenSessionError) return response(403, "La sesión no tiene permiso para consultar inspecciones.", path);
     return response(500, "No se pudo cargar la inspección.", path);
   }

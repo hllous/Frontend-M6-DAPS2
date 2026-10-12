@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -159,6 +159,7 @@ export async function POST(request: Request) {
           headers: { "Idempotency-Key": idempotencyKey },
           body: backendForm,
         },
+        { timeoutMs: 60_000 },
       );
             return forwardResponse(backendResponse);
     }
@@ -246,7 +247,7 @@ export async function POST(request: Request) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa o es inválida.", path);
     }
-    return errorResponse(500, "Error interno del servidor.", path);
+    return mapSessionError(caught, path, "Error interno del servidor.");
   }
 }
 
@@ -304,7 +305,7 @@ export async function GET(request: Request) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa o es inválida.", path);
     }
-    return errorResponse(500, "Error interno del servidor.", path);
+    return mapSessionError(caught, path, "Error interno del servidor.");
   }
 }
 

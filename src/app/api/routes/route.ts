@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudieron cargar los recorridos.", path);
+    return mapSessionError(error, path, "No se pudieron cargar los recorridos.");
   }
 }
 
@@ -133,6 +133,6 @@ export async function POST(request: Request) {
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo crear el recorrido.", path);
+    return mapSessionError(error, path, "No se pudo crear el recorrido.");
   }
 }

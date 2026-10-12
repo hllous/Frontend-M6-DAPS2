@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -41,7 +41,7 @@ export async function GET(request: Request, context: Context) {
   } catch (error) {
     if (error instanceof InvalidSessionError) { recordTelemetryEvent({ name: "auth_session_expired", status: 401 }); return errorResponse(401, "La sesión no está activa.", new URL(request.url).pathname); }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, new URL(request.url).pathname);
-    return errorResponse(500, "No se pudo cargar el vehículo.", new URL(request.url).pathname);
+    return mapSessionError(error, new URL(request.url).pathname, "No se pudo cargar el vehículo.");
   }
 }
 
@@ -64,7 +64,7 @@ export async function PATCH(request: Request, context: Context) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo actualizar el vehículo.", path);
+    return mapSessionError(error, path, "No se pudo actualizar el vehículo.");
   }
 }
 
@@ -82,6 +82,6 @@ export async function DELETE(request: Request, context: Context) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo dar de baja el vehículo.", path);
+    return mapSessionError(error, path, "No se pudo dar de baja el vehículo.");
   }
 }

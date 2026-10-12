@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -106,7 +106,7 @@ export async function GET(request: Request) {
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudieron cargar los servicios.", path);
+    return mapSessionError(error, path, "No se pudieron cargar los servicios.");
   }
 }
 
@@ -214,6 +214,6 @@ export async function POST(request: Request) {
       return errorResponse(503, error.message, path);
     }
     if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
-    return errorResponse(500, "No se pudo programar el servicio.", path);
+    return mapSessionError(error, path, "No se pudo programar el servicio.");
   }
 }

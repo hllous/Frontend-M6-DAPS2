@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   AuthUnavailableError,
+  BackendUnavailableError,
   ForbiddenSessionError,
   InvalidSessionError,
   type Session,
@@ -54,6 +55,9 @@ export function mapSessionError(error: unknown, path: string, fallbackMessage: s
     return errorResponse(403, error.message, path);
   }
   if (error instanceof AuthUnavailableError) {
+    return errorResponse(503, error.message, path);
+  }
+  if (error instanceof BackendUnavailableError) {
     return errorResponse(503, error.message, path);
   }
   return errorResponse(500, fallbackMessage, path);

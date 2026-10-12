@@ -145,6 +145,19 @@ describe("session route handlers", () => {
       expect((await response.json()).message).toMatch(/No se pudo resolver la cuadrilla.*HTTP 500/);
     });
 
+    it("returns the shared unavailable response when the timed crew lookup rejects", async () => {
+      backendMode();
+      const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(new DOMException("Timed out", "TimeoutError"));
+
+      const response = await login(loginRequest("field-crew-leader-route"));
+
+      expect(timeoutSpy).toHaveBeenCalledWith(15_000);
+      expect(response.status).toBe(503);
+      expect((await response.json()).message).toBe("El backend no responde. Reintente en unos segundos.");
+      expect(response.headers.get("set-cookie")).toBeNull();
+    });
+
     it("does not look up crews for Office nor in mock mode", async () => {
       const backendFetch = vi.spyOn(globalThis, "fetch");
       backendMode();

@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -34,7 +34,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para consultar inspecciones.", path);
-    return errorResponse(500, "No se pudo cargar la historia de inspecciones.", path);
+    return mapSessionError(error, path, "No se pudo cargar la historia de inspecciones.");
   }
 }
 
@@ -72,6 +72,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para programar inspecciones.", path);
-    return errorResponse(500, "No se pudo programar la inspección.", path);
+    return mapSessionError(error, path, "No se pudo programar la inspección.");
   }
 }
