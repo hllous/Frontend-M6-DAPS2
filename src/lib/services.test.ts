@@ -881,6 +881,39 @@ describe("services adapter", () => {
       expect(result.isOutside).toBe(true);
       expect(result.timing).toBe("late");
     });
+
+    it("uses the Argentine day at 22:30 even when UTC has crossed into tomorrow", () => {
+      const result = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-09-22", windowFrom: "00:00", windowTo: "23:59" } as any,
+        new Date("2026-09-23T01:30:00Z"),
+      );
+
+      expect(result).toEqual({ isOutside: false, timing: "within", message: null });
+    });
+
+    it("uses the Argentine day across month and year boundaries", () => {
+      const monthEnd = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-02-28", windowFrom: "00:00", windowTo: "23:59" } as any,
+        new Date("2026-03-01T02:30:00Z"),
+      );
+      const yearEnd = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-12-31", windowFrom: "00:00", windowTo: "23:59" } as any,
+        new Date("2027-01-01T02:30:00Z"),
+      );
+
+      expect(monthEnd).toEqual({ isOutside: false, timing: "within", message: null });
+      expect(yearEnd).toEqual({ isOutside: false, timing: "within", message: null });
+    });
+
+    it("formats the scheduled calendar date in outside-window messages", () => {
+      const result = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-09-23" } as any,
+        new Date("2026-09-22T15:00:00Z"),
+      );
+
+      expect(result.message).toContain("23 sept 2026");
+      expect(result.message).not.toContain("2026-09-23");
+    });
   });
 
   describe("servicesAdapter zone results and completion", () => {

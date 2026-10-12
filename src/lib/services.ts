@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { todayInArgentina } from "./argentina-date";
+import { formatCalendarDay, todayInArgentina } from "./argentina-date";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import {
   streetClosureRequestsAdapter,
@@ -1341,10 +1341,8 @@ export function checkServiceWindowTiming(
     return { isOutside: false, timing: "within", message: null };
   }
 
-  const currentYear = now.getFullYear();
-  const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
-  const currentDay = String(now.getDate()).padStart(2, "0");
-  const currentDateStr = `${currentYear}-${currentMonth}-${currentDay}`;
+  const currentDateStr = todayInArgentina(now);
+  const scheduledDateLabel = formatCalendarDay(service.scheduledDate);
 
   const currentHours = String(now.getHours()).padStart(2, "0");
   const currentMinutes = String(now.getMinutes()).padStart(2, "0");
@@ -1354,14 +1352,14 @@ export function checkServiceWindowTiming(
     return {
       isOutside: true,
       timing: "late",
-      message: `Inicio fuera de ventana horaria: la fecha programada fue el ${service.scheduledDate} (${service.windowFrom} – ${service.windowTo}).`,
+      message: `Inicio fuera de ventana horaria: la fecha programada fue el ${scheduledDateLabel} (${service.windowFrom} – ${service.windowTo}).`,
     };
   }
   if (service.scheduledDate > currentDateStr) {
     return {
       isOutside: true,
       timing: "early",
-      message: `Inicio fuera de ventana horaria: el servicio está programado para el ${service.scheduledDate} (${service.windowFrom} – ${service.windowTo}).`,
+      message: `Inicio fuera de ventana horaria: el servicio está programado para el ${scheduledDateLabel} (${service.windowFrom} – ${service.windowTo}).`,
     };
   }
 

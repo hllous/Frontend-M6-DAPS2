@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 import { HttpResponse, http } from "msw";
@@ -44,6 +44,45 @@ describe("ScheduleServiceDialog component", () => {
     expect(screen.getByLabelText(/Recorrido asignado/)).toBeInTheDocument();
     expect(screen.getAllByText(/sin cuadrilla ni vehículo asignados/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: "Programar servicio" })).toBeInTheDocument();
+  });
+
+  it("defaults to and sets the minimum at today's Argentine date", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-23T01:30:00Z"));
+
+    try {
+      render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+      await catalogsLoaded();
+
+      const dateInput = screen.getByLabelText(/Fecha programada/);
+      expect(dateInput).toHaveValue("2026-09-22");
+      expect(dateInput).toHaveAttribute("min", "2026-09-22");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects a date before today in Argentina with a Spanish validation message", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-23T01:30:00Z"));
+    const onCreated = vi.fn();
+    const create = vi.spyOn(servicesAdapter, "create");
+    const user = userEvent.setup();
+
+    try {
+      render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={onCreated} />);
+      await catalogsLoaded();
+
+      const dateInput = screen.getByLabelText(/Fecha programada/);
+      fireEvent.change(dateInput, { target: { value: "2026-09-21" } });
+      await user.click(screen.getByRole("button", { name: "Programar servicio" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("La fecha programada debe ser hoy o una fecha posterior en Argentina.");
+      expect(create).not.toHaveBeenCalled();
+      expect(onCreated).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("derives mode strictly from ServiceType without allowing operator to override mode", async () => {
