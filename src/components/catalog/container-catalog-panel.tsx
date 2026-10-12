@@ -96,6 +96,7 @@ const emptyForm: ContainerForm = {
 
 const containerTypes = containerTypeSchema.options;
 const containerStatuses = containerStatusSchema.options;
+const serviceLookupFailure = "No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.";
 
 function StatusBadge({ status }: { status: ContainerStatus }) {
   const label = CONTAINER_STATUS_LABELS[status];
@@ -152,6 +153,8 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
   const [startRelocatingContainer, setStartRelocatingContainer] = useState<Container | null>(null);
   const [confirmRelocatingContainer, setConfirmRelocatingContainer] = useState<Container | null>(null);
   const [services, setServices] = useState<Service[]>([]);
+  const [servicesStatus, setServicesStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [serviceLookupVersion, setServiceLookupVersion] = useState(0);
   const [startingRepairContainer, setStartingRepairContainer] = useState<Container | null>(null);
   const [completingRepairContainer, setCompletingRepairContainer] = useState<Container | null>(null);
   const [removingContainer, setRemovingContainer] = useState<Container | null>(null);
@@ -159,18 +162,32 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
 
   useEffect(() => {
     let isCurrent = true;
-    void servicesAdapter
-      .list({ pageSize: 100 })
-      .then((page) => {
-        if (isCurrent) setServices(page.services);
-      })
-      .catch(() => {
-        if (isCurrent) setServices([]);
-      });
+    async function requestServices() {
+      setServicesStatus("loading");
+      const services: Service[] = [];
+      let page = 1;
+      let totalPages = 1;
+      let total = 0;
+      do {
+        const result = await servicesAdapter.list({ page, pageSize: 100 });
+        if (!isCurrent) return;
+        if (result.page !== page) throw new Error(serviceLookupFailure);
+        services.push(...result.services);
+        totalPages = result.totalPages;
+        total = result.total;
+        page += 1;
+      } while (page <= totalPages && page <= 20);
+      if (totalPages >= 20 || services.length < total) throw new Error(serviceLookupFailure);
+      setServices(services);
+      setServicesStatus("ready");
+    }
+    void requestServices().catch(() => {
+      if (isCurrent) setServicesStatus("error");
+    });
     return () => {
       isCurrent = false;
     };
-  }, [requestVersion]);
+  }, [requestVersion, serviceLookupVersion]);
 
   useEffect(() => {
     if (!detailContainer) return;
@@ -251,6 +268,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         setDetailEvidence([]);
         setIsLoadingEvidence(true);
         setDetailContainer(container);
+        refreshServiceLookup();
       })
       .catch(() => undefined);
     return () => {
@@ -284,6 +302,12 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
     setDetailEvidence([]);
     setIsLoadingEvidence(true);
     setDetailContainer(container);
+    refreshServiceLookup();
+  }
+
+  function refreshServiceLookup() {
+    setServicesStatus("loading");
+    setServiceLookupVersion((version) => version + 1);
   }
 
   function closeDetail() {
@@ -400,6 +424,11 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
           {notice}
         </p>
       )}
+
+      {servicesStatus === "error" && !detailContainer ? <div role="status" className="text-sm text-[var(--color-warning)]">
+        <p>{serviceLookupFailure}</p>
+        <Button variant="outline" onClick={refreshServiceLookup}>Reintentar</Button>
+      </div> : null}
 
       {/* Filter panel */}
       <div
@@ -582,6 +611,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                           <Button
                             variant="outline"
                             size="sm"
+                            disabled={servicesStatus !== "ready"}
                             onClick={() => setEmptyContainer(container)}
                             className="text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
                           >
@@ -604,6 +634,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                           <Button
                             variant="outline"
                             size="sm"
+                            disabled={servicesStatus !== "ready"}
                             onClick={() => setStartRelocatingContainer(container)}
                             className="text-[var(--color-info)] hover:bg-[var(--color-info)]/10"
                           >
@@ -626,6 +657,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                           <Button
                             variant="outline"
                             size="sm"
+                            disabled={servicesStatus !== "ready"}
                             onClick={() => setConfirmRelocatingContainer(container)}
                             className="text-[var(--color-info)] hover:bg-[var(--color-info)]/10"
                           >
@@ -648,6 +680,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                           <Button
                             variant="outline"
                             size="sm"
+                            disabled={servicesStatus !== "ready" || Boolean(inFlight)}
                             onClick={() => setRemovingContainer(container)}
                             className="text-destructive hover:bg-destructive/10"
                           >
@@ -670,6 +703,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                         <Button
                           variant="outline"
                           size="sm"
+                          disabled={servicesStatus !== "ready"}
                           onClick={() => setCompletingRepairContainer(container)}
                           className="text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
                         >
@@ -1050,6 +1084,10 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                       </Button>
                     </>
                   )}
+                  {servicesStatus === "error" ? <div role="status" className="text-sm text-[var(--color-warning)]">
+                    <p>{serviceLookupFailure}</p>
+                    <Button variant="outline" onClick={refreshServiceLookup}>Reintentar</Button>
+                  </div> : null}
                   {(() => {
                     const detailInFlight = findInFlightServiceForContainer(detailContainer, services);
                     return (
@@ -1068,6 +1106,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                               type="button"
                               variant="outline"
                               size="sm"
+                              disabled={servicesStatus !== "ready"}
                               onClick={() => {
                                 const target = detailContainer;
                                 closeDetail();
@@ -1094,6 +1133,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                               type="button"
                               variant="outline"
                               size="sm"
+                              disabled={servicesStatus !== "ready"}
                               onClick={() => {
                                 const target = detailContainer;
                                 closeDetail();
@@ -1120,6 +1160,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                               type="button"
                               variant="outline"
                               size="sm"
+                              disabled={servicesStatus !== "ready"}
                               onClick={() => {
                                 const target = detailContainer;
                                 closeDetail();
@@ -1155,6 +1196,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                         type="button"
                         variant="outline"
                         size="sm"
+                        disabled={servicesStatus !== "ready" || Boolean(detailInFlight)}
                         onClick={() => {
                           const target = detailContainer;
                           closeDetail();
@@ -1182,6 +1224,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                       type="button"
                       variant="outline"
                       size="sm"
+                      disabled={servicesStatus !== "ready"}
                       onClick={() => {
                         const target = detailContainer;
                         closeDetail();
@@ -1211,6 +1254,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         onOpenChange={(open) => !open && setReportingOverflowContainer(null)}
         container={reportingOverflowContainer}
         onSuccess={(updated) => {
+          refreshServiceLookup();
           setState((prev) =>
             prev.status === "ready"
               ? {
@@ -1232,6 +1276,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         onOpenChange={(open) => !open && setReportingDamageContainer(null)}
         container={reportingDamageContainer}
         onSuccess={(updated) => {
+          refreshServiceLookup();
           applyUpdatedContainer(updated);
           setNotice(`Reporte de daño registrado con éxito para el contenedor ${updated.code}.`);
         }}
@@ -1243,6 +1288,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         onOpenChange={(open) => !open && setEmptyContainer(null)}
         container={emptyContainer}
         onSuccess={(updated) => {
+          refreshServiceLookup();
           setState((prev) =>
             prev.status === "ready"
               ? {
@@ -1264,6 +1310,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         onOpenChange={(open) => !open && setStartRelocatingContainer(null)}
         container={startRelocatingContainer}
         onSuccess={(updated) => {
+          refreshServiceLookup();
           setState((prev) =>
             prev.status === "ready"
               ? {
@@ -1285,6 +1332,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         onOpenChange={(open) => !open && setConfirmRelocatingContainer(null)}
         container={confirmRelocatingContainer}
         onSuccess={(updated) => {
+          refreshServiceLookup();
           setState((prev) =>
             prev.status === "ready"
               ? {
@@ -1305,6 +1353,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         onOpenChange={(open) => !open && setStartingRepairContainer(null)}
         container={startingRepairContainer}
         onSuccess={(updated) => {
+          refreshServiceLookup();
           applyUpdatedContainer(updated);
           setNotice(`Reparación iniciada para el contenedor ${updated.code}.`);
         }}
@@ -1315,6 +1364,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         onOpenChange={(open) => !open && setCompletingRepairContainer(null)}
         container={completingRepairContainer}
         onSuccess={(updated) => {
+          refreshServiceLookup();
           applyUpdatedContainer(updated);
           setNotice(`Reparación completada con éxito para el contenedor ${updated.code}.`);
         }}
@@ -1325,6 +1375,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         onOpenChange={(open) => !open && setRemovingContainer(null)}
         container={removingContainer}
         onSuccess={(updated) => {
+          refreshServiceLookup();
           applyUpdatedContainer(updated);
           setNotice(`Contenedor ${updated.code} retirado con éxito.`);
         }}
