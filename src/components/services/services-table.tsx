@@ -137,6 +137,7 @@ function ColumnFilterPopover({
 
 export function ServicesTable({
   services,
+  filterOptionsServices = services,
   selectedId,
   onSelect,
   sortKey,
@@ -147,6 +148,7 @@ export function ServicesTable({
   dense = false,
 }: {
   services: Service[];
+  filterOptionsServices?: Service[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   sortKey: SortKey;
@@ -170,15 +172,17 @@ export function ServicesTable({
 
   const availableZones = useMemo(() => {
     const set = new Set<string>();
-    services.forEach((s) => s.zoneNames.forEach((zn) => set.add(zn)));
+    filterOptionsServices.forEach((s) => s.zoneNames.forEach((zn) => set.add(zn)));
+    columnFilters.zones.forEach((zone) => set.add(zone));
     return Array.from(set).sort();
-  }, [services]);
+  }, [filterOptionsServices, columnFilters.zones]);
 
   const availableCrews = useMemo(() => {
     const set = new Set<string>();
-    services.forEach((s) => set.add(s.crewName ?? "Sin asignar"));
+    filterOptionsServices.forEach((s) => set.add(s.crewName ?? "Sin asignar"));
+    columnFilters.crews.forEach((crew) => set.add(crew));
     return Array.from(set).sort();
-  }, [services]);
+  }, [filterOptionsServices, columnFilters.crews]);
 
   const sortedServices = useMemo(() => {
     const copy = [...services];
