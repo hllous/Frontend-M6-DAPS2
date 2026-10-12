@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getTreeSurveyFixture } from "@/lib/tree-survey-fixtures";
 import { getRequiredSession, InvalidSessionError, AuthUnavailableError } from "@/lib/session";
 
@@ -14,7 +14,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const session = getRequiredSession(request);
     const { id, surveyId } = await context.params;
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/trees/${id}/surveys/${surveyId}`);
+      const response = await fetchBackend(request, `/trees/${pathId(id)}/surveys/${pathId(surveyId)}`);
       return forwardResponse(response);
     }
     const survey = getTreeSurveyFixture(id, surveyId);

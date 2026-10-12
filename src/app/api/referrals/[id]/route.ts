@@ -1,6 +1,6 @@
 import { backendMode, errorResponse } from "@/lib/bff-route";
 import { getScenario } from "@/lib/scenarios";
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { repairRequestSchema } from "@/lib/repair-requests";
 import { referralFromBackendRepairRequest, referralFromStreetClosureRequest, isReferralVisibleToScenario, isReferralVisibleToBackendSources } from "@/lib/referrals";
 import { streetClosureRequestSchema } from "@/lib/street-closure-requests";
@@ -28,7 +28,7 @@ export async function GET(
     let referral = useBackend ? null : findFixtureReferral(id);
     if (useBackend) {
       for (const kind of ["repair-requests", "street-closure-requests"] as const) {
-        const backendResponse = await fetchBackend(request, `/${kind}/${encodeURIComponent(id)}`);
+        const backendResponse = await fetchBackend(request, `/${kind}/${pathId(id)}`);
         if (backendResponse.status === 404) continue;
         const payload = await backendResponse.text();
         if (!backendResponse.ok) return new Response(payload, { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });

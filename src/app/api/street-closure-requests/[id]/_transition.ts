@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   getStreetClosureRequestFixture,
   updateStreetClosureRequestFixture,
@@ -42,7 +42,7 @@ export async function handleStreetClosureTransition(
     }
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/street-closure-requests/${id}/${transition}`, undefined, {
+      const backendResponse = await fetchBackend(request, `/street-closure-requests/${pathId(id)}/${transition}`, undefined, {
         method: "POST",
         headers: transition === "approve" ? { "content-type": "application/json" } : undefined,
         body: transition === "approve" ? JSON.stringify(body) : undefined,

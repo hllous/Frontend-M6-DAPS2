@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { assignCrewFixture } from "@/lib/services-fixtures";
 import { assignCrewInputSchema } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
@@ -47,7 +47,7 @@ export async function POST(
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/assign-crew`,
+        `/services/${pathId(serviceId)}/assign-crew`,
         undefined,
         {
           method: "POST",

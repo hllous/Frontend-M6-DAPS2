@@ -67,9 +67,9 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
     expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("conserva la proyección si falla la lectura de evidencia y codifica el servicio", async () => {
+  it("conserva la proyección si falla la lectura de evidencia con un servicio válido", async () => {
     const backendFetch = fieldBackend()
-      .mockResolvedValueOnce(Response.json({ ...inspection, serviceId: "servicio/real?x=1" }))
+      .mockResolvedValueOnce(Response.json({ ...inspection, serviceId: "servicio-real-1" }))
       .mockResolvedValueOnce(Response.json({ crewId }))
       .mockResolvedValueOnce(Response.json({ message: "Evidencia no disponible." }, { status: 503 }));
     const response = await detail(await backendCookie());
@@ -81,7 +81,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
     expect(body).not.toHaveProperty("reporterSnapshot");
     expect(body).not.toHaveProperty("violationNotice");
     expect(body).not.toHaveProperty("attachments");
-    expect(String(backendFetch.mock.calls[2]?.[0])).toBe("https://backend.internal/services/servicio%2Freal%3Fx%3D1");
+    expect(String(backendFetch.mock.calls[2]?.[0])).toBe("https://backend.internal/services/servicio-real-1");
   });
 
   it.each(["901159c1-3230-440a-ba3d-d7baf55fab24", null, undefined])("Campo no recibe inspecciones de otra cuadrilla (%s)", async (otherCrewId) => {

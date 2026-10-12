@@ -1,7 +1,7 @@
 import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { environmentalInspectionSchema } from "@/lib/environmental-reports";
 import { serviceFixtures } from "@/lib/services-fixtures";
@@ -29,7 +29,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     requireCapability(session, "environmentalInspection:view");
     const scenario = getScenario(session.scenarioId);
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, "/environmental-inspections/" + encodeURIComponent(id), "environmentalInspection:view");
+      const backendResponse = await fetchBackend(request, "/environmental-inspections/" + pathId(id), "environmentalInspection:view");
       if (!backendResponse.ok) return withInspectionAttachments(request, backendResponse);
       let payload: unknown;
       try { payload = await backendResponse.json(); } catch {
@@ -40,7 +40,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       let inspection: Record<string, unknown> = parsed.data;
       if (scenario.actor.kind === "FIELD") {
         if (!parsed.data.serviceId || !session.crew?.id) return response(404, "Inspección no encontrada.", path);
-        const serviceResponse = await fetchBackend(request, `/services/${encodeURIComponent(parsed.data.serviceId)}`);
+        const serviceResponse = await fetchBackend(request, `/services/${pathId(parsed.data.serviceId)}`);
         if (!serviceResponse.ok) return withInspectionAttachments(request, serviceResponse);
         const service: unknown = await serviceResponse.json();
         if (!service || typeof service !== "object" || !("crewId" in service) || service.crewId !== session.crew.id) {

@@ -2,7 +2,7 @@ import { backendMode, errorResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getRepairRequestFixture, repairRequestFixtures } from "@/lib/repair-request-fixtures";
 import {
   getReferralSourceServiceIds,
@@ -72,7 +72,7 @@ export async function backendReferralSourceIds(request: Request, crewId: string)
     sourceIds.add(service.id);
     let inspectionId = service.inspectionId;
     if (inspectionId === undefined && service.origin === "INSPECTION") {
-      const response = await fetchBackend(request, `/services/${encodeURIComponent(service.id)}`);
+      const response = await fetchBackend(request, `/services/${pathId(service.id)}`);
       if (!response.ok) throw new Error(`Backend respondió ${response.status} al consultar el servicio.`);
       const detail = referralServiceSchema.parse(await response.json());
       if (detail.id === service.id && detail.crewId === crewId) inspectionId = detail.inspectionId;

@@ -2,7 +2,7 @@ import { backendMode, errorResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import type { ZoneReferenceReport } from "@/lib/zones";
 
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
@@ -29,7 +29,7 @@ export async function GET(
     const id = await targetId(context);
 
     if (backendMode(session)) {
-      const detail = await fetchBackend(request, `/zones/${encodeURIComponent(id)}`);
+      const detail = await fetchBackend(request, `/zones/${pathId(id)}`);
       if (detail.status === 404) return errorResponse(404, `Zona operativa ${id} no encontrada.`, path);
       if (!detail.ok) throw new AuthUnavailableError("No se pudo consultar la zona.");
       z.object({ id: z.literal(id) }).parse(await detail.json());

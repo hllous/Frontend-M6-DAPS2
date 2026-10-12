@@ -1,65 +1,47 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
-import { fetchBackend } from "./bff-backend";
+import { AUTH_COOKIE_NAME, createSession, sealSession } from "./session";
+import { fetchBackend, pathId } from "./bff-backend";
 
-const originalMode = process.env.M6_AUTH_MODE;
-const originalJwt = process.env.M6_DEV_JWT;
-const originalOrigin = process.env.M6_BACKEND_ORIGIN;
+const backendOrigin = "https://backend.internal";
+const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+
+function backendRequest() {
+  process.env.M6_BACKEND_ORIGIN = backendOrigin;
+  const session = createSession("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin });
+  const cookie = `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
+  return new Request("http://localhost/api/services/service-1/start", { headers: { cookie } });
+}
 
 afterEach(() => {
-  if (originalMode === undefined) delete process.env.M6_AUTH_MODE;
-  else process.env.M6_AUTH_MODE = originalMode;
-  if (originalJwt === undefined) delete process.env.M6_DEV_JWT;
-  else process.env.M6_DEV_JWT = originalJwt;
-  if (originalOrigin === undefined) delete process.env.M6_BACKEND_ORIGIN;
-  else process.env.M6_BACKEND_ORIGIN = originalOrigin;
+  delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
 
-describe("server-owned backend adapter", () => {
-  it("adds the pre-signed development JWT only on the server-to-server request", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const loginResponse = await login(new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
-    }));
-    const cookie = loginResponse.headers.get("set-cookie")?.split(";")[0] ?? "";
-    const backendResponse = new Response(JSON.stringify({ ok: true }), { status: 200 });
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(backendResponse);
-
-    await expect(fetchBackend(
-      new Request("http://localhost/api/services", { headers: { cookie } }),
-      "/api/services",
-      "service:view",
-    )).resolves.toBe(backendResponse);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      new URL("/api/services", "https://backend.internal"),
-      expect.objectContaining({ headers: expect.any(Headers) }),
-    );
-    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
-    expect(new Headers(requestInit.headers).get("Authorization")).toBe(
-      "Bearer header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
-    );
+describe("pathId", () => {
+  it.each(["crew-b", "RR-0001", "a_b", "a~b", "a.b"]) ("keeps valid fixture id %s safe", (id) => {
+    expect(pathId(id)).toBe(encodeURIComponent(id));
   });
 
-  it("never uses a real backend in mock mode", async () => {
-    process.env.M6_AUTH_MODE = "mock";
-    const loginResponse = await login(new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
-    }));
-    const cookie = loginResponse.headers.get("set-cookie")?.split(";")[0] ?? "";
+  it.each(["..", "a/b", "a?b=c", "a#b", "%2e%2e"])("returns a 400 without fetching for invalid id %s", async (id) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("unused"));
+    const response = await fetchBackend(backendRequest(), `/services/${pathId(id)}/start`);
 
-    await expect(fetchBackend(
-      new Request("http://localhost/api/services", { headers: { cookie } }),
-      "/api/services",
-      "service:view",
-    )).rejects.toThrow(/modo mock/i);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: "Bad Request",
+      message: "Identificador inválido.",
+      path: "/api/services/service-1/start",
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects a normalized path that differs from the supplied backend path", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("unused"));
+
+    await expect(fetchBackend(backendRequest(), "/services/../containers/container-1/remove")).rejects.toThrow(
+      "El recurso backend debe ser una ruta interna.",
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

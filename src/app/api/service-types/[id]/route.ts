@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { serviceTypeUpdateInputSchema } from "@/lib/service-types";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
@@ -17,7 +17,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const session = getRequiredSession(request);
     const id = await targetId(context);
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/service-types/${id}`);
+      const response = await fetchBackend(request, `/service-types/${pathId(id)}`);
       return forwardResponse(response);
     }
     const item = serviceTypeFixtures.find((candidate) => candidate.id === id);
@@ -42,7 +42,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const parsed = serviceTypeUpdateInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/service-types/${id}`, "serviceType:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
+      const response = await fetchBackend(request, `/service-types/${pathId(id)}`, "serviceType:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
       return forwardResponse(response);
     }
     const updated = updateServiceTypeFixture(id, parsed.data);
@@ -64,7 +64,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     requireCapability(session, "serviceType:manage");
     const id = await targetId(context);
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/service-types/${id}`, "serviceType:manage", { method: "DELETE" });
+      const response = await fetchBackend(request, `/service-types/${pathId(id)}`, "serviceType:manage", { method: "DELETE" });
       return forwardResponse(response);
     }
     const updated = updateServiceTypeFixture(id, { active: false });

@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { containerFixtures, updateContainerFixture } from "@/lib/containers-fixtures";
 import { updateContainerInputSchema } from "@/lib/containers";
 import { getScenario } from "@/lib/scenarios";
@@ -27,7 +27,7 @@ export async function GET(
     const session = getRequiredSession(request);
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/containers/${id}`);
+      const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}`);
             return forwardResponse(backendResponse);
     }
 
@@ -76,7 +76,7 @@ export async function PATCH(
     }
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/containers/${id}`, "container:manage", {
+      const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}`, "container:manage", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),

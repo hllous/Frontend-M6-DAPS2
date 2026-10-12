@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
@@ -51,7 +51,7 @@ export async function PUT(
     }
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/routes/${id}/stops`, "route:manage", {
+      const backendResponse = await fetchBackend(request, `/routes/${pathId(id)}/stops`, "route:manage", {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),

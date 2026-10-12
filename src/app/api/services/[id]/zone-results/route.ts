@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   addZoneResultFixture,
   getZoneResultsByServiceId,
@@ -34,7 +34,7 @@ export async function GET(
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/zone-results`,
+        `/services/${pathId(serviceId)}/zone-results`,
       );
             return forwardResponse(backendResponse);
     }
@@ -102,7 +102,7 @@ export async function POST(
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/zone-results`,
+        `/services/${pathId(serviceId)}/zone-results`,
         undefined,
         {
           method: "POST",

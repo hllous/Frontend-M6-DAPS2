@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getStreetClosureRequestFixture } from "@/lib/street-closure-request-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
@@ -23,7 +23,7 @@ export async function GET(
       return errorResponse(403, "Solo Oficina puede consultar solicitudes de corte de calle.", path);
     }
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/street-closure-requests/${id}`);
+      const backendResponse = await fetchBackend(request, `/street-closure-requests/${pathId(id)}`);
       return forwardResponse(backendResponse);
     }
     const requestFixture = getStreetClosureRequestFixture(id);

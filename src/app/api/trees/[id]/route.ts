@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { treeFixtures, updateTreeFixture } from "@/lib/tree-fixtures";
 import { treeUpdateInputSchema } from "@/lib/trees";
 import { getScenario } from "@/lib/scenarios";
@@ -24,7 +24,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const session = getRequiredSession(request);
     const id = await targetId(context);
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/trees/${id}`);
+      const response = await fetchBackend(request, `/trees/${pathId(id)}`);
       return forwardResponse(response);
     }
     const item = treeFixtures.find((candidate) => candidate.id === id);
@@ -46,7 +46,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const parsed = treeUpdateInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/trees/${id}`, "tree:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
+      const response = await fetchBackend(request, `/trees/${pathId(id)}`, "tree:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
       return forwardResponse(response);
     }
     const updated = updateTreeFixture(id, parsed.data);
@@ -65,7 +65,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const session = requireOffice(request);
     const id = await targetId(context);
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/trees/${id}`, "tree:manage", { method: "DELETE" });
+      const response = await fetchBackend(request, `/trees/${pathId(id)}`, "tree:manage", { method: "DELETE" });
       return forwardResponse(response);
     }
     const updated = updateTreeFixture(id, { active: false });

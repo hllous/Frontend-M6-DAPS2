@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
@@ -32,7 +32,7 @@ export async function GET(
     const session = getRequiredSession(request);
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/routes/${id}`);
+      const backendResponse = await fetchBackend(request, `/routes/${pathId(id)}`);
             return forwardResponse(backendResponse);
     }
 
@@ -82,7 +82,7 @@ export async function PATCH(
     }
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/routes/${id}`, "route:manage", {
+      const backendResponse = await fetchBackend(request, `/routes/${pathId(id)}`, "route:manage", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
@@ -128,7 +128,7 @@ export async function DELETE(
     requireCapability(session, "route:manage");
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/routes/${id}`, "route:manage", {
+      const backendResponse = await fetchBackend(request, `/routes/${pathId(id)}`, "route:manage", {
         method: "DELETE",
       });
             return forwardResponse(backendResponse);

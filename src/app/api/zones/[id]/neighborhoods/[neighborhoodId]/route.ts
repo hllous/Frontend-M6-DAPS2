@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
@@ -35,7 +35,7 @@ export async function DELETE(
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(
         request,
-        `/zones/${id}/neighborhoods/${encodeURIComponent(neighborhoodId)}`,
+        `/zones/${pathId(id)}/neighborhoods/${pathId(neighborhoodId)}`,
         "zone:manage",
         { method: "DELETE" },
       );

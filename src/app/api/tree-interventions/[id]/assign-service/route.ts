@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getTreeInterventionFixture, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 import {
   treeInterventionAssignServiceInputSchema,
@@ -28,7 +28,7 @@ async function backendAssignService(
 ) {
   const response = await fetchBackend(
     request,
-    `/tree-interventions/${encodeURIComponent(id)}/assign-service`,
+    `/tree-interventions/${pathId(id)}/assign-service`,
     "service:schedule",
     {
       method: "POST",

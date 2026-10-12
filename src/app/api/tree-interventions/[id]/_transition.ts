@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   getTreeInterventionFixture,
   updateTreeInterventionFixture,
@@ -49,7 +49,7 @@ async function backendTransition(
   }
   const response = await fetchBackend(
     request,
-    `/tree-interventions/${encodeURIComponent(id)}/${transition === "submit" ? "submit-for-authorization" : transition}`,
+    `/tree-interventions/${pathId(id)}/${transition === "submit" ? "submit-for-authorization" : transition}`,
     transitionCapability(transition),
     init,
   );

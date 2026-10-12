@@ -2,7 +2,7 @@ import { backendMode, errorResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { serviceFrequencySchema } from "@/lib/service-frequencies";
 import type { RouteReferenceReport } from "@/lib/routes";
@@ -30,7 +30,7 @@ export async function GET(
     const session = getRequiredSession(request);
 
     if (backendMode(session)) {
-      const detail = await fetchBackend(request, `/routes/${encodeURIComponent(id)}`);
+      const detail = await fetchBackend(request, `/routes/${pathId(id)}`);
       if (detail.status === 404) return errorResponse(404, "Recorrido no encontrado.", path);
       if (!detail.ok) throw new AuthUnavailableError("No se pudo consultar el recorrido.");
       z.object({ id: z.literal(id) }).parse(await detail.json());

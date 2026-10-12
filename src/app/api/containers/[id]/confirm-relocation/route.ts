@@ -1,7 +1,7 @@
 import { backendMode, errorResponse, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getContainerFixture, confirmRelocationFixture } from "@/lib/containers-fixtures";
 import { confirmRelocationInputSchema } from "@/lib/containers";
 import { getScenario } from "@/lib/scenarios";
@@ -44,7 +44,7 @@ export async function POST(
     }
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/containers/${id}/confirm-relocation`, "container:manage", {
+      const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}/confirm-relocation`, "container:manage", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
