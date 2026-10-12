@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { fetchBackend } from "@/lib/bff-backend";
 import { getRepairRequestFixture, transitionRepairRequestFixture } from "@/lib/repair-request-fixtures";
@@ -16,7 +17,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = repairRequestRecoveryInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) { const response = await fetchBackend(request, `/repair-requests/${id}/close`, undefined, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
+    if (backendMode(session)) { const response = await fetchBackend(request, `/repair-requests/${id}/close`, undefined, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }); return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } }); }
     const current = getRepairRequestFixture(id);
     if (!current) return errorResponse(404, `Derivación ${id} no encontrada.`, path);
     if (current.status !== "IN_PROGRESS") return errorResponse(409, `Solo se puede cerrar una derivación IN_PROGRESS (estado actual: ${current.status}).`, path);

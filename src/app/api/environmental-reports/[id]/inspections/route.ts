@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -26,7 +27,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     requireCapability(session, "environmentalInspection:view");
     const scenario = getScenario(session.scenarioId);
     if (scenario.actor.kind === "FIELD") return errorResponse(404, "Historia de inspecciones no encontrada.", path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       return withInspectionAttachments(request, await fetchBackend(request, "/environmental-reports/" + encodeURIComponent(id) + "/inspections", "environmentalInspection:view"));
     }
     if (!getEnvironmentalReportFixture(id)) return errorResponse(404, "Expediente ambiental no encontrado.", path);
@@ -51,7 +52,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = environmentalInspectionScheduleInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       // El backend solo acepta serviceId/inspectorId al programar (CreateInspectionDto
       // con forbidNonWhitelisted): la fecha, la ventana, el checklist y la zona van al
       // Service, no a la inspección.

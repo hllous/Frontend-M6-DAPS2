@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -39,7 +40,7 @@ export async function GET(
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/services/${serviceId}`);
       const bodyText = await backendResponse.text();
       return new NextResponse(bodyText, {

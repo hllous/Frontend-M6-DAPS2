@@ -68,6 +68,7 @@ type SessionOptions = {
   mode: AuthMode;
   now?: number;
   devJwt?: string;
+  backendOrigin?: string;
 };
 
 type RuntimeEnvironment = {
@@ -113,6 +114,10 @@ export function createSession(
   const accessToken = options.devJwt;
   if (!accessToken) {
     throw new AuthUnavailableError("El modo de desarrollo requiere M6_DEV_JWT en el servidor.");
+  }
+
+  if (!options.backendOrigin) {
+    throw new AuthUnavailableError("El backend de desarrollo no está configurado.");
   }
 
   const jwtExpiresAt = readJwtExpiry(accessToken);

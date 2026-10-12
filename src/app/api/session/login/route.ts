@@ -18,9 +18,8 @@ class CrewResolutionError extends Error {}
  * Campo filtra por su cuadrilla y el backend exige su UUID, que cambia con cada seed.
  * El escenario guarda el nombre (Crew no tiene código) y acá se busca el id real.
  */
-async function resolveBackendCrew(session: Session): Promise<ScenarioCrew | undefined> {
+async function resolveBackendCrew(session: Session, origin: string | undefined): Promise<ScenarioCrew | undefined> {
   const crewName = getScenario(session.scenarioId).actor.backendCrewName;
-  const origin = process.env.M6_BACKEND_ORIGIN;
   if (session.mode !== "backend-development" || !crewName || !origin) return undefined;
 
   const unavailable = `No se pudo resolver la cuadrilla «${crewName}» del escenario de Campo contra el backend.`;
@@ -57,11 +56,13 @@ export async function POST(request: Request) {
   }
 
   try {
+    const backendOrigin = process.env.M6_BACKEND_ORIGIN;
     const created = createSession(body.scenarioId, {
       mode: getAuthMode(),
       devJwt: process.env.M6_DEV_JWT,
+      backendOrigin,
     });
-    const crew = await resolveBackendCrew(created);
+    const crew = await resolveBackendCrew(created, backendOrigin);
     const session = crew ? { ...created, crew } : created;
     const response = NextResponse.json({ session: publicSession(session) });
     response.cookies.set({
