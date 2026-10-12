@@ -17,15 +17,25 @@ function queryFromUrl(url: URL): TreeInterventionQuery {
   };
 }
 
+function queryString(query: TreeInterventionQuery) {
+  const params = new URLSearchParams();
+  if (query.interventionType !== undefined) params.set("interventionType", String(query.interventionType));
+  if (query.status !== undefined) params.set("status", String(query.status));
+  if (query.page !== undefined) params.set("page", String(query.page));
+  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  const value = params.toString();
+  return value ? `?${value}` : "";
+}
+
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
+    const query = queryFromUrl(new URL(request.url));
     if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const response = await fetchBackend(request, `/tree-interventions${new URL(request.url).search}`);
+      const response = await fetchBackend(request, `/tree-interventions${queryString(query)}`);
       return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
     }
-    const query = queryFromUrl(new URL(request.url));
     return NextResponse.json(paginateTreeInterventionFixtures(filterTreeInterventionFixtures(query), query.page, query.pageSize));
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
