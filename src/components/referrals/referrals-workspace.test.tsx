@@ -8,6 +8,7 @@ import { handlers } from "@/mocks/handlers";
 import { fixtureReferrals } from "@/app/api/referrals/route";
 import { addRepairRequestFixture, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { scenarios } from "@/lib/scenarios";
+import { isReferralVisibleToScenario, referralFromBackendRepairRequest } from "@/lib/referrals";
 import { resetStreetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import { ReferralsWorkspace } from "./referrals-workspace";
 
@@ -23,6 +24,29 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("ReferralsWorkspace", () => {
+  it("renders a BFF-scoped Field referral whose source UUID is absent from fixtures", async () => {
+    const id = "15c86465-54d3-4e0a-83a5-26a3cc510017";
+    const inspectionId = "bd685878-7c96-4e99-9b38-b0368a011fa0";
+    const referral = referralFromBackendRepairRequest({
+      id, damageType: "BROKEN_SIDEWALK", address: "Av. Rivadavia 2200",
+      severity: "LOW", publicSafetyRisk: false, detectedInType: "INSPECTION",
+      detectedInId: inspectionId, status: "REQUESTED", requestedAt: "2026-10-01T08:00:00.000Z",
+    });
+    server.use(http.get("*/api/referrals", () => HttpResponse.json({ data: [referral], meta: { total: 1 } })));
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={{
+      ...scenarios.fieldCrewLeader,
+      actor: { ...scenarios.fieldCrewLeader.actor, crewId: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516" },
+    }} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(list).getByRole("button", { name: new RegExp(id) }));
+    const detail = await screen.findByRole("region", { name: `Detalle de ${id}` });
+    expect(within(detail).getByRole("link", { name: /Ver inspección fuente/ })).toHaveAttribute(
+      "href", `/app?destination=environment&inspectionId=${inspectionId}`,
+    );
+  });
+
   it("lets Office list both referral kinds and open their own detail", async () => {
     const user = userEvent.setup();
     render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
@@ -147,7 +171,10 @@ describe("ReferralsWorkspace", () => {
     const all = fixtureReferrals();
     const outOfScope = { ...all[0], id: "RR-OTHER", sourceServiceId: "SVC-1042", sourceLabel: "Servicio de otra cuadrilla" };
     server.use(
-      http.get("*/api/referrals", () => HttpResponse.json({ data: [...all, outOfScope], meta: { total: all.length + 1 } })),
+      http.get("*/api/referrals", () => {
+        const data = [...all, outOfScope].filter((referral) => isReferralVisibleToScenario(referral, scenarios.fieldCrewLeader));
+        return HttpResponse.json({ data, meta: { total: data.length } });
+      }),
     );
 
     const user = userEvent.setup();
