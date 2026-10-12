@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { getRepairRequestFixture, repairRequestFixtures } from "@/lib/repair-request-fixtures";
@@ -11,8 +12,8 @@ import {
 } from "@/lib/referrals";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import type { RepairRequest } from "@/lib/repair-requests";
-import type { StreetClosureRequest } from "@/lib/street-closure-requests";
+import { repairRequestSchema } from "@/lib/repair-requests";
+import { streetClosureRequestSchema } from "@/lib/street-closure-requests";
 import { getStreetClosureRequestFixture, streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 
 const ERROR_LABELS: Record<number, string> = {
@@ -44,6 +45,30 @@ export function referralsForScenario(scenario: ReturnType<typeof getScenario>): 
   );
 }
 
+export async function backendCollection<T>(request: Request, path: string, recordSchema: z.ZodType<T>): Promise<T[]> {
+  const pageSchema = z.object({
+    data: z.array(recordSchema),
+    meta: z.object({
+      total: z.number().int().nonnegative(),
+      page: z.number().int().positive(),
+      pageSize: z.number().int().positive().max(100),
+      totalPages: z.number().int().nonnegative(),
+    }),
+  });
+  const records: T[] = [];
+  for (let page = 1; page <= 50; page += 1) {
+    const query = new URLSearchParams(path.split("?")[1]);
+    query.set("page", String(page));
+    query.set("pageSize", "100");
+    const response = await fetchBackend(request, `${path.split("?")[0]}?${query}`);
+    if (!response.ok) throw new Error(`Backend respondió ${response.status} al consultar derivaciones.`);
+    const payload = pageSchema.parse(await response.json());
+    records.push(...payload.data);
+    if (page >= payload.meta.totalPages) return records;
+  }
+  throw new Error("La consulta de derivaciones superó el límite de páginas.");
+}
+
 async function backendReferralCollection(request: Request, scenario: ReturnType<typeof getScenario>): Promise<Referral[]> {
   const serviceIds = getReferralSourceServiceIds(scenario);
   const paths = serviceIds === undefined
@@ -57,15 +82,9 @@ async function backendReferralCollection(request: Request, scenario: ReturnType<
       ]);
 
   const collections = await Promise.all(paths.map(async ({ kind, path }) => {
-    const backendResponse = await fetchBackend(request, path);
-    const payload = await backendResponse.json() as unknown;
-    if (!backendResponse.ok) throw new Error(`Backend respondió ${backendResponse.status} al consultar derivaciones.`);
-    const records = payload && typeof payload === "object" && "data" in payload && Array.isArray(payload.data)
-      ? payload.data
-      : Array.isArray(payload) ? payload : [];
     return kind === "REPAIR_REQUEST"
-      ? (records as RepairRequest[]).map(referralFromRepairRequest)
-      : (records as StreetClosureRequest[]).map(referralFromStreetClosureRequest);
+      ? (await backendCollection(request, path, repairRequestSchema)).map(referralFromRepairRequest)
+      : (await backendCollection(request, path, streetClosureRequestSchema)).map(referralFromStreetClosureRequest);
   }));
 
   return collections.flat().sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));

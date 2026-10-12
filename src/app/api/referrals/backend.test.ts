@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
 import { GET as detail } from "./[id]/route";
+import { GET as list } from "./route";
 
 const repairId = "15c86465-54d3-4e0a-83a5-26a3cc510017";
 const closureId = "ce0bbfaa-8720-4566-b9d1-738cb37a689b";
@@ -53,7 +54,66 @@ function getDetail(cookie: string, id = repairId) {
   });
 }
 
+function page(data: unknown[], total: number, currentPage = 1, totalPages = 1) {
+  return { data, meta: { total, page: currentPage, pageSize: 100, totalPages } };
+}
+
 describe("referrals against the backend", () => {
+  it("returns every page of both collections and the complete total to Office", async () => {
+    const repairs = Array.from({ length: 101 }, (_, index) => ({
+      ...repair, id: `15c86465-54d3-4e0a-83a5-${String(index).padStart(12, "0")}`,
+    }));
+    const closures = Array.from({ length: 101 }, (_, index) => ({
+      ...closure, id: `ce0bbfaa-8720-4566-b9d1-${String(index).padStart(12, "0")}`,
+    }));
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      const records = url.pathname === "/repair-requests" ? repairs : closures;
+      const currentPage = Number(url.searchParams.get("page") ?? 1);
+      return Response.json(page(records.slice((currentPage - 1) * 100, currentPage * 100), 101, currentPage, 2));
+    });
+    const cookie = await authenticatedCookie();
+    const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.meta.total).toBe(202);
+    expect(body.data).toHaveLength(202);
+    expect(body.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: repairs[100].id }),
+      expect.objectContaining({ id: closures[100].id }),
+    ]));
+    expect(backendFetch.mock.calls.map(([url]) => String(url)).sort()).toEqual([
+      "https://backend.internal/repair-requests?page=1&pageSize=100",
+      "https://backend.internal/repair-requests?page=2&pageSize=100",
+      "https://backend.internal/street-closure-requests?page=1&pageSize=100",
+      "https://backend.internal/street-closure-requests?page=2&pageSize=100",
+    ]);
+    expect(backendFetch.mock.calls.every(([, init]) => (init?.method ?? "GET") === "GET")).toBe(true);
+  });
+
+  it("rejects malformed collection records at the backend boundary", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      Response.json(page(String(input).includes("/repair-requests") ? [{ id: repairId }] : [], 1)));
+    const cookie = await authenticatedCookie();
+    const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
+    expect(response.status).toBe(500);
+  });
+
+  it("stops at 50 pages and reports an error instead of a partial total", async () => {
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      return Response.json(url.pathname === "/repair-requests"
+        ? page([repair], 51, Number(url.searchParams.get("page")), 51)
+        : page([], 0, 1, 0));
+    });
+    const cookie = await authenticatedCookie();
+    const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
+    expect(response.status).toBe(500);
+    expect(backendFetch).toHaveBeenCalledTimes(51);
+    expect(backendFetch.mock.calls.some(([url]) => new URL(String(url)).searchParams.get("page") === "51")).toBe(false);
+  });
+
   it("opens a RepairRequest UUID through the repair endpoint", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(repair));
     const response = await getDetail(await authenticatedCookie());
