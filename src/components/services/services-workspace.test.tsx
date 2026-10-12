@@ -155,6 +155,51 @@ describe("ServicesWorkspace component", () => {
     });
   });
 
+  it("keeps loaded zones available while column filters narrow the service list", async () => {
+    resetServiceFixtures();
+    updateServiceFixture("SVC-1042", { zoneNames: ["Zona A"], status: "SCHEDULED", crewName: "Cuadrilla A" });
+    updateServiceFixture("SVC-1043", { zoneNames: ["Zona B"], crewName: "Cuadrilla B" });
+    updateServiceFixture("SVC-1044", { zoneNames: ["Zona C"], crewName: "Cuadrilla C" });
+
+    const user = userEvent.setup();
+    try {
+      render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+      await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+      await user.click(screen.getByRole("button", { name: "Filtrar por cuadrilla" }));
+
+      let crewFilter = screen.getByRole("dialog", { name: "Filtro de cuadrilla" });
+      await user.click(within(crewFilter).getByRole("checkbox", { name: "Cuadrilla A" }));
+      crewFilter = screen.getByRole("dialog", { name: "Filtro de cuadrilla" });
+      expect(within(crewFilter).getByRole("checkbox", { name: "Cuadrilla B" })).toBeInTheDocument();
+      expect(within(crewFilter).getByRole("checkbox", { name: "Cuadrilla C" })).toBeInTheDocument();
+      await user.click(within(crewFilter).getByRole("button", { name: "Limpiar" }));
+      await user.keyboard("{Escape}");
+
+      await user.click(screen.getByRole("button", { name: "Filtrar por zona" }));
+
+      let zoneFilter = screen.getByRole("dialog", { name: "Filtro de zona" });
+      await user.click(within(zoneFilter).getByRole("checkbox", { name: "Zona A" }));
+
+      zoneFilter = screen.getByRole("dialog", { name: "Filtro de zona" });
+      expect(within(zoneFilter).getByRole("checkbox", { name: "Zona B" })).toBeInTheDocument();
+      expect(within(zoneFilter).getByRole("checkbox", { name: "Zona C" })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Filtrar por estado" }));
+      const statusFilter = screen.getByRole("dialog", { name: "Filtro de estado" });
+      await user.click(within(statusFilter).getByRole("checkbox", { name: "Completado" }));
+      await user.keyboard("{Escape}");
+
+      await user.click(screen.getByRole("button", { name: "Filtrar por zona" }));
+      zoneFilter = screen.getByRole("dialog", { name: "Filtro de zona" });
+      expect(within(zoneFilter).getByRole("checkbox", { name: "Zona A" })).toBeChecked();
+      expect(within(zoneFilter).getByRole("checkbox", { name: "Zona B" })).toBeInTheDocument();
+      expect(within(zoneFilter).getByRole("checkbox", { name: "Zona C" })).toBeInTheDocument();
+    } finally {
+      resetServiceFixtures();
+    }
+  });
+
   it("sorts by lifecycle-aware status and service columns", async () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);

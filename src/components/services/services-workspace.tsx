@@ -959,6 +959,7 @@ export function ServicesWorkspace({
                 {mobileTab === "list" ? (
                   <ServicesTable
                     services={filteredServices}
+                    filterOptionsServices={loadState.services}
                     selectedId={selectedId}
                     onSelect={handleSelect}
                     sortKey={sortKey}
@@ -1041,6 +1042,7 @@ export function ServicesWorkspace({
                       >
                         <ServicesTable
                           services={filteredServices}
+                          filterOptionsServices={loadState.services}
                           selectedId={selectedId}
                           onSelect={handleSelect}
                           sortKey={sortKey}
@@ -1060,6 +1062,7 @@ export function ServicesWorkspace({
                       >
                         <ServicesTable
                           services={filteredServices}
+                          filterOptionsServices={loadState.services}
                           selectedId={selectedId}
                           onSelect={handleSelect}
                           sortKey={sortKey}
