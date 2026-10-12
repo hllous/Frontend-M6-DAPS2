@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
@@ -9,11 +10,17 @@ import {
   resetStreetClosureRequestFixtures,
   updateStreetClosureRequestFixture,
 } from "@/lib/street-closure-request-fixtures";
-import { resetServiceFixtures, resetZoneResultFixtures, updateServiceFixture } from "@/lib/services-fixtures";
+import { resetServiceFixtures, resetZoneResultFixtures, serviceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { resetEnvironmentalInspectionFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { ServicesWorkspace } from "./services-workspace";
 
 const server = setupServer(...handlers);
+
+function startedServiceFixture() {
+  const service = serviceFixtures.find((candidate) => candidate.id === "SVC-1096");
+  if (!service) throw new Error("SVC-1096 fixture is required for the start-service tests.");
+  return { ...service, status: "IN_PROGRESS" as const };
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
@@ -198,6 +205,117 @@ describe("ServicesWorkspace component", () => {
     } finally {
       resetServiceFixtures();
     }
+  });
+
+  it("disables service start while pending and only sends one request on a double click", async () => {
+    resetServiceFixtures();
+    let startCalls = 0;
+    let releaseStart!: () => void;
+    const responseGate = new Promise<void>((resolve) => {
+      releaseStart = resolve;
+    });
+    server.use(http.post("*/api/services/SVC-1096/start", async () => {
+      startCalls += 1;
+      await responseGate;
+      return HttpResponse.json(startedServiceFixture());
+    }));
+
+    window.history.replaceState(null, "", "/app?detail=SVC-1096");
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
+
+    const detail = await screen.findByRole("region", { name: "Detalle completo de SVC-1096" });
+    const startButton = within(detail).getByRole("button", { name: "Iniciar servicio" });
+    try {
+      await user.dblClick(startButton);
+      await waitFor(() => expect(startCalls).toBe(1));
+      expect(startButton).toBeDisabled();
+      expect(startButton).toHaveTextContent("Iniciando...");
+    } finally {
+      releaseStart();
+    }
+
+    await waitFor(() => {
+      expect(within(detail).queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
+      expect(within(detail).queryByRole("button", { name: "Iniciando..." })).not.toBeInTheDocument();
+    });
+    expect(startCalls).toBe(1);
+  });
+
+  it("shows a backend start error and clears it after a successful retry", async () => {
+    resetServiceFixtures();
+    let startCalls = 0;
+    const errorMessage = "No se puede iniciar el servicio: falta asignar una cuadrilla.";
+    server.use(http.post("*/api/services/SVC-1096/start", () => {
+      startCalls += 1;
+      if (startCalls === 1) {
+        return HttpResponse.json(
+          {
+            statusCode: 409,
+            message: errorMessage,
+            error: "Conflict",
+            timestamp: "2026-10-12T15:00:00.000Z",
+            path: "/api/services/SVC-1096/start",
+          },
+          { status: 409 },
+        );
+      }
+      return HttpResponse.json(startedServiceFixture());
+    }));
+
+    window.history.replaceState(null, "", "/app?detail=SVC-1096");
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
+
+    const detail = await screen.findByRole("region", { name: "Detalle completo de SVC-1096" });
+    await user.click(within(detail).getByRole("button", { name: "Iniciar servicio" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(errorMessage);
+
+    await user.click(within(detail).getByRole("button", { name: "Iniciar servicio" }));
+    await waitFor(() => expect(startCalls).toBe(2));
+    await waitFor(() => expect(screen.queryByText(errorMessage)).not.toBeInTheDocument());
+    expect(within(detail).queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
+  });
+
+  it("clears the previous service start error when a different service is opened", async () => {
+    resetServiceFixtures();
+    const errorMessage = "No se puede iniciar el servicio: falta asignar una cuadrilla.";
+    server.use(http.post("*/api/services/SVC-1096/start", () => HttpResponse.json(
+      {
+        statusCode: 409,
+        message: errorMessage,
+        error: "Conflict",
+        timestamp: "2026-10-12T15:00:00.000Z",
+        path: "/api/services/SVC-1096/start",
+      },
+      { status: 409 },
+    )));
+
+    window.history.replaceState(null, "", "/app?detail=SVC-1096");
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
+
+    let detail = await screen.findByRole("region", { name: "Detalle completo de SVC-1096" });
+    await user.click(within(detail).getByRole("button", { name: "Iniciar servicio" }));
+    expect(await within(detail).findByRole("alert")).toHaveTextContent(errorMessage);
+
+    await user.click(within(detail).getByRole("button", { name: "Volver a Servicios" }));
+    const openServiceDetail = async (id: string, title: string) => {
+      const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+      const row = within(table).getByText(title).closest("tr");
+      if (!row) throw new Error(`Service ${id} must be listed for this test.`);
+      await user.click(row);
+      const preview = await screen.findByRole("complementary");
+      await user.click(within(preview).getByRole("button", { name: /Ver detalle completo/ }));
+      return screen.findByRole("region", { name: `Detalle completo de ${id}` });
+    };
+
+    detail = await openServiceDetail("SVC-1095", "Barrido mecánico — Recorrido 10");
+    expect(within(detail).queryByRole("alert")).not.toBeInTheDocument();
+
+    await user.click(within(detail).getByRole("button", { name: "Volver a Servicios" }));
+    detail = await openServiceDetail("SVC-1096", "Barrido mecánico — Recorrido 11");
+    expect(within(detail).queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("sorts by lifecycle-aware status and service columns", async () => {
