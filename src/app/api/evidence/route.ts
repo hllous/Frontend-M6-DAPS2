@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -161,7 +162,7 @@ export async function POST(request: Request) {
       return NextResponse.json(evidenceCache.get(cacheKey)!, { status: 200 });
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       // UploadEvidenceDto (forbidNonWhitelisted) sólo acepta file, ownerType y ownerId:
       // fileName y fileSize son para la validación de este BFF y darían 400.
       const backendForm = new FormData();
@@ -261,7 +262,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json(attachment, { status: 201 });
   } catch (caught: unknown) {
-    if (caught instanceof AuthUnavailableError || caught instanceof InvalidSessionError) {
+    if (caught instanceof AuthUnavailableError) {
+      return errorResponse(503, caught.message, path);
+    }
+    if (caught instanceof InvalidSessionError) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa o es inválida.", path);
     }

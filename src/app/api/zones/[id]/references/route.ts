@@ -1,3 +1,4 @@
+import { backendMode } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -43,7 +44,7 @@ export async function GET(
     const session = getRequiredSession(request);
     const id = await targetId(context);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const detail = await fetchBackend(request, `/zones/${encodeURIComponent(id)}`);
       if (detail.status === 404) return errorResponse(404, `Zona operativa ${id} no encontrada.`, path);
       if (!detail.ok) throw new AuthUnavailableError("No se pudo consultar la zona.");

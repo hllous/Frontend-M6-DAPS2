@@ -4,6 +4,7 @@ import { POST as login } from "@/app/api/session/login/route";
 import { resetEnvironmentalInspectionFixtures } from "@/lib/environmental-report-fixtures";
 import { resetRepairRequestFixtures, repairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
+import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 import { GET, POST } from "./route";
 
 beforeEach(() => {
@@ -92,9 +93,12 @@ describe("repair request BFF collection routes", () => {
     });
 
     it("Campo sin cuadrilla en la sesión no crea la derivación", async () => {
-      delete process.env.M6_BACKEND_ORIGIN;
-      const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
-      process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+      const session = createSession("field-crew-leader-route", {
+        mode: "backend-development",
+        devJwt: process.env.M6_DEV_JWT,
+        backendOrigin: process.env.M6_BACKEND_ORIGIN,
+      });
+      const cookie = `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ crewId }));
       const response = await POST(createRequest(cookie, body));
 

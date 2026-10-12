@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
-import { resetRouteFixtures, routeFixtures } from "@/lib/routes-fixtures";
+import { paginateRouteFixtures, resetRouteFixtures, routeFixtures } from "@/lib/routes-fixtures";
 import { resetZoneFixtures } from "@/lib/zones-fixtures";
 import { RouteCatalogPanel } from "./route-catalog-panel";
 
@@ -21,6 +21,69 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("RouteCatalogPanel component", () => {
+
+  it("refreshes a selected Route without interrupting stop editing or refetching the list", async () => {
+    const user = userEvent.setup();
+    let listRequestCount = 0;
+    let releaseSelectedRouteResponse!: () => void;
+    let releaseAdditionalResponses!: () => void;
+    let signalSelectedRouteRequest!: () => void;
+    const selectedRouteRequestStarted = new Promise<void>((resolve) => {
+      signalSelectedRouteRequest = resolve;
+    });
+    const selectedRouteResponseGate = new Promise<void>((resolve) => {
+      releaseSelectedRouteResponse = resolve;
+    });
+    const additionalResponsesGate = new Promise<void>((resolve) => {
+      releaseAdditionalResponses = resolve;
+    });
+
+    server.use(
+      http.get("*/api/routes", async () => {
+        listRequestCount += 1;
+        const requestNumber = listRequestCount;
+        if (requestNumber === 2) {
+          signalSelectedRouteRequest();
+          await selectedRouteResponseGate;
+        } else if (requestNumber > 2) {
+          await additionalResponsesGate;
+        }
+
+        const routes = routeFixtures.map((route) =>
+          requestNumber === 2 && route.id === "route-1"
+            ? { ...route, name: "Recorrido Casco Histórico actualizado" }
+            : route,
+        );
+        return HttpResponse.json(paginateRouteFixtures(routes));
+      }),
+    );
+
+    try {
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      await screen.findByText("REC-001");
+      expect(listRequestCount).toBe(1);
+
+      await user.click(screen.getByTestId("view-route-route-1"));
+      await selectedRouteRequestStarted;
+      await user.click(screen.getByTestId("edit-stops-button"));
+      await user.click(screen.getByTestId("stop-remove-1"));
+      expect(screen.queryByTestId("stop-item-1")).not.toBeInTheDocument();
+
+      releaseSelectedRouteResponse();
+      expect(
+        await screen.findByRole("heading", { name: "Recorrido Casco Histórico actualizado" }),
+      ).toBeVisible();
+      expect(screen.getByTestId("stop-sequence-builder")).toBeVisible();
+      expect(screen.getByTestId("stop-item-0")).toBeVisible();
+      expect(screen.queryByTestId("stop-item-1")).not.toBeInTheDocument();
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      expect(listRequestCount).toBe(2);
+    } finally {
+      releaseSelectedRouteResponse();
+      releaseAdditionalResponses();
+    }
+  });
 
   it("requires acknowledgement when route references cannot be verified", async () => {
     server.use(http.get("/api/routes/:id/references", () => HttpResponse.json({ message: "No disponible" }, { status: 503 })));
