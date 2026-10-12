@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -32,7 +33,7 @@ const vehicleTypeLabels: Record<VehicleType, string> = {
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; vehicles: Vehicle[] };
+  | { status: "ready"; vehicles: Vehicle[]; total: number; totalPages: number };
 
 type VehicleForm = { plate: string; vehicleType: VehicleType; capacity: string };
 
@@ -43,6 +44,7 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
   const [activeFilter, setActiveFilter] = useState<"all" | "true" | "false">("all");
   const [typeFilter, setTypeFilter] = useState<VehicleType | "all">("all");
   const [requestVersion, setRequestVersion] = useState(0);
+  const [page, setPage] = useState(1);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -60,15 +62,20 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
     async function requestVehicles() {
       setState({ status: "loading" });
       try {
-        const page = await vehiclesAdapter.list(query);
-        if (isCurrent) setState({ status: "ready", vehicles: page.vehicles });
+        const result = await vehiclesAdapter.list({ ...query, page, pageSize: 20 });
+        if (!isCurrent) return;
+        if (page > Math.max(1, result.totalPages)) {
+          setPage(Math.max(1, result.totalPages));
+          return;
+        }
+        setState({ status: "ready", vehicles: result.vehicles, total: result.total, totalPages: result.totalPages });
       } catch (caught) {
         if (isCurrent) setState({ status: "error", message: caught instanceof Error ? caught.message : "No se pudieron cargar los vehículos." });
       }
     }
     void requestVehicles();
     return () => { isCurrent = false; };
-  }, [query, requestVersion]);
+  }, [query, requestVersion, page]);
 
   function openCreate() {
     setEditing(null);
@@ -132,13 +139,13 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
       <div className={styles.filters} aria-label="Filtros de vehículos">
         <Field>
           <FieldLabel htmlFor="vehicle-active-filter">Estado</FieldLabel>
-          <select id="vehicle-active-filter" value={activeFilter} onChange={(event) => setActiveFilter(event.target.value as typeof activeFilter)} className={styles.control}>
+          <select id="vehicle-active-filter" value={activeFilter} onChange={(event) => { setActiveFilter(event.target.value as typeof activeFilter); setPage(1); }} className={styles.control}>
             <option value="all">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option>
           </select>
         </Field>
         <Field>
           <FieldLabel htmlFor="vehicle-type-filter">Tipo de vehículo</FieldLabel>
-          <select id="vehicle-type-filter" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as VehicleType | "all")} className={styles.control}>
+          <select id="vehicle-type-filter" value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value as VehicleType | "all"); setPage(1); }} className={styles.control}>
             <option value="all">Todos los tipos</option>
             {vehicleTypes.map((type) => <option key={type} value={type}>{vehicleTypeLabels[type]}</option>)}
           </select>
@@ -165,6 +172,8 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
           </table>
         </div>
       ) : null}
+
+      {state.status === "ready" ? <CatalogPager page={page} pageSize={20} total={state.total} totalPages={state.totalPages} onPageChange={setPage} label="Paginación de vehículos" /> : null}
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent>
