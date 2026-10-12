@@ -39,6 +39,15 @@ function loginRequest(scenarioId: string) {
 }
 
 describe("session route handlers", () => {
+  it.each(["constructor", "__proto__"])("rejects inherited scenario key %s without setting a session cookie", async (scenarioId) => {
+    process.env.M6_AUTH_MODE = "mock";
+    const response = await login(loginRequest(scenarioId));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ message: "Seleccione un escenario operativo válido." });
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
   it("creates an opaque cookie for a mock scenario", async () => {
     process.env.M6_AUTH_MODE = "mock";
     const response = await login(loginRequest("office-duty-queue"));
