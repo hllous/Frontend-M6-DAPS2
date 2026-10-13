@@ -147,10 +147,10 @@ describe("POST /api/evidence BFF route", () => {
 
   it("returns 413 when file exceeds 10 MB", async () => {
     const cookie = await authenticatedCookie("field-crew-leader-route");
-    const largeFile = new File(["dummy"], "big.jpg", { type: "image/jpeg" });
+    const largeFile = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "big.jpg", { type: "image/jpeg" });
     const formData = new FormData();
     formData.append("file", largeFile);
-    formData.append("fileSize", String(11 * 1024 * 1024));
+    formData.append("fileSize", "1");
     formData.append("ownerType", "ZONE_RESULT");
     formData.append("ownerId", "ZR-1");
 
@@ -165,6 +165,21 @@ describe("POST /api/evidence BFF route", () => {
     const body = await response.json();
     expect(body.error).toBe("Payload Too Large");
     expect(body.message).toMatch(/10 MB/i);
+  });
+
+  it("rejects an oversized Content-Length before reading the multipart body", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const request = new Request("http://localhost/api/evidence", {
+      method: "POST",
+      headers: { cookie, "Idempotency-Key": "large-body", "content-length": String(11 * 1024 * 1024) },
+      body: "unparsed body",
+    });
+    const parseBody = vi.spyOn(request, "formData");
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(413);
+    expect(parseBody).not.toHaveBeenCalled();
   });
 
   it("returns 400 when more than one file is sent", async () => {

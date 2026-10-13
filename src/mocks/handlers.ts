@@ -2184,12 +2184,8 @@ export const handlers = [
       );
     }
 
-    const rawFileSize = formData.get("fileSize");
-    const declaredSize = rawFileSize ? Number(rawFileSize) : NaN;
-    const fileSize = !isNaN(declaredSize) ? declaredSize : file.size;
-
     const maxSizeBytes = 10 * 1024 * 1024;
-    if (fileSize > maxSizeBytes) {
+    if (file.size > maxSizeBytes) {
       return HttpResponse.json(
         {
           statusCode: 400,

@@ -38,6 +38,8 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+// Allow room for multipart boundaries and the owner metadata.
+const MULTIPART_MARGIN_BYTES = 64 * 1024;
 
 
 
@@ -55,6 +57,11 @@ export async function POST(request: Request) {
         "La cabecera Idempotency-Key es obligatoria para la carga de evidencia.",
         path,
       );
+    }
+
+    const contentLength = Number(request.headers.get("content-length"));
+    if (Number.isFinite(contentLength) && contentLength > MAX_FILE_SIZE + MULTIPART_MARGIN_BYTES) {
+      return errorResponse(413, "El archivo supera el tamaño máximo permitido de 10 MB.", path);
     }
 
     let formData: FormData;
@@ -119,12 +126,8 @@ export async function POST(request: Request) {
       return errorResponse(400, "El campo 'ownerId' es obligatorio.", path);
     }
 
-    const rawFileSize = formData.get("fileSize");
-    const declaredSize = rawFileSize ? Number(rawFileSize) : NaN;
-    const fileSize = !isNaN(declaredSize) ? declaredSize : file.size;
-
     // File validation: Size & MIME
-    if (fileSize > MAX_FILE_SIZE) {
+    if (file.size > MAX_FILE_SIZE) {
       return errorResponse(413, "El archivo supera el tamaño máximo permitido de 10 MB.", path);
     }
 
@@ -145,7 +148,7 @@ export async function POST(request: Request) {
 
     if (backendMode(session)) {
       // UploadEvidenceDto (forbidNonWhitelisted) sólo acepta file, ownerType y ownerId:
-      // fileName y fileSize son para la validación de este BFF y darían 400.
+      // fileName es metadato local y daría 400.
       const backendForm = new FormData();
       backendForm.append("file", file);
       backendForm.append("ownerType", ownerType);

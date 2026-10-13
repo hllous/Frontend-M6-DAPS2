@@ -1167,7 +1167,6 @@ export const servicesAdapter = {
     const formData = new FormData();
     formData.append("file", params.file);
     formData.append("fileName", params.file.name);
-    formData.append("fileSize", String(params.file.size));
     formData.append("ownerType", params.ownerType);
     formData.append("ownerId", params.ownerId);
 
