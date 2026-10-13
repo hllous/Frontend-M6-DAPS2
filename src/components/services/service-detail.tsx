@@ -14,7 +14,6 @@ import {
   Play,
   PlayCircle,
   Route,
-  ShieldCheck,
   Siren,
   Truck,
   Users,
@@ -34,6 +33,7 @@ import type { StreetClosureDependency } from "@/lib/street-closure-requests";
 import { StatusBadge } from "./status-badge";
 import { ZoneExecutionPanel } from "./zone-execution-panel";
 import { InspectionExecutionPanel } from "./inspection-execution-panel";
+import { SERVICE_ORIGIN_LABEL, serviceTargetTypeLabel } from "./service-ui-labels";
 
 export function ServiceDetail({
   service,
@@ -102,7 +102,7 @@ export function ServiceDetail({
   const isReadOnly = !canStartService && !onAssignCrew && !onReschedule && !onConfirmReschedule && !onCancelService;
 
   return (
-    <div className="flex h-full flex-col bg-[var(--color-surface)] overflow-hidden" role="region" aria-label={`Detalle completo de ${service.id}`}>
+    <div className="flex h-full flex-col bg-[var(--color-surface)] overflow-hidden" role="region" aria-label={`Detalle completo de ${service.title}`}>
       <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-3 bg-[var(--color-canvas)]">
         <Button
           variant="outline"
@@ -229,7 +229,7 @@ export function ServiceDetail({
             </span>
           )}
           <span className="text-xs font-medium text-[var(--color-text-secondary)]">
-            {service.id} · Detalle operativo
+            Detalle operativo
           </span>
         </div>
       </div>
@@ -250,8 +250,6 @@ export function ServiceDetail({
                 </span>
               )}
               <span>·</span>
-              <span className="font-bold text-[var(--color-text)]">{service.id}</span>
-              <span>·</span>
               <span>{service.serviceTypeName}</span>
             </div>
 
@@ -262,7 +260,7 @@ export function ServiceDetail({
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <StatusBadge status={service.status} />
               <span className="rounded-lg bg-[var(--color-surface-subtle)] px-2.5 py-1 text-xs font-medium text-[var(--color-text)]">
-                Origen: {service.origin}
+                Origen: {SERVICE_ORIGIN_LABEL[service.origin]}
               </span>
             </div>
           </div>
@@ -464,7 +462,7 @@ export function ServiceDetail({
                 {service.crewName ?? "Sin asignar"}
               </div>
               <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                {service.crewId ? `ID: ${service.crewId}` : "Pendiente de coordinación"}
+                {service.crewId ? "Asignación vigente" : "Pendiente de coordinación"}
               </div>
             </div>
 
@@ -520,7 +518,7 @@ export function ServiceDetail({
               {service.targetRef && (
                 <div>
                   <span className="font-semibold text-[var(--color-text-secondary)]">Bien de inventario / Objetivo:</span>
-                  <p className="mt-1 font-medium text-[var(--color-text)]">{service.targetRef} ({service.targetType})</p>
+                  <p className="mt-1 font-medium text-[var(--color-text)]">{service.targetRef} ({serviceTargetTypeLabel(service.targetType)})</p>
                 </div>
               )}
               {service.ticketId && (
@@ -631,13 +629,6 @@ export function ServiceDetail({
             <li className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
               <span className="text-[var(--color-text-secondary)] block font-medium">Cuadrilla</span>
               <span className="font-bold text-[var(--color-text)] mt-0.5 block">{service.crewName ?? "Sin asignar"}</span>
-            </li>
-            <li className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <span className="text-[var(--color-text-secondary)] block font-medium">Seguridad operativa</span>
-              <span className="inline-flex items-center gap-1 text-[var(--color-success)] mt-1 font-semibold">
-                <ShieldCheck className="h-4 w-4" aria-hidden />
-                Validación Zod activa
-              </span>
             </li>
           </ul>
         </aside>

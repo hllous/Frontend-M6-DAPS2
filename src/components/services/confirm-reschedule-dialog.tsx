@@ -99,7 +99,7 @@ function ConfirmRescheduleForm({
           <CalendarCheck2 className="h-4 w-4" aria-hidden />
           <span>Paso 2 de 2 · Nueva fecha y ventana</span>
         </div>
-        <DialogTitle>Confirmar reprogramación de {service.id}</DialogTitle>
+        <DialogTitle>Confirmar reprogramación de {service.title}</DialogTitle>
         <DialogDescription>
           Motivo registrado: <strong>{service.statusReason ?? "Sin motivo registrado"}</strong>. El
           servicio volverá a estado Programado con la fecha y ventana horaria que indique aquí.

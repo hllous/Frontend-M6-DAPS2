@@ -13,10 +13,11 @@ async function openServiceDetail(
   await page.goto("/app?destination=services");
   await page.setViewportSize(WIDE_VIEWPORT);
   const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
-  await expect(table.getByRole("row", { name: new RegExp(serviceId) })).toBeVisible();
-  await table.getByRole("row", { name: new RegExp(serviceId) }).click();
+  const serviceRow = table.locator(`tr[data-service-id="${serviceId}"]`);
+  await expect(serviceRow).toBeVisible();
+  await serviceRow.click();
   await page.getByRole("button", { name: "Ver detalle completo" }).click();
-  await expect(page.getByRole("region", { name: new RegExp(`Detalle completo de ${serviceId}`, "i") })).toBeVisible();
+  await expect(page.getByRole("region", { name: /Detalle completo de/i })).toBeVisible();
 }
 
 test.describe("StreetClosureRequest from Service context", () => {

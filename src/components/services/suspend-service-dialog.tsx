@@ -334,7 +334,7 @@ function SuspendServiceForm({
           <span>Suspensión de servicio en curso</span>
         </div>
         <DialogTitle className="text-xl font-bold text-[var(--color-text)]">
-          {suspendedService ? `Servicio suspendido · ${service.id}` : `Suspender ${service.id}`}
+          {suspendedService ? `Servicio suspendido · ${service.title}` : `Suspender ${service.title}`}
         </DialogTitle>
         <DialogDescription className="text-xs text-[var(--color-text-secondary)]">
           {suspendedService

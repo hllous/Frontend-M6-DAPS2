@@ -61,7 +61,7 @@ describe("ServicesWorkspace component", () => {
     expect(within(preview).getByRole("button", { name: /Ver detalle completo/ })).toBeInTheDocument();
 
     // Map marker is highlighted
-    const marker = await screen.findByRole("button", { name: /Parada 1: SVC-1042/ });
+    const marker = await screen.findByRole("button", { name: /Parada 1: Recolección de residuos — Recorrido 4/ });
     expect(marker).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -70,7 +70,7 @@ describe("ServicesWorkspace component", () => {
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-    const marker = await screen.findByRole("button", { name: /SVC-1043/ });
+    const marker = await screen.findByRole("button", { name: /Poda de árbol — Av\. Rivadavia 2200/ });
     await user.click(marker);
 
     // Preview opened
@@ -95,18 +95,25 @@ describe("ServicesWorkspace component", () => {
     await user.click(row);
 
     // Live preview is visible, but NOT full detail yet
-    expect(screen.queryByRole("region", { name: /Detalle completo de SVC-1042/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /Detalle completo de Recolección de residuos — Recorrido 4/ })).not.toBeInTheDocument();
 
     // Click explicit button "Ver detalle completo"
     const detailBtn = screen.getByRole("button", { name: /Ver detalle completo/ });
     await user.click(detailBtn);
 
     // Now full detail is rendered
+    let detail!: HTMLElement;
     await waitFor(() => {
-      expect(screen.getByRole("region", { name: "Detalle completo de SVC-1042" })).toBeInTheDocument();
+      detail = screen.getByRole("region", { name: "Detalle completo de Recolección de residuos — Recorrido 4" });
+      expect(detail).toBeInTheDocument();
     });
     expect(screen.getByRole("button", { name: "Volver a Servicios" })).toBeInTheDocument();
-    expect(screen.getByText("ID: crew-a")).toBeInTheDocument();
+    expect(within(detail).getByText("Asignación vigente")).toBeInTheDocument();
+    expect(screen.queryByText("ID: crew-a")).not.toBeInTheDocument();
+    expect(within(detail).getByText("Origen: Planificación")).toBeInTheDocument();
+    expect(within(detail).queryByText("PLANNED")).not.toBeInTheDocument();
+    expect(within(detail).queryByText("Seguridad operativa")).not.toBeInTheDocument();
+    expect(within(detail).queryByText("Validación Zod activa")).not.toBeInTheDocument();
 
     // Go back to workspace
     await user.click(screen.getByRole("button", { name: "Volver a Servicios" }));
@@ -118,7 +125,7 @@ describe("ServicesWorkspace component", () => {
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-    const marker = await screen.findByRole("button", { name: /Parada 1: SVC-1042/ });
+    const marker = await screen.findByRole("button", { name: /Parada 1: Recolección de residuos — Recorrido 4/ });
     marker.focus();
     expect(marker).toHaveFocus();
 
@@ -128,7 +135,7 @@ describe("ServicesWorkspace component", () => {
     });
     expect(marker).toHaveAttribute("aria-pressed", "true");
 
-    const marker2 = await screen.findByRole("button", { name: /SVC-1043/ });
+    const marker2 = await screen.findByRole("button", { name: /Poda de árbol — Av\. Rivadavia 2200/ });
     marker2.focus();
     await user.keyboard(" ");
     await waitFor(() => {
@@ -224,7 +231,7 @@ describe("ServicesWorkspace component", () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
 
-    const detail = await screen.findByRole("region", { name: "Detalle completo de SVC-1096" });
+    const detail = await screen.findByRole("region", { name: "Detalle completo de Barrido mecánico — Recorrido 11" });
     const startButton = within(detail).getByRole("button", { name: "Iniciar servicio" });
     try {
       await user.dblClick(startButton);
@@ -267,7 +274,7 @@ describe("ServicesWorkspace component", () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
 
-    const detail = await screen.findByRole("region", { name: "Detalle completo de SVC-1096" });
+    const detail = await screen.findByRole("region", { name: "Detalle completo de Barrido mecánico — Recorrido 11" });
     await user.click(within(detail).getByRole("button", { name: "Iniciar servicio" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(errorMessage);
 
@@ -295,7 +302,7 @@ describe("ServicesWorkspace component", () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
 
-    let detail = await screen.findByRole("region", { name: "Detalle completo de SVC-1096" });
+    let detail = await screen.findByRole("region", { name: "Detalle completo de Barrido mecánico — Recorrido 11" });
     await user.click(within(detail).getByRole("button", { name: "Iniciar servicio" }));
     expect(await within(detail).findByRole("alert")).toHaveTextContent(errorMessage);
 
@@ -307,7 +314,7 @@ describe("ServicesWorkspace component", () => {
       await user.click(row);
       const preview = await screen.findByRole("complementary");
       await user.click(within(preview).getByRole("button", { name: /Ver detalle completo/ }));
-      return screen.findByRole("region", { name: `Detalle completo de ${id}` });
+      return screen.findByRole("region", { name: `Detalle completo de ${title}` });
     };
 
     detail = await openServiceDetail("SVC-1095", "Barrido mecánico — Recorrido 10");
@@ -318,7 +325,7 @@ describe("ServicesWorkspace component", () => {
     expect(within(detail).queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("sorts by lifecycle-aware status and service columns", async () => {
+  it("sorts rows by lifecycle-aware status and by service title", async () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
@@ -329,13 +336,48 @@ describe("ServicesWorkspace component", () => {
     const statusSortBtn = within(table).getByRole("button", { name: /Ordenar por Estado/ });
     await user.click(statusSortBtn); // toggles to desc
 
-    const rowsDesc = within(table).getAllByRole("row");
+    const rowsDesc = within(table).getAllByRole("row").slice(1);
     expect(rowsDesc.length).toBeGreaterThan(1);
+    const cancelledRow = rowsDesc.findIndex((row) => row.textContent?.includes("Cancelado"));
+    const completedRow = rowsDesc.findIndex((row) => row.textContent?.includes("Completado"));
+    const scheduledRow = rowsDesc.findIndex((row) => row.textContent?.includes("Programado"));
+    expect(cancelledRow).toBeGreaterThanOrEqual(0);
+    expect(cancelledRow).toBeLessThan(completedRow);
+    expect(completedRow).toBeLessThan(scheduledRow);
 
     // Sort by service name
     const serviceSortBtn = within(table).getByRole("button", { name: /Ordenar por Servicio/ });
     await user.click(serviceSortBtn);
-    expect(serviceSortBtn).toHaveAttribute("aria-label", expect.stringContaining("ascending"));
+    expect(serviceSortBtn).toHaveAttribute("aria-label", expect.stringContaining("ascendente"));
+    const rowsByService = within(table).getAllByRole("row").slice(1);
+    const titles = rowsByService.map((row) => row.textContent ?? "");
+    expect(titles.findIndex((title) => title.includes("Barrido mecánico — Bulevar Costero"))).toBeLessThan(
+      titles.findIndex((title) => title.includes("Recolección de residuos — Recorrido 4")),
+    );
+  });
+
+  it("shows the no-services empty state when the period has no services", async () => {
+    server.use(http.get("*/api/services", () => HttpResponse.json({
+      data: [],
+      meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 },
+    })));
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    expect(await within(table).findByText("No hay servicios para mostrar en este período.")).toBeInTheDocument();
+  });
+
+  it("shows the no-matches empty state and offers to clear filters", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    fireEvent.change(screen.getByPlaceholderText("Buscar servicio, zona o cuadrilla…"), {
+      target: { value: "servicio inexistente" },
+    });
+    expect(await within(table).findByText("No hay servicios que coincidan con los filtros aplicados.")).toBeInTheDocument();
+    await user.click(within(table).getByRole("button", { name: "Limpiar filtros" }));
+    expect(await within(table).findByText("Recolección de residuos — Recorrido 4")).toBeInTheDocument();
   });
 
   it("remains fully usable and functional when the map encounters an outage", async () => {
@@ -415,7 +457,7 @@ describe("ServicesWorkspace component", () => {
 
     // Live preview opens
     const preview = await screen.findByRole("complementary");
-    expect(preview).toHaveTextContent("SVC-1043");
+    expect(preview).toHaveTextContent("Poda de árbol — Av. Rivadavia 2200");
     expect(preview).toHaveTextContent("Sin asignar");
 
     // Click "Asignar cuadrilla" button in preview
@@ -425,7 +467,7 @@ describe("ServicesWorkspace component", () => {
     // AssignCrewDialog opens
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: "Asignar cuadrilla y vehículo" })).toBeInTheDocument();
-    expect(within(dialog).getByText("SVC-1043")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("Poda de árbol — Av. Rivadavia 2200")).toHaveLength(2);
 
     // Select crew-c (loaded from the crews adapter)
     const crewSelect = within(dialog).getByLabelText(/Cuadrilla asignada/i);
@@ -463,7 +505,7 @@ describe("ServicesWorkspace component", () => {
     // Dialog opens automatically based on URL params
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: "Asignar cuadrilla y vehículo" })).toBeInTheDocument();
-    expect(within(dialog).getByText("SVC-1043")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("Poda de árbol — Av. Rivadavia 2200")).toHaveLength(2);
   });
 
   it("reschedules a scheduled service through the two-step Office flow, preserving its zones", async () => {
@@ -478,7 +520,7 @@ describe("ServicesWorkspace component", () => {
     await user.click(detailBtn);
 
     await waitFor(() => {
-      expect(screen.getByRole("region", { name: "Detalle completo de SVC-1050" })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Detalle completo de Barrido mecánico — Bulevar Costero" })).toBeInTheDocument();
     });
     // #321: Oficina no ejecuta el servicio, pero tiene acciones: no es sólo consulta.
     expect(screen.queryByText("Solo consulta")).not.toBeInTheDocument();
@@ -538,12 +580,12 @@ describe("ServicesWorkspace component", () => {
     await user.click(detailBtn);
 
     await waitFor(() => {
-      expect(screen.getByRole("region", { name: "Detalle completo de SVC-1044" })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Detalle completo de Retiro de contenedor dañado CT-0442" })).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: "Cancelar servicio" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("heading", { name: "Cancelar SVC-1044" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Cancelar Retiro de contenedor dañado CT-0442" })).toBeInTheDocument();
 
     // Empty reason is rejected
     await user.click(within(dialog).getByRole("button", { name: "Cancelar servicio" }));
@@ -612,7 +654,7 @@ describe("ServicesWorkspace component", () => {
     await user.click(detailBtn);
 
     await waitFor(() => {
-      expect(screen.getByRole("region", { name: "Detalle completo de SVC-1042" })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Detalle completo de Recolección de residuos — Recorrido 4" })).toBeInTheDocument();
     });
 
     expect(screen.queryByRole("button", { name: "Cancelar servicio" })).not.toBeInTheDocument();
@@ -623,7 +665,7 @@ describe("ServicesWorkspace component", () => {
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
     const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-    await user.click(within(table).getByRole("row", { name: /SVC-1050/ }));
+    await user.click(within(table).getByRole("row", { name: /Barrido mecánico — Bulevar Costero/ }));
     await user.click(await screen.findByRole("button", { name: /Ver detalle completo/ }));
 
     expect(await screen.findByRole("status", { name: /corte de calle pendiente/i })).toHaveTextContent(
@@ -638,7 +680,7 @@ describe("ServicesWorkspace component", () => {
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
     const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-    await user.click(within(table).getByRole("row", { name: /SVC-1050/ }));
+    await user.click(within(table).getByRole("row", { name: /Barrido mecánico — Bulevar Costero/ }));
     await user.click(await screen.findByRole("button", { name: /Ver detalle completo/ }));
 
     expect(await screen.findByRole("status", { name: /corte de calle rechazado/i })).toHaveTextContent(

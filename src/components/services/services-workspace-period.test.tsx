@@ -59,7 +59,7 @@ describe("Services workspace period", () => {
     const get = vi.spyOn(servicesAdapter, "get").mockResolvedValue(service);
     render(<ServicesWorkspace />);
     expect(await screen.findByText("Este servicio está fuera del período seleccionado.")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: `Detalle completo de ${service.id}` })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: `Detalle completo de ${service.title}` })).toBeInTheDocument();
     expect(get).toHaveBeenCalledWith(service.id);
   });
 
