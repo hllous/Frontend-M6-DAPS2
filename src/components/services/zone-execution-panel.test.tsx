@@ -564,6 +564,49 @@ describe("ZoneExecutionPanel component", () => {
     expect(screen.getByText(/Servicio finalizado con estado: Parcial/i)).toBeVisible();
   });
 
+  it("rejects a cleared relocation coordinate before completing the service", async () => {
+    const user = userEvent.setup();
+    const relocationService: Service = {
+      ...mockPointService,
+      id: "SVC-TEST-RELOCATION",
+      targetType: "CONTAINER",
+      targetId: "cont-5",
+      targetRef: "CT-0442",
+    };
+    let completionRequests = 0;
+
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-RELOCATION",
+        serviceId: relocationService.id,
+        zoneId: "zone-3",
+        status: "SERVICED",
+        reason: null,
+        notes: null,
+        recordedAt: "2026-09-05T15:00:00.000Z",
+      }])),
+      http.post("*/api/services/:serviceId/complete", () => {
+        completionRequests += 1;
+        return HttpResponse.json({ ...relocationService, status: "COMPLETED" });
+      }),
+    );
+
+    render(<ZoneExecutionPanel service={relocationService} canExecute />);
+
+    await screen.findByText("Todas las zonas registradas. Listo para finalizar.");
+    const latitude = await screen.findByLabelText("Latitud");
+    const longitude = screen.getByLabelText("Longitud");
+    await user.type(latitude, "-34.6037");
+    await user.clear(latitude);
+    await user.type(longitude, "-58.3816");
+    await user.click(screen.getByRole("button", { name: "Completar servicio" }));
+
+    expect(
+      await screen.findByText("La latitud es obligatoria para completar la reubicación."),
+    ).toBeVisible();
+    expect(completionRequests).toBe(0);
+  });
+
   it("uses the same interaction for POINT mode single zone", async () => {
     const user = userEvent.setup();
 
