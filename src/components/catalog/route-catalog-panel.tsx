@@ -53,6 +53,20 @@ type LoadState =
   | { status: "ready"; items: Route[] }
   | { status: "error"; message: string };
 
+type StalenessWarningReason = "changed" | "unavailable" | null;
+
+function stopSequenceSignature(stops: Route["stops"]) {
+  return JSON.stringify(
+    stops
+      .map((stop) => ({
+        zoneId: stop.zoneId,
+        order: stop.sequence,
+        estimatedDurationMin: stop.estimatedDurationMin,
+      }))
+      .sort((left, right) => left.order - right.order),
+  );
+}
+
 export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario }) {
   const canManage =
     scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("route:manage");
@@ -106,12 +120,13 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   };
   const [isEditingStops, setIsEditingStops] = useState(false);
   const [initialUpdatedAt, setInitialUpdatedAt] = useState<string | null>(null);
+  const [initialStopsSignature, setInitialStopsSignature] = useState("");
   const [draftStops, setDraftStops] = useState<StopDraftItem[]>([]);
   const [newStopZoneId, setNewStopZoneId] = useState("");
   const [newStopDuration, setNewStopDuration] = useState(30);
   const [stopEditorError, setStopEditorError] = useState<string | null>(null);
   const [isSavingStops, setIsSavingStops] = useState(false);
-  const [showStalenessWarning, setShowStalenessWarning] = useState(false);
+  const [stalenessWarningReason, setStalenessWarningReason] = useState<StalenessWarningReason>(null);
 
   // Load available zones once
   useEffect(() => {
@@ -280,6 +295,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   function handleOpenStopEditor() {
     if (!selectedRoute) return;
     setInitialUpdatedAt(selectedRoute.updatedAt ?? null);
+    setInitialStopsSignature(stopSequenceSignature(selectedRoute.stops));
     setDraftStops(
       selectedRoute.stops.map((s, idx) => ({
         tempId: s.id || `stop-draft-${idx}-${Date.now()}`,
@@ -292,7 +308,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     setNewStopZoneId("");
     setNewStopDuration(30);
     setStopEditorError(null);
-    setShowStalenessWarning(false);
+    setStalenessWarningReason(null);
     setIsEditingStops(true);
   }
 
@@ -391,14 +407,20 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     // Advisory staleness check (criterion 4)
     try {
       const fresh = await routesAdapter.get(selectedRoute.id);
-      if (initialUpdatedAt && fresh.updatedAt && fresh.updatedAt !== initialUpdatedAt) {
+      const routeDetailsChanged = Boolean(
+        initialUpdatedAt && fresh.updatedAt && fresh.updatedAt !== initialUpdatedAt,
+      );
+      const stopsChanged = stopSequenceSignature(fresh.stops) !== initialStopsSignature;
+      if (routeDetailsChanged || stopsChanged) {
         // Staleness detected! Advisory warning
-        setShowStalenessWarning(true);
+        setStalenessWarningReason("changed");
         setIsSavingStops(false);
         return;
       }
     } catch {
-      // Non-blocking precheck
+      setStalenessWarningReason("unavailable");
+      setIsSavingStops(false);
+      return;
     }
 
     await executeSaveStops();
@@ -408,7 +430,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     if (!selectedRoute) return;
     setIsSavingStops(true);
     setStopEditorError(null);
-    setShowStalenessWarning(false);
+    setStalenessWarningReason(null);
 
     try {
       const updated = await routesAdapter.setStops(selectedRoute.id, {
@@ -436,7 +458,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   function handleCancelStopEditor() {
     setIsEditingStops(false);
     setStopEditorError(null);
-    setShowStalenessWarning(false);
+    setStalenessWarningReason(null);
   }
 
   return (
@@ -1316,19 +1338,30 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       </CatalogDeactivationDialog>
 
       {/* Staleness Advisory Warning Dialog (#111) */}
-      <Dialog open={showStalenessWarning} onOpenChange={setShowStalenessWarning}>
+      <Dialog
+        open={stalenessWarningReason !== null}
+        onOpenChange={(open) => !open && setStalenessWarningReason(null)}
+      >
         <DialogContent data-testid="staleness-warning-dialog" className="sm:max-w-md">
           <DialogHeader>
             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
               <AlertTriangle className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-center">Aviso de concurrencia en el recorrido</DialogTitle>
+            <DialogTitle className="text-center">
+              {stalenessWarningReason === "unavailable"
+                ? "No se pudo verificar el recorrido"
+                : "Aviso de concurrencia en el recorrido"}
+            </DialogTitle>
             <DialogDescription className="text-center space-y-2 text-xs">
               <span className="block text-foreground text-sm font-medium">
-                El recorrido fue modificado en el servidor después de que abrió este editor.
+                {stalenessWarningReason === "unavailable"
+                  ? "No se pudo comprobar si el recorrido fue modificado en el servidor."
+                  : "El recorrido fue modificado en el servidor después de que abrió este editor."}
               </span>
               <span className="block rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-2.5 text-left font-medium text-[var(--color-warning)]">
-                Aviso informativo (no autoritativo): El backend no posee control de concurrencia ni bloqueo optimista para paradas. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica.
+                {stalenessWarningReason === "unavailable"
+                  ? "Aviso informativo: no fue posible verificar la secuencia actual. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."
+                  : "Aviso informativo (no autoritativo): El backend no posee control de concurrencia ni bloqueo optimista para paradas. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."}
               </span>
             </DialogDescription>
           </DialogHeader>
@@ -1336,7 +1369,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
             <Button
               type="button"
               variant="outline"
-              onClick={() => setShowStalenessWarning(false)}
+              onClick={() => setStalenessWarningReason(null)}
               disabled={isSavingStops}
               data-testid="cancel-staleness-button"
             >

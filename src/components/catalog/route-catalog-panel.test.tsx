@@ -2,11 +2,12 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
 import { paginateRouteFixtures, resetRouteFixtures, routeFixtures } from "@/lib/routes-fixtures";
+import { routesAdapter } from "@/lib/routes";
 import { resetZoneFixtures } from "@/lib/zones-fixtures";
 import { RouteCatalogPanel } from "./route-catalog-panel";
 
@@ -17,6 +18,7 @@ afterEach(() => {
   server.resetHandlers();
   resetRouteFixtures();
   resetZoneFixtures();
+  vi.restoreAllMocks();
 });
 afterAll(() => server.close());
 
@@ -538,6 +540,55 @@ describe("RouteCatalogPanel component", () => {
         expect(screen.queryByTestId("staleness-warning-dialog")).not.toBeInTheDocument();
         expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
         expect(screen.getByTestId("stops-list")).toBeInTheDocument();
+      });
+    });
+
+    it("warns when the ordered stops changed even if updatedAt is absent", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await screen.findByText("REC-001");
+      await user.click(screen.getByTestId("view-route-route-1"));
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      const fixture = routeFixtures.find((route) => route.id === "route-1");
+      if (fixture) {
+        fixture.updatedAt = undefined;
+        const [first, second] = fixture.stops;
+        if (first && second) {
+          first.sequence = 2;
+          first.estimatedDurationMin += 5;
+          second.sequence = 1;
+        }
+      }
+
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      expect(await screen.findByTestId("staleness-warning-dialog")).toBeInTheDocument();
+      expect(screen.getByText(/El recorrido fue modificado en el servidor/i)).toBeInTheDocument();
+    });
+
+    it("warns when the precheck GET fails and sends one PUT after the user continues", async () => {
+      const user = userEvent.setup();
+      const setStopsSpy = vi.spyOn(routesAdapter, "setStops");
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await screen.findByText("REC-001");
+      await user.click(screen.getByTestId("view-route-route-1"));
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      server.use(http.get("*/api/routes/:routeId", () => HttpResponse.error()));
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      const warning = await screen.findByTestId("staleness-warning-dialog");
+      expect(within(warning).getByText(/No se pudo comprobar si el recorrido fue modificado/i)).toBeInTheDocument();
+      expect(setStopsSpy).not.toHaveBeenCalled();
+
+      await user.click(screen.getByTestId("confirm-staleness-save-button"));
+      await waitFor(() => {
+        expect(setStopsSpy).toHaveBeenCalledTimes(1);
+        expect(screen.queryByTestId("staleness-warning-dialog")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
       });
     });
   });
