@@ -62,8 +62,9 @@ describe("ServiceFrequenciesPanel", () => {
 
     expect(await screen.findByText(/no genera servicios automáticamente/i)).toBeVisible();
     expect(screen.queryByText(/Services/i)).not.toBeInTheDocument();
-    const row = screen.getByRole("row", { name: /Recolección domiciliaria/ });
-    expect(within(row).getAllByRole("cell")[0]).toHaveAttribute("data-label", "Tipo de servicio");
+    const row = screen.getByRole("row", { name: /Recorrido Casco Histórico/ });
+    expect(within(row).getByRole("rowheader")).toHaveAttribute("data-label", "Tipo de servicio");
+    expect(within(row).getAllByRole("cell")[0]).toHaveAttribute("data-label", "Recorrido");
     expect(row.querySelector('td[data-label="Acciones"]')).not.toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Nueva frecuencia" }));

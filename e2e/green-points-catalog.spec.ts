@@ -8,7 +8,7 @@ test.describe("Green Point catalog management #124", () => {
     await page.goto("/app/catalog/green-points");
 
     await expect(page.getByRole("heading", { name: "Puntos verdes" })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "GP-001" })).toBeVisible();
+    await expect(page.getByRole("rowheader", { name: "GP-001" })).toBeVisible();
 
     await page.getByRole("button", { name: "Registrar punto verde" }).click();
     const dialog = page.getByRole("dialog");
@@ -23,7 +23,9 @@ test.describe("Green Point catalog management #124", () => {
 
     await expect(dialog).not.toBeVisible();
     await expect(page.getByText("Punto verde creado con éxito.")).toBeVisible();
-    const code = await page.locator("tbody tr").last().locator("td").first().textContent();
+    const codeCell = page.getByRole("rowheader", { name: /^GP-E2E-/ });
+    await expect(codeCell).toBeVisible();
+    const code = (await codeCell.textContent())?.trim();
     expect(code).toMatch(/^GP-E2E-/);
 
     const row = page.getByRole("row", { name: new RegExp(code ?? "GP-E2E-") });
@@ -37,7 +39,7 @@ test.describe("Green Point catalog management #124", () => {
     await deactivateDialog.getByRole("button", { name: `Dar de baja el punto verde ${code}` }).click();
     await expect(page.getByText("Punto verde dado de baja")).toBeVisible();
     await page.getByLabel("Filtrar puntos verdes por estado").selectOption("false");
-    await expect(page.getByRole("cell", { name: code ?? "GP-E2E-" })).toBeVisible();
+    await expect(page.getByRole("rowheader", { name: code ?? "GP-E2E-" })).toBeVisible();
   });
 
   test("Field can inspect but cannot manage Green Points", async ({ page }) => {

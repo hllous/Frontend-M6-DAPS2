@@ -30,8 +30,9 @@ test.describe("ServiceFrequency rule authoring #112", () => {
 
     const updatedRow = page.getByRole("row").filter({ hasText: "Recolección domiciliaria" }).last();
     await updatedRow.getByRole("button", { name: "Cerrar vigencia" }).click();
-    await expect(page.getByRole("heading", { name: "Cerrar vigencia" })).toBeVisible();
-    await page.getByRole("button", { name: "Cerrar vigencia" }).last().click();
+    const closeDialog = page.getByRole("dialog", { name: "Confirmar cierre de vigencia" });
+    await expect(closeDialog.getByRole("heading", { name: "Confirmar cierre de vigencia" })).toBeVisible();
+    await closeDialog.getByRole("button", { name: "Cerrar vigencia de Recolección domiciliaria" }).click();
     await expect(page.getByText(/Vigencia cerrada/)).toBeVisible();
   });
 });
