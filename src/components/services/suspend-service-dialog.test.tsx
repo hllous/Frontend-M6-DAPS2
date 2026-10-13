@@ -71,6 +71,22 @@ function ControlledSuspendServiceDialog({
 }
 
 describe("SuspendServiceDialog", () => {
+  it("associates required-field validation with the reason and note controls", async () => {
+    const user = userEvent.setup();
+    render(<ControlledSuspendServiceDialog onOpenChange={vi.fn()} onSuspended={vi.fn()} />);
+    const reason = screen.getByLabelText(/Motivo de suspensión/i);
+    const note = screen.getByLabelText(/^Nota/i);
+
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+    expect(reason).toHaveAttribute("aria-invalid", "true");
+    expect(document.getElementById(reason.getAttribute("aria-describedby")!)).toHaveTextContent("Debe seleccionar un motivo de suspensión.");
+
+    await user.selectOptions(reason, "VEHICLE_BREAKDOWN");
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+    expect(note).toHaveAttribute("aria-invalid", "true");
+    expect(document.getElementById(note.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent("Debe indicar una nota describiendo la suspensión.");
+  });
+
   it("keeps a suspended service open after an evidence upload fails and closes after retry", async () => {
     let suspendAttempts = 0;
     let uploadAttempts = 0;

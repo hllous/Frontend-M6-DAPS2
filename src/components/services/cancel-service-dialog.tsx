@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { servicesAdapter, type Service } from "@/lib/services";
 import { MAX_REASON_LENGTH } from "@/lib/input-limits";
 
@@ -58,15 +58,18 @@ function CancelServiceForm({
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reasonError, setReasonError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!reason.trim()) {
-      setErrorMessage("Debe indicar el motivo de la cancelación.");
+      setReasonError("Debe indicar el motivo de la cancelación.");
+      setErrorMessage(null);
       return;
     }
 
     setIsSubmitting(true);
+    setReasonError(null);
     setErrorMessage(null);
     try {
       const updated = await servicesAdapter.cancel(service.id, { reason: reason.trim() });
@@ -119,17 +122,21 @@ function CancelServiceForm({
             value={reason}
             onChange={(e) => {
               setReason(e.target.value);
+            setReasonError(null);
               setErrorMessage(null);
             }}
             required
+          aria-invalid={Boolean(reasonError)}
+          aria-describedby={reasonError ? `${formId}-reason-help ${formId}-reason-error` : `${formId}-reason-help`}
             placeholder="Ej. Solicitud del cliente, servicio duplicado, ya no es necesario…"
-            className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+          className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
           />
-          <FieldDescription>Obligatorio. Esta acción no se puede deshacer.</FieldDescription>
+          <FieldDescription id={`${formId}-reason-help`}>Obligatorio. Esta acción no se puede deshacer.</FieldDescription>
+          {reasonError && <FieldError id={`${formId}-reason-error`}>{reasonError}</FieldError>}
         </Field>
       </form>
 
-      <DialogFooter>
+      <DialogFooter className="flex-wrap">
         <Button
           type="button"
           variant="outline"
@@ -142,16 +149,11 @@ function CancelServiceForm({
           type="submit"
           form={formId}
           disabled={isSubmitting}
-          className="font-semibold bg-[var(--color-danger)] text-white hover:bg-[var(--color-danger)]/90"
+          aria-busy={isSubmitting}
+          className="min-h-12 font-semibold bg-[var(--color-danger)] text-white hover:bg-[var(--color-danger)]/90 min-[761px]:min-h-10"
         >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              <span>Cancelando…</span>
-            </>
-          ) : (
-            <span>Cancelar servicio</span>
-          )}
+          <Loader2 data-icon="inline-start" className={isSubmitting ? "animate-spin" : "invisible"} aria-hidden />
+          <span>Cancelar servicio</span>
         </Button>
       </DialogFooter>
     </>

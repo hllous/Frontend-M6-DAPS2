@@ -60,6 +60,7 @@ import {
   type SortDir,
   type SortKey,
 } from "./services-table";
+import { sortServices } from "./service-sorting";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 import { todayInArgentina } from "@/lib/argentina-date";
 
@@ -207,7 +208,7 @@ export function ServicesWorkspace({
   // Detect viewport width for 760px boundary
   useEffect(() => {
     const checkWidth = () => {
-      setIsNarrow(window.innerWidth < 760);
+      setIsNarrow(window.innerWidth <= 760);
     };
     checkWidth();
     window.addEventListener("resize", checkWidth);
@@ -278,6 +279,34 @@ export function ServicesWorkspace({
     const c = Array.from(columnFilters.crews).sort().join(",");
     return `${search}|${z}|${s}|${c}|${columnFilters.timeFrom}|${columnFilters.timeTo}`;
   }, [search, columnFilters]);
+
+  const focusSelectedServiceRow = useCallback((id = selectedId) => {
+    if (!id || typeof document === "undefined") return;
+    requestAnimationFrame(() => {
+      const row = Array.from(document.querySelectorAll<HTMLElement>("[data-service-id]"))
+        .find((element) => element.dataset.serviceId === id && element.tagName === "TR");
+      row?.focus();
+    });
+  }, [selectedId]);
+
+  const closePreview = useCallback(() => {
+    const id = selectedId;
+    setSelectedId(null);
+    focusSelectedServiceRow(id ?? undefined);
+  }, [focusSelectedServiceRow, selectedId]);
+
+  useEffect(() => {
+    if (!selectedId || detailId) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      const target = event.target;
+      if (target instanceof Element && target.closest('[role="dialog"]')) return;
+      event.preventDefault();
+      closePreview();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closePreview, detailId, selectedId]);
 
   // Synchronize state with URL parameters
   useEffect(() => {
@@ -387,6 +416,11 @@ export function ServicesWorkspace({
       return true;
     });
   }, [loadState, search, columnFilters]);
+
+  const sortedServices = useMemo(
+    () => sortServices(filteredServices, sortKey, sortDir),
+    [filteredServices, sortKey, sortDir],
+  );
 
   const selectedService = useMemo(() => {
     if (!selectedId || loadState.status !== "ready") return null;
@@ -680,7 +714,7 @@ export function ServicesWorkspace({
         <select
           value={activePeriod}
           onChange={(event) => setPeriodChoice(event.target.value as Period)}
-          className="min-h-12 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 text-base md:min-h-10 md:text-sm"
+          className="min-h-12 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 text-base min-[761px]:min-h-10 min-[761px]:text-sm"
         >
           <option value="semana">Esta semana</option>
           <option value="mes">Este mes</option>
@@ -702,7 +736,10 @@ export function ServicesWorkspace({
         )}
         <ServiceDetail
           service={detailService}
-          onBack={() => setDetailId(null)}
+          onBack={() => {
+            setDetailId(null);
+            focusSelectedServiceRow();
+          }}
           onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
           onStartService={canExecuteService ? handleStartService : undefined}
           onSuspendService={canExecuteService ? (s) => setSuspendingServiceId(s.id) : undefined}
@@ -824,7 +861,7 @@ export function ServicesWorkspace({
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--color-canvas)]">
       {/* Workspace Header & Toolbar */}
-      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-3 md:px-5">
+      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-3 min-[761px]:px-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-lg font-bold tracking-tight text-[var(--color-text)]">
@@ -991,7 +1028,7 @@ export function ServicesWorkspace({
                 ) : (
                   <div className="h-full p-2">
                     <MapView
-                      services={filteredServices}
+                      services={sortedServices}
                       selectedId={selectedId}
                       onSelect={handleSelect}
                       error={mapError}
@@ -1005,12 +1042,12 @@ export function ServicesWorkspace({
 
                 {/* Mobile live preview sheet/card when an item is selected */}
                 {selectedService && (
-                  <div className="absolute inset-x-0 bottom-0 z-40 max-h-[75%] rounded-t-2xl border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl">
+                  <div className="absolute inset-x-0 bottom-0 z-40 max-h-[75%] rounded-t-2xl border-t border-[var(--color-border)] bg-[var(--color-surface)]">
                     <ServicePreview
                       service={selectedService}
                       onOpenDetail={handleOpenDetail}
                       onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
-                      onClose={() => setSelectedId(null)}
+                      onClose={closePreview}
                     />
                   </div>
                 )}
@@ -1044,7 +1081,7 @@ export function ServicesWorkspace({
                       >
                         <div className="h-full p-3">
                           <MapView
-                            services={filteredServices}
+                            services={sortedServices}
                             selectedId={selectedId}
                             onSelect={handleSelect}
                             error={mapError}
@@ -1064,7 +1101,7 @@ export function ServicesWorkspace({
                         minSize={30}
                       >
                         <ServicesTable
-                          services={filteredServices}
+                          services={sortedServices}
                           filterOptionsServices={loadState.services}
                           selectedId={selectedId}
                           onSelect={handleSelect}
@@ -1109,7 +1146,7 @@ export function ServicesWorkspace({
                       >
                         <div className="h-full p-3">
                           <MapView
-                            services={filteredServices}
+                            services={sortedServices}
                             selectedId={selectedId}
                             onSelect={handleSelect}
                             error={mapError}
@@ -1126,12 +1163,12 @@ export function ServicesWorkspace({
 
                 {/* Anchored live preview alongside split pane when service selected */}
                 {selectedService && (
-                  <div className="absolute inset-y-0 right-0 z-30 w-80 md:w-96 shadow-2xl transition-transform duration-300">
+                  <div className="absolute inset-y-0 right-0 z-30 w-80 min-[761px]:w-96 transition-transform duration-300">
                     <ServicePreview
                       service={selectedService}
                       onOpenDetail={handleOpenDetail}
                       onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
-                      onClose={() => setSelectedId(null)}
+                      onClose={closePreview}
                     />
                   </div>
                 )}

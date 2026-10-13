@@ -40,7 +40,7 @@ describe("ScheduleServiceDialog component", () => {
     expect(screen.getByRole("heading", { name: "Programar nuevo servicio" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Origen del servicio/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Tipo de servicio/)).toBeInTheDocument();
-    expect(screen.getByText(/Recorrido \(ROUTE\)/)).toBeInTheDocument();
+    expect(screen.getByText("Recorrido")).toBeInTheDocument();
     expect(screen.getByLabelText(/Recorrido asignado/)).toBeInTheDocument();
     expect(screen.getAllByText(/sin cuadrilla ni vehículo asignados/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: "Programar servicio" })).toBeInTheDocument();
@@ -99,7 +99,7 @@ describe("ScheduleServiceDialog component", () => {
 
     await catalogsLoaded();
     // Initial state: st-waste-route -> ROUTE
-    expect(screen.getByText(/Recorrido \(ROUTE\)/)).toBeInTheDocument();
+    expect(screen.getByText("Recorrido")).toBeInTheDocument();
     expect(screen.getByLabelText(/Recorrido asignado/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Tipo de objetivo/)).not.toBeInTheDocument();
 
@@ -108,7 +108,7 @@ describe("ScheduleServiceDialog component", () => {
     await user.selectOptions(serviceTypeSelect, "st-tree-pruning");
 
     // Mode is now POINT
-    expect(screen.getByText(/Punto fijo \(POINT\)/)).toBeInTheDocument();
+    expect(screen.getByText("Punto fijo")).toBeInTheDocument();
     expect(screen.queryByLabelText(/Recorrido asignado/)).not.toBeInTheDocument();
     // Con un bien del inventario la zona se deriva del bien: no se pide.
     expect(screen.queryByLabelText(/Zona operativa/)).not.toBeInTheDocument();
@@ -129,7 +129,7 @@ describe("ScheduleServiceDialog component", () => {
 
     expect(screen.getByRole("heading", { name: "Programar servicio vinculado" })).toBeInTheDocument();
     expect(screen.getByText("Origen vinculado preservado")).toBeInTheDocument();
-    expect(screen.getByText("Reclamo ciudadano (TICKET)")).toBeInTheDocument();
+    expect(screen.getByText("Denuncia ciudadana")).toBeInTheDocument();
     expect(screen.getByText(linkedTicketId)).toBeInTheDocument();
     // Generic origin select is not rendered in linked mode
     expect(screen.queryByLabelText("Origen del servicio *")).not.toBeInTheDocument();
@@ -225,6 +225,10 @@ describe("ScheduleServiceDialog component", () => {
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/Debe elegir el árbol urbano/);
+    const target = screen.getByLabelText(/Bien del inventario/);
+    expect(target).toHaveAttribute("aria-invalid", "true");
+    const errorId = target.getAttribute("aria-describedby")?.split(" ").at(-1);
+    expect(document.getElementById(errorId!)).toHaveTextContent(/Debe elegir el árbol urbano/);
     expect(create).not.toHaveBeenCalled();
   });
 

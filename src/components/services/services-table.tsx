@@ -27,12 +27,12 @@ import {
 } from "@/components/ui/empty";
 import { formatCalendarDay } from "@/lib/argentina-date";
 import type { Service, ServiceStatus } from "@/lib/services";
-import { STATUS_LABEL, STATUS_ORDER } from "@/lib/services";
+import { STATUS_LABEL } from "@/lib/services";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
+import { sortServices, type SortDir, type SortKey } from "./service-sorting";
 
-export type SortKey = "service" | "zone" | "status" | "crew" | "scheduled";
-export type SortDir = "asc" | "desc";
+export type { SortDir, SortKey } from "./service-sorting";
 
 export type ColumnFilters = {
   zones: Set<string>;
@@ -52,24 +52,6 @@ const ALL_STATUSES: ServiceStatus[] = [
   "CANCELLED",
 ];
 
-function compareServices(a: Service, b: Service, key: SortKey): number {
-  switch (key) {
-    case "status":
-      return STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
-    case "service":
-      return a.title.localeCompare(b.title);
-    case "zone":
-      return (a.zoneNames[0] ?? "").localeCompare(b.zoneNames[0] ?? "");
-    case "crew":
-      return (a.crewName ?? "zzz").localeCompare(b.crewName ?? "zzz");
-    case "scheduled": {
-      const aTime = `${a.scheduledDate} ${a.windowFrom ?? ""}`;
-      const bTime = `${b.scheduledDate} ${b.windowFrom ?? ""}`;
-      return aTime.localeCompare(bTime);
-    }
-  }
-}
-
 function ColumnFilterPopover({
   label,
   active,
@@ -83,6 +65,7 @@ function ColumnFilterPopover({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +73,11 @@ function ColumnFilterPopover({
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
     }
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -103,6 +90,7 @@ function ColumnFilterPopover({
   return (
     <div className="relative inline-block" ref={ref}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
@@ -120,7 +108,7 @@ function ColumnFilterPopover({
         <div
           role="dialog"
           aria-label={`Filtro de ${label}`}
-          className="absolute right-0 top-full z-50 mt-1 min-w-[220px] rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-left shadow-lg"
+          className="absolute right-0 top-full z-50 mt-1 min-w-[220px] rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-left"
         >
           <div className="mb-2 flex items-center justify-between border-b border-[var(--color-border)] pb-2 text-xs font-semibold text-[var(--color-text)]">
             <span className="capitalize">{label}</span>
@@ -169,6 +157,9 @@ export function ServicesTable({
   dense?: boolean;
 }) {
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const [activeRow, setActiveRow] = useState<{ selectionId: string | null; rowId: string | null }>(
+    { selectionId: selectedId, rowId: selectedId },
+  );
 
   // Auto-scroll selected row into view smoothly
   useEffect(() => {
@@ -195,13 +186,13 @@ export function ServicesTable({
   }, [filterOptionsServices, columnFilters.crews]);
 
   const sortedServices = useMemo(() => {
-    const copy = [...services];
-    copy.sort((a, b) => {
-      const cmp = compareServices(a, b, sortKey);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return copy;
+    return sortServices(services, sortKey, sortDir);
   }, [services, sortKey, sortDir]);
+
+  const preferredTabStopId = activeRow.selectionId === selectedId ? activeRow.rowId : selectedId;
+  const tabStopId = sortedServices.some((service) => service.id === preferredTabStopId)
+    ? preferredTabStopId
+    : sortedServices[0]?.id ?? null;
 
   const toggleZone = (zone: string) => {
     const next = new Set(columnFilters.zones);
@@ -235,7 +226,7 @@ export function ServicesTable({
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
       <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-left text-xs" role="grid">
+        <table className="w-full border-collapse text-left text-xs" role="grid" aria-rowcount={sortedServices.length + 1}>
           <thead className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
             <tr role="row">
               {columns.map((col) => {
@@ -375,7 +366,7 @@ export function ServicesTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-border)]">
-            {sortedServices.map((service) => {
+            {sortedServices.map((service, index) => {
               const isSelected = service.id === selectedId;
 
               return (
@@ -385,15 +376,33 @@ export function ServicesTable({
                   ref={(el) => {
                     rowRefs.current[service.id] = el;
                   }}
-                  tabIndex={0}
+                  tabIndex={service.id === tabStopId ? 0 : -1}
                   role="row"
+                  aria-rowindex={index + 2}
                   aria-selected={isSelected}
                   onClick={() => onSelect(service.id)}
+                  onFocus={() => setActiveRow({ selectionId: selectedId, rowId: service.id })}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       onSelect(service.id);
+                      return;
                     }
+                    const currentIndex = sortedServices.findIndex((candidate) => candidate.id === service.id);
+                    const nextIndex = e.key === "ArrowDown"
+                      ? Math.min(currentIndex + 1, sortedServices.length - 1)
+                      : e.key === "ArrowUp"
+                        ? Math.max(currentIndex - 1, 0)
+                        : e.key === "Home"
+                          ? 0
+                          : e.key === "End"
+                            ? sortedServices.length - 1
+                            : currentIndex;
+                    if (nextIndex === currentIndex) return;
+                    e.preventDefault();
+                    const nextService = sortedServices[nextIndex];
+                    setActiveRow({ selectionId: selectedId, rowId: nextService.id });
+                    rowRefs.current[nextService.id]?.focus();
                   }}
                   className={cn(
                     "cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-focus)]",

@@ -157,7 +157,7 @@ export function CreateRepairRequestDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4 shadow-sm">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4">
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
             <div className="min-w-0 text-sm">
@@ -174,7 +174,7 @@ export function CreateRepairRequestDialog({
         </div>
 
         {outcome === "unsent" && (
-          <div role="status" className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4 shadow-sm">
+          <div role="status" className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4">
             <div className="flex items-center gap-2 text-sm font-bold text-[var(--color-warning)]">
               <AlertCircle className="h-4 w-4" aria-hidden />
               <span>{isInspection ? "Derivación sin enviar" : "Unsent referral"}</span>
@@ -186,7 +186,7 @@ export function CreateRepairRequestDialog({
         )}
 
         {createdRequest && (
-          <div role="status" className="rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)]/50 p-4 shadow-sm">
+          <div role="status" className="rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)]/50 p-4">
             <div className="flex items-center gap-2 text-sm font-bold text-[var(--color-success)]">
               <CheckCircle2 className="h-4 w-4" aria-hidden />
               <span>Derivación creada y pendiente de respuesta de M3.</span>

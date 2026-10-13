@@ -44,6 +44,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     // Close preview to test map interaction directly
     await preview.getByRole("button", { name: "Cerrar vista previa" }).click();
     await expect(preview).not.toBeVisible();
+    await expect(firstServiceRow).toBeFocused();
 
     // Select a different marker directly on the map (SVC-1051) by targeting
     // the real, visible Leaflet marker pin — not the sr-only accessible
@@ -100,12 +101,15 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
 
     // Full detail view is active
     await expect(page.getByRole("region", { name: /Detalle completo de Poda de árbol — Av\. Rivadavia 2200/i })).toBeVisible();
-    await expect(page.getByText("Detalle operativo")).toBeVisible();
+    await expect(page.getByText("Detalle operativo", { exact: true })).toBeVisible();
+    await expect(page.locator("main")).toHaveCount(1);
 
     // Return back to services workspace
     await page.getByRole("button", { name: "Volver a Servicios" }).click();
     await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
     await expect(table).toBeVisible();
+    await expect(page.locator("main")).toHaveCount(1);
+    await expect(row).toBeFocused();
   });
 
   test("narrow viewport provides view switcher between list and map", async ({ page }) => {
