@@ -75,3 +75,58 @@ test("keeps the mobile map visible with a keyboard and drag accessible inventory
 
   await expect(map).toBeVisible();
 });
+
+test("keeps the map box height constant across tabs on desktop and mobile #423", async ({ page }) => {
+  await loginViaApi(page, "office-duty-queue");
+
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
+
+    const mapPanel = page.locator("div[class*='mapPanel']");
+    await expect(mapPanel).toBeVisible();
+    const heights: number[] = [];
+
+    for (const label of ["Inventario", "Zonas", "Cobertura", "Recorrido"]) {
+      const tab = page.getByRole("tab", { name: label });
+      await tab.click();
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+      const listArea = label === "Inventario"
+        ? page.locator("section[class*='visibleList'] ul")
+        : page.locator("section[class*='viewPanel']");
+      await expect.poll(() => listArea.evaluate((element) => getComputedStyle(element).overflowY)).toBe("auto");
+      const box = await mapPanel.boundingBox();
+      if (!box) throw new Error(`Expected the map panel to be visible for ${label}.`);
+      heights.push(box.height);
+    }
+
+    expect(
+      Math.max(...heights) - Math.min(...heights),
+      `map panel heights at ${viewport.width}px: ${heights.join(", ")}`,
+    ).toBeLessThan(1);
+  }
+});
+
+test("keeps the mobile refresh action compact and keyboard accessible #423", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginViaApi(page, "office-duty-queue");
+  await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
+
+  const refresh = page.getByRole("button", { name: "Actualizar datos" });
+  await expect(refresh).toBeVisible();
+  await expect(refresh).toBeEnabled();
+  const box = await refresh.boundingBox();
+  if (!box) throw new Error("Expected the refresh control to have a visible target.");
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.width).toBeLessThanOrEqual(64);
+
+  await refresh.focus();
+  await expect(refresh).toBeFocused();
+  await expect.poll(() => refresh.evaluate((button) => getComputedStyle(button).outlineStyle)).toBe("solid");
+  await expect.poll(() => refresh.evaluate((button) => getComputedStyle(button).outlineWidth)).toBe("3px");
+  await refresh.hover();
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toHaveText("Actualizar datos");
+});

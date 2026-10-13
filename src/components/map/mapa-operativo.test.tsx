@@ -36,6 +36,28 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("MapaOperativo", () => {
+  it("keeps the map heading concise and exposes an accessible refresh action", async () => {
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByRole("heading", { name: "Mapa operativo" })).toBeVisible();
+    expect(await screen.findByText("Elementos", { exact: true })).toBeVisible();
+    expect(screen.queryByText(/Supervise el inventario urbano/)).not.toBeInTheDocument();
+    const refresh = screen.getByRole("button", { name: "Actualizar datos" });
+    expect(refresh).toBeEnabled();
+    expect(refresh).toHaveAttribute("aria-label", "Actualizar datos");
+  });
+
+  it("changes map views with keyboard-operable tabs", async () => {
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    const inventoryTab = await screen.findByRole("tab", { name: "Inventario" });
+    inventoryTab.focus();
+    await user.keyboard("{ArrowRight}");
+
+    expect(screen.getByRole("tab", { name: "Zonas" })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("presents every point layer with a synchronized accessible list", async () => {
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);

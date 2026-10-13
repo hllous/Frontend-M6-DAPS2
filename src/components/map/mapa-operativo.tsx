@@ -17,6 +17,8 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatArgentinaDateTime, todayInArgentina } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS } from "@/lib/containers";
 import { indicatorsAdapter, type CoverageIndicator } from "@/lib/indicators";
@@ -496,146 +498,161 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
 
   return (
     <section className={styles.workspace} aria-labelledby="mapa-operativo-title">
-      <header className={styles.heading}>
-        <div>
+      <Tabs
+        value={view}
+        onValueChange={(nextView) => {
+          if (typeof nextView === "string") handleViewChange(nextView as OperationalMapView);
+        }}
+        className={styles.tabs}
+      >
+        <header className={styles.heading}>
           <h1 id="mapa-operativo-title">Mapa operativo</h1>
-          <p>
-            {scenario.actor.kind === "OFFICE"
-              ? "Supervise el inventario urbano y la cobertura territorial de la operación."
-              : "Consulte los recursos urbanos cercanos a su operación."}
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => void load()} disabled={isLoading}>
-          <RefreshCw data-icon="inline-start" aria-hidden />
-          Actualizar datos
-        </Button>
-      </header>
-
-      <div className={styles.viewSwitcher} role="tablist" aria-label="Vistas del mapa operativo">
-        {availableMapViews.map((option) => (
-          <Button
-            key={option.id}
-            id={`map-tab-${option.id}`}
-            className={styles.viewTab}
-            variant={view === option.id ? "default" : "outline"}
-            role="tab"
-            aria-selected={view === option.id}
-            aria-controls={`map-view-${option.id}`}
-            onClick={() => handleViewChange(option.id)}
-          >
-            {option.label}
-          </Button>
-        ))}
-      </div>
-
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTriangle aria-hidden />
-          <AlertTitle>El mapa no está disponible</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-          <Button variant="outline" size="sm" onClick={() => void load()}>
-            Reintentar
-          </Button>
-        </Alert>
-      ) : null}
-
-      {viewError ? (
-        <Alert variant="destructive">
-          <AlertTriangle aria-hidden />
-          <AlertTitle>La vista no está disponible</AlertTitle>
-          <AlertDescription>{viewError}</AlertDescription>
-          <Button variant="outline" size="sm" onClick={() => {
-            setViewError(null);
-            if (view === "route") {
-              setRoutesLoaded(false);
-            } else if (view === "today") {
-              setTodayLoaded(false);
-            } else if (view === "coverage") {
-              setCoverage(null);
-              setCoverageLoaded(false);
-            }
-          }}>
-            Reintentar vista
-          </Button>
-        </Alert>
-      ) : null}
-
-      {isLoading ? <MapLoading /> : data ? (
-        <div className={cn(styles.layout, view === "inventory" && styles.layoutInventory)} id={`map-view-${view}`} role="tabpanel" aria-labelledby={`map-tab-${view}`}>
-          <div className={styles.mapPanel}>
-            <div className={styles.mapToolbar}>
-              <strong>{currentView.title}</strong>
-              <span>{mapToolbarSummary(view, locatedItems.length, zones, routeStops.length, todayServices.length, coverageZoneOverlays)}</span>
-              {lastConsultedAt ? <span>Consultado {formatArgentinaDateTime(lastConsultedAt)}</span> : null}
-            </div>
-            <OperationalMapCanvas
-              view={view}
-              markers={locatedItems}
-              zones={zones}
-              routeStops={routeStops}
-              todayZones={todayZoneCoverage}
-              coverageZones={coverageZoneOverlays}
-              selectedStopSequence={selectedStopSequence}
-              onSelectStop={setSelectedStopSequence}
-              selectedZoneCode={selectedZoneCode}
-              onSelectZone={setSelectedZoneCode}
-              selectedMarkerKey={selectedMarkerKey}
-              onSelectMarker={selectInventoryMarker}
-            />
-          </div>
-
-          {view === "inventory" ? (
-            <InventoryMapDrawer
-              ariaLabel={`Controles de la vista ${currentView.label}`}
-              className={styles.sidePanel}
-              summary={`Elementos visibles · ${locatedItems.length}`}
-            >
-              <InventoryPanel
-                items={items}
-                locatedItems={locatedItems}
-                unlocatedCount={unlocatedCount}
-                selectedMapItemKey={selectedMarkerKey}
-                onSelectItem={selectInventoryItem}
-                enabledLayers={enabledLayers}
-                onLayerChange={(layer, checked) => {
-                  setEnabledLayers((current) => ({ ...current, [layer]: checked }));
-                }}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    className={styles.refreshButton}
+                    variant="outline"
+                    size="icon"
+                    type="button"
+                    aria-label="Actualizar datos"
+                    onClick={() => void load()}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw aria-hidden />
+                  </Button>
+                }
               />
-            </InventoryMapDrawer>
-          ) : (
-            <aside className={styles.sidePanel} aria-label={`Controles de la vista ${currentView.label}`}>
-              {view === "zones" ? (
-                <ZonesMapPanel zones={zones} selectedZoneCode={selectedZoneCode} onSelectZone={setSelectedZoneCode} />
-              ) : view === "route" ? (
-                <RouteMapPanel
-                  routes={routes}
-                  selectedRouteId={selectedRouteId}
-                  selectedRoute={selectedRoute}
+              <TooltipContent>Actualizar datos</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </header>
+
+        <TabsList
+          activateOnFocus
+          className={styles.viewSwitcher}
+          variant="line"
+          aria-label="Vistas del mapa operativo"
+        >
+          {availableMapViews.map((option) => (
+            <TabsTrigger key={option.id} value={option.id} className={styles.viewTab}>
+              {option.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTriangle aria-hidden />
+            <AlertTitle>El mapa no está disponible</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+            <Button variant="outline" size="sm" onClick={() => void load()}>
+              Reintentar
+            </Button>
+          </Alert>
+        ) : null}
+
+        <TabsContent value={view} id={`map-view-${view}`} className={styles.tabContent}>
+          {viewError ? (
+            <Alert variant="destructive">
+              <AlertTriangle aria-hidden />
+              <AlertTitle>La vista no está disponible</AlertTitle>
+              <AlertDescription>{viewError}</AlertDescription>
+              <Button variant="outline" size="sm" onClick={() => {
+                setViewError(null);
+                if (view === "route") {
+                  setRoutesLoaded(false);
+                } else if (view === "today") {
+                  setTodayLoaded(false);
+                } else if (view === "coverage") {
+                  setCoverage(null);
+                  setCoverageLoaded(false);
+                }
+              }}>
+                Reintentar vista
+              </Button>
+            </Alert>
+          ) : null}
+
+          {isLoading ? <MapLoading /> : data ? (
+            <div className={cn(styles.layout, view === "inventory" && styles.layoutInventory)}>
+              <div className={styles.mapPanel}>
+                <div className={styles.mapToolbar}>
+                  <strong>{currentView.title}</strong>
+                  <span>{mapToolbarSummary(view, locatedItems.length, zones, routeStops.length, todayServices.length, coverageZoneOverlays)}</span>
+                  {lastConsultedAt ? <span>Consultado {formatArgentinaDateTime(lastConsultedAt)}</span> : null}
+                </div>
+                <OperationalMapCanvas
+                  view={view}
+                  markers={locatedItems}
+                  zones={zones}
                   routeStops={routeStops}
-                  onRouteChange={handleRouteChange}
+                  todayZones={todayZoneCoverage}
+                  coverageZones={coverageZoneOverlays}
                   selectedStopSequence={selectedStopSequence}
                   onSelectStop={setSelectedStopSequence}
-                  loading={isViewLoading}
-                />
-              ) : view === "coverage" ? (
-                <CoverageMapPanel
-                  coverage={coverage}
-                  zones={coverageZoneOverlays}
-                  loading={isViewLoading}
                   selectedZoneCode={selectedZoneCode}
                   onSelectZone={setSelectedZoneCode}
+                  selectedMarkerKey={selectedMarkerKey}
+                  onSelectMarker={selectInventoryMarker}
                 />
+              </div>
+
+              {view === "inventory" ? (
+                <InventoryMapDrawer
+                  ariaLabel={`Controles de la vista ${currentView.label}`}
+                  className={styles.sidePanel}
+                  summary="Elementos"
+                >
+                  <InventoryPanel
+                    items={items}
+                    locatedItems={locatedItems}
+                    unlocatedCount={unlocatedCount}
+                    selectedMapItemKey={selectedMarkerKey}
+                    onSelectItem={selectInventoryItem}
+                    enabledLayers={enabledLayers}
+                    onLayerChange={(layer, checked) => {
+                      setEnabledLayers((current) => ({ ...current, [layer]: checked }));
+                    }}
+                  />
+                </InventoryMapDrawer>
               ) : (
-                <TodayMapPanel
-                  services={todayServices}
-                  zones={todayZoneCoverage}
-                  loading={isViewLoading}
-                />
+                <aside className={styles.sidePanel} aria-label={`Controles de la vista ${currentView.label}`}>
+                  {view === "zones" ? (
+                    <ZonesMapPanel zones={zones} selectedZoneCode={selectedZoneCode} onSelectZone={setSelectedZoneCode} />
+                  ) : view === "route" ? (
+                    <RouteMapPanel
+                      routes={routes}
+                      selectedRouteId={selectedRouteId}
+                      selectedRoute={selectedRoute}
+                      routeStops={routeStops}
+                      onRouteChange={handleRouteChange}
+                      selectedStopSequence={selectedStopSequence}
+                      onSelectStop={setSelectedStopSequence}
+                      loading={isViewLoading}
+                    />
+                  ) : view === "coverage" ? (
+                    <CoverageMapPanel
+                      coverage={coverage}
+                      zones={coverageZoneOverlays}
+                      loading={isViewLoading}
+                      selectedZoneCode={selectedZoneCode}
+                      onSelectZone={setSelectedZoneCode}
+                    />
+                  ) : (
+                    <TodayMapPanel
+                      services={todayServices}
+                      zones={todayZoneCoverage}
+                      loading={isViewLoading}
+                    />
+                  )}
+                </aside>
               )}
-            </aside>
-          )}
-        </div>
-      ) : null}
+            </div>
+          ) : null}
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }

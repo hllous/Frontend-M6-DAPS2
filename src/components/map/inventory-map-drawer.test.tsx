@@ -9,13 +9,13 @@ describe("InventoryMapDrawer", () => {
     const user = userEvent.setup();
 
     render(
-      <InventoryMapDrawer ariaLabel="Inventario visible" summary="Elementos visibles · 19">
+      <InventoryMapDrawer ariaLabel="Inventario visible" summary="Elementos">
         <button type="button">Primer elemento</button>
       </InventoryMapDrawer>,
     );
 
     const handle = screen.getByRole("button", { name: "Mostrar lista" });
-    const summary = screen.getByText("Elementos visibles · 19");
+    const summary = screen.getByText("Elementos");
     expect(handle).toHaveAttribute("aria-expanded", "false");
     expect(handle).toHaveAttribute("aria-describedby", summary.id);
 
@@ -36,7 +36,7 @@ describe("InventoryMapDrawer", () => {
     const user = userEvent.setup();
 
     render(
-      <InventoryMapDrawer ariaLabel="Inventario visible" summary="Elementos visibles · 19">
+      <InventoryMapDrawer ariaLabel="Inventario visible" summary="Elementos">
         <button type="button">Primer elemento</button>
       </InventoryMapDrawer>,
     );
