@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AUTH_COOKIE_NAME, BackendUnavailableError, createSession, sealSession } from "./session";
 import { fetchBackend, pathId } from "./bff-backend";
+import { forwardResponse } from "./bff-route";
 
 const backendOrigin = "https://backend.internal";
 const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
@@ -47,6 +48,22 @@ describe("pathId", () => {
 });
 
 describe("fetchBackend availability", () => {
+  it.each([[200, 502], [201, 502], [503, 503]])(
+    "wraps non-JSON upstream %s as status %s and uses the calling BFF path",
+    async (upstreamStatus, expectedStatus) => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<html>gateway</html>", {
+        status: upstreamStatus,
+        headers: { "content-type": "text/html" },
+      }));
+      const request = backendRequest();
+      const upstream = await fetchBackend(request, "/services/service-1/start");
+
+      const response = forwardResponse(upstream);
+      expect(response.status).toBe(expectedStatus);
+      expect(await response.json()).toMatchObject({ statusCode: expectedStatus, path: "/api/services/service-1/start" });
+    },
+  );
+
   it("translates network failures into BackendUnavailableError", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
 
