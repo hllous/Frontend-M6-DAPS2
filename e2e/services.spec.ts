@@ -170,24 +170,26 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(preview.getByText("Programado").first()).toBeVisible();
   });
 
-  test("linked-create entry prefills origin and reference ID and schedules successfully", async ({ page }) => {
+  test("linked-create entry shows its localized origin and schedules successfully", async ({ page }) => {
     await page.setViewportSize(WIDE_VIEWPORT);
     await loginViaApi(page, "office-duty-queue");
 
+    const linkedTicketId = "550e8400-e29b-41d4-a716-446655440921";
     // Navigate with linked-create query params
     await page.goto(
-      "/app?destination=services&action=schedule&origin=TICKET&referenceId=550e8400-e29b-41d4-a716-446655440921",
+      `/app?destination=services&action=schedule&origin=TICKET&referenceId=${linkedTicketId}`,
     );
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("heading", { name: "Programar servicio vinculado" })).toBeVisible();
     await expect(dialog.getByText("Origen vinculado preservado")).toBeVisible();
-    await expect(dialog.getByText("550e8400-e29b-41d4-a716-446655440921")).toBeVisible();
+    await expect(dialog.getByText("Denuncia ciudadana", { exact: true })).toBeVisible();
+    await expect(dialog).not.toContainText(linkedTicketId);
 
     // Select a POINT service type
     await dialog.getByLabel(/Tipo de servicio/i).selectOption({ label: "Mantenimiento de contenedores (Punto)" });
-    await expect(dialog.getByText(/Punto fijo \(POINT\)/i)).toBeVisible();
+    await expect(dialog.getByText("Punto fijo", { exact: true })).toBeVisible();
 
     // Pick the real container from the inventory (#319)
     await expect(dialog.getByLabel(/Tipo de objetivo/i)).toHaveValue("CONTAINER");
