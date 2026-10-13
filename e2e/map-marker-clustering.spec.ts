@@ -36,3 +36,42 @@ test("selecting an inventory list item highlights its map marker #424", async ({
   await expect(item).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('[class*="markerSelected"]').first()).toBeVisible();
 });
+
+test("keeps the mobile map visible with a keyboard and drag accessible inventory drawer #423", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginViaApi(page, "office-duty-queue");
+  await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
+
+  const drawer = page.getByRole("complementary", { name: "Controles de la vista Inventario" });
+  const map = page.locator(".leaflet-container");
+  const handle = drawer.locator('[data-inventory-map-drawer-handle="true"]');
+
+  await expect(map).toBeVisible();
+  await expect(handle).toBeInViewport({ ratio: 0.95 });
+  await expect(handle).toHaveAccessibleName("Mostrar lista");
+  await expect(handle).toHaveAttribute("aria-expanded", "false");
+  await expect(handle).toHaveCSS("min-height", "80px");
+  await expect(drawer.getByRole("heading", { name: "Elementos visibles" })).toBeVisible();
+
+  await handle.focus();
+  await page.keyboard.press("Tab");
+  await expect(handle).toHaveAttribute("aria-expanded", "true");
+  await expect(handle).toHaveAccessibleName("Ocultar lista");
+  const firstItem = drawer.getByRole("button", { name: /CONT-002/ });
+  await firstItem.focus();
+  await expect(firstItem).toBeFocused();
+  await expect(firstItem).toBeInViewport();
+
+  const expandedHandle = handle;
+  const expandedBox = await expandedHandle.boundingBox();
+  if (!expandedBox) throw new Error("Expected the expanded drawer handle to be visible.");
+  const x = expandedBox.x + expandedBox.width / 2;
+  const startY = expandedBox.y + expandedBox.height / 2;
+  await page.mouse.move(x, startY);
+  await page.mouse.down();
+  await page.mouse.move(x, startY + 220, { steps: 5 });
+  await page.mouse.up();
+  await expect(drawer.getByRole("button", { name: "Mostrar lista" })).toHaveAttribute("aria-expanded", "false");
+
+  await expect(map).toBeVisible();
+});
