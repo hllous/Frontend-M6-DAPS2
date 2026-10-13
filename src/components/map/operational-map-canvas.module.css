@@ -1,5 +1,5 @@
 .map {
-  min-height: 568px;
+  min-height: 0;
   flex: 1;
   background: var(--color-surface-subtle);
   font-family: inherit;
@@ -106,7 +106,7 @@
 }
 
 @media (max-width: 760px) {
-  .map { min-height: 54vh; }
+  .map { min-height: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
