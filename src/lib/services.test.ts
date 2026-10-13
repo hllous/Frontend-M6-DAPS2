@@ -15,6 +15,8 @@ import {
   ServiceRequestError,
   ServiceStartBlockedError,
   servicesAdapter,
+  suspendServiceInputSchema,
+  toSuspendServiceBackendInput,
   toCreateServiceBackendInput,
 } from "./services";
 import { olvidarCatalogoDeEtiquetas } from "./service-labels";
@@ -1045,5 +1047,17 @@ describe("services adapter", () => {
       expect(completed.id).toBe("SVC-1050");
       expect(completed.status).toBe("COMPLETED");
     });
+  });
+});
+
+describe("suspension reason contract", () => {
+  it("keeps the reason label and required note in the backend reason", () => {
+    const input = suspendServiceInputSchema.parse({ reason: "VEHICLE_BREAKDOWN", note: "  El camión no arranca.  " });
+    expect(toSuspendServiceBackendInput(input)).toEqual({ reason: "Desperfecto vehicular: El camión no arranca." });
+  });
+  it.each([[487, true], [488, false]])("caps the combined reason at 500 characters (note %s)", (length, valid) => {
+    const parsed = suspendServiceInputSchema.safeParse({ reason: "OTHER", note: "a".repeat(length) });
+    expect(parsed.success).toBe(valid);
+    if (!parsed.success) expect(parsed.error.issues[0].message).toContain("500 caracteres");
   });
 });

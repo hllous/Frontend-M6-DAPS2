@@ -66,9 +66,13 @@ jobs:
       - name: Unit and component tests
         run: npm test
 
-  e2e:
-    name: e2e
+  e2e-shard:
+    name: e2e shard ${{ matrix.shard }}/3
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -89,15 +93,26 @@ jobs:
       # mock scenarios and fixture data only — no production or Tier 2 data ever enters
       # these runs, so the traces/screenshots below carry none either.
       - name: Playwright smoke and accessibility suite
-        run: npm run test:e2e
+        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-24.04
+    needs: [e2e-shard]
+    if: ${{ always() }}
+    steps:
+      - name: Require every Playwright shard to succeed
+        env:
+          SHARDS_RESULT: ${{ needs.e2e-shard.result }}
+        run: test "$SHARDS_RESULT" = "success"
 
   security:
     name: security
