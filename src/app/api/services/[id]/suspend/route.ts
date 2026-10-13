@@ -7,6 +7,7 @@ import {
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import {
+  STATUS_LABEL,
   suspendServiceInputSchema,
   toSuspendServiceBackendInput,
 } from "@/lib/services";
@@ -83,7 +84,7 @@ export async function POST(
     if (service.status !== "IN_PROGRESS") {
       return errorResponse(
         409,
-        `Solo se pueden suspender servicios en curso (IN_PROGRESS) (estado actual: ${service.status}).`,
+        `Solo se pueden suspender servicios en curso (estado actual: ${STATUS_LABEL[service.status]}).`,
         path,
       );
     }

@@ -12,7 +12,7 @@ const catalogCards = [
     title: "Tipos de servicio",
     description: "Categorías, modo de ejecución y necesidad de vehículo.",
     icon: Boxes,
-    tone: "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400",
+    tone: "bg-[var(--color-info-fill)] text-[var(--color-info)]",
   },
   {
     href: "/app/catalog/disposal-sites",
@@ -98,7 +98,7 @@ export function CatalogLanding({ scenario }: { scenario: OperationalScenario }) 
     <section aria-labelledby="catalog-title" className="flex w-full flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-muted-foreground">Configuración</p>
-        <h1 id="catalog-title" className="text-2xl font-semibold tracking-tight">
+        <h1 id="catalog-title" className="text-[28px] leading-[34px] max-[760px]:text-[26px] max-[760px]:leading-[32px] font-bold tracking-tight">
           Catálogo
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">

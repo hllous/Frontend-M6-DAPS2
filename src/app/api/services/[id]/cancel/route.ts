@@ -6,7 +6,7 @@ import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
-import { cancelServiceInputSchema } from "@/lib/services";
+import { cancelServiceInputSchema, STATUS_LABEL } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -76,8 +76,8 @@ export async function POST(
     if (!CANCELLABLE_STATUSES.has(service.status)) {
       const message =
         service.status === "IN_PROGRESS"
-          ? `No se puede cancelar un servicio en curso (IN_PROGRESS) directamente; debe suspenderse primero.`
-          : `Solo se pueden cancelar servicios programados (SCHEDULED), a reprogramar (RESCHEDULED) o suspendidos (SUSPENDED) (estado actual: ${service.status}).`;
+          ? `No se puede cancelar un servicio en curso directamente; debe suspenderse primero.`
+          : `Solo se pueden cancelar servicios programados, a reprogramar o suspendidos (estado actual: ${STATUS_LABEL[service.status]}).`;
       return errorResponse(409, message, path);
     }
 

@@ -4,11 +4,13 @@ import { setupServer } from "msw/node";
 
 import {
   clearFieldDraft,
+  clearAllFieldDrafts,
   getFieldDraft,
   hasServiceDrifted,
   resubmitFieldAction,
   retryFieldDraft,
   saveFieldDraft,
+  setFieldDraftOwner,
   snapshotService,
   submitFieldAction,
   type FieldDraft,
@@ -17,6 +19,8 @@ import type { Service } from "./services";
 import { NetworkFailureError } from "./authenticated-fetch";
 
 const server = setupServer();
+
+beforeEach(() => setFieldDraftOwner("actor-a"));
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
@@ -54,6 +58,33 @@ function makeService(overrides: Partial<Service> = {}): Service {
 }
 
 describe("field-drafts storage primitives", () => {
+  it("clears all actors' drafts and legacy keys while preserving unrelated storage", () => {
+    localStorage.setItem("m6:field-draft:v2:actor-a:service:start", "private-a");
+    localStorage.setItem("m6:field-draft:v2:actor-b:service:start", "private-b");
+    localStorage.setItem("m6:field-draft:service:start", "legacy");
+    localStorage.setItem("map-preference", "table");
+    clearAllFieldDrafts();
+    expect(localStorage.length).toBe(1);
+    expect(localStorage.getItem("map-preference")).toBe("table");
+    const draft: FieldDraft = { serviceId: "SVC-9001", actionType: "start", payload: null, composedAgainst: snapshotService(makeService()), savedAt: "2026-09-05T09:00:00.000Z" };
+    expect(saveFieldDraft(draft)).toBe(false);
+    expect(getFieldDraft("SVC-9001", "start")).toBeNull();
+  });
+
+  it("isolates drafts by actor and does not expose legacy unscoped drafts", () => {
+    const draft: FieldDraft = { serviceId: "SVC-9001", actionType: "start", payload: { note: "private" }, composedAgainst: snapshotService(makeService()), savedAt: "2026-09-05T09:00:00.000Z" };
+    localStorage.setItem("m6:field-draft:SVC-9001:start", JSON.stringify(draft));
+    setFieldDraftOwner("actor-a");
+    expect(localStorage.getItem("m6:field-draft:SVC-9001:start")).toBeNull();
+    expect(getFieldDraft("SVC-9001", "start")).toBeNull();
+    expect(saveFieldDraft(draft)).toBe(true);
+    setFieldDraftOwner("actor-b");
+    expect(getFieldDraft("SVC-9001", "start")).toBeNull();
+    clearFieldDraft("SVC-9001", "start");
+    setFieldDraftOwner("actor-a");
+    expect(getFieldDraft("SVC-9001", "start")).toEqual(draft);
+  });
+
   it("round-trips a draft through save/get/clear", () => {
     const service = makeService();
     const draft: FieldDraft<{ note: string }> = {
