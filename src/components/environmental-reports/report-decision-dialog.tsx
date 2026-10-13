@@ -29,14 +29,15 @@ interface ReportDecisionDialogProps {
   decision: ReportDecision | null;
   reportId: string;
   onOpenChange: (open: boolean) => void;
+  finalFocus?: React.ComponentProps<typeof DialogContent>["finalFocus"];
   /** Resolves to an error message when the action failed, or null on success. */
   onConfirm: (decision: ReportDecision, reason: string) => Promise<string | null>;
 }
 
-export function ReportDecisionDialog({ decision, reportId, onOpenChange, onConfirm }: ReportDecisionDialogProps) {
+export function ReportDecisionDialog({ decision, reportId, onOpenChange, onConfirm, finalFocus }: ReportDecisionDialogProps) {
   return (
     <Dialog open={decision !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" finalFocus={finalFocus}>
         {decision ? <ReportDecisionForm key={`${reportId}-${decision}`} decision={decision} reportId={reportId} onOpenChange={onOpenChange} onConfirm={onConfirm} /> : null}
       </DialogContent>
     </Dialog>
@@ -47,16 +48,19 @@ function ReportDecisionForm({ decision, reportId, onOpenChange, onConfirm }: { d
   const formId = useId();
   const copy = COPY[decision];
   const [reason, setReason] = useState("");
+  const [reasonInvalid, setReasonInvalid] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!reason.trim()) {
+      setReasonInvalid(true);
       setErrorMessage("Debe indicar el motivo.");
       return;
     }
     setSubmitting(true);
+    setReasonInvalid(false);
     setErrorMessage(null);
     const failure = await onConfirm(decision, reason.trim());
     setSubmitting(false);
@@ -74,7 +78,7 @@ function ReportDecisionForm({ decision, reportId, onOpenChange, onConfirm }: { d
         {errorMessage && (
           <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <span>{errorMessage}</span>
+            <span id={reasonInvalid ? `${formId}-reason-error` : undefined}>{errorMessage}</span>
           </div>
         )}
         <Field>
@@ -85,10 +89,12 @@ function ReportDecisionForm({ decision, reportId, onOpenChange, onConfirm }: { d
             maxLength={MAX_REASON_LENGTH}
             value={reason}
             disabled={submitting}
-            onChange={(event) => { setReason(event.target.value); setErrorMessage(null); }}
+            onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); setErrorMessage(null); }}
+            aria-invalid={reasonInvalid}
+            aria-describedby={reasonInvalid ? `${formId}-reason-error` : `${formId}-reason-help`}
             className="w-full resize-y rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"
           />
-          <FieldDescription>Obligatorio. Hasta {MAX_REASON_LENGTH} caracteres.</FieldDescription>
+          <FieldDescription id={`${formId}-reason-help`}>Obligatorio. Hasta {MAX_REASON_LENGTH} caracteres.</FieldDescription>
         </Field>
       </form>
       <DialogFooter>

@@ -11,6 +11,7 @@ import {
   transitionEnvironmentalReportFixture,
 } from "@/lib/environmental-report-fixtures";
 import { issueViolationNoticeInputSchema } from "@/lib/environmental-reports";
+import { establishmentDirectoryAdapter } from "@/lib/establishment-directory";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
@@ -76,6 +77,13 @@ export async function POST(request: Request, context: NoticeContext) {
     if (!(inspection.attachments?.length ?? 0)) return errorResponse(400, "Debe adjuntar al menos una evidencia a la inspección antes de emitir el acta.", path);
     if (getViolationNoticeFixture(id)) return errorResponse(409, "La inspección ya tiene un acta emitida. Las correcciones requieren una nueva inspección.", path);
     if (!getEnvironmentalReportFixture(inspection.reportId)) return errorResponse(404, "Expediente ambiental no encontrado.", path);
+
+    if (parsedInput.data.establishmentId) {
+      const establishment = await establishmentDirectoryAdapter.resolve({ query: parsedInput.data.establishmentId });
+      if (!establishment || establishment.id !== parsedInput.data.establishmentId) {
+        return errorResponse(400, "El establecimiento indicado no existe en el directorio local.", path);
+      }
+    }
 
     const notice = createViolationNoticeFixture(id, parsedInput.data);
     addViolationNoticeFixture(notice);
