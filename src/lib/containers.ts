@@ -381,7 +381,6 @@ export const containersAdapter = {
     const formData = new FormData();
     formData.append("file", params.file);
     formData.append("fileName", params.file.name);
-    formData.append("fileSize", String(params.file.size));
     formData.append("ownerType", "CONTAINER");
     formData.append("ownerId", params.containerId);
 
