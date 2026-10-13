@@ -5,9 +5,10 @@ import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogPager } from "@/components/catalog/catalog-pager";
+import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   vehiclesAdapter,
@@ -50,7 +51,12 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<VehicleForm>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
+  const [plateError, setPlateError] = useState<string | null>(null);
+  const [capacityError, setCapacityError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [deactivatingVehicle, setDeactivatingVehicle] = useState<Vehicle | null>(null);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
 
   const query = useMemo<VehicleQuery>(() => ({
     active: activeFilter === "all" ? undefined : activeFilter === "true",
@@ -94,13 +100,17 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setFormError(null);
+    setPlateError(null);
+    setCapacityError(null);
     const capacity = Number(form.capacity);
-    if (!form.plate.trim() || !Number.isFinite(capacity) || capacity <= 0) {
-      setFormError("Indique una patente y una capacidad mayor que cero.");
+    const plate = form.plate.trim();
+    if (!plate) setPlateError("Ingrese una patente.");
+    if (!Number.isFinite(capacity) || capacity <= 0) setCapacityError("Ingrese una capacidad mayor que cero.");
+    if (!plate || !Number.isFinite(capacity) || capacity <= 0) {
       return;
     }
     if (capacity > MAX_DECIMAL_10_2) {
-      setFormError(`La capacidad no puede superar ${MAX_DECIMAL_10_2.toLocaleString("es-AR")}.`);
+      setCapacityError(`La capacidad no puede superar ${MAX_DECIMAL_10_2.toLocaleString("es-AR")}.`);
       return;
     }
     try {
@@ -115,14 +125,24 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
     }
   }
 
-  async function deactivate(vehicle: Vehicle) {
-    if (!window.confirm(`¿Dar de baja el vehículo ${vehicle.plate}?`)) return;
+  function deactivate(vehicle: Vehicle) {
+    setDeactivatingVehicle(vehicle);
+    setDeactivateError(null);
+  }
+
+  async function confirmDeactivation() {
+    if (!deactivatingVehicle) return;
+    setIsSubmittingDeactivate(true);
+    setDeactivateError(null);
     try {
-      await vehiclesAdapter.remove(vehicle.id);
-      setNotice(`Vehículo ${vehicle.plate} dado de baja.`);
+      await vehiclesAdapter.remove(deactivatingVehicle.id);
+      setDeactivatingVehicle(null);
+      setNotice(`Vehículo ${deactivatingVehicle.plate} dado de baja.`);
       setRequestVersion((version) => version + 1);
     } catch (caught) {
-      setNotice(caught instanceof Error ? caught.message : "No se pudo dar de baja el vehículo.");
+      setDeactivateError(caught instanceof Error ? caught.message : "No se pudo dar de baja el vehículo.");
+    } finally {
+      setIsSubmittingDeactivate(false);
     }
   }
 
@@ -166,7 +186,7 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
                 <td data-label="Tipo">{vehicleTypeLabels[vehicle.vehicleType]}</td>
                 <td data-label="Capacidad (t)">{vehicle.capacity === null ? "—" : `${vehicle.capacity.toLocaleString("es-AR")} t`}</td>
                 <td data-label="Estado"><span className={vehicle.active ? styles.active : styles.inactive}>{vehicle.active ? <Check aria-hidden /> : <X aria-hidden />}{vehicle.active ? "Activo" : "Inactivo"}</span></td>
-                {canManage ? <td className={styles.actions}><Button variant="outline" size="sm" onClick={() => openEdit(vehicle)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{vehicle.active ? <Button variant="destructive" size="sm" onClick={() => void deactivate(vehicle)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}
+                {canManage ? <td className={styles.actions} data-label="Acciones"><Button variant="outline" size="sm" onClick={() => openEdit(vehicle)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{vehicle.active ? <Button variant="destructive" size="sm" onClick={() => void deactivate(vehicle)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}
               </tr>
             ))}</tbody>
           </table>
@@ -175,15 +195,33 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
 
       {state.status === "ready" ? <CatalogPager page={page} pageSize={20} total={state.total} totalPages={state.totalPages} onPageChange={setPage} label="Paginación de vehículos" /> : null}
 
+      <CatalogDeactivationDialog
+        open={Boolean(deactivatingVehicle)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeactivatingVehicle(null);
+            setDeactivateError(null);
+          }
+        }}
+        title={`Confirmar baja del vehículo ${deactivatingVehicle?.plate ?? ""}`.trim()}
+        consequence="El vehículo quedará inactivo y no estará disponible para nuevas asignaciones. Las asignaciones existentes conservarán su referencia."
+        confirmAction={`Dar de baja el vehículo ${deactivatingVehicle?.plate ?? ""}`.trim()}
+        safeAlternative={`Conservar el vehículo ${deactivatingVehicle?.plate ?? ""}`.trim()}
+        onConfirm={() => void confirmDeactivation()}
+        isSubmitting={isSubmittingDeactivate}
+      >
+        {deactivateError ? <p role="alert" className={styles.formError}>{deactivateError}</p> : null}
+      </CatalogDeactivationDialog>
+
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>{editing ? "Editar vehículo" : "Registrar vehículo"}</DialogTitle><DialogDescription>Complete los datos del recurso operativo. La baja se realiza de forma lógica.</DialogDescription></DialogHeader>
           {formError ? <p role="alert" className={styles.formError}>{formError}</p> : null}
           <form id="vehicle-form" onSubmit={(event) => void save(event)}>
             <FieldGroup>
-              <Field><FieldLabel htmlFor="vehicle-plate">Patente</FieldLabel><input id="vehicle-plate" value={form.plate} onChange={(event) => setForm({ ...form, plate: event.target.value })} className={styles.control} required /></Field>
+              <Field><FieldLabel htmlFor="vehicle-plate">Patente</FieldLabel><input id="vehicle-plate" value={form.plate} onChange={(event) => { setForm({ ...form, plate: event.target.value }); setPlateError(null); setFormError(null); }} className={styles.control} required aria-invalid={Boolean(plateError)} aria-describedby={plateError ? "vehicle-plate-error" : undefined} /><FieldError id="vehicle-plate-error">{plateError}</FieldError></Field>
               <Field><FieldLabel htmlFor="vehicle-type-form">Tipo de vehículo</FieldLabel><select id="vehicle-type-form" value={form.vehicleType} onChange={(event) => setForm({ ...form, vehicleType: event.target.value as VehicleType })} className={styles.control}>{vehicleTypes.map((type) => <option key={type} value={type}>{vehicleTypeLabels[type]}</option>)}</select></Field>
-              <Field><FieldLabel htmlFor="vehicle-capacity">Capacidad (toneladas)</FieldLabel><input id="vehicle-capacity" type="number" min="0.01" max={MAX_DECIMAL_10_2} step="0.01" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} className={styles.control} required /><FieldDescription>Capacidad operativa declarada, en toneladas. Admite hasta dos decimales.</FieldDescription></Field>
+              <Field><FieldLabel htmlFor="vehicle-capacity">Capacidad (toneladas)</FieldLabel><input id="vehicle-capacity" type="number" min="0.01" max={MAX_DECIMAL_10_2} step="0.01" value={form.capacity} onChange={(event) => { setForm({ ...form, capacity: event.target.value }); setCapacityError(null); setFormError(null); }} className={styles.control} required aria-invalid={Boolean(capacityError)} aria-describedby={capacityError ? "vehicle-capacity-error" : undefined} /><FieldError id="vehicle-capacity-error">{capacityError}</FieldError><FieldDescription>Capacidad operativa declarada, en toneladas. Admite hasta dos decimales.</FieldDescription></Field>
             </FieldGroup>
           </form>
           <DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)}>Cancelar</Button><Button type="submit" form="vehicle-form">Guardar vehículo</Button></DialogFooter>

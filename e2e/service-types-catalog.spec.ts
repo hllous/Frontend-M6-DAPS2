@@ -28,6 +28,9 @@ test.describe("ServiceType catalog management #102", () => {
 
     const updatedRow = page.getByRole("row", { name: new RegExp(code) });
     await updatedRow.getByRole("button", { name: "Dar de baja" }).click();
+    const deactivateDialog = page.getByRole("dialog");
+    await expect(deactivateDialog.getByRole("heading", { name: `Confirmar baja del tipo de servicio ${code}` })).toBeVisible();
+    await deactivateDialog.getByRole("button", { name: `Dar de baja el tipo de servicio ${code}` }).click();
     await expect(page.getByText("Tipo de servicio dado de baja")).toBeVisible();
     await page.getByLabel("Filtrar por estado").selectOption("false");
     await expect(page.getByText(code)).toBeVisible();
