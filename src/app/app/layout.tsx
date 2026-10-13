@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
-import { FoundationDemo } from "@/components/shell/foundation-demo";
+import { SessionShell } from "@/components/auth/session-shell";
 import { getSession } from "@/lib/session";
 import { leaveApplication } from "./actions";
 
@@ -13,8 +13,8 @@ export default async function AppLayout({
   if (!session) redirect("/login");
 
   return (
-    <FoundationDemo scenarioId={session.scenarioId} logoutAction={leaveApplication}>
+    <SessionShell scenarioId={session.scenarioId} logoutAction={leaveApplication}>
       {children}
-    </FoundationDemo>
+    </SessionShell>
   );
 }
