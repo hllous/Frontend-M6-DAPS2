@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -23,7 +23,7 @@ import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 
 
-function requireReadAccess(request: Request, path: string, sourceId?: string) {
+async function requireReadAccess(request: Request, path: string, sourceId?: string) {
   const session = getRequiredSession(request);
   const scenario = getScenario(session);
   if (scenario.actor.kind === "OFFICE") return { session, scenario };
@@ -31,6 +31,8 @@ function requireReadAccess(request: Request, path: string, sourceId?: string) {
   // Field may read only the dependency context for a Service assigned to its crew.
   // Backend remains authoritative for this scope when the BFF is forwarding.
   if (sourceId && backendMode(session)) {
+    const scopedService = await requireCrewScope(request, session, { serviceId: sourceId });
+    if (scopedService instanceof Response) return { response: scopedService };
     return { session, scenario };
   }
   const service = sourceId
@@ -56,7 +58,7 @@ export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const sourceId = new URL(request.url).searchParams.get("sourceId") ?? undefined;
-    const access = requireReadAccess(request, path, sourceId);
+    const access = await requireReadAccess(request, path, sourceId);
     if (access.response) return access.response;
     const queryResult = streetClosureRequestQuerySchema.safeParse({
       status: new URL(request.url).searchParams.get("status") ?? undefined,

@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -24,8 +24,11 @@ export async function GET(
     const scenario = getScenario(session);
 
     if (backendMode(session)) {
+      const scopedService = await requireCrewScope(request, session, { serviceId });
+      if (scopedService instanceof Response) return scopedService;
+      if (scopedService) return NextResponse.json(scopedService);
       const backendResponse = await fetchBackend(request, `/services/${pathId(serviceId)}`);
-            return forwardResponse(backendResponse);
+      return forwardResponse(backendResponse);
     }
 
     const service = serviceFixtures.find((s) => s.id === serviceId);
