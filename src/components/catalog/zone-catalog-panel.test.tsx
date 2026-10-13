@@ -28,7 +28,7 @@ describe("ZoneCatalogPanel component", () => {
     await user.click(within(row).getByRole("button", { name: "Dar de baja" }));
     const dialog = await screen.findByRole("dialog");
     expect(await within(dialog).findByText("No se pudieron verificar las referencias. Si contin\u00faa, la baja puede afectar servicios o elementos que todav\u00eda usan este registro.")).toBeVisible();
-    const confirm = within(dialog).getByRole("button", { name: "Dar de baja de todas formas" });
+    const confirm = within(dialog).getByRole("button", { name: "Dar de baja la zona Z-BEL" });
     expect(confirm).toBeDisabled();
     await user.click(within(dialog).getByRole("checkbox", { name: "Entiendo que no se verificaron las referencias" }));
     expect(confirm).toBeEnabled();
@@ -185,7 +185,7 @@ describe("ZoneCatalogPanel component", () => {
 
     // Confirmation dialog should appear
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("heading", { name: "Confirmar baja de zona operativa" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Confirmar baja de zona Z-BEL" })).toBeInTheDocument();
     expect(within(dialog).getByText(/Advertencia: esta zona todavía cuenta con elementos activos referenciados/i)).toBeInTheDocument();
     expect(within(dialog).getByText(/Recorridos activos/i)).toBeInTheDocument();
     expect(within(dialog).getByText(/Contenedores asociados:/i)).toBeInTheDocument();
@@ -196,15 +196,35 @@ describe("ZoneCatalogPanel component", () => {
     expect(screen.queryByRole("checkbox", { name: "Entiendo que no se verificaron las referencias" })).not.toBeInTheDocument();
 
     // Confirm deactivation
-    const confirmButton = within(dialog).getByRole("button", { name: "Dar de baja de todas formas" });
+    const confirmButton = within(dialog).getByRole("button", { name: "Dar de baja la zona Z-BEL" });
     await user.click(confirmButton);
 
     // Dialog should close and zone status becomes Inactiva
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: "Confirmar baja de zona operativa" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Confirmar baja de zona Z-BEL" })).not.toBeInTheDocument();
       const updatedRow = screen.getByText("Z-BEL").closest("tr")!;
       expect(within(updatedRow).getByText("Inactiva")).toBeInTheDocument();
     });
+  });
+
+  it("shows a deactivation failure as an alert and keeps the confirmation open", async () => {
+    server.use(http.delete("/api/zones/:id", () => HttpResponse.json({
+      statusCode: 500,
+      message: "No se pudo dar de baja la zona.",
+      error: "Internal Server Error",
+      timestamp: "2026-10-13T12:00:00.000Z",
+      path: "/api/zones/zone-1",
+    }, { status: 500 })));
+    const user = userEvent.setup();
+    render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /Z-BEL/ });
+    await user.click(within(row).getByRole("button", { name: "Dar de baja" }));
+    const dialog = await screen.findByRole("dialog");
+    const confirm = within(dialog).getByRole("button", { name: "Dar de baja la zona Z-BEL" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await user.click(confirm);
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("No se pudo dar de baja la zona.");
+    expect(dialog).toBeVisible();
   });
 
   it("searches, assigns, and removes neighborhoods from a Zone", async () => {

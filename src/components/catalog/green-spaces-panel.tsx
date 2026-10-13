@@ -5,6 +5,7 @@ import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -13,6 +14,8 @@ import { greenSpacesAdapter, greenSpaceTypeSchema, type GreenSpace, type GreenSp
 import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { MAX_DECIMAL_10_2 } from "@/lib/input-limits";
+
+import styles from "./catalog-panel.module.css";
 
 type LoadState =
   | { status: "loading" }
@@ -52,6 +55,9 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
   const [form, setForm] = useState<GreenSpaceForm>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [deactivating, setDeactivating] = useState<GreenSpace | null>(null);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
 
   const query = useMemo<GreenSpaceQuery>(() => ({
     active: activeFilter === "all" ? undefined : activeFilter === "true",
@@ -127,14 +133,24 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
     }
   }
 
-  async function deactivate(greenSpace: GreenSpace) {
-    if (!window.confirm(`¿Dar de baja el espacio verde ${greenSpace.name}?`)) return;
+  function deactivate(greenSpace: GreenSpace) {
+    setDeactivating(greenSpace);
+    setDeactivateError(null);
+  }
+
+  async function confirmDeactivation() {
+    if (!deactivating) return;
+    setIsSubmittingDeactivate(true);
+    setDeactivateError(null);
     try {
-      await greenSpacesAdapter.remove(greenSpace.id);
-      setNotice(`Espacio verde ${greenSpace.name} dado de baja.`);
+      await greenSpacesAdapter.remove(deactivating.id);
+      setDeactivating(null);
+      setNotice(`Espacio verde ${deactivating.name} dado de baja.`);
       setRequestVersion((version) => version + 1);
     } catch (caught) {
-      setNotice(caught instanceof Error ? caught.message : "No se pudo dar de baja el espacio verde.");
+      setDeactivateError(caught instanceof Error ? caught.message : "No se pudo dar de baja el espacio verde.");
+    } finally {
+      setIsSubmittingDeactivate(false);
     }
   }
 
@@ -176,18 +192,18 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
       {state.status === "error" ? <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm"><span>{state.message}</span><Button variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar carga</Button></div> : null}
       {state.status === "ready" && state.greenSpaces.length === 0 ? <p className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">No hay espacios verdes que coincidan con los filtros.</p> : null}
       {state.status === "ready" && state.greenSpaces.length > 0 ? (
-        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full text-left text-sm">
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
             <caption className="sr-only">Espacios verdes registrados</caption>
-            <thead className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground"><tr><th scope="col" className="px-4 py-3">Nombre</th><th scope="col" className="px-4 py-3">Tipo</th><th scope="col" className="px-4 py-3">Superficie</th><th scope="col" className="px-4 py-3">Zona</th><th scope="col" className="px-4 py-3">Estado</th>{canManage ? <th scope="col" className="px-4 py-3"><span className="sr-only">Acciones</span></th> : null}</tr></thead>
-            <tbody className="divide-y divide-border">{state.greenSpaces.map((greenSpace) => {
+            <thead><tr><th scope="col">Nombre</th><th scope="col">Tipo</th><th scope="col">Superficie</th><th scope="col">Zona</th><th scope="col">Estado</th>{canManage ? <th scope="col"><span className="sr-only">Acciones</span></th> : null}</tr></thead>
+            <tbody>{state.greenSpaces.map((greenSpace) => {
               return <tr key={greenSpace.id}>
-                <th scope="row" className="px-4 py-3 font-medium">{greenSpace.name}</th>
-                <td className="px-4 py-3">{spaceTypeLabels[greenSpace.spaceType]}</td>
-                <td className="px-4 py-3">{greenSpace.areaM2 === null ? "—" : `${greenSpace.areaM2.toLocaleString("es-AR")} m²`}</td>
-                <td className="px-4 py-3">{zoneLabel(zones, greenSpace.zoneId, zonesLoaded)}</td>
-                <td className="px-4 py-3"><span className="inline-flex items-center gap-1">{greenSpace.active ? <Check aria-hidden className="size-4 text-[var(--color-success)]" /> : <X aria-hidden className="size-4 text-muted-foreground" />}{greenSpace.active ? "Activo" : "Inactivo"}</span></td>
-                {canManage ? <td className="flex gap-2 px-4 py-3"><Button variant="outline" size="sm" onClick={() => openEdit(greenSpace)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{greenSpace.active ? <Button variant="destructive" size="sm" onClick={() => void deactivate(greenSpace)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}
+                <th scope="row" data-label="Nombre">{greenSpace.name}</th>
+                <td data-label="Tipo">{spaceTypeLabels[greenSpace.spaceType]}</td>
+                <td data-label="Superficie">{greenSpace.areaM2 === null ? "—" : `${greenSpace.areaM2.toLocaleString("es-AR")} m²`}</td>
+                <td data-label="Zona">{zoneLabel(zones, greenSpace.zoneId, zonesLoaded)}</td>
+                <td data-label="Estado"><span className="inline-flex items-center gap-1">{greenSpace.active ? <Check aria-hidden className="size-4 text-[var(--color-success)]" /> : <X aria-hidden className="size-4 text-muted-foreground" />}{greenSpace.active ? "Activo" : "Inactivo"}</span></td>
+                {canManage ? <td className={styles.actions} data-label="Acciones"><Button variant="outline" size="sm" onClick={() => openEdit(greenSpace)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{greenSpace.active ? <Button variant="destructive" size="sm" onClick={() => deactivate(greenSpace)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}
               </tr>;
             })}</tbody>
           </table>
@@ -195,6 +211,24 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
       ) : null}
 
       {state.status === "ready" ? <CatalogPager page={page} pageSize={20} total={state.total} totalPages={state.totalPages} onPageChange={setPage} label="Paginación de espacios verdes" /> : null}
+
+      <CatalogDeactivationDialog
+        open={Boolean(deactivating)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeactivating(null);
+            setDeactivateError(null);
+          }
+        }}
+        title={`Confirmar baja del espacio verde ${deactivating?.name ?? ""}`.trim()}
+        consequence="El espacio verde quedará inactivo. Los registros existentes conservarán su referencia histórica."
+        confirmAction={`Dar de baja el espacio verde ${deactivating?.name ?? ""}`.trim()}
+        safeAlternative={`Conservar el espacio verde ${deactivating?.name ?? ""}`.trim()}
+        onConfirm={() => void confirmDeactivation()}
+        isSubmitting={isSubmittingDeactivate}
+      >
+        {deactivateError ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{deactivateError}</p> : null}
+      </CatalogDeactivationDialog>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent>
