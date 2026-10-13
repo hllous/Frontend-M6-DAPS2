@@ -6,6 +6,7 @@ test.describe("EnvironmentalReport case file", () => {
   test("Office can inspect the complete queue and move a received report into review", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=environment");
+    await expect(page.getByRole("main")).toHaveCount(1);
     const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
     await expect(list).toBeVisible();
     await expect(list.getByRole("button", { name: /ER-1001/ })).toBeVisible();

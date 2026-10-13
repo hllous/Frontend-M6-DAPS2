@@ -23,7 +23,6 @@ import {
   ServiceRequestError,
   containerLocationSchema,
   type Attachment,
-  type ContainerLocation,
   type CompleteServiceInput,
   servicesAdapter,
   STATUS_LABEL,
@@ -131,10 +130,10 @@ export function ZoneExecutionPanel({
     id: string;
     status: "ACTIVE" | "OVERFLOWED" | "DAMAGED" | "UNDER_REPAIR" | "RELOCATING" | "REMOVED";
   } | null>(null);
-  const [containerLocation, setContainerLocation] = useState<ContainerLocation>({
+  const [containerLocation, setContainerLocation] = useState({
     address: "",
-    lat: Number.NaN,
-    lng: Number.NaN,
+    lat: "",
+    lng: "",
   });
 
   const isContainerTarget = service.mode === "POINT" && service.targetType === "CONTAINER";
@@ -436,10 +435,23 @@ export function ZoneExecutionPanel({
 
     let completionInput: CompleteServiceInput | undefined;
     if (isContainerRelocating) {
+      const latitude = containerLocation.lat.trim();
+      const longitude = containerLocation.lng.trim();
+      const missingCoordinates = [
+        ...(latitude ? [] : ["latitud"]),
+        ...(longitude ? [] : ["longitud"]),
+      ];
+      if (missingCoordinates.length > 0) {
+        const missingLabel = missingCoordinates.join(" y la ");
+        const verb = missingCoordinates.length === 1 ? "es obligatoria" : "son obligatorias";
+        setCompletionError(`La ${missingLabel} ${verb} para completar la reubicación.`);
+        return;
+      }
+
       const parsedLocation = containerLocationSchema.safeParse({
         address: containerLocation.address,
-        lat: Number(containerLocation.lat),
-        lng: Number(containerLocation.lng),
+        lat: Number(latitude),
+        lng: Number(longitude),
       });
       if (!parsedLocation.success) {
         setCompletionError(parsedLocation.error.issues.map((issue) => issue.message).join(" "));
@@ -530,8 +542,8 @@ export function ZoneExecutionPanel({
                     min="-90"
                     max="90"
                     step="any"
-                    value={Number.isNaN(containerLocation.lat) ? "" : containerLocation.lat}
-                    onChange={(event) => setContainerLocation((current) => ({ ...current, lat: Number(event.target.value) }))}
+                    value={containerLocation.lat}
+                    onChange={(event) => setContainerLocation((current) => ({ ...current, lat: event.target.value }))}
                     className="mt-1 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal"
                     required
                   />
@@ -544,8 +556,8 @@ export function ZoneExecutionPanel({
                     min="-180"
                     max="180"
                     step="any"
-                    value={Number.isNaN(containerLocation.lng) ? "" : containerLocation.lng}
-                    onChange={(event) => setContainerLocation((current) => ({ ...current, lng: Number(event.target.value) }))}
+                    value={containerLocation.lng}
+                    onChange={(event) => setContainerLocation((current) => ({ ...current, lng: event.target.value }))}
                     className="mt-1 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal"
                     required
                   />

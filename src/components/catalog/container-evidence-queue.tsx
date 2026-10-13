@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { AlertTriangle, CheckCircle2, Paperclip, RefreshCw, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EVIDENCE_FILE_SIZE_LABEL, MAX_EVIDENCE_FILE_SIZE_BYTES } from "@/lib/evidence-limits";
 import { containersAdapter, ContainerRequestError } from "@/lib/containers";
 
 export interface QueuedEvidenceFile {
@@ -15,7 +16,7 @@ export interface QueuedEvidenceFile {
   error?: string;
 }
 
-export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+export const MAX_FILE_SIZE = MAX_EVIDENCE_FILE_SIZE_BYTES;
 export const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -39,7 +40,7 @@ export function useEvidenceQueue() {
     for (const file of Array.from(files)) {
       if (file.size > MAX_FILE_SIZE) {
         rejectedErrors.push(
-          `"${file.name}" supera el tamaño máximo permitido de 10 MB.`,
+          `"${file.name}" supera el tamaño máximo permitido de ${EVIDENCE_FILE_SIZE_LABEL}.`,
         );
         continue;
       }
@@ -159,12 +160,23 @@ export function EvidenceQueueView({
             Evidencia adjunta
           </span>
           <span className="text-[11px] text-muted-foreground">
-            Opcional. Formatos JPEG, PNG, WebP o PDF hasta 10 MB.
+            Opcional. Formatos JPEG, PNG, WebP o PDF hasta {EVIDENCE_FILE_SIZE_LABEL}.
           </span>
         </div>
+        <input
+          id={inputId}
+          type="file"
+          multiple
+          accept={ACCEPTED_FILE_TYPES}
+          onChange={onFileSelect}
+          disabled={disabled}
+          aria-invalid={Boolean(fileValidationError)}
+          aria-describedby={fileValidationError ? "container-evidence-error" : undefined}
+          className="peer sr-only"
+        />
         <label
           htmlFor={inputId}
-          className={`inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors ${
+          className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--color-border-strong)] bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors peer-focus-visible:ring-3 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-[var(--color-focus)] max-[760px]:min-h-12 ${
             disabled
               ? "opacity-50 cursor-not-allowed"
               : "hover:bg-muted cursor-pointer"
@@ -173,19 +185,11 @@ export function EvidenceQueueView({
           <Upload className="size-3.5" aria-hidden />
           <span>Seleccionar archivo</span>
         </label>
-        <input
-          id={inputId}
-          type="file"
-          multiple
-          accept={ACCEPTED_FILE_TYPES}
-          onChange={onFileSelect}
-          disabled={disabled}
-          className="sr-only"
-        />
       </div>
 
       {fileValidationError && (
         <div
+          id="container-evidence-error"
           role="alert"
           className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive"
         >
