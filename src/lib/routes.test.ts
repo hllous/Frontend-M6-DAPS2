@@ -5,7 +5,7 @@ import { HttpResponse, http } from "msw";
 import { handlers } from "@/mocks/handlers";
 import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_ROUTES_QUERY, resetRouteFixtures } from "./routes-fixtures";
-import { RouteContractError, RouteRequestError, routesAdapter } from "./routes";
+import { RouteContractError, RouteRequestError, routeStopInputSchema, routesAdapter } from "./routes";
 
 const server = setupServer(...handlers);
 
@@ -18,6 +18,15 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("routes adapter", () => {
+  it("validates route stop zone ids with the shared external id limits", () => {
+    expect(routeStopInputSchema.safeParse({ zoneId: " zone-1 ", estimatedDurationMin: 30 })).toMatchObject({
+      success: true,
+      data: { zoneId: "zone-1" },
+    });
+    expect(routeStopInputSchema.safeParse({ zoneId: " ", estimatedDurationMin: 30 }).success).toBe(false);
+    expect(routeStopInputSchema.safeParse({ zoneId: "z".repeat(101), estimatedDurationMin: 30 }).success).toBe(false);
+  });
+
   it("normalizes a successful paginated response into frontend-owned shapes", async () => {
     const page = await routesAdapter.list();
 
