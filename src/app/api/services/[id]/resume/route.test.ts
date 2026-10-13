@@ -133,7 +133,7 @@ it.each([403, 409, 500, 503])("preserves backend error status and body (%s)", as
   const error = { statusCode: status, message: "El backend rechazó la operación." };
   const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
     if (String(url).includes("/crews")) return Response.json({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] });
-    if ((init?.method ?? "GET") === "GET") return Response.json({ crewId: "11111111-1111-4111-8111-111111111111" });
+    if ((init?.method ?? "GET") === "GET") return Response.json({ id: "real-service", crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
   const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");

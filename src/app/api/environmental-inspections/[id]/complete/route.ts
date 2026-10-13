@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -7,7 +7,7 @@ import {
   transitionEnvironmentalReportFixture,
   updateEnvironmentalInspectionFixture,
 } from "@/lib/environmental-report-fixtures";
-import { environmentalInspectionCompleteInputSchema, inspectionChecklist } from "@/lib/environmental-reports";
+import { environmentalInspectionCompleteInputSchema, environmentalInspectionSchema, inspectionChecklist } from "@/lib/environmental-reports";
 import { serviceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
@@ -51,6 +51,22 @@ export async function POST(
     }
 
     if (backendMode(session)) {
+      if (scenario.actor.kind === "FIELD") {
+        const inspectionResponse = await fetchBackend(request, `/environmental-inspections/${pathId(id)}`);
+        if (!inspectionResponse.ok) return forwardResponse(inspectionResponse);
+        let inspectionPayload: unknown;
+        try { inspectionPayload = await inspectionResponse.json(); } catch {
+          return errorResponse(502, "La respuesta de la inspección no contiene JSON válido.", path);
+        }
+        const rawInspection = inspectionPayload && typeof inspectionPayload === "object" && "data" in inspectionPayload && !("id" in inspectionPayload)
+          ? (inspectionPayload as { data: unknown }).data
+          : inspectionPayload;
+        const inspection = environmentalInspectionSchema.safeParse(rawInspection);
+        if (!inspection.success) return errorResponse(502, "La respuesta de la inspección no respeta el contrato documentado.", path);
+        if (!inspection.data.serviceId) return errorResponse(409, "La inspección no tiene un servicio operativo vinculado.", path);
+        const scopedService = await requireCrewScope(request, session, { serviceId: inspection.data.serviceId });
+        if (scopedService instanceof Response) return scopedService;
+      }
       const backendInput = {
         inspectedAt: parsedInput.data.inspectedAt,
         outcome: parsedInput.data.outcome,
