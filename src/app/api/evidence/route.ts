@@ -1,5 +1,6 @@
 import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import {
@@ -23,6 +24,7 @@ import {
 import {
   evidenceOwnerTypeSchema,
   type Attachment,
+  type EvidenceOwnerType,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
@@ -43,6 +45,79 @@ const MULTIPART_MARGIN_BYTES = 64 * 1024;
 
 
 
+const scopeIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/);
+const serviceScopeSchema = z.object({ id: scopeIdSchema, crewId: scopeIdSchema.nullable() });
+const zoneScopeSchema = z.array(z.object({ id: scopeIdSchema }));
+
+async function readEvidenceScope<T>(request: Request, resource: string, schema: z.ZodType<T>, path: string): Promise<
+  { data: T; response?: never } | { data?: never; response: NextResponse }
+> {
+  const response = await fetchBackend(request, resource);
+  if (!response.ok) return { response: forwardResponse(response) };
+  const parsed = schema.safeParse(await response.json().catch(() => null));
+  if (!parsed.success) {
+    return { response: errorResponse(502, "La respuesta del propietario de evidencia es inválida.", path) };
+  }
+  return { data: parsed.data };
+}
+
+// TODO #431: migrate this preflight to requireCrewScope when the shared helper lands.
+async function checkBackendEvidenceCrew(
+  request: Request, ownerType: EvidenceOwnerType, ownerId: string,
+  serviceId: string | null, crewId: string | undefined, path: string,
+): Promise<NextResponse | null> {
+  const denied = () => errorResponse(403, "Solo la cuadrilla asignada puede subir evidencia de este registro.", path);
+  if (!crewId) return denied();
+
+  if (ownerType === "SERVICE" || ownerType === "INSPECTION") {
+    let owningServiceId = ownerId;
+    if (ownerType === "INSPECTION") {
+      const inspection = await readEvidenceScope(request, `/environmental-inspections/${encodeURIComponent(ownerId)}`,
+        z.object({ id: scopeIdSchema, serviceId: scopeIdSchema.nullable() }), path);
+      if (inspection.response) return inspection.response;
+      if (inspection.data.id !== ownerId || !inspection.data.serviceId) return denied();
+      owningServiceId = inspection.data.serviceId;
+    }
+    const service = await readEvidenceScope(request, `/services/${encodeURIComponent(owningServiceId)}`, serviceScopeSchema, path);
+    if (service.response) return service.response;
+    return service.data.id === owningServiceId && service.data.crewId === crewId ? null : denied();
+  }
+
+  if (ownerType === "ZONE_RESULT") {
+    if (serviceId) {
+      const service = await readEvidenceScope(request, `/services/${encodeURIComponent(serviceId)}`, serviceScopeSchema, path);
+      if (service.response) return service.response;
+      if (service.data.id !== serviceId || service.data.crewId !== crewId) return denied();
+      const zones = await readEvidenceScope(request, `/services/${encodeURIComponent(serviceId)}/zone-results`, zoneScopeSchema, path);
+      if (zones.response) return zones.response;
+      return zones.data.some((zone) => zone.id === ownerId) ? null : denied();
+    }
+
+    // The API has no ZoneResult-to-Service lookup. Bound the legacy-client fallback.
+    const pageSchema = z.object({
+      data: z.array(serviceScopeSchema).max(100),
+      meta: z.object({ totalPages: z.number().int().nonnegative() }),
+    });
+    for (let page = 1; page <= 10; page++) {
+      type ServicesPage = z.infer<typeof pageSchema>;
+      const services: { data: ServicesPage; response?: never } | { data?: never; response: NextResponse } =
+        await readEvidenceScope<ServicesPage>(request,
+          `/services?crewId=${encodeURIComponent(crewId)}&pageSize=100&page=${page}`, pageSchema, path);
+      if (services.response) return services.response;
+      for (const listedService of services.data.data) {
+        if (listedService.crewId !== crewId) continue;
+        const zones = await readEvidenceScope(request, `/services/${encodeURIComponent(listedService.id)}/zone-results`, zoneScopeSchema, path);
+        if (zones.response) return zones.response;
+        if (zones.data.some((zone) => zone.id === ownerId)) return null;
+      }
+      if (page >= services.data.meta.totalPages) break;
+    }
+    return denied();
+  }
+
+  return null;
+}
+
 export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
 
@@ -57,6 +132,10 @@ export async function POST(request: Request) {
         "La cabecera Idempotency-Key es obligatoria para la carga de evidencia.",
         path,
       );
+    }
+
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(idempotencyKey)) {
+      return errorResponse(400, "La cabecera Idempotency-Key debe contener entre 1 y 128 letras, números, guiones o guiones bajos.", path);
     }
 
     const contentLength = Number(request.headers.get("content-length"));
@@ -126,6 +205,10 @@ export async function POST(request: Request) {
       return errorResponse(400, "El campo 'ownerId' es obligatorio.", path);
     }
 
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(ownerId)) {
+      return errorResponse(400, "El campo 'ownerId' debe ser un identificador válido de hasta 100 caracteres.", path);
+    }
+
     // File validation: Size & MIME
     if (file.size > MAX_FILE_SIZE) {
       return errorResponse(413, "El archivo supera el tamaño máximo permitido de 10 MB.", path);
@@ -140,13 +223,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Idempotency check: if already processed for this owner, return existing attachment
-    const cacheKey = `${ownerType}:${ownerId}:${idempotencyKey}`;
-    if (evidenceCache.has(cacheKey)) {
-      return NextResponse.json(evidenceCache.get(cacheKey)!, { status: 200 });
-    }
-
     if (backendMode(session)) {
+      if (scenario.actor.kind === "FIELD" && ownerType !== "CONTAINER") {
+        const rawServiceId = ownerType === "ZONE_RESULT" ? formData.get("serviceId") : null;
+        if (rawServiceId !== null && (typeof rawServiceId !== "string" || !scopeIdSchema.safeParse(rawServiceId).success)) {
+          return errorResponse(400, "El campo 'serviceId' debe ser un identificador válido de hasta 100 caracteres.", path);
+        }
+        const denied = await checkBackendEvidenceCrew(request, ownerType, ownerId, rawServiceId as string | null, session.crew?.id, path);
+        if (denied) return denied;
+      }
       // UploadEvidenceDto (forbidNonWhitelisted) sólo acepta file, ownerType y ownerId:
       // fileName es metadato local y daría 400.
       const backendForm = new FormData();
@@ -202,12 +287,18 @@ export async function POST(request: Request) {
     }
 
     if (
-      owningService &&
+      (ownerType === "SERVICE" || ownerType === "ZONE_RESULT") &&
       scenario.actor.kind === "FIELD" &&
-      scenario.actor.crewId &&
-      owningService.crewId !== scenario.actor.crewId
+      (!owningService || !scenario.actor.crewId || owningService.crewId !== scenario.actor.crewId)
     ) {
       return errorResponse(403, "Solo la cuadrilla asignada al servicio puede subir evidencia.", path);
+    }
+
+    // Authorization always precedes a mock replay. Backend idempotency stays upstream.
+    const cacheKey = `${session.scenarioId}:${scenario.actor.crewId ?? scenario.actor.kind}:${ownerType}:${ownerId}:${idempotencyKey}`;
+    const cachedAttachment = evidenceCache.get(cacheKey);
+    if (cachedAttachment) {
+      return NextResponse.json(cachedAttachment, { status: 200 });
     }
 
     const rawNameFromForm = formData.get("fileName");
