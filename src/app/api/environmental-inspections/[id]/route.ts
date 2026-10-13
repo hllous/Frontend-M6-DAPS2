@@ -1,4 +1,4 @@
-import { backendMode } from "@/lib/bff-route";
+import { backendMode, errorResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -8,10 +8,6 @@ import { serviceFixtures } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { withInspectionAttachments } from "../_attachments";
 import { AuthUnavailableError, BackendUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
-
-function response(status: number, message: string, path: string) {
-  return NextResponse.json({ statusCode: status, message, error: status === 404 ? "Not Found" : status === 403 ? "Forbidden" : status === 401 ? "Unauthorized" : status === 503 ? "Service Unavailable" : "Error", path }, { status });
-}
 
 function projectFieldInspection(inspection: Record<string, unknown>) {
   const projected = { ...inspection };
@@ -33,18 +29,18 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       if (!backendResponse.ok) return withInspectionAttachments(request, backendResponse);
       let payload: unknown;
       try { payload = await backendResponse.json(); } catch {
-        return response(502, "La respuesta del backend no contiene una inspección válida.", path);
+        return errorResponse(502, "La respuesta del backend no contiene una inspección válida.", path);
       }
       const parsed = environmentalInspectionSchema.safeParse(payload);
-      if (!parsed.success) return response(502, "La respuesta del backend no contiene una inspección válida.", path);
+      if (!parsed.success) return errorResponse(502, "La respuesta del backend no contiene una inspección válida.", path);
       let inspection: Record<string, unknown> = parsed.data;
       if (scenario.actor.kind === "FIELD") {
-        if (!parsed.data.serviceId || !session.crew?.id) return response(404, "Inspección no encontrada.", path);
+        if (!parsed.data.serviceId || !session.crew?.id) return errorResponse(404, "Inspección no encontrada.", path);
         const serviceResponse = await fetchBackend(request, `/services/${pathId(parsed.data.serviceId)}`);
         if (!serviceResponse.ok) return withInspectionAttachments(request, serviceResponse);
         const service: unknown = await serviceResponse.json();
         if (!service || typeof service !== "object" || !("crewId" in service) || service.crewId !== session.crew.id) {
-          return response(404, "Inspección no encontrada.", path);
+          return errorResponse(404, "Inspección no encontrada.", path);
         }
         inspection = projectFieldInspection(inspection);
       }
@@ -54,18 +50,18 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       }));
     }
     const inspection = getEnvironmentalInspectionFixture(id);
-    if (!inspection) return response(404, "Inspección no encontrada.", path);
+    if (!inspection) return errorResponse(404, "Inspección no encontrada.", path);
     if (scenario.actor.kind === "FIELD") {
       const service = inspection.serviceId ? serviceFixtures.find((candidate) => candidate.id === inspection.serviceId) : null;
-      if (!service || service.crewId !== scenario.actor.crewId) return response(404, "Inspección no encontrada.", path);
+      if (!service || service.crewId !== scenario.actor.crewId) return errorResponse(404, "Inspección no encontrada.", path);
       return NextResponse.json(projectFieldInspection(inspection));
     }
     return NextResponse.json(inspection);
   } catch (error) {
-    if (error instanceof InvalidSessionError) return response(401, "La sesión no está activa.", path);
-    if (error instanceof AuthUnavailableError) return response(503, error.message, path);
-    if (error instanceof BackendUnavailableError) return response(503, error.message, path);
-    if (error instanceof ForbiddenSessionError) return response(403, "La sesión no tiene permiso para consultar inspecciones.", path);
-    return response(500, "No se pudo cargar la inspección.", path);
+    if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
+    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
+    if (error instanceof BackendUnavailableError) return errorResponse(503, error.message, path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para consultar inspecciones.", path);
+    return errorResponse(500, "No se pudo cargar la inspección.", path);
   }
 }

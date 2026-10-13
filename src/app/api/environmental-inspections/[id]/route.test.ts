@@ -93,6 +93,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
       statusCode: 404, message: "Inspección no encontrada.", error: "Not Found",
+      timestamp: expect.any(String),
       path: `/api/environmental-inspections/${inspectionId}`,
     });
     expect(backendFetch).toHaveBeenCalledTimes(3);
@@ -150,7 +151,8 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
 
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
-      statusCode: 502, message: "La respuesta del backend no contiene una inspección válida.", error: "Error",
+      statusCode: 502, message: "La respuesta del backend no contiene una inspección válida.", error: "Bad Gateway",
+      timestamp: expect.any(String),
       path: `/api/environmental-inspections/${inspectionId}`,
     });
     expect(backendFetch).toHaveBeenCalledTimes(scenarioId.startsWith("field") ? 2 : 1);
@@ -208,7 +210,7 @@ describe("GET /api/environmental-inspections/:id con fixtures", () => {
     expect(backendFetch).not.toHaveBeenCalled();
     const body = await response.json();
     if (status === 200) expect(body.id).toBe(id);
-    else expect(body.message).toBe("Inspección no encontrada.");
+    else expect(body).toMatchObject({ message: "Inspección no encontrada.", timestamp: expect.any(String) });
     if (scenarioId.startsWith("field")) {
       expect(body).not.toHaveProperty("inspectorId");
       expect(body).not.toHaveProperty("reporterSnapshot");
