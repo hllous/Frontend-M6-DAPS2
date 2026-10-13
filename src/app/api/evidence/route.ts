@@ -99,12 +99,14 @@ async function checkBackendEvidenceCrew(
       meta: z.object({ totalPages: z.number().int().nonnegative() }),
     });
     for (let page = 1; page <= 10; page++) {
-      const services = await readEvidenceScope(request,
-        `/services?crewId=${encodeURIComponent(crewId)}&pageSize=100&page=${page}`, pageSchema, path);
+      type ServicesPage = z.infer<typeof pageSchema>;
+      const services: { data: ServicesPage; response?: never } | { data?: never; response: NextResponse } =
+        await readEvidenceScope<ServicesPage>(request,
+          `/services?crewId=${encodeURIComponent(crewId)}&pageSize=100&page=${page}`, pageSchema, path);
       if (services.response) return services.response;
-      for (const service of services.data.data) {
-        if (service.crewId !== crewId) continue;
-        const zones = await readEvidenceScope(request, `/services/${encodeURIComponent(service.id)}/zone-results`, zoneScopeSchema, path);
+      for (const listedService of services.data.data) {
+        if (listedService.crewId !== crewId) continue;
+        const zones = await readEvidenceScope(request, `/services/${encodeURIComponent(listedService.id)}/zone-results`, zoneScopeSchema, path);
         if (zones.response) return zones.response;
         if (zones.data.some((zone) => zone.id === ownerId)) return null;
       }
