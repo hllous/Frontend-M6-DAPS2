@@ -1,3 +1,4 @@
+import { EVIDENCE_FILE_SIZE_LABEL, MAX_EVIDENCE_FILE_SIZE_BYTES } from "@/lib/evidence-limits";
 import { HttpResponse, http } from "msw";
 
 import { getScenario, scenarios, type ScenarioId } from "@/lib/scenarios";
@@ -2184,12 +2185,11 @@ export const handlers = [
       );
     }
 
-    const maxSizeBytes = 10 * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
+    if (file.size > MAX_EVIDENCE_FILE_SIZE_BYTES) {
       return HttpResponse.json(
         {
           statusCode: 400,
-          message: "El archivo supera el tamaño máximo permitido de 10 MB.",
+          message: `El archivo supera el tamaño máximo permitido de ${EVIDENCE_FILE_SIZE_LABEL}.`,
           error: "Bad Request",
           timestamp: new Date().toISOString(),
           path: "/api/evidence",

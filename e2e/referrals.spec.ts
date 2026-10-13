@@ -7,6 +7,7 @@ test.describe("Referral workspace", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=referrals");
 
+    await expect(page.getByRole("main")).toHaveCount(1);
     const list = page.getByRole("region", { name: "Lista de derivaciones" });
     await expect(list).toBeVisible();
     await expect(list.getByRole("button", { name: /RR-1001/ })).toBeVisible();

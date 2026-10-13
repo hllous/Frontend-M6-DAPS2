@@ -151,7 +151,7 @@ function MapViewportController({
     const points = locations.flatMap((location) => [
       ...(location.coordinates ? [location.coordinates] : []),
       ...(location.locationType === "route"
-        ? location.zones.flatMap((zone) => zone.coordinates.flat())
+        ? location.zones.flatMap((zone) => zone.coordinates.flat(2))
         : []),
     ]);
 
@@ -198,19 +198,21 @@ export function ServicesMapCanvas({
       <MapResizeController />
       <MapViewportController locations={locations} filterFingerprint={filterFingerprint} />
 
-      {serviceZones.map(({ zone, serviceIds }) => (
-        <Polygon
-          key={zone.zoneId}
-          positions={zone.coordinates}
-          pathOptions={serviceZonePathOptions(serviceIds.includes(selectedId ?? ""))}
-        >
-          <Tooltip sticky>
-            <strong>{zone.code}</strong> · {zone.name}
-            <br />
-            {serviceIds.length} servicio{serviceIds.length === 1 ? "" : "s"} en la zona
-          </Tooltip>
-        </Polygon>
-      ))}
+      {serviceZones.flatMap(({ zone, serviceIds }) =>
+        zone.coordinates.map((polygon, partIndex) => (
+          <Polygon
+            key={`${zone.zoneId}-${partIndex}`}
+            positions={polygon}
+            pathOptions={serviceZonePathOptions(serviceIds.includes(selectedId ?? ""))}
+          >
+            <Tooltip sticky>
+              <strong>{zone.code}</strong> · {zone.name}
+              <br />
+              {serviceIds.length} servicio{serviceIds.length === 1 ? "" : "s"} en la zona
+            </Tooltip>
+          </Polygon>
+        )),
+      )}
 
       {visibleMarkers.map(({ service, location }, index) => {
         return (

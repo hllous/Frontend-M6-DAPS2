@@ -105,7 +105,7 @@ describe("POST /api/services/[id]/confirm-reschedule BFF route", () => {
 
     expect(response.status).toBe(409);
     const body = await response.json();
-    expect(body.message).toMatch(/RESCHEDULED/i);
+    expect(body.message).toBe("Solo se puede confirmar la nueva fecha de servicios a reprogramar (estado actual: Programado).");
   });
 
   it("moves a rescheduled service back to SCHEDULED with the new date/window, preserving zoneIds verbatim", async () => {
