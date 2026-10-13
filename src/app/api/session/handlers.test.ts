@@ -5,6 +5,7 @@ import { GET as session } from "./route";
 import { POST as logout } from "./logout/route";
 import { GET as listServices } from "../services/route";
 import { GET as scenarioRoute } from "../mock/scenarios/[scenarioId]/route";
+import * as sessionModule from "@/lib/session";
 
 const originalEnvironment = {
   authMode: process.env.M6_AUTH_MODE,
@@ -82,6 +83,22 @@ describe("session route handlers", () => {
     expect(response.status).toBe(200);
     expect(cookie).not.toContain(token);
     expect(JSON.stringify(body)).not.toContain(token);
+  });
+
+  it("does not expose the missing development JWT name in the BFF response", async () => {
+    process.env.M6_AUTH_MODE = "backend-development";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    delete process.env.M6_DEV_JWT;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const response = await login(loginRequest("office-duty-queue"));
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.message).toBe("La autenticación solicitada no está disponible.");
+    expect(JSON.stringify(body)).not.toContain("M6_DEV_JWT");
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   describe("Field crew in backend-development mode (#293)", () => {
@@ -183,6 +200,20 @@ describe("session route handlers", () => {
 
     const logoutResponse = await logout(new Request("http://localhost/api/session/logout", { method: "POST", headers: { cookie } }));
     expect(logoutResponse.headers.get("set-cookie")).toMatch(/Max-Age=0/i);
+  });
+
+  it("clears the session cookie when refresh rejects an otherwise valid session", async () => {
+    process.env.M6_AUTH_MODE = "mock";
+    const loginResponse = await login(loginRequest("office-duty-queue"));
+    const cookie = loginResponse.headers.get("set-cookie") ?? "";
+    vi.spyOn(sessionModule, "refreshSession").mockReturnValue(undefined);
+
+    const response = await session(new Request("http://localhost/api/session", { headers: { cookie } }));
+
+    expect(response.status).toBe(401);
+    const setCookie = String(response.headers.get("set-cookie"));
+    expect(setCookie).toContain("m6_session=");
+    expect(setCookie).toMatch(/Max-Age=0/i);
   });
 
   it("does not fall back when real M1 mode is requested", async () => {

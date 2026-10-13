@@ -275,6 +275,7 @@ describe("FieldWorkPanel component", () => {
       expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible();
       expect(screen.getByText("Reparación de contenedor CT-0112")).toBeVisible();
     });
+    expect(screen.queryByText("SVC-1050", { exact: true })).not.toBeInTheDocument();
 
     // Does NOT show services assigned to crew-a or unassigned
     expect(screen.queryByText(/Recolección de residuos — Recorrido 4/i)).not.toBeInTheDocument();
@@ -295,7 +296,7 @@ describe("FieldWorkPanel component", () => {
     await user.click(detailButtons[0]);
 
     // Detail view opens
-    expect(screen.getByRole("region", { name: /Detalle completo de SVC-1050/i })).toBeVisible();
+    expect(screen.getByRole("region", { name: /Detalle completo de Barrido mecánico — Bulevar Costero/i })).toBeVisible();
     expect(screen.getByText("Solo consulta")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /asignar cuadrilla/i })).not.toBeInTheDocument();
@@ -439,7 +440,11 @@ describe("FieldWorkPanel component", () => {
 
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
 
-    expect(screen.getByRole("heading", { name: /Suspender SVC-1060/i })).toBeVisible();
+    expect(
+      screen.getByRole("heading", {
+        name: "Suspender Barrido mecánico — Recorrido en curso",
+      }),
+    ).toBeVisible();
 
     await user.selectOptions(
       screen.getByLabelText(/Motivo de suspensión/i),

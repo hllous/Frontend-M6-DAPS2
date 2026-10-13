@@ -53,8 +53,6 @@ export function ServicePreview({
                 Punto
               </span>
             )}
-            <span>·</span>
-            <span className="font-bold text-[var(--color-text)]">{service.id}</span>
           </div>
           <h2
             id="preview-title"

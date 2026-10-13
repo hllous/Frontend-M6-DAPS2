@@ -291,6 +291,7 @@ export function FieldWorkPanel({
             return (
               <li
                 key={service.id}
+                data-service-id={service.id}
                 className="flex flex-col gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex flex-1 flex-col gap-2 min-w-0">
@@ -302,9 +303,6 @@ export function FieldWorkPanel({
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold text-[var(--color-text)]">
                           {service.title}
-                        </span>
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
-                          {service.id}
                         </span>
                         <StatusBadge status={service.status} />
                       </div>

@@ -228,7 +228,7 @@ function AssignCrewForm({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-secondary)]">
-                <span className="font-bold text-[var(--color-text)]">{service.id}</span>
+                <span className="font-bold text-[var(--color-text)]">{service.title}</span>
                 <span>·</span>
                 <span>{service.serviceTypeName}</span>
                 <span>·</span>

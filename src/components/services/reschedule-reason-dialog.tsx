@@ -88,7 +88,7 @@ function RescheduleReasonForm({
           <CalendarClock className="h-4 w-4" aria-hidden />
           <span>Paso 1 de 2 · Motivo de reprogramación</span>
         </div>
-        <DialogTitle>Reprogramar {service.id}</DialogTitle>
+        <DialogTitle>Reprogramar {service.title}</DialogTitle>
         <DialogDescription>
           El servicio pasará a estado &quot;A reprogramar&quot; a la espera de una nueva fecha y ventana
           horaria. Las zonas asignadas se conservan sin cambios.

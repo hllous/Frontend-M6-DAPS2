@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   AUTH_COOKIE_NAME,
+  AuthUnavailableError,
+  SESSION_ABSOLUTE_MS,
+  SESSION_IDLE_MS,
   createSession,
   effectiveSessionExpiry,
   getAuthMode,
@@ -16,7 +19,10 @@ import {
 const now = Date.parse("2026-09-05T15:00:00.000Z");
 const secret = "test-session-secret-that-is-long-enough";
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 
 describe("owned BFF session", () => {
   it("marks the session cookie Secure only in production, so LAN/HTTP access works in dev", () => {
@@ -71,9 +77,40 @@ describe("owned BFF session", () => {
     expect(cookie).not.toContain(token);
   });
 
+  it("rejects a sealed cookie with a tampered authentication tag", () => {
+    const session = createSession("office-duty-queue", { mode: "mock", now });
+    const [iv, authTag, ciphertext] = sealSession(session, secret).split(".");
+    const changedTag = authTag?.startsWith("A") ? `B${authTag.slice(1)}` : `A${authTag?.slice(1)}`;
+
+    expect(getSessionFromCookieValue(`${iv}.${changedTag}.${ciphertext}`, secret, now)).toBeUndefined();
+  });
+
+  it("rejects a cookie sealed with a different M6_SESSION_SECRET", () => {
+    const session = createSession("office-duty-queue", { mode: "mock", now });
+    const cookie = sealSession(session, secret);
+
+    expect(getSessionFromCookieValue(cookie, "a-different-session-secret", now)).toBeUndefined();
+  });
+
+  it("rejects an idle-expired cookie", () => {
+    const session = createSession("office-duty-queue", { mode: "mock", now });
+    const cookie = sealSession(session, secret);
+
+    expect(getSessionFromCookieValue(cookie, secret, now + SESSION_IDLE_MS)).toBeUndefined();
+  });
+
+  it("rejects an absolute-expired cookie even when its idle deadline matches", () => {
+    const created = createSession("office-duty-queue", { mode: "mock", now });
+    const session = { ...created, lastActivityAt: created.absoluteExpiresAt - SESSION_IDLE_MS };
+    const cookie = sealSession(session, secret);
+
+    expect(session.absoluteExpiresAt).toBe(now + SESSION_ABSOLUTE_MS);
+    expect(getSessionFromCookieValue(cookie, secret, session.absoluteExpiresAt)).toBeUndefined();
+  });
+
   it("fails closed for real M1 authentication", () => {
     expect(() => createSession("office-duty-queue", { mode: "real-m1", now })).toThrow(
-      /bloqueada|unavailable/i,
+      "La autenticación solicitada no está disponible.",
     );
   });
 
@@ -82,7 +119,16 @@ describe("owned BFF session", () => {
       mode: "backend-development",
       now,
       devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
-    })).toThrow("El backend de desarrollo no está configurado.");
+    })).toThrow("La autenticación solicitada no está disponible.");
+  });
+
+  it("keeps authentication diagnostics in the server log and exposes a generic message", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const error = new AuthUnavailableError("M6_DEV_JWT no tiene una expiración válida.");
+
+    expect(error.message).toBe("La autenticación solicitada no está disponible.");
+    expect(log).toHaveBeenCalledWith("[m6-auth-unavailable]", "M6_DEV_JWT no tiene una expiración válida.");
   });
 
   it("respects an explicit M6_AUTH_MODE override in production", () => {

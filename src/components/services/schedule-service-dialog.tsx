@@ -24,6 +24,7 @@ import { greenPointsAdapter } from "@/lib/green-points";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { cn } from "@/lib/utils";
 import { MAX_NOTES_LENGTH } from "@/lib/input-limits";
+import { SERVICE_MODE_LABEL, SERVICE_ORIGIN_LABEL } from "./service-ui-labels";
 
 interface ScheduleServiceDialogProps {
   open: boolean;
@@ -394,16 +395,14 @@ export function ScheduleServiceDialog({
                 <Info className="h-4 w-4 text-[var(--color-action)] shrink-0" aria-hidden />
                 <span>Origen vinculado preservado</span>
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+              <div className="mt-2 grid grid-cols-1 gap-3 text-xs">
                 <div>
                   <span className="text-[var(--color-text-secondary)]">Origen:</span>
                   <p className="font-bold text-[var(--color-text)] mt-0.5">
-                    {origin === "TICKET" && "Reclamo ciudadano (TICKET)"}
-                    {origin === "INSPECTION" && "Inspección ambiental (INSPECTION)"}
-                    {origin === "WEATHER_ALERT" && "Alerta meteorológica (WEATHER_ALERT)"}
+                    {SERVICE_ORIGIN_LABEL[origin]}
                   </p>
                 </div>
-                {origin === "TICKET" && !hasTrustedTicketContext ? (
+                {origin === "TICKET" && !hasTrustedTicketContext && (
                   <Field>
                     <FieldLabel htmlFor="linked-ticket-id">UUID del ticket de M2 *</FieldLabel>
                     <input
@@ -415,13 +414,6 @@ export function ScheduleServiceDialog({
                     />
                     <FieldDescription id="linked-ticket-id-help">Pegue el UUID técnico del expediente. El formato TK-… es publicId y no sirve para correlacionar eventos.</FieldDescription>
                   </Field>
-                ) : (
-                  <div>
-                    <span className="text-[var(--color-text-secondary)]">{origin === "TICKET" ? "UUID de ticket:" : "ID Referencia:"}</span>
-                    <p className="font-mono font-bold text-[var(--color-text)] mt-0.5">
-                      {referenceId || "(Sin ID)"}
-                    </p>
-                  </div>
                 )}
               </div>
             </div>
@@ -455,7 +447,7 @@ export function ScheduleServiceDialog({
             >
               {serviceTypes.map((st) => (
                 <option key={st.id} value={st.id}>
-                  {st.name} ({st.mode === "ROUTE" ? "Recorrido" : "Punto"})
+                  {st.name} ({SERVICE_MODE_LABEL[st.mode]})
                 </option>
               ))}
             </select>
@@ -474,12 +466,12 @@ export function ScheduleServiceDialog({
                 {derivedMode === "ROUTE" ? (
                   <>
                     <RouteIcon className="h-3 w-3" aria-hidden />
-                    <span>Recorrido (ROUTE)</span>
+                    <span>Recorrido</span>
                   </>
                 ) : (
                   <>
                     <MapPin className="h-3 w-3" aria-hidden />
-                    <span>Punto fijo (POINT)</span>
+                    <span>Punto fijo</span>
                   </>
                 )}
               </span>
@@ -693,7 +685,7 @@ export function ScheduleServiceDialog({
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-[11px] text-[var(--color-text-secondary)] flex items-center gap-2">
             <Info className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" aria-hidden />
             <span>
-              El servicio se creará en estado <strong>PROGRAMADO</strong> sin cuadrilla ni vehículo asignados. La asignación operativa se realiza posteriormente en el despacho.
+              El servicio se creará en estado <strong>Programado</strong> sin cuadrilla ni vehículo asignados. La asignación operativa se realiza posteriormente en el despacho.
             </span>
           </div>
         </form>

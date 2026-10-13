@@ -41,10 +41,22 @@ describe("pathId", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("unused"));
 
     await expect(fetchBackend(backendRequest(), "/services/../containers/container-1/remove")).rejects.toThrow(
-      "El recurso backend debe ser una ruta interna.",
+      "La autenticación solicitada no está disponible.",
     );
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it.each(["//evil.com", "/\\evil.com", "https://evil.com/path"])(
+    "rejects external resource path %s without fetching",
+    async (resourcePath) => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("unused"));
+
+      await expect(fetchBackend(backendRequest(), resourcePath)).rejects.toThrow(
+        "La autenticación solicitada no está disponible.",
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("fetchBackend availability", () => {
