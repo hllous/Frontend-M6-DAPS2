@@ -29,12 +29,18 @@ describe("BFF upstream relay", () => {
     });
   });
 
-  it("wraps a missing content type and preserves the upstream status even for success", async () => {
+  it("wraps a missing content type from a 2xx response as Bad Gateway", async () => {
     const upstream = new Response("unexpected body", { status: 200 });
     upstream.headers.delete("content-type");
     const result = forwardResponse(upstream);
-    expect(result.status).toBe(200);
-    expect(await result.json()).toMatchObject({ statusCode: 200, path: "" });
+    expect(result.status).toBe(502);
+    expect(await result.json()).toMatchObject({ statusCode: 502, error: "Bad Gateway", path: "" });
+  });
+
+  it("preserves a non-JSON gateway error status", async () => {
+    const result = forwardResponse(new Response("upstream", { status: 503, headers: { "content-type": "text/html" } }), "/api/services");
+    expect(result.status).toBe(503);
+    expect(await result.json()).toMatchObject({ statusCode: 503, error: "Service Unavailable", path: "/api/services" });
   });
 
   it.each([204, 205, 304])("preserves bodyless HTTP %s with nosniff", async (status) => {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { bffPathForResponse } from "./bff-response-path";
 import {
   AuthUnavailableError,
   BackendUnavailableError,
@@ -63,12 +64,13 @@ export function mapSessionError(error: unknown, path: string, fallbackMessage: s
   return errorResponse(500, fallbackMessage, path);
 }
 
-export function forwardResponse(response: Response, path = response.url ? new URL(response.url).pathname : ""): NextResponse {
+export function forwardResponse(response: Response, path = bffPathForResponse(response) ?? ""): NextResponse {
   const contentType = response.headers.get("content-type");
   const bodyless = [204, 205, 304].includes(response.status);
   if (!bodyless && contentType?.split(";")[0].trim().toLowerCase() !== "application/json") {
     void response.body?.cancel().catch(() => undefined);
-    const error = errorResponse(response.status, "La respuesta del backend no tiene un tipo de contenido JSON válido.", path);
+    const errorStatus = response.status >= 200 && response.status < 300 ? 502 : response.status;
+    const error = errorResponse(errorStatus, "La respuesta del backend no tiene un tipo de contenido JSON válido.", path);
     error.headers.set("X-Content-Type-Options", "nosniff");
     return error;
   }
