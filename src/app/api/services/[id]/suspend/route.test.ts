@@ -122,7 +122,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
 
     expect(response.status).toBe(409);
     const body = await response.json();
-    expect(body.message).toMatch(/IN_PROGRESS/i);
+    expect(body.message).toBe("Solo se pueden suspender servicios en curso (estado actual: Programado).");
   });
 
   it("successfully suspends an in-progress service and records the reason and note", async () => {

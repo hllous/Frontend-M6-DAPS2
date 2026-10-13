@@ -3,6 +3,7 @@ import { connection } from "next/server";
 
 import { SessionShell } from "@/components/auth/session-shell";
 import { getSession } from "@/lib/session";
+import { getScenario } from "@/lib/scenarios";
 import { leaveApplication } from "./actions";
 
 export default async function AppLayout({
@@ -13,7 +14,7 @@ export default async function AppLayout({
   if (!session) redirect("/login");
 
   return (
-    <SessionShell scenarioId={session.scenarioId} logoutAction={leaveApplication}>
+    <SessionShell actorId={getScenario(session).actor.userId} scenarioId={session.scenarioId} logoutAction={leaveApplication}>
       {children}
     </SessionShell>
   );

@@ -17,7 +17,9 @@ describe("CatalogPageHeader", () => {
     const breadcrumb = screen.getByRole("navigation", { name: "Ruta de navegación" });
     expect(within(breadcrumb).getByRole("link", { name: "Catálogo" })).toHaveAttribute("href", "/app?destination=catalog");
     expect(within(breadcrumb).getByText("Vehículos")).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("heading", { level: 1, name: "Vehículos" })).toHaveAttribute("id", "vehicles-title");
+    const title = screen.getByRole("heading", { level: 1, name: "Vehículos" });
+    expect(title).toHaveAttribute("id", "vehicles-title");
+    expect(title).toHaveClass("text-[28px]", "leading-[34px]", "max-[760px]:text-[26px]", "max-[760px]:leading-[32px]");
     expect(screen.getByText("Registre los vehículos.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Registrar vehículo" })).toBeVisible();
   });

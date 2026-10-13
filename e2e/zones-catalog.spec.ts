@@ -77,12 +77,12 @@ test.describe("Zone catalog management #106", () => {
     // Confirmation dialog appears
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("heading", { name: "Confirmar baja de zona operativa" })).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Confirmar baja de zona Z-BEL" })).toBeVisible();
     await expect(dialog.getByText(/Advertencia: esta zona todavía cuenta con elementos activos referenciados/i)).toBeVisible();
     await expect(dialog.getByText(/El backend no realiza control de integridad referencial/i)).toBeVisible();
 
     // Confirm deactivation
-    await dialog.getByRole("button", { name: "Dar de baja de todas formas" }).click();
+    await dialog.getByRole("button", { name: "Dar de baja la zona Z-BEL" }).click();
 
     await expect(dialog).not.toBeVisible();
     await expect(row.getByText("Inactiva")).toBeVisible();

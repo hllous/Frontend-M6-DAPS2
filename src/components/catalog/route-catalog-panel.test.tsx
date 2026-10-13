@@ -101,12 +101,32 @@ describe("RouteCatalogPanel component", () => {
     expect(routeFixtures.find((route) => route.id === "route-1")?.active).toBe(false);
   });
 
+  it("shows a deactivation failure as an alert and keeps the confirmation open", async () => {
+    server.use(http.delete("/api/routes/:id", () => HttpResponse.json({
+      statusCode: 500,
+      message: "No se pudo dar de baja el recorrido.",
+      error: "Internal Server Error",
+      timestamp: "2026-10-13T12:00:00.000Z",
+      path: "/api/routes/route-1",
+    }, { status: 500 })));
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByTestId("deactivate-route-route-1"));
+    const dialog = await screen.findByRole("dialog");
+    const confirm = within(dialog).getByTestId("confirm-deactivate-button");
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await user.click(confirm);
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("No se pudo dar de baja el recorrido.");
+    expect(dialog).toBeVisible();
+  });
+
   it("renders the routes catalog with heading, search input, filters and table for Office", async () => {
     render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     expect(screen.getByRole("heading", { name: "Recorridos", level: 1 })).toBeInTheDocument();
     expect(screen.getByTestId("create-route-button")).toBeVisible();
     expect(screen.getByTestId("search-routes-input")).toBeInTheDocument();
+    expect(screen.getByLabelText("Buscar recorridos")).toBeInTheDocument();
     expect(screen.getByTestId("active-filter-select")).toBeInTheDocument();
     expect(screen.getByTestId("zone-filter-select")).toBeInTheDocument();
 
@@ -337,6 +357,7 @@ describe("RouteCatalogPanel component", () => {
       // Verify sequence builder opened
       expect(screen.getByTestId("stop-sequence-builder")).toBeInTheDocument();
       expect(screen.getByTestId("builder-empty-stops")).toBeInTheDocument();
+      expect(screen.getByLabelText("Zona operativa")).toBeInTheDocument();
 
       // Select zone-1 and add
       const zoneSelect = screen.getByTestId("stop-zone-select");

@@ -44,6 +44,24 @@ describe("ServicesWorkspace component", () => {
     expect(screen.getByRole("region", { name: "Mapa territorial de Servicios" })).toBeInTheDocument();
   });
 
+  it("hides planning mutation actions for office-limited intake", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeLimited} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = within(table).getByText("Poda de árbol — Av. Rivadavia 2200").closest("tr")!;
+    await user.click(row);
+
+    const preview = await screen.findByRole("complementary");
+    expect(within(preview).queryByRole("button", { name: "Asignar cuadrilla" })).not.toBeInTheDocument();
+
+    await user.click(within(preview).getByRole("button", { name: /Ver detalle completo/ }));
+    expect(await screen.findByRole("region", { name: "Detalle completo de SVC-1043" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Asignar cuadrilla" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reprogramar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar servicio" })).not.toBeInTheDocument();
+  });
+
   it("synchronizes table selection with map marker and opens live preview", async () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);

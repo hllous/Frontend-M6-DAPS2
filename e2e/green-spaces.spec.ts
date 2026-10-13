@@ -35,8 +35,10 @@ test.describe("Green Spaces catalog management @smoke", () => {
     const editedRow = panel.getByRole("row", { name: /Espacio E2E editado #108/ });
     await expect(editedRow).toBeVisible();
 
-    page.once("dialog", (browserDialog) => browserDialog.accept());
     await editedRow.getByRole("button", { name: "Dar de baja" }).click();
+    const deactivateDialog = page.getByRole("dialog");
+    await expect(deactivateDialog.getByRole("heading", { name: "Confirmar baja del espacio verde Espacio E2E editado #108" })).toBeVisible();
+    await deactivateDialog.getByRole("button", { name: "Dar de baja el espacio verde Espacio E2E editado #108" }).click();
     await expect(editedRow.getByText("Inactivo")).toBeVisible();
     await expect(panel.getByRole("button", { name: /regar|regar|cortar|riego|corte/i })).toHaveCount(0);
   });
