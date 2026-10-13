@@ -185,11 +185,11 @@ it("rejects malformed JSON with 400", async () => {
   expect((await response.json()).message).toContain("JSON válido");
 });
 
-it.each([401, 403, 409, 503])("preserves backend error status and body (%s)", async (status) => {
+it.each([403, 409, 500, 503])("preserves backend error status and body (%s)", async (status) => {
   process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
   const error = { statusCode: status, message: "El backend rechazó la operación." };
   const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
-    if (String(url).endsWith("/crews")) return Response.json({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] });
+    if (String(url).includes("/crews")) return Response.json({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] });
     if ((init?.method ?? "GET") === "GET") return Response.json({ crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
