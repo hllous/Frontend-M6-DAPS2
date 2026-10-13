@@ -122,7 +122,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
 
     expect(response.status).toBe(409);
     const body = await response.json();
-    expect(body.message).toMatch(/IN_PROGRESS/i);
+    expect(body.message).toBe("Solo se pueden suspender servicios en curso (estado actual: Programado).");
   });
 
   it("successfully suspends an in-progress service and records the reason and note", async () => {
@@ -150,7 +150,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     expect(updatedFixture?.status).toBe("SUSPENDED");
   });
 
-  it("forwards only the DTO reason and JSON content type in backend-development mode", async () => {
+  it("forwards the reason label and note with JSON content type in backend-development mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
@@ -172,6 +172,6 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     expect(response.status).toBe(200);
     const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
     expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
-    expect(JSON.parse(String(requestInit.body))).toEqual({ reason: "VEHICLE_BREAKDOWN" });
+    expect(JSON.parse(String(requestInit.body))).toEqual({ reason: "Desperfecto vehicular: El camión no arranca." });
   });
 });

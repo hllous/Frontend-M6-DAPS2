@@ -98,9 +98,9 @@ function StartRepairModalContent({
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
           Cancelar
         </Button>
-        <Button type="submit" form="start-repair-form" disabled={isSubmitting}>
+        <Button type="submit" form="start-repair-form" disabled={isSubmitting} aria-busy={isSubmitting}>
           <Wrench data-icon="inline-start" aria-hidden />
-          {isSubmitting ? "Iniciando…" : "Iniciar reparación"}
+          Iniciar reparación
         </Button>
       </DialogFooter>
     </DialogContent>
