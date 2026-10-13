@@ -28,7 +28,18 @@ vi.mock("react-leaflet", async () => {
       ref: (element: HTMLDivElement | null) => { if (element) mapState.container = element; },
       "aria-label": props["aria-label"],
     }, children),
-    Marker: emptyComponent,
+    Marker: ({ children, title, icon, eventHandlers }: {
+      children?: React.ReactNode;
+      title?: string;
+      icon?: { options?: { html?: string } };
+      eventHandlers?: { click?: () => void };
+    }) => ReactModule.createElement("button", {
+      type: "button",
+      title,
+      "aria-label": title,
+      "data-icon-html": icon?.options?.html,
+      onClick: eventHandlers?.click,
+    }, children),
     Pane: emptyComponent,
     Polygon: emptyComponent,
     Popup: emptyComponent,
@@ -73,6 +84,40 @@ afterEach(() => {
 });
 
 describe("OperationalMapCanvas inventory clusters", () => {
+  it("selects an inventory marker and reflects its selected state", async () => {
+    const marker = {
+      id: "container-1",
+      layer: "containers",
+      title: "CONT-001",
+      description: "Contenedor activo",
+      lat: -34.58,
+      lng: -58.42,
+      markerSymbol: "C",
+      markerTone: "info" as const,
+    };
+    const onSelectMarker = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <OperationalMapCanvas view="inventory" markers={[marker]} onSelectMarker={onSelectMarker} />,
+    );
+    const markerButton = await screen.findByRole("button", { name: /CONT-001/ });
+    const initialIcon = markerButton.getAttribute("data-icon-html");
+
+    await user.click(markerButton);
+    expect(onSelectMarker).toHaveBeenCalledWith(marker);
+
+    rerender(
+      <OperationalMapCanvas
+        view="inventory"
+        markers={[marker]}
+        selectedMarkerKey="containers-container-1"
+        onSelectMarker={onSelectMarker}
+      />,
+    );
+    const selectedMarker = screen.getByRole("button", { name: /CONT-001/ });
+    expect(selectedMarker.getAttribute("data-icon-html")).not.toBe(initialIcon);
+  });
+
   it("names clusters for the inventory layer", async () => {
     render(<OperationalMapCanvas view="inventory" markers={[]} />);
 

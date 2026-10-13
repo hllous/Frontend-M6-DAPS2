@@ -409,6 +409,10 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
       <div className={styles.summaryHeading}><h2>Resumen del período</h2><span>{appliedQuery.from && appliedQuery.to ? `${formatDate(appliedQuery.from)} – ${formatDate(appliedQuery.to)}` : "Últimos 30 días"}</span></div>
       <FamilySelectorBand states={familyStates} selectedFamily={selectedFamily} onSelect={selectFamily} onRetry={retryFamily} />
+      {isNarrow ? <div className={styles.mobileViewToggle} role="group" aria-label="Visualización de indicadores">
+        <Button type="button" variant={viewMode === "bars" ? "default" : "outline"} aria-pressed={viewMode === "bars"} onClick={() => setViewMode("bars")}>Barras</Button>
+        <Button type="button" variant={viewMode === "table" ? "default" : "outline"} aria-pressed={viewMode === "table"} onClick={() => setViewMode("table")}>Tabla</Button>
+      </div> : null}
       {isNarrow ? <Tabs defaultValue="summary" className={styles.mobileTabs}>
         <TabsList aria-label="Secciones del tablero" className={styles.tabList}>
           <TabsTrigger value="summary">Resumen</TabsTrigger>
@@ -500,7 +504,7 @@ function AccessibleRecords({ family, plan, selection, breakdown, point, records,
     {familyStatus === "loading" && !plan ? <p className={styles.recordsMessage} role="status">Cargando registros relacionados…</p> : null}
     {familyStatus === "error" && !plan ? <p className={styles.recordsMessage} role="alert">No se pudieron cargar los registros relacionados porque la familia seleccionada no está disponible.</p> : null}
     <div className={styles.recordsHeader}>
-      <div><h2 id="indicator-records-title">Registros accesibles</h2><p>Consulta los registros que explican la señal sin habilitar su gestión desde el tablero.</p></div>
+      <div><h2 id="indicator-records-title">Registros accesibles</h2><p>Consulte los registros que explican la señal sin habilitar su gestión desde el tablero.</p></div>
       {plan?.resource ? <Link className={styles.recordsLink} href={plan.href}>{plan.linkLabel}</Link> : null}
     </div>
     <div className={styles.recordsContext} aria-live="polite">
