@@ -8,7 +8,7 @@ import {
 } from "@/lib/services-fixtures";
 import { rescheduleServiceInputSchema } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
 
@@ -31,6 +31,8 @@ export async function POST(
     if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, "Solo Oficina puede reprogramar un servicio.", path);
     }
+
+    requireCapability(session, "service:reschedule");
 
     let body: unknown;
     try {
