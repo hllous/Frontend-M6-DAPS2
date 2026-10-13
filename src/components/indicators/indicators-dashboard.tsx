@@ -136,7 +136,7 @@ function containerToTraceRecord(container: Container, zones: Map<string, string>
 }
 
 function formatNumber(value: number, unit: string) {
-  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: unit === "%" || unit === "h" || unit === "m³" ? 1 : 0 }).format(value);
+  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: unit === "%" || unit === "h" || unit === "m³" || unit === "días" ? 1 : 0 }).format(value);
 }
 
 function formatDate(value: string) {
@@ -580,9 +580,9 @@ function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoi
 }
 
 function TableView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
-  const detailLabels = points.find((point) => point.details?.length)?.details?.map((detail) => detail.label) ?? [];
+  const detailLabels = [...new Set(points.flatMap((point) => point.details?.map((detail) => detail.label) ?? []))];
   const valueHeading = tableValueHeading(points[0]?.unit);
-  return <div className={styles.tableWrap}><table className={styles.table}><caption>Valores exactos de {title.toLowerCase()}</caption><thead><tr><th scope="col">Categoría</th>{detailLabels.map((label) => <th key={label} scope="col">{label}</th>)}<th scope="col">{valueHeading}</th></tr></thead><tbody>{points.map((point) => <tr key={point.id}><td><button type="button" className={styles.rowButton} data-selected={selectedId === point.id} aria-pressed={selectedId === point.id} onClick={() => onSelect(point.id)}>{point.label}{point.note ? <span className={styles.note}>{point.note}</span> : null}</button></td>{detailLabels.map((label) => { const detail = point.details?.find((item) => item.label === label); return <td key={label} className={styles.value}>{detail ? metricText(detail) : "—"}</td>; })}<td className={styles.value}>{metricText(point)}</td></tr>)}</tbody></table></div>;
+  return <div className={styles.tableWrap}><table className={styles.table}><caption>Valores exactos de {title.toLowerCase()}</caption><thead><tr><th scope="col">Categoría</th>{detailLabels.map((label) => <th key={label} scope="col">{label}</th>)}<th scope="col">{valueHeading}</th></tr></thead><tbody>{points.map((point) => <tr key={point.id}><td><button type="button" className={styles.rowButton} data-selected={selectedId === point.id} aria-pressed={selectedId === point.id} onClick={() => onSelect(point.id)}>{point.label}{point.note ? <span className={styles.note}>{point.note}</span> : null}</button></td>{detailLabels.map((label) => { const detail = point.details?.find((item) => item.label === label); return <td key={label} className={styles.value}>{detail ? metricText(detail) : ""}</td>; })}<td className={styles.value}>{metricText(point)}</td></tr>)}</tbody></table></div>;
 }
 
 function tableValueHeading(unit?: string) {
