@@ -92,15 +92,15 @@ test.describe("Route catalog management #107", () => {
     await row.getByTestId("deactivate-route-route-1").click();
 
     // Confirmation warning dialog appears
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("dialog", { name: "Confirmar baja del recorrido REC-001" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("heading", { name: "Desactivar recorrido" })).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Confirmar baja del recorrido REC-001" })).toBeVisible();
     await expect(dialog.getByTestId("references-warning-dialog")).toBeVisible();
     await expect(dialog.getByText(/Advertencia: El recorrido está asignado a frecuencias de servicio activas/i)).toBeVisible();
     await expect(dialog.getByText(/Recolección Domiciliaria/i)).toBeVisible();
 
     // Confirm deactivation
-    await dialog.getByTestId("confirm-deactivate-button").click();
+    await dialog.getByRole("button", { name: "Dar de baja el recorrido REC-001" }).click();
 
     await expect(dialog).not.toBeVisible();
     await expect(row.getByText("Inactivo")).toBeVisible();

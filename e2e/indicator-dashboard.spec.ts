@@ -3,6 +3,20 @@ import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
 
 test.describe("operational indicator dashboard #138", () => {
+  test("Field can open the semantic indicator table on a narrow screen", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=dashboards");
+
+    const viewToggle = page.getByRole("group", { name: "Visualización de indicadores" });
+    await expect(viewToggle.getByRole("button", { name: "Barras" })).toHaveAttribute("aria-pressed", "true");
+    await viewToggle.getByRole("button", { name: "Tabla" }).click();
+    await page.getByRole("tab", { name: "Territorio" }).click();
+
+    const territory = page.getByRole("region", { name: "Detalle territorial" });
+    await expect(territory.getByRole("table").first()).toBeVisible();
+  });
+
   test("Office sees the four families, filters, and the visual table companion", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=dashboards");
