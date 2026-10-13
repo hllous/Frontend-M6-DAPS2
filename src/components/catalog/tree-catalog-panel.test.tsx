@@ -35,7 +35,8 @@ describe("TreeCatalogPanel", () => {
     expect(await screen.findByText("Árbol actualizado con éxito.")).toBeVisible();
     const refreshedRow = await screen.findByRole("row", { name: /ARB-00442/ });
     await within(refreshedRow).getByRole("button", { name: "Dar de baja" }).click();
-    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Confirmar baja" }));
+    const deactivateDialog = await screen.findByRole("dialog");
+    fireEvent.click(within(deactivateDialog).getByRole("button", { name: "Dar de baja el árbol ARB-00442" }));
     expect(await screen.findByText(/Árbol dado de baja/)).toBeVisible();
   });
 
@@ -79,9 +80,26 @@ describe("TreeCatalogPanel", () => {
     const row = await screen.findByRole("row", { name: /ARB-00442/ });
     fireEvent.click(within(row).getByRole("button", { name: "Dar de baja" }));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Conservar árbol ARB-00442" }));
     expect(removed).toBe(0);
     expect(screen.queryByText(/Árbol dado de baja/)).not.toBeInTheDocument();
+  });
+
+  it("shows a deactivation failure as an alert and keeps the confirmation open", async () => {
+    server.use(http.delete("*/api/trees/:treeId", () => HttpResponse.json({
+      statusCode: 500,
+      message: "No se pudo eliminar",
+      error: "Internal Server Error",
+      timestamp: "2026-10-13T12:00:00.000Z",
+      path: "/api/trees/tree-1",
+    }, { status: 500 })));
+    render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /ARB-00442/ });
+    fireEvent.click(within(row).getByRole("button", { name: "Dar de baja" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Dar de baja el árbol ARB-00442" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("No se pudo eliminar");
+    expect(dialog).toBeVisible();
   });
 
   it("keeps filters and selected tree in the URL and restores them on load", async () => {

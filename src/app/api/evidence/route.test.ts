@@ -6,9 +6,11 @@ import {
   evidenceCache,
   resetServiceFixtures,
   resetZoneResultFixtures,
+  serviceFixtures,
   zoneResultFixtures,
 } from "@/lib/services-fixtures";
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
+import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 import { withNodeFile } from "@/mocks/node-file";
 import { GET, POST as rawPost } from "./route";
 
@@ -48,7 +50,268 @@ async function authenticatedCookie(scenarioId: string, mode = "mock") {
   return response.headers.get("set-cookie") ?? "";
 }
 
+function evidenceRequest(cookie: string, ownerType: string, ownerId: string, key?: string, serviceId?: string) {
+  const body = new FormData();
+  body.append("file", new File(["image"], "photo.jpg", { type: "image/jpeg" }));
+  body.append("ownerType", ownerType);
+  body.append("ownerId", ownerId);
+  if (serviceId) body.append("serviceId", serviceId);
+  return new Request("http://localhost/api/evidence", {
+    method: "POST", headers: { cookie, ...(key === undefined ? {} : { "Idempotency-Key": key }) }, body,
+  });
+}
+
+// Build actual multipart bytes: jsdom FormData serializes its File differently from Undici.
+function sizedMultipartRequest(cookie: string, fileBytes: number, contentLength: string) {
+  const boundary = "evidence-size-boundary";
+  const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="big.jpg"\r\nContent-Type: image/jpeg\r\n\r\n${"x".repeat(fileBytes)}\r\n`
+    + `--${boundary}\r\nContent-Disposition: form-data; name="ownerType"\r\n\r\nSERVICE\r\n`
+    + `--${boundary}\r\nContent-Disposition: form-data; name="ownerId"\r\n\r\nSVC-1050\r\n`
+    + `--${boundary}\r\nContent-Disposition: form-data; name="fileSize"\r\n\r\n1\r\n--${boundary}--\r\n`;
+  return new Request("http://localhost/api/evidence", {
+    method: "POST", body,
+    headers: { cookie, "Idempotency-Key": "actual-size", "content-type": `multipart/form-data; boundary=${boundary}`, "content-length": contentLength },
+  });
+}
+
+function backendCookie(crewId = "crew-real") {
+  process.env.M6_AUTH_MODE = "backend-development";
+  process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+  const session = createSession("field-crew-leader-route", {
+    mode: "backend-development", devJwt: process.env.M6_DEV_JWT, backendOrigin: process.env.M6_BACKEND_ORIGIN,
+  });
+  session.crew = { id: crewId, name: "Cuadrilla real" };
+  return `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
+}
+
 describe("POST /api/evidence BFF route", () => {
+  it("denies another Field crew replaying an authorized upload key", async () => {
+    const cookieA = await authenticatedCookie("field-crew-leader-route");
+    const first = await POST(evidenceRequest(cookieA, "SERVICE", "SVC-1050", "shared-key"));
+    expect(first.status).toBe(201);
+    const sessionB = createSession("field-crew-leader-route", { mode: "mock" });
+    sessionB.crew = { id: "crew-a", name: "Otra cuadrilla" };
+    const cookieB = `${AUTH_COOKIE_NAME}=${sealSession(sessionB)}`;
+
+    const replay = await POST(evidenceRequest(cookieB, "SERVICE", "SVC-1050", "shared-key"));
+
+    expect(replay.status).toBe(403);
+  });
+
+  it("rechecks the Service assignment before replaying a cached upload", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    expect((await POST(evidenceRequest(cookie, "SERVICE", "SVC-1050", "reassigned-key"))).status).toBe(201);
+    serviceFixtures.find((service) => service.id === "SVC-1050")!.crewId = "crew-a";
+
+    expect((await POST(evidenceRequest(cookie, "SERVICE", "SVC-1050", "reassigned-key"))).status).toBe(403);
+  });
+
+  it("scopes authorized container retries to the actor and crew", async () => {
+    const field = await authenticatedCookie("field-crew-leader-route");
+    const office = await authenticatedCookie("office-duty-queue");
+    expect((await POST(evidenceRequest(field, "CONTAINER", "cont-1", "actor-key"))).status).toBe(201);
+    expect((await POST(evidenceRequest(office, "CONTAINER", "cont-1", "actor-key"))).status).toBe(201);
+    expect((await POST(evidenceRequest(field, "CONTAINER", "cont-1", "actor-key"))).status).toBe(200);
+  });
+
+  it.each(["a".repeat(129), "key:bad", "key/bad", "key bad"])("rejects invalid Idempotency-Key %s", async (key) => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    expect((await POST(evidenceRequest(cookie, "SERVICE", "SVC-1050", key))).status).toBe(400);
+  });
+
+  it.each(["a".repeat(101), "../service", "service/1", "service bad"])("rejects malformed ownerId %s", async (ownerId) => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    expect((await POST(evidenceRequest(cookie, "SERVICE", ownerId, "owner-key"))).status).toBe(400);
+  });
+
+  it("requires Idempotency-Key in backend-development without contacting the backend", async () => {
+    const cookie = backendCookie();
+    const backendFetch = vi.spyOn(globalThis, "fetch");
+
+    expect((await POST(evidenceRequest(cookie, "SERVICE", "d8a3a8e5-f7d7-4453-9095-e22478e0fc01"))).status).toBe(400);
+    expect(backendFetch).not.toHaveBeenCalled();
+  });
+
+  it("checks the real Service crew before forwarding an upload", async () => {
+    const cookie = backendCookie();
+    const ownerId = "d8a3a8e5-f7d7-4453-9095-e22478e0fc01";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id: ownerId, crewId: "another-crew" }));
+
+    const response = await POST(evidenceRequest(cookie, "SERVICE", ownerId, "backend-crew-key"));
+
+    expect(response.status).toBe(403);
+    expect(backendFetch).toHaveBeenCalledTimes(1);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/services/${ownerId}`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+  });
+
+  describe("backend owner scope", () => {
+    const serviceId = "d8a3a8e5-f7d7-4453-9095-e22478e0fc01";
+    const ownerId = "79bcdbd4-e9fe-48e5-b011-643f6d13857b";
+
+    it("checks Inspection ownership through its real Service", async () => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(Response.json({ id: ownerId, serviceId }))
+        .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: "another-crew" }));
+
+      expect((await POST(evidenceRequest(cookie, "INSPECTION", ownerId, "inspection-scope"))).status).toBe(403);
+      expect(backendFetch.mock.calls.map(([url]) => String(url))).toEqual([
+        `https://backend.internal/environmental-inspections/${ownerId}`,
+        `https://backend.internal/services/${serviceId}`,
+      ]);
+    });
+
+    it("uploads an owned ZoneResult with the optional serviceId fast path", async () => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: "crew-real" }))
+        .mockResolvedValueOnce(Response.json([{ id: ownerId }]))
+        .mockResolvedValueOnce(Response.json({ id: "attachment-real" }, { status: 201 }));
+      const response = await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-fast", serviceId));
+
+      expect(response.status).toBe(201);
+      expect(backendFetch.mock.calls.map(([url]) => String(url))).toEqual([
+        `https://backend.internal/services/${serviceId}`,
+        `https://backend.internal/services/${serviceId}/zone-results`,
+        "https://backend.internal/evidence",
+      ]);
+      expect([...(backendFetch.mock.calls[2]?.[1]?.body as FormData).keys()]).toEqual(["file", "ownerType", "ownerId"]);
+    });
+
+    it("rejects another crew's Service on the ZoneResult fast path", async () => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id: serviceId, crewId: "another-crew" }));
+
+      expect((await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-fast-foreign", serviceId))).status).toBe(403);
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects a ZoneResult absent from the assigned-services fallback", async () => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ data: [], meta: { totalPages: 0 } }));
+
+      expect((await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-not-found"))).status).toBe(403);
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects malformed optional serviceId before contacting the backend", async () => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch");
+
+      expect((await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-invalid-parent", "../service"))).status).toBe(400);
+      expect(backendFetch).not.toHaveBeenCalled();
+    });
+
+    it("rejects a Field session without a resolved backend crew", async () => {
+      backendCookie();
+      const session = createSession("field-crew-leader-route", {
+        mode: "backend-development", devJwt: process.env.M6_DEV_JWT, backendOrigin: process.env.M6_BACKEND_ORIGIN,
+      });
+      const cookie = `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
+      const backendFetch = vi.spyOn(globalThis, "fetch");
+
+      expect((await POST(evidenceRequest(cookie, "SERVICE", serviceId, "missing-crew"))).status).toBe(403);
+      expect(backendFetch).not.toHaveBeenCalled();
+    });
+
+    it("never reuses a stale mock cache entry in backend-development", async () => {
+      const cookie = backendCookie();
+      evidenceCache.set(`SERVICE:${serviceId}:stale-key`, {
+        id: "mock-attachment", url: "/mock/evidence/photo.jpg", filename: "photo.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-05T10:00:00Z",
+      });
+      const backendFetch = vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: "crew-real" }))
+        .mockResolvedValueOnce(Response.json({ id: "backend-attachment" }, { status: 201 }));
+
+      const response = await POST(evidenceRequest(cookie, "SERVICE", serviceId, "stale-key"));
+
+      expect(response.status).toBe(201);
+      expect(await response.json()).toEqual({ id: "backend-attachment" });
+      expect(backendFetch).toHaveBeenCalledTimes(2);
+      expect(backendFetch.mock.calls[1]?.[1]?.method).toBe("POST");
+    });
+
+    it("finds an owned ZoneResult across assigned service pages without serviceId", async () => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(Response.json({ data: [], meta: { totalPages: 2 } }))
+        .mockResolvedValueOnce(Response.json({ data: [{ id: serviceId, crewId: "crew-real" }], meta: { totalPages: 2 } }))
+        .mockResolvedValueOnce(Response.json([{ id: ownerId }]))
+        .mockResolvedValueOnce(Response.json({ id: "attachment-real" }, { status: 201 }));
+
+      expect((await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-fallback"))).status).toBe(201);
+      expect(backendFetch.mock.calls.map(([url]) => String(url))).toEqual([
+        "https://backend.internal/services?crewId=crew-real&pageSize=100&page=1",
+        "https://backend.internal/services?crewId=crew-real&pageSize=100&page=2",
+        `https://backend.internal/services/${serviceId}/zone-results`,
+        "https://backend.internal/evidence",
+      ]);
+    });
+
+    it("does not trust an unrelated crew returned by the assigned-services filter", async () => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({
+        data: [{ id: serviceId, crewId: "another-crew" }], meta: { totalPages: 1 },
+      }));
+
+      expect((await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-foreign"))).status).toBe(403);
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects a ZoneResult absent from the selected assigned Service", async () => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: "crew-real" }))
+        .mockResolvedValueOnce(Response.json([]));
+      const form = new FormData();
+      form.append("file", new File(["image"], "photo.jpg", { type: "image/jpeg" }));
+      form.append("ownerType", "ZONE_RESULT");
+      form.append("ownerId", ownerId);
+      form.append("serviceId", serviceId);
+
+      expect((await POST(new Request("http://localhost/api/evidence", { method: "POST", headers: { cookie, "Idempotency-Key": "zone-absent" }, body: form }))).status).toBe(403);
+      expect(backendFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("stops the ZoneResult fallback after ten service pages", async () => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ data: [], meta: { totalPages: 11 } }));
+
+      expect((await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-page-cap"))).status).toBe(403);
+      expect(backendFetch).toHaveBeenCalledTimes(10);
+      expect(String(backendFetch.mock.calls[9]?.[0])).toContain("page=10");
+    });
+
+    it.each([401, 403, 404, 503])("preserves owner lookup HTTP %s without uploading", async (status) => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ message: "Error de origen" }, { status }));
+
+      expect((await POST(evidenceRequest(cookie, "SERVICE", serviceId, "upstream-error"))).status).toBe(status);
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([{ crewId: 42 }, { id: serviceId }, "not-json"])("rejects malformed owner responses without uploading: %j", async (payload) => {
+      const cookie = backendCookie();
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        typeof payload === "string" ? new Response(payload) : Response.json(payload),
+      );
+
+      expect((await POST(evidenceRequest(cookie, "SERVICE", serviceId, "malformed-owner"))).status).toBe(502);
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("evicts old mock retries when the bounded cache fills", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    for (let index = 0; index <= 256; index++) {
+      expect((await POST(evidenceRequest(cookie, "SERVICE", "SVC-1050", `bounded-${index}`))).status).toBe(201);
+    }
+    expect((await POST(evidenceRequest(cookie, "SERVICE", "SVC-1050", "bounded-256"))).status).toBe(200);
+    expect((await POST(evidenceRequest(cookie, "SERVICE", "SVC-1050", "bounded-0"))).status).toBe(201);
+  });
+
   it("requires an active session and returns 401", async () => {
     const response = await POST(
       new Request("http://localhost/api/evidence", {
@@ -145,26 +408,33 @@ describe("POST /api/evidence BFF route", () => {
     expect(response.status).toBe(400);
   });
 
-  it("returns 413 when file exceeds 10 MB", async () => {
+  it("returns 413 when file exceeds 4 MB despite understated size hints", async () => {
     const cookie = await authenticatedCookie("field-crew-leader-route");
-    const largeFile = new File(["dummy"], "big.jpg", { type: "image/jpeg" });
-    const formData = new FormData();
-    formData.append("file", largeFile);
-    formData.append("fileSize", String(11 * 1024 * 1024));
-    formData.append("ownerType", "ZONE_RESULT");
-    formData.append("ownerId", "ZR-1");
-
-    const response = await POST(
-      new Request("http://localhost/api/evidence", {
-        method: "POST",
-        headers: { cookie, "Idempotency-Key": "key-3" },
-        body: formData,
-      }),
-    );
+    const response = await POST(sizedMultipartRequest(cookie, 4 * 1024 * 1024 + 1, "1"));
     expect(response.status).toBe(413);
-    const body = await response.json();
-    expect(body.error).toBe("Payload Too Large");
-    expect(body.message).toMatch(/10 MB/i);
+    expect(await response.json()).toMatchObject({ error: "Payload Too Large", message: "El archivo supera el tamaño máximo permitido de 4 MB." });
+  });
+
+  it("accepts a file exactly 4 MB with room for multipart metadata", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const response = await POST(sizedMultipartRequest(cookie, 4 * 1024 * 1024, String(4 * 1024 * 1024 + 64 * 1024)));
+
+    expect(response.status).toBe(201);
+  });
+
+  it("rejects an oversized Content-Length before reading the multipart body", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const request = new Request("http://localhost/api/evidence", {
+      method: "POST",
+      headers: { cookie, "Idempotency-Key": "large-body", "content-length": String(4 * 1024 * 1024 + 64 * 1024 + 1) },
+      body: "unparsed body",
+    });
+    const parseBody = vi.spyOn(request, "formData");
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(413);
+    expect(parseBody).not.toHaveBeenCalled();
   });
 
   it("returns 400 when more than one file is sent", async () => {
@@ -275,7 +545,13 @@ describe("POST /api/evidence BFF route", () => {
     const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
     backendFetch.mockClear();
     let sentKeys: string[] = [];
-    backendFetch.mockImplementation(async (_input, init) => {
+    backendFetch.mockImplementation(async (input, init) => {
+      if (String(input).includes("/environmental-inspections/")) {
+        return Response.json({ id: "8d5bc42e-b6e5-404e-aea4-b1654f6c6baa", serviceId: "real-service" });
+      }
+      if (String(input).endsWith("/services/real-service")) {
+        return Response.json({ id: "real-service", crewId: "crew-real" });
+      }
       sentKeys = [...(init?.body as FormData).keys()];
       return new Response(JSON.stringify({ id: "att-1" }), { status: 201, headers: { "content-type": "application/json" } });
     });

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -80,6 +81,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const [referencesAcknowledged, setReferencesAcknowledged] = useState(false);
   const [isLoadingReferences, setIsLoadingReferences] = useState(false);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
 
   // Neighborhood assignment state
   const [neighborhoodZone, setNeighborhoodZone] = useState<Zone | null>(null);
@@ -178,6 +180,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     setReferencesReport(null);
     setReferencesUnavailable(false);
     setReferencesAcknowledged(false);
+    setDeactivateError(null);
     setIsLoadingReferences(true);
     try {
       const report = await zonesAdapter.checkReferences(zone.id);
@@ -198,8 +201,8 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       setDeactivatingZone(null);
       setReferencesReport(null);
       setRequestVersion((v) => v + 1);
-    } catch {
-      // Keep dialog open or show error
+    } catch (caught) {
+      setDeactivateError(caught instanceof ZoneRequestError ? caught.message : "No se pudo dar de baja la zona operativa.");
     } finally {
       setIsSubmittingDeactivate(false);
     }
@@ -588,7 +591,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                         zone.active
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                          ? "bg-[var(--color-success-fill)] text-[var(--color-success)]"
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
@@ -669,7 +672,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             </div>
           )}
           {neighborhoodNotice && (
-            <div role="status" className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
+            <div role="status" className="rounded-md bg-[var(--color-success-fill)] p-3 text-sm text-[var(--color-success)]">
               {neighborhoodNotice}
             </div>
           )}
@@ -809,123 +812,59 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
         </DialogContent>
       </Dialog>
 
-      {/* Deactivate confirmation dialog */}
-      <Dialog
+      <CatalogDeactivationDialog
         open={Boolean(deactivatingZone)}
         onOpenChange={(open) => {
           if (!open) {
             setDeactivatingZone(null);
             setReferencesReport(null);
+            setDeactivateError(null);
           }
         }}
+        title={`Confirmar baja de zona ${deactivatingZone?.code ?? ""}`.trim()}
+        consequence={`La zona ${deactivatingZone?.code ?? ""} — ${deactivatingZone?.name ?? ""} quedará inactiva. Los registros asociados conservarán su referencia.`.trim()}
+        confirmAction={`Dar de baja la zona ${deactivatingZone?.code ?? ""}`.trim()}
+        safeAlternative={`Conservar zona ${deactivatingZone?.code ?? ""}`.trim()}
+        confirmDisabled={isLoadingReferences || (referencesUnavailable && !referencesAcknowledged)}
+        isSubmitting={isSubmittingDeactivate}
+        onConfirm={() => void handleConfirmDeactivate()}
       >
-        <DialogContent aria-labelledby="confirm-deactivate-title">
-          <DialogHeader>
-            <DialogTitle id="confirm-deactivate-title" className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" aria-hidden="true" />
-              Confirmar baja de zona operativa
-            </DialogTitle>
-            <DialogDescription>
-              {deactivatingZone && (
-                <span>
-                  Zona: <strong>{deactivatingZone.code}</strong> — {deactivatingZone.name}
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          {isLoadingReferences ? (
-            <div className="flex items-center justify-center py-6 gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Verificando referencias de la zona...
+        {deactivateError ? <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{deactivateError}</p> : null}
+        {isLoadingReferences ? (
+          <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Verificando referencias de la zona...
+          </div>
+        ) : referencesUnavailable ? (
+          <div className="flex flex-col gap-3">
+            <Alert className="border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
+              <AlertTriangle aria-hidden="true" />
+              <AlertDescription className="text-[var(--color-warning)]">
+                No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
+              </AlertDescription>
+            </Alert>
+            <Field>
+              <FieldLabel className="flex min-h-10 cursor-pointer items-center gap-3 [@media(max-width:760px)]:min-h-12">
+                <Checkbox checked={referencesAcknowledged} onCheckedChange={setReferencesAcknowledged} disabled={isSubmittingDeactivate} />
+                Entiendo que no se verificaron las referencias
+              </FieldLabel>
+            </Field>
+          </div>
+        ) : referencesReport && referencesReport.totalReferences > 0 ? (
+          <div className="flex flex-col gap-3 py-2 text-sm">
+            <div className="rounded-lg border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-[var(--color-warning)]">
+              <p className="font-medium">Advertencia: esta zona todavía cuenta con elementos activos referenciados:</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+                {referencesReport.activeRoutes.length > 0 ? <li><strong>Recorridos activos ({referencesReport.activeRoutes.length}):</strong> {referencesReport.activeRoutes.map((route) => `${route.code} (${route.name})`).join(", ")}</li> : null}
+                {referencesReport.containersCount > 0 ? <li><strong>Contenedores asociados:</strong> {referencesReport.containersCount}</li> : null}
+                {referencesReport.treesCount > 0 ? <li><strong>Árboles censados:</strong> {referencesReport.treesCount}</li> : null}
+                {referencesReport.greenSpacesCount > 0 ? <li><strong>Espacios verdes:</strong> {referencesReport.greenSpacesCount}</li> : null}
+              </ul>
             </div>
-          ) : referencesUnavailable ? (
-            <div className="flex flex-col gap-3">
-              <Alert className="border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
-                <AlertTriangle aria-hidden="true" />
-                <AlertDescription className="text-[var(--color-warning)]">
-                  No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
-                </AlertDescription>
-              </Alert>
-              <Field>
-                <FieldLabel className="flex min-h-10 cursor-pointer items-center gap-3 [@media(max-width:760px)]:min-h-12">
-                  <Checkbox checked={referencesAcknowledged} onCheckedChange={setReferencesAcknowledged} disabled={isSubmittingDeactivate} />
-                  Entiendo que no se verificaron las referencias
-                </FieldLabel>
-              </Field>
-            </div>
-          ) : referencesReport && referencesReport.totalReferences > 0 ? (
-            <div className="flex flex-col gap-3 py-2 text-sm">
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
-                <p className="font-medium text-amber-900 dark:text-amber-300">
-                  Advertencia: esta zona todavía cuenta con elementos activos referenciados:
-                </p>
-                <ul className="mt-2 list-disc pl-5 space-y-1 text-xs text-amber-800 dark:text-amber-400">
-                  {referencesReport.activeRoutes.length > 0 && (
-                    <li>
-                      <strong>Recorridos activos ({referencesReport.activeRoutes.length}):</strong>{" "}
-                      {referencesReport.activeRoutes.map((r) => `${r.code} (${r.name})`).join(", ")}
-                    </li>
-                  )}
-                  {referencesReport.containersCount > 0 && (
-                    <li>
-                      <strong>Contenedores asociados:</strong> {referencesReport.containersCount}
-                    </li>
-                  )}
-                  {referencesReport.treesCount > 0 && (
-                    <li>
-                      <strong>Árboles censados:</strong> {referencesReport.treesCount}
-                    </li>
-                  )}
-                  {referencesReport.greenSpacesCount > 0 && (
-                    <li>
-                      <strong>Espacios verdes:</strong> {referencesReport.greenSpacesCount}
-                    </li>
-                  )}
-                </ul>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                El backend no realiza control de integridad referencial. Si desactiva la zona, los elementos asociados
-                continuarán vinculados a una zona inactiva.
-              </p>
-              <p className="font-semibold text-foreground">
-                ¿Desea dar de baja la zona de todas formas?
-              </p>
-            </div>
-          ) : (
-            <div className="py-2 text-sm">
-              <p>
-                La zona no posee referencias activas en recorridos, contenedores, árboles ni espacios verdes.
-              </p>
-              <p className="mt-2 font-medium">
-                ¿Confirmar la baja lógica de la zona operativa?
-              </p>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setDeactivatingZone(null);
-                setReferencesReport(null);
-              }}
-              disabled={isSubmittingDeactivate}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleConfirmDeactivate}
-              disabled={isSubmittingDeactivate || isLoadingReferences || (referencesUnavailable && !referencesAcknowledged)}
-            >
-              {isSubmittingDeactivate ? "Dando de baja..." : "Dar de baja de todas formas"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <p className="text-xs text-muted-foreground">El backend no realiza control de integridad referencial; los elementos asociados seguirán vinculados a una zona inactiva.</p>
+          </div>
+        ) : null}
+      </CatalogDeactivationDialog>
     </section>
   );
 }

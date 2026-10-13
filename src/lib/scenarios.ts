@@ -39,6 +39,9 @@ export type Capability =
   | "tree:survey"
   | "treeIntervention:request"
   | "treeIntervention:authorize"
+  | "service:assign"
+  | "service:cancel"
+  | "service:reschedule"
   | "service:schedule";
 
 export type ScenarioId =
@@ -107,6 +110,9 @@ export const scenarios: Record<
       "treeIntervention:request",
       "treeIntervention:authorize",
       "service:schedule",
+      "service:assign",
+      "service:cancel",
+      "service:reschedule",
       "zone:manage",
       "route:manage",
       "serviceFrequency:manage",

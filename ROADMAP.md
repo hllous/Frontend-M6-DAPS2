@@ -44,7 +44,7 @@ Estado revisado el 01/10/2026 contra el código frontend y Backend `develop` `30
 
 | Gate | Type | Affects | Tracking |
 |---|---|---|---|
-| M1's token verification and refresh contract (JWKS/keys, algorithm, issuer/audience, claims, TTL and rotation) is unpublished; real-M1 login fails closed in the frontend | Blocks production authentication | Phase 0 / Phase 8 | [#17](https://github.com/hllous/Frontend-M6-DAPS2/issues/17), [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md) |
+| M1's token verification and refresh contract (JWKS/keys, algorithm, issuer/audience, claims, TTL and rotation) is unpublished; real-M1 login fails closed in the frontend; M1's 2026-10-13 login description returns `{ user_id, dni, role, auth }` with no token, so where the JWT travels is also unconfirmed | Blocks production authentication | Phase 0 / Phase 8 | [#17](https://github.com/hllous/Frontend-M6-DAPS2/issues/17), [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md) |
 | M1 role-to-Capability mapping is unconfirmed; Backend has no domain `@Roles()` restrictions in use | Unresolved authorization hypothesis | Every phase's capability gating; production readiness | [#8](https://github.com/hllous/Frontend-M6-DAPS2/issues/8), `CONTEXT.md`'s `Capability` term |
 | Backend's development JWT verifier uses an HS256 stopgap, not M1's final contract | Development integration only | Phase 0 `backend-development` mode | [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md) |
 | M9's neighborhood catalog is unpublished; the frontend adapter still uses replaceable data | External data source pending | Phase 2c neighborhood assignment | [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36) |
@@ -188,6 +188,7 @@ A vertical slice attached to Phase 1, not a horizontal sweep across every domain
 **Acceptance evidence**: see `CONTRACTS.md` → [EnvironmentalReport workflow](CONTRACTS.md#environmentalreport-workflow) and → [Evidence workflow](CONTRACTS.md#evidence-workflow) for the binding reopen/late-update/terminal-state and evidence-upload rules — not restated here. Additionally:
 - Creating a `RepairRequest` from an EnvironmentalInspection is now available (Phase 3's extension).
 - Notice issuance is blocked without a resolved `establishmentId` until the M4 establishment-directory adapter is real; until then it runs against the typed, replaceable stub the gate describes.
+- The Office possible-duplicate warning for EnvironmentalReports is deferred until Backend exposes a signal ([Backend #285](https://github.com/hllous/Backend-M6-DAPS2/issues/285); tracked by [Frontend #413](https://github.com/hllous/Frontend-M6-DAPS2/issues/413)).
 
 **Unblocks**: Phase 7.
 

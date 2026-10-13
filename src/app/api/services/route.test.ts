@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as login } from "@/app/api/session/login/route";
 import { ServiceRequestError, servicesAdapter } from "@/lib/services";
 import { GET, POST } from "./route";
+import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -262,5 +263,36 @@ describe("authenticated services BFF route", () => {
       // targetRef no existe en el DTO: sin targetId se conserva en las notas y no se descarta.
       notes: "Objetivo: Referencia visible",
     });
+  });
+});
+
+function listRequest(query = "") {
+  process.env.M6_AUTH_MODE = "backend-development";
+  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+  process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+  const session = createSession("office-duty-queue", {
+    mode: "backend-development",
+    devJwt: process.env.M6_DEV_JWT,
+    backendOrigin: process.env.M6_BACKEND_ORIGIN,
+  });
+  return new Request(`http://localhost/api/services${query}`, { headers: { cookie: `${AUTH_COOKIE_NAME}=${sealSession(session)}` } });
+}
+const envelope = { data: [], meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 } };
+describe("Services list backend contract", () => {
+  it.each(["status", "mode", "origin"])("rejects invalid %s before forwarding", async (key) => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(envelope));
+    expect((await GET(listRequest(`?${key}=INVALID`))).status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("forwards supported filters and excludes mock-only filters", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(envelope));
+    const response = await GET(listRequest("?serviceTypeId=type-real&vehicleId=vehicle-real&ticketId=ticket-real&search=texto&timeFrom=08:00&timeTo=10:00"));
+    expect(response.status).toBe(200);
+    expect(String(fetch.mock.calls[0]?.[0])).toBe("https://backend.internal/services?serviceTypeId=type-real&vehicleId=vehicle-real&ticketId=ticket-real");
+    expect(await response.json()).toEqual(envelope);
+  });
+  it("rejects malformed successful backend payloads", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [{ id: "real-service" }] }));
+    expect((await GET(listRequest())).status).toBe(502);
   });
 });
