@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { AlertCircle, CheckCircle2, ExternalLink, Info, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { NetworkFailureError } from "@/lib/authenticated-fetch";
 import type { EnvironmentalInspection, EnvironmentalReport } from "@/lib/environmental-reports";
-import { getFieldDraft, submitFieldAction } from "@/lib/field-drafts";
+import {
+  clearFieldDraft,
+  getFieldDraft,
+  resubmitFieldAction,
+  submitFieldAction,
+  type FieldDraftServiceSnapshot,
+} from "@/lib/field-drafts";
 import {
   createRepairRequestInputSchema,
   REPAIR_DAMAGE_TYPE_LABEL,
@@ -20,6 +26,7 @@ import {
   type RepairSeverity,
 } from "@/lib/repair-requests";
 import type { Service } from "@/lib/services";
+import { DraftConflictView } from "./draft-conflict-view";
 
 const EMPTY_FORM = (sourceType: CreateRepairRequestInput["detectedInType"], sourceId: string, address = ""): CreateRepairRequestInput => ({
   damageType: "BROKEN_PAVEMENT",
@@ -30,7 +37,50 @@ const EMPTY_FORM = (sourceType: CreateRepairRequestInput["detectedInType"], sour
   detectedInId: sourceId,
 });
 
-type Outcome = "unsent" | null;
+type Outcome = "checking" | "unsent" | "verification-failed" | null;
+
+interface RepairRequestDraftPayload {
+  input: CreateRepairRequestInput;
+  composedAt: string;
+}
+
+type StoredRepairRequestPayload = CreateRepairRequestInput | RepairRequestDraftPayload;
+
+function isRepairRequestDraftPayload(
+  payload: StoredRepairRequestPayload,
+): payload is RepairRequestDraftPayload {
+  return "input" in payload && typeof payload.composedAt === "string";
+}
+
+function inputFromDraft(payload: StoredRepairRequestPayload): CreateRepairRequestInput {
+  return isRepairRequestDraftPayload(payload) ? payload.input : payload;
+}
+
+function compositionTimeFromDraft(
+  payload: StoredRepairRequestPayload,
+  composedAgainst: FieldDraftServiceSnapshot,
+  savedAt: string,
+): string {
+  if (isRepairRequestDraftPayload(payload)) return payload.composedAt;
+  return composedAgainst.updatedAt ?? savedAt;
+}
+
+async function findExistingServiceRepairRequest(
+  serviceId: string,
+  payload: RepairRequestDraftPayload,
+): Promise<RepairRequest | null> {
+  const result = await repairRequestsAdapter.list({ detectedInId: serviceId });
+  const composedAt = Date.parse(payload.composedAt);
+  if (!Number.isFinite(composedAt)) return null;
+
+  return result.repairRequests.find((request) => {
+    const createdAt = Date.parse(request.createdAt ?? request.requestedAt);
+    return request.detectedInType === "SERVICE" &&
+      request.damageType === payload.input.damageType &&
+      Number.isFinite(createdAt) &&
+      createdAt > composedAt;
+  }) ?? null;
+}
 
 export function CreateRepairRequestDialog({
   open,
@@ -50,6 +100,7 @@ export function CreateRepairRequestDialog({
   const isInspection = Boolean(inspection);
   const sourceId = inspection?.id ?? service?.id ?? "";
   const sourceKey = service?.id ?? inspection?.id ?? "repair-request-source";
+  const serviceId = service?.id;
   const sourceLabel = inspection
     ? `Inspección ${inspection.id}${report ? ` · ${report.id}` : ""}`
     : service?.title ?? `Servicio ${sourceId}`;
@@ -58,22 +109,96 @@ export function CreateRepairRequestDialog({
     : `/app?destination=services&detail=${encodeURIComponent(sourceId)}`;
   const sourceAddress = report?.address ?? report?.location?.address ?? "";
   const formId = useId();
+  const initialDraft = getFieldDraft<StoredRepairRequestPayload>(sourceKey, "repairRequest");
   const [values, setValues] = useState<CreateRepairRequestInput>(() => {
-    const draft = getFieldDraft<CreateRepairRequestInput>(sourceKey, "repairRequest");
-    return draft?.payload ?? EMPTY_FORM(isInspection ? "INSPECTION" : "SERVICE", sourceId, sourceAddress);
+    return initialDraft
+      ? inputFromDraft(initialDraft.payload)
+      : EMPTY_FORM(isInspection ? "INSPECTION" : "SERVICE", sourceId, sourceAddress);
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [outcome, setOutcome] = useState<Outcome>(() => (
-    getFieldDraft<CreateRepairRequestInput>(sourceKey, "repairRequest") ? "unsent" : null
-  ));
+  const [outcome, setOutcome] = useState<Outcome>(() => initialDraft ? "checking" : null);
   const [createdRequest, setCreatedRequest] = useState<RepairRequest | null>(null);
+  const [alreadyRegisteredRequest, setAlreadyRegisteredRequest] = useState<RepairRequest | null>(null);
+  const [composedAgainst, setComposedAgainst] = useState<FieldDraftServiceSnapshot | null>(
+    () => initialDraft?.composedAgainst ?? null,
+  );
+  const [conflict, setConflict] = useState<{
+    current: Service;
+    composedAgainst: FieldDraftServiceSnapshot;
+  } | null>(null);
+
+  const showAlreadyRegistered = useCallback((request: RepairRequest) => {
+    clearFieldDraft(sourceKey, "repairRequest");
+    setAlreadyRegisteredRequest(request);
+    setCreatedRequest(null);
+    setComposedAgainst(null);
+    setConflict(null);
+    setOutcome(null);
+    setErrors({});
+    onCreated(request);
+  }, [onCreated, sourceKey]);
+
+  async function verifyLostResponse(payload: RepairRequestDraftPayload) {
+    if (!service) return;
+    setOutcome("checking");
+    try {
+      const existing = await findExistingServiceRepairRequest(service.id, payload);
+      if (existing) {
+        showAlreadyRegistered(existing);
+        return;
+      }
+      setOutcome("unsent");
+    } catch {
+      setOutcome("verification-failed");
+      setErrors({
+        form: "No se pudo verificar si la derivación ya quedó registrada. Verifique el estado antes de volver a enviarla.",
+      });
+    }
+  }
+
+  useEffect(() => {
+    if (!open || !serviceId) return;
+    const draft = getFieldDraft<StoredRepairRequestPayload>(serviceId, "repairRequest");
+    if (!draft) return;
+
+    let isCurrent = true;
+    const payload: RepairRequestDraftPayload = {
+      input: inputFromDraft(draft.payload),
+      composedAt: compositionTimeFromDraft(draft.payload, draft.composedAgainst, draft.savedAt),
+    };
+    void findExistingServiceRepairRequest(serviceId, payload)
+      .then((existing) => {
+        if (!isCurrent) return;
+        if (existing) {
+          showAlreadyRegistered(existing);
+        } else {
+          setOutcome("unsent");
+        }
+      })
+      .catch(() => {
+        if (!isCurrent) return;
+        setOutcome("verification-failed");
+        setErrors({
+          form: "No se pudo verificar si la derivación ya quedó registrada. Verifique el estado antes de volver a enviarla.",
+        });
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [open, serviceId, sourceKey, showAlreadyRegistered]);
 
   function restoreDraft() {
-    const draft = getFieldDraft<CreateRepairRequestInput>(sourceKey, "repairRequest");
-    setValues(draft?.payload ?? EMPTY_FORM(isInspection ? "INSPECTION" : "SERVICE", sourceId, sourceAddress));
-    setOutcome(draft ? "unsent" : null);
+    const draft = getFieldDraft<StoredRepairRequestPayload>(sourceKey, "repairRequest");
+    setValues(draft
+      ? inputFromDraft(draft.payload)
+      : EMPTY_FORM(isInspection ? "INSPECTION" : "SERVICE", sourceId, sourceAddress));
+    setOutcome(draft ? (service ? "checking" : "unsent") : null);
     setCreatedRequest(null);
+    setAlreadyRegisteredRequest(null);
+    setComposedAgainst(draft?.composedAgainst ?? null);
+    setConflict(null);
     setErrors({});
   }
 
@@ -82,15 +207,19 @@ export function CreateRepairRequestDialog({
     setErrors((current) => {
       const next = { ...current };
       delete next[key];
+      delete next.form;
       return next;
     });
-    setOutcome(null);
+    if (!composedAgainst) setOutcome(null);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrors({});
-    setOutcome(null);
+    const storedDraft = service
+      ? getFieldDraft<StoredRepairRequestPayload>(sourceKey, "repairRequest")
+      : null;
+    if (!storedDraft) setOutcome(null);
     const parsed = createRepairRequestInputSchema.safeParse(values);
     if (!parsed.success) {
       const nextErrors: Record<string, string> = {};
@@ -100,37 +229,91 @@ export function CreateRepairRequestDialog({
     }
 
     setIsSubmitting(true);
-    if (service) {
-      const result = await submitFieldAction({
-        service,
-        actionType: "repairRequest",
-        payload: parsed.data,
-        submit: repairRequestsAdapter.create,
-      });
-      if (result.kind === "success") {
-        setCreatedRequest(result.result);
-        onCreated(result.result);
-      } else if (result.kind === "draft-saved") {
-        setValues(result.draft.payload);
-        setOutcome("unsent");
+    try {
+      if (service) {
+        const payload: RepairRequestDraftPayload = {
+          input: parsed.data,
+          composedAt: storedDraft
+            ? compositionTimeFromDraft(
+                storedDraft.payload,
+                storedDraft.composedAgainst,
+                storedDraft.savedAt,
+              )
+            : new Date().toISOString(),
+        };
+
+        if (storedDraft) {
+          setOutcome("checking");
+          let existing: RepairRequest | null;
+          try {
+            existing = await findExistingServiceRepairRequest(service.id, payload);
+          } catch {
+            setOutcome("verification-failed");
+            setErrors({
+              form: "No se pudo verificar si la derivación ya quedó registrada. Verifique el estado antes de volver a enviarla.",
+            });
+            return;
+          }
+          if (existing) {
+            showAlreadyRegistered(existing);
+            return;
+          }
+
+          const result = await resubmitFieldAction({
+            serviceId: service.id,
+            actionType: "repairRequest",
+            composedAgainst: storedDraft.composedAgainst,
+            payload,
+            submit: (draftPayload) => repairRequestsAdapter.create(draftPayload.input),
+          });
+          if (result.kind === "success") {
+            setOutcome(null);
+            setComposedAgainst(null);
+            setCreatedRequest(result.result);
+            onCreated(result.result);
+          } else if (result.kind === "conflict") {
+            setOutcome("unsent");
+            setConflict({ current: result.current, composedAgainst: result.composedAgainst });
+          } else if (result.kind === "still-offline") {
+            await verifyLostResponse(payload);
+          } else {
+            setOutcome("unsent");
+            setErrors({ form: result.message });
+          }
+          return;
+        }
+
+        const result = await submitFieldAction({
+          service,
+          actionType: "repairRequest",
+          payload,
+          submit: (draftPayload) => repairRequestsAdapter.create(draftPayload.input),
+        });
+        if (result.kind === "success") {
+          setCreatedRequest(result.result);
+          onCreated(result.result);
+        } else if (result.kind === "draft-saved") {
+          setValues(result.draft.payload.input);
+          setComposedAgainst(result.draft.composedAgainst);
+          await verifyLostResponse(result.draft.payload);
+        } else {
+          setErrors({ form: result.message });
+        }
       } else {
-        setErrors({ form: result.message });
-      }
-    } else {
-      try {
         const created = await repairRequestsAdapter.create(parsed.data);
         setCreatedRequest(created);
         onCreated(created);
-      } catch (cause) {
-        if (cause instanceof NetworkFailureError) {
-          setValues(parsed.data);
-          setOutcome("unsent");
-        } else {
-          setErrors({ form: cause instanceof Error ? cause.message : "No se pudo crear la derivación." });
-        }
       }
+    } catch (cause) {
+      if (!service && cause instanceof NetworkFailureError) {
+        setValues(parsed.data);
+        setOutcome("unsent");
+      } else {
+        setErrors({ form: cause instanceof Error ? cause.message : "No se pudo crear la derivación." });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -144,6 +327,7 @@ export function CreateRepairRequestDialog({
   }
 
   const inputClass = "min-h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]";
+  const resolvedRequest = createdRequest ?? alreadyRegisteredRequest;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -173,26 +357,44 @@ export function CreateRepairRequestDialog({
           </div>
         </div>
 
-        {outcome === "unsent" && (
+        {outcome && (
           <div role="status" className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-bold text-[var(--color-warning)]">
               <AlertCircle className="h-4 w-4" aria-hidden />
-              <span>{isInspection ? "Derivación sin enviar" : "Unsent referral"}</span>
+              <span>
+                {outcome === "checking"
+                  ? "Verificando el estado de la derivación"
+                  : outcome === "verification-failed"
+                    ? "No se pudo verificar el estado"
+                    : isInspection
+                      ? "Derivación sin enviar"
+                      : "Unsent referral"}
+              </span>
             </div>
             <p className="mt-1 text-sm text-[var(--color-text)]">
-              No se creó un registro de seguimiento porque el envío falló. Los valores quedaron retenidos en este dispositivo; revise la conexión y envíe la derivación manualmente.
+              {outcome === "checking"
+                ? "Comprobando si el Servicio ya tiene una derivación de este tipo."
+                : outcome === "verification-failed"
+                  ? "No vuelva a enviar hasta confirmar si la derivación quedó registrada."
+                  : isInspection
+                    ? "No se recibió confirmación del envío. Los valores quedaron retenidos en este dispositivo."
+                    : "No se recibió confirmación del envío y no se encontró una derivación del mismo tipo creada desde que se preparó el borrador."}
             </p>
           </div>
         )}
 
-        {createdRequest && (
+        {resolvedRequest && (
           <div role="status" className="rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)]/50 p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-bold text-[var(--color-success)]">
               <CheckCircle2 className="h-4 w-4" aria-hidden />
-              <span>Derivación creada y pendiente de respuesta de M3.</span>
+              <span>
+                {alreadyRegisteredRequest
+                  ? "Derivación ya registrada."
+                  : "Derivación creada y pendiente de respuesta de M3."}
+              </span>
             </div>
             <p className="mt-1 text-sm text-[var(--color-text)]">
-              Seguimiento {createdRequest.id} · {isInspection ? `Inspección ${sourceId}` : `Servicio ${sourceId}`}
+              Seguimiento {resolvedRequest.id} · {isInspection ? `Inspección ${sourceId}` : `Servicio ${sourceId}`}
             </p>
           </div>
         )}
@@ -204,7 +406,7 @@ export function CreateRepairRequestDialog({
           </div>
         )}
 
-        {!createdRequest && (
+        {!resolvedRequest && !conflict && (
           <form id={formId} noValidate onSubmit={handleSubmit} className="py-2">
             <FieldGroup>
               <Field>
@@ -248,13 +450,40 @@ export function CreateRepairRequestDialog({
           </form>
         )}
 
+        {!resolvedRequest && conflict && (
+          <DraftConflictView
+            serviceId={sourceId}
+            actionLabel="derivación de reparación"
+            composedAgainst={conflict.composedAgainst}
+            current={conflict.current}
+            onPreserve={() => {
+              setConflict(null);
+              setOutcome("unsent");
+            }}
+            onDiscard={() => {
+              clearFieldDraft(sourceKey, "repairRequest");
+              setValues(EMPTY_FORM(isInspection ? "INSPECTION" : "SERVICE", sourceId, sourceAddress));
+              setComposedAgainst(null);
+              setConflict(null);
+              setOutcome(null);
+              setErrors({});
+            }}
+          />
+        )}
+
         <DialogFooter>
-          {createdRequest ? (
+          {resolvedRequest ? (
             <Button type="button" onClick={() => handleOpenChange(false)}>Cerrar confirmación</Button>
           ) : (
-            <Button type="submit" form={formId} disabled={isSubmitting} className="min-h-10">
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-              {isSubmitting ? "Creando derivación..." : "Crear derivación a M3"}
+            <Button type="submit" form={formId} disabled={isSubmitting || outcome === "checking" || Boolean(conflict)} className="min-h-10">
+              {(isSubmitting || outcome === "checking") && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+              {isSubmitting
+                ? "Verificando y enviando..."
+                : outcome === "checking"
+                  ? "Verificando estado..."
+                  : composedAgainst
+                    ? "Verificar y reenviar derivación"
+                    : "Crear derivación a M3"}
             </Button>
           )}
         </DialogFooter>
