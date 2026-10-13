@@ -33,6 +33,7 @@ describe("TreeInterventionsPanel", () => {
     expect(await screen.findByRole("heading", { name: "Intervenciones de arbolado" })).toBeVisible();
     const request = await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i });
     expect(within(request).getByText("Solicitada")).toBeVisible();
+    expect(within(request).getByRole("button", { name: "Ver detalle" })).toHaveClass("max-[760px]:h-12");
     await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
 
     const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
@@ -81,11 +82,20 @@ describe("TreeInterventionsPanel", () => {
     await screen.findByRole("heading", { name: "Intervenciones de arbolado" });
     await screen.getByRole("button", { name: "Solicitar intervención" }).click();
     const dialog = screen.getByRole("dialog", { name: /Solicitar intervención/ });
-    await user.selectOptions(within(dialog).getByLabelText(/^Árboles a intervenir/), ["tree-2", "tree-4"]);
     await user.selectOptions(within(dialog).getByLabelText(/^Tipo de intervención/), "REMOVAL");
+    await within(dialog).getByRole("button", { name: "Crear solicitud de intervención" }).click();
+    const treesInput = within(dialog).getByLabelText(/^Árboles a intervenir/);
+    expect(await within(dialog).findByText("Seleccione al menos un árbol.")).toBeVisible();
+    expect(treesInput).toHaveAttribute("aria-invalid", "true");
+    expect(treesInput).toHaveAttribute("aria-describedby", "intervention-trees-help intervention-trees-error");
+
+    await user.selectOptions(within(dialog).getByLabelText(/^Árboles a intervenir/), ["tree-2", "tree-4"]);
     await user.type(within(dialog).getByLabelText(/^Dirección/), "Paseo de la Costa 220");
     await within(dialog).getByRole("button", { name: "Crear solicitud de intervención" }).click();
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("justificación");
+    const justificationInput = within(dialog).getByLabelText(/^Justificación/);
+    expect(justificationInput).toHaveAttribute("aria-invalid", "true");
+    expect(justificationInput).toHaveAttribute("aria-describedby", "intervention-justification-help intervention-justification-error");
 
     await user.type(within(dialog).getByLabelText(/^Justificación/), "El tronco presenta inestabilidad crítica.");
     await within(dialog).getByRole("button", { name: "Crear solicitud de intervención" }).click();
@@ -125,6 +135,7 @@ describe("TreeInterventionsPanel", () => {
     await user.click(within(detail).getByRole("button", { name: "Programar servicio" }));
 
     const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
+    expect(await within(form).findByText(/Se creará un servicio de punto/)).toBeVisible();
     expect(within(form).getByLabelText("Fecha programada")).toBeVisible();
     expect(within(form).getByLabelText("Desde")).toBeVisible();
     expect(within(form).getByLabelText("Hasta")).toBeVisible();

@@ -790,7 +790,18 @@ const INITIAL_ZONE_RESULT_FIXTURES: ZoneResult[] = [
 
 export const zoneResultFixtures: ZoneResult[] = [...INITIAL_ZONE_RESULT_FIXTURES];
 
-export const evidenceCache = new Map<string, Attachment>();
+// Mock-only retries are process-local and bounded; Backend owns durable idempotency.
+class EvidenceCache extends Map<string, Attachment> {
+  override set(key: string, attachment: Attachment): this {
+    if (!this.has(key) && this.size >= 256) {
+      const oldest = this.keys().next().value;
+      if (oldest !== undefined) this.delete(oldest);
+    }
+    return super.set(key, attachment);
+  }
+}
+
+export const evidenceCache = new EvidenceCache();
 
 export function sanitizeFilename(originalName: string, mimeType: string): string {
   const baseName = originalName.replace(/^.*[\\/]/, "");

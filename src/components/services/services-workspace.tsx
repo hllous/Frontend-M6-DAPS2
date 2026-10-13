@@ -522,9 +522,10 @@ export function ServicesWorkspace({
   }, []);
 
   const isField = scenario?.actor.kind === "FIELD";
-  const canAssignCrew = !isField;
+  const canAssignCrew = Boolean(scenario?.capabilities.includes("service:assign"));
   const canSchedule = !isField;
-  const canReschedule = !isField;
+  const canReschedule = Boolean(scenario?.capabilities.includes("service:reschedule"));
+  const canCancel = Boolean(scenario?.capabilities.includes("service:cancel"));
   const canExecuteService = Boolean(scenario?.capabilities.includes("service:execute"));
   const canCreateRepairRequest = scenario?.actor.kind === "OFFICE" || fieldCanViewRepairRequests;
   const canCreateStreetClosureRequest = scenario?.actor.kind === "OFFICE";
@@ -709,7 +710,7 @@ export function ServicesWorkspace({
           onResumeService={canExecuteService ? handleResumeService : undefined}
           onReschedule={canReschedule ? (s) => setReschedulingServiceId(s.id) : undefined}
           onConfirmReschedule={canReschedule ? (s) => setConfirmingRescheduleServiceId(s.id) : undefined}
-          onCancelService={canReschedule ? (s) => setCancelingServiceId(s.id) : undefined}
+          onCancelService={canCancel ? (s) => setCancelingServiceId(s.id) : undefined}
           onCreateRepairRequest={canCreateRepairRequest ? (s) => setRepairRequestServiceId(s.id) : undefined}
           onCreateStreetClosureRequest={canCreateStreetClosureRequest ? (s) => setStreetClosureServiceId(s.id) : undefined}
           onServiceUpdated={handleServiceUpdated}
@@ -725,8 +726,8 @@ export function ServicesWorkspace({
               displayedStreetClosureState.serviceId !== detailId,
           )}
           streetClosureDependencyError={displayedStreetClosureState.error}
-          onRejectedClosureReschedule={(service) => setReschedulingServiceId(service.id)}
-          onRejectedClosureCancel={(service) => setCancelingServiceId(service.id)}
+          onRejectedClosureReschedule={canReschedule ? (service) => setReschedulingServiceId(service.id) : undefined}
+          onRejectedClosureCancel={canCancel ? (service) => setCancelingServiceId(service.id) : undefined}
           repairRequests={fieldCanViewRepairRequests ? repairRequests[detailService.id] ?? [] : undefined}
           repairRequestsLoading={fieldCanViewRepairRequests && !Object.prototype.hasOwnProperty.call(repairRequests, detailService.id) && !repairRequestsErrors[detailService.id]}
           repairRequestsError={repairRequestsErrors[detailService.id] ?? null}
@@ -790,14 +791,6 @@ export function ServicesWorkspace({
               service={confirmingRescheduleServiceId ? detailService : null}
               onConfirmed={handleRescheduleConfirmed}
             />
-            <CancelServiceDialog
-              open={Boolean(cancelingServiceId && detailService.id === cancelingServiceId)}
-              onOpenChange={(open) => {
-                if (!open) setCancelingServiceId(null);
-              }}
-              service={cancelingServiceId ? detailService : null}
-              onCancelled={handleServiceCancelled}
-            />
             {canCreateStreetClosureRequest && streetClosureService && (
               <CreateStreetClosureRequestDialog
                 key={streetClosureService.id}
@@ -816,6 +809,16 @@ export function ServicesWorkspace({
               />
             )}
           </>
+        )}
+        {canCancel && (
+          <CancelServiceDialog
+            open={Boolean(cancelingServiceId && detailService.id === cancelingServiceId)}
+            onOpenChange={(open) => {
+              if (!open) setCancelingServiceId(null);
+            }}
+            service={cancelingServiceId ? detailService : null}
+            onCancelled={handleServiceCancelled}
+          />
         )}
       </>
     );

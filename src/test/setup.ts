@@ -81,3 +81,10 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 afterEach(() => {
   cleanup();
 });
+
+// #397 field-draft owner for component tests
+import { beforeEach } from "vitest";
+import { setFieldDraftOwner } from "@/lib/field-drafts";
+
+beforeEach(() => setFieldDraftOwner("test-actor"));
+afterEach(() => setFieldDraftOwner(undefined));

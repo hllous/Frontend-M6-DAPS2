@@ -229,7 +229,7 @@ describe("zone-results BFF route", () => {
 
   it("forwards the zone-result DTO with JSON content type", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 201 }));
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 201, headers: { "content-type": "application/json" } }));
     // El login resuelve la cuadrilla de Campo contra GET /crews antes de la llamada bajo prueba.
     backendFetch.mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] }), { status: 200 }));
     const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");

@@ -437,7 +437,8 @@ function SuspendServiceForm({
                   className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                 />
                 <FieldDescription>
-                  Obligatoria. Explica el motivo seleccionado con el detalle operativo del caso.
+                  Obligatoria. Se envía junto con el motivo seleccionado; entre ambos no pueden
+                  superar los 500 caracteres.
                 </FieldDescription>
               </Field>
             </>
