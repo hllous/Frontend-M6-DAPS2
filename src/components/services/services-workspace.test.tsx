@@ -56,7 +56,7 @@ describe("ServicesWorkspace component", () => {
     expect(within(preview).queryByRole("button", { name: "Asignar cuadrilla" })).not.toBeInTheDocument();
 
     await user.click(within(preview).getByRole("button", { name: /Ver detalle completo/ }));
-    expect(await screen.findByRole("region", { name: "Detalle completo de SVC-1043" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: /^Detalle completo de Poda de árbol/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Asignar cuadrilla" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reprogramar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancelar servicio" })).not.toBeInTheDocument();
@@ -454,13 +454,15 @@ describe("ServicesWorkspace component", () => {
     expect(screen.getByRole("complementary")).toHaveTextContent("Sin asignar");
   });
 
-  it("opens scheduling dialog via linked URL parameters prefilling origin and reference ID", async () => {
-    window.history.replaceState(null, "", "/app?destination=services&action=schedule&origin=TICKET&referenceId=550e8400-e29b-41d4-a716-446655440921");
+  it("opens linked scheduling dialog with a localized origin and hides the technical reference ID", async () => {
+    const linkedTicketId = "550e8400-e29b-41d4-a716-446655440921";
+    window.history.replaceState(null, "", `/app?destination=services&action=schedule&origin=TICKET&referenceId=${linkedTicketId}`);
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByRole("heading", { name: "Programar servicio vinculado" })).toBeInTheDocument();
     expect(screen.getByText("Origen vinculado preservado")).toBeInTheDocument();
-    expect(screen.getByText("550e8400-e29b-41d4-a716-446655440921")).toBeInTheDocument();
+    expect(screen.getByText("Denuncia ciudadana", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText(linkedTicketId)).not.toBeInTheDocument();
   });
 
   it("opens assign crew dialog from live preview, attaches crew, and reflects immediately in table and preview", async () => {

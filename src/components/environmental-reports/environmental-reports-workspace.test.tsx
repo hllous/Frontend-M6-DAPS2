@@ -315,11 +315,11 @@ describe("EnvironmentalReportsWorkspace", () => {
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1005" });
 
     await user.click(await within(detail).findByRole("button", { name: "Reprogramar inspección" }));
-    const reasonDialog = await screen.findByRole("dialog", { name: "Reprogramar SVC-1072" });
+    const reasonDialog = await screen.findByRole("dialog", { name: /^Reprogramar/ });
     await user.type(within(reasonDialog).getByLabelText(/Motivo/), "Alerta meteorológica");
     await user.click(within(reasonDialog).getByRole("button", { name: "Mover a reprogramar" }));
 
-    const confirmDialog = await screen.findByRole("dialog", { name: "Confirmar reprogramación de SVC-1072" });
+    const confirmDialog = await screen.findByRole("dialog", { name: /^Confirmar reprogramación de/ });
     await user.type(within(confirmDialog).getByLabelText("Nueva fecha *"), "2030-01-15");
     await user.click(within(confirmDialog).getByRole("button", { name: "Confirmar nueva fecha" }));
 

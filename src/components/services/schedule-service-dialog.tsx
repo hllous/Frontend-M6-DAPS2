@@ -395,14 +395,14 @@ export function ScheduleServiceDialog({
                 <Info className="h-4 w-4 text-[var(--color-action)] shrink-0" aria-hidden />
                 <span>Origen vinculado preservado</span>
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+              <div className="mt-2 grid grid-cols-1 gap-3 text-xs">
                 <div>
                   <span className="text-[var(--color-text-secondary)]">Origen:</span>
                   <p className="font-bold text-[var(--color-text)] mt-0.5">
                     {SERVICE_ORIGIN_LABEL[origin]}
                   </p>
                 </div>
-                {origin === "TICKET" && !hasTrustedTicketContext ? (
+                {origin === "TICKET" && !hasTrustedTicketContext && (
                   <Field>
                     <FieldLabel htmlFor="linked-ticket-id">UUID del ticket de M2 *</FieldLabel>
                     <input
@@ -414,13 +414,6 @@ export function ScheduleServiceDialog({
                     />
                     <FieldDescription id="linked-ticket-id-help">Pegue el UUID técnico del expediente. El formato TK-… es publicId y no sirve para correlacionar eventos.</FieldDescription>
                   </Field>
-                ) : (
-                  <div>
-                    <span className="text-[var(--color-text-secondary)]">{origin === "TICKET" ? "UUID de ticket:" : "ID Referencia:"}</span>
-                    <p className="font-mono font-bold text-[var(--color-text)] mt-0.5">
-                      {referenceId || "(Sin ID)"}
-                    </p>
-                  </div>
                 )}
               </div>
             </div>
@@ -478,7 +471,7 @@ export function ScheduleServiceDialog({
                 ) : (
                   <>
                     <MapPin className="h-3 w-3" aria-hidden />
-                    <span>Punto fijo (POINT)</span>
+                    <span>Punto fijo</span>
                   </>
                 )}
               </span>
