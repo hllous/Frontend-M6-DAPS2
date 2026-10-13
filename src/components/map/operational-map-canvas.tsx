@@ -247,34 +247,39 @@ export function OperationalMapCanvas({
       ) : null}
 
       {view === "zones"
-        ? zones.map((zone) => (
-            <Polygon
-              key={zone.code}
-              positions={zone.coordinates}
-              pathOptions={zonePathOptions(selectedZoneCode === zone.code)}
-              eventHandlers={onSelectZone ? { click: () => onSelectZone(zone.code) } : undefined}
-            >
-              <Tooltip sticky>
-                <strong>{zone.code}</strong> · {zone.name}
-              </Tooltip>
-            </Polygon>
-          ))
+        ? zones.flatMap((zone) =>
+            zone.coordinates.map((polygon, partIndex) => (
+              <Polygon
+                key={`${zone.code}-${partIndex}`}
+                positions={polygon}
+                pathOptions={zonePathOptions(selectedZoneCode === zone.code)}
+                eventHandlers={onSelectZone ? { click: () => onSelectZone(zone.code) } : undefined}
+              >
+                <Tooltip sticky>
+                  <strong>{zone.code}</strong> · {zone.name}
+                </Tooltip>
+              </Polygon>
+            )),
+          )
         : null}
 
       {view === "route"
         ? routeStops.map((stop) => (
             <Fragment key={stop.id}>
-              {stop.geometry ? (
-                <Polygon
-                  positions={stop.geometry.coordinates}
-                  pathOptions={zonePathOptions(selectedStopSequence === stop.sequence)}
-                  eventHandlers={onSelectStop ? { click: () => onSelectStop(stop.sequence) } : undefined}
-                >
-                  <Tooltip sticky>
-                    <strong>Parada {stop.sequence}</strong> · {stop.zoneName}
-                  </Tooltip>
-                </Polygon>
-              ) : null}
+              {stop.geometry
+                ? stop.geometry.coordinates.map((polygon, partIndex) => (
+                    <Polygon
+                      key={`${stop.id}-${partIndex}`}
+                      positions={polygon}
+                      pathOptions={zonePathOptions(selectedStopSequence === stop.sequence)}
+                      eventHandlers={onSelectStop ? { click: () => onSelectStop(stop.sequence) } : undefined}
+                    >
+                      <Tooltip sticky>
+                        <strong>Parada {stop.sequence}</strong> · {stop.zoneName}
+                      </Tooltip>
+                    </Polygon>
+                  ))
+                : null}
               {stop.geometry ? (
                 <Marker
                   position={stop.geometry.center}
@@ -300,58 +305,62 @@ export function OperationalMapCanvas({
       {view === "today"
         ? todayZones.map((zone) =>
             zone.geometry ? (
-              <Polygon
-                key={zone.zoneId}
-                positions={zone.geometry.coordinates}
-                pathOptions={todayStatusPathOptions[zone.status]}
-              >
-                <Tooltip sticky>
-                  <strong>{zone.zoneName}</strong> · {zone.status}
-                </Tooltip>
-              </Polygon>
+              zone.geometry.coordinates.map((polygon, partIndex) => (
+                <Polygon
+                  key={`${zone.zoneId}-${partIndex}`}
+                  positions={polygon}
+                  pathOptions={todayStatusPathOptions[zone.status]}
+                >
+                  <Tooltip sticky>
+                    <strong>{zone.zoneName}</strong> · {zone.status}
+                  </Tooltip>
+                </Polygon>
+              ))
             ) : null,
           )
         : null}
 
       {view === "coverage"
-        ? coverageZones.map((zone) => (
-            <Polygon
-              key={zone.zoneCode}
-              positions={zone.geometry.coordinates}
-              pathOptions={coveragePathOptions(zone, selectedZoneCode === zone.zoneCode)}
-              eventHandlers={onSelectZone ? { click: () => onSelectZone(zone.zoneCode) } : undefined}
-            >
-              <Tooltip sticky>
-                <strong>{zone.zoneName}</strong>
-                <br />
-                {zone.rate === null ? "Sin datos para el período" : `Cobertura: ${formatCoverageRate(zone.rate)}`}
-                <br />
-                {zone.note}
-              </Tooltip>
-              <Popup>
-                <strong>{zone.zoneCode} · {zone.zoneName}</strong>
-                <span className={styles.popupDescription}>
-                  {zone.rate === null ? "Sin datos para el período" : `Cobertura ${formatCoverageRate(zone.rate)} · ${zone.note}`}
-                </span>
-              </Popup>
-            </Polygon>
-          ))
+        ? coverageZones.flatMap((zone) =>
+            zone.geometry.coordinates.map((polygon, partIndex) => (
+              <Polygon
+                key={`${zone.zoneCode}-${partIndex}`}
+                positions={polygon}
+                pathOptions={coveragePathOptions(zone, selectedZoneCode === zone.zoneCode)}
+                eventHandlers={onSelectZone ? { click: () => onSelectZone(zone.zoneCode) } : undefined}
+              >
+                <Tooltip sticky>
+                  <strong>{zone.zoneName}</strong>
+                  <br />
+                  {zone.rate === null ? "Sin datos para el período" : `Cobertura: ${formatCoverageRate(zone.rate)}`}
+                  <br />
+                  {zone.note}
+                </Tooltip>
+                <Popup>
+                  <strong>{zone.zoneCode} · {zone.zoneName}</strong>
+                  <span className={styles.popupDescription}>
+                    {zone.rate === null ? "Sin datos para el período" : `Cobertura ${formatCoverageRate(zone.rate)} · ${zone.note}`}
+                  </span>
+                </Popup>
+              </Polygon>
+            )),
+          )
         : null}
 
       {view !== "inventory"
-        ? zones.map((zone) => {
+        ? zones.flatMap((zone) => {
             const isCoveredToday = todayZones.some((todayZone) => todayZone.zoneCode === zone.code);
             const isRouteZone = routeStops.some((stop) => stop.zoneCode === zone.code);
             const isCoverageZone = coverageZones.some((coverageZone) => coverageZone.zoneCode === zone.code);
             if ((view === "today" && isCoveredToday) || (view === "route" && isRouteZone) || view === "zones" || (view === "coverage" && isCoverageZone)) {
-              return null;
+              return [];
             }
 
-            return (
-              <Polygon key={`context-${zone.code}`} positions={zone.coordinates} pathOptions={zonePathOptions(false)}>
+            return zone.coordinates.map((polygon, partIndex) => (
+              <Polygon key={`context-${zone.code}-${partIndex}`} positions={polygon} pathOptions={zonePathOptions(false)}>
                 <Tooltip sticky>{zone.name}</Tooltip>
               </Polygon>
-            );
+            ));
           })
         : null}
     </MapContainer>

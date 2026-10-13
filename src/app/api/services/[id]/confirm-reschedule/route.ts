@@ -6,7 +6,7 @@ import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
-import { confirmRescheduleInputSchema, toConfirmRescheduleBackendInput } from "@/lib/services";
+import { confirmRescheduleInputSchema, STATUS_LABEL, toConfirmRescheduleBackendInput } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -74,7 +74,7 @@ export async function POST(
     if (service.status !== "RESCHEDULED") {
       return errorResponse(
         409,
-        `Solo se puede confirmar la nueva fecha de servicios a reprogramar (RESCHEDULED) (estado actual: ${service.status}).`,
+        `Solo se puede confirmar la nueva fecha de servicios a reprogramar (estado actual: ${STATUS_LABEL[service.status]}).`,
         path,
       );
     }

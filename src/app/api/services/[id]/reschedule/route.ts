@@ -6,7 +6,7 @@ import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
-import { rescheduleServiceInputSchema } from "@/lib/services";
+import { rescheduleServiceInputSchema, STATUS_LABEL } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -74,7 +74,7 @@ export async function POST(
     if (service.status !== "SCHEDULED") {
       return errorResponse(
         409,
-        `Solo se pueden reprogramar servicios programados (SCHEDULED) (estado actual: ${service.status}).`,
+        `Solo se pueden reprogramar servicios programados (estado actual: ${STATUS_LABEL[service.status]}).`,
         path,
       );
     }

@@ -1,17 +1,22 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { FoundationDemo } from "@/components/shell/foundation-demo";
+import { ShellLoading } from "@/components/shell/shell-states";
+import { getFieldDraftOwner, setFieldDraftOwner, subscribeFieldDraftOwner } from "@/lib/field-drafts";
 import type { ScenarioId } from "@/lib/scenarios";
 import { broadcastLogout } from "@/lib/session-client";
 
-export function SessionShell({ scenarioId, logoutAction, children }: {
+export function SessionShell({ actorId, scenarioId, logoutAction, children }: {
+  actorId: string;
   scenarioId: ScenarioId;
   logoutAction: (formData: FormData) => Promise<void>;
   children?: ReactNode;
 }) {
   const [logoutError, setLogoutError] = useState<string>();
+  const draftOwner = useSyncExternalStore(subscribeFieldDraftOwner, getFieldDraftOwner, () => undefined);
+  useEffect(() => setFieldDraftOwner(actorId), [actorId]);
 
   async function logout(formData: FormData) {
     setLogoutError(undefined);
@@ -23,6 +28,8 @@ export function SessionShell({ scenarioId, logoutAction, children }: {
     }
     await broadcastLogout();
   }
+
+  if (draftOwner !== actorId) return <main className="p-6"><ShellLoading /></main>;
 
   return (
     <>
