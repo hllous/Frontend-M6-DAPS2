@@ -26,6 +26,9 @@ describe("GreenSpacesPanel", () => {
 
     expect(await screen.findByRole("heading", { name: "Espacios verdes" })).toBeVisible();
     expect(screen.getByText("Parque del Bicentenario")).toBeVisible();
+    const row = await screen.findByRole("row", { name: /Parque del Bicentenario/ });
+    expect(row.querySelector('th[data-label="Nombre"]')).not.toBeNull();
+    expect(row.querySelector('td[data-label="Acciones"]')).not.toBeNull();
 
     await user.selectOptions(screen.getByLabelText("Tipo de espacio"), "PLANTER");
     expect(await screen.findByText("Cantero Central")).toBeVisible();
@@ -37,7 +40,6 @@ describe("GreenSpacesPanel", () => {
 
   it("allows Office to create, edit, and logically deactivate a GreenSpace", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal("confirm", () => true);
     render(<GreenSpacesPanel scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByText("Parque del Bicentenario");
@@ -62,6 +64,10 @@ describe("GreenSpacesPanel", () => {
 
     const editedRow = screen.getByRole("row", { name: /Plaza editada desde panel/ });
     await user.click(within(editedRow).getByRole("button", { name: "Dar de baja" }));
+    const confirmation = screen.getByRole("dialog");
+    expect(confirmation).toHaveTextContent("Plaza editada desde panel");
+    expect(within(confirmation).getByRole("button", { name: /Conservar el espacio verde/ })).toBeVisible();
+    await user.click(within(confirmation).getByRole("button", { name: /Dar de baja el espacio verde Plaza editada desde panel/ }));
     expect(await screen.findByText(/dado de baja/)).toBeVisible();
   }, 10_000);
 

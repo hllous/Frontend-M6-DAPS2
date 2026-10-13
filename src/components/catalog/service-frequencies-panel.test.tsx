@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 import { HttpResponse, http } from "msw";
@@ -43,9 +43,9 @@ describe("ServiceFrequenciesPanel", () => {
     expect(closeButton).toBeVisible();
     expect(screen.queryByRole("button", { name: /generar/i })).not.toBeInTheDocument();
     await user.click(closeButton);
-    expect(screen.getByRole("heading", { name: "Cerrar vigencia" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Confirmar cierre de vigencia" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Conservar vigencia" })).toBeVisible();
-    expect(screen.getByText(/Services ya creados quedan intactos/i)).toBeVisible();
+    expect(screen.getByText(/servicios ya creados quedan intactos/i)).toBeVisible();
   });
 
   it("does not expose management actions to Field", async () => {
@@ -54,5 +54,22 @@ describe("ServiceFrequenciesPanel", () => {
     expect(screen.queryByRole("button", { name: "Nueva frecuencia" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
     expect(screen.getByText(/puede consultar las frecuencias/i)).toBeVisible();
+  });
+
+  it("uses Spanish copy, exposes responsive table labels, and shows focus on weekday controls", async () => {
+    const user = userEvent.setup();
+    render(<ServiceFrequenciesPanel scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByText(/no genera servicios automáticamente/i)).toBeVisible();
+    expect(screen.queryByText(/Services/i)).not.toBeInTheDocument();
+    const row = screen.getByRole("row", { name: /Recolección domiciliaria/ });
+    expect(within(row).getAllByRole("cell")[0]).toHaveAttribute("data-label", "Tipo de servicio");
+    expect(row.querySelector('td[data-label="Acciones"]')).not.toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Nueva frecuencia" }));
+    const monday = screen.getByRole("checkbox", { name: "Lunes" });
+    monday.focus();
+    expect(monday).toHaveFocus();
+    expect(monday.closest("label")).toHaveClass("focus-within:ring-[3px]");
   });
 });

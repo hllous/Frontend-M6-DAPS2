@@ -25,6 +25,9 @@ test.describe("DisposalSite catalog management #103", () => {
     await expect(page.getByText("Sitio e2e actualizado")).toBeVisible();
 
     await page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: "Dar de baja" }).click();
+    const deactivateDialog = page.getByRole("dialog");
+    await expect(deactivateDialog.getByRole("heading", { name: `Confirmar baja del sitio de disposición ${code}` })).toBeVisible();
+    await deactivateDialog.getByRole("button", { name: `Dar de baja el sitio de disposición ${code}` }).click();
     await expect(page.getByText("Sitio de disposición dado de baja")).toBeVisible();
     await page.getByLabel("Filtrar sitios por estado").selectOption("false");
     await expect(page.getByText(code)).toBeVisible();

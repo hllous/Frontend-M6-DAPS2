@@ -32,6 +32,9 @@ test.describe("Green Point catalog management #124", () => {
     await page.getByRole("dialog").getByRole("button", { name: "Cerrar detalle" }).click();
 
     await row.getByRole("button", { name: "Dar de baja" }).click();
+    const deactivateDialog = page.getByRole("dialog");
+    await expect(deactivateDialog.getByRole("heading", { name: new RegExp(`Confirmar baja del punto verde ${code}`) })).toBeVisible();
+    await deactivateDialog.getByRole("button", { name: `Dar de baja el punto verde ${code}` }).click();
     await expect(page.getByText("Punto verde dado de baja")).toBeVisible();
     await page.getByLabel("Filtrar puntos verdes por estado").selectOption("false");
     await expect(page.getByRole("cell", { name: code ?? "GP-E2E-" })).toBeVisible();
