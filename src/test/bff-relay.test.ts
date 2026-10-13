@@ -29,15 +29,27 @@ describe("BFF upstream relay", () => {
     });
   });
 
-  it("wraps a missing content type from a 2xx response as Bad Gateway", async () => {
-    const upstream = new Response("unexpected body", { status: 200 });
+  it("relays a 2xx response with no content type as JSON", async () => {
+    const body = '{"ok":true}';
+    const upstream = new Response(body, { status: 200 });
     upstream.headers.delete("content-type");
     const result = forwardResponse(upstream);
-    expect(result.status).toBe(502);
-    expect(await result.json()).toMatchObject({ statusCode: 502, error: "Bad Gateway", path: "" });
+    expect(result.status).toBe(200);
+    expect(result.headers.get("content-type")).toBe("application/json");
+    expect(result.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(await result.text()).toBe(body);
   });
 
-  it("preserves a non-JSON gateway error status", async () => {
+  it("wraps a text/html 2xx response as Bad Gateway", async () => {
+    const result = forwardResponse(new Response("<html>upstream failure</html>", {
+      status: 200, headers: { "content-type": "text/html" },
+    }), "/api/services");
+    expect(result.status).toBe(502);
+    expect(result.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(await result.json()).toMatchObject({ statusCode: 502, error: "Bad Gateway", path: "/api/services" });
+  });
+
+  it("preserves a text/html 503 gateway error status", async () => {
     const result = forwardResponse(new Response("upstream", { status: 503, headers: { "content-type": "text/html" } }), "/api/services");
     expect(result.status).toBe(503);
     expect(await result.json()).toMatchObject({ statusCode: 503, error: "Service Unavailable", path: "/api/services" });

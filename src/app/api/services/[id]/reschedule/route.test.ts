@@ -136,7 +136,7 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
 
   it("forwards the status-change DTO with JSON content type", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
     const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
 
     const response = await POST(

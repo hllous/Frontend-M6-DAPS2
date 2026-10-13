@@ -139,7 +139,7 @@ export function mapSessionError(error: unknown, path: string, fallbackMessage: s
 export function forwardResponse(response: Response, path = bffPathForResponse(response) ?? ""): NextResponse {
   const contentType = response.headers.get("content-type");
   const bodyless = [204, 205, 304].includes(response.status);
-  if (!bodyless && contentType?.split(";")[0].trim().toLowerCase() !== "application/json") {
+  if (!bodyless && contentType !== null && contentType.split(";")[0].trim().toLowerCase() !== "application/json") {
     void response.body?.cancel().catch(() => undefined);
     const errorStatus = response.status >= 200 && response.status < 300 ? 502 : response.status;
     const error = errorResponse(errorStatus, "La respuesta del backend no tiene un tipo de contenido JSON válido.", path);
@@ -149,7 +149,7 @@ export function forwardResponse(response: Response, path = bffPathForResponse(re
   return new NextResponse(response.body, {
     status: response.status,
     headers: {
-      ...(contentType ? { "content-type": contentType } : {}),
+      "content-type": contentType ?? "application/json",
       "X-Content-Type-Options": "nosniff",
     },
   });
