@@ -75,6 +75,19 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("InspectionExecutionPanel", () => {
+  it("rejects evidence above 4 MB before adding it to the queue", async () => {
+    const user = userEvent.setup();
+    server.use(http.get("*/api/environmental-inspections/INS-TEST-1", () => HttpResponse.json(inspectionResponse())));
+    render(<InspectionExecutionPanel service={service} canExecute />);
+    await screen.findByRole("heading", { name: /Ejecuci/ });
+
+    await user.upload(screen.getByLabelText(/Seleccionar archivos/), new File([new Uint8Array(4 * 1024 * 1024 + 1)], "large.jpg", { type: "image/jpeg" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent('"large.jpg" supera el tamaño máximo permitido de 4 MB.');
+    expect(screen.queryByRole("list", { name: "Archivos de evidencia seleccionados" })).not.toBeInTheDocument();
+    expect(screen.getByText(/JPEG, PNG, WebP y PDF hasta 4 MB por archivo/)).toBeVisible();
+  });
+
   it("lets a Crew Leader complete a clean inspection and renders the returned next step", async () => {
     const user = userEvent.setup();
     let completionBody: unknown;

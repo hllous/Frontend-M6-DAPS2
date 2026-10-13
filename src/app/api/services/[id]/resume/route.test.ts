@@ -97,7 +97,7 @@ describe("POST /api/services/[id]/resume BFF route", () => {
 
     expect(response.status).toBe(409);
     const body = await response.json();
-    expect(body.message).toMatch(/SUSPENDED/i);
+    expect(body.message).toBe("Solo se pueden reanudar servicios suspendidos (estado actual: Programado).");
   });
 
   it("successfully resumes a suspended service, transitions to IN_PROGRESS and clears the reason", async () => {

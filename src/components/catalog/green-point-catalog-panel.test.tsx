@@ -53,4 +53,24 @@ describe("GreenPointCatalogPanel", () => {
     expect(remove).toHaveBeenCalledWith("green-point-1");
     expect(await screen.findByText(/Punto verde dado de baja/)).toBeVisible();
   });
+
+  it("associates Green Point validation errors with the invalid fields", async () => {
+    const user = userEvent.setup();
+    render(<GreenPointCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Puntos verdes" });
+    await user.click(screen.getByRole("button", { name: "Registrar punto verde" }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar punto verde" }));
+
+    const nameError = await within(dialog).findByText("El nombre es obligatorio.");
+    const nameInput = within(dialog).getByLabelText("Nombre");
+    expect(nameInput).toHaveAttribute("aria-invalid", "true");
+    expect(nameInput).toHaveAttribute("aria-describedby", "green-point-name-error");
+    expect(nameError).toHaveAttribute("id", "green-point-name-error");
+
+    const zoneInput = within(dialog).getByLabelText("Zona operativa");
+    expect(zoneInput).toHaveAttribute("aria-invalid", "true");
+    expect(zoneInput).toHaveAttribute("aria-describedby", "green-point-zone-error");
+  });
 });

@@ -48,6 +48,9 @@ type PointForm = {
   active: boolean;
 };
 
+type PointFormField = keyof PointForm;
+type PointFormFieldErrors = Partial<Record<PointFormField, string>>;
+
 const emptyForm: PointForm = {
   code: "",
   name: "",
@@ -90,6 +93,7 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
   const [formOpen, setFormOpen] = useState(false);
   const [editingPoint, setEditingPoint] = useState<GreenPoint | null>(null);
   const [form, setForm] = useState<PointForm>(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState<PointFormFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [detailPoint, setDetailPoint] = useState<GreenPoint | null>(null);
@@ -136,6 +140,7 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
   const openCreate = () => {
     setEditingPoint(null);
     setForm(emptyForm);
+    setFieldErrors({});
     setFormError(null);
     setFormOpen(true);
   };
@@ -143,6 +148,7 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
   const openEdit = (point: GreenPoint) => {
     setEditingPoint(point);
     setForm({ code: point.code, name: point.name, zoneId: point.zoneId, wasteTypes: point.wasteTypes, address: point.address ?? "", lat: point.lat === null ? "" : String(point.lat), lng: point.lng === null ? "" : String(point.lng), active: point.active });
+    setFieldErrors({});
     setFormError(null);
     setFormOpen(true);
   };
@@ -162,17 +168,37 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
 
   const toggleWasteType = (wasteType: WasteType) => {
     setForm((current) => ({ ...current, wasteTypes: current.wasteTypes.includes(wasteType) ? current.wasteTypes.filter((item) => item !== wasteType) : [...current.wasteTypes, wasteType] }));
+    setFieldErrors((current) => ({ ...current, wasteTypes: undefined }));
+    setFormError(null);
+  };
+
+  const updateFormField = <K extends PointFormField,>(field: K, value: PointForm[K]) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setFieldErrors((current) => ({ ...current, [field]: undefined }));
+    setFormError(null);
   };
 
   const submitForm = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
+    setFieldErrors({});
     const payload = pointFormPayload(form);
     const parsed = editingPoint
       ? greenPointUpdateInputSchema.safeParse(payload)
       : greenPointCreateInputSchema.safeParse({ code: form.code, ...payload });
     if (!parsed.success) {
-      setFormError(parsed.error.issues[0]?.message ?? "Revise los datos del formulario.");
+      const nextFieldErrors: PointFormFieldErrors = {};
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0];
+        if (typeof field === "string" && field in emptyForm && !nextFieldErrors[field as PointFormField]) {
+          nextFieldErrors[field as PointFormField] = issue.message;
+        }
+      }
+      if (Object.keys(nextFieldErrors).length > 0) {
+        setFieldErrors(nextFieldErrors);
+      } else {
+        setFormError(parsed.error.issues[0]?.message ?? "Revise los datos del formulario.");
+      }
       return;
     }
 
@@ -260,7 +286,136 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
         <div className="grid gap-3 md:hidden">{state.items.map((point) => <article key={point.id} className="rounded-xl border border-border bg-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-xs text-muted-foreground">{point.code}</p><h2 className="mt-1 font-semibold">{point.name}</h2></div><span className="text-sm">{point.active ? "Activo" : "Inactivo"}</span></div><dl className="mt-4 grid gap-3 text-sm"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Zona</dt><dd className="mt-0.5">{zoneLabel(zones, point.zoneId, zonesLoaded)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Residuos aceptados</dt><dd className="mt-0.5">{point.wasteTypes.map((type) => WASTE_TYPE_LABELS[type]).join(", ")}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ubicación</dt><dd className="mt-0.5">{point.address ?? "Sin dirección registrada"}</dd></div></dl><div className="mt-4 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => void openDetail(point)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button>{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => openEdit(point)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{point.active ? <Button type="button" size="sm" variant="destructive" onClick={() => void deactivate(point)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</> : null}</div></article>)}</div>
       </> : null}
 
-      <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent><DialogHeader><DialogTitle>{editingPoint ? "Editar punto verde" : "Registrar punto verde"}</DialogTitle><DialogDescription>{editingPoint ? "Actualice los datos del punto. La selección de residuos reemplaza el conjunto completo aceptado." : "Complete los datos del punto de entrega voluntaria."}</DialogDescription></DialogHeader>{formError ? <p role="alert" className="text-sm text-destructive">{formError}</p> : null}<form id="green-point-form" onSubmit={(event) => void submitForm(event)} noValidate><FieldGroup><Field><FieldLabel htmlFor="green-point-code">Código</FieldLabel><input id="green-point-code" className={formControlClass} value={form.code} disabled={Boolean(editingPoint)} onChange={(event) => setForm({ ...form, code: event.target.value })} required={!editingPoint} aria-describedby={editingPoint ? "green-point-code-help" : undefined} /><FieldDescription id="green-point-code-help">El código identifica el punto en la vía pública y no se puede cambiar.</FieldDescription></Field><Field><FieldLabel htmlFor="green-point-name">Nombre</FieldLabel><input id="green-point-name" className={formControlClass} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></Field><Field><FieldLabel htmlFor="green-point-zone">Zona operativa</FieldLabel><select id="green-point-zone" className={formControlClass} value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })} required><option value="">Seleccione una zona</option>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}</select></Field><fieldset className="grid gap-2"><legend className="text-sm font-semibold">Residuos aceptados</legend><p className="text-xs text-muted-foreground">La selección representa el conjunto completo actual; no es una lista ordenada.</p><div className="grid gap-2 sm:grid-cols-2">{wasteTypes.map((type) => <label key={type} className="flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm max-[760px]:min-h-12"><input type="checkbox" checked={form.wasteTypes.includes(type)} onChange={() => toggleWasteType(type)} />{WASTE_TYPE_LABELS[type]}</label>)}</div></fieldset><Field><FieldLabel htmlFor="green-point-address">Dirección</FieldLabel><input id="green-point-address" className={formControlClass} value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /><FieldDescription>Opcional. Permite encontrar el punto junto con su ubicación geográfica.</FieldDescription></Field><div className="grid grid-cols-2 gap-3"><Field><FieldLabel htmlFor="green-point-lat">Latitud</FieldLabel><input id="green-point-lat" className={formControlClass} type="number" min="-90" max="90" step="any" value={form.lat} onChange={(event) => setForm({ ...form, lat: event.target.value })} /></Field><Field><FieldLabel htmlFor="green-point-lng">Longitud</FieldLabel><input id="green-point-lng" className={formControlClass} type="number" min="-180" max="180" step="any" value={form.lng} onChange={(event) => setForm({ ...form, lng: event.target.value })} /></Field></div>{editingPoint ? <label className="flex min-h-10 items-center gap-2 text-sm max-[760px]:min-h-12"><input type="checkbox" checked={form.active} onChange={(event) => setForm({ ...form, active: event.target.checked })} /> Activo</label> : null}</FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={isSubmitting}>Cancelar</Button><Button type="submit" form="green-point-form" disabled={isSubmitting}>{isSubmitting ? "Guardando…" : "Guardar punto verde"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingPoint ? "Editar punto verde" : "Registrar punto verde"}</DialogTitle>
+            <DialogDescription>
+              {editingPoint
+                ? "Actualice los datos del punto. La selección de residuos reemplaza el conjunto completo aceptado."
+                : "Complete los datos del punto de entrega voluntaria."}
+            </DialogDescription>
+          </DialogHeader>
+          {formError ? <p role="alert" className="text-sm text-destructive">{formError}</p> : null}
+          <form id="green-point-form" onSubmit={(event) => void submitForm(event)} noValidate>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="green-point-code">Código</FieldLabel>
+                <input
+                  id="green-point-code"
+                  className={formControlClass}
+                  value={form.code}
+                  disabled={Boolean(editingPoint)}
+                  onChange={(event) => updateFormField("code", event.target.value)}
+                  required={!editingPoint}
+                  aria-invalid={Boolean(fieldErrors.code)}
+                  aria-describedby={["green-point-code-help", fieldErrors.code ? "green-point-code-error" : null].filter(Boolean).join(" ")}
+                />
+                <FieldDescription id="green-point-code-help">El código identifica el punto en la vía pública y no se puede cambiar.</FieldDescription>
+                {fieldErrors.code ? <FieldError id="green-point-code-error">{fieldErrors.code}</FieldError> : null}
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="green-point-name">Nombre</FieldLabel>
+                <input
+                  id="green-point-name"
+                  className={formControlClass}
+                  value={form.name}
+                  onChange={(event) => updateFormField("name", event.target.value)}
+                  required
+                  aria-invalid={Boolean(fieldErrors.name)}
+                  aria-describedby={fieldErrors.name ? "green-point-name-error" : undefined}
+                />
+                {fieldErrors.name ? <FieldError id="green-point-name-error">{fieldErrors.name}</FieldError> : null}
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="green-point-zone">Zona operativa</FieldLabel>
+                <select
+                  id="green-point-zone"
+                  className={formControlClass}
+                  value={form.zoneId}
+                  onChange={(event) => updateFormField("zoneId", event.target.value)}
+                  required
+                  aria-invalid={Boolean(fieldErrors.zoneId)}
+                  aria-describedby={fieldErrors.zoneId ? "green-point-zone-error" : undefined}
+                >
+                  <option value="">Seleccione una zona</option>
+                  {zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}
+                </select>
+                {fieldErrors.zoneId ? <FieldError id="green-point-zone-error">{fieldErrors.zoneId}</FieldError> : null}
+              </Field>
+              <fieldset
+                className="grid gap-2"
+                aria-invalid={Boolean(fieldErrors.wasteTypes)}
+                aria-describedby={fieldErrors.wasteTypes ? "green-point-waste-types-error" : undefined}
+              >
+                <legend className="text-sm font-semibold">Residuos aceptados</legend>
+                <p className="text-xs text-muted-foreground">La selección representa el conjunto completo actual; no es una lista ordenada.</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {wasteTypes.map((type) => (
+                    <label key={type} className="flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm max-[760px]:min-h-12">
+                      <input type="checkbox" checked={form.wasteTypes.includes(type)} onChange={() => toggleWasteType(type)} />
+                      {WASTE_TYPE_LABELS[type]}
+                    </label>
+                  ))}
+                </div>
+                {fieldErrors.wasteTypes ? <FieldError id="green-point-waste-types-error">{fieldErrors.wasteTypes}</FieldError> : null}
+              </fieldset>
+              <Field>
+                <FieldLabel htmlFor="green-point-address">Dirección</FieldLabel>
+                <input
+                  id="green-point-address"
+                  className={formControlClass}
+                  value={form.address}
+                  onChange={(event) => updateFormField("address", event.target.value)}
+                  aria-invalid={Boolean(fieldErrors.address)}
+                  aria-describedby={fieldErrors.address ? "green-point-address-error" : undefined}
+                />
+                <FieldDescription>Opcional. Permite encontrar el punto junto con su ubicación geográfica.</FieldDescription>
+                {fieldErrors.address ? <FieldError id="green-point-address-error">{fieldErrors.address}</FieldError> : null}
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field>
+                  <FieldLabel htmlFor="green-point-lat">Latitud</FieldLabel>
+                  <input
+                    id="green-point-lat"
+                    className={formControlClass}
+                    type="number"
+                    min="-90"
+                    max="90"
+                    step="any"
+                    value={form.lat}
+                    onChange={(event) => updateFormField("lat", event.target.value)}
+                    aria-invalid={Boolean(fieldErrors.lat)}
+                    aria-describedby={fieldErrors.lat ? "green-point-lat-error" : undefined}
+                  />
+                  {fieldErrors.lat ? <FieldError id="green-point-lat-error">{fieldErrors.lat}</FieldError> : null}
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="green-point-lng">Longitud</FieldLabel>
+                  <input
+                    id="green-point-lng"
+                    className={formControlClass}
+                    type="number"
+                    min="-180"
+                    max="180"
+                    step="any"
+                    value={form.lng}
+                    onChange={(event) => updateFormField("lng", event.target.value)}
+                    aria-invalid={Boolean(fieldErrors.lng)}
+                    aria-describedby={fieldErrors.lng ? "green-point-lng-error" : undefined}
+                  />
+                  {fieldErrors.lng ? <FieldError id="green-point-lng-error">{fieldErrors.lng}</FieldError> : null}
+                </Field>
+              </div>
+              {editingPoint ? <label className="flex min-h-10 items-center gap-2 text-sm max-[760px]:min-h-12"><input type="checkbox" checked={form.active} onChange={(event) => updateFormField("active", event.target.checked)} /> Activo</label> : null}
+            </FieldGroup>
+          </form>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={isSubmitting}>Cancelar</Button>
+            <Button type="submit" form="green-point-form" disabled={isSubmitting}>{isSubmitting ? "Guardando…" : "Guardar punto verde"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <CatalogDeactivationDialog
         open={Boolean(deactivatingPoint)}
