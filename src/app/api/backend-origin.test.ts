@@ -203,7 +203,7 @@ describe("backend origin fail-closed behavior", () => {
     const response = await invoke(backendCookie);
 
     expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ statusCode: 503, message: "El backend de desarrollo no está configurado." });
+    expect(await response.json()).toMatchObject({ statusCode: 503, message: "La autenticación solicitada no está disponible." });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(fixtureSnapshot()).toBe(before);
   });
@@ -219,6 +219,6 @@ describe("backend origin fail-closed behavior", () => {
     }));
 
     expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ message: "El backend de desarrollo no está configurado." });
+    expect(await response.json()).toEqual({ message: "La autenticación solicitada no está disponible." });
   });
 });

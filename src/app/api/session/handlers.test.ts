@@ -5,6 +5,7 @@ import { GET as session } from "./route";
 import { POST as logout } from "./logout/route";
 import { GET as listServices } from "../services/route";
 import { GET as scenarioRoute } from "../mock/scenarios/[scenarioId]/route";
+import * as sessionModule from "@/lib/session";
 
 const originalEnvironment = {
   authMode: process.env.M6_AUTH_MODE,
@@ -183,6 +184,20 @@ describe("session route handlers", () => {
 
     const logoutResponse = await logout(new Request("http://localhost/api/session/logout", { method: "POST", headers: { cookie } }));
     expect(logoutResponse.headers.get("set-cookie")).toMatch(/Max-Age=0/i);
+  });
+
+  it("clears the session cookie when refresh rejects an otherwise valid session", async () => {
+    process.env.M6_AUTH_MODE = "mock";
+    const loginResponse = await login(loginRequest("office-duty-queue"));
+    const cookie = loginResponse.headers.get("set-cookie") ?? "";
+    vi.spyOn(sessionModule, "refreshSession").mockReturnValue(undefined);
+
+    const response = await session(new Request("http://localhost/api/session", { headers: { cookie } }));
+
+    expect(response.status).toBe(401);
+    const setCookie = String(response.headers.get("set-cookie"));
+    expect(setCookie).toContain("m6_session=");
+    expect(setCookie).toMatch(/Max-Age=0/i);
   });
 
   it("does not fall back when real M1 mode is requested", async () => {

@@ -20,7 +20,9 @@ export async function GET(request: Request) {
 
   const activeSession = refreshSession(session);
   if (!activeSession) {
-    return NextResponse.json({ message: "La sesión expiró." }, { status: 401 });
+    const response = NextResponse.json({ message: "La sesión expiró." }, { status: 401 });
+    response.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions());
+    return response;
   }
 
   const response = NextResponse.json({ session: publicSession(activeSession) });
