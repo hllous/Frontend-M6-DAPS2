@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { externalIdInput } from "@/lib/input-limits";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 
@@ -73,7 +74,7 @@ export const updateRouteInputSchema = z.object({
 export type UpdateRouteInput = z.infer<typeof updateRouteInputSchema>;
 
 export const routeStopInputSchema = z.object({
-  zoneId: z.string().trim().min(1, "El ID de la zona es obligatorio"),
+  zoneId: externalIdInput("El ID de la zona es obligatorio"),
   estimatedDurationMin: z
     .number({ message: "La duración estimada debe ser un número" })
     .int("La duración estimada debe ser un número entero")
