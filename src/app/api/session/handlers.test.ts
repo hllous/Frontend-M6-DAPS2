@@ -85,6 +85,22 @@ describe("session route handlers", () => {
     expect(JSON.stringify(body)).not.toContain(token);
   });
 
+  it("does not expose the missing development JWT name in the BFF response", async () => {
+    process.env.M6_AUTH_MODE = "backend-development";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    delete process.env.M6_DEV_JWT;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const response = await login(loginRequest("office-duty-queue"));
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.message).toBe("La autenticación solicitada no está disponible.");
+    expect(JSON.stringify(body)).not.toContain("M6_DEV_JWT");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   describe("Field crew in backend-development mode (#293)", () => {
     function backendMode() {
       process.env.M6_AUTH_MODE = "backend-development";
