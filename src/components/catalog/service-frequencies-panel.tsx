@@ -30,6 +30,8 @@ import {
   type ServiceFrequencyShift,
 } from "@/lib/service-frequencies";
 
+import styles from "./catalog-panel.module.css";
+
 const weekdays = [
   { value: 1, label: "Lunes", short: "Lun" },
   { value: 2, label: "Martes", short: "Mar" },
@@ -86,6 +88,7 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
   const [createDraft, setCreateDraft] = useState<ServiceFrequencyCreateInput>(emptyCreateDraft);
   const [editing, setEditing] = useState<EditDraft | null>(null);
   const [closing, setClosing] = useState<ServiceFrequency | null>(null);
+  const [closeError, setCloseError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
@@ -151,7 +154,6 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "No se pudo crear la frecuencia.";
       setCreateError(errorMessage);
-      setMessage(errorMessage);
     }
   }
 
@@ -163,25 +165,25 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
     try {
       await serviceFrequenciesAdapter.update(editing.item.id, { weekdays: editing.weekdays, shift: editing.shift, validFrom: editing.validFrom, validTo: editing.validTo || null });
       setEditing(null);
-      setMessage("Frecuencia actualizada. Los Services ya creados no se modifican.");
+      setMessage("Frecuencia actualizada. Los servicios ya creados no se modifican.");
       refresh();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "No se pudo actualizar la frecuencia.";
       setEditError(errorMessage);
-      setMessage(errorMessage);
     }
   }
 
   async function confirmClose() {
     if (!closing) return;
     setMessage(null);
+    setCloseError(null);
     try {
       await serviceFrequenciesAdapter.close(closing.id);
       setClosing(null);
-      setMessage("Vigencia cerrada. Los Services ya creados no se modifican.");
+      setMessage("Vigencia cerrada. Los servicios ya creados no se modifican.");
       refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No se pudo cerrar la vigencia.");
+      setCloseError(error instanceof Error ? error.message : "No se pudo cerrar la vigencia.");
     }
   }
 
@@ -190,7 +192,7 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
       <CatalogPageHeader
         title="Frecuencias de servicio"
         titleId="service-frequencies-title"
-        description="Configure reglas de recorrido por día, turno y vigencia. Esta configuración no genera Services automáticamente."
+        description="Configure reglas de recorrido por día, turno y vigencia. Esta configuración no genera servicios automáticamente."
         actions={canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nueva frecuencia"}</Button> : null}
       />
 
@@ -226,8 +228,23 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
       {state.status === "error" ? <div role="alert" className="rounded-xl border border-destructive/30 bg-card p-5"><p>{state.message}</p><Button type="button" variant="outline" className="mt-3" onClick={refresh}>Reintentar</Button></div> : null}
       {state.status === "ready" && state.items.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin frecuencias</EmptyTitle><EmptyDescription>No hay reglas para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty> : null}
       {state.status === "ready" && state.items.length > 0 ? (
-        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[900px] text-left text-sm"><caption className="sr-only">Frecuencias de servicio</caption><thead className="border-b border-border bg-muted text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Tipo de servicio</th><th className="px-4 py-3">Recorrido</th><th className="px-4 py-3">Días</th><th className="px-4 py-3">Turno</th><th className="px-4 py-3">Vigencia</th><th className="px-4 py-3"><span className="sr-only">Acciones</span></th></tr></thead><tbody>{state.items.map((item) => <tr key={item.id} className="border-b border-border last:border-0"><td className="px-4 py-3 font-medium">{serviceTypeNames.get(item.serviceTypeId) ?? item.serviceTypeId}</td><td className="px-4 py-3">{routeNames.get(item.routeId) ?? item.routeId}</td><td className="px-4 py-3">{item.weekdays.map(weekdayLabel).join(", ")}</td><td className="px-4 py-3">{shiftLabel(item.shift)}</td><td className="px-4 py-3"><span className="block">Desde {formatDate(item.validFrom)}</span><span className="text-muted-foreground">Hasta {formatDate(item.validTo)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2">{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => { setEditing({ item, weekdays: item.weekdays, shift: item.shift, validFrom: item.validFrom, validTo: item.validTo ?? "" }); setShowCreate(false); }}>Editar</Button>{item.validTo === null ? <Button type="button" size="sm" variant="destructive" onClick={() => setClosing(item)}>Cerrar vigencia</Button> : null}</> : null}</div></td></tr>)}</tbody></table>
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <caption className="sr-only">Frecuencias de servicio</caption>
+            <thead><tr><th scope="col">Tipo de servicio</th><th scope="col">Recorrido</th><th scope="col">Días</th><th scope="col">Turno</th><th scope="col">Vigencia</th><th scope="col"><span className="sr-only">Acciones</span></th></tr></thead>
+            <tbody>{state.items.map((item) => (
+              <tr key={item.id}>
+                <th scope="row" data-label="Tipo de servicio">{serviceTypeNames.get(item.serviceTypeId) ?? item.serviceTypeId}</th>
+                <td data-label="Recorrido">{routeNames.get(item.routeId) ?? item.routeId}</td>
+                <td data-label="Días">{item.weekdays.map(weekdayLabel).join(", ")}</td>
+                <td data-label="Turno">{shiftLabel(item.shift)}</td>
+                <td data-label="Vigencia"><span className="block">Desde {formatDate(item.validFrom)}</span><span className="text-muted-foreground">Hasta {formatDate(item.validTo)}</span></td>
+                <td className={styles.actions} data-label="Acciones">
+                  {canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => { setEditing({ item, weekdays: item.weekdays, shift: item.shift, validFrom: item.validFrom, validTo: item.validTo ?? "" }); setShowCreate(false); }}>Editar</Button>{item.validTo === null ? <Button type="button" size="sm" variant="destructive" onClick={() => setClosing(item)}>Cerrar vigencia</Button> : null}</> : null}
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
         </div>
       ) : null}
 
@@ -239,11 +256,12 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
         </form>
       ) : null}
 
-      <Dialog open={closing !== null} onOpenChange={(open) => { if (!open) setClosing(null); }}>
+      <Dialog open={closing !== null} onOpenChange={(open) => { if (!open) { setClosing(null); setCloseError(null); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Cerrar vigencia</DialogTitle><DialogDescription>La regla dejará de estar vigente. El sistema establecerá la fecha de cierre hoy o en la fecha de inicio si todavía no comenzó.</DialogDescription></DialogHeader>
-          <div className="flex items-start gap-3 py-4 text-sm"><CalendarClock className="mt-0.5 text-muted-foreground" aria-hidden="true" /><p>Esta acción solo modifica la ventana de vigencia de la frecuencia. Los Services ya creados quedan intactos.</p></div>
-          <DialogFooter><DialogClose render={<Button type="button" variant="outline" />}>Conservar vigencia</DialogClose><Button type="button" variant="destructive" onClick={() => void confirmClose()}>Cerrar vigencia</Button></DialogFooter>
+          <DialogHeader><DialogTitle>Confirmar cierre de vigencia</DialogTitle><DialogDescription>Se cerrará la regla de {closing ? serviceTypeNames.get(closing.serviceTypeId) ?? "servicio" : "servicio"} para el recorrido {closing ? routeNames.get(closing.routeId) ?? "seleccionado" : "seleccionado"}. La regla dejará de estar vigente.</DialogDescription></DialogHeader>
+          <div className="flex items-start gap-3 py-4 text-sm"><CalendarClock className="mt-0.5 text-muted-foreground" aria-hidden="true" /><p>El sistema establecerá la fecha de cierre hoy o en la fecha de inicio si todavía no comenzó. Los servicios ya creados quedan intactos.</p></div>
+          {closeError ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{closeError}</p> : null}
+          <DialogFooter><DialogClose render={<Button type="button" variant="outline" />}>Conservar vigencia</DialogClose><Button type="button" variant="destructive" onClick={() => void confirmClose()}>Cerrar vigencia de {closing ? serviceTypeNames.get(closing.serviceTypeId) ?? "servicio" : "servicio"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </section>
@@ -251,5 +269,5 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
 }
 
 function DayPicker({ idPrefix, values, onToggle }: { idPrefix: string; values: number[]; onToggle: (value: number) => void }) {
-  return <fieldset className="md:col-span-2"><legend className="mb-1.5 text-sm font-semibold">Días de la semana</legend><FieldDescription>Seleccione todos los días que forman parte de la regla.</FieldDescription><div className="mt-2 flex flex-wrap gap-2">{weekdays.map((day) => { const checked = values.includes(day.value); return <label key={day.value} htmlFor={`${idPrefix}-${day.value}`} className={`inline-flex min-h-10 max-[760px]:min-h-12 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm ${checked ? "border-primary bg-primary/10 text-foreground" : "border-input bg-background text-muted-foreground"}`}><input id={`${idPrefix}-${day.value}`} type="checkbox" className="sr-only" checked={checked} onChange={() => onToggle(day.value)} />{checked ? <Check className="h-4 w-4" aria-hidden="true" /> : <X className="h-4 w-4" aria-hidden="true" />}{day.label}</label>; })}</div></fieldset>;
+  return <fieldset className="md:col-span-2"><legend className="mb-1.5 text-sm font-semibold">Días de la semana</legend><FieldDescription>Seleccione todos los días que forman parte de la regla.</FieldDescription><div className="mt-2 flex flex-wrap gap-2">{weekdays.map((day) => { const checked = values.includes(day.value); return <label key={day.value} htmlFor={`${idPrefix}-${day.value}`} className={`inline-flex min-h-10 max-[760px]:min-h-12 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm focus-within:outline-none focus-within:ring-[3px] focus-within:ring-offset-2 focus-within:ring-[var(--color-action)] ${checked ? "border-primary bg-primary/10 text-foreground" : "border-input bg-background text-muted-foreground"}`}><input id={`${idPrefix}-${day.value}`} type="checkbox" className="sr-only" checked={checked} onChange={() => onToggle(day.value)} />{checked ? <Check className="h-4 w-4" aria-hidden="true" /> : <X className="h-4 w-4" aria-hidden="true" />}{day.label}</label>; })}</div></fieldset>;
 }

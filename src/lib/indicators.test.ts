@@ -90,6 +90,20 @@ describe("indicatorsAdapter", () => {
     ]);
   });
 
+  it("forwards zone-only and service-type-only catalog filters", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => (
+      new Response(JSON.stringify(coverageIndicatorFixture))
+    ));
+
+    await indicatorsAdapter.getCoverage({ from: "2026-09-01", to: "2026-09-30", zoneId: "zone-2" });
+    await indicatorsAdapter.getCoverage({ from: "2026-09-01", to: "2026-09-30", serviceTypeId: "service-sweeping" });
+
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
+      "/api/indicators/coverage?from=2026-09-01&to=2026-09-30&zoneId=zone-2",
+      "/api/indicators/coverage?from=2026-09-01&to=2026-09-30&serviceTypeId=service-sweeping",
+    ]);
+  });
+
   it("normalizes the four validated families for the dashboard boundary", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);

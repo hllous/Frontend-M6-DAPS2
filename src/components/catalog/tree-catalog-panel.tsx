@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, CircleOff, Eye, MapPinned, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -130,6 +131,8 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const [loadedDetail, setLoadedDetail] = useState<DetailState | null>(null);
   const [surveyTree, setSurveyTree] = useState<Tree | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<Tree | null>(null);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
   const [interventionOpen, setInterventionOpen] = useState(false);
   const [interventionTreeIds, setInterventionTreeIds] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -249,14 +252,17 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
   };
 
   const deactivate = async (tree: Tree) => {
-    setNotice(null);
-    setDeactivateTarget(null);
+    setDeactivateError(null);
+    setIsSubmittingDeactivate(true);
     try {
       await treesAdapter.remove(tree.id);
+      setDeactivateTarget(null);
       setNotice("Árbol dado de baja. Se conserva su referencia histórica.");
       setRequestVersion((version) => version + 1);
     } catch (caught) {
-      setNotice(caught instanceof TreeRequestError ? caught.message : "No se pudo dar de baja el árbol.");
+      setDeactivateError(caught instanceof TreeRequestError ? caught.message : "No se pudo dar de baja el árbol.");
+    } finally {
+      setIsSubmittingDeactivate(false);
     }
   };
 
@@ -295,7 +301,23 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
       {canRequestIntervention ? <Button type="button" variant="outline" disabled={!surveyTreeSelection} onClick={() => { setInterventionTreeIds([surveyTreeSelection]); setInterventionOpen(true); }}>Solicitar intervención sobre el árbol seleccionado</Button> : null}
       {canRequestIntervention ? <TreeInterventionRequestDialog key={`${interventionOpen}-${interventionTreeIds.join(",")}`} open={interventionOpen} onOpenChange={setInterventionOpen} trees={state.status === "ready" ? state.items : []} initialTreeIds={interventionTreeIds} onCreated={() => setNotice("Solicitud de intervención creada. Estado inicial: solicitada.")} /> : null}
 
-      <Dialog open={Boolean(deactivateTarget)} onOpenChange={(open) => !open && setDeactivateTarget(null)}><DialogContent><DialogHeader><DialogTitle>Dar de baja el árbol {deactivateTarget?.surveyCode}</DialogTitle><DialogDescription>El árbol quedará inactivo y se conservará su referencia histórica. ¿Desea continuar?</DialogDescription></DialogHeader><DialogFooter><Button type="button" variant="outline" onClick={() => setDeactivateTarget(null)}>Cancelar</Button><Button type="button" variant="destructive" onClick={() => deactivateTarget && void deactivate(deactivateTarget)}>Confirmar baja</Button></DialogFooter></DialogContent></Dialog>
+      <CatalogDeactivationDialog
+        open={Boolean(deactivateTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeactivateTarget(null);
+            setDeactivateError(null);
+          }
+        }}
+        title={`Confirmar baja del árbol ${deactivateTarget?.surveyCode ?? ""}`.trim()}
+        consequence="El árbol quedará inactivo y se conservará su referencia histórica."
+        confirmAction={`Dar de baja el árbol ${deactivateTarget?.surveyCode ?? ""}`.trim()}
+        safeAlternative={`Conservar árbol ${deactivateTarget?.surveyCode ?? ""}`.trim()}
+        isSubmitting={isSubmittingDeactivate}
+        onConfirm={() => deactivateTarget && void deactivate(deactivateTarget)}
+      >
+        {deactivateError ? <p role="alert" className="text-sm text-destructive">{deactivateError}</p> : null}
+      </CatalogDeactivationDialog>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent><DialogHeader><DialogTitle>{editingTree ? "Editar árbol" : "Registrar árbol"}</DialogTitle><DialogDescription>{editingTree ? "Actualice los datos del ejemplar. El código de relevamiento es inmutable." : "Complete los datos del ejemplar censado."}</DialogDescription></DialogHeader>{formError ? <p role="alert" className="text-sm text-destructive">{formError}</p> : null}<form id="tree-form" onSubmit={(event) => void submitForm(event)} noValidate><FieldGroup><Field><FieldLabel htmlFor="tree-survey-code">Código de relevamiento</FieldLabel><input id="tree-survey-code" className={formControlClass} value={form.surveyCode} disabled={Boolean(editingTree)} onChange={(event) => setForm({ ...form, surveyCode: event.target.value })} required={!editingTree} aria-describedby={editingTree ? "tree-survey-code-help" : undefined} /><FieldDescription id="tree-survey-code-help">Identifica el ejemplar en el censo y no se puede cambiar.</FieldDescription></Field><Field><FieldLabel htmlFor="tree-species">Especie</FieldLabel><input id="tree-species" className={formControlClass} value={form.species} onChange={(event) => setForm({ ...form, species: event.target.value })} required /></Field><Field><FieldLabel htmlFor="tree-zone">Zona operativa</FieldLabel><select id="tree-zone" className={formControlClass} value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })} required><option value="">Seleccione una zona</option>{zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.code} · {zone.name}</option>)}</select></Field><Field><FieldLabel htmlFor="tree-address">Dirección</FieldLabel><input id="tree-address" className={formControlClass} value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /><FieldDescription>Opcional. Se utiliza junto con la especie en la búsqueda.</FieldDescription></Field><div className="grid grid-cols-2 gap-3"><Field><FieldLabel htmlFor="tree-lat">Latitud</FieldLabel><input id="tree-lat" className={formControlClass} type="number" min="-90" max="90" step="any" value={form.lat} onChange={(event) => setForm({ ...form, lat: event.target.value })} /></Field><Field><FieldLabel htmlFor="tree-lng">Longitud</FieldLabel><input id="tree-lng" className={formControlClass} type="number" min="-180" max="180" step="any" value={form.lng} onChange={(event) => setForm({ ...form, lng: event.target.value })} /></Field></div><div className="grid grid-cols-2 gap-3"><Field><FieldLabel htmlFor="tree-height">Altura (m)</FieldLabel><input id="tree-height" className={formControlClass} type="number" min="0" max="999.99" step="any" value={form.heightM} onChange={(event) => setForm({ ...form, heightM: event.target.value })} required /></Field><Field><FieldLabel htmlFor="tree-diameter">Diámetro (cm)</FieldLabel><input id="tree-diameter" className={formControlClass} type="number" min="0" max="9999.9" step="any" value={form.diameterCm} onChange={(event) => setForm({ ...form, diameterCm: event.target.value })} required /></Field></div>{editingTree ? <label className="flex min-h-10 items-center gap-2 text-sm max-[760px]:min-h-12"><input type="checkbox" checked={form.active} onChange={(event) => setForm({ ...form, active: event.target.checked })} /> Activo</label> : null}</FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={isSubmitting}>Cancelar</Button><Button type="submit" form="tree-form" disabled={isSubmitting}>{isSubmitting ? "Guardando…" : "Guardar árbol"}</Button></DialogFooter></DialogContent></Dialog>
 

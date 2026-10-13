@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
+import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 import { GET } from "./route";
 
 const backendUnavailableMessage = "El backend no responde. Reintente en unos segundos.";
@@ -65,5 +66,29 @@ describe("GET /api/services/:id backend availability", () => {
 
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ message: backendUnavailableMessage });
+  });
+});
+
+describe("Service detail mock visibility", () => {
+  it.each([
+    ["office-duty-queue", "not-a-fixture", 404],
+    ["field-crew-leader-route", "not-a-fixture", 404],
+    ["field-crew-leader-route", "SVC-1042", 403],
+    ["field-crew-leader-route", "SVC-1050", 200],
+  ] as const)("returns %s detail %s with status %s", async (scenarioId, id, status) => {
+    process.env.M6_AUTH_MODE = "mock";
+    const cookie = `${AUTH_COOKIE_NAME}=${sealSession(createSession(scenarioId, { mode: "mock" }))}`;
+    const response = await GET(new Request(`http://localhost/api/services/${id}`, { headers: { cookie } }), { params: Promise.resolve({ id }) });
+    expect(response.status).toBe(status);
+    if (status === 200) expect((await response.json()).crewId).toBe("crew-b");
+  });
+  it("preserves a backend detail 404", async () => {
+    const cookie = await backendCookie();
+    const error = { statusCode: 404, message: "Servicio no encontrado." };
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(error, { status: 404 }));
+    const response = await serviceRequest(cookie);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual(error);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
