@@ -35,7 +35,7 @@ it("shows a retry message without broadcasting when the logout action fails", as
   remote.addEventListener("message", received);
   render(<SessionShell scenarioId="office-duty-queue" logoutAction={async () => { throw new TypeError("offline"); }} />);
   await userEvent.click(await screen.findByRole("button", { name: "Cerrar sesión" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo cerrar la sesión. Reintente.");
+  expect(await screen.findByText("No se pudo cerrar la sesión. Reintente.")).toHaveAttribute("role", "alert");
   await waitFor(() => expect(assign).not.toHaveBeenCalled());
   expect(received).not.toHaveBeenCalled();
   remote.close();
