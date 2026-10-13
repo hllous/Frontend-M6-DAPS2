@@ -71,6 +71,21 @@ function ControlledSuspendServiceDialog({
 }
 
 describe("SuspendServiceDialog", () => {
+  it("explains that the note is sent with the reason within the combined 500-character limit", () => {
+    render(
+      <ControlledSuspendServiceDialog
+        onOpenChange={vi.fn()}
+        onSuspended={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "Obligatoria. Se envía junto con el motivo seleccionado; entre ambos no pueden superar los 500 caracteres.",
+      ),
+    ).toBeVisible();
+  });
+
   it("keeps a suspended service open after an evidence upload fails and closes after retry", async () => {
     let suspendAttempts = 0;
     let uploadAttempts = 0;
@@ -131,6 +146,60 @@ describe("SuspendServiceDialog", () => {
     expect(uploadAttempts).toBe(2);
     expect(idempotencyKeys[0]).toBeTruthy();
     expect(idempotencyKeys[1]).toBe(idempotencyKeys[0]);
+  });
+
+  it("retries only failed uploads when another evidence file already succeeded", async () => {
+    let uploadAttempts = 0;
+    const idempotencyKeys: string[] = [];
+    const onOpenChange = vi.fn();
+    const onSuspended = vi.fn();
+    server.use(
+      http.post("*/api/services/:serviceId/suspend", () =>
+        HttpResponse.json({ ...service, status: "SUSPENDED", statusReason: "Desperfecto vehicular" }),
+      ),
+      http.post("*/api/evidence", ({ request }) => {
+        uploadAttempts += 1;
+        idempotencyKeys.push(request.headers.get("Idempotency-Key") ?? "");
+        if (uploadAttempts === 1) {
+          return HttpResponse.json(errorResponse(422, "No se pudo validar el archivo."), { status: 422 });
+        }
+        return HttpResponse.json({
+          id: `attachment-suspend-evidence-retry-${uploadAttempts}`,
+          url: "https://evidence.example.com/evidencia.jpg",
+          filename: `evidencia-${uploadAttempts}.jpg`,
+          contentType: "image/jpeg",
+          uploadedAt: "2026-10-12T12:01:00.000Z",
+        });
+      }),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ControlledSuspendServiceDialog onOpenChange={onOpenChange} onSuspended={onSuspended} />,
+    );
+    await user.selectOptions(screen.getByLabelText(/Motivo de suspensión/i), "VEHICLE_BREAKDOWN");
+    await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
+    await user.upload(screen.getByLabelText("Seleccionar archivo"), [
+      new File(["foto 1"], "evidencia-1.jpg", { type: "image/jpeg" }),
+      new File(["foto 2"], "evidencia-2.jpg", { type: "image/jpeg" }),
+    ]);
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Servicio suspendido; falta subir 1 archivo",
+    );
+    expect(uploadAttempts).toBe(2);
+    await user.click(screen.getByRole("button", { name: "Reintentar archivos pendientes" }));
+
+    await waitFor(() => {
+      expect(onSuspended).toHaveBeenCalledTimes(1);
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+    expect(uploadAttempts).toBe(3);
+    expect(idempotencyKeys[0]).toBeTruthy();
+    expect(idempotencyKeys[1]).toBeTruthy();
+    expect(idempotencyKeys[1]).not.toBe(idempotencyKeys[0]);
+    expect(idempotencyKeys[2]).toBe(idempotencyKeys[0]);
   });
 
   it("closes after the suspension and every evidence upload succeed", async () => {
