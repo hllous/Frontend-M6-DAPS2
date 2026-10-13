@@ -542,7 +542,7 @@ function ReferralDetail({
           <span className="text-xs font-semibold tabular-nums text-[var(--color-text-secondary)]">{referral.id}</span>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 space-y-5 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto w-full max-w-6xl flex-1 space-y-5 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-[var(--color-action)]">{referralKindLabel[referral.kind]}</p>
@@ -586,7 +586,7 @@ function ReferralDetail({
             <DateField label="Última actualización" value={referral.updatedAt} />
           </dl>
         </section>
-      </main>
+      </div>
     </div>
   );
 }
