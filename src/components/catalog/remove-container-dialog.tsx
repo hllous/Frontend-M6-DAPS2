@@ -118,7 +118,7 @@ function RemoveContainerModalContent({
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-          Cancelar
+          Conservar contenedor {container.code}
         </Button>
         <Button type="submit" form="remove-container-form" variant="destructive" disabled={isSubmitting}>
           <ArchiveX data-icon="inline-start" aria-hidden />
