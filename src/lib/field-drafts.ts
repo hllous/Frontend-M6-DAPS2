@@ -1,4 +1,5 @@
 import { NetworkFailureError } from "./authenticated-fetch";
+import { registerSessionLogoutCleanup } from "./session-client";
 import { servicesAdapter, type Service } from "./services";
 
 /**
@@ -138,6 +139,10 @@ export function clearFieldDraft(
     // ignore
   }
 }
+
+// The session client is also imported by service adapters, so register cleanup
+// here instead of making that shared module import this services-dependent module.
+registerSessionLogoutCleanup(clearAllFieldDrafts);
 
 /** True when the Service changed server-side since the draft was composed. */
 export function hasServiceDrifted(

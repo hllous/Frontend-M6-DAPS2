@@ -1,8 +1,17 @@
 import { recordTelemetryEvent } from "./telemetry";
-import { clearAllFieldDrafts } from "./field-drafts";
 
 const CHANNEL_NAME = "m6-session";
 const LOGOUT_MESSAGE = "logout";
+const logoutCleanupListeners = new Set<() => void>();
+
+export function registerSessionLogoutCleanup(cleanup: () => void): () => void {
+  logoutCleanupListeners.add(cleanup);
+  return () => { logoutCleanupListeners.delete(cleanup); };
+}
+
+function clearSessionClientState(): void {
+  logoutCleanupListeners.forEach((cleanup) => cleanup());
+}
 
 let channel: BroadcastChannel | undefined;
 
@@ -13,7 +22,7 @@ function getChannel(): BroadcastChannel | undefined {
 }
 
 export async function broadcastLogout(): Promise<void> {
-  clearAllFieldDrafts();
+  clearSessionClientState();
   recordTelemetryEvent({ name: "auth_logout_broadcast" });
   try {
     await fetch("/api/session/logout", { method: "POST", cache: "no-store" });
@@ -30,7 +39,7 @@ export function onRemoteLogout(callback: () => void): () => void {
 
   const handleMessage = (event: MessageEvent) => {
     if (event.data === LOGOUT_MESSAGE) {
-      clearAllFieldDrafts();
+      clearSessionClientState();
       callback();
     }
   };
