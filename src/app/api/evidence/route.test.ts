@@ -181,9 +181,9 @@ describe("POST /api/evidence BFF route", () => {
       }),
     );
     expect(response.status).toBe(413);
-    const body = await response.json();
-    expect(body.error).toBe("Payload Too Large");
-    expect(body.message).toMatch(/10 MB/i);
+    const payload = await response.json();
+    expect(payload.error).toBe("Payload Too Large");
+    expect(payload.message).toMatch(/10 MB/i);
   });
 
   it("rejects an oversized Content-Length before reading the multipart body", async () => {
