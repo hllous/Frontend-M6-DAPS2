@@ -9,6 +9,7 @@ import type { Service } from "@/lib/services";
 import type { MapCoordinate } from "@/lib/operational-zones";
 import { summarizeServiceZones, type ServiceMapLocation } from "@/lib/services-map";
 
+import { SERVICE_MODE_LABEL } from "./service-ui-labels";
 import styles from "./services-map.module.css";
 
 const defaultCenter: MapCoordinate = [-34.58, -58.42];
@@ -63,7 +64,7 @@ function AccessibleServiceMarker({
   const markerRef = useRef<LeafletMarker | null>(null);
   const locationLabel = location.locationLabel ?? "Ubicación resuelta";
   const greenSpace = isGreenSpaceService(service);
-  const accessibleLabel = `Parada ${markerNumber}${greenSpace ? " en espacio verde" : ""}: ${service.id} — ${service.title} (${location.zones
+  const accessibleLabel = `Parada ${markerNumber}${greenSpace ? " en espacio verde" : ""}: ${service.title} (${location.zones
     .map((zone) => zone.name)
     .join(", ")})`;
 
@@ -73,6 +74,7 @@ function AccessibleServiceMarker({
 
     element.setAttribute("aria-label", accessibleLabel);
     element.setAttribute("aria-pressed", String(selected));
+    element.setAttribute("data-service-id", service.id);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -89,15 +91,15 @@ function AccessibleServiceMarker({
     <Marker
       ref={markerRef}
       position={location.coordinates!}
-      title={`${service.id} · ${service.title} · ${locationLabel}`}
+      title={`${service.title} · ${locationLabel}`}
       alt={accessibleLabel}
       icon={serviceMarkerIcon(markerNumber, selected, greenSpace)}
       eventHandlers={{ click: () => onSelect(service.id) }}
     >
       <Popup>
-        <strong>{service.id} · {service.title}</strong>
+        <strong>{service.title}</strong>
         <span className={styles.popupDescription}>
-          {service.serviceTypeName} · {service.mode === "ROUTE" ? "Recorrido" : "Punto"}
+          {service.serviceTypeName} · {SERVICE_MODE_LABEL[service.mode]}
         </span>
         <span className={styles.popupDescription}>
           {greenSpace ? `Espacio verde · ${locationLabel}` : locationLabel}

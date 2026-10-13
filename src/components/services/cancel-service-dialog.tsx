@@ -88,7 +88,7 @@ function CancelServiceForm({
           <Ban className="h-4 w-4" aria-hidden />
           <span>Cancelación de servicio</span>
         </div>
-        <DialogTitle>Cancelar {service.id}</DialogTitle>
+        <DialogTitle>Cancelar {service.title}</DialogTitle>
         <DialogDescription>
           El servicio pasará a estado &quot;Cancelado&quot; de forma definitiva
           {service.status === "RESCHEDULED"

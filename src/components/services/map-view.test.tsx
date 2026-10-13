@@ -12,19 +12,24 @@ import type { Service } from "@/lib/services";
 import { zoneFixtures } from "@/lib/zones-fixtures";
 
 type DynamicMapProps = {
+  services: Service[];
   locations: Array<{ serviceId: string; coordinates: [number, number] | null }>;
   onSelect: (id: string) => void;
 };
 
 vi.mock("next/dynamic", () => ({
-  default: () => function MockServicesMapCanvas({ locations, onSelect }: DynamicMapProps) {
+  default: () => function MockServicesMapCanvas({ services, locations, onSelect }: DynamicMapProps) {
     return (
       <div data-testid="services-map-canvas">
         {locations
           .filter((location) => location.coordinates !== null)
           .map((location) => (
-            <button key={location.serviceId} type="button" onClick={() => onSelect(location.serviceId)}>
-              {location.serviceId}
+            <button
+              key={location.serviceId}
+              type="button"
+              onClick={() => onSelect(location.serviceId)}
+            >
+              {services.find((service) => service.id === location.serviceId)?.title}
             </button>
           ))}
       </div>
@@ -83,9 +88,9 @@ describe("MapView", () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     const services = [
-      makeService({ id: "SVC-TREE-1", targetType: "TREE", targetId: "tree-1" }),
-      makeService({ id: "SVC-ROUTE-1", mode: "ROUTE" }),
-      makeService({ id: "SVC-NO-LOCATION", targetType: "TREE", targetId: "tree-does-not-exist" }),
+      makeService({ id: "SVC-TREE-1", title: "Servicio arbóreo", targetType: "TREE", targetId: "tree-1" }),
+      makeService({ id: "SVC-ROUTE-1", title: "Servicio de recorrido", mode: "ROUTE" }),
+      makeService({ id: "SVC-NO-LOCATION", title: "Servicio sin ubicación", targetType: "TREE", targetId: "tree-does-not-exist" }),
     ];
 
     render(<MapView services={services} selectedId={null} onSelect={onSelect} />);
@@ -94,7 +99,7 @@ describe("MapView", () => {
     expect(screen.getByText("3 servicios visibles")).toBeVisible();
     expect(screen.getByText("1 servicio sin ubicación")).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: "SVC-TREE-1" }));
+    await user.click(screen.getByRole("button", { name: "Servicio arbóreo" }));
 
     expect(onSelect).toHaveBeenCalledWith("SVC-TREE-1");
   });
@@ -103,19 +108,37 @@ describe("MapView", () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     const services = [
-      makeService({ id: "SVC-UNVERIFIED", zoneIds: ["zone-does-not-exist"], targetType: "TREE", targetId: "tree-1" }),
+      makeService({ id: "SVC-UNVERIFIED", title: "Servicio sin zona", zoneIds: ["zone-does-not-exist"], targetType: "TREE", targetId: "tree-1" }),
     ];
 
     render(<MapView services={services} selectedId="SVC-UNVERIFIED" onSelect={onSelect} />);
 
     expect(await screen.findByTestId("services-map-canvas")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "SVC-UNVERIFIED" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Servicio sin zona" })).not.toBeInTheDocument();
     expect(screen.getByText("1 servicio sin ubicación")).toBeVisible();
     expect(screen.getByText(/su zona no pudo verificarse; no se muestra como pin/)).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: "Seleccionar SVC-UNVERIFIED con ubicación sin verificar" }));
+    await user.click(screen.getByRole("button", { name: "Seleccionar Servicio sin zona con ubicación sin verificar" }));
 
     expect(onSelect).toHaveBeenCalledWith("SVC-UNVERIFIED");
+  });
+
+  it("distinguishes an empty filtered map and lets the user clear filters", async () => {
+    const user = userEvent.setup();
+    const onClearFilters = vi.fn();
+    render(
+      <MapView
+        services={[]}
+        selectedId={null}
+        onSelect={vi.fn()}
+        hasActiveFilters
+        onClearFilters={onClearFilters}
+      />,
+    );
+
+    expect(await screen.findByText("No hay servicios que coincidan con los filtros aplicados")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Limpiar filtros" }));
+    expect(onClearFilters).toHaveBeenCalledOnce();
   });
 
   it("keeps the map retry action when territorial data fails", async () => {

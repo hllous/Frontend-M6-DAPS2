@@ -987,6 +987,8 @@ export function ServicesWorkspace({
                     onSortChange={handleSortChange}
                     columnFilters={columnFilters}
                     onColumnFiltersChange={setColumnFilters}
+                    hasActiveFilters={hasActiveFilters}
+                    onClearFilters={handleClearFilters}
                     dense
                   />
                 ) : (
@@ -998,6 +1000,8 @@ export function ServicesWorkspace({
                       error={mapError}
                       onRetry={() => setMapError(false)}
                       filterFingerprint={filterFingerprint}
+                      hasActiveFilters={hasActiveFilters}
+                      onClearFilters={handleClearFilters}
                     />
                   </div>
                 )}
@@ -1049,6 +1053,8 @@ export function ServicesWorkspace({
                             error={mapError}
                             onRetry={() => setMapError(false)}
                             filterFingerprint={filterFingerprint}
+                            hasActiveFilters={hasActiveFilters}
+                            onClearFilters={handleClearFilters}
                           />
                         </div>
                       </ResizablePanel>
@@ -1070,6 +1076,8 @@ export function ServicesWorkspace({
                           onSortChange={handleSortChange}
                           columnFilters={columnFilters}
                           onColumnFiltersChange={setColumnFilters}
+                          hasActiveFilters={hasActiveFilters}
+                          onClearFilters={handleClearFilters}
                         />
                       </ResizablePanel>
                     </>
@@ -1090,6 +1098,8 @@ export function ServicesWorkspace({
                           onSortChange={handleSortChange}
                           columnFilters={columnFilters}
                           onColumnFiltersChange={setColumnFilters}
+                          hasActiveFilters={hasActiveFilters}
+                          onClearFilters={handleClearFilters}
                         />
                       </ResizablePanel>
 
@@ -1108,6 +1118,8 @@ export function ServicesWorkspace({
                             error={mapError}
                             onRetry={() => setMapError(false)}
                             filterFingerprint={filterFingerprint}
+                            hasActiveFilters={hasActiveFilters}
+                            onClearFilters={handleClearFilters}
                           />
                         </div>
                       </ResizablePanel>

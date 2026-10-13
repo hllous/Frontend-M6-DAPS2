@@ -7,7 +7,7 @@ test.describe.serial("Environmental inspection execution #134", () => {
     await loginViaApi(page, "field-crew-member-route");
     await page.goto("/app");
 
-    const serviceCard = page.locator("li").filter({ hasText: "SVC-1112" });
+    const serviceCard = page.locator('[data-service-id="SVC-1112"]');
     await expect(serviceCard).toBeVisible();
     await serviceCard.getByRole("button", { name: "Ver detalle" }).click();
 
@@ -21,7 +21,7 @@ test.describe.serial("Environmental inspection execution #134", () => {
     await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app");
 
-    const serviceCard = page.locator("li").filter({ hasText: "SVC-1112" });
+    const serviceCard = page.locator('[data-service-id="SVC-1112"]');
     await expect(serviceCard).toBeVisible();
     await serviceCard.getByRole("button", { name: "Iniciar servicio" }).click();
     await expect(serviceCard.getByText("En curso")).toBeVisible();
