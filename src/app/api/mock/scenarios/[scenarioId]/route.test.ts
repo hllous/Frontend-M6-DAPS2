@@ -91,7 +91,7 @@ describe("authorized scenario BFF route", () => {
       expect(response.status).toBe(403);
       expect(response.headers.get("set-cookie")).toBeNull();
       expect(await response.json()).toMatchObject({
-        message: "El backend no permite consultar este recurso.",
+        message: "La sesión no puede consultar este escenario.",
         error: "Forbidden",
       });
     });
