@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
 import { addRepairRequestFixture, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
@@ -15,6 +15,9 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
+  delete process.env.M6_DEV_JWT;
+  delete process.env.M6_BACKEND_ORIGIN;
+  vi.restoreAllMocks();
 });
 
 async function authenticatedCookie(scenarioId: string) {
@@ -66,5 +69,27 @@ describe("referral detail BFF", () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  it("returns a safe 502 when the backend success body is not JSON", async () => {
+    process.env.M6_AUTH_MODE = "backend-development";
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<!doctype html><title>Proxy error</title>", {
+      status: 200,
+      headers: { "content-type": "text/html" },
+    }));
+    const cookie = await authenticatedCookie("office-duty-queue");
+
+    const response = await GET(
+      new Request("http://localhost/api/referrals/RR-NONJSON", { headers: { cookie } }),
+      { params: Promise.resolve({ id: "RR-NONJSON" }) },
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({
+      message: "El backend devolvió una respuesta inválida.",
+      path: "/api/referrals/RR-NONJSON",
+    });
   });
 });

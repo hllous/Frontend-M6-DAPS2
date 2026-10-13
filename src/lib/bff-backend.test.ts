@@ -41,7 +41,7 @@ describe("pathId", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("unused"));
 
     await expect(fetchBackend(backendRequest(), "/services/../containers/container-1/remove")).rejects.toThrow(
-      "El recurso backend debe ser una ruta interna.",
+      "La autenticación solicitada no está disponible.",
     );
     expect(fetchSpy).not.toHaveBeenCalled();
   });
