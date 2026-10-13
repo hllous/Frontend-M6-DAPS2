@@ -177,7 +177,7 @@ describe("POST /api/services/[id]/assign-crew BFF route", () => {
 
   it("forwards overrideNote to the backend in backend-development mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
     const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
     const input = { crewId: "d907516e-ddb7-46d4-a7d4-cd235cbb1529", vehicleId: null, overrideNote: "Coordinado con el jefe de cuadrilla." };
 

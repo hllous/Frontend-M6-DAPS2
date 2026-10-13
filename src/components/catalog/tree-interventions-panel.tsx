@@ -180,11 +180,11 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
             </Field>
             <Field data-invalid={fieldHasError("treeIds")}>
               <FieldLabel htmlFor="intervention-trees">Árboles a intervenir <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-              <select id="intervention-trees" multiple size={Math.min(6, Math.max(3, props.trees.length))} className={`${formControlClass} h-auto py-2`} value={form.treeIds} aria-invalid={fieldHasError("treeIds")} aria-describedby="intervention-trees-help" onChange={(event) => setForm({ ...form, treeIds: Array.from(event.target.selectedOptions, (option) => option.value), address: form.address || props.trees.find((tree) => tree.id === event.target.value)?.address || "" })}>
+              <select id="intervention-trees" multiple size={Math.min(6, Math.max(3, props.trees.length))} className={`${formControlClass} h-auto py-2`} value={form.treeIds} aria-invalid={fieldHasError("treeIds")} aria-describedby={fieldHasError("treeIds") ? "intervention-trees-help intervention-trees-error" : "intervention-trees-help"} onChange={(event) => setForm({ ...form, treeIds: Array.from(event.target.selectedOptions, (option) => option.value), address: form.address || props.trees.find((tree) => tree.id === event.target.value)?.address || "" })}>
                 {props.trees.map((tree) => <option key={tree.id} value={tree.id}>{treeName(tree)} · {tree.address ?? "Sin dirección"}</option>)}
               </select>
               <FieldDescription id="intervention-trees-help">Mantenga presionada la tecla Ctrl o ⌘ para seleccionar más de un árbol.</FieldDescription>
-              {fieldHasError("treeIds") ? <FieldError>{formError}</FieldError> : null}
+              {fieldHasError("treeIds") ? <FieldError id="intervention-trees-error">{formError}</FieldError> : null}
             </Field>
             <Field data-invalid={fieldHasError("address")}>
               <FieldLabel htmlFor="intervention-address">Dirección <span aria-hidden="true">(obligatorio)</span></FieldLabel>
@@ -201,9 +201,9 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
             </Field>
             <Field data-invalid={fieldHasError("justification")}>
               <FieldLabel htmlFor="intervention-justification">Justificación{form.interventionType === "REMOVAL" ? <span aria-hidden="true"> (obligatorio para extracción)</span> : null}</FieldLabel>
-              <textarea id="intervention-justification" className={`${formControlClass} min-h-24`} value={form.justification} aria-invalid={fieldHasError("justification")} aria-describedby="intervention-justification-help" onChange={(event) => setForm({ ...form, justification: event.target.value })} />
+              <textarea id="intervention-justification" className={`${formControlClass} min-h-24`} value={form.justification} aria-invalid={fieldHasError("justification")} aria-describedby={fieldHasError("justification") ? "intervention-justification-help intervention-justification-error" : "intervention-justification-help"} onChange={(event) => setForm({ ...form, justification: event.target.value })} />
               <FieldDescription id="intervention-justification-help">Es obligatoria para solicitar una extracción. No se adjuntan evidencias en esta etapa.</FieldDescription>
-              {fieldHasError("justification") ? <FieldError>{formError}</FieldError> : null}
+              {fieldHasError("justification") ? <FieldError id="intervention-justification-error">{formError}</FieldError> : null}
             </Field>
           </FieldGroup>
         </form>
@@ -471,7 +471,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
               <InterventionStatusBadge status={intervention.status} />
             </div>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles</dt><dd className="mt-0.5">{intervention.treeIds.length} {intervention.treeIds.length === 1 ? "ejemplar" : "ejemplares"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{intervention.priority === null ? "—" : PRIORITY_LABELS[intervention.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{address}</dd></div></dl>
-            <div className="mt-4 flex justify-end"><Button type="button" size="sm" variant="outline" onClick={() => void openDetail(intervention)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button></div>
+            <div className="mt-4 flex justify-end"><Button type="button" size="sm" variant="outline" className="h-10 max-[760px]:h-12" onClick={() => void openDetail(intervention)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button></div>
           </article>;
           })}
         </div>
@@ -569,7 +569,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                         {resources === "error" ? <FieldDescription>No se pudieron cargar cuadrillas y vehículos; puede asignarlos después desde Servicios.</FieldDescription> : null}
                       </Field>
                     </FieldGroup>
-                    <p className="text-xs text-muted-foreground">{"Se crear\u00e1 un Service POINT con el primer \u00e1rbol como objetivo t\u00e9cnico y el listado completo de \u00e1rboles como contexto relacionado."}</p>
+                    <p className="text-xs text-muted-foreground">{"Se crear\u00e1 un servicio de punto, con el primer \u00e1rbol como objetivo t\u00e9cnico y el listado completo de \u00e1rboles como contexto relacionado."}</p>
                     <div className="flex flex-wrap justify-end gap-2">
                       <Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => setScheduleOpen(false)}>{"Cancelar programaci\u00f3n"}</Button>
                       <Button type="submit" disabled={activeAction !== null} aria-busy={activeAction === "schedule"}><CalendarClock data-icon="inline-start" aria-hidden />{activeAction === "schedule" ? "Programando servicio\u2026" : "Programar servicio de intervenci\u00f3n"}</Button>
