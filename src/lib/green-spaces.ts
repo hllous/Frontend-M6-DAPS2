@@ -2,19 +2,18 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { withResponseCoordinates } from "./response-coordinates";
 import { MAX_DECIMAL_10_2, boundedDecimalInput, latitudeInput, longitudeInput } from "@/lib/input-limits";
 
 export const greenSpaceTypeSchema = z.enum(["SQUARE", "PARK", "PLANTER", "MEDIAN", "PROMENADE"]);
 export type GreenSpaceType = z.infer<typeof greenSpaceTypeSchema>;
 
-export const greenSpaceSchema = z.object({
+export const greenSpaceSchema = withResponseCoordinates({
   id: z.string(),
   name: z.string(),
   spaceType: greenSpaceTypeSchema,
   areaM2: z.number().nullable(),
   zoneId: z.string(),
-  lat: z.number().nullable(),
-  lng: z.number().nullable(),
   active: z.boolean(),
 });
 export type GreenSpace = z.infer<typeof greenSpaceSchema>;

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema, type Attachment, type Service, type ServiceStatus } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
+import { withResponseCoordinates } from "./response-coordinates";
 import { MAX_INT32, latitudeInput, longitudeInput } from "@/lib/input-limits";
 
 export { attachmentSchema, type Attachment };
@@ -33,14 +34,12 @@ export type DamageType = z.infer<typeof damageTypeSchema>;
 export const severitySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 export type Severity = z.infer<typeof severitySchema>;
 
-export const containerSchema = z.object({
+export const containerSchema = withResponseCoordinates({
   id: z.string(),
   code: z.string(),
   containerType: containerTypeSchema,
   zoneId: z.string(),
   address: z.string().nullable(),
-  lat: z.number().nullable(),
-  lng: z.number().nullable(),
   capacityLiters: z.number(),
   status: containerStatusSchema,
   damageType: damageTypeSchema.nullable().optional(),

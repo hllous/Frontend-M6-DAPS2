@@ -139,8 +139,10 @@ export function MapView({
                 <strong>{unlocatedServiceLabel(unlocatedLocations.length)}</strong>
                 <span>
                   {selectedUnlocated
-                    ? `${selectedUnlocated.serviceId} no tiene un objetivo o una zona con coordenadas resolubles.`
-                    : "No se muestran como pines hasta contar con una ubicación resoluble."}
+                    ? selectedUnlocated.locationType === "unverified"
+                      ? `${selectedUnlocated.serviceId} tiene coordenadas, pero su zona no pudo verificarse; no se muestra como pin.`
+                      : `${selectedUnlocated.serviceId} no tiene un objetivo o una zona con coordenadas resolubles.`
+                    : "No se muestran como pines hasta contar con una ubicación resoluble y verificada."}
                 </span>
                 <div className={styles.locationActions} aria-label="Servicios sin ubicación">
                   {unlocatedLocations.map((location) => {
@@ -150,7 +152,9 @@ export function MapView({
                         key={location.serviceId}
                         type="button"
                         className={styles.locationAction}
-                        aria-label={`Seleccionar ${location.serviceId} sin ubicación`}
+                        aria-label={location.locationType === "unverified"
+                          ? `Seleccionar ${location.serviceId} con ubicación sin verificar`
+                          : `Seleccionar ${location.serviceId} sin ubicación`}
                         aria-pressed={location.serviceId === selectedId}
                         onClick={() => onSelect(location.serviceId)}
                       >

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { withResponseCoordinates } from "./response-coordinates";
 import {
   riskLevelSchema,
   riskTypeSchema,
@@ -18,14 +19,12 @@ export const treeLastSurveySchema = z.object({
   suggestedIntervention: treeInterventionTypeSchema.nullable(),
 });
 
-export const treeSchema = z.object({
+export const treeSchema = withResponseCoordinates({
   id: z.string(),
   surveyCode: z.string(),
   zoneId: z.string(),
   species: z.string().nullable(),
   address: z.string().nullable(),
-  lat: z.number().nullable(),
-  lng: z.number().nullable(),
   heightM: z.number().nullable(),
   diameterCm: z.number().nullable(),
   active: z.boolean(),
