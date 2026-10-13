@@ -127,3 +127,23 @@ describe("POST /api/services/[id]/resume BFF route", () => {
     expect(updatedFixture?.statusReason).toBeNull();
   });
 });
+
+it.each([403, 409, 500, 503])("preserves backend error status and body (%s)", async (status) => {
+  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+  const error = { statusCode: status, message: "El backend rechazó la operación." };
+  const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+    if (String(url).includes("/crews")) return Response.json({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] });
+    if ((init?.method ?? "GET") === "GET") return Response.json({ crewId: "11111111-1111-4111-8111-111111111111" });
+    return Response.json(error, { status });
+  });
+  const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+  backendFetch.mockClear();
+  const response = await POST(new Request("http://localhost/api/services/real-service/resume", {
+    method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(undefined),
+  }), { params: Promise.resolve({ id: "real-service" }) });
+  expect(response.status).toBe(status);
+  expect(await response.json()).toEqual(error);
+  const forwards = backendFetch.mock.calls.filter(([, init]) => init?.method === "POST");
+  expect(forwards).toHaveLength(1);
+  expect(String(forwards[0][0])).toBe("https://backend.internal/services/real-service/resume");
+});

@@ -694,3 +694,4 @@
 @media (prefers-reduced-motion: reduce) {
   .layerControl { transition: none; }
 }
+  .itemButton { min-height: 48px; }

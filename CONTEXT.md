@@ -144,9 +144,9 @@ _Avoid_: repeat inspection, inspection retry
 Acta formal e inmutable emitida por Office después de constatar una infracción. Puede quedar registrada sin derivación a M4 cuando no se identifica un establecimiento.
 _Avoid_: sanction, fine, warning
 
-**Non-forwarded notice**:
-ViolationNotice que no puede enviarse a M4 porque no se identificó un establecimiento. Su registro no implica una sanción externa.
-_Avoid_: failed notice, pending notice
+**Aviso no derivado (non-forwarded notice)**:
+ViolationNotice que se registra sin derivación a M4 porque no se identificó un establecimiento. Su registro no implica una sanción externa.
+_Avoid_: sanction, fine, warning, failed notice, pending notice
 
 **SanctionOutcome**:
 Resolución de M4 asociada a una ViolationNotice, que representa la decisión externa sobre la sanción.

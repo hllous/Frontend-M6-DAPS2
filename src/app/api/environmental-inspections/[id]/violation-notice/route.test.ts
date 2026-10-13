@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
 import {
@@ -7,6 +7,7 @@ import {
   resetEnvironmentalReportFixtures,
 } from "@/lib/environmental-report-fixtures";
 import type { EnvironmentalInspection } from "@/lib/environmental-reports";
+import { resetEstablishmentDirectoryAdapter, setEstablishmentDirectoryAdapter } from "@/lib/establishment-directory";
 import { GET, POST } from "./route";
 
 const completedViolationInspection: EnvironmentalInspection = {
@@ -39,6 +40,7 @@ const noticeInput = {
 
 beforeEach(() => {
   resetEnvironmentalReportFixtures();
+  resetEstablishmentDirectoryAdapter();
   addEnvironmentalInspectionFixture({ ...completedViolationInspection, attachments: [...completedViolationInspection.attachments ?? []] });
 });
 
@@ -47,6 +49,7 @@ afterEach(() => {
   delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   resetEnvironmentalReportFixtures();
+  resetEstablishmentDirectoryAdapter();
 });
 
 async function authenticatedCookie(scenarioId: string) {
@@ -105,6 +108,19 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
     const read = await GET(new Request("http://localhost/api/environmental-inspections/INS-1008/violation-notice", { headers: { cookie } }), { params: Promise.resolve({ id: "INS-1008" }) });
     expect(read.status).toBe(200);
     expect((await read.json()).establishmentId).toBeNull();
+  });
+
+  it("rejects an unknown establishment id through the local directory adapter", async () => {
+    const resolve = vi.fn(async () => null);
+    setEstablishmentDirectoryAdapter({ resolve });
+    const cookie = await authenticatedCookie("office-duty-queue");
+    const establishmentId = "EST-DESCONOCIDO";
+    const response = await POST(noticeRequest(cookie, { ...noticeInput, establishmentId }), noticeContext);
+
+    expect(resolve).toHaveBeenCalledWith({ query: establishmentId });
+    expect(response.status).toBe(400);
+    expect((await response.json()).message).toMatch(/directorio local/i);
+    expect(getEnvironmentalReportFixture("ER-1008")?.status).not.toBe("CLOSED");
   });
 
   it("rejects incomplete inspections, missing evidence, and malformed required fields", async () => {

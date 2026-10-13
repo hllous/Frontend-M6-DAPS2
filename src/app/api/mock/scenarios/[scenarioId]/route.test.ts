@@ -78,11 +78,22 @@ describe("authorized scenario BFF route", () => {
       });
     }
 
-    it.each([401, 403])("maps a backend %i to an invalid session", async (status) => {
-      const response = await getWithBackend(async () => new Response(null, { status }));
+    it("maps a backend 401 to an invalid session", async () => {
+      const response = await getWithBackend(async () => new Response(null, { status: 401 }));
 
       expect(response.status).toBe(401);
       expect((await response.json()).message).toBe("La sesión no está activa.");
+    });
+
+    it("preserves the session on a backend 403 and returns a Spanish denial", async () => {
+      const response = await getWithBackend(async () => new Response(null, { status: 403 }));
+
+      expect(response.status).toBe(403);
+      expect(response.headers.get("set-cookie")).toBeNull();
+      expect(await response.json()).toMatchObject({
+        message: "La sesión no puede consultar este escenario.",
+        error: "Forbidden",
+      });
     });
 
     it("keeps the real status of a backend 500 and does not blame the session", async () => {

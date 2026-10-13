@@ -24,3 +24,15 @@ test("groups inventory markers and progressively reveals numbered pins #215", as
 
   await expect.poll(async () => page.locator('[class*="markerPin"]:visible').count()).toBeGreaterThan(0);
 });
+
+test("selecting an inventory list item highlights its map marker #424", async ({ page }) => {
+  await loginViaApi(page, "office-duty-queue");
+  await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
+
+  const item = page.getByRole("button", { name: /CONT-002/ });
+  await expect(item).toHaveAttribute("aria-pressed", "false");
+  await item.click();
+
+  await expect(item).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[class*="markerSelected"]').first()).toBeVisible();
+});
