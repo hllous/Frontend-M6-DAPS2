@@ -36,10 +36,50 @@ export interface FieldDraft<TPayload = unknown> {
 }
 
 const STORAGE_PREFIX = "m6:field-draft:";
+const ACTOR_STORAGE_PREFIX = `${STORAGE_PREFIX}v2:`;
+let draftOwner: string | undefined;
+const ownerListeners = new Set<() => void>();
 const DRAFT_UNSAVED_MESSAGE = "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.";
 
+export function getFieldDraftOwner(): string | undefined {
+  return draftOwner;
+}
+
+export function subscribeFieldDraftOwner(listener: () => void): () => void {
+  ownerListeners.add(listener);
+  return () => { ownerListeners.delete(listener); };
+}
+
+/** Set from the public session before any Field component reads storage. */
+export function setFieldDraftOwner(actorId: string | undefined): void {
+  try {
+    // Old unscoped drafts have no trustworthy owner. Never migrate their contents.
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(STORAGE_PREFIX) && !key.startsWith(ACTOR_STORAGE_PREFIX)) localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage may be unavailable; reads/writes still fail closed below.
+  }
+  if (draftOwner === actorId) return;
+  draftOwner = actorId;
+  ownerListeners.forEach((listener) => listener());
+}
+
+export function clearAllFieldDrafts(): void {
+  setFieldDraftOwner(undefined);
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(STORAGE_PREFIX)) localStorage.removeItem(key);
+    }
+  } catch {
+    // Logout still proceeds when storage is unavailable.
+  }
+}
+
 function draftKey(serviceId: string, actionType: FieldDraftActionType, scope?: string): string {
-  return `${STORAGE_PREFIX}${serviceId}:${actionType}${scope ? `:${scope}` : ""}`;
+  return `${ACTOR_STORAGE_PREFIX}${encodeURIComponent(draftOwner!)}:${serviceId}:${actionType}${scope ? `:${scope}` : ""}`;
 }
 
 export function snapshotService(service: Service): FieldDraftServiceSnapshot {
@@ -58,6 +98,7 @@ export function snapshotService(service: Service): FieldDraftServiceSnapshot {
 }
 
 export function saveFieldDraft<TPayload>(draft: FieldDraft<TPayload>): boolean {
+  if (!draftOwner) return false;
   try {
     localStorage.setItem(
       draftKey(draft.serviceId, draft.actionType, draft.scope),
@@ -75,6 +116,7 @@ export function getFieldDraft<TPayload>(
   actionType: FieldDraftActionType,
   scope?: string,
 ): FieldDraft<TPayload> | null {
+  if (!draftOwner) return null;
   try {
     const raw = localStorage.getItem(draftKey(serviceId, actionType, scope));
     if (!raw) return null;
@@ -89,6 +131,7 @@ export function clearFieldDraft(
   actionType: FieldDraftActionType,
   scope?: string,
 ): void {
+  if (!draftOwner) return;
   try {
     localStorage.removeItem(draftKey(serviceId, actionType, scope));
   } catch {
