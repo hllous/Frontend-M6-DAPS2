@@ -272,14 +272,12 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setViewError(null);
     if (view === "coverage") {
       setCoverage(null);
-    setViewError(null);
       setCoverageLoaded(false);
       setIsCoverageLoading(true);
     }
-    try {
-      const [nextData, nextZones] = await Promise.all([
     if (view === "route") {
       setRoutesLoaded(false);
       setRouteDetailRequestVersion((version) => version + 1);
@@ -290,11 +288,14 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
       setTodayLoaded(false);
       setIsTodayLoading(true);
     }
+    try {
+      const [nextData, nextZones] = await Promise.all([
         operationalMapAdapter.load(),
         operationalZonesAdapter.list(),
       ]);
       setData(nextData);
       setZones(nextZones);
+      setLastConsultedAt(new Date().toISOString());
     } catch {
       setError(mapLoadError);
       setLastConsultedAt(new Date().toISOString());
@@ -311,9 +312,9 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
         if (!isCurrent) return;
         setData(nextData);
         setZones(nextZones);
+        setLastConsultedAt(new Date().toISOString());
         setIsLoading(false);
       },
-        setLastConsultedAt(new Date().toISOString());
       () => {
         if (!isCurrent) return;
         setError(mapLoadError);
@@ -475,8 +476,6 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
     setIsRouteLoading(Boolean(nextRouteId));
   };
 
-  return (
-    <section className={styles.workspace} aria-labelledby="mapa-operativo-title">
   const selectInventoryItem = (item: MapListItem) => {
     const itemKey = `${item.layer}-${item.id}`;
     const currentKey = selectedTreeId ? `trees-${selectedTreeId}` : selectedMapItemKey;
@@ -494,6 +493,8 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
 
   const selectedMarkerKey = selectedTreeId ? `trees-${selectedTreeId}` : selectedMapItemKey;
 
+  return (
+    <section className={styles.workspace} aria-labelledby="mapa-operativo-title">
       <header className={styles.heading}>
         <div>
           <h1 id="mapa-operativo-title">Mapa operativo</h1>
@@ -564,9 +565,9 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
             <div className={styles.mapToolbar}>
               <strong>{currentView.title}</strong>
               <span>{mapToolbarSummary(view, locatedItems.length, zones, routeStops.length, todayServices.length, coverageZoneOverlays)}</span>
+              {lastConsultedAt ? <span>Consultado {formatArgentinaDateTime(lastConsultedAt)}</span> : null}
             </div>
             <OperationalMapCanvas
-              {lastConsultedAt ? <span>Consultado {formatArgentinaDateTime(lastConsultedAt)}</span> : null}
               view={view}
               markers={locatedItems}
               zones={zones}
