@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { confirmRescheduleInputSchema, servicesAdapter, type Service } from "@/lib/services";
 
@@ -62,18 +62,27 @@ function ConfirmRescheduleForm({
   const [windowEnd, setWindowEnd] = useState(() => service.windowTo ?? "12:00");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ date?: string; start?: string; end?: string }>({});
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrorMessage(null);
+    setFieldErrors({});
     const input = { scheduledDate, timeWindow: { start: windowStart, end: windowEnd } };
     if (!scheduledDate) {
-      setErrorMessage("Seleccione la nueva fecha del servicio.");
+      setFieldErrors({ date: "Seleccione la nueva fecha del servicio." });
       return;
     }
     const validation = confirmRescheduleInputSchema.safeParse(input);
     if (!validation.success) {
-      setErrorMessage(validation.error.issues[0]?.message ?? "Revise la nueva fecha y la ventana horaria.");
+      const nextErrors: typeof fieldErrors = {};
+      for (const issue of validation.error.issues) {
+        if (issue.path[0] === "scheduledDate") nextErrors.date ??= issue.message;
+        else if (issue.path[0] === "timeWindow" && issue.path[1] === "start") nextErrors.start ??= issue.message;
+        else if (issue.path[0] === "timeWindow" && issue.path[1] === "end") nextErrors.end ??= issue.message;
+        else if (!nextErrors.start) nextErrors.start = issue.message;
+      }
+      setFieldErrors(nextErrors);
       return;
     }
     setIsSubmitting(true);
@@ -143,10 +152,13 @@ function ConfirmRescheduleForm({
               type="date"
               min={minDate}
               value={scheduledDate}
-              onChange={(e) => setScheduledDate(e.target.value)}
+              onChange={(e) => { setScheduledDate(e.target.value); setFieldErrors((prev) => ({ ...prev, date: undefined })); }}
               required
-              className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+              aria-invalid={Boolean(fieldErrors.date)}
+              aria-describedby={fieldErrors.date ? `${formId}-date-error` : undefined}
+              className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
             />
+            {fieldErrors.date && <FieldError id={`${formId}-date-error`}>{fieldErrors.date}</FieldError>}
           </Field>
           <Field className="sm:col-span-1">
             <FieldLabel htmlFor={`${formId}-start`}>Desde *</FieldLabel>
@@ -154,10 +166,13 @@ function ConfirmRescheduleForm({
               id={`${formId}-start`}
               type="time"
               value={windowStart}
-              onChange={(e) => setWindowStart(e.target.value)}
+              onChange={(e) => { setWindowStart(e.target.value); setFieldErrors((prev) => ({ ...prev, start: undefined })); }}
               required
-              className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+              aria-invalid={Boolean(fieldErrors.start)}
+              aria-describedby={fieldErrors.start ? `${formId}-start-error` : undefined}
+              className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
             />
+            {fieldErrors.start && <FieldError id={`${formId}-start-error`}>{fieldErrors.start}</FieldError>}
           </Field>
           <Field className="sm:col-span-1">
             <FieldLabel htmlFor={`${formId}-end`}>Hasta *</FieldLabel>
@@ -165,15 +180,18 @@ function ConfirmRescheduleForm({
               id={`${formId}-end`}
               type="time"
               value={windowEnd}
-              onChange={(e) => setWindowEnd(e.target.value)}
+              onChange={(e) => { setWindowEnd(e.target.value); setFieldErrors((prev) => ({ ...prev, end: undefined })); }}
               required
-              className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+              aria-invalid={Boolean(fieldErrors.end)}
+              aria-describedby={fieldErrors.end ? `${formId}-end-error` : undefined}
+              className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
             />
+            {fieldErrors.end && <FieldError id={`${formId}-end-error`}>{fieldErrors.end}</FieldError>}
           </Field>
         </div>
       </form>
 
-      <DialogFooter>
+      <DialogFooter className="flex-wrap">
         <Button
           type="button"
           variant="outline"
@@ -182,15 +200,9 @@ function ConfirmRescheduleForm({
         >
           Cancelar
         </Button>
-        <Button type="submit" form={formId} disabled={isSubmitting} className="font-semibold">
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              <span>Confirmando…</span>
-            </>
-          ) : (
-            <span>Confirmar nueva fecha</span>
-          )}
+        <Button type="submit" form={formId} disabled={isSubmitting} aria-busy={isSubmitting} className="min-h-12 font-semibold min-[761px]:min-h-10">
+          <Loader2 data-icon="inline-start" className={isSubmitting ? "animate-spin" : "invisible"} aria-hidden />
+          <span>Confirmar nueva fecha</span>
         </Button>
       </DialogFooter>
     </>

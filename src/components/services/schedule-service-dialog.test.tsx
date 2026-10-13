@@ -225,6 +225,10 @@ describe("ScheduleServiceDialog component", () => {
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/Debe elegir el árbol urbano/);
+    const target = screen.getByLabelText(/Bien del inventario/);
+    expect(target).toHaveAttribute("aria-invalid", "true");
+    const errorId = target.getAttribute("aria-describedby")?.split(" ").at(-1);
+    expect(document.getElementById(errorId!)).toHaveTextContent(/Debe elegir el árbol urbano/);
     expect(create).not.toHaveBeenCalled();
   });
 

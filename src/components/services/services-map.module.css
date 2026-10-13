@@ -104,7 +104,7 @@
   gap: var(--space-12);
   padding: var(--space-24);
   background: var(--color-canvas);
-  color: var(--color-text-primary);
+  color: var(--color-text);
   text-align: center;
 }
 
@@ -255,7 +255,7 @@
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--color-surface);
-  color: var(--color-text-primary);
+  color: var(--color-text);
   text-align: center;
   transform: translate(-50%, -50%);
 }

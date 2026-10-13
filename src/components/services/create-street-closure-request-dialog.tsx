@@ -265,7 +265,7 @@ export function CreateStreetClosureRequestDialog({
         )}
 
         {outcome === "unsent" && (
-          <div role="status" className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4 shadow-sm">
+          <div role="status" className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4">
             <p className="text-sm font-bold text-[var(--color-warning)]">Solicitud sin enviar</p>
             <p className="mt-1 text-sm text-[var(--color-warning)]">
               No se creó un registro en M6. Los valores quedaron conservados; reenvíe la solicitud manualmente cuando revise la conexión.
@@ -273,7 +273,7 @@ export function CreateStreetClosureRequestDialog({
           </div>
         )}
 
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4 shadow-sm">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4">
           <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Contexto de la {sourceTypeLabel}</p>
           <p className="mt-1 text-sm font-bold text-[var(--color-text)]">{sourceTitle}</p>
           <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
@@ -310,7 +310,7 @@ export function CreateStreetClosureRequestDialog({
                   onChange={(event) => updateForm("reason", event.target.value)}
                   aria-invalid={Boolean(errors.reason)}
                   aria-describedby={errors.reason ? "street-closure-reason-error" : undefined}
-                  className="min-h-24 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-3 text-sm text-[var(--color-text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                  className="min-h-24 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-3 text-sm text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
                   placeholder={source.kind === "SERVICE" ? "Explique por qué el Servicio necesita el corte" : "Explique por qué la intervención de arbolado necesita el corte"}
                 />
                 {errors.reason && <FieldError id="street-closure-reason-error">{errors.reason}</FieldError>}
@@ -322,7 +322,7 @@ export function CreateStreetClosureRequestDialog({
                   id="street-closure-type"
                   value={form.closureType}
                   onChange={(event) => updateForm("closureType", event.target.value as StreetClosureType)}
-                  className="h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] md:h-10"
+                  className="min-h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                 >
                   <option value="PARTIAL">Parcial</option>
                   <option value="TOTAL">Total</option>
@@ -330,7 +330,7 @@ export function CreateStreetClosureRequestDialog({
                 <FieldDescription>El tipo describe la solicitud enviada a M7, no una decisión de M7.</FieldDescription>
               </Field>
 
-              <FieldGroup className="grid gap-4 md:grid-cols-2">
+              <FieldGroup className="grid gap-4 min-[761px]:grid-cols-2">
                 <Field>
                   <FieldLabel htmlFor="street-closure-requested-from">Inicio solicitado *</FieldLabel>
                   <input
@@ -341,7 +341,7 @@ export function CreateStreetClosureRequestDialog({
                     onChange={(event) => updateForm("requestedFrom", event.target.value)}
                     aria-invalid={Boolean(errors.requestedFrom)}
                     aria-describedby={errors.requestedFrom ? "street-closure-requested-from-error" : undefined}
-                    className="h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] md:h-10"
+                    className="min-h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                   />
                   {errors.requestedFrom && <FieldError id="street-closure-requested-from-error">{errors.requestedFrom}</FieldError>}
                 </Field>
@@ -355,7 +355,7 @@ export function CreateStreetClosureRequestDialog({
                     onChange={(event) => updateForm("requestedTo", event.target.value)}
                     aria-invalid={Boolean(errors.requestedTo)}
                     aria-describedby={errors.requestedTo ? "street-closure-requested-to-error" : undefined}
-                    className="h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] md:h-10"
+                    className="min-h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                   />
                   {errors.requestedTo && <FieldError id="street-closure-requested-to-error">{errors.requestedTo}</FieldError>}
                 </Field>
@@ -373,7 +373,7 @@ export function CreateStreetClosureRequestDialog({
                 <p className="mt-1 text-xs text-[var(--color-text-secondary)]">Agregue al menos un tramo con calle y sus dos calles transversales.</p>
               </div>
               {form.affectedSections.map((section, index) => (
-                <fieldset key={index} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4 shadow-sm">
+                <fieldset key={index} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4">
                   <legend className="px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Tramo afectado {index + 1}</legend>
                   <FieldGroup className="mt-2 gap-4">
                     <Field>
@@ -387,11 +387,11 @@ export function CreateStreetClosureRequestDialog({
                         onChange={(event) => updateSection(index, "streetName", event.target.value)}
                         aria-invalid={Boolean(errors[`affectedSections.${index}.streetName`])}
                         aria-describedby={errors[`affectedSections.${index}.streetName`] ? `affected-section-${index}-street-error` : undefined}
-                        className="h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] md:h-10"
+                        className="min-h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                       />
                       {errors[`affectedSections.${index}.streetName`] && <FieldError id={`affected-section-${index}-street-error`}>{errors[`affectedSections.${index}.streetName`]}</FieldError>}
                     </Field>
-                    <FieldGroup className="grid gap-4 md:grid-cols-2">
+                    <FieldGroup className="grid gap-4 min-[761px]:grid-cols-2">
                       <Field>
                         <FieldLabel htmlFor={`affected-section-${index}-from`}>Desde calle transversal *</FieldLabel>
                         <input
@@ -400,7 +400,7 @@ export function CreateStreetClosureRequestDialog({
                           onChange={(event) => updateSection(index, "fromCross", event.target.value)}
                           aria-invalid={Boolean(errors[`affectedSections.${index}.fromCross`])}
                           aria-describedby={errors[`affectedSections.${index}.fromCross`] ? `affected-section-${index}-from-error` : undefined}
-                          className="h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] md:h-10"
+                          className="min-h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                         />
                         {errors[`affectedSections.${index}.fromCross`] && <FieldError id={`affected-section-${index}-from-error`}>{errors[`affectedSections.${index}.fromCross`]}</FieldError>}
                       </Field>
@@ -412,7 +412,7 @@ export function CreateStreetClosureRequestDialog({
                           onChange={(event) => updateSection(index, "toCross", event.target.value)}
                           aria-invalid={Boolean(errors[`affectedSections.${index}.toCross`])}
                           aria-describedby={errors[`affectedSections.${index}.toCross`] ? `affected-section-${index}-to-error` : undefined}
-                          className="h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] md:h-10"
+                          className="min-h-12 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                         />
                         {errors[`affectedSections.${index}.toCross`] && <FieldError id={`affected-section-${index}-to-error`}>{errors[`affectedSections.${index}.toCross`]}</FieldError>}
                       </Field>

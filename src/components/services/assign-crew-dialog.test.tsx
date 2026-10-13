@@ -131,6 +131,9 @@ describe("AssignCrewDialog", () => {
     await user.selectOptions(screen.getByLabelText(/Cuadrilla asignada/i), CREW_ID);
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
     expect(screen.getByText(/requiere la asignación obligatoria de un vehículo/i)).toBeInTheDocument();
+    const vehicle = screen.getByLabelText(/Vehículo operativo/i);
+    expect(vehicle).toHaveAttribute("aria-invalid", "true");
+    expect(document.getElementById(vehicle.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent(/requiere la asignación obligatoria de un vehículo/i);
     expect(bodies).toHaveLength(0);
 
     await user.selectOptions(screen.getByLabelText(/Vehículo operativo/i), VEHICLE_ID);
