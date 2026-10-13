@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   AUTH_COOKIE_NAME,
+  AuthUnavailableError,
   createSession,
   effectiveSessionExpiry,
   getAuthMode,
@@ -16,7 +17,10 @@ import {
 const now = Date.parse("2026-09-05T15:00:00.000Z");
 const secret = "test-session-secret-that-is-long-enough";
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 
 describe("owned BFF session", () => {
   it("marks the session cookie Secure only in production, so LAN/HTTP access works in dev", () => {
@@ -73,7 +77,7 @@ describe("owned BFF session", () => {
 
   it("fails closed for real M1 authentication", () => {
     expect(() => createSession("office-duty-queue", { mode: "real-m1", now })).toThrow(
-      /bloqueada|unavailable/i,
+      "La autenticación solicitada no está disponible.",
     );
   });
 
@@ -82,7 +86,16 @@ describe("owned BFF session", () => {
       mode: "backend-development",
       now,
       devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
-    })).toThrow("El backend de desarrollo no está configurado.");
+    })).toThrow("La autenticación solicitada no está disponible.");
+  });
+
+  it("keeps authentication diagnostics in the server log and exposes a generic message", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const error = new AuthUnavailableError("M6_DEV_JWT no tiene una expiración válida.");
+
+    expect(error.message).toBe("La autenticación solicitada no está disponible.");
+    expect(log).toHaveBeenCalledWith("[m6-auth-unavailable]", "M6_DEV_JWT no tiene una expiración válida.");
   });
 
   it("respects an explicit M6_AUTH_MODE override in production", () => {
