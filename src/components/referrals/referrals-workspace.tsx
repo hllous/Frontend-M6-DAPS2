@@ -16,7 +16,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -531,11 +531,16 @@ function ReferralDetail({
   canRecover: boolean;
   onRecovered: (updatedReferral: Referral) => void;
 }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, [referral.id]);
+
   return (
     <div className="flex min-h-full flex-col bg-[var(--color-surface)]" role="region" aria-label={`Detalle de ${referral.id}`}>
       <header className="border-b border-[var(--color-border)] bg-[var(--color-canvas)] px-4 py-3 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
-          <Button variant="outline" size="sm" onClick={onBack} className="min-h-10 gap-1.5 sm:min-h-8">
+          <Button variant="outline" size="sm" onClick={onBack} className="min-h-10 gap-1.5 max-[760px]:min-h-12">
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Volver a derivaciones
           </Button>
@@ -546,7 +551,7 @@ function ReferralDetail({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-[var(--color-action)]">{referralKindLabel[referral.kind]}</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Detalle de {referral.id}</h1>
+            <h1 ref={headingRef} tabIndex={-1} className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-text)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] sm:text-[28px]">Detalle de {referral.id}</h1>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Registro M6 · destino externo: {referral.destination}</p>
           </div>
           <StatusBadge referral={referral} />
@@ -865,7 +870,7 @@ function ReferralRecoveryForm({
 
       <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4 py-2">
         {errorMessage && (
-          <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-xs text-[var(--color-danger)]">
+          <div id={`${formId}-external-id-error`} role="alert" className="flex items-start gap-2.5 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-xs text-[var(--color-danger)]">
             <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>{errorMessage}</span>
           </div>
@@ -894,10 +899,11 @@ function ReferralRecoveryForm({
               }}
               required
               aria-invalid={Boolean(errorMessage)}
+              aria-describedby={errorMessage ? `${formId}-external-id-error ${formId}-external-id-help` : `${formId}-external-id-help`}
               placeholder={referral.destination === "M3" ? "Ej. M3-OT-2048" : "Ej. M7-C-882"}
-              className="min-h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+              className="min-h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus-visible:ring-3 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] focus-visible:ring-[var(--color-focus)]"
             />
-            <span className="text-xs leading-4 text-[var(--color-text-secondary)]">{action.externalHelp}</span>
+            <span id={`${formId}-external-id-help`} className="text-xs leading-4 text-[var(--color-text-secondary)]">{action.externalHelp}</span>
           </div>
         )}
 
