@@ -4,8 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
-import { handlers } from "@/mocks/handlers";
+import * as argentinaDate from "@/lib/argentina-date";
 import { scenarios } from "@/lib/scenarios";
+import { handlers } from "@/mocks/handlers";
 import { MapaOperativo } from "./mapa-operativo";
 
 const server = setupServer(...handlers);
@@ -29,11 +30,34 @@ const canonicalZoneResponse = {
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 afterAll(() => server.close());
 
 describe("MapaOperativo", () => {
+  it("keeps the map heading concise and exposes an accessible refresh action", async () => {
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByRole("heading", { name: "Mapa operativo" })).toBeVisible();
+    expect(await screen.findByText("Elementos", { exact: true })).toBeVisible();
+    expect(screen.queryByText(/Supervise el inventario urbano/)).not.toBeInTheDocument();
+    const refresh = screen.getByRole("button", { name: "Actualizar datos" });
+    expect(refresh).toBeEnabled();
+    expect(refresh).toHaveAttribute("aria-label", "Actualizar datos");
+  });
+
+  it("changes map views with keyboard-operable tabs", async () => {
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    const inventoryTab = await screen.findByRole("tab", { name: "Inventario" });
+    inventoryTab.focus();
+    await user.keyboard("{ArrowRight}");
+
+    expect(screen.getByRole("tab", { name: "Zonas" })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("presents every point layer with a synchronized accessible list", async () => {
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
@@ -52,6 +76,31 @@ describe("MapaOperativo", () => {
 
     expect(screen.queryByText("CONT-002")).not.toBeInTheDocument();
     expect(screen.getByText("Punto verde Plaza Mitre")).toBeInTheDocument();
+  });
+
+  it("selects containers, green points, and green spaces from the inventory list", async () => {
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    for (const label of [/CONT-002/, /Punto verde Plaza Mitre/, /^Parque del Bicentenario/]) {
+      const item = await screen.findByRole("button", { name: label });
+      await user.click(item);
+
+      expect(item).toHaveAttribute("aria-pressed", "true");
+    }
+  });
+
+  it("shows the last consultation time in each operational map view", async () => {
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Elementos visibles" });
+    expect(screen.getByText(/Consultado/)).toBeVisible();
+
+    for (const view of ["Zonas", "Cobertura", "Recorrido", "Atención hoy"]) {
+      await user.click(screen.getByRole("tab", { name: view }));
+      expect(await screen.findByText(/Consultado/)).toBeVisible();
+    }
   });
 
   it("keeps the selected tree in the URL and links its catalog detail", async () => {
@@ -211,8 +260,42 @@ describe("MapaOperativo", () => {
     expect(screen.getByText("Z-PAL · Palermo")).toBeVisible();
   });
 
+  it("offers active routes from every paginated result in the picker", async () => {
+    const requestedPages: number[] = [];
+    const createRoute = (id: string, code: string, name: string) => ({ id, code, name, active: true, stops: [] });
+    server.use(
+      http.get("*/api/routes", ({ request }) => {
+        const url = new URL(request.url);
+        requestedPages.push(Number(url.searchParams.get("page")));
+        const page = Number(url.searchParams.get("page"));
+        const route = page === 1
+          ? createRoute("route-first-page", "R-001", "Primer recorrido")
+          : createRoute("route-later-page", "R-101", "Recorrido posterior");
+        return HttpResponse.json({
+          data: [route],
+          meta: { total: 101, page, pageSize: 100, totalPages: 2 },
+        });
+      }),
+      http.get("*/api/routes/:id", ({ params }) => HttpResponse.json(
+        params.id === "route-later-page"
+          ? createRoute("route-later-page", "R-101", "Recorrido posterior")
+          : createRoute("route-first-page", "R-001", "Primer recorrido"),
+      )),
+    );
+
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("tab", { name: "Recorrido" }));
+
+    const picker = await screen.findByLabelText("Recorrido a visualizar");
+    expect(within(picker).getByRole("option", { name: "R-101 · Recorrido posterior" })).toBeInTheDocument();
+    expect(requestedPages.sort()).toEqual([1, 2]);
+  });
+
   it("loads each scheduled service detail to paint today's per-zone results", async () => {
-    vi.setSystemTime(new Date("2026-09-10T12:00:00-03:00"));
+    vi.setSystemTime(new Date("2026-09-11T02:30:00.000Z"));
+    const todaySpy = vi.spyOn(argentinaDate, "todayInArgentina").mockReturnValue("2026-09-10");
+    const serviceListUrls: URL[] = [];
     const service = {
       id: "SVC-TODAY-1",
       serviceTypeId: "st-waste-route",
@@ -255,12 +338,13 @@ describe("MapaOperativo", () => {
 
     server.use(
       http.get("*/api/zones", () => HttpResponse.json(canonicalZoneResponse)),
-      http.get("*/api/services", () =>
-        HttpResponse.json({
+      http.get("*/api/services", ({ request }) => {
+        serviceListUrls.push(new URL(request.url));
+        return HttpResponse.json({
           data: [{ ...service, zoneResults: undefined }],
           meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
-        }),
-      ),
+        });
+      }),
       http.get("*/api/services/SVC-TODAY-1", () => HttpResponse.json(service)),
     );
 
@@ -275,5 +359,8 @@ describe("MapaOperativo", () => {
     expect(screen.getByText("Palermo")).toBeVisible();
     expect(screen.getByText("Parcial")).toBeVisible();
     expect(screen.getByText(/1 servicio programado hoy/)).toBeVisible();
+    expect(todaySpy).toHaveBeenCalled();
+    expect(serviceListUrls.at(-1)?.searchParams.get("scheduledFrom")).toBe("2026-09-10");
+    expect(serviceListUrls.at(-1)?.searchParams.get("scheduledTo")).toBe("2026-09-10");
   });
 });

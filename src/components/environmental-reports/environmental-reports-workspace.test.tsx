@@ -165,6 +165,11 @@ describe("EnvironmentalReportsWorkspace", () => {
     const dialog = await screen.findByRole("dialog", { name: "Derivar expediente" });
     await user.click(within(dialog).getByRole("button", { name: "Derivar expediente" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("Debe indicar el motivo.");
+    const reason = within(dialog).getByLabelText(/Motivo/);
+    expect(reason).toHaveAttribute("aria-invalid", "true");
+    const describedBy = reason.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy!)).toHaveTextContent("Debe indicar el motivo.");
     expect(forward).not.toHaveBeenCalled();
 
     await user.type(within(dialog).getByLabelText(/Motivo/), "Corresponde a otra dependencia");
@@ -172,6 +177,24 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     await waitFor(() => expect(forward).toHaveBeenCalledWith("ER-1001", { reason: "Corresponde a otra dependencia" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Derivar expediente" })).not.toBeInTheDocument());
+    await waitFor(() => expect(within(detail).getByRole("heading", { name: "Expediente ER-1001" })).toHaveFocus());
+  });
+
+  it("returns focus to the report heading after dismissing a report", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1001/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1001" });
+    await user.click(within(detail).getByRole("button", { name: "Iniciar revisión" }));
+    await user.click(await within(detail).findByRole("button", { name: "Desestimar expediente" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Desestimar expediente" });
+    await user.type(within(dialog).getByLabelText(/Motivo/), "El hallazgo no requiere intervención.");
+    await user.click(within(dialog).getByRole("button", { name: "Desestimar expediente" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Desestimar expediente" })).not.toBeInTheDocument());
+    await waitFor(() => expect(within(detail).getByRole("heading", { name: "Expediente ER-1001" })).toHaveFocus());
   });
 
   it("finds a report by publicId and keeps the technical ticketId in its detail", async () => {
@@ -368,6 +391,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(detail).getByText("Acta inmutable")).toBeVisible();
     expect(within(detail).getByText("Actas previas del establecimiento")).toBeVisible();
     expect(within(detail).queryByRole("button", { name: /Editar acta|Eliminar acta/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(within(detail).getByRole("heading", { name: "Expediente ER-1008" })).toHaveFocus());
   });
 
   it("keeps issuance disabled until inspection evidence is present", async () => {
@@ -394,9 +418,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.type(within(dialog).getByLabelText(/Buscar establecimiento/), "referencia inexistente");
     await user.click(within(dialog).getByRole("button", { name: "Buscar establecimiento" }));
     await user.click(await within(dialog).findByRole("button", { name: "Continuar sin establecimiento" }));
-    await user.click(within(dialog).getByRole("button", { name: "Registrar aviso no-forwarded" }));
+    await user.click(within(dialog).getByRole("button", { name: "Registrar aviso no derivado" }));
 
-    expect(await within(detail).findByText("Aviso no-forwarded")).toBeVisible();
+    expect(await within(detail).findByRole("status", { name: "Aviso no derivado" })).toBeVisible();
     expect(within(detail).getByText("M4 no fue contactado")).toBeVisible();
     expect(within(detail).getByText(/cerrado localmente/i)).toBeVisible();
     expect(within(detail).getByRole("status", { name: "Estado: Cerrado" })).toBeVisible();

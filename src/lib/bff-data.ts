@@ -26,8 +26,11 @@ export async function loadAuthorizedScenario(
       if (error instanceof AuthUnavailableError) throw error;
       throw new BackendUnavailableError(503, "No se pudo conectar con el backend.");
     }
-    if (backendResponse.status === 401 || backendResponse.status === 403) {
+    if (backendResponse.status === 401) {
       throw new InvalidSessionError("El backend rechazó la sesión de desarrollo.");
+    }
+    if (backendResponse.status === 403) {
+      throw new ForbiddenSessionError("El backend no permite consultar este recurso.");
     }
     if (!backendResponse.ok) {
       throw new BackendUnavailableError(

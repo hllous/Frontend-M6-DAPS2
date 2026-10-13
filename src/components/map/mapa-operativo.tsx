@@ -17,6 +17,9 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatArgentinaDateTime, todayInArgentina } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS } from "@/lib/containers";
 import { indicatorsAdapter, type CoverageIndicator } from "@/lib/indicators";
 import {
@@ -43,7 +46,9 @@ import type { OperationalScenario } from "@/lib/scenarios";
 import { ZONE_RESULT_STATUS_LABEL } from "@/lib/services";
 import type { RiskLevel } from "@/lib/tree-surveys";
 import { treeCatalogHref } from "@/lib/trees";
+import { cn } from "@/lib/utils";
 
+import { InventoryMapDrawer } from "./inventory-map-drawer";
 import type { OperationalMapView } from "./operational-map-canvas";
 import styles from "./mapa-operativo.module.css";
 
@@ -217,11 +222,6 @@ function toListItems(data: OperationalMapData): MapListItem[] {
   ];
 }
 
-function todayIsoDate() {
-  const now = new Date();
-  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
-}
-
 function formatTodayDate(date: string) {
   return new Intl.DateTimeFormat("es-AR", {
     day: "numeric",
@@ -236,6 +236,7 @@ function activeZoneRecords(zones: OperationalZone[]) {
 
 export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
   const [data, setData] = useState<OperationalMapData | null>(null);
+  const [lastConsultedAt, setLastConsultedAt] = useState<string | null>(null);
   const [zones, setZones] = useState<OperationalZone[]>([]);
   const [enabledLayers, setEnabledLayers] = useState(initialLayers);
   const [view, setView] = useState<OperationalMapView>("inventory");
@@ -244,6 +245,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
   const [viewError, setViewError] = useState<string | null>(null);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [routesLoaded, setRoutesLoaded] = useState(false);
+  const [routeDetailRequestVersion, setRouteDetailRequestVersion] = useState(0);
   const [selectedRouteId, setSelectedRouteId] = useState("");
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [isRouteLoading, setIsRouteLoading] = useState(false);
@@ -255,6 +257,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
   const [isCoverageLoading, setIsCoverageLoading] = useState(false);
   const [selectedStopSequence, setSelectedStopSequence] = useState<number | null>(null);
   const [selectedZoneCode, setSelectedZoneCode] = useState<string | null>(null);
+  const [selectedMapItemKey, setSelectedMapItemKey] = useState<string | null>(null);
   // El árbol seleccionado vive en la URL (`tree`), igual que en el catálogo de arbolado.
   const router = useRouter();
   const pathname = usePathname();
@@ -273,10 +276,21 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setViewError(null);
     if (view === "coverage") {
       setCoverage(null);
       setCoverageLoaded(false);
       setIsCoverageLoading(true);
+    }
+    if (view === "route") {
+      setRoutesLoaded(false);
+      setRouteDetailRequestVersion((version) => version + 1);
+      setIsRouteLoading(true);
+    }
+    if (view === "today") {
+      setTodayServices([]);
+      setTodayLoaded(false);
+      setIsTodayLoading(true);
     }
     try {
       const [nextData, nextZones] = await Promise.all([
@@ -285,6 +299,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
       ]);
       setData(nextData);
       setZones(nextZones);
+      setLastConsultedAt(new Date().toISOString());
     } catch {
       setError(mapLoadError);
     } finally {
@@ -300,6 +315,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
         if (!isCurrent) return;
         setData(nextData);
         setZones(nextZones);
+        setLastConsultedAt(new Date().toISOString());
         setIsLoading(false);
       },
       () => {
@@ -318,19 +334,28 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
     if (view !== "route" || routesLoaded) return;
     let isCurrent = true;
 
-    void routesAdapter.list({ active: true, page: 1, pageSize: 100 }).then(
-      (result) => {
+    void (async () => {
+      const firstPage = await routesAdapter.list({ active: true, page: 1, pageSize: 100 });
+      const nextRoutes = [...firstPage.routes];
+
+      for (let page = 2; page <= firstPage.totalPages; page += 1) {
+        const result = await routesAdapter.list({ active: true, page, pageSize: 100 });
         if (!isCurrent) return;
-        setRoutes(result.routes);
-        setSelectedRouteId((current) => current || result.routes[0]?.id || "");
+        nextRoutes.push(...result.routes);
+      }
+
+      if (isCurrent) {
+        setRoutes(nextRoutes);
+        setSelectedRouteId((current) => current || nextRoutes[0]?.id || "");
         setRoutesLoaded(true);
-      },
-      (reason) => {
-        if (!isCurrent) return;
-        setViewError(viewLoadError);
-        setRoutesLoaded(true);
-      },
-    );
+        setLastConsultedAt(new Date().toISOString());
+      }
+    })().catch(() => {
+      if (!isCurrent) return;
+      setViewError(viewLoadError);
+      setRoutesLoaded(true);
+      setIsRouteLoading(false);
+    });
 
     return () => {
       isCurrent = false;
@@ -346,6 +371,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
         if (!isCurrent) return;
         setSelectedRoute(route);
         setIsRouteLoading(false);
+        setLastConsultedAt(new Date().toISOString());
       },
       (reason) => {
         if (!isCurrent) return;
@@ -358,18 +384,19 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
     return () => {
       isCurrent = false;
     };
-  }, [selectedRouteId, view]);
+  }, [routeDetailRequestVersion, selectedRouteId, view]);
 
   useEffect(() => {
     if (view !== "today" || todayLoaded) return;
     let isCurrent = true;
 
-    void loadTodayServiceCoverage(todayIsoDate()).then(
+    void loadTodayServiceCoverage(todayInArgentina()).then(
       (coverage) => {
         if (!isCurrent) return;
         setTodayServices(coverage);
         setTodayLoaded(true);
         setIsTodayLoading(false);
+        setLastConsultedAt(new Date().toISOString());
       },
       () => {
         if (!isCurrent) return;
@@ -394,6 +421,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
         setCoverage(nextCoverage);
         setCoverageLoaded(true);
         setIsCoverageLoading(false);
+        setLastConsultedAt(new Date().toISOString());
       },
       () => {
         if (!isCurrent) return;
@@ -451,139 +479,180 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
     setIsRouteLoading(Boolean(nextRouteId));
   };
 
+  const selectInventoryItem = (item: MapListItem) => {
+    const itemKey = `${item.layer}-${item.id}`;
+    const currentKey = selectedTreeId ? `trees-${selectedTreeId}` : selectedMapItemKey;
+    const nextKey = currentKey === itemKey ? null : itemKey;
+    setSelectedMapItemKey(nextKey);
+    if (item.layer === "trees") selectTree(nextKey ? item.id : null);
+    else if (selectedTreeId) selectTree(null);
+  };
+
+  const selectInventoryMarker = (marker: { id: string; layer: string }) => {
+    setSelectedMapItemKey(`${marker.layer}-${marker.id}`);
+    if (marker.layer === "trees") selectTree(marker.id);
+    else if (selectedTreeId) selectTree(null);
+  };
+
+  const selectedMarkerKey = selectedTreeId ? `trees-${selectedTreeId}` : selectedMapItemKey;
+
   return (
     <section className={styles.workspace} aria-labelledby="mapa-operativo-title">
-      <header className={styles.heading}>
-        <div>
+      <Tabs
+        value={view}
+        onValueChange={(nextView) => {
+          if (typeof nextView === "string") handleViewChange(nextView as OperationalMapView);
+        }}
+        className={styles.tabs}
+      >
+        <header className={styles.heading}>
           <h1 id="mapa-operativo-title">Mapa operativo</h1>
-          <p>
-            {scenario.actor.kind === "OFFICE"
-              ? "Supervise el inventario urbano y la cobertura territorial de la operación."
-              : "Consulte los recursos urbanos cercanos a su operación."}
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => void load()} disabled={isLoading}>
-          <RefreshCw data-icon="inline-start" aria-hidden />
-          Actualizar datos
-        </Button>
-      </header>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    className={styles.refreshButton}
+                    variant="outline"
+                    size="icon"
+                    type="button"
+                    aria-label="Actualizar datos"
+                    onClick={() => void load()}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw aria-hidden />
+                  </Button>
+                }
+              />
+              <TooltipContent>Actualizar datos</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </header>
 
-      <div className={styles.viewSwitcher} role="tablist" aria-label="Vistas del mapa operativo">
-        {availableMapViews.map((option) => (
-          <Button
-            key={option.id}
-            id={`map-tab-${option.id}`}
-            className={styles.viewTab}
-            variant={view === option.id ? "default" : "outline"}
-            role="tab"
-            aria-selected={view === option.id}
-            aria-controls={`map-view-${option.id}`}
-            onClick={() => handleViewChange(option.id)}
-          >
-            {option.label}
-          </Button>
-        ))}
-      </div>
+        <TabsList
+          activateOnFocus
+          className={styles.viewSwitcher}
+          variant="line"
+          aria-label="Vistas del mapa operativo"
+        >
+          {availableMapViews.map((option) => (
+            <TabsTrigger key={option.id} value={option.id} className={styles.viewTab}>
+              {option.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTriangle aria-hidden />
-          <AlertTitle>El mapa no está disponible</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-          <Button variant="outline" size="sm" onClick={() => void load()}>
-            Reintentar
-          </Button>
-        </Alert>
-      ) : null}
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTriangle aria-hidden />
+            <AlertTitle>El mapa no está disponible</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+            <Button variant="outline" size="sm" onClick={() => void load()}>
+              Reintentar
+            </Button>
+          </Alert>
+        ) : null}
 
-      {viewError ? (
-        <Alert variant="destructive">
-          <AlertTriangle aria-hidden />
-          <AlertTitle>La vista no está disponible</AlertTitle>
-          <AlertDescription>{viewError}</AlertDescription>
-          <Button variant="outline" size="sm" onClick={() => {
-            setViewError(null);
-            if (view === "route") {
-              setRoutesLoaded(false);
-            } else if (view === "today") {
-              setTodayLoaded(false);
-            } else if (view === "coverage") {
-              setCoverage(null);
-              setCoverageLoaded(false);
-            }
-          }}>
-            Reintentar vista
-          </Button>
-        </Alert>
-      ) : null}
+        <TabsContent value={view} id={`map-view-${view}`} className={styles.tabContent}>
+          {viewError ? (
+            <Alert variant="destructive">
+              <AlertTriangle aria-hidden />
+              <AlertTitle>La vista no está disponible</AlertTitle>
+              <AlertDescription>{viewError}</AlertDescription>
+              <Button variant="outline" size="sm" onClick={() => {
+                setViewError(null);
+                if (view === "route") {
+                  setRoutesLoaded(false);
+                } else if (view === "today") {
+                  setTodayLoaded(false);
+                } else if (view === "coverage") {
+                  setCoverage(null);
+                  setCoverageLoaded(false);
+                }
+              }}>
+                Reintentar vista
+              </Button>
+            </Alert>
+          ) : null}
 
-      {isLoading ? <MapLoading /> : data ? (
-        <div className={styles.layout} id={`map-view-${view}`} role="tabpanel" aria-labelledby={`map-tab-${view}`}>
-          <div className={styles.mapPanel}>
-            <div className={styles.mapToolbar}>
-              <strong>{currentView.title}</strong>
-              <span>{mapToolbarSummary(view, locatedItems.length, zones, routeStops.length, todayServices.length, coverageZoneOverlays)}</span>
+          {isLoading ? <MapLoading /> : data ? (
+            <div className={cn(styles.layout, view === "inventory" && styles.layoutInventory)}>
+              <div className={styles.mapPanel}>
+                <div className={styles.mapToolbar}>
+                  <strong>{currentView.title}</strong>
+                  <span>{mapToolbarSummary(view, locatedItems.length, zones, routeStops.length, todayServices.length, coverageZoneOverlays)}</span>
+                  {lastConsultedAt ? <span>Consultado {formatArgentinaDateTime(lastConsultedAt)}</span> : null}
+                </div>
+                <OperationalMapCanvas
+                  view={view}
+                  markers={locatedItems}
+                  zones={zones}
+                  routeStops={routeStops}
+                  todayZones={todayZoneCoverage}
+                  coverageZones={coverageZoneOverlays}
+                  selectedStopSequence={selectedStopSequence}
+                  onSelectStop={setSelectedStopSequence}
+                  selectedZoneCode={selectedZoneCode}
+                  onSelectZone={setSelectedZoneCode}
+                  selectedMarkerKey={selectedMarkerKey}
+                  onSelectMarker={selectInventoryMarker}
+                />
+              </div>
+
+              {view === "inventory" ? (
+                <InventoryMapDrawer
+                  ariaLabel={`Controles de la vista ${currentView.label}`}
+                  className={styles.sidePanel}
+                  summary="Elementos"
+                >
+                  <InventoryPanel
+                    items={items}
+                    locatedItems={locatedItems}
+                    unlocatedCount={unlocatedCount}
+                    selectedMapItemKey={selectedMarkerKey}
+                    onSelectItem={selectInventoryItem}
+                    enabledLayers={enabledLayers}
+                    onLayerChange={(layer, checked) => {
+                      setEnabledLayers((current) => ({ ...current, [layer]: checked }));
+                    }}
+                  />
+                </InventoryMapDrawer>
+              ) : (
+                <aside className={styles.sidePanel} aria-label={`Controles de la vista ${currentView.label}`}>
+                  {view === "zones" ? (
+                    <ZonesMapPanel zones={zones} selectedZoneCode={selectedZoneCode} onSelectZone={setSelectedZoneCode} />
+                  ) : view === "route" ? (
+                    <RouteMapPanel
+                      routes={routes}
+                      selectedRouteId={selectedRouteId}
+                      selectedRoute={selectedRoute}
+                      routeStops={routeStops}
+                      onRouteChange={handleRouteChange}
+                      selectedStopSequence={selectedStopSequence}
+                      onSelectStop={setSelectedStopSequence}
+                      loading={isViewLoading}
+                    />
+                  ) : view === "coverage" ? (
+                    <CoverageMapPanel
+                      coverage={coverage}
+                      zones={coverageZoneOverlays}
+                      loading={isViewLoading}
+                      selectedZoneCode={selectedZoneCode}
+                      onSelectZone={setSelectedZoneCode}
+                    />
+                  ) : (
+                    <TodayMapPanel
+                      services={todayServices}
+                      zones={todayZoneCoverage}
+                      loading={isViewLoading}
+                    />
+                  )}
+                </aside>
+              )}
             </div>
-            <OperationalMapCanvas
-              view={view}
-              markers={locatedItems}
-              zones={zones}
-              routeStops={routeStops}
-              todayZones={todayZoneCoverage}
-              coverageZones={coverageZoneOverlays}
-              selectedStopSequence={selectedStopSequence}
-              onSelectStop={setSelectedStopSequence}
-              selectedZoneCode={selectedZoneCode}
-              onSelectZone={setSelectedZoneCode}
-              selectedMarkerKey={selectedTreeId ? `trees-${selectedTreeId}` : null}
-              onSelectMarker={(marker) => { if (marker.layer === "trees") selectTree(marker.id); }}
-            />
-          </div>
-
-          <aside className={styles.sidePanel} aria-label={`Controles de la vista ${currentView.label}`}>
-            {view === "inventory" ? (
-              <InventoryPanel
-                items={items}
-                locatedItems={locatedItems}
-                unlocatedCount={unlocatedCount}
-                selectedTreeId={selectedTreeId}
-                onSelectTree={selectTree}
-                enabledLayers={enabledLayers}
-                onLayerChange={(layer, checked) => {
-                  setEnabledLayers((current) => ({ ...current, [layer]: checked }));
-                }}
-              />
-            ) : view === "zones" ? (
-              <ZonesMapPanel zones={zones} selectedZoneCode={selectedZoneCode} onSelectZone={setSelectedZoneCode} />
-            ) : view === "route" ? (
-              <RouteMapPanel
-                routes={routes}
-                selectedRouteId={selectedRouteId}
-                selectedRoute={selectedRoute}
-                routeStops={routeStops}
-                onRouteChange={handleRouteChange}
-                selectedStopSequence={selectedStopSequence}
-                onSelectStop={setSelectedStopSequence}
-                loading={isViewLoading}
-              />
-            ) : view === "coverage" ? (
-              <CoverageMapPanel
-                coverage={coverage}
-                zones={coverageZoneOverlays}
-                loading={isViewLoading}
-                selectedZoneCode={selectedZoneCode}
-                onSelectZone={setSelectedZoneCode}
-              />
-            ) : (
-              <TodayMapPanel
-                services={todayServices}
-                zones={todayZoneCoverage}
-                loading={isViewLoading}
-              />
-            )}
-          </aside>
-        </div>
-      ) : null}
+          ) : null}
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
@@ -610,16 +679,16 @@ function InventoryPanel({
   items,
   locatedItems,
   unlocatedCount,
-  selectedTreeId,
-  onSelectTree,
+  selectedMapItemKey,
+  onSelectItem,
   enabledLayers,
   onLayerChange,
 }: {
   items: MapListItem[];
   locatedItems: (MapListItem & { lat: number; lng: number })[];
   unlocatedCount: number;
-  selectedTreeId: string | null;
-  onSelectTree: (treeId: string | null) => void;
+  selectedMapItemKey: string | null;
+  onSelectItem: (item: MapListItem) => void;
   enabledLayers: Record<LayerId, boolean>;
   onLayerChange: (layer: LayerId, checked: boolean) => void;
 }) {
@@ -655,29 +724,22 @@ function InventoryPanel({
         {locatedItems.length > 0 ? (
           <ul>
             {locatedItems.map((item) => {
-              const isSelectedTree = item.layer === "trees" && item.id === selectedTreeId;
+              const isSelected = `${item.layer}-${item.id}` === selectedMapItemKey;
               return (
-                <li key={`${item.layer}-${item.id}`} className={isSelectedTree ? styles.selected : undefined}>
+                <li key={`${item.layer}-${item.id}`} className={isSelected ? styles.selected : undefined}>
                   <span className={`${styles.listMarker} ${styles[item.markerTone]}`} aria-hidden />
-                  {item.layer === "trees" ? (
-                    <span>
-                      <button
-                        type="button"
-                        className={styles.itemButton}
-                        aria-pressed={isSelectedTree}
-                        onClick={() => onSelectTree(isSelectedTree ? null : item.id)}
-                      >
-                        <strong>{item.title}</strong>
-                        <small>{item.description}</small>
-                      </button>
-                      {isSelectedTree ? <Link className={styles.itemLink} href={treeCatalogHref(item.id)}>Ver ficha del árbol {item.title}</Link> : null}
-                    </span>
-                  ) : (
-                    <span>
+                  <span>
+                    <button
+                      type="button"
+                      className={styles.itemButton}
+                      aria-pressed={isSelected}
+                      onClick={() => onSelectItem(item)}
+                    >
                       <strong>{item.title}</strong>
                       <small>{item.description}</small>
-                    </span>
-                  )}
+                    </button>
+                    {isSelected && item.layer === "trees" ? <Link className={styles.itemLink} href={treeCatalogHref(item.id)}>Ver ficha del árbol {item.title}</Link> : null}
+                  </span>
                 </li>
               );
             })}
@@ -905,7 +967,7 @@ function TodayMapPanel({
           <MapPinned aria-hidden />
           <h2 id="today-view-title">Zonas atendidas hoy</h2>
         </div>
-        <p>{formatTodayDate(todayIsoDate())}. La cobertura se actualiza desde los resultados registrados por zona.</p>
+        <p>{formatTodayDate(todayInArgentina())}. La cobertura se actualiza desde los resultados registrados por zona.</p>
       </div>
       <p className={styles.todaySummary}>
         {services.length} servicio{services.length === 1 ? "" : "s"} programado{services.length === 1 ? "" : "s"} hoy

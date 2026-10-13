@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -19,6 +20,8 @@ import {
 } from "@/lib/service-types";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
+
+import styles from "./catalog-panel.module.css";
 
 const categories: Array<{ value: ServiceTypeCategory; label: string }> = [
   { value: "WASTE_COLLECTION", label: "Recolección" },
@@ -48,6 +51,9 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
   const [showCreate, setShowCreate] = useState(false);
   const [createDraft, setCreateDraft] = useState(initialCreate);
   const [editing, setEditing] = useState<ServiceType | null>(null);
+  const [deactivating, setDeactivating] = useState<ServiceType | null>(null);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
@@ -86,7 +92,6 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "No se pudo crear el tipo de servicio.";
       setCreateError(errorMessage);
-      setMessage(errorMessage);
     }
   };
 
@@ -103,18 +108,27 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "No se pudo actualizar el tipo de servicio.";
       setEditError(errorMessage);
-      setMessage(errorMessage);
     }
   };
 
-  const deactivate = async (item: ServiceType) => {
-    setMessage(null);
+  const deactivate = (item: ServiceType) => {
+    setDeactivating(item);
+    setDeactivateError(null);
+  };
+
+  const confirmDeactivation = async () => {
+    if (!deactivating) return;
+    setIsSubmittingDeactivate(true);
+    setDeactivateError(null);
     try {
-      await serviceTypesAdapter.remove(item.id);
+      await serviceTypesAdapter.remove(deactivating.id);
+      setDeactivating(null);
       setMessage("Tipo de servicio dado de baja. Los servicios existentes conservan su configuración.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      setMessage(error instanceof ServiceTypeRequestError ? error.message : "No se pudo dar de baja el tipo de servicio.");
+      setDeactivateError(error instanceof ServiceTypeRequestError ? error.message : "No se pudo dar de baja el tipo de servicio.");
+    } finally {
+      setIsSubmittingDeactivate(false);
     }
   };
 
@@ -123,7 +137,7 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
       <CatalogPageHeader
         title="Tipos de servicio"
         titleId="service-types-title"
-        description="Definí cómo se programan y ejecutan los servicios urbanos."
+        description="Defina cómo se programan y ejecutan los servicios urbanos."
         actions={canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nuevo tipo de servicio"}</Button> : null}
       />
 
@@ -155,9 +169,47 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
       {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio" className="flex flex-col gap-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : null}
       {state.status === "error" ? <div role="alert" className="rounded-xl border border-destructive/30 bg-card p-5"><p>{state.message}</p><Button type="button" variant="outline" className="mt-3" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></div> : null}
       {state.status === "ready" && state.items.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin tipos de servicio</EmptyTitle><EmptyDescription>No hay resultados para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty> : null}
-      {state.status === "ready" && state.items.length > 0 ? <div className="relative overflow-x-auto rounded-xl border border-border bg-card"><table className="w-full min-w-[760px] text-left text-sm"><caption className="sr-only">Tipos de servicio</caption><thead className="border-b border-border bg-muted text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Código</th><th className="px-4 py-3">Nombre</th><th className="px-4 py-3">Categoría</th><th className="px-4 py-3">Modo</th><th className="px-4 py-3">Vehículo</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3"><span className="sr-only">Acciones</span></th></tr></thead><tbody>{state.items.map((item) => <tr key={item.id} className="border-b border-border last:border-0"><td className="px-4 py-3 font-mono text-xs">{item.code}</td><td className="px-4 py-3 font-medium">{item.name}</td><td className="px-4 py-3">{categories.find((option) => option.value === item.category)?.label ?? item.category}</td><td className="px-4 py-3">{item.mode === "ROUTE" ? "Recorrido" : "Punto"}</td><td className="px-4 py-3">{item.requiresVehicle ? "Sí" : "No"}</td><td className="px-4 py-3">{item.active ? "Activo" : "Inactivo"}</td><td className="px-4 py-3"><div className="flex justify-end gap-2">{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => { setEditing(item); setShowCreate(false); }}>Editar</Button>{item.active ? <Button type="button" size="sm" variant="destructive" onClick={() => void deactivate(item)}>Dar de baja</Button> : null}</> : null}</div></td></tr>)}</tbody></table></div> : null}
+      {state.status === "ready" && state.items.length > 0 ? (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <caption className="sr-only">Tipos de servicio</caption>
+            <thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Categoría</th><th scope="col">Modo</th><th scope="col">Vehículo</th><th scope="col">Estado</th><th scope="col"><span className="sr-only">Acciones</span></th></tr></thead>
+            <tbody>{state.items.map((item) => (
+              <tr key={item.id}>
+                <th scope="row" data-label="Código">{item.code}</th>
+                <td data-label="Nombre">{item.name}</td>
+                <td data-label="Categoría">{categories.find((option) => option.value === item.category)?.label ?? item.category}</td>
+                <td data-label="Modo">{item.mode === "ROUTE" ? "Recorrido" : "Punto"}</td>
+                <td data-label="Vehículo">{item.requiresVehicle ? "Sí" : "No"}</td>
+                <td data-label="Estado">{item.active ? "Activo" : "Inactivo"}</td>
+                <td className={styles.actions} data-label="Acciones">
+                  {canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => { setEditing(item); setShowCreate(false); }}>Editar</Button>{item.active ? <Button type="button" size="sm" variant="destructive" onClick={() => deactivate(item)}>Dar de baja</Button> : null}</> : null}
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ) : null}
 
       {editing && canManage ? <form onSubmit={submitEdit} className="rounded-xl border border-border bg-card p-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">Editar tipo de servicio</h2><FieldDescription>El código, la categoría y el modo son de solo lectura porque ya pueden estar copiados en servicios programados.</FieldDescription></div><Button type="button" variant="ghost" onClick={() => setEditing(null)}>Cerrar</Button></div><FieldGroup className="mt-5 grid gap-4 md:grid-cols-2"><Field><FieldLabel htmlFor="edit-service-type-code">Código</FieldLabel><input id="edit-service-type-code" className={formControlClass} value={editing.code} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-service-type-name">Nombre</FieldLabel><input id="edit-service-type-name" className={formControlClass} required value={editing.name} aria-invalid={Boolean(editError)} aria-describedby={editError ? "edit-service-type-name-error" : undefined} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /><FieldError id="edit-service-type-name-error">{editError}</FieldError></Field><Field><FieldLabel htmlFor="edit-service-type-category">Categoría</FieldLabel><input id="edit-service-type-category" className={formControlClass} value={categories.find((item) => item.value === editing.category)?.label ?? editing.category} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-service-type-mode">Modo</FieldLabel><input id="edit-service-type-mode" className={formControlClass} value={editing.mode === "ROUTE" ? "Recorrido" : "Punto"} readOnly aria-readonly="true" /></Field><label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm"><input type="checkbox" checked={editing.requiresVehicle} onChange={(event) => setEditing({ ...editing, requiresVehicle: event.target.checked })} /> Requiere vehículo</label><label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(event) => setEditing({ ...editing, active: event.target.checked })} /> Activo</label></FieldGroup><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancelar</Button><Button type="submit">Guardar cambios</Button></div></form> : null}
+
+      <CatalogDeactivationDialog
+        open={deactivating !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeactivating(null);
+            setDeactivateError(null);
+          }
+        }}
+        title={`Confirmar baja del tipo de servicio ${deactivating?.code ?? ""}`.trim()}
+        consequence="El tipo de servicio quedará inactivo. Los servicios existentes conservarán la configuración con la que se crearon."
+        confirmAction={`Dar de baja el tipo de servicio ${deactivating?.code ?? ""}`.trim()}
+        safeAlternative={`Conservar el tipo de servicio ${deactivating?.code ?? ""}`.trim()}
+        onConfirm={() => void confirmDeactivation()}
+        isSubmitting={isSubmittingDeactivate}
+      >
+        {deactivateError ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{deactivateError}</p> : null}
+      </CatalogDeactivationDialog>
     </section>
   );
 }

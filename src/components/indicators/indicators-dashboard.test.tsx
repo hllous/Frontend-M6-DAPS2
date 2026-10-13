@@ -5,7 +5,7 @@ import { delay, http, HttpResponse, passthrough } from "msw";
 import { setupServer } from "msw/node";
 
 import { scenarios } from "@/lib/scenarios";
-import { coverageIndicatorFixture, incidentsIndicatorFixture } from "@/lib/indicator-fixtures";
+import { coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "@/lib/indicator-fixtures";
 import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
 import { handlers } from "@/mocks/handlers";
 
@@ -88,9 +88,14 @@ describe("IndicatorsDashboard", () => {
     expect(within(tabs).getByRole("tab", { name: "Territorio" })).toBeVisible();
     expect(within(tabs).getByRole("tab", { name: "Registros" })).toBeVisible();
 
+    const viewToggle = screen.getByRole("group", { name: "Visualización de indicadores" });
+    await user.click(within(viewToggle).getByRole("button", { name: "Tabla" }));
+    expect(within(viewToggle).getByRole("button", { name: "Tabla" })).toHaveAttribute("aria-pressed", "true");
+
     await user.click(within(tabs).getByRole("tab", { name: "Territorio" }));
     expect(within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByRole("heading", { name: "Contenedores por zona" })).toBeVisible();
+    expect(await within(screen.getByRole("region", { name: "Detalle territorial" })).findByRole("table")).toBeVisible();
 
     vi.unstubAllGlobals();
   });
@@ -314,6 +319,37 @@ describe("IndicatorsDashboard", () => {
     await user.click(incidentsButton);
     expect(await screen.findByRole("heading", { name: "Incidencias" })).toBeVisible();
     expect(screen.getByText(/Resolución media de reportes:/).closest("p")).toHaveTextContent("Sin reportes cerrados");
+  });
+
+  it("marks Incidencias and Residuos as empty when their families have no records", async () => {
+    const incidents = structuredClone(incidentsIndicatorFixture);
+    incidents.containers.byStatus = [];
+    incidents.containers.byZone = [];
+    incidents.trees.byRiskLevel = [];
+    incidents.reports.total = 0;
+    incidents.reports.byType = [];
+    incidents.reports.byStatus = [];
+    incidents.reports.avgResolutionDays = null;
+
+    const waste = structuredClone(wasteIndicatorFixture);
+    waste.totals = { weightKg: 0, volumeM3: 0, divertedKg: 0, divertedPct: 0 };
+    waste.byWasteType = [];
+    waste.byDisposalSite = [];
+    waste.records = 0;
+
+    server.use(
+      http.get("*/api/indicators/incidents", () => HttpResponse.json(incidents)),
+      http.get("*/api/indicators/waste", () => HttpResponse.json(waste)),
+    );
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    for (const family of ["Incidencias", "Residuos"]) {
+      const familyButton = within(familyBand).getByRole("button", { name: new RegExp(family) });
+      const familyCard = familyButton.closest("article");
+      expect(familyCard).not.toBeNull();
+      expect(await within(familyCard as HTMLElement).findByText("Sin datos")).toBeVisible();
+    }
   });
 
   it("lists real zones and service types and sends their UUIDs as filters (#302)", async () => {

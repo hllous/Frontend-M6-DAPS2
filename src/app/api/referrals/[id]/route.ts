@@ -32,7 +32,12 @@ export async function GET(
         if (backendResponse.status === 404) continue;
         const payload = await backendResponse.text();
         if (!backendResponse.ok) return new Response(payload, { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
-        const backendPayload = JSON.parse(payload) as unknown;
+        let backendPayload: unknown;
+        try {
+          backendPayload = JSON.parse(payload) as unknown;
+        } catch {
+          return errorResponse(502, "El backend devolvió una respuesta inválida.", path);
+        }
         referral = kind === "repair-requests"
           ? referralFromBackendRepairRequest(repairRequestSchema.parse(backendPayload))
           : referralFromStreetClosureRequest(streetClosureRequestSchema.parse(backendPayload));

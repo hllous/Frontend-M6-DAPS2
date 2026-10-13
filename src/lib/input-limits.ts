@@ -108,6 +108,9 @@ export function parseCoordinateField(raw: string, kind: "lat" | "lng"): Coordina
   const noun = kind === "lat" ? "latitud" : "longitud";
   const text = raw.trim();
   if (!text) return { error: `Indique una ${noun} numérica válida.` };
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {
+    return { error: `La ${noun} debe ser un número válido.` };
+  }
   const parsed = (kind === "lat" ? latitudeInput() : longitudeInput()).safeParse(Number(text));
   if (!parsed.success) {
     const message = parsed.error.issues[0]?.message ?? `Indique una ${noun} numérica válida.`;

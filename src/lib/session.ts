@@ -35,7 +35,8 @@ export type PublicSession = Omit<Session, "accessToken"> & {
 
 export class AuthUnavailableError extends Error {
   constructor(message = "La autenticación solicitada no está disponible.") {
-    super(message);
+    console.error("[m6-auth-unavailable]", message);
+    super("La autenticación solicitada no está disponible.");
     this.name = "AuthUnavailableError";
   }
 }

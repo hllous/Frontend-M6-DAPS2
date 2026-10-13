@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "@/lib/indicator-fixtures";
-import { defaultIndicatorQuery, indicatorQueryErrorMessage, indicatorQuerySchema } from "@/lib/indicators";
+import { defaultIndicatorQuery, familyAppliesCatalogFilters, indicatorQueryErrorMessage, indicatorQuerySchema } from "@/lib/indicators";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
 const families = ["coverage", "compliance", "incidents", "waste"] as const;
@@ -20,8 +20,8 @@ function queryString(request: Request, family: IndicatorFamily) {
   const params = new URLSearchParams();
   if (parsed.data.from) params.set("from", parsed.data.from);
   if (parsed.data.to) params.set("to", parsed.data.to);
-  if ((family === "coverage" || family === "compliance") && parsed.data.zoneId) params.set("zoneId", parsed.data.zoneId);
-  if ((family === "coverage" || family === "compliance") && parsed.data.serviceTypeId) params.set("serviceTypeId", parsed.data.serviceTypeId);
+  if (familyAppliesCatalogFilters(family) && parsed.data.zoneId) params.set("zoneId", parsed.data.zoneId);
+  if (familyAppliesCatalogFilters(family) && parsed.data.serviceTypeId) params.set("serviceTypeId", parsed.data.serviceTypeId);
   return { value: params.toString() ? `?${params.toString()}` : "" } as const;
 }
 

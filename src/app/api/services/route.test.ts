@@ -296,3 +296,37 @@ describe("Services list backend contract", () => {
     expect((await GET(listRequest())).status).toBe(502);
   });
 });
+
+describe("Services list pagination and crew scope", () => {
+  it.each([
+    ["?page=-9&pageSize=-2", "?page=1&pageSize=1"],
+    ["?page=99999999999&pageSize=9999", "?page=10000000&pageSize=100"],
+    ["?page=2.8&pageSize=3.8", "?page=2&pageSize=3"],
+    ["?page=invalid&pageSize=invalid", ""],
+  ])("clamps pagination %s before forwarding", async (query, expected) => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(envelope));
+    expect((await GET(listRequest(query))).status).toBe(200);
+    expect(String(fetch.mock.calls[0][0])).toBe(`https://backend.internal/services${expected}`);
+  });
+  it("overrides an arbitrary crewId with the Field session crew", async () => {
+    listRequest();
+    const session = createSession("field-crew-leader-route", {
+      mode: "backend-development", devJwt: process.env.M6_DEV_JWT, backendOrigin: process.env.M6_BACKEND_ORIGIN,
+    });
+    session.crew = { id: "crew-real", name: "Cuadrilla real" };
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(envelope));
+    const response = await GET(new Request("http://localhost/api/services?crewId=crew-other", {
+      headers: { cookie: `${AUTH_COOKIE_NAME}=${sealSession(session)}` },
+    }));
+    expect(response.status).toBe(200);
+    expect(String(fetch.mock.calls[0][0])).toBe("https://backend.internal/services?crewId=crew-real");
+  });
+  it("returns only the Field crew services in mock mode even with another crew filter", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const response = await GET(new Request("http://localhost/api/services?crewId=crew-a", { headers: { cookie } }));
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.data.length).toBeGreaterThan(0);
+    expect(payload.data.every((service: { crewId: string }) => service.crewId === "crew-b")).toBe(true);
+  });
+});

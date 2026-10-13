@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -51,6 +52,20 @@ type LoadState =
   | { status: "loading" }
   | { status: "ready"; items: Route[] }
   | { status: "error"; message: string };
+
+type StalenessWarningReason = "changed" | "unavailable" | null;
+
+function stopSequenceSignature(stops: Route["stops"]) {
+  return JSON.stringify(
+    stops
+      .map((stop) => ({
+        zoneId: stop.zoneId,
+        order: stop.sequence,
+        estimatedDurationMin: stop.estimatedDurationMin,
+      }))
+      .sort((left, right) => left.order - right.order),
+  );
+}
 
 export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario }) {
   const canManage =
@@ -93,6 +108,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   const [referencesAcknowledged, setReferencesAcknowledged] = useState(false);
   const [isLoadingReferences, setIsLoadingReferences] = useState(false);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
 
   // Stop sequence editor state (#111)
   type StopDraftItem = {
@@ -104,12 +120,13 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   };
   const [isEditingStops, setIsEditingStops] = useState(false);
   const [initialUpdatedAt, setInitialUpdatedAt] = useState<string | null>(null);
+  const [initialStopsSignature, setInitialStopsSignature] = useState("");
   const [draftStops, setDraftStops] = useState<StopDraftItem[]>([]);
   const [newStopZoneId, setNewStopZoneId] = useState("");
   const [newStopDuration, setNewStopDuration] = useState(30);
   const [stopEditorError, setStopEditorError] = useState<string | null>(null);
   const [isSavingStops, setIsSavingStops] = useState(false);
-  const [showStalenessWarning, setShowStalenessWarning] = useState(false);
+  const [stalenessWarningReason, setStalenessWarningReason] = useState<StalenessWarningReason>(null);
 
   // Load available zones once
   useEffect(() => {
@@ -245,6 +262,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     setReferencesReport(null);
     setReferencesUnavailable(false);
     setReferencesAcknowledged(false);
+    setDeactivateError(null);
     setIsLoadingReferences(true);
     try {
       const report = await routesAdapter.checkReferences(route.id);
@@ -267,8 +285,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         setSelectedRoute(updated);
       }
       setRequestVersion((v) => v + 1);
-    } catch {
-      // Deactivate failed
+    } catch (caught) {
+      setDeactivateError(caught instanceof RouteRequestError ? caught.message : "No se pudo dar de baja el recorrido.");
     } finally {
       setIsSubmittingDeactivate(false);
     }
@@ -277,6 +295,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   function handleOpenStopEditor() {
     if (!selectedRoute) return;
     setInitialUpdatedAt(selectedRoute.updatedAt ?? null);
+    setInitialStopsSignature(stopSequenceSignature(selectedRoute.stops));
     setDraftStops(
       selectedRoute.stops.map((s, idx) => ({
         tempId: s.id || `stop-draft-${idx}-${Date.now()}`,
@@ -289,7 +308,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     setNewStopZoneId("");
     setNewStopDuration(30);
     setStopEditorError(null);
-    setShowStalenessWarning(false);
+    setStalenessWarningReason(null);
     setIsEditingStops(true);
   }
 
@@ -388,14 +407,20 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     // Advisory staleness check (criterion 4)
     try {
       const fresh = await routesAdapter.get(selectedRoute.id);
-      if (initialUpdatedAt && fresh.updatedAt && fresh.updatedAt !== initialUpdatedAt) {
+      const routeDetailsChanged = Boolean(
+        initialUpdatedAt && fresh.updatedAt && fresh.updatedAt !== initialUpdatedAt,
+      );
+      const stopsChanged = stopSequenceSignature(fresh.stops) !== initialStopsSignature;
+      if (routeDetailsChanged || stopsChanged) {
         // Staleness detected! Advisory warning
-        setShowStalenessWarning(true);
+        setStalenessWarningReason("changed");
         setIsSavingStops(false);
         return;
       }
     } catch {
-      // Non-blocking precheck
+      setStalenessWarningReason("unavailable");
+      setIsSavingStops(false);
+      return;
     }
 
     await executeSaveStops();
@@ -405,7 +430,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     if (!selectedRoute) return;
     setIsSavingStops(true);
     setStopEditorError(null);
-    setShowStalenessWarning(false);
+    setStalenessWarningReason(null);
 
     try {
       const updated = await routesAdapter.setStops(selectedRoute.id, {
@@ -433,7 +458,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   function handleCancelStopEditor() {
     setIsEditingStops(false);
     setStopEditorError(null);
-    setShowStalenessWarning(false);
+    setStalenessWarningReason(null);
   }
 
   return (
@@ -468,7 +493,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 <span
                   className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                     selectedRoute.active
-                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                      ? "bg-[var(--color-success-fill)] text-[var(--color-success)]"
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
@@ -697,7 +722,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                                 max={1440}
                                 value={stop.estimatedDurationMin}
                                 onChange={(e) => handleDurationChange(idx, Number(e.target.value))}
-                                className="h-8 w-20 rounded-md border border-input bg-transparent px-2 text-xs text-right"
+                                className="h-10 w-20 rounded-md border border-input bg-transparent px-2 text-xs text-right max-[760px]:h-12"
                                 data-testid={`stop-duration-input-${idx}`}
                               />
                               <span className="text-xs text-muted-foreground">min</span>
@@ -709,7 +734,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                                 size="sm"
                                 onClick={() => handleMoveStop(idx, "up")}
                                 disabled={idx === 0}
-                                className="h-7 w-7 p-0"
+                                className="h-10 w-10 p-0 max-[760px]:h-12 max-[760px]:w-12"
                                 title="Mover arriba"
                                 aria-label="Mover arriba"
                                 data-testid={`stop-move-up-${idx}`}
@@ -722,7 +747,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                                 size="sm"
                                 onClick={() => handleMoveStop(idx, "down")}
                                 disabled={idx === draftStops.length - 1}
-                                className="h-7 w-7 p-0"
+                                className="h-10 w-10 p-0 max-[760px]:h-12 max-[760px]:w-12"
                                 title="Mover abajo"
                                 aria-label="Mover abajo"
                                 data-testid={`stop-move-down-${idx}`}
@@ -734,7 +759,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleRemoveStop(idx)}
-                                className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                                className="h-10 w-10 p-0 text-destructive hover:bg-destructive/10 max-[760px]:h-12 max-[760px]:w-12"
                                 title="Quitar parada"
                                 aria-label="Quitar parada"
                                 data-testid={`stop-remove-${idx}`}
@@ -756,7 +781,11 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <div className="flex-1">
+                      <label htmlFor="stop-zone-select" className="mb-1 block text-xs font-medium text-foreground">
+                        Zona operativa
+                      </label>
                       <select
+                        id="stop-zone-select"
                         value={newStopZoneId}
                         onChange={(e) => setNewStopZoneId(e.target.value)}
                         className={`${formControlClass} w-full text-xs`}
@@ -799,7 +828,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                       variant="secondary"
                       size="sm"
                       onClick={handleAddStop}
-                      className="inline-flex items-center gap-1 text-xs"
+                      className="inline-flex h-10 items-center gap-1 text-xs max-[760px]:h-12"
                       data-testid="add-stop-button"
                     >
                       <Plus className="h-3.5 w-3.5" />
@@ -851,8 +880,12 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           {/* Search */}
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <label htmlFor="search-routes-input" className="mb-1 block text-xs font-medium text-foreground">
+              Buscar recorridos
+            </label>
+            <Search className="absolute left-2.5 top-8 h-4 w-4 text-muted-foreground max-[760px]:top-9" />
             <input
+              id="search-routes-input"
               type="text"
               placeholder="Buscar por código o nombre..."
               value={search}
@@ -997,7 +1030,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
                       {route.stops.length === 0 ? (
-                        <span className="text-amber-600 dark:text-amber-400 font-medium">
+                        <span className="font-medium text-[var(--color-warning)]">
                           Sin paradas
                         </span>
                       ) : (
@@ -1008,7 +1041,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                           route.active
-                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                            ? "bg-[var(--color-success-fill)] text-[var(--color-success)]"
                             : "bg-muted text-muted-foreground"
                         }`}
                       >
@@ -1238,127 +1271,97 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         </DialogContent>
       </Dialog>
 
-      {/* Modal: Confirmación de desactivación con advertencia de referencias de ServiceFrequency */}
-      <Dialog
+      <CatalogDeactivationDialog
         open={deactivatingRoute !== null}
         onOpenChange={(open) => {
           if (!open) {
             setDeactivatingRoute(null);
             setReferencesReport(null);
+            setDeactivateError(null);
           }
         }}
+        title={`Confirmar baja del recorrido ${deactivatingRoute?.code ?? ""}`.trim()}
+        consequence={`El recorrido ${deactivatingRoute?.code ?? ""} — ${deactivatingRoute?.name ?? ""} quedará inactivo. Las frecuencias existentes conservarán su referencia.`.trim()}
+        confirmAction={`Dar de baja el recorrido ${deactivatingRoute?.code ?? ""}`.trim()}
+        safeAlternative={`Conservar recorrido ${deactivatingRoute?.code ?? ""}`.trim()}
+        confirmDisabled={isLoadingReferences || (referencesUnavailable && !referencesAcknowledged)}
+        isSubmitting={isSubmittingDeactivate}
+        onConfirm={() => void handleConfirmDeactivate()}
+        contentClassName="sm:max-w-md"
+        confirmDataTestId="confirm-deactivate-button"
       >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              Desactivar recorrido
-            </DialogTitle>
-            <DialogDescription>
-              ¿Está seguro de que desea desactivar el recorrido{" "}
-              <strong>{deactivatingRoute?.code} ({deactivatingRoute?.name})</strong>?
-            </DialogDescription>
-          </DialogHeader>
-
-          {isLoadingReferences ? (
-            <div className="flex items-center justify-center py-4 text-xs text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Verificando referencias a frecuencias de servicio...
-            </div>
-          ) : referencesUnavailable ? (
-            <div className="flex flex-col gap-3">
-              <Alert className="border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
-                <AlertTriangle aria-hidden="true" />
-                <AlertDescription className="text-[var(--color-warning)]">
-                  No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
-                </AlertDescription>
-              </Alert>
-              <Field>
-                <FieldLabel className="flex min-h-10 cursor-pointer items-center gap-3 [@media(max-width:760px)]:min-h-12">
-                  <Checkbox checked={referencesAcknowledged} onCheckedChange={setReferencesAcknowledged} disabled={isSubmittingDeactivate} />
-                  Entiendo que no se verificaron las referencias
-                </FieldLabel>
-              </Field>
+        {deactivateError ? <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{deactivateError}</p> : null}
+        {isLoadingReferences ? (
+          <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Verificando referencias a frecuencias de servicio...
+          </div>
+        ) : referencesUnavailable ? (
+          <div className="flex flex-col gap-3">
+            <Alert className="border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
+              <AlertTriangle aria-hidden="true" />
+              <AlertDescription className="text-[var(--color-warning)]">
+                No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
+              </AlertDescription>
+            </Alert>
+            <Field>
+              <FieldLabel className="flex min-h-10 cursor-pointer items-center gap-3 [@media(max-width:760px)]:min-h-12">
+                <Checkbox checked={referencesAcknowledged} onCheckedChange={setReferencesAcknowledged} disabled={isSubmittingDeactivate} />
+                Entiendo que no se verificaron las referencias
+              </FieldLabel>
+            </Field>
+          </div>
+        ) : referencesReport ? (
+          referencesReport.totalReferences > 0 ? (
+            <div className="space-y-3">
+              <div className="space-y-2 rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-xs text-[var(--color-warning)]" data-testid="references-warning-dialog">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  Advertencia: el recorrido está asignado a frecuencias de servicio activas
+                </div>
+                <p>El backend no realiza control referencial automático. Desactivar este recorrido mantendrá las frecuencias existentes pero podría impactar en la programación operativa futura.</p>
+                <div className="mt-1 space-y-1 rounded border bg-background/50 p-2">
+                  <div className="text-xs font-medium">Frecuencias activas ({referencesReport.activeServiceFrequencies.length}):</div>
+                  <ul className="list-disc space-y-0.5 pl-4">
+                    {referencesReport.activeServiceFrequencies.map((frequency) => <li key={frequency.id}><strong>{frequency.serviceTypeName}</strong> — Turno {frequency.shift} ({frequency.weekdays.join(", ")})</li>)}
+                  </ul>
+                </div>
+              </div>
             </div>
           ) : (
-            referencesReport && (
-              <div className="space-y-3">
-                {referencesReport.totalReferences > 0 ? (
-                  /* Acceptance Criteria #3: Warns when referenced by active ServiceFrequency */
-                  <div
-                    className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200 space-y-2"
-                    data-testid="references-warning-dialog"
-                  >
-                    <div className="font-semibold flex items-center gap-1.5">
-                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                      Advertencia: El recorrido está asignado a frecuencias de servicio activas
-                    </div>
-                    <p>
-                      El backend no realiza control referencial automático. Desactivar este recorrido mantendrá las frecuencias existentes pero podría impactar en la programación operativa futura.
-                    </p>
-                    <div className="rounded border bg-background/50 p-2 space-y-1 mt-1">
-                      <div className="font-medium text-xs">Frecuencias activas ({referencesReport.activeServiceFrequencies.length}):</div>
-                      <ul className="list-disc pl-4 space-y-0.5">
-                        {referencesReport.activeServiceFrequencies.map((freq) => (
-                          <li key={freq.id}>
-                            <strong>{freq.serviceTypeName}</strong> — Turno {freq.shift} ({freq.weekdays.join(", ")})
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 p-2.5 rounded-md">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    No se detectaron frecuencias de servicio activas referenciando este recorrido.
-                  </div>
-                )}
-              </div>
-            )
-          )}
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setDeactivatingRoute(null);
-                setReferencesReport(null);
-              }}
-              disabled={isSubmittingDeactivate}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleConfirmDeactivate}
-              disabled={isSubmittingDeactivate || isLoadingReferences || (referencesUnavailable && !referencesAcknowledged)}
-              data-testid="confirm-deactivate-button"
-            >
-              {isSubmittingDeactivate && (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              )}
-              Confirmar desactivación
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <div className="flex items-center gap-2 rounded-md bg-[var(--color-success-fill)] p-2.5 text-xs text-[var(--color-success)]">
+              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+              No se detectaron frecuencias de servicio activas referenciando este recorrido.
+            </div>
+          )
+        ) : null}
+      </CatalogDeactivationDialog>
 
       {/* Staleness Advisory Warning Dialog (#111) */}
-      <Dialog open={showStalenessWarning} onOpenChange={setShowStalenessWarning}>
+      <Dialog
+        open={stalenessWarningReason !== null}
+        onOpenChange={(open) => !open && setStalenessWarningReason(null)}
+      >
         <DialogContent data-testid="staleness-warning-dialog" className="sm:max-w-md">
           <DialogHeader>
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 mb-2">
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
               <AlertTriangle className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-center">Aviso de concurrencia en el recorrido</DialogTitle>
+            <DialogTitle className="text-center">
+              {stalenessWarningReason === "unavailable"
+                ? "No se pudo verificar el recorrido"
+                : "Aviso de concurrencia en el recorrido"}
+            </DialogTitle>
             <DialogDescription className="text-center space-y-2 text-xs">
               <span className="block text-foreground text-sm font-medium">
-                El recorrido fue modificado en el servidor después de que abrió este editor.
+                {stalenessWarningReason === "unavailable"
+                  ? "No se pudo comprobar si el recorrido fue modificado en el servidor."
+                  : "El recorrido fue modificado en el servidor después de que abrió este editor."}
               </span>
-              <span className="block text-amber-800 dark:text-amber-300 font-medium bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-md text-left">
-                Aviso informativo (no autoritativo): El backend no posee control de concurrencia ni bloqueo optimista para paradas. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica.
+              <span className="block rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-2.5 text-left font-medium text-[var(--color-warning)]">
+                {stalenessWarningReason === "unavailable"
+                  ? "Aviso informativo: no fue posible verificar la secuencia actual. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."
+                  : "Aviso informativo (no autoritativo): El backend no posee control de concurrencia ni bloqueo optimista para paradas. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."}
               </span>
             </DialogDescription>
           </DialogHeader>
@@ -1366,7 +1369,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
             <Button
               type="button"
               variant="outline"
-              onClick={() => setShowStalenessWarning(false)}
+              onClick={() => setStalenessWarningReason(null)}
               disabled={isSavingStops}
               data-testid="cancel-staleness-button"
             >

@@ -12,7 +12,7 @@ describe("backendMode", () => {
     delete process.env.M6_BACKEND_ORIGIN;
 
     expect(() => backendMode({ mode: "backend-development" })).toThrow(
-      "El backend de desarrollo no está configurado.",
+      "La autenticación solicitada no está disponible.",
     );
   });
 
@@ -20,7 +20,7 @@ describe("backendMode", () => {
     process.env.M6_BACKEND_ORIGIN = "";
 
     expect(() => backendMode({ mode: "backend-development" })).toThrow(
-      "El backend de desarrollo no está configurado.",
+      "La autenticación solicitada no está disponible.",
     );
   });
 
@@ -49,7 +49,7 @@ describe("backendMode", () => {
   it.each([
     [new InvalidSessionError(), 401, "La sesión no está activa."],
     [new ForbiddenSessionError("Acceso denegado."), 403, "Acceso denegado."],
-    [new AuthUnavailableError("Sin backend."), 503, "Sin backend."],
+    [new AuthUnavailableError("Sin backend."), 503, "La autenticación solicitada no está disponible."],
     [new BackendUnavailableError(503, "El backend no responde. Reintente en unos segundos."), 503, "El backend no responde. Reintente en unos segundos."],
     [new Error("detalle interno"), 500, "No se pudo completar la solicitud."],
   ])("maps %s to its shared status and safe message", async (error, status, message) => {

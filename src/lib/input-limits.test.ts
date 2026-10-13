@@ -116,6 +116,10 @@ describe("parametros de consulta", () => {
 });
 
 describe("parseCoordinateField", () => {
+  it.each(["0x10", "0b10", "1e1", "-1e1"])("rechaza la forma no decimal %s", (raw) => {
+    expect(parseCoordinateField(raw, "lat")).toEqual({ error: "La latitud debe ser un número válido." });
+  });
+
   it("devuelve el valor redondeado a 7 decimales", () => {
     expect(parseCoordinateField(" -34.123456789 ", "lat")).toEqual({ value: -34.1234568 });
     expect(parseCoordinateField("-58.381599", "lng")).toEqual({ value: -58.381599 });
