@@ -413,12 +413,33 @@ export const NOT_SERVICED_REASON_LABEL: Record<NotServicedReason, string> = {
   OTHER: "Otro motivo",
 };
 
+export const serviceQuerySchema = z.object({
+  status: z.union([serviceStatusSchema, z.array(serviceStatusSchema)]).optional(),
+  mode: serviceModeSchema.optional(),
+  origin: serviceOriginSchema.optional(),
+  serviceTypeId: z.string().min(1).optional(),
+  vehicleId: z.string().min(1).optional(),
+  ticketId: z.string().min(1).optional(),
+  zoneId: z.string().min(1).optional(),
+  crewId: z.string().min(1).optional(),
+  scheduledFrom: z.union([z.iso.date(), z.iso.datetime({ offset: true })]).optional(),
+  scheduledTo: z.union([z.iso.date(), z.iso.datetime({ offset: true })]).optional(),
+  search: z.string().optional(),
+  timeFrom: z.string().optional(),
+  timeTo: z.string().optional(),
+  page: z.number().int().optional(),
+  pageSize: z.number().int().optional(),
+});
+
 export type ServiceQuery = {
   status?: ServiceStatus | ServiceStatus[];
   mode?: ServiceMode;
   origin?: ServiceOrigin;
   zoneId?: string;
   crewId?: string;
+  serviceTypeId?: string;
+  vehicleId?: string;
+  ticketId?: string;
   search?: string;
   timeFrom?: string;
   timeTo?: string;
@@ -484,7 +505,7 @@ export const STATUS_ORDER: Record<ServiceStatus, number> = {
   CANCELLED: 6,
 };
 
-const servicesEnvelopeSchema = z.object({
+export const servicesEnvelopeSchema = z.object({
   data: z.array(serviceWireSchema),
   meta: z.object({
     total: z.number(),
@@ -515,6 +536,9 @@ function buildServicesQueryString(query: ServiceQuery): string {
   if (query.origin) params.set("origin", query.origin);
   if (query.zoneId) params.set("zoneId", query.zoneId);
   if (query.crewId) params.set("crewId", query.crewId);
+  if (query.serviceTypeId) params.set("serviceTypeId", query.serviceTypeId);
+  if (query.vehicleId) params.set("vehicleId", query.vehicleId);
+  if (query.ticketId) params.set("ticketId", query.ticketId);
   if (query.search) params.set("search", query.search);
   if (query.timeFrom) params.set("timeFrom", query.timeFrom);
   if (query.timeTo) params.set("timeTo", query.timeTo);
