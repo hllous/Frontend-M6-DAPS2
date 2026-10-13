@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { servicesAdapter, type Service } from "@/lib/services";
 import { MAX_REASON_LENGTH } from "@/lib/input-limits";
 
@@ -58,15 +58,18 @@ function RescheduleReasonForm({
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reasonError, setReasonError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!reason.trim()) {
-      setErrorMessage("Debe indicar el motivo de la reprogramación.");
+      setReasonError("Debe indicar el motivo de la reprogramación.");
+      setErrorMessage(null);
       return;
     }
 
     setIsSubmitting(true);
+    setReasonError(null);
     setErrorMessage(null);
     try {
       const updated = await servicesAdapter.reschedule(service.id, { reason: reason.trim() });
@@ -117,19 +120,23 @@ function RescheduleReasonForm({
             value={reason}
             onChange={(e) => {
               setReason(e.target.value);
+            setReasonError(null);
               setErrorMessage(null);
             }}
             required
+          aria-invalid={Boolean(reasonError)}
+          aria-describedby={reasonError ? `${formId}-reason-help ${formId}-reason-error` : `${formId}-reason-help`}
             placeholder="Ej. Alerta meteorológica, rechazo de corte de calle por Tránsito…"
-            className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+          className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
           />
-          <FieldDescription>
+          <FieldDescription id={`${formId}-reason-help`}>
             La nueva fecha y ventana horaria se definen en un segundo paso, una vez confirmado el motivo.
           </FieldDescription>
+          {reasonError && <FieldError id={`${formId}-reason-error`}>{reasonError}</FieldError>}
         </Field>
       </form>
 
-      <DialogFooter>
+      <DialogFooter className="flex-wrap">
         <Button
           type="button"
           variant="outline"
@@ -138,15 +145,9 @@ function RescheduleReasonForm({
         >
           Cancelar
         </Button>
-        <Button type="submit" form={formId} disabled={isSubmitting} className="font-semibold">
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              <span>Reprogramando…</span>
-            </>
-          ) : (
-            <span>Mover a reprogramar</span>
-          )}
+        <Button type="submit" form={formId} disabled={isSubmitting} aria-busy={isSubmitting} className="min-h-12 font-semibold min-[761px]:min-h-10">
+          <Loader2 data-icon="inline-start" className={isSubmitting ? "animate-spin" : "invisible"} aria-hidden />
+          <span>Mover a reprogramar</span>
         </Button>
       </DialogFooter>
     </>

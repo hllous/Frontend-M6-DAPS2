@@ -162,6 +162,14 @@ export function ScheduleServiceDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [scheduledDateError, setScheduledDateError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    serviceType?: string;
+    target?: string;
+    targetRef?: string;
+    reference?: string;
+    route?: string;
+    zone?: string;
+  }>({});
 
   // Los tipos de servicio, recorridos y zonas son los del backend (UUID): no se pueden fijar en el código.
   useEffect(() => {
@@ -188,6 +196,7 @@ export function ScheduleServiceDialog({
     setTargetType(next);
     setSelectedTarget(null);
     setTargetSearch("");
+    setFieldErrors({});
   };
 
   const serviceTypes = useMemo(() => (catalogs.status === "ready" ? catalogs.serviceTypes : []), [catalogs]);
@@ -241,6 +250,7 @@ export function ScheduleServiceDialog({
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setErrorMessage(null);
+      setFieldErrors({});
       setScheduledDateError(null);
       setIsSubmitting(false);
     }
@@ -250,10 +260,13 @@ export function ScheduleServiceDialog({
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setErrorMessage(null);
+    setFieldErrors({});
     setScheduledDateError(null);
 
     if (catalogs.status !== "ready" || !selectedServiceType) {
-      setErrorMessage("No hay un tipo de servicio activo para programar. Cree o active uno en Catálogo > Tipos de servicio.");
+      const message = "No hay un tipo de servicio activo para programar. Cree o active uno en Catálogo > Tipos de servicio.";
+      if (catalogs.status === "ready") setFieldErrors({ serviceType: message });
+      else setErrorMessage(message);
       return;
     }
 
@@ -263,22 +276,22 @@ export function ScheduleServiceDialog({
     }
 
     if (inventoryType && !selectedTarget) {
-      setErrorMessage(`Debe elegir el ${TARGET_KIND_LABELS[inventoryType].toLocaleLowerCase("es")} sobre el que se ejecuta el servicio.`);
+      setFieldErrors({ target: `Debe elegir el ${TARGET_KIND_LABELS[inventoryType].toLocaleLowerCase("es")} sobre el que se ejecuta el servicio.` });
       return;
     }
 
     if (derivedMode === "POINT" && !inventoryType && !targetRef.trim()) {
-      setErrorMessage("Debe indicar la dirección o referencia de la ubicación.");
+      setFieldErrors({ targetRef: "Debe indicar la dirección o referencia de la ubicación." });
       return;
     }
 
     if (origin === "TICKET" && !referenceId.trim()) {
-      setErrorMessage("Debe indicar el UUID técnico del reclamo.");
+      setFieldErrors({ reference: "Debe indicar el UUID técnico del reclamo." });
       return;
     }
 
     if (origin === "TICKET" && !isUuid(referenceId.trim())) {
-      setErrorMessage("El ticketId debe ser un UUID válido. El identificador TK-… es publicId y no reemplaza el UUID técnico.");
+      setFieldErrors({ reference: "El ticketId debe ser un UUID válido. El identificador TK-… es publicId y no reemplaza el UUID técnico." });
       return;
     }
 
@@ -307,14 +320,16 @@ export function ScheduleServiceDialog({
         const stops = selectedRouteZones.length > 0 ? selectedRouteZones.map((zone) => zone.id) : (await routesAdapter.get(routeId)).stops.map((stop) => stop.zoneId);
         zoneIds = [...new Set(stops)];
       } catch (cause) {
-        setErrorMessage(cause instanceof Error ? cause.message : "No se pudo consultar el recorrido seleccionado.");
+        setFieldErrors({ route: cause instanceof Error ? cause.message : "No se pudo consultar el recorrido seleccionado." });
         setIsSubmitting(false);
         return;
       }
     }
 
     if (zoneIds.filter(Boolean).length === 0) {
-      setErrorMessage(derivedMode === "ROUTE" ? "El recorrido seleccionado no tiene paradas con zona asignada." : "Debe seleccionarse al menos una zona para el servicio.");
+      setFieldErrors(derivedMode === "ROUTE"
+        ? { route: "El recorrido seleccionado no tiene paradas con zona asignada." }
+        : { zone: "Debe seleccionarse al menos una zona para el servicio." });
       setIsSubmitting(false);
       return;
     }
@@ -387,7 +402,7 @@ export function ScheduleServiceDialog({
           </div>
         )}
 
-        <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-4 py-2" aria-busy={catalogs.status === "loading"}>
+        <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4 py-2" aria-busy={catalogs.status === "loading"}>
           {/* Linked Origin Banner */}
           {isLinked ? (
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3.5">
@@ -408,11 +423,13 @@ export function ScheduleServiceDialog({
                     <input
                       id="linked-ticket-id"
                       value={manualTicketId}
-                      onChange={(event) => setManualTicketId(event.target.value)}
-                      className="mt-1 h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 font-mono text-xs text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"
-                      aria-describedby="linked-ticket-id-help"
+                      onChange={(event) => { setManualTicketId(event.target.value); setFieldErrors((prev) => ({ ...prev, reference: undefined })); }}
+                      className="mt-1 min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 font-mono text-xs text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                      aria-invalid={Boolean(fieldErrors.reference)}
+                      aria-describedby={fieldErrors.reference ? "linked-ticket-id-help linked-ticket-id-error" : "linked-ticket-id-help"}
                     />
                     <FieldDescription id="linked-ticket-id-help">Pegue el UUID técnico del expediente. El formato TK-… es publicId y no sirve para correlacionar eventos.</FieldDescription>
+                    {fieldErrors.reference && <FieldError id="linked-ticket-id-error">{fieldErrors.reference}</FieldError>}
                   </Field>
                 )}
               </div>
@@ -425,7 +442,7 @@ export function ScheduleServiceDialog({
                 id="service-origin"
                 value={genericOrigin}
                 onChange={(e) => setGenericOrigin(e.target.value as ServiceOrigin)}
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
               >
                 <option value="MANUAL">Manual (operación a demanda)</option>
                 <option value="PLANNED">Planificado (programa regular de servicio)</option>
@@ -442,8 +459,10 @@ export function ScheduleServiceDialog({
             <select
               id="service-type"
               value={serviceTypeId}
-              onChange={(e) => setServiceTypeId(e.target.value)}
-              className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs font-medium text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+              onChange={(e) => { setServiceTypeId(e.target.value); setFieldErrors((prev) => ({ ...prev, serviceType: undefined })); }}
+              aria-invalid={Boolean(fieldErrors.serviceType)}
+              aria-describedby={fieldErrors.serviceType ? "service-type-error" : undefined}
+              className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs font-medium text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
             >
               {serviceTypes.map((st) => (
                 <option key={st.id} value={st.id}>
@@ -451,7 +470,8 @@ export function ScheduleServiceDialog({
                 </option>
               ))}
             </select>
-            <div className="mt-1.5 flex items-center gap-2">
+            {fieldErrors.serviceType && <FieldError id="service-type-error">{fieldErrors.serviceType}</FieldError>}
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="text-xs text-[var(--color-text-secondary)]">
                 Modo determinado por el catálogo:
               </span>
@@ -459,8 +479,8 @@ export function ScheduleServiceDialog({
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
                   derivedMode === "ROUTE"
-                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
-                    : "bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20",
+                    ? "bg-[var(--color-info-fill)] text-[var(--color-info)] border border-[var(--color-info-line)]"
+                    : "bg-[var(--color-info-fill)] text-[var(--color-accent)] border border-[var(--color-accent)]/20",
                 )}
               >
                 {derivedMode === "ROUTE" ? (
@@ -483,14 +503,16 @@ export function ScheduleServiceDialog({
 
           {/* Scope / Destination: ROUTE vs POINT */}
           {derivedMode === "ROUTE" ? (
-            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3.5 flex flex-col gap-2.5">
+            <div className="rounded-xl border border-[var(--color-info-line)] bg-[var(--color-info-fill)]/30 p-3.5 flex flex-col gap-2.5">
               <Field>
                 <FieldLabel htmlFor="service-route">Recorrido asignado *</FieldLabel>
                 <select
                   id="service-route"
                   value={routeId}
-                  onChange={(e) => setRouteId(e.target.value)}
-                  className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                  onChange={(e) => { setRouteId(e.target.value); setFieldErrors((prev) => ({ ...prev, route: undefined })); }}
+                  aria-invalid={Boolean(fieldErrors.route)}
+                  aria-describedby={fieldErrors.route ? "service-route-error" : undefined}
+                  className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                 >
                   {routes.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -498,6 +520,7 @@ export function ScheduleServiceDialog({
                     </option>
                   ))}
                 </select>
+                {fieldErrors.route && <FieldError id="service-route-error">{fieldErrors.route}</FieldError>}
               </Field>
 
               {selectedRoute && (
@@ -511,7 +534,7 @@ export function ScheduleServiceDialog({
                         key={zone.id}
                         className="inline-flex items-center gap-1 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] px-2 py-0.5 text-xs text-[var(--color-text)]"
                       >
-                        <Check className="h-3 w-3 text-blue-600 dark:text-blue-400" aria-hidden />
+                        <Check className="h-3 w-3 text-[var(--color-info)]" aria-hidden />
                         {zone.name}
                       </span>
                     ))}
@@ -520,14 +543,14 @@ export function ScheduleServiceDialog({
               )}
             </div>
           ) : (
-            <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3.5 flex flex-col gap-3">
+            <div className="rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-info-fill)]/30 p-3.5 flex flex-col gap-3">
               <Field>
                 <FieldLabel htmlFor="target-type">Tipo de objetivo *</FieldLabel>
                 <select
                   id="target-type"
                   value={targetType}
                   onChange={(e) => handleTargetTypeChange(e.target.value as TargetKind)}
-                  className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                  className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                 >
                   {(Object.keys(TARGET_KIND_LABELS) as TargetKind[]).map((kind) => (
                     <option key={kind} value={kind}>
@@ -547,7 +570,7 @@ export function ScheduleServiceDialog({
                       value={targetSearch}
                       onChange={(e) => setTargetSearch(e.target.value)}
                       placeholder={inventoryType === "GREEN_SPACE" ? "Nombre del espacio" : "Código o dirección"}
-                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                      className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                     />
                   </Field>
                   <Field>
@@ -555,10 +578,12 @@ export function ScheduleServiceDialog({
                     <select
                       id="target-id"
                       value={selectedTarget?.id ?? ""}
-                      onChange={(e) => setSelectedTarget(visibleTargetOptions.find((o) => o.id === e.target.value) ?? null)}
-                      aria-describedby="target-id-status"
+                      onChange={(e) => { setSelectedTarget(visibleTargetOptions.find((o) => o.id === e.target.value) ?? null); setFieldErrors((prev) => ({ ...prev, target: undefined })); }}
+                      required
+                      aria-invalid={Boolean(fieldErrors.target)}
+                      aria-describedby={fieldErrors.target ? "target-id-status target-id-error" : "target-id-status"}
                       aria-busy={targetOptions.status === "loading"}
-                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                      className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                     >
                       <option value="">Seleccione un bien…</option>
                       {visibleTargetOptions.map((option) => (
@@ -573,6 +598,7 @@ export function ScheduleServiceDialog({
                       {targetOptions.status === "ready" && targetOptions.options.length > 0 &&
                         (selectedTargetZone ? `Zona derivada del bien: ${selectedTargetZone.name}.` : "La zona del servicio se deriva del bien elegido.")}
                     </FieldDescription>
+                    {fieldErrors.target && <FieldError id="target-id-error">{fieldErrors.target}</FieldError>}
                     {targetOptions.status === "error" && (
                       <FieldError>No se pudo consultar el inventario. Cambie la búsqueda para reintentar.</FieldError>
                     )}
@@ -585,8 +611,10 @@ export function ScheduleServiceDialog({
                     <select
                       id="point-zone"
                       value={pointZoneId}
-                      onChange={(e) => setPointZoneId(e.target.value)}
-                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                      onChange={(e) => { setPointZoneId(e.target.value); setFieldErrors((prev) => ({ ...prev, zone: undefined })); }}
+                      aria-invalid={Boolean(fieldErrors.zone)}
+                      aria-describedby={fieldErrors.zone ? "point-zone-error" : undefined}
+                      className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                     >
                       {zones
                         .filter((z) => z.active)
@@ -596,6 +624,7 @@ export function ScheduleServiceDialog({
                           </option>
                         ))}
                     </select>
+                    {fieldErrors.zone && <FieldError id="point-zone-error">{fieldErrors.zone}</FieldError>}
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="target-ref">Dirección o referencia *</FieldLabel>
@@ -603,11 +632,14 @@ export function ScheduleServiceDialog({
                       id="target-ref"
                       type="text"
                       value={targetRef}
-                      onChange={(e) => setTargetRef(e.target.value)}
+                      onChange={(e) => { setTargetRef(e.target.value); setFieldErrors((prev) => ({ ...prev, targetRef: undefined })); }}
                       placeholder="p. ej. Av. Rivadavia 2200"
                       required
-                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                      aria-invalid={Boolean(fieldErrors.targetRef)}
+                      aria-describedby={fieldErrors.targetRef ? "target-ref-error" : undefined}
+                      className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                     />
+                    {fieldErrors.targetRef && <FieldError id="target-ref-error">{fieldErrors.targetRef}</FieldError>}
                     <FieldDescription>Sin bien del inventario el servicio se ubica por zona; la referencia queda en las notas.</FieldDescription>
                   </Field>
                 </div>
@@ -637,7 +669,7 @@ export function ScheduleServiceDialog({
                   }
                 }}
                 required
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
               />
               {scheduledDateError && <FieldError id="scheduled-date-error">{scheduledDateError}</FieldError>}
             </Field>
@@ -650,7 +682,7 @@ export function ScheduleServiceDialog({
                 value={windowStart}
                 onChange={(e) => setWindowStart(e.target.value)}
                 required
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
               />
             </Field>
 
@@ -662,7 +694,7 @@ export function ScheduleServiceDialog({
                 value={windowEnd}
                 onChange={(e) => setWindowEnd(e.target.value)}
                 required
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
               />
             </Field>
           </div>
@@ -677,7 +709,7 @@ export function ScheduleServiceDialog({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Instrucciones especiales para la cuadrilla o restricciones de acceso…"
-              className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] resize-none"
+              className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] resize-none min-[761px]:min-h-10"
             />
           </Field>
 
@@ -690,7 +722,7 @@ export function ScheduleServiceDialog({
           </div>
         </form>
 
-        <DialogFooter>
+        <DialogFooter className="flex-wrap">
           <Button
             type="button"
             variant="outline"
@@ -703,16 +735,11 @@ export function ScheduleServiceDialog({
             type="submit"
             form={formId}
             disabled={isSubmitting || catalogs.status !== "ready"}
-            className="font-semibold"
+            aria-busy={isSubmitting}
+            className="min-h-12 font-semibold min-[761px]:min-h-10"
           >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                <span>Programando…</span>
-              </>
-            ) : (
-              <span>Programar servicio</span>
-            )}
+            <Loader2 data-icon="inline-start" className={isSubmitting ? "animate-spin" : "invisible"} aria-hidden />
+            <span>Programar servicio</span>
           </Button>
         </DialogFooter>
       </DialogContent>

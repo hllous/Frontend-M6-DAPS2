@@ -79,8 +79,69 @@ describe("ServicesWorkspace component", () => {
     expect(within(preview).getByRole("button", { name: /Ver detalle completo/ })).toBeInTheDocument();
 
     // Map marker is highlighted
-    const marker = await screen.findByRole("button", { name: /Parada 1: Recolección de residuos — Recorrido 4/ });
+    const marker = await screen.findByRole("button", { name: /Parada \d+: Recolección de residuos — Recorrido 4/ });
     expect(marker).toHaveAttribute("aria-pressed", "true");
+
+    const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>("tr[data-service-id]"));
+    const markers = Array.from(document.querySelectorAll<HTMLElement>("[data-service-id][aria-label^='Parada']"));
+    rows.forEach((serviceRow, rowIndex) => {
+      const serviceMarker = markers.find((candidate) => candidate.dataset.serviceId === serviceRow.dataset.serviceId);
+      if (!serviceMarker) return;
+      const markerRank = Number(serviceMarker.getAttribute("aria-label")?.match(/^Parada (\d+)/)?.[1]);
+      expect(markerRank).toBe(rowIndex + 1);
+    });
+  });
+
+  it("uses one roving grid row tab stop and supports arrow and selection keys", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>("tr[data-service-id]"));
+    expect(rows.filter((row) => row.tabIndex === 0)).toHaveLength(1);
+    expect(rows.filter((row) => row.tabIndex === -1)).toHaveLength(rows.length - 1);
+
+    const firstRowIndex = rows.findIndex((row) => row.tabIndex === 0);
+    const firstRow = rows[firstRowIndex];
+    firstRow.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(rows[firstRowIndex + 1]).toHaveFocus();
+    expect(rows[firstRowIndex + 1]).toHaveAttribute("aria-selected", "false");
+
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(rows[firstRowIndex + 1]).toHaveAttribute("aria-selected", "true"));
+  });
+
+  it("closes the live preview on Escape and restores focus to its table row", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    const row = within(table).getByText("Recolección de residuos — Recorrido 4").closest("tr")!;
+    await user.click(row);
+    expect(await screen.findByRole("complementary")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("complementary")).not.toBeInTheDocument());
+    expect(row).toHaveFocus();
+  });
+
+  it("uses the field layout at 760px and office layout from 761px", async () => {
+    const originalWidth = window.innerWidth;
+    const user = userEvent.setup();
+    try {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 760 });
+      render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+      expect(await screen.findByRole("button", { name: /Lista \(/ })).toBeInTheDocument();
+
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 761 });
+      fireEvent(window, new Event("resize"));
+      await user.click(await screen.findByRole("button", { name: /Intercambiar paneles/ }));
+      expect(screen.queryByRole("button", { name: /Lista \(/ })).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+      fireEvent(window, new Event("resize"));
+    }
   });
 
   it("synchronizes map marker selection with table and opens preview", async () => {
@@ -135,7 +196,9 @@ describe("ServicesWorkspace component", () => {
 
     // Go back to workspace
     await user.click(screen.getByRole("button", { name: "Volver a Servicios" }));
-    expect(screen.getByRole("region", { name: "Tabla operativa de Servicios" })).toBeInTheDocument();
+    const returnedTable = screen.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const returnedRow = within(returnedTable).getByText("Recolección de residuos — Recorrido 4").closest("tr")!;
+    await waitFor(() => expect(returnedRow).toHaveFocus());
   });
 
   it("operates map markers using keyboard Enter and Space", async () => {
@@ -143,7 +206,7 @@ describe("ServicesWorkspace component", () => {
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-    const marker = await screen.findByRole("button", { name: /Parada 1: Recolección de residuos — Recorrido 4/ });
+    const marker = await screen.findByRole("button", { name: /Parada \d+: Recolección de residuos — Recorrido 4/ });
     marker.focus();
     expect(marker).toHaveFocus();
 
@@ -207,6 +270,7 @@ describe("ServicesWorkspace component", () => {
       expect(within(crewFilter).getByRole("checkbox", { name: "Cuadrilla C" })).toBeInTheDocument();
       await user.click(within(crewFilter).getByRole("button", { name: "Limpiar" }));
       await user.keyboard("{Escape}");
+      expect(screen.getByRole("button", { name: "Filtrar por cuadrilla" })).toHaveFocus();
 
       await user.click(screen.getByRole("button", { name: "Filtrar por zona" }));
 
