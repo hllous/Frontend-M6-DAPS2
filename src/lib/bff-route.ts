@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { fetchBackend, pathId } from "./bff-backend";
+import { getScenario, type Capability, type OperationalScenario } from "./scenarios";
 
 import {
   AuthUnavailableError,
   BackendUnavailableError,
   ForbiddenSessionError,
   InvalidSessionError,
+  getRequiredSession,
+  requireCapability,
   type Session,
 } from "./session";
 
@@ -25,6 +31,72 @@ const ERROR_LABELS: Record<number, string> = {
   503: "Service Unavailable",
   504: "Gateway Timeout",
 };
+
+export function authorize(
+  request: Request,
+  options: { office?: true; capability: Capability },
+): { session: Session; scenario: OperationalScenario } | NextResponse {
+  try {
+    const session = getRequiredSession(request);
+    const scenario = getScenario(session);
+    if (options.office && scenario.actor.kind !== "OFFICE") {
+      throw new ForbiddenSessionError("Esta acción requiere una sesión de Oficina.");
+    }
+    requireCapability(session, options.capability);
+    return { session, scenario };
+  } catch (error) {
+    return mapSessionError(error, new URL(request.url).pathname, "No se pudo autorizar la solicitud.");
+  }
+}
+
+// Scope checks need the ownership fields, not the view adapter's enriched Service.
+// Preserve the remaining wire fields so callers can reuse this single read.
+const crewScopedServiceSchema = z.object({
+  id: z.string(),
+  crewId: z.string().nullable().optional(),
+}).passthrough();
+export type CrewScopedService = z.infer<typeof crewScopedServiceSchema>;
+
+/** Office has no crew restriction; undefined means no scope lookup was necessary. */
+export async function requireCrewScope(
+  request: Request,
+  session: Session,
+  { serviceId }: { serviceId: string },
+): Promise<CrewScopedService | NextResponse | undefined> {
+  const path = new URL(request.url).pathname;
+  try {
+    const useBackend = backendMode(session);
+    const scenario = getScenario(session);
+    if (scenario.actor.kind === "OFFICE") return undefined;
+    const crewId = useBackend ? session.crew?.id : scenario.actor.crewId;
+    if (scenario.actor.kind !== "FIELD" || !crewId) {
+      return errorResponse(403, "El servicio no pertenece a la cuadrilla asignada a este usuario.", path);
+    }
+
+    let service: CrewScopedService;
+    if (useBackend) {
+      const response = await fetchBackend(request, `/services/${pathId(serviceId)}`);
+      if (!response.ok) return forwardResponse(response);
+      const payload: unknown = await response.json().catch(() => undefined);
+      const parsed = crewScopedServiceSchema.safeParse(payload);
+      if (!parsed.success) {
+        return errorResponse(502, "La respuesta del servicio no respeta el contrato documentado.", path);
+      }
+      service = parsed.data;
+    } else {
+      const { serviceFixtures } = await import("./services-fixtures");
+      const fixture = serviceFixtures.find((candidate) => candidate.id === serviceId);
+      if (!fixture) return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
+      service = fixture;
+    }
+    if (service.crewId !== crewId) {
+      return errorResponse(403, "El servicio no pertenece a la cuadrilla asignada a este usuario.", path);
+    }
+    return service;
+  } catch (error) {
+    return mapSessionError(error, path, "No se pudo verificar la cuadrilla del servicio.");
+  }
+}
 
 export function backendMode(session: Pick<Session, "mode">): boolean {
   if (session.mode === "mock") return false;
