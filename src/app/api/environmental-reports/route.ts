@@ -1,5 +1,6 @@
 import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import {
@@ -10,9 +11,11 @@ import {
 } from "@/lib/environmental-report-fixtures";
 import {
   createEnvironmentalReportInputSchema,
+  environmentalReportSchema,
   environmentalReportPrioritySchema,
   environmentalReportStatusSchema,
   environmentalReportTypeSchema,
+  type EnvironmentalReport,
   type EnvironmentalReportQuery,
 } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
@@ -40,6 +43,69 @@ function visibleToField(report: { assignedCrewId?: string | null }, scenario: Re
   return scenario.actor.kind !== "FIELD" || Boolean(scenario.actor.crewId && report.assignedCrewId === scenario.actor.crewId);
 }
 
+function matchesQuery(report: EnvironmentalReport, query: EnvironmentalReportQuery) {
+  if (query.status && report.status !== query.status) return false;
+  if (query.reportType && report.reportType !== query.reportType) return false;
+  if (query.priority && report.priority !== query.priority) return false;
+  if (query.publicId && report.publicId !== query.publicId) return false;
+  if (query.ticketId && report.ticketId !== query.ticketId) return false;
+  const search = query.search?.trim().toLowerCase();
+  if (search && ![report.id, report.address ?? "", report.description ?? "", report.publicId ?? "", report.ticketId ?? ""].some((value) => value.toLowerCase().includes(search))) return false;
+  return true;
+}
+
+const environmentalReportPageSchema = z.object({
+  data: z.array(environmentalReportSchema),
+  meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
+}).passthrough();
+
+function backendListQuery(query: EnvironmentalReportQuery, page: number, pageSize: number) {
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.reportType) params.set("reportType", query.reportType);
+  if (query.priority) params.set("priority", query.priority);
+  if (query.publicId) params.set("publicId", query.publicId);
+  if (query.ticketId) params.set("ticketId", query.ticketId);
+  const search = query.search?.trim();
+  if (search) params.set("search", search);
+  params.set("page", String(page));
+  params.set("pageSize", String(pageSize));
+  return params.toString();
+}
+
+async function listFieldReports(request: Request, query: EnvironmentalReportQuery, crewId: string | undefined, path: string) {
+  if (!crewId) return errorResponse(403, "La sesión no tiene una cuadrilla asignada.", path);
+
+  const backendPageSize = 100;
+  const visibleReports: EnvironmentalReport[] = [];
+  let totalPages = 1;
+  for (let page = 1; page <= totalPages; page += 1) {
+    const backendResponse = await fetchBackend(
+      request,
+      `/environmental-reports?${backendListQuery(query, page, backendPageSize)}`,
+      "environmentalReport:view",
+    );
+    if (!backendResponse.ok) return forwardResponse(backendResponse);
+
+    let payload: unknown;
+    try { payload = await backendResponse.json(); } catch {
+      return errorResponse(502, "La respuesta de expedientes ambientales no contiene JSON válido.", path);
+    }
+    const parsed = environmentalReportPageSchema.safeParse(payload);
+    if (!parsed.success) return errorResponse(502, "La respuesta de expedientes ambientales no respeta el contrato documentado.", path);
+    if (page === 1) totalPages = Math.max(1, parsed.data.meta.totalPages);
+    visibleReports.push(...parsed.data.data.filter((report) => report.assignedCrewId === crewId && matchesQuery(report, query)));
+  }
+
+  const page = query.page ?? 1;
+  const pageSize = query.pageSize ?? 100;
+  return NextResponse.json({
+    data: visibleReports.slice((page - 1) * pageSize, page * pageSize),
+    meta: { total: visibleReports.length, page, pageSize, totalPages: Math.max(1, Math.ceil(visibleReports.length / pageSize)) },
+    sanctionOutcomeIntegrationExceptions: [],
+  });
+}
+
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
@@ -49,6 +115,7 @@ export async function GET(request: Request) {
     const query = queryFromUrl(new URL(request.url));
 
     if (backendMode(session)) {
+      if (scenario.actor.kind === "FIELD") return listFieldReports(request, query, session.crew?.id, path);
       const backendResponse = await fetchBackend(request, `/environmental-reports${new URL(request.url).search}`, "environmentalReport:view");
       return forwardResponse(backendResponse);
     }

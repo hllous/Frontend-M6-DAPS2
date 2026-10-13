@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
+import { environmentalReportSchema } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
 
@@ -18,6 +19,21 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/environmental-reports/${pathId(id)}`, "environmentalReport:view");
+      if (scenario.actor.kind === "FIELD" && backendResponse.ok) {
+        let payload: unknown;
+        try { payload = await backendResponse.json(); } catch {
+          return errorResponse(502, "La respuesta del expediente ambiental no contiene JSON válido.", path);
+        }
+        const raw = payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+          ? (payload as { data: unknown }).data
+          : payload;
+        const parsed = environmentalReportSchema.safeParse(raw);
+        if (!parsed.success) return errorResponse(502, "La respuesta del expediente ambiental no respeta el contrato documentado.", path);
+        if (!session.crew?.id || parsed.data.assignedCrewId !== session.crew.id) {
+          return errorResponse(404, "Expediente ambiental no encontrado.", path);
+        }
+        return NextResponse.json(parsed.data);
+      }
       return forwardResponse(backendResponse);
     }
 
