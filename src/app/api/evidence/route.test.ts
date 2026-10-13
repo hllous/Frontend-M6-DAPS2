@@ -147,18 +147,37 @@ describe("POST /api/evidence BFF route", () => {
 
   it("returns 413 when file exceeds 10 MB", async () => {
     const cookie = await authenticatedCookie("field-crew-leader-route");
-    const largeFile = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "big.jpg", { type: "image/jpeg" });
-    const formData = new FormData();
-    formData.append("file", largeFile);
-    formData.append("fileSize", "1");
-    formData.append("ownerType", "ZONE_RESULT");
-    formData.append("ownerId", "ZR-1");
+    const boundary = "----evidence-test-boundary";
+    const fileContents = "x".repeat(10 * 1024 * 1024 + 1);
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="file"; filename="big.jpg"',
+      "Content-Type: image/jpeg",
+      "",
+      fileContents,
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="ownerType"',
+      "",
+      "ZONE_RESULT",
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="ownerId"',
+      "",
+      "ZR-1",
+      `--${boundary}--`,
+      "",
+    ].join("\r\n");
 
     const response = await POST(
       new Request("http://localhost/api/evidence", {
         method: "POST",
-        headers: { cookie, "Idempotency-Key": "key-3" },
-        body: formData,
+        headers: {
+          cookie,
+          "Idempotency-Key": "key-3",
+          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+          // The body contains >10 MB despite this intentionally understated hint.
+          "Content-Length": "1",
+        },
+        body,
       }),
     );
     expect(response.status).toBe(413);
