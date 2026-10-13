@@ -163,9 +163,20 @@ export function EvidenceQueueView({
             Opcional. Formatos JPEG, PNG, WebP o PDF hasta {EVIDENCE_FILE_SIZE_LABEL}.
           </span>
         </div>
+        <input
+          id={inputId}
+          type="file"
+          multiple
+          accept={ACCEPTED_FILE_TYPES}
+          onChange={onFileSelect}
+          disabled={disabled}
+          aria-invalid={Boolean(fileValidationError)}
+          aria-describedby={fileValidationError ? "container-evidence-error" : undefined}
+          className="peer sr-only"
+        />
         <label
           htmlFor={inputId}
-          className={`inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors ${
+          className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--color-border-strong)] bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors peer-focus-visible:ring-3 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-[var(--color-focus)] max-[760px]:min-h-12 ${
             disabled
               ? "opacity-50 cursor-not-allowed"
               : "hover:bg-muted cursor-pointer"
@@ -174,19 +185,11 @@ export function EvidenceQueueView({
           <Upload className="size-3.5" aria-hidden />
           <span>Seleccionar archivo</span>
         </label>
-        <input
-          id={inputId}
-          type="file"
-          multiple
-          accept={ACCEPTED_FILE_TYPES}
-          onChange={onFileSelect}
-          disabled={disabled}
-          className="sr-only"
-        />
       </div>
 
       {fileValidationError && (
         <div
+          id="container-evidence-error"
           role="alert"
           className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive"
         >
