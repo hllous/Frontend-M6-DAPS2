@@ -104,7 +104,7 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
 
     expect(response.status).toBe(409);
     const body = await response.json();
-    expect(body.message).toMatch(/SCHEDULED/i);
+    expect(body.message).toBe("Solo se pueden reprogramar servicios programados (estado actual: En curso).");
   });
 
   it("moves a scheduled service to RESCHEDULED, preserving its zoneIds snapshot verbatim", async () => {
