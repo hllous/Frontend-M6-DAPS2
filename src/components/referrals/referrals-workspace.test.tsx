@@ -196,7 +196,9 @@ describe("ReferralsWorkspace", () => {
     const row = await screen.findByRole("button", { name: /RR-1001/ });
     row.focus();
     await user.keyboard("{Enter}");
-    expect(await screen.findByRole("region", { name: "Detalle de RR-1001" })).toBeVisible();
+    const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
+    expect(detail).toBeVisible();
+    await waitFor(() => expect(within(detail).getByRole("heading", { name: "Detalle de RR-1001" })).toHaveFocus());
 
     await user.click(screen.getByRole("button", { name: "Volver a derivaciones" }));
     await waitFor(() => expect(screen.getByRole("region", { name: "Lista de derivaciones" })).toBeVisible());
@@ -215,6 +217,12 @@ describe("ReferralsWorkspace", () => {
     expect(within(dialog).getByText(/acción solo registra un hecho externo ya confirmado/i)).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
     expect(within(dialog).getByRole("alert")).toHaveTextContent(/identificador externo de m3/i);
+    const recoveryIdentifier = within(dialog).getByLabelText(/Identificador externo de M3/);
+    const recoveryAlert = within(dialog).getByRole("alert");
+    const describedByIds = recoveryIdentifier.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
+    expect(recoveryIdentifier).toHaveAttribute("aria-invalid", "true");
+    expect(recoveryAlert.getAttribute("id")).toBeTruthy();
+    expect(describedByIds).toContain(recoveryAlert.getAttribute("id"));
 
     await user.type(within(dialog).getByLabelText(/Identificador externo de M3/), "M3-OT-2048");
     await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
