@@ -147,8 +147,7 @@ describe("GreenSpacesPanel pagination", () => {
 it("clamps the current page after its last active record is deactivated", async () => {
   const vehicle = { id: "a358142e-a427-46b3-8b36-fb13091e023f", name: "Plaza remota", spaceType: "SQUARE" as const, zoneId: "zone-1", areaM2: 100, lat: null, lng: null, active: true };
   let removed = false;
-  vi.spyOn(window, "confirm").mockReturnValue(true);
-  vi.spyOn(greenSpacesAdapter, "remove").mockImplementation(async () => { removed = true; return { ...vehicle, active: false }; });
+  const remove = vi.spyOn(greenSpacesAdapter, "remove").mockImplementation(async () => { removed = true; return { ...vehicle, active: false }; });
   const list = vi.spyOn(greenSpacesAdapter, "list").mockImplementation(async (query) => ({ greenSpaces: removed && query?.page === 3 ? [] : [vehicle], page: query?.page ?? 1, pageSize: 20, total: removed ? 40 : 41, totalPages: removed ? 2 : 3 }));
   const user = userEvent.setup();
   render(<GreenSpacesPanel scenario={scenarios.officeDutyQueue} />);
@@ -159,6 +158,10 @@ it("clamps the current page after its last active record is deactivated", async 
   await user.click(screen.getByRole("button", { name: "Siguiente" }));
   await screen.findByText("Página 3 de 3");
   await user.click(screen.getByRole("button", { name: "Dar de baja" }));
+  const dialog = screen.getByRole("dialog");
+  expect(dialog).toHaveTextContent("Plaza remota");
+  expect(remove).not.toHaveBeenCalled();
+  await user.click(within(dialog).getByRole("button", { name: /Dar de baja el espacio verde Plaza remota/ }));
   expect(await screen.findByText("Página 2 de 2")).toBeVisible();
   await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, active: true })));
 });
