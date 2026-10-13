@@ -136,7 +136,7 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
 
   it("forwards the status-change DTO with JSON content type", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
     const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
 
     const response = await POST(
@@ -153,4 +153,16 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
     expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
     expect(JSON.parse(String(requestInit.body))).toEqual(rescheduleBody);
   });
+});
+
+it.each(["mock", "backend-development"])("denies limited Office planning before forwarding (%s)", async (mode) => {
+  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+  const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
+  const cookie = await authenticatedCookie("office-limited-intake", mode);
+  backendFetch.mockClear();
+  const response = await POST(new Request("http://localhost/api/services/real-service/reschedule", {
+    method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(rescheduleBody),
+  }), { params: Promise.resolve({ id: "real-service" }) });
+  expect(response.status).toBe(403);
+  expect(backendFetch).not.toHaveBeenCalled();
 });

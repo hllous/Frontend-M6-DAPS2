@@ -322,11 +322,14 @@ export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
 export const suspendServiceInputSchema = z.object({
   reason: notServicedReasonSchema,
   note: z.string().trim().min(1, "La nota es obligatoria para suspender el servicio"),
+}).refine((input) => toSuspendServiceBackendInput(input).reason.length <= 500, {
+  path: ["note"],
+  message: "El motivo y la nota de suspensión no pueden superar los 500 caracteres.",
 });
 export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
 
-export function toSuspendServiceBackendInput(input: SuspendServiceInput) {
-  return { reason: input.reason };
+export function toSuspendServiceBackendInput(input: { reason: NotServicedReason; note: string }) {
+  return { reason: `${NOT_SERVICED_REASON_LABEL[input.reason]}: ${input.note}` };
 }
 
 export const rescheduleServiceInputSchema = z.object({
@@ -1191,7 +1194,6 @@ export const servicesAdapter = {
     const formData = new FormData();
     formData.append("file", params.file);
     formData.append("fileName", params.file.name);
-    formData.append("fileSize", String(params.file.size));
     formData.append("ownerType", params.ownerType);
     formData.append("ownerId", params.ownerId);
 

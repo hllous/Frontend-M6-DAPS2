@@ -7,7 +7,6 @@ import {
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import {
-  NOT_SERVICED_REASON_LABEL,
   suspendServiceInputSchema,
   toSuspendServiceBackendInput,
 } from "@/lib/services";
@@ -89,7 +88,7 @@ export async function POST(
       );
     }
 
-    const statusReason = `${NOT_SERVICED_REASON_LABEL[input.reason]}: ${input.note}`;
+    const statusReason = toSuspendServiceBackendInput(input).reason;
 
     const updated = updateServiceFixture(service.id, {
       status: "SUSPENDED",
