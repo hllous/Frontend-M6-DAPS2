@@ -19,6 +19,12 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { formatCalendarDay } from "@/lib/argentina-date";
 import type { Service, ServiceStatus } from "@/lib/services";
 import { STATUS_LABEL, STATUS_ORDER } from "@/lib/services";
@@ -145,6 +151,8 @@ export function ServicesTable({
   onSortChange,
   columnFilters,
   onColumnFiltersChange,
+  hasActiveFilters = false,
+  onClearFilters,
   dense = false,
 }: {
   services: Service[];
@@ -156,6 +164,8 @@ export function ServicesTable({
   onSortChange: (key: SortKey) => void;
   columnFilters: ColumnFilters;
   onColumnFiltersChange: (filters: ColumnFilters) => void;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
   dense?: boolean;
 }) {
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
@@ -236,6 +246,7 @@ export function ServicesTable({
                     ? "ascending"
                     : "descending"
                   : "none";
+                const directionLabel = sortDir === "asc" ? "ascendente" : "descendente";
 
                 return (
                   <th
@@ -249,7 +260,7 @@ export function ServicesTable({
                         type="button"
                         onClick={() => onSortChange(col.key)}
                         className="flex items-center gap-1 hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] rounded"
-                        aria-label={`Ordenar por ${col.label}, actualmente ${ariaSort === "none" ? "sin ordenar" : ariaSort}`}
+                        aria-label={`Ordenar por ${col.label}, actualmente ${ariaSort === "none" ? "sin ordenar" : directionLabel}`}
                       >
                         <span>{col.label}</span>
                         {isSorted ? (
@@ -370,6 +381,7 @@ export function ServicesTable({
               return (
                 <tr
                   key={service.id}
+                  data-service-id={service.id}
                   ref={(el) => {
                     rowRefs.current[service.id] = el;
                   }}
@@ -401,12 +413,11 @@ export function ServicesTable({
                         <div className="font-semibold text-[var(--color-text)] leading-tight">
                           {service.title}
                         </div>
-                        <div className="mt-0.5 text-[11px] text-[var(--color-text-secondary)]">
-                          <span>{service.id}</span>
-                          {dense && (
-                            <span> · {service.zoneNames.join(", ")}</span>
-                          )}
-                        </div>
+                        {dense && service.zoneNames.length > 0 && (
+                          <div className="mt-0.5 text-[11px] text-[var(--color-text-secondary)]">
+                            {service.zoneNames.join(", ")}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -445,8 +456,28 @@ export function ServicesTable({
 
             {sortedServices.length === 0 && (
               <tr>
-                <td colSpan={columns.length} className="p-12 text-center text-sm text-[var(--color-text-secondary)]">
-                  Ningún servicio coincide con los filtros aplicados.
+                <td colSpan={columns.length} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
+                  <Empty className="mx-auto max-w-sm gap-3 rounded-none p-0" role="status">
+                    <EmptyHeader>
+                      <EmptyTitle>
+                        {hasActiveFilters
+                          ? "No hay servicios que coincidan con los filtros aplicados."
+                          : "No hay servicios para mostrar en este período."}
+                      </EmptyTitle>
+                    </EmptyHeader>
+                    {hasActiveFilters && onClearFilters && (
+                      <EmptyContent>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={dense ? "min-h-12" : "min-h-10"}
+                          onClick={onClearFilters}
+                        >
+                          Limpiar filtros
+                        </Button>
+                      </EmptyContent>
+                    )}
+                  </Empty>
                 </td>
               </tr>
             )}

@@ -12,9 +12,9 @@ async function openServiceDetail(
   await page.goto("/app?destination=services");
   const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
   await expect(table).toBeVisible();
-  await table.getByRole("row", { name: new RegExp(serviceId) }).click();
+  await table.locator(`tr[data-service-id="${serviceId}"]`).click();
   await page.getByRole("button", { name: "Ver detalle completo" }).click();
-  await expect(page.getByRole("region", { name: new RegExp(`Detalle completo de ${serviceId}`, "i") })).toBeVisible();
+  await expect(page.getByRole("region", { name: /Detalle completo de/i })).toBeVisible();
 }
 
 test.describe("RepairRequest Service-sourced workflow", () => {

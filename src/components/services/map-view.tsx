@@ -4,6 +4,13 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2, MapPin, MapPinOff, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { operationalMapAdapter, type OperationalMapData } from "@/lib/operational-map";
 import { operationalZonesAdapter, type OperationalZone } from "@/lib/operational-zones";
 import { resolveServiceMapLocations } from "@/lib/services-map";
@@ -44,6 +51,8 @@ type MapViewProps = {
   error?: boolean;
   onRetry?: () => void;
   filterFingerprint?: string;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
   className?: string;
 };
 
@@ -55,6 +64,8 @@ export function MapView({
   error = false,
   onRetry,
   filterFingerprint,
+  hasActiveFilters = false,
+  onClearFilters,
   className,
 }: MapViewProps) {
   const [referenceData, setReferenceData] = useState<ReferenceDataState>({ status: "loading" });
@@ -125,11 +136,25 @@ export function MapView({
           />
 
           {services.length === 0 ? (
-            <div className={styles.emptyNotice} role="status">
-              <MapPin aria-hidden="true" />
-              <strong>No hay servicios para mostrar</strong>
-              <span>Modifique los filtros para consultar otra selección.</span>
-            </div>
+            <Empty className={styles.emptyNotice} role="status">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <MapPin aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>
+                  {hasActiveFilters
+                    ? "No hay servicios que coincidan con los filtros aplicados"
+                    : "No hay servicios para mostrar en este período"}
+                </EmptyTitle>
+              </EmptyHeader>
+              {hasActiveFilters && onClearFilters ? (
+                <EmptyContent>
+                  <Button type="button" variant="outline" className="min-h-12" onClick={onClearFilters}>
+                    Limpiar filtros
+                  </Button>
+                </EmptyContent>
+              ) : null}
+            </Empty>
           ) : null}
 
           {unlocatedLocations.length > 0 ? (
@@ -140,25 +165,26 @@ export function MapView({
                 <span>
                   {selectedUnlocated
                     ? selectedUnlocated.locationType === "unverified"
-                      ? `${selectedUnlocated.serviceId} tiene coordenadas, pero su zona no pudo verificarse; no se muestra como pin.`
-                      : `${selectedUnlocated.serviceId} no tiene un objetivo o una zona con coordenadas resolubles.`
+                      ? `${services.find((service) => service.id === selectedUnlocated.serviceId)?.title ?? "El servicio"} tiene coordenadas, pero su zona no pudo verificarse; no se muestra como pin.`
+                      : `${services.find((service) => service.id === selectedUnlocated.serviceId)?.title ?? "El servicio"} no tiene un objetivo o una zona con coordenadas resolubles.`
                     : "No se muestran como pines hasta contar con una ubicación resoluble y verificada."}
                 </span>
                 <div className={styles.locationActions} aria-label="Servicios sin ubicación">
                   {unlocatedLocations.map((location) => {
                     const service = services.find((candidate) => candidate.id === location.serviceId);
+                    const serviceTitle = service?.title ?? "Servicio sin nombre";
                     return (
                       <button
                         key={location.serviceId}
                         type="button"
                         className={styles.locationAction}
                         aria-label={location.locationType === "unverified"
-                          ? `Seleccionar ${location.serviceId} con ubicación sin verificar`
-                          : `Seleccionar ${location.serviceId} sin ubicación`}
+                          ? `Seleccionar ${serviceTitle} con ubicación sin verificar`
+                          : `Seleccionar ${serviceTitle} sin ubicación`}
                         aria-pressed={location.serviceId === selectedId}
                         onClick={() => onSelect(location.serviceId)}
                       >
-                        {service?.id ?? location.serviceId}
+                        {serviceTitle}
                       </button>
                     );
                   })}
@@ -207,7 +233,7 @@ export function MapView({
               key={service.id}
               type="button"
               tabIndex={isLoading && !hasError ? 0 : -1}
-              aria-label={`Parada ${index + 1}: ${service.id} — ${service.title} (${service.zoneNames.join(", ")})`}
+              aria-label={`Parada ${index + 1}: ${service.title} (${service.zoneNames.join(", ")})`}
               aria-pressed={service.id === selectedId}
               onClick={() => onSelect(service.id)}
             >
