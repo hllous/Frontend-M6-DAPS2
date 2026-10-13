@@ -7,6 +7,7 @@ import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_SERVICES_QUERY } from "./services-fixtures";
 import {
   BackendServiceZoneSelectionError,
+  assignCrewInputSchema,
   checkAssignmentConflicts,
   confirmRescheduleInputSchema,
   createServiceInputSchema,
@@ -1059,5 +1060,16 @@ describe("suspension reason contract", () => {
     const parsed = suspendServiceInputSchema.safeParse({ reason: "OTHER", note: "a".repeat(length) });
     expect(parsed.success).toBe(valid);
     if (!parsed.success) expect(parsed.error.issues[0].message).toContain("500 caracteres");
+  });
+});
+
+describe("planning overrideNote boundaries", () => {
+  it.each([[9, false], [10, true], [500, true], [501, false]])("validates overrideNote length %s for scheduling and assignment", (length, valid) => {
+    const overrideNote = "a".repeat(length);
+    expect(assignCrewInputSchema.safeParse({ crewId: "crew-real", overrideNote }).success).toBe(valid);
+    expect(createServiceInputSchema.safeParse({
+      serviceTypeId: "type-real", origin: "PLANNED", zoneIds: ["zone-real"],
+      scheduledDate: "2099-09-10", timeWindow: { start: "09:00", end: "13:00" }, overrideNote,
+    }).success).toBe(valid);
   });
 });
