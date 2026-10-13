@@ -105,7 +105,7 @@ describe("POST /api/services/[id]/confirm-reschedule BFF route", () => {
 
     expect(response.status).toBe(409);
     const body = await response.json();
-    expect(body.message).toMatch(/RESCHEDULED/i);
+    expect(body.message).toBe("Solo se puede confirmar la nueva fecha de servicios a reprogramar (estado actual: Programado).");
   });
 
   it("moves a rescheduled service back to SCHEDULED with the new date/window, preserving zoneIds verbatim", async () => {
@@ -164,4 +164,16 @@ describe("POST /api/services/[id]/confirm-reschedule BFF route", () => {
       windowTo: "13:00",
     });
   });
+});
+
+it.each(["mock", "backend-development"])("denies limited Office planning before forwarding (%s)", async (mode) => {
+  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+  const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
+  const cookie = await authenticatedCookie("office-limited-intake", mode);
+  backendFetch.mockClear();
+  const response = await POST(new Request("http://localhost/api/services/real-service/confirm-reschedule", {
+    method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(confirmBody),
+  }), { params: Promise.resolve({ id: "real-service" }) });
+  expect(response.status).toBe(403);
+  expect(backendFetch).not.toHaveBeenCalled();
 });

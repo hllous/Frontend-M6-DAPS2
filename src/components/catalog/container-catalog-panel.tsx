@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   ArchiveX,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import styles from "@/components/catalog/catalog-panel.module.css";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -156,9 +157,17 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
   const [servicesStatus, setServicesStatus] = useState<"loading" | "ready" | "error">("loading");
   const [serviceLookupVersion, setServiceLookupVersion] = useState(0);
   const [startingRepairContainer, setStartingRepairContainer] = useState<Container | null>(null);
+  const pendingRepairFocusId = useRef<string | null>(null);
   const [completingRepairContainer, setCompletingRepairContainer] = useState<Container | null>(null);
   const [removingContainer, setRemovingContainer] = useState<Container | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (startingRepairContainer || !pendingRepairFocusId.current) return;
+    const containerId = pendingRepairFocusId.current;
+    pendingRepairFocusId.current = null;
+    document.getElementById(`container-detail-${containerId}`)?.focus();
+  }, [startingRepairContainer]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -522,8 +531,8 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       )}
 
       {state.status === "ready" && state.containers.length > 0 && (
-        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full text-left text-sm">
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
             <caption className="sr-only">Inventario de contenedores registrados</caption>
             <thead className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
@@ -544,27 +553,30 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                 const inFlight = findInFlightServiceForContainer(container, services);
                 return (
                   <tr key={container.id}>
-                    <th scope="row" className="px-4 py-3 font-semibold text-foreground">
+                    <th scope="row" data-label="Código" className="px-4 py-3 font-semibold text-foreground">
                       {container.code}
                     </th>
-                    <td className="px-4 py-3">{CONTAINER_TYPE_LABELS[container.containerType]}</td>
-                    <td className="px-4 py-3">
+                    <td data-label="Tipo" className="px-4 py-3">{CONTAINER_TYPE_LABELS[container.containerType]}</td>
+                    <td data-label="Zona" className="px-4 py-3">
                       {zone ? `${zone.code} · ${zone.name}` : container.zoneId}
                     </td>
-                    <td className="px-4 py-3">{container.address ?? "—"}</td>
-                    <td className="px-4 py-3">{container.capacityLiters.toLocaleString("es-AR")} L</td>
-                    <td className="px-4 py-3">
+                    <td data-label="Dirección" className="px-4 py-3">{container.address ?? "—"}</td>
+                    <td data-label="Capacidad" className="px-4 py-3">{container.capacityLiters.toLocaleString("es-AR")} L</td>
+                    <td data-label="Estado" className="px-4 py-3">
                       <StatusBadge status={container.status} />
                     </td>
-                    <td className="flex flex-wrap gap-2 px-4 py-3">
+                    <td data-label="Acciones" className={`${styles.actions} px-4 py-3`}>
                       <Button
+                        id={`container-detail-${container.id}`}
                         variant="outline"
                         size="sm"
+                        className="h-10 max-[760px]:h-12"
                         onClick={() => openDetail(container)}
                       >
                         <Eye data-icon="inline-start" aria-hidden />
                         Ver detalle
                       </Button>
+                      <div className="flex flex-wrap gap-2 max-[760px]:hidden">
                       {canManage && (
                         <Button
                           variant="outline"
@@ -671,7 +683,10 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setStartingRepairContainer(container)}
+                            onClick={() => {
+                              pendingRepairFocusId.current = container.id;
+                              setStartingRepairContainer(container);
+                            }}
                             className="text-[var(--color-action)]"
                           >
                             <Wrench data-icon="inline-start" aria-hidden />
@@ -712,6 +727,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                         </Button>
                         )
                       )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1184,6 +1200,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                         size="sm"
                         onClick={() => {
                           const target = detailContainer;
+                          pendingRepairFocusId.current = target.id;
                           closeDetail();
                           setStartingRepairContainer(target);
                         }}
