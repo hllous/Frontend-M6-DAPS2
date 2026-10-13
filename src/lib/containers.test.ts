@@ -5,6 +5,7 @@ import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { withNodeFile } from "@/mocks/node-file";
 import { NetworkFailureError } from "./authenticated-fetch";
+import { containerFixtures } from "./containers-fixtures";
 import {
   ContainerContractError,
   ContainerRequestError,
@@ -37,6 +38,24 @@ describe("containers adapter", () => {
 
     await expect(containersAdapter.list()).resolves.toMatchObject({
       containers: [{ id: "container-null", address: null, lat: null, lng: null }],
+    });
+  });
+
+  it("keeps the container page when a response coordinate is out of range (#439)", async () => {
+    const base = containerFixtures[0]!;
+    server.use(http.get("*/api/containers", () => HttpResponse.json({
+      data: [
+        { ...base, id: "container-invalid-map-coordinate", code: "CT-INVALID-COORD", lat: 91, lng: -58.4 },
+        { ...base, id: "container-valid-map-coordinate", code: "CT-VALID-COORD", lat: -34.6, lng: -58.4 },
+      ],
+      meta: { total: 2, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(containersAdapter.list()).resolves.toMatchObject({
+      containers: [
+        { id: "container-invalid-map-coordinate", lat: null, lng: null },
+        { id: "container-valid-map-coordinate", lat: -34.6, lng: -58.4 },
+      ],
     });
   });
 

@@ -99,6 +99,25 @@ describe("MapView", () => {
     expect(onSelect).toHaveBeenCalledWith("SVC-TREE-1");
   });
 
+  it("lists a service whose zone cannot be verified instead of plotting it", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const services = [
+      makeService({ id: "SVC-UNVERIFIED", zoneIds: ["zone-does-not-exist"], targetType: "TREE", targetId: "tree-1" }),
+    ];
+
+    render(<MapView services={services} selectedId="SVC-UNVERIFIED" onSelect={onSelect} />);
+
+    expect(await screen.findByTestId("services-map-canvas")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "SVC-UNVERIFIED" })).not.toBeInTheDocument();
+    expect(screen.getByText("1 servicio sin ubicación")).toBeVisible();
+    expect(screen.getByText(/su zona no pudo verificarse; no se muestra como pin/)).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Seleccionar SVC-UNVERIFIED con ubicación sin verificar" }));
+
+    expect(onSelect).toHaveBeenCalledWith("SVC-UNVERIFIED");
+  });
+
   it("keeps the map retry action when territorial data fails", async () => {
     const user = userEvent.setup();
     const onRetry = vi.fn();

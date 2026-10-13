@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { withResponseCoordinates } from "./response-coordinates";
 import { latitudeInput, longitudeInput } from "@/lib/input-limits";
 
 export const wasteTypeSchema = z.enum(["HOUSEHOLD", "RECYCLABLE", "BULKY", "GREEN", "MIXED"]);
@@ -14,15 +15,13 @@ export const WASTE_TYPE_LABELS: Record<WasteType, string> = {
   MIXED: "Mixtos",
 };
 
-export const greenPointSchema = z.object({
+export const greenPointSchema = withResponseCoordinates({
   id: z.string(),
   code: z.string(),
   name: z.string(),
   zoneId: z.string(),
   wasteTypes: z.array(wasteTypeSchema),
   address: z.string().nullable(),
-  lat: z.number().nullable(),
-  lng: z.number().nullable(),
   active: z.boolean(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
