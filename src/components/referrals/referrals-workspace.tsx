@@ -540,7 +540,7 @@ function ReferralDetail({
     <div className="flex min-h-full flex-col bg-[var(--color-surface)]" role="region" aria-label={`Detalle de ${referral.id}`}>
       <header className="border-b border-[var(--color-border)] bg-[var(--color-canvas)] px-4 py-3 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
-          <Button variant="outline" size="sm" onClick={onBack} className="min-h-10 gap-1.5 max-[760px]:min-h-12">
+          <Button variant="outline" size="sm" onClick={onBack} className="min-h-10 gap-1.5 [@media(max-width:760px)]:min-h-12">
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Volver a derivaciones
           </Button>
