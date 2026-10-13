@@ -2,6 +2,7 @@ import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { EVIDENCE_FILE_SIZE_LABEL, MAX_EVIDENCE_FILE_SIZE_BYTES } from "@/lib/evidence-limits";
 import { fetchBackend } from "@/lib/bff-backend";
 import {
   addAttachmentToService,
@@ -39,7 +40,6 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
 ]);
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 // Allow room for multipart boundaries and the owner metadata.
 const MULTIPART_MARGIN_BYTES = 64 * 1024;
 
@@ -139,8 +139,8 @@ export async function POST(request: Request) {
     }
 
     const contentLength = Number(request.headers.get("content-length"));
-    if (Number.isFinite(contentLength) && contentLength > MAX_FILE_SIZE + MULTIPART_MARGIN_BYTES) {
-      return errorResponse(413, "El archivo supera el tamaño máximo permitido de 10 MB.", path);
+    if (Number.isFinite(contentLength) && contentLength > MAX_EVIDENCE_FILE_SIZE_BYTES + MULTIPART_MARGIN_BYTES) {
+      return errorResponse(413, `El archivo supera el tamaño máximo permitido de ${EVIDENCE_FILE_SIZE_LABEL}.`, path);
     }
 
     let formData: FormData;
@@ -210,8 +210,8 @@ export async function POST(request: Request) {
     }
 
     // File validation: Size & MIME
-    if (file.size > MAX_FILE_SIZE) {
-      return errorResponse(413, "El archivo supera el tamaño máximo permitido de 10 MB.", path);
+    if (file.size > MAX_EVIDENCE_FILE_SIZE_BYTES) {
+      return errorResponse(413, `El archivo supera el tamaño máximo permitido de ${EVIDENCE_FILE_SIZE_LABEL}.`, path);
     }
 
     const mimeType = file.type || "application/octet-stream";
