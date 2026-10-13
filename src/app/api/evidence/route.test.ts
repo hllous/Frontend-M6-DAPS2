@@ -61,6 +61,19 @@ function evidenceRequest(cookie: string, ownerType: string, ownerId: string, key
   });
 }
 
+// Build actual multipart bytes: jsdom FormData serializes its File differently from Undici.
+function sizedMultipartRequest(cookie: string, fileBytes: number, contentLength: string) {
+  const boundary = "evidence-size-boundary";
+  const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="big.jpg"\r\nContent-Type: image/jpeg\r\n\r\n${"x".repeat(fileBytes)}\r\n`
+    + `--${boundary}\r\nContent-Disposition: form-data; name="ownerType"\r\n\r\nSERVICE\r\n`
+    + `--${boundary}\r\nContent-Disposition: form-data; name="ownerId"\r\n\r\nSVC-1050\r\n`
+    + `--${boundary}\r\nContent-Disposition: form-data; name="fileSize"\r\n\r\n1\r\n--${boundary}--\r\n`;
+  return new Request("http://localhost/api/evidence", {
+    method: "POST", body,
+    headers: { cookie, "Idempotency-Key": "actual-size", "content-type": `multipart/form-data; boundary=${boundary}`, "content-length": contentLength },
+  });
+}
+
 function backendCookie(crewId = "crew-real") {
   process.env.M6_AUTH_MODE = "backend-development";
   process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
@@ -395,52 +408,25 @@ describe("POST /api/evidence BFF route", () => {
     expect(response.status).toBe(400);
   });
 
-  it("returns 413 when file exceeds 10 MB", async () => {
+  it("returns 413 when file exceeds 4 MB despite understated size hints", async () => {
     const cookie = await authenticatedCookie("field-crew-leader-route");
-    const boundary = "----evidence-test-boundary";
-    const fileContents = "x".repeat(10 * 1024 * 1024 + 1);
-    const body = [
-      `--${boundary}`,
-      'Content-Disposition: form-data; name="file"; filename="big.jpg"',
-      "Content-Type: image/jpeg",
-      "",
-      fileContents,
-      `--${boundary}`,
-      'Content-Disposition: form-data; name="ownerType"',
-      "",
-      "ZONE_RESULT",
-      `--${boundary}`,
-      'Content-Disposition: form-data; name="ownerId"',
-      "",
-      "ZR-1",
-      `--${boundary}--`,
-      "",
-    ].join("\r\n");
-
-    const response = await POST(
-      new Request("http://localhost/api/evidence", {
-        method: "POST",
-        headers: {
-          cookie,
-          "Idempotency-Key": "key-3",
-          "Content-Type": `multipart/form-data; boundary=${boundary}`,
-          // The body contains >10 MB despite this intentionally understated hint.
-          "Content-Length": "1",
-        },
-        body,
-      }),
-    );
+    const response = await POST(sizedMultipartRequest(cookie, 4 * 1024 * 1024 + 1, "1"));
     expect(response.status).toBe(413);
-    const payload = await response.json();
-    expect(payload.error).toBe("Payload Too Large");
-    expect(payload.message).toMatch(/10 MB/i);
+    expect(await response.json()).toMatchObject({ error: "Payload Too Large", message: "El archivo supera el tamaño máximo permitido de 4 MB." });
+  });
+
+  it("accepts a file exactly 4 MB with room for multipart metadata", async () => {
+    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const response = await POST(sizedMultipartRequest(cookie, 4 * 1024 * 1024, String(4 * 1024 * 1024 + 64 * 1024)));
+
+    expect(response.status).toBe(201);
   });
 
   it("rejects an oversized Content-Length before reading the multipart body", async () => {
     const cookie = await authenticatedCookie("field-crew-leader-route");
     const request = new Request("http://localhost/api/evidence", {
       method: "POST",
-      headers: { cookie, "Idempotency-Key": "large-body", "content-length": String(11 * 1024 * 1024) },
+      headers: { cookie, "Idempotency-Key": "large-body", "content-length": String(4 * 1024 * 1024 + 64 * 1024 + 1) },
       body: "unparsed body",
     });
     const parseBody = vi.spyOn(request, "formData");

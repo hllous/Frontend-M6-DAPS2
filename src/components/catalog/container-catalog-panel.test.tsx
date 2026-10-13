@@ -8,7 +8,7 @@ import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { handlers } from "@/mocks/handlers";
 import { withNodeFile } from "@/mocks/node-file";
 import { scenarios } from "@/lib/scenarios";
-import type { ContainerStatus } from "@/lib/containers";
+import { containersAdapter, type ContainerStatus } from "@/lib/containers";
 import { ContainerCatalogPanel } from "./container-catalog-panel";
 
 const server = setupServer(...handlers);
@@ -262,6 +262,22 @@ describe("ContainerCatalogPanel", () => {
     expect(screen.getAllByRole("button", { name: "Ver detalle" }).length).toBeGreaterThan(0);
   });
 
+  it("labels each container table cell for the Field-width list layout", async () => {
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewMember} />);
+
+    const row = await screen.findByRole("row", { name: /CONT-001/ });
+    expect(Array.from(row.querySelectorAll("[data-label]"), (cell) => cell.getAttribute("data-label"))).toEqual([
+      "Código",
+      "Tipo",
+      "Zona",
+      "Dirección",
+      "Capacidad",
+      "Estado",
+      "Acciones",
+    ]);
+    expect(within(row).getByRole("button", { name: "Ver detalle" })).toHaveClass("max-[760px]:h-12");
+  });
+
   it("lets Office dispatch standalone repair and removal transitions", { timeout: 10000 }, async () => {
     const user = userEvent.setup();
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
@@ -289,6 +305,37 @@ describe("ContainerCatalogPanel", () => {
     expect(within(activeRow).queryByRole("button", { name: "Retirar contenedor" })).not.toBeInTheDocument();
   });
 
+  it("keeps the repair action name stable and returns focus to container detail after repair starts", { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    const originalStartRepair = containersAdapter.startRepair.bind(containersAdapter);
+    let releaseRepair!: () => void;
+    const repairGate = new Promise<void>((resolve) => {
+      releaseRepair = resolve;
+    });
+    vi.spyOn(containersAdapter, "startRepair").mockImplementation(async (containerId) => {
+      await repairGate;
+      return originalStartRepair(containerId);
+    });
+
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    const row = await screen.findByRole("row", { name: /CONT-003/ });
+    const detailButton = within(row).getByRole("button", { name: "Ver detalle" });
+    await user.click(detailButton);
+    const detailDialog = screen.getByRole("dialog", { name: /Detalle del contenedor CONT-003/ });
+    await user.click(within(detailDialog).getByRole("button", { name: "Iniciar reparación independiente" }));
+
+    const repairDialog = screen.getByRole("dialog", { name: /Iniciar reparación independiente · CONT-003/ });
+    const repairButton = within(repairDialog).getByRole("button", { name: "Iniciar reparación" });
+    await user.click(repairButton);
+    expect(repairButton).toHaveAttribute("aria-busy", "true");
+    expect(repairButton).toHaveTextContent("Iniciar reparación");
+
+    releaseRepair();
+    expect(await screen.findByText("Reparación iniciada para el contenedor CONT-003.")).toBeVisible();
+    await waitFor(() => expect(detailButton).toHaveFocus());
+  });
+
   it("allows Office to remove a damaged container and hides lifecycle actions after removal", { timeout: 10000 }, async () => {
     const user = userEvent.setup();
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
@@ -299,6 +346,7 @@ describe("ContainerCatalogPanel", () => {
 
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /Retirar contenedor CONT-003/ })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Conservar contenedor CONT-003" })).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Confirmar retiro" }));
 
     const removedRow = screen.getByRole("row", { name: /CONT-003/ });
@@ -471,12 +519,14 @@ describe("ContainerCatalogPanel", () => {
     const dialog = screen.getByRole("dialog");
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
+    const pickerLabel = within(dialog).getByText("Seleccionar archivo").closest("label");
+    expect(pickerLabel).toHaveClass("peer-focus-visible:ring-3");
 
-    // File > 10MB
+    // File > 4 MB
     const oversizedFile = new File(["x".repeat(100)], "huge-file.pdf", {
       type: "application/pdf",
     });
-    Object.defineProperty(oversizedFile, "size", { value: 11 * 1024 * 1024 });
+    Object.defineProperty(oversizedFile, "size", { value: 4 * 1024 * 1024 + 1 });
 
     // Invalid MIME type
     const invalidMimeFile = new File(["test content"], "script.exe", {
@@ -487,7 +537,7 @@ describe("ContainerCatalogPanel", () => {
 
     expect(
       await within(dialog).findByText(
-        /"huge-file.pdf" supera el tamaño máximo permitido de 10 MB\./,
+        /"huge-file.pdf" supera el tamaño máximo permitido de 4 MB\./,
         { exact: false },
       ),
     ).toBeVisible();
@@ -497,6 +547,8 @@ describe("ContainerCatalogPanel", () => {
         { exact: false },
       ),
     ).toBeVisible();
+    expect(fileInput).toHaveAttribute("aria-describedby", "container-evidence-error");
+    expect(dialog.querySelector("#container-evidence-error")).toHaveAttribute("role", "alert");
   });
 
   it("uploads evidence after report and reuses idempotencyKey on retry", { timeout: 10000 }, async () => {
