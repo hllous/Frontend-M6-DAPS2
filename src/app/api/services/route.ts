@@ -1,5 +1,6 @@
 import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { crewFixtures } from "@/lib/crew-fixtures";
@@ -16,10 +17,9 @@ import {
   ROUTE_CATALOG,
   SERVICE_TYPE_CATALOG,
   type Service,
-  type ServiceMode,
-  type ServiceOrigin,
   type ServiceQuery,
-  type ServiceStatus,
+  serviceQuerySchema,
+  servicesEnvelopeSchema,
   toCreateServiceBackendInput,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
@@ -34,14 +34,17 @@ import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 function parseServiceQuery(url: URL): ServiceQuery {
   const statuses = url.searchParams.getAll("status");
-  return {
+  return serviceQuerySchema.parse({
     status: statuses.length > 1
-      ? (statuses as ServiceStatus[])
+      ? statuses
       : statuses.length === 1
-      ? (statuses[0] as ServiceStatus)
+      ? statuses[0]
       : undefined,
-    mode: (url.searchParams.get("mode") as ServiceMode) ?? undefined,
-    origin: (url.searchParams.get("origin") as ServiceOrigin) ?? undefined,
+    mode: url.searchParams.get("mode") ?? undefined,
+    origin: url.searchParams.get("origin") ?? undefined,
+    serviceTypeId: url.searchParams.get("serviceTypeId") ?? undefined,
+    vehicleId: url.searchParams.get("vehicleId") ?? undefined,
+    ticketId: url.searchParams.get("ticketId") ?? undefined,
     zoneId: url.searchParams.get("zoneId") ?? undefined,
     crewId: url.searchParams.get("crewId") ?? undefined,
     search: searchParam(url.searchParams),
@@ -51,7 +54,7 @@ function parseServiceQuery(url: URL): ServiceQuery {
     scheduledTo: url.searchParams.get("scheduledTo") ?? undefined,
     page: pageParam(url.searchParams),
     pageSize: pageSizeParam(url.searchParams),
-  };
+  });
 }
 
 function backendQueryString(query: ServiceQuery): string {
@@ -67,9 +70,9 @@ function backendQueryString(query: ServiceQuery): string {
   if (query.origin) params.set("origin", query.origin);
   if (query.zoneId) params.set("zoneId", query.zoneId);
   if (query.crewId) params.set("crewId", query.crewId);
-  if (query.search) params.set("search", query.search);
-  if (query.timeFrom) params.set("timeFrom", query.timeFrom);
-  if (query.timeTo) params.set("timeTo", query.timeTo);
+  if (query.serviceTypeId) params.set("serviceTypeId", query.serviceTypeId);
+  if (query.vehicleId) params.set("vehicleId", query.vehicleId);
+  if (query.ticketId) params.set("ticketId", query.ticketId);
   if (query.scheduledFrom) params.set("scheduledFrom", query.scheduledFrom);
   if (query.scheduledTo) params.set("scheduledTo", query.scheduledTo);
   if (query.page !== undefined) params.set("page", String(query.page));
@@ -94,11 +97,17 @@ export async function GET(request: Request) {
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/services${backendQueryString(query)}`);
-            return forwardResponse(backendResponse);
+      if (!backendResponse.ok) return forwardResponse(backendResponse);
+      const parsed = servicesEnvelopeSchema.safeParse(await backendResponse.json().catch(() => undefined));
+      if (!parsed.success) {
+        return errorResponse(502, "La respuesta de servicios no respeta el contrato esperado.", path);
+      }
+      return NextResponse.json(parsed.data);
     }
 
     return NextResponse.json(paginateServiceFixtures(filterServiceFixtures(query), query.page, query.pageSize));
   } catch (error) {
+    if (error instanceof z.ZodError) return errorResponse(400, "Los filtros de servicios son inválidos.", path);
     if (error instanceof InvalidSessionError) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa.", path);
