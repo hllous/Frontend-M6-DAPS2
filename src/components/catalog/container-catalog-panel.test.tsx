@@ -472,11 +472,11 @@ describe("ContainerCatalogPanel", () => {
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
 
-    // File > 10MB
+    // File > 4 MB
     const oversizedFile = new File(["x".repeat(100)], "huge-file.pdf", {
       type: "application/pdf",
     });
-    Object.defineProperty(oversizedFile, "size", { value: 11 * 1024 * 1024 });
+    Object.defineProperty(oversizedFile, "size", { value: 4 * 1024 * 1024 + 1 });
 
     // Invalid MIME type
     const invalidMimeFile = new File(["test content"], "script.exe", {
@@ -487,7 +487,7 @@ describe("ContainerCatalogPanel", () => {
 
     expect(
       await within(dialog).findByText(
-        /"huge-file.pdf" supera el tamaño máximo permitido de 10 MB\./,
+        /"huge-file.pdf" supera el tamaño máximo permitido de 4 MB\./,
         { exact: false },
       ),
     ).toBeVisible();

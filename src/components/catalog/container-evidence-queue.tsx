@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { AlertTriangle, CheckCircle2, Paperclip, RefreshCw, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EVIDENCE_FILE_SIZE_LABEL, MAX_EVIDENCE_FILE_SIZE_BYTES } from "@/lib/evidence-limits";
 import { containersAdapter, ContainerRequestError } from "@/lib/containers";
 
 export interface QueuedEvidenceFile {
@@ -15,7 +16,7 @@ export interface QueuedEvidenceFile {
   error?: string;
 }
 
-export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+export const MAX_FILE_SIZE = MAX_EVIDENCE_FILE_SIZE_BYTES;
 export const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -39,7 +40,7 @@ export function useEvidenceQueue() {
     for (const file of Array.from(files)) {
       if (file.size > MAX_FILE_SIZE) {
         rejectedErrors.push(
-          `"${file.name}" supera el tamaño máximo permitido de 10 MB.`,
+          `"${file.name}" supera el tamaño máximo permitido de ${EVIDENCE_FILE_SIZE_LABEL}.`,
         );
         continue;
       }
@@ -159,7 +160,7 @@ export function EvidenceQueueView({
             Evidencia adjunta
           </span>
           <span className="text-[11px] text-muted-foreground">
-            Opcional. Formatos JPEG, PNG, WebP o PDF hasta 10 MB.
+            Opcional. Formatos JPEG, PNG, WebP o PDF hasta {EVIDENCE_FILE_SIZE_LABEL}.
           </span>
         </div>
         <label
