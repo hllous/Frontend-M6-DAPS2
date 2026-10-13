@@ -59,15 +59,16 @@ describe("backendMode", () => {
     expect(await response.json()).toMatchObject({ message, path: "/api/test" });
   });
 
-  it("relays an upstream response body, status and content type unchanged", async () => {
+  it("wraps an upstream content type outside application/json in the standard error envelope", async () => {
     const response = await forwardResponse(new Response("upstream body", {
       status: 409,
       headers: { "content-type": "application/problem+json" },
     }));
 
     expect(response.status).toBe(409);
-    expect(response.headers.get("content-type")).toBe("application/problem+json");
-    expect(await response.text()).toBe("upstream body");
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(await response.json()).toMatchObject({ statusCode: 409, error: "Conflict" });
   });
 
   it("relays bodyless upstream responses", async () => {
