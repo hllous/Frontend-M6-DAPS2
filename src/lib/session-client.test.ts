@@ -14,6 +14,7 @@ function mockLocationAssign() {
 
 describe("cross-tab session logout", () => {
   it("clears the session, redirects the initiating tab, and notifies other tabs over BroadcastChannel", async () => {
+    localStorage.setItem("m6:field-draft:v2:actor-a:service:start", "private");
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
     const assignMock = mockLocationAssign();
     const otherTabChannel = new BroadcastChannel("m6-session");
@@ -25,6 +26,7 @@ describe("cross-tab session logout", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/session/logout", expect.objectContaining({ method: "POST" }));
     expect(assignMock).toHaveBeenCalledWith("/login");
+    expect(localStorage.getItem("m6:field-draft:v2:actor-a:service:start")).toBeNull();
     await expect(receivedInOtherTab).resolves.toBe("logout");
     otherTabChannel.close();
   });
@@ -39,12 +41,14 @@ describe("cross-tab session logout", () => {
   });
 
   it("lets another tab listen for a remote logout and unsubscribe", async () => {
+    localStorage.setItem("m6:field-draft:v2:actor-a:service:start", "private");
     const remoteTabChannel = new BroadcastChannel("m6-session");
     const onLogout = vi.fn();
     const stopListening = onRemoteLogout(onLogout);
 
     remoteTabChannel.postMessage("logout");
     await vi.waitFor(() => expect(onLogout).toHaveBeenCalledTimes(1));
+    expect(localStorage.getItem("m6:field-draft:v2:actor-a:service:start")).toBeNull();
 
     stopListening();
     remoteTabChannel.postMessage("logout");
