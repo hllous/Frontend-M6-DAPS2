@@ -38,7 +38,7 @@ const ResizableHandle = ({
 }) => (
   <ResizableSeparator
     className={cn(
-      "relative flex w-px items-center justify-center bg-[var(--color-border)] after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)]",
+      "relative flex w-px items-center justify-center bg-[var(--color-border)] after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]",
       className,
     )}
     {...props}
