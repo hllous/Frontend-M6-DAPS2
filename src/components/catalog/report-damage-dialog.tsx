@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
@@ -113,9 +114,7 @@ function ReportDamageModalContent({
       });
     } catch (err) {
       const msg =
-        err instanceof ContainerRequestError || err instanceof Error
-          ? err.message
-          : "No se pudo registrar el reporte de daño.";
+        getErrorMessage(err, "No se pudo registrar el reporte de daño.");
       setErrorMessage(msg);
       setIsSubmitting(false);
       return;

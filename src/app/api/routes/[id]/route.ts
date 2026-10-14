@@ -1,14 +1,12 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import {
@@ -62,12 +60,8 @@ export async function PATCH(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede editar recorridos.");
-    }
-    requireCapability(session, "route:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede editar recorridos.", capability: "route:manage", throwOnError: true });
 
     let body: unknown;
     try {
@@ -120,12 +114,8 @@ export async function DELETE(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede desactivar recorridos.");
-    }
-    requireCapability(session, "route:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede desactivar recorridos.", capability: "route:manage", throwOnError: true });
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/routes/${pathId(id)}`, "route:manage", {

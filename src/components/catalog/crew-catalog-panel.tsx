@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, Eye, Pencil, Plus, Trash2, UserMinus, UserPlus, X } from "lucide-react";
@@ -65,7 +66,7 @@ export function CrewCatalogPanel({ scenario }: { scenario: OperationalScenario }
         ? result.crews.filter((crew) => crew.id === scenario.actor.crewId)
         : result.crews;
       if (current) setState({ status: "ready", crews, total: result.total, totalPages: result.totalPages });
-    }).catch((caught: unknown) => { if (current) setState({ status: "error", message: caught instanceof Error ? caught.message : "No se pudieron cargar las cuadrillas." }); });
+    }).catch((caught: unknown) => { if (current) setState({ status: "error", message: errorMessage(caught, "No se pudieron cargar las cuadrillas.") }); });
     return () => { current = false; };
   }, [query, requestVersion, scenario, page]);
 
@@ -77,23 +78,23 @@ export function CrewCatalogPanel({ scenario }: { scenario: OperationalScenario }
     event.preventDefault(); setFormError(null);
     if (!form.name.trim() || !form.leaderUserId || !form.organizationId) { setFormError("Complete el nombre, responsable y organización."); return; }
     try { if (editing) await crewsAdapter.update(editing.id, { name: form.name.trim(), leaderUserId: form.leaderUserId, organizationId: form.organizationId, defaultShift: form.defaultShift, active: editing.active }); else await crewsAdapter.create({ ...form, name: form.name.trim() }); setFormOpen(false); setNotice(editing ? "Cuadrilla actualizada." : "Cuadrilla registrada."); setRequestVersion((version) => version + 1); }
-    catch (caught) { setFormError(caught instanceof Error ? caught.message : "No se pudo guardar la cuadrilla."); }
+    catch (caught) { setFormError(errorMessage(caught, "No se pudo guardar la cuadrilla.")); }
   }
-  async function showDetail(crew: Crew) { try { setSelected(await crewsAdapter.get(crew.id)); setMemberSelection([]); setMemberError(null); setActionError(null); } catch (caught) { setActionError(caught instanceof Error ? caught.message : "No se pudo cargar el detalle."); } }
+  async function showDetail(crew: Crew) { try { setSelected(await crewsAdapter.get(crew.id)); setMemberSelection([]); setMemberError(null); setActionError(null); } catch (caught) { setActionError(errorMessage(caught, "No se pudo cargar el detalle.")); } }
   async function addMembers(event: FormEvent) {
     event.preventDefault();
     if (!selected || memberSelection.length === 0) { setMemberError("Seleccione al menos un integrante."); return; }
     setMemberError(null);
     try { setSelected(await crewsAdapter.addMembers(selected.id, memberSelection)); setMemberSelection([]); setNotice("Integrantes agregados."); }
-    catch (caught) { setMemberError(caught instanceof Error ? caught.message : "No se pudieron agregar los integrantes."); }
+    catch (caught) { setMemberError(errorMessage(caught, "No se pudieron agregar los integrantes.")); }
   }
   async function removeMember(userId: string) {
     if (!selected) return;
     try { setSelected(await crewsAdapter.removeMember(selected.id, userId)); setNotice("Integrante quitado."); }
-    catch (caught) { setMemberError(caught instanceof Error ? caught.message : "No se pudo quitar el integrante."); }
+    catch (caught) { setMemberError(errorMessage(caught, "No se pudo quitar el integrante.")); }
   }
   function deactivate(crew: Crew) { setDeactivating(crew); setDeactivateError(null); }
-  async function confirmDeactivation() { if (!deactivating) return; setIsSubmittingDeactivate(true); setDeactivateError(null); try { await crewsAdapter.remove(deactivating.id); setDeactivating(null); setNotice(`Cuadrilla ${deactivating.name} dada de baja.`); setRequestVersion((version) => version + 1); } catch (caught) { setDeactivateError(caught instanceof Error ? caught.message : "No se pudo dar de baja la cuadrilla."); } finally { setIsSubmittingDeactivate(false); } }
+  async function confirmDeactivation() { if (!deactivating) return; setIsSubmittingDeactivate(true); setDeactivateError(null); try { await crewsAdapter.remove(deactivating.id); setDeactivating(null); setNotice(`Cuadrilla ${deactivating.name} dada de baja.`); setRequestVersion((version) => version + 1); } catch (caught) { setDeactivateError(errorMessage(caught, "No se pudo dar de baja la cuadrilla.")); } finally { setIsSubmittingDeactivate(false); } }
 
   return (
     <section aria-labelledby="crews-title" className={styles.resourcePanel}>

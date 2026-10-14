@@ -1,9 +1,8 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getContainerFixture, startRepairFixture } from "@/lib/containers-fixtures";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -24,11 +23,8 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE" || !scenario.capabilities.includes("container:manage")) {
-      return errorResponse(403, "No tiene permisos para iniciar reparaciones de contenedores.", path);
-    }
+    authorize(session, { office: true, officeMessage: "No tiene permisos para iniciar reparaciones de contenedores.", capability: "container:manage", capabilityMessage: "No tiene permisos para iniciar reparaciones de contenedores.", throwOnError: true });
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}/start-repair`, "container:manage", {

@@ -1,10 +1,10 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { serviceTypeUpdateInputSchema } from "@/lib/service-types";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { serviceTypeFixtures, updateServiceTypeFixture } from "@/lib/service-type-fixtures";
 
 
@@ -35,7 +35,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar tipos de servicio.");
-    requireCapability(session, "serviceType:manage");
+    authorize(session, { capability: "serviceType:manage", throwOnError: true });
     const id = await targetId(context);
     let body: unknown;
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
@@ -61,7 +61,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede dar de baja un tipo de servicio.");
-    requireCapability(session, "serviceType:manage");
+    authorize(session, { capability: "serviceType:manage", throwOnError: true });
     const id = await targetId(context);
     if (backendMode(session)) {
       const response = await fetchBackend(request, `/service-types/${pathId(id)}`, "serviceType:manage", { method: "DELETE" });

@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -13,7 +13,7 @@ import {
 import { environmentalInspectionScheduleInputSchema, type EnvironmentalInspection } from "@/lib/environmental-reports";
 import { withInspectionAttachments } from "@/app/api/environmental-inspections/_attachments";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 
 
@@ -22,7 +22,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "environmentalInspection:view");
+    authorize(session, { capability: "environmentalInspection:view", throwOnError: true });
     const scenario = getScenario(session.scenarioId);
     if (scenario.actor.kind === "FIELD") return errorResponse(404, "Historia de inspecciones no encontrada.", path);
     if (backendMode(session)) {
@@ -43,7 +43,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "environmentalInspection:schedule");
+    authorize(session, { capability: "environmentalInspection:schedule", throwOnError: true });
     const scenario = getScenario(session.scenarioId);
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede programar inspecciones.", path);
     let body: unknown;

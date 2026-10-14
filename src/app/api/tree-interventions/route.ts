@@ -1,10 +1,10 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { addTreeInterventionFixture, createTreeInterventionFixture, filterTreeInterventionFixtures, paginateTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
 import { treeInterventionCreateInputSchema, treeInterventionStatusSchema, treeInterventionTypeSchema, type TreeInterventionQuery } from "@/lib/tree-interventions";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "treeIntervention:request");
+    authorize(session, { capability: "treeIntervention:request", throwOnError: true });
     const parsed = treeInterventionCreateInputSchema.safeParse(await request.json().catch(() => undefined));
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) {

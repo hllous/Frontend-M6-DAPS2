@@ -1,4 +1,4 @@
-import { backendMode, errorResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -7,7 +7,7 @@ import { environmentalInspectionSchema } from "@/lib/environmental-reports";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { withInspectionAttachments } from "../_attachments";
-import { AuthUnavailableError, BackendUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, BackendUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 function projectFieldInspection(inspection: Record<string, unknown>) {
   const projected = { ...inspection };
@@ -22,7 +22,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "environmentalInspection:view");
+    authorize(session, { capability: "environmentalInspection:view", throwOnError: true });
     const scenario = getScenario(session.scenarioId);
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/environmental-inspections/" + pathId(id), "environmentalInspection:view");

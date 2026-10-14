@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useId, useMemo, useState } from "react";
 import {
@@ -122,7 +123,7 @@ function AssignCrewForm({
         if (active) {
           setResources({
             status: "error",
-            message: cause instanceof Error ? cause.message : "No se pudieron cargar los datos de la asignación.",
+            message: getErrorMessage(cause, "No se pudieron cargar los datos de la asignación."),
           });
         }
       });
@@ -197,9 +198,7 @@ function AssignCrewForm({
         return;
       }
       const msg =
-        cause instanceof Error
-          ? cause.message
-          : "Ocurrió un error al procesar la asignación de recursos.";
+        getErrorMessage(cause, "Ocurrió un error al procesar la asignación de recursos.");
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);

@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -16,7 +16,6 @@ import {
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -70,7 +69,7 @@ export async function handleTreeInterventionTransition(
     if (scenario.actor.kind !== "OFFICE") {
       return errorResponse(403, `Solo Oficina puede ${transitionLabel(transition)}.`, path);
     }
-    requireCapability(session, transitionCapability(transition));
+    authorize(session, { capability: transitionCapability(transition), throwOnError: true });
 
     let input: TreeInterventionAuthorizeInput | undefined;
     if (transition === "authorize") {

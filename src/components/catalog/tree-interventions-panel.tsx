@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3, Eye, Info, Plus, RefreshCw, Send, ShieldAlert, UserRound } from "lucide-react";
@@ -152,7 +153,7 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
       props.onCreated?.(created);
       props.onOpenChange(false);
     } catch (caught) {
-      setFormError(caught instanceof Error ? caught.message : "No se pudo crear la solicitud de intervención.");
+      setFormError(errorMessage(caught, "No se pudo crear la solicitud de intervención."));
       setFormErrorField("form");
     } finally {
       setIsSubmitting(false);
@@ -257,7 +258,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
 
   useEffect(() => {
     let current = true;
-    void treeInterventionsAdapter.list(query).then((loaded) => { if (current) setState({ status: "ready", page: loaded }); }).catch((caught) => { if (current) setState({ status: "error", message: caught instanceof Error ? caught.message : "No se pudieron cargar las intervenciones." }); });
+    void treeInterventionsAdapter.list(query).then((loaded) => { if (current) setState({ status: "ready", page: loaded }); }).catch((caught) => { if (current) setState({ status: "error", message: errorMessage(caught, "No se pudieron cargar las intervenciones.") }); });
     return () => { current = false; };
   }, [query, requestVersion]);
 
@@ -332,7 +333,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       } else {
         setServiceLookupStatus("ready");
       }
-    } catch (caught) { setDetailError(caught instanceof Error ? caught.message : "No se pudo cargar el detalle de la intervención."); } finally { setDetailLoading(false); }
+    } catch (caught) { setDetailError(errorMessage(caught, "No se pudo cargar el detalle de la intervención.")); } finally { setDetailLoading(false); }
   }, [verifyExistingService]);
 
   useEffect(() => {
@@ -381,7 +382,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           writeUnsynced(detail.id, createdService.id);
           setUnsyncedService({ id: createdService.id, title: createdService.title });
           setScheduleOpen(false);
-          setActionError(caught instanceof Error ? caught.message : "No se pudo vincular el servicio.");
+          setActionError(errorMessage(caught, "No se pudo vincular el servicio."));
         }
         return;
       }
@@ -397,7 +398,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       setNotice(action === "submit" ? "La extracción fue enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
       if (action === "reject") setRejectConfirmOpen(false);
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : "No se pudo actualizar la intervención.");
+      setActionError(errorMessage(caught, "No se pudo actualizar la intervención."));
     } finally { setActiveAction(null); }
   };
 
@@ -428,7 +429,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       setRequestVersion((version) => version + 1);
       setNotice(linkNotice(unsyncedService.id, linkedTo));
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : "No se pudo vincular el servicio.");
+      setActionError(errorMessage(caught, "No se pudo vincular el servicio."));
     } finally {
       setActiveAction(null);
     }

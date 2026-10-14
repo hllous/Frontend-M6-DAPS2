@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -7,8 +7,7 @@ import {
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import { rescheduleServiceInputSchema, STATUS_LABEL } from "@/lib/services";
-import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
 
@@ -25,14 +24,9 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     // Permission check: reprogramming is an Office decision, not a Field action.
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede reprogramar un servicio.", path);
-    }
-
-    requireCapability(session, "service:reschedule");
+    authorize(session, { office: true, officeMessage: "Solo Oficina puede reprogramar un servicio.", capability: "service:reschedule", throwOnError: true });
 
     let body: unknown;
     try {
