@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import {
   ArrowLeft,
@@ -237,7 +238,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
         return {
           kind: "error" as const,
           sourceId,
-          error: error instanceof Error ? error.message : "No se pudo verificar el Servicio de origen.",
+          error: getErrorMessage(error, "No se pudo verificar el Servicio de origen."),
         };
       }
     }));
@@ -261,7 +262,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
       .catch((error: unknown) => {
         if (isCurrent) setLoadState({
           status: "error",
-          message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes.",
+          message: getErrorMessage(error, "Intente nuevamente en unos instantes."),
         });
       });
     return () => {
@@ -275,7 +276,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
       .then((result) => setLoadState({ status: "ready", ...result }))
       .catch((error: unknown) => setLoadState({
         status: "error",
-        message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes.",
+        message: getErrorMessage(error, "Intente nuevamente en unos instantes."),
       }));
   };
 
@@ -849,7 +850,7 @@ function ReferralRecoveryForm({
         }
       }
 
-      setErrorMessage(cause instanceof Error ? cause.message : "No se pudo registrar la recuperación manual.");
+      setErrorMessage(getErrorMessage(cause, "No se pudo registrar la recuperación manual."));
     } finally {
       setIsSubmitting(false);
     }

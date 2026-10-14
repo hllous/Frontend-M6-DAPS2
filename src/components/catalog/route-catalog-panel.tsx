@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useState } from "react";
 import {
@@ -446,9 +447,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       const message =
         caught instanceof RouteRequestError
           ? caught.message
-          : caught instanceof Error
-            ? caught.message
-            : "No se pudo guardar la secuencia de paradas.";
+          : errorMessage(caught, "No se pudo guardar la secuencia de paradas.");
       setStopEditorError(message);
     } finally {
       setIsSavingStops(false);

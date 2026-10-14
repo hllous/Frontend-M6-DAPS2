@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { Plus, Trash2, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -201,7 +202,7 @@ export function CreateStreetClosureRequestDialog({
           setOutcome("unsent");
           setAnnouncement("La solicitud quedó sin enviar. Revise los valores y envíela manualmente cuando vuelva la conexión.");
         } else {
-          setErrors({ form: cause instanceof Error ? cause.message : "No se pudo crear la solicitud." });
+          setErrors({ form: errorMessage(cause, "No se pudo crear la solicitud.") });
           setAnnouncement("No se pudo crear la solicitud.");
         }
       }

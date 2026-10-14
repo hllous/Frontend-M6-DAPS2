@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useId, useMemo, useState } from "react";
 import { AlertCircle, Calendar, Check, Clock, Info, Loader2, MapPin, Route as RouteIcon } from "lucide-react";
@@ -320,7 +321,7 @@ export function ScheduleServiceDialog({
         const stops = selectedRouteZones.length > 0 ? selectedRouteZones.map((zone) => zone.id) : (await routesAdapter.get(routeId)).stops.map((stop) => stop.zoneId);
         zoneIds = [...new Set(stops)];
       } catch (cause) {
-        setFieldErrors({ route: cause instanceof Error ? cause.message : "No se pudo consultar el recorrido seleccionado." });
+        setFieldErrors({ route: getErrorMessage(cause, "No se pudo consultar el recorrido seleccionado.") });
         setIsSubmitting(false);
         return;
       }
@@ -359,9 +360,7 @@ export function ScheduleServiceDialog({
       handleOpenChange(false);
     } catch (cause) {
       const msg =
-        cause instanceof Error
-          ? cause.message
-          : "No se pudo programar el servicio. Verifique los datos ingresados.";
+        getErrorMessage(cause, "No se pudo programar el servicio. Verifique los datos ingresados.");
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);

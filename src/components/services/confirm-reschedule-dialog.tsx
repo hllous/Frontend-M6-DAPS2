@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
 import { AlertCircle, CalendarCheck2, Check, Loader2, MapPin } from "lucide-react";
@@ -92,9 +93,7 @@ function ConfirmRescheduleForm({
       onOpenChange(false);
     } catch (cause) {
       const msg =
-        cause instanceof Error
-          ? cause.message
-          : "Ocurrió un error al confirmar la nueva fecha del servicio.";
+        getErrorMessage(cause, "Ocurrió un error al confirmar la nueva fecha del servicio.");
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);

@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
@@ -62,9 +63,7 @@ function CompleteRepairModalContent({
       updated = await containersAdapter.completeRepair(container.id);
     } catch (error) {
       setErrorMessage(
-        error instanceof ContainerRequestError || error instanceof Error
-          ? error.message
-          : "No se pudo completar la reparación del contenedor.",
+        getErrorMessage(error, "No se pudo completar la reparación del contenedor."),
       );
       setIsSubmitting(false);
       return;

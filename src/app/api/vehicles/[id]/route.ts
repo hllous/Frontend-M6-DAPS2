@@ -1,9 +1,8 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { updateVehicleInputSchema } from "@/lib/vehicles";
 import { vehicleFixtures } from "@/lib/vehicles-fixtures";
@@ -18,14 +17,10 @@ async function requestContext(request: Request, context: Context) {
   const { id } = await context.params;
   const path = new URL(request.url).pathname;
   const session = getRequiredSession(request);
-  const scenario = getScenario(session);
-  return { id, path, session, scenario };
+  return { id, path, session };
 }
 
-function requireOfficeCapability(session: ReturnType<typeof getRequiredSession>, scenario: ReturnType<typeof getScenario>) {
-  if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar vehículos.");
-  requireCapability(session, "vehicle:manage");
-}
+function requireOfficeCapability(session: ReturnType<typeof getRequiredSession>) { authorize(session, { office: true, officeMessage: "Solo Oficina puede administrar vehículos.", capability: "vehicle:manage", throwOnError: true }); }
 
 async function forward(request: Request, path: string, capability?: "vehicle:manage", init?: RequestInit) {
   const response = await fetchBackend(request, path, capability, init);
@@ -48,13 +43,13 @@ export async function GET(request: Request, context: Context) {
 export async function PATCH(request: Request, context: Context) {
   const path = new URL(request.url).pathname;
   try {
-    const { id, session, scenario } = await requestContext(request, context);
-    requireOfficeCapability(session, scenario);
+    const { id, session } = await requestContext(request, context);
+    requireOfficeCapability(session);
     let body: unknown;
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = updateVehicleInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    requireOfficeCapability(session, scenario);
+    requireOfficeCapability(session);
     if (backendMode(session)) return forward(request, `/vehicles/${pathId(id)}`, "vehicle:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
     const vehicle = vehicleFixtures.find((item) => item.id === id);
     if (!vehicle) return errorResponse(404, `El vehículo ${id} no existe.`, path);
@@ -71,8 +66,8 @@ export async function PATCH(request: Request, context: Context) {
 export async function DELETE(request: Request, context: Context) {
   const path = new URL(request.url).pathname;
   try {
-    const { id, session, scenario } = await requestContext(request, context);
-    requireOfficeCapability(session, scenario);
+    const { id, session } = await requestContext(request, context);
+    requireOfficeCapability(session);
     if (backendMode(session)) return forward(request, `/vehicles/${pathId(id)}`, "vehicle:manage", { method: "DELETE" });
     const vehicle = vehicleFixtures.find((item) => item.id === id);
     if (!vehicle) return errorResponse(404, `El vehículo ${id} no existe.`, path);
