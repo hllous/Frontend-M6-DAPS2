@@ -4,7 +4,7 @@ import { Activity, AlertTriangle, Boxes, MapPinned, RefreshCw, Route as RouteIco
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -258,6 +258,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
   const [selectedStopSequence, setSelectedStopSequence] = useState<number | null>(null);
   const [selectedZoneCode, setSelectedZoneCode] = useState<string | null>(null);
   const [selectedMapItemKey, setSelectedMapItemKey] = useState<string | null>(null);
+  const viewSwitcherRef = useRef<HTMLDivElement>(null);
   // El árbol seleccionado vive en la URL (`tree`), igual que en el catálogo de arbolado.
   const router = useRouter();
   const pathname = usePathname();
@@ -501,7 +502,15 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
       <Tabs
         value={view}
         onValueChange={(nextView) => {
-          if (typeof nextView === "string") handleViewChange(nextView as OperationalMapView);
+          if (typeof nextView !== "string") return;
+          const nextLabel = availableMapViews.find((option) => option.id === nextView)?.label;
+          const nextTab = Array.from(
+            viewSwitcherRef.current?.querySelectorAll<HTMLElement>('[role="tab"]') ?? [],
+          ).find((tab) => tab.textContent?.trim() === nextLabel);
+          if (nextTab && typeof nextTab.scrollIntoView === "function") {
+            nextTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+          }
+          handleViewChange(nextView as OperationalMapView);
         }}
         className={styles.tabs}
       >
@@ -530,6 +539,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
         </header>
 
         <TabsList
+          ref={viewSwitcherRef}
           activateOnFocus
           className={styles.viewSwitcher}
           variant="line"
@@ -715,7 +725,7 @@ function InventoryPanel({
 
       <section className={styles.visibleList} aria-labelledby="visible-items-title">
         <div className={styles.listHeading}>
-          <h2 id="visible-items-title">Elementos visibles</h2>
+          <h2 id="visible-items-title">Elementos</h2>
           <span>{locatedItems.length}</span>
         </div>
         {unlocatedCount > 0 ? (

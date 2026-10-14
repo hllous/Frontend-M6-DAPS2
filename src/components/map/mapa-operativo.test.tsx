@@ -40,7 +40,7 @@ describe("MapaOperativo", () => {
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByRole("heading", { name: "Mapa operativo" })).toBeVisible();
-    expect(await screen.findByText("Elementos", { exact: true })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Elementos" })).toBeVisible();
     expect(screen.queryByText(/Supervise el inventario urbano/)).not.toBeInTheDocument();
     const refresh = screen.getByRole("button", { name: "Actualizar datos" });
     expect(refresh).toBeEnabled();
@@ -63,7 +63,7 @@ describe("MapaOperativo", () => {
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
     expect(screen.getByRole("status", { name: "Cargando mapa operativo" })).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Elementos visibles" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Elementos" })).toBeInTheDocument();
     expect(screen.getByText("CONT-002")).toBeInTheDocument();
     expect(screen.getByText("Punto verde Plaza Mitre")).toBeInTheDocument();
     expect(screen.getByText("Parque del Bicentenario")).toBeInTheDocument();
@@ -94,7 +94,7 @@ describe("MapaOperativo", () => {
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Elementos visibles" });
+    await screen.findByRole("heading", { name: "Elementos" });
     expect(screen.getByText(/Consultado/)).toBeVisible();
 
     for (const view of ["Zonas", "Cobertura", "Recorrido", "Atención hoy"]) {
@@ -108,7 +108,7 @@ describe("MapaOperativo", () => {
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    const list = within(await screen.findByRole("region", { name: "Elementos visibles" }));
+    const list = within(await screen.findByRole("region", { name: "Elementos" }));
     const selected = list.getByRole("button", { name: /ARB-00442/ });
     expect(selected).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("link", { name: "Ver ficha del árbol ARB-00442" })).toHaveAttribute("href", "/app/catalog/trees?tree=tree-1&detail=tree-1");

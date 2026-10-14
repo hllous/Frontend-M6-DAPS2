@@ -872,9 +872,6 @@ export function ServicesWorkspace({
             <h1 className="text-lg font-bold tracking-tight text-[var(--color-text)]">
               Servicios Urbanos
             </h1>
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              Programación y seguimiento territorial de recorridos y puntos
-            </p>
           </div>
 
           <div className="flex items-center gap-2">

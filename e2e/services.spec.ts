@@ -15,6 +15,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
   test("wide viewport shows split pane with table, map, and synchronized selection", async ({ page }) => {
     await page.setViewportSize(WIDE_VIEWPORT);
     await openServices(page);
+    await expect(page.getByText("Programación y seguimiento territorial de recorridos y puntos")).toHaveCount(0);
 
     // Verify presence of table region and map region
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
