@@ -63,7 +63,7 @@ test.describe("automated WCAG checks @smoke", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
-    await expect(page.getByRole("button", { name: /Lista \(/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Lista", exact: true })).toBeVisible();
     await expect(table).toBeVisible();
     await expectNoViolations(page);
 

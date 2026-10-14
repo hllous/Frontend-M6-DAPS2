@@ -5,7 +5,88 @@
 }
 
 .desktopWorkspaceLayoutOpen {
-  grid-template-columns: minmax(0, 1fr) minmax(0, min(28rem, 30vw));
+  grid-template-columns: minmax(0, 1fr) minmax(0, min(24rem, 28vw));
+}
+
+.mobileWorkspaceLayout {
+  flex: 0 0 auto;
+  height: min(65vh, calc(100dvh - 440px));
+  min-height: 190px;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.mobileWorkspaceLayout .panelGroup {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.mobileWorkspaceLayout .mobileMapPanel,
+.mobileWorkspaceLayout .mobileTablePanel {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  flex: none !important;
+}
+
+.mobileWorkspaceLayout .mobileMapPanel {
+  z-index: 0;
+}
+
+.mobileWorkspaceLayout .mobileTablePanel {
+  z-index: 1;
+  pointer-events: none;
+}
+
+.mobileWorkspaceLayout .mobileTablePanel > div {
+  pointer-events: none;
+}
+
+.mobileServiceDrawer {
+  pointer-events: auto;
+}
+
+.mobileDrawerContent {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.mobileTablePane,
+.mobilePreviewSurface {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobileTablePane {
+  opacity: 1;
+}
+
+.mobileTablePaneHidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+}
+
+.mobilePreviewSurface {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+}
+
+.mobilePreviewSurfaceOpen {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .previewRail {
@@ -29,45 +110,14 @@
   transform: translateX(0);
 }
 
-.mobilePreview {
-  position: absolute;
-  z-index: 30;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.mobilePreviewOpen {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.mobileMapPreview {
-  inset: 0;
-  transform: translateY(8px);
-}
-
-.mobileListPreview {
-  inset-inline: 0;
-  bottom: 0;
-  max-height: 75%;
-  overflow: hidden;
-  border-radius: 1rem 1rem 0 0;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
-  transform: translateY(8px);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .desktopWorkspaceLayout {
     transition-duration: 1ms;
   }
 
   .previewSurface,
-  .mobilePreview {
+  .mobileTablePane,
+  .mobilePreviewSurface {
     transform: none;
     transition-duration: 150ms;
   }

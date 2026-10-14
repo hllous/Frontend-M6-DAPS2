@@ -29,7 +29,6 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import type { PanelImperativeHandle } from "react-resizable-panels";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
@@ -109,7 +108,6 @@ export function ServicesWorkspace({
     return value === "semana" || value === "mes" || value === "todo" ? value : null;
   });
   const [activePeriod, setActivePeriod] = useState<Period>(periodChoice ?? "todo");
-  const [totalServices, setTotalServices] = useState(0);
 
   // Global search
   const [search, setSearch] = useState<string>(() => getParam("q") ?? "");
@@ -204,9 +202,6 @@ export function ServicesWorkspace({
     return getParam("view") === "map" ? "map" : "list";
   });
   const [isNarrow, setIsNarrow] = useState(false);
-  const mapPanelRef = useRef<PanelImperativeHandle | null>(null);
-  const tablePanelRef = useRef<PanelImperativeHandle | null>(null);
-  const desktopPanelLayout = useRef<{ map: number; table: number } | null>(null);
 
   // Map resilience
   const [mapError, setMapError] = useState(initialMapError);
@@ -220,39 +215,6 @@ export function ServicesWorkspace({
     window.addEventListener("resize", checkWidth);
     return () => window.removeEventListener("resize", checkWidth);
   }, []);
-
-  useEffect(() => {
-    const mapPanel = mapPanelRef.current;
-    const tablePanel = tablePanelRef.current;
-    if (!mapPanel || !tablePanel) return;
-
-    if (!isNarrow) {
-      const layout = desktopPanelLayout.current;
-      mapPanel.expand();
-      tablePanel.expand();
-      if (layout) {
-        mapPanel.resize(`${layout.map}%`);
-        tablePanel.resize(`${layout.table}%`);
-        desktopPanelLayout.current = null;
-      }
-      return;
-    }
-
-    desktopPanelLayout.current ??= {
-      map: mapPanel.getSize().asPercentage,
-      table: tablePanel.getSize().asPercentage,
-    };
-
-    if (mobileTab === "map") {
-      tablePanel.collapse();
-      mapPanel.expand();
-      mapPanel.resize("100%");
-    } else {
-      mapPanel.collapse();
-      tablePanel.expand();
-      tablePanel.resize("100%");
-    }
-  }, [isNarrow, mobileTab]);
 
   // Fetch all services
   useEffect(() => {
@@ -268,7 +230,6 @@ export function ServicesWorkspace({
         if (!isCurrent) return;
         const period = periodChoice ?? (count.total > 100 ? "semana" : "todo");
         setActivePeriod(period);
-        setTotalServices(count.total);
         const query: ServiceQuery = { ...base, pageSize: 100 };
         if (period !== "todo") {
           const today = todayInArgentina();
@@ -536,7 +497,8 @@ export function ServicesWorkspace({
   const handleSelect = useCallback((id: string) => {
     setRetainedPreviewId(id);
     setSelectedId((prev) => (prev === id ? null : id));
-  }, []);
+    if (isNarrow) setMobileTab("list");
+  }, [isNarrow]);
 
   const handleOpenDetail = useCallback((id: string) => {
     setStartErrors({});
@@ -544,15 +506,13 @@ export function ServicesWorkspace({
   }, []);
 
   const handleSortChange = useCallback((key: SortKey) => {
-    setSortKey((prevKey) => {
-      if (prevKey === key) {
-        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-        return key;
-      }
-      setSortDir("asc");
-      return key;
-    });
-  }, []);
+    if (sortKey === key) {
+      setSortDir((direction) => (direction === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir("asc");
+  }, [sortKey]);
 
   const handleClearFilters = useCallback(() => {
     setSearch("");
@@ -753,6 +713,24 @@ export function ServicesWorkspace({
     columnFilters.crews.size > 0 ||
     Boolean(columnFilters.timeFrom || columnFilters.timeTo);
 
+  const servicesTable = (
+    <ServicesTable
+      services={sortedServices}
+      filterOptionsServices={loadState.status === "ready" ? loadState.services : []}
+      serviceOrdinals={serviceOrdinals}
+      selectedId={selectedId}
+      onSelect={handleSelect}
+      sortKey={sortKey}
+      sortDir={sortDir}
+      onSortChange={handleSortChange}
+      columnFilters={columnFilters}
+      onColumnFiltersChange={setColumnFilters}
+      hasActiveFilters={hasActiveFilters}
+      onClearFilters={handleClearFilters}
+      dense={isNarrow}
+    />
+  );
+
   const periodBar = (
     <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm text-[var(--color-text-secondary)]">
       <label className="flex items-center gap-2">
@@ -770,9 +748,6 @@ export function ServicesWorkspace({
           <option value="todo">Todo el período</option>
         </select>
       </label>
-      {loadState.status === "ready" && (
-        <span aria-live="polite">Mostrando {loadState.services.length} de {totalServices} servicios</span>
-      )}
     </div>
   );
 
@@ -1043,7 +1018,7 @@ export function ServicesWorkspace({
                     )}
                   >
                     <LayoutList className="h-4 w-4" aria-hidden />
-                    <span>Lista ({filteredServices.length})</span>
+                    <span>Lista</span>
                   </button>
                   <button
                     type="button"
@@ -1065,28 +1040,18 @@ export function ServicesWorkspace({
 
             <div className={cn(
               "relative min-h-0 min-w-0 flex-1",
-              !isNarrow && styles.desktopWorkspaceLayout,
+              isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout,
               !isNarrow && selectedService && styles.desktopWorkspaceLayoutOpen,
             )}>
-              <ResizablePanelGroup direction="horizontal" className="h-full min-w-0 flex-1">
+              <ResizablePanelGroup direction="horizontal" className={cn("h-full min-w-0 flex-1", styles.panelGroup)}>
                 <ResizablePanel
                   id="map-pane"
-                  panelRef={mapPanelRef}
                   defaultSize="50%"
                   minSize="30%"
-                  collapsedSize="0%"
-                  collapsible
                   style={{ overflow: "hidden" }}
-                  className="min-h-0 min-w-0 overflow-hidden"
+                  className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileMapPanel)}
                 >
-                  <div className={cn(
-                    "h-full min-h-0 min-w-0",
-                    isNarrow ? "p-2" : "p-3",
-                    isNarrow && mobileTab !== "map" && "invisible",
-                  )}
-                    aria-hidden={isNarrow && mobileTab !== "map"}
-                    inert={isNarrow && mobileTab !== "map"}
-                  >
+                  <div className={cn("h-full min-h-0 min-w-0", !isNarrow && "p-3")}>
                     <MapView
                       services={sortedServices}
                       serviceOrdinals={serviceOrdinals}
@@ -1105,80 +1070,57 @@ export function ServicesWorkspace({
                   withHandle
                   disabled={isNarrow}
                   aria-label="Ajustar ancho entre mapa y tabla"
-                  className={isNarrow ? "hidden" : ""}
+                  className={cn(styles.mobileResizeHandle, isNarrow && "hidden")}
                 />
 
                 <ResizablePanel
                   id="table-pane"
-                  panelRef={tablePanelRef}
                   defaultSize="50%"
                   minSize="30%"
-                  collapsedSize="0%"
-                  collapsible
-                  className="min-h-0 min-w-0 overflow-hidden"
+                  className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}
                 >
-                  <div
-                    className="h-full min-h-0"
-                    aria-hidden={isNarrow && mobileTab !== "list"}
-                    inert={isNarrow && mobileTab !== "list"}
-                  >
-                    <ServicesTable
-                      services={sortedServices}
-                      filterOptionsServices={loadState.services}
-                      serviceOrdinals={serviceOrdinals}
-                      selectedId={selectedId}
-                      onSelect={handleSelect}
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSortChange={handleSortChange}
-                      columnFilters={columnFilters}
-                      onColumnFiltersChange={setColumnFilters}
-                      hasActiveFilters={hasActiveFilters}
-                      onClearFilters={handleClearFilters}
-                      dense={isNarrow}
-                    />
+                  <div className={cn("h-full min-h-0", isNarrow && "pointer-events-none")}>
+                    {isNarrow ? (
+                      <InventoryMapDrawer
+                        ariaLabel="Lista de servicios"
+                        summary={selectedService?.title ?? "Lista de servicios"}
+                        expanded={mobileTab === "list"}
+                        onExpandedChange={(expanded) => setMobileTab(expanded ? "list" : "map")}
+                        className={styles.mobileServiceDrawer}
+                      >
+                        <div className={styles.mobileDrawerContent}>
+                          <div
+                            className={cn(styles.mobileTablePane, previewService && styles.mobileTablePaneHidden)}
+                            aria-hidden={Boolean(previewService)}
+                            inert={Boolean(previewService)}
+                          >
+                            {servicesTable}
+                          </div>
+                          <div
+                            className={cn(styles.mobilePreviewSurface, selectedService && styles.mobilePreviewSurfaceOpen)}
+                            aria-hidden={!selectedService}
+                            inert={!selectedService}
+                          >
+                            {previewService && (
+                              <ServicePreview
+                                service={previewService}
+                                onOpenDetail={handleOpenDetail}
+                                onAssignCrew={canAssignCrew ? (service) => setAssigningServiceId(service.id) : undefined}
+                                onClose={closePreview}
+                                className="select-text border-l-0"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </InventoryMapDrawer>
+                    ) : servicesTable}
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
 
-              {isNarrow && (
-                <div
-                  className={cn(
-                    styles.mobilePreview,
-                    selectedService && styles.mobilePreviewOpen,
-                    mobileTab === "map" ? styles.mobileMapPreview : styles.mobileListPreview,
-                  )}
-                  aria-hidden={!selectedService}
-                  inert={!selectedService}
-                >
-                  {previewService && mobileTab === "map" ? (
-                    <InventoryMapDrawer
-                      ariaLabel="Vista previa del servicio"
-                      summary={previewService.title}
-                    >
-                      <ServicePreview
-                        service={previewService}
-                        onOpenDetail={handleOpenDetail}
-                        onAssignCrew={canAssignCrew ? (service) => setAssigningServiceId(service.id) : undefined}
-                        onClose={closePreview}
-                        className="select-text border-l-0"
-                      />
-                    </InventoryMapDrawer>
-                  ) : previewService ? (
-                    <ServicePreview
-                      service={previewService}
-                      onOpenDetail={handleOpenDetail}
-                      onAssignCrew={canAssignCrew ? (service) => setAssigningServiceId(service.id) : undefined}
-                      onClose={closePreview}
-                      className="select-text rounded-t-2xl border-t"
-                    />
-                  ) : null}
-                </div>
-              )}
-
               {!isNarrow && (
                 <div
-                  className={styles.previewRail}
+                  className={cn(styles.previewRail, selectedService && styles.previewRailOpen)}
                   aria-hidden={!selectedService}
                   inert={!selectedService}
                 >

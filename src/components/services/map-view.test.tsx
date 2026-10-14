@@ -84,7 +84,7 @@ describe("MapView", () => {
     vi.spyOn(operationalZonesAdapter, "list").mockResolvedValue(zones);
   });
 
-  it("shows resolved services, preserves selection, and explains unlocated services", async () => {
+  it("shows resolved services without covering the map with location notices", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     const services = [
@@ -96,31 +96,23 @@ describe("MapView", () => {
     render(<MapView services={services} selectedId={null} onSelect={onSelect} />);
 
     expect(await screen.findByTestId("services-map-canvas")).toBeVisible();
-    expect(screen.getByText("3 servicios visibles")).toBeVisible();
-    expect(screen.getByText("1 servicio sin ubicación")).toBeVisible();
+    expect(screen.queryByText(/servicios? visibles|sin ubicación/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Servicio arbóreo" }));
 
     expect(onSelect).toHaveBeenCalledWith("SVC-TREE-1");
   });
 
-  it("lists a service whose zone cannot be verified instead of plotting it", async () => {
-    const user = userEvent.setup();
-    const onSelect = vi.fn();
+  it("omits a service whose zone cannot be verified from the map", async () => {
     const services = [
       makeService({ id: "SVC-UNVERIFIED", title: "Servicio sin zona", zoneIds: ["zone-does-not-exist"], targetType: "TREE", targetId: "tree-1" }),
     ];
 
-    render(<MapView services={services} selectedId="SVC-UNVERIFIED" onSelect={onSelect} />);
+    render(<MapView services={services} selectedId="SVC-UNVERIFIED" onSelect={vi.fn()} />);
 
     expect(await screen.findByTestId("services-map-canvas")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Servicio sin zona" })).not.toBeInTheDocument();
-    expect(screen.getByText("1 servicio sin ubicación")).toBeVisible();
-    expect(screen.getByText(/su zona no pudo verificarse; no se muestra como pin/)).toBeVisible();
-
-    await user.click(screen.getByRole("button", { name: "Seleccionar Servicio sin zona con ubicación sin verificar" }));
-
-    expect(onSelect).toHaveBeenCalledWith("SVC-UNVERIFIED");
+    expect(screen.queryByText(/sin ubicación|no pudo verificarse/i)).not.toBeInTheDocument();
   });
 
   it("distinguishes an empty filtered map and lets the user clear filters", async () => {

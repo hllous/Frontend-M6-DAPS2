@@ -26,7 +26,7 @@ describe("Services workspace period", () => {
       total: 54, totalPages: query?.pageSize === 1 ? 54 : 1, page: 1, pageSize: query?.pageSize ?? 100,
     }));
     render(<ServicesWorkspace />);
-    expect(await screen.findByText("Mostrando 54 de 54 servicios")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("todo");
     expect(list.mock.calls).toEqual([[{ pageSize: 1 }], [{ pageSize: 100 }]]);
   });
@@ -42,12 +42,11 @@ describe("Services workspace period", () => {
       page: query?.page ?? 1, pageSize: query?.pageSize ?? 100,
     }));
     render(<ServicesWorkspace />);
-    expect(await screen.findByText("Mostrando 21 de 240 servicios")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("semana");
     expect(list).toHaveBeenCalledWith({ pageSize: 100, scheduledFrom: "2026-10-26", scheduledTo: "2026-11-01" });
     expect(list).toHaveBeenCalledWith({ pageSize: 100, page: 2, scheduledFrom: "2026-10-26", scheduledTo: "2026-11-01" });
     fireEvent.change(screen.getByRole("combobox", { name: "Período" }), { target: { value: "mes" } });
-    await screen.findByText("Mostrando 21 de 240 servicios");
     await waitFor(() => expect(list).toHaveBeenCalledWith({ pageSize: 100, scheduledFrom: "2026-11-01", scheduledTo: "2026-11-30" }));
     expect(new URLSearchParams(window.location.search).get("periodo")).toBe("mes");
   });
@@ -72,7 +71,7 @@ describe("Services workspace period", () => {
     render(<ServicesWorkspace />);
     expect(await screen.findByText("No hay servicios en este período.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Ver todo el período" }));
-    expect(await screen.findByText("Mostrando 1 de 54 servicios")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
     expect(list).toHaveBeenCalledWith({ pageSize: 100 });
     expect(new URLSearchParams(window.location.search).get("periodo")).toBe("todo");
   });
@@ -81,7 +80,7 @@ describe("Services workspace period", () => {
     window.history.replaceState(null, "", "/app?periodo=todo");
     const list = vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 240, totalPages: 3, page: 1, pageSize: 100 });
     render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
-    await screen.findByText("Mostrando 0 de 240 servicios");
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
     expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("todo");
     expect(list.mock.calls).toEqual([
       [{ crewId: "crew-b", pageSize: 1 }],
@@ -106,7 +105,7 @@ describe("Services workspace period", () => {
     vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 54, totalPages: 1, page: 1, pageSize: 100 });
     const get = vi.spyOn(servicesAdapter, "get").mockRejectedValue(new ServiceRequestError("No encontrado", 404));
     render(<ServicesWorkspace />);
-    await screen.findByText("Mostrando 0 de 54 servicios");
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
     await waitFor(() => expect(get).toHaveBeenCalledWith("unknown-id"));
     expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("todo");
     expect(screen.queryByText("Este servicio está fuera del período seleccionado.")).not.toBeInTheDocument();

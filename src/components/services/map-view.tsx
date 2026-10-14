@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2, MapPin, MapPinOff, RefreshCw } from "lucide-react";
+import { AlertCircle, Loader2, MapPin, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -35,14 +35,6 @@ type ReferenceDataState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; mapData: OperationalMapData; zones: OperationalZone[] };
-
-function serviceCountLabel(count: number) {
-  return `${count} servicio${count === 1 ? "" : "s"} visible${count === 1 ? "" : "s"}`;
-}
-
-function unlocatedServiceLabel(count: number) {
-  return `${count} servicio${count === 1 ? "" : "s"} sin ubicación`;
-}
 
 type MapViewProps = {
   services: Service[];
@@ -107,11 +99,6 @@ export function MapView({
         : [],
     [referenceData, services],
   );
-  const unlocatedLocations = useMemo(
-    () => locations.filter((location) => location.coordinates === null),
-    [locations],
-  );
-  const selectedUnlocated = unlocatedLocations.find((location) => location.serviceId === selectedId);
   const hasReferenceDataError = referenceData.status === "error";
   const hasError = error || hasReferenceDataError;
   const isLoading = loading || referenceData.status === "loading";
@@ -164,41 +151,6 @@ export function MapView({
             </Empty>
           ) : null}
 
-          {unlocatedLocations.length > 0 ? (
-            <div className={styles.locationNotice} role="status" aria-live="polite">
-              <MapPinOff aria-hidden="true" />
-              <div>
-                <strong>{unlocatedServiceLabel(unlocatedLocations.length)}</strong>
-                <span>
-                  {selectedUnlocated
-                    ? selectedUnlocated.locationType === "unverified"
-                      ? `${services.find((service) => service.id === selectedUnlocated.serviceId)?.title ?? "El servicio"} tiene coordenadas, pero su zona no pudo verificarse; no se muestra como pin.`
-                      : `${services.find((service) => service.id === selectedUnlocated.serviceId)?.title ?? "El servicio"} no tiene un objetivo o una zona con coordenadas resolubles.`
-                    : "No se muestran como pines hasta contar con una ubicación resoluble y verificada."}
-                </span>
-                <div className={styles.locationActions} aria-label="Servicios sin ubicación">
-                  {unlocatedLocations.map((location) => {
-                    const service = services.find((candidate) => candidate.id === location.serviceId);
-                    const serviceTitle = service?.title ?? "Servicio sin nombre";
-                    return (
-                      <button
-                        key={location.serviceId}
-                        type="button"
-                        className={styles.locationAction}
-                        aria-label={location.locationType === "unverified"
-                          ? `Seleccionar ${serviceTitle} con ubicación sin verificar`
-                          : `Seleccionar ${serviceTitle} sin ubicación`}
-                        aria-pressed={location.serviceId === selectedId}
-                        onClick={() => onSelect(location.serviceId)}
-                      >
-                        {serviceTitle}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
@@ -250,10 +202,6 @@ export function MapView({
         </div>
       ) : null}
 
-      <div className={styles.counter} aria-live="polite">
-        <MapPin aria-hidden="true" />
-        <span>{serviceCountLabel(services.length)}</span>
-      </div>
     </div>
   );
 }

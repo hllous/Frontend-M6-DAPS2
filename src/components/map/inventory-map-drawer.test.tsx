@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -46,5 +46,34 @@ describe("InventoryMapDrawer", () => {
 
     expect(screen.getByRole("button", { name: "Primer elemento" })).toHaveFocus();
     expect(screen.getByRole("button", { name: "Ocultar lista" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("hides collapsed compact content from assistive technology until expanded", async () => {
+    const originalWidth = window.innerWidth;
+    const user = userEvent.setup();
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+
+    try {
+      render(
+        <InventoryMapDrawer ariaLabel="Inventario visible" summary="Elementos">
+          <button type="button">Primer elemento</button>
+        </InventoryMapDrawer>,
+      );
+
+      const drawer = await screen.findByRole("complementary", { name: "Inventario visible" });
+      await waitFor(() => expect(drawer).toHaveAttribute("data-compact", "true"));
+      const handle = screen.getByRole("button", { name: "Mostrar lista" });
+      const content = drawer.querySelector(`#${handle.getAttribute("aria-controls")}`)!;
+
+      expect(content).toHaveAttribute("aria-hidden", "true");
+      expect(content).toHaveAttribute("inert");
+      expect(screen.queryByRole("button", { name: "Primer elemento" })).not.toBeInTheDocument();
+
+      await user.click(handle);
+
+      expect(screen.getByRole("button", { name: "Primer elemento" })).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
   });
 });

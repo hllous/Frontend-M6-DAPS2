@@ -12,6 +12,8 @@ type InventoryMapDrawerProps = {
   ariaLabel: string;
   children: ReactNode;
   className?: string;
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
   summary: string;
 };
 
@@ -24,16 +26,30 @@ type DragStart = {
 const HANDLE_HEIGHT = 80;
 const DRAG_THRESHOLD = 6;
 
-export function InventoryMapDrawer({ ariaLabel, children, className, summary }: InventoryMapDrawerProps) {
+export function InventoryMapDrawer({
+  ariaLabel,
+  children,
+  className,
+  expanded: controlledExpanded,
+  onExpandedChange,
+  summary,
+}: InventoryMapDrawerProps) {
   const contentId = useId();
   const summaryId = `${contentId}-summary`;
   const drawerRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragStart | null>(null);
   const draggedRef = useRef(false);
-  const [expanded, setExpanded] = useState(false);
+  const [localExpanded, setLocalExpanded] = useState(false);
+  const expanded = controlledExpanded ?? localExpanded;
   const [isCompact, setIsCompact] = useState(false);
+  const contentHidden = isCompact && !expanded;
   const [dragDelta, setDragDelta] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+
+  function updateExpanded(nextExpanded: boolean) {
+    if (controlledExpanded === undefined) setLocalExpanded(nextExpanded);
+    onExpandedChange?.(nextExpanded);
+  }
 
   useEffect(() => {
     const updateViewport = () => setIsCompact(window.innerWidth <= servicesMobileBreakpoint());
@@ -44,7 +60,7 @@ export function InventoryMapDrawer({ ariaLabel, children, className, summary }: 
 
   function handleFocusCapture(event: FocusEvent<HTMLElement>) {
     if (!(event.target instanceof HTMLElement) || event.target.dataset.inventoryMapDrawerHandle !== "true") {
-      setExpanded(true);
+      updateExpanded(true);
     }
   }
 
@@ -80,7 +96,7 @@ export function InventoryMapDrawer({ ariaLabel, children, className, summary }: 
       const closedOffset = Math.max(0, drawerHeight - HANDLE_HEIGHT);
       const startOffset = drag.expanded ? 0 : closedOffset;
       const finalOffset = Math.max(0, Math.min(closedOffset, startOffset + delta));
-      setExpanded(finalOffset < closedOffset / 2);
+      updateExpanded(finalOffset < closedOffset / 2);
     }
 
     if (event.type === "pointercancel") draggedRef.current = false;
@@ -94,7 +110,7 @@ export function InventoryMapDrawer({ ariaLabel, children, className, summary }: 
       draggedRef.current = false;
       return;
     }
-    setExpanded((current) => !current);
+    updateExpanded(!expanded);
   }
 
   return (
@@ -127,7 +143,12 @@ export function InventoryMapDrawer({ ariaLabel, children, className, summary }: 
         <span className={styles.grabber} aria-hidden="true" />
         <span id={summaryId} className={styles.summary}>{summary}</span>
       </Button>
-      <div id={contentId} className={styles.content}>
+      <div
+        id={contentId}
+        className={styles.content}
+        aria-hidden={contentHidden || undefined}
+        inert={contentHidden}
+      >
         {children}
       </div>
     </aside>

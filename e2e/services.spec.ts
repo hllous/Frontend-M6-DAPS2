@@ -22,6 +22,9 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
     await expect(table).toBeVisible();
     await expect(map).toBeVisible();
+    await expect(page.getByText(/Mostrando \d+ de \d+ servicios/)).toHaveCount(0);
+    await expect(map.getByText(/servicios? visibles/i)).toHaveCount(0);
+    await expect(map.getByText(/sin ubicaci[oó]n/i)).toHaveCount(0);
 
     // Verify rows exist
     const rows = table.getByRole("row");
@@ -34,13 +37,19 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     // Preview panel opens with title and details
     const preview = page.locator("aside[aria-labelledby='preview-title']");
     await expect(preview).toBeVisible();
-    await expect(preview.getByText("Poda de árbol — Av. Rivadavia 2200")).toBeVisible();
+    const previewTitle = preview.getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200" });
+    await expect(previewTitle).toBeVisible();
+    await expect(preview.locator("xpath=..")).toHaveCSS("opacity", "1");
     await expect(preview.getByRole("button", { name: "Ver detalle completo" })).toBeVisible();
 
-    // Corresponding map marker has aria-pressed="true"
-    const marker1 = map.locator("button[aria-pressed='true']");
+    // Assert the visible Leaflet pin itself, not the off-screen loading index.
+    const marker1 = map.locator('.leaflet-marker-icon[data-service-id="SVC-1043"]');
     await expect(marker1).toBeVisible();
     await expect(marker1).toHaveAttribute("aria-label", /Poda de árbol — Av\. Rivadavia 2200/);
+    await expect(marker1).toHaveAttribute("aria-pressed", "true");
+    const firstRowOrdinal = (await firstServiceRow.locator("td").first().innerText()).trim();
+    await expect(marker1).toHaveText(firstRowOrdinal);
+    await expect(map.locator('.leaflet-marker-icon[aria-pressed="true"]')).toHaveAttribute("data-service-id", "SVC-1043");
 
     // Close preview to test map interaction directly
     await preview.getByRole("button", { name: "Cerrar vista previa" }).click();
@@ -66,6 +75,40 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     // Corresponding table row is selected
     const secondServiceRow = table.locator('tr[data-service-id="SVC-1051"]');
     await expect(secondServiceRow).toHaveAttribute("aria-selected", "true");
+    const marker2Ordinal = (await secondServiceRow.locator("td").first().innerText()).trim();
+    const marker2Pin = map.locator('.leaflet-marker-icon[data-service-id="SVC-1051"]');
+    await expect(marker2Pin).toHaveText(marker2Ordinal);
+    await expect(map.locator('.leaflet-marker-icon[aria-pressed="true"]')).toHaveAttribute("data-service-id", "SVC-1051");
+  });
+
+  test("service column toggles ascending and descending in visible row order", async ({ page }) => {
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await openServices(page);
+
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const serviceHeader = table.getByRole("columnheader", { name: /Servicio/ });
+    const sortButton = serviceHeader.getByRole("button", { name: /Ordenar por Servicio/ });
+    const serviceTitles = () => table.locator("tr[data-service-id] button[data-service-select]").evaluateAll((buttons) =>
+      buttons.map((button) => button.querySelector("span span")?.textContent?.trim() ?? ""),
+    );
+
+    await sortButton.click();
+    await expect(serviceHeader).toHaveAttribute("aria-sort", "ascending");
+    const ascendingTitles = await serviceTitles();
+    expect(ascendingTitles).toEqual([...ascendingTitles].sort((a, b) => a.localeCompare(b)));
+
+    await sortButton.click();
+    await expect(serviceHeader).toHaveAttribute("aria-sort", "descending");
+    const descendingTitles = await serviceTitles();
+    expect(descendingTitles).toEqual([...descendingTitles].sort((a, b) => b.localeCompare(a)));
+
+    const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
+    const selectedRow = table.locator('tr[data-service-id="SVC-1043"]');
+    await selectedRow.click();
+    const selectedOrdinal = (await selectedRow.locator("td").first().innerText()).trim();
+    const selectedMarker = map.locator('.leaflet-marker-icon[data-service-id="SVC-1043"]');
+    await expect(selectedMarker).toHaveText(selectedOrdinal);
+    await expect(selectedMarker).toHaveAttribute("aria-pressed", "true");
   });
 
   test("search input filters services and updates the URL parameter", async ({ page }) => {
@@ -113,7 +156,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(row.locator("button[data-service-select]")).toBeFocused();
   });
 
-  test("narrow viewport provides view switcher between list and map", async ({ page }) => {
+  test("narrow viewport keeps the map visible under a two-state service-list drawer", async ({ page }) => {
     await page.setViewportSize(NARROW_VIEWPORT);
     await openServices(page);
 
@@ -124,25 +167,46 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(listToggle).toBeVisible();
     await expect(mapToggle).toBeVisible();
 
-    // Initially, list/table is visible and map is not visible
+    // The map stays mounted behind the expanded list drawer.
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
     await expect(table).toBeVisible();
-    await expect(page.getByRole("region", { name: /mapa territorial de servicios/i })).not.toBeVisible();
+    const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
+    await expect(map).toBeVisible();
+    const listDrawer = page.getByRole("complementary", { name: "Lista de servicios" });
+    await expect(listDrawer).toHaveAttribute("data-expanded", "true");
+
+    const headerLabels = await table.locator("thead th").evaluateAll((headers) => headers.map((header) => {
+      const label = header.querySelector("button span") ?? header;
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      const rect = range.getBoundingClientRect();
+      const cell = header.getBoundingClientRect();
+      return { label: label.textContent?.trim() ?? "", left: rect.left, right: rect.right, cellLeft: cell.left, cellRight: cell.right };
+    }));
+    const clippedHeaderLabels = headerLabels.filter((label) => label.left < label.cellLeft - 1 || label.right > label.cellRight + 1);
+    expect(clippedHeaderLabels).toEqual([]);
+    const overlappingHeaderLabels = headerLabels.slice(0, -1).flatMap((label, index) => {
+      const nextLabel = headerLabels[index + 1];
+      return label.right > nextLabel.left + 1 ? [`${label.label} overlaps ${nextLabel.label}`] : [];
+    });
+    expect(overlappingHeaderLabels).toEqual([]);
 
     // Switch to Map view
     await mapToggle.click();
-    const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
     await expect(map).toBeVisible();
-    await expect(table).not.toBeVisible();
-    const marker = map.locator("button[aria-label*='Poda de árbol — Av. Rivadavia 2200']");
+    await expect(listDrawer).toHaveAttribute("data-expanded", "false");
+    const marker = map.locator('.leaflet-marker-icon[data-service-id="SVC-1043"]');
     await expect(marker).toBeVisible();
+    await expect(map.getByText(/servicios? sin ubicaci[oó]n/i)).toHaveCount(0);
 
     // Activating a marker in map view opens the preview (operable via keyboard Enter)
     await marker.focus();
     await page.keyboard.press("Enter");
-    const drawer = page.getByRole("complementary", { name: "Vista previa del servicio" });
-    await expect(drawer).toHaveAttribute("data-expanded", "false");
-    await expect(drawer.getByRole("button", { name: "Mostrar lista" })).toContainText("Poda de árbol — Av. Rivadavia 2200");
+    await expect(listDrawer).toHaveAttribute("data-expanded", "true");
+    const preview = page.locator("aside[aria-labelledby='preview-title']");
+    await expect(preview).toBeVisible();
+    await expect(preview.getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200" })).toBeVisible();
+    await expect(preview.locator("xpath=..")).toHaveCSS("opacity", "1");
     const getMapSize = () => map.evaluate((element) => {
       const { width, height } = element.getBoundingClientRect();
       return { width, height };
@@ -160,12 +224,6 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
       return stableMapSizeSamples;
     }, { intervals: [200], timeout: 5000 }).toBeGreaterThanOrEqual(2);
     const collapsedMapSize = await getMapSize();
-
-    await drawer.getByRole("button", { name: "Mostrar lista" }).click();
-    await expect(drawer).toHaveAttribute("data-expanded", "true");
-    const preview = page.locator("aside[aria-labelledby='preview-title']");
-    await expect(preview).toBeVisible();
-    await expect(preview.getByText("Poda de árbol — Av. Rivadavia 2200")).toBeVisible();
     await expect.poll(getMapSize).toEqual(collapsedMapSize);
   });
 

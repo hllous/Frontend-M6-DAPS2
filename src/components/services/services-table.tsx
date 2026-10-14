@@ -220,20 +220,20 @@ export function ServicesTable({
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll [scrollbar-gutter:stable]">
         <table
-          className={cn("w-full table-fixed border-collapse text-left text-xs", dense ? "min-w-[24rem]" : "min-w-[40rem]")}
+          className={cn("w-full table-fixed border-collapse text-left text-xs", dense ? "min-w-[22rem]" : "min-w-[40rem]")}
           aria-label="Servicios operativos"
         >
           <colgroup>
-            <col className="w-[4%]" />
-            <col className={dense ? "w-[48%]" : "w-[28%]"} />
+            <col className={dense ? "w-[12%]" : "w-[8%]"} />
+            <col className={dense ? "w-[32%]" : "w-[28%]"} />
+            {!dense && <col className="w-[14%]" />}
+            <col className={dense ? "w-[26%]" : "w-[18%]"} />
             {!dense && <col className="w-[18%]" />}
-            <col className={dense ? "w-[20%]" : "w-[14%]"} />
-            {!dense && <col className="w-[16%]" />}
-            <col className={dense ? "w-[28%]" : "w-[20%]"} />
+            <col className={dense ? "w-[30%]" : "w-[14%]"} />
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
             <tr>
-              <th scope="col" aria-label="Número de parada" className="w-12 p-3 text-center">Parada</th>
+              <th scope="col" aria-label="Número de parada" className="px-1 py-3 text-center">#</th>
               {columns.map((col) => {
                 if (dense && col.hideWhenDense) return null;
                 const isSorted = sortKey === col.key;
@@ -249,16 +249,19 @@ export function ServicesTable({
                     key={col.key}
                     scope="col"
                     aria-sort={ariaSort}
-                    className="p-3 select-none"
+                    className={cn("select-none px-1.5 py-3")}
                   >
-                    <div className="flex items-center justify-between gap-1.5">
+                    <div className={cn("flex items-center justify-between gap-1.5", dense && "gap-1")}>
                       <button
                         type="button"
                         onClick={() => onSortChange(col.key)}
-                        className="flex items-center gap-1 hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] rounded"
+                        className={cn(
+                          "flex min-w-0 items-center gap-1 hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] rounded",
+                          dense && "gap-0.5",
+                        )}
                         aria-label={`Ordenar por ${col.label}, actualmente ${ariaSort === "none" ? "sin ordenar" : directionLabel}`}
                       >
-                        <span>{col.label}</span>
+                        <span>{col.key === "scheduled" ? "Fecha" : col.label}</span>
                         {isSorted ? (
                           sortDir === "asc" ? (
                             <ArrowUp className="h-3 w-3 text-[var(--color-action)]" aria-hidden />
@@ -392,7 +395,7 @@ export function ServicesTable({
                       : "hover:bg-[var(--color-canvas)]",
                   )}
                 >
-                  <td className="p-2 text-center tabular-nums">
+                  <td className={cn("text-center tabular-nums", dense ? "px-1 py-2" : "px-1.5 py-2")}>
                     <span
                       aria-label={`Parada ${ordinal}`}
                       className="inline-flex size-7 items-center justify-center rounded-full bg-[var(--color-action)] text-xs font-bold text-[var(--color-on-institutional)]"
@@ -400,7 +403,7 @@ export function ServicesTable({
                       {ordinal}
                     </span>
                   </td>
-                  <td className="p-3">
+                  <td className="px-1.5 py-2">
                     <button
                       type="button"
                       data-service-select="true"
@@ -437,9 +440,12 @@ export function ServicesTable({
                     </td>
                   )}
 
-                  <td className="p-3">
+                  <td className="px-1.5 py-2">
                     <div className="flex flex-col gap-1 items-start">
-                      <StatusBadge status={service.status} />
+                      <StatusBadge
+                        status={service.status}
+                        className={dense ? "gap-1 px-1.5 text-[10px] [&_svg]:h-3 [&_svg]:w-3" : undefined}
+                      />
                     </div>
                   </td>
 
@@ -451,7 +457,7 @@ export function ServicesTable({
                     </td>
                   )}
 
-                  <td className="p-3 text-[var(--color-text)] tabular-nums whitespace-nowrap">
+                  <td className="px-1.5 py-2 text-[var(--color-text)] tabular-nums whitespace-nowrap">
                     <div>{formatCalendarDay(service.scheduledDate)}</div>
                     {service.windowFrom && (
                       <div className="text-[11px] text-[var(--color-text-secondary)]">

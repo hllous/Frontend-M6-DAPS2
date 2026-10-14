@@ -136,7 +136,7 @@ describe("ServicesWorkspace component", () => {
     try {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 760 });
       render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
-      expect(await screen.findByRole("button", { name: /Lista \(/ })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Lista" })).toBeInTheDocument();
 
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 761 });
       fireEvent(window, new Event("resize"));
@@ -159,18 +159,17 @@ describe("ServicesWorkspace component", () => {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
       render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
-      await user.click(await screen.findByRole("button", { name: "Mapa" }));
-      await screen.findByText(/servicios visibles$/);
+      const map = await screen.findByRole("region", { name: "Mapa territorial de Servicios" });
       const mapLoadCount = mapLoad.mock.calls.length;
       const zoneLoadCount = zoneLoad.mock.calls.length;
       const serviceListCount = serviceList.mock.calls.length;
 
-      await user.click(screen.getByRole("button", { name: /Lista \(/ }));
+      await user.click(screen.getByRole("button", { name: "Lista" }));
       await user.type(screen.getByRole("searchbox", { name: "Buscar servicios por texto libre" }), "Poda");
       await user.click(screen.getByRole("button", { name: /Ordenar por Servicio/ }));
       await user.click(screen.getByRole("row", { name: /Poda de árbol — Av\. Rivadavia 2200/ }));
       await user.click(screen.getByRole("button", { name: "Mapa" }));
-      await screen.findByText(/servicios visibles$/);
+      expect(screen.getByRole("region", { name: "Mapa territorial de Servicios" })).toBe(map);
 
       expect(mapLoad).toHaveBeenCalledTimes(mapLoadCount);
       expect(zoneLoad).toHaveBeenCalledTimes(zoneLoadCount);
@@ -190,16 +189,12 @@ describe("ServicesWorkspace component", () => {
 
       await user.click(await screen.findByRole("button", { name: "Mapa" }));
       const map = await screen.findByRole("region", { name: "Mapa territorial de Servicios" });
+      expect(map).toBeVisible();
       const marker = await within(map).findByRole("button", { name: /Poda de árbol — Av\. Rivadavia 2200/ });
       await user.click(marker);
 
-      const drawer = await screen.findByRole("complementary", { name: "Vista previa del servicio" });
-      const toggle = within(drawer).getByRole("button", { name: "Mostrar lista" });
-      expect(toggle).toHaveAttribute("aria-expanded", "false");
-      expect(map).toBeVisible();
-
-      await user.click(toggle);
-
+      const drawer = await screen.findByRole("complementary", { name: "Lista de servicios" });
+      const toggle = within(drawer).getByRole("button", { name: "Ocultar lista" });
       expect(toggle).toHaveAttribute("aria-expanded", "true");
       expect(map).toBeVisible();
       expect(within(drawer).getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200" })).toBeInTheDocument();
