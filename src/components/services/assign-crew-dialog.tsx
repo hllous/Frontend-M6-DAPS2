@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import {
   checkAssignmentConflicts,
@@ -91,6 +91,7 @@ function AssignCrewForm({
   const [backendConflict, setBackendConflict] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ crew?: string; vehicle?: string; overrideNote?: string }>({});
 
   // Cuadrillas, vehículos y requiresVehicle salen del backend: sin ellos no se puede confirmar.
   const [resources, setResources] = useState<
@@ -153,26 +154,26 @@ function AssignCrewForm({
     if (!service || !ready) return;
 
     if (!crewId) {
-      setErrorMessage("Debe seleccionar una cuadrilla asignada.");
+      setErrorMessage(null);
+      setFieldErrors({ crew: "Debe seleccionar una cuadrilla asignada." });
       return;
     }
 
     if (requiresVehicle && (!vehicleId || !vehicleId.trim())) {
-      setErrorMessage(
-        "El tipo de servicio requiere la asignación obligatoria de un vehículo operativo.",
-      );
+      setErrorMessage(null);
+      setFieldErrors({ vehicle: "El tipo de servicio requiere la asignación obligatoria de un vehículo operativo." });
       return;
     }
 
     if (needsOverrideNote && overrideNote.trim().length < OVERRIDE_NOTE_MIN) {
-      setErrorMessage(
-        `Hay un solapamiento: justifique la asignación en al menos ${OVERRIDE_NOTE_MIN} caracteres.`,
-      );
+      setErrorMessage(null);
+      setFieldErrors({ overrideNote: `Hay un solapamiento: justifique la asignación en al menos ${OVERRIDE_NOTE_MIN} caracteres.` });
       return;
     }
 
     setIsSubmitting(true);
     setErrorMessage(null);
+    setFieldErrors({});
 
     try {
       const updated = await servicesAdapter.assignCrew(service.id, {
@@ -335,11 +336,13 @@ function AssignCrewForm({
                   setCrewId(e.target.value);
                   setBackendConflict(null);
                   setErrorMessage(null);
+                  setFieldErrors((prev) => ({ ...prev, crew: undefined }));
                 }}
                 disabled={!ready}
                 required
-                aria-describedby={`${formId}-crew-desc`}
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                aria-invalid={Boolean(fieldErrors.crew)}
+                aria-describedby={fieldErrors.crew ? `${formId}-crew-desc ${formId}-crew-error` : `${formId}-crew-desc`}
+                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
               >
                 <option value="">Seleccione una cuadrilla…</option>
                 {crews.map((c) => (
@@ -351,6 +354,7 @@ function AssignCrewForm({
               <FieldDescription id={`${formId}-crew-desc`}>
                 Equipo municipal o de cooperativa responsable de la ejecución del servicio.
               </FieldDescription>
+              {fieldErrors.crew && <FieldError id={`${formId}-crew-error`}>{fieldErrors.crew}</FieldError>}
             </Field>
 
             {/* Field: Vehicle */}
@@ -370,11 +374,13 @@ function AssignCrewForm({
                   setVehicleId(e.target.value);
                   setBackendConflict(null);
                   setErrorMessage(null);
+                  setFieldErrors((prev) => ({ ...prev, vehicle: undefined }));
                 }}
                 disabled={!ready}
-                aria-describedby={`${formId}-vehicle-desc`}
+                aria-invalid={Boolean(fieldErrors.vehicle)}
+                aria-describedby={fieldErrors.vehicle ? `${formId}-vehicle-desc ${formId}-vehicle-error` : `${formId}-vehicle-desc`}
                 className={cn(
-                  "w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]",
+                  "min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10",
                   requiresVehicle && !vehicleId && "border-[var(--color-warning-line)]",
                 )}
               >
@@ -392,6 +398,7 @@ function AssignCrewForm({
                   ? "Requerido por la especificación técnica del tipo de servicio (ej. recolección o barrido mecánico)."
                   : "Opcional según los requerimientos operativos de la cuadrilla para este tipo de servicio."}
               </FieldDescription>
+              {fieldErrors.vehicle && <FieldError id={`${formId}-vehicle-error`}>{fieldErrors.vehicle}</FieldError>}
             </Field>
           </FieldGroup>
 
@@ -449,20 +456,23 @@ function AssignCrewForm({
                 onChange={(e) => {
                   setOverrideNote(e.target.value);
                   setErrorMessage(null);
+                  setFieldErrors((prev) => ({ ...prev, overrideNote: undefined }));
                 }}
                 required
                 maxLength={OVERRIDE_NOTE_MAX}
                 rows={3}
-                aria-describedby={`${formId}-override-note-desc`}
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                aria-invalid={Boolean(fieldErrors.overrideNote)}
+                aria-describedby={fieldErrors.overrideNote ? `${formId}-override-note-desc ${formId}-override-note-error` : `${formId}-override-note-desc`}
+                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
               />
               <FieldDescription id={`${formId}-override-note-desc`}>
                 Entre {OVERRIDE_NOTE_MIN} y {OVERRIDE_NOTE_MAX} caracteres. Ej.: la otra parada termina antes; se coordinó con el jefe de cuadrilla.
               </FieldDescription>
+              {fieldErrors.overrideNote && <FieldError id={`${formId}-override-note-error`}>{fieldErrors.overrideNote}</FieldError>}
             </Field>
           )}
 
-          <DialogFooter className="border-t border-[var(--color-border)] pt-4 gap-2 sm:justify-end">
+          <DialogFooter className="flex-wrap border-t border-[var(--color-border)] pt-4 gap-2 sm:justify-end">
             <Button
               type="button"
               variant="outline"
@@ -479,19 +489,11 @@ function AssignCrewForm({
               variant="default"
               size="sm"
               disabled={isSubmitting || !ready}
-              className="text-xs font-semibold gap-1.5"
+              aria-busy={isSubmitting}
+              className="min-h-12 text-xs font-semibold gap-1.5 min-[761px]:min-h-10"
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                  <span>Guardando asignación…</span>
-                </>
-              ) : (
-                <>
-                  <Check className="h-3.5 w-3.5" aria-hidden />
-                  <span>Confirmar asignación</span>
-                </>
-              )}
+              {isSubmitting ? <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden /> : <Check data-icon="inline-start" aria-hidden />}
+              <span>Confirmar asignación</span>
             </Button>
           </DialogFooter>
         </form>

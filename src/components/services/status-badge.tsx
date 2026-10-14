@@ -50,8 +50,6 @@ export function StatusBadge({
         STATUS_CLASSES[status],
         className,
       )}
-      role="status"
-      aria-label={`Estado: ${label}`}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
       <span>{label}</span>
