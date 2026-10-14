@@ -1,20 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AUTH_COOKIE_NAME, BackendUnavailableError, createSession, sealSession } from "./session";
+import { BackendUnavailableError } from "./session";
 import { fetchBackend, pathId } from "./bff-backend";
 import { forwardResponse } from "./bff-route";
+import { createSessionCookie } from "@/test/session";
 
 const backendOrigin = "https://backend.internal";
 const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
 
 function backendRequest() {
-  process.env.M6_BACKEND_ORIGIN = backendOrigin;
-  const session = createSession("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin });
-  const cookie = `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
+  const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin });
   return new Request("http://localhost/api/services/service-1/start", { headers: { cookie } });
 }
 
 afterEach(() => {
+  delete process.env.M6_AUTH_MODE;
+  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });

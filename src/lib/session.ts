@@ -1,7 +1,7 @@
 import {
   createCipheriv,
   createDecipheriv,
-  createHash,
+  hkdfSync,
   randomBytes,
 } from "node:crypto";
 import { cookies } from "next/headers";
@@ -80,6 +80,8 @@ type RuntimeEnvironment = {
 };
 
 const localSessionSecret = "m6-local-development-session-secret";
+const sessionKeySalt = Buffer.from("m6-bff-session-key-salt-v1", "utf8");
+const sessionKeyInfo = Buffer.from("aes-256-gcm cookie encryption v1", "utf8");
 
 export function getAuthMode(environment: RuntimeEnvironment = process.env): AuthMode {
   const configuredMode = environment.M6_AUTH_MODE;
@@ -149,11 +151,6 @@ export function isSessionActive(session: Session, now = Date.now()): boolean {
   return now < effectiveSessionExpiry(session);
 }
 
-export function refreshSession(session: Session, now = Date.now()): Session | undefined {
-  if (!isSessionActive(session, now)) return undefined;
-  return { ...session, lastActivityAt: now };
-}
-
 export function publicSession(session: Session): PublicSession {
   const { accessToken: _accessToken, ...safeSession } = session;
   return { ...safeSession, expiresAt: effectiveSessionExpiry(session) };
@@ -206,7 +203,7 @@ export function getSessionFromCookieValue(
     ]).toString("utf8");
     const value = JSON.parse(plaintext) as Partial<Session>;
 
-    if (!isSession(value)) return undefined;
+    if (!isSession(value) || value.mode !== getAuthMode()) return undefined;
     return isSessionActive(value, now) ? value : undefined;
   } catch {
     return undefined;
@@ -263,7 +260,13 @@ export function sessionSecret(environment: RuntimeEnvironment = process.env): st
 }
 
 function deriveKey(secret: string): Buffer {
-  return createHash("sha256").update(secret).digest();
+  return Buffer.from(hkdfSync(
+    "sha256",
+    Buffer.from(secret, "utf8"),
+    sessionKeySalt,
+    sessionKeyInfo,
+    32,
+  ));
 }
 
 function readJwtExpiry(token: string): number | undefined {
