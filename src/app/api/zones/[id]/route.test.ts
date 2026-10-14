@@ -177,4 +177,21 @@ describe("authenticated zones [id] BFF route", () => {
       expect(fixture?.active).toBe(false);
     });
   });
+
+  it("forwards an authorized backend zone deactivation with its id and DELETE method", async () => {
+    const id = "zone_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, active: false }));
+
+    const response = await DELETE(
+      new Request(`http://localhost/api/zones/${id}`, { method: "DELETE", headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/zones/${id}`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("DELETE");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+  });
 });

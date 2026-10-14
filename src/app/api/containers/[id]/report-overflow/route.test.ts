@@ -105,4 +105,25 @@ describe("POST /api/containers/[id]/report-overflow BFF route", () => {
 
     expect(response.status).toBe(404);
   });
+
+  it("forwards an authorized backend overflow report with its id and method", async () => {
+    const id = "container_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "OVERFLOWED" }));
+
+    const response = await POST(
+      new Request(`http://localhost/api/containers/${id}/report-overflow`, { method: "POST", headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/containers/${id}/report-overflow`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+  });
 });

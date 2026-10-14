@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetStreetClosureRequestFixtures, streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
@@ -16,6 +16,7 @@ afterEach(() => {
   delete process.env.M6_AUTH_MODE;
   delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
+  vi.restoreAllMocks();
 });
 
 
@@ -153,5 +154,18 @@ describe("street closure request BFF routes", () => {
     expect((await response.json()).data).toEqual([
       expect.objectContaining({ sourceId: "SVC-1050", status: "REQUESTED" }),
     ]);
+  });
+
+  it("forwards an authorized backend closure list with its filters and GET method", async () => {
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0, page: 2, pageSize: 50 } }));
+
+    const response = await GET(new Request("http://localhost/api/street-closure-requests?page=2&pageSize=50", { headers: { cookie } }));
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/street-closure-requests?page=2&pageSize=50");
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 });

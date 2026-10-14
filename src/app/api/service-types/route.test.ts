@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetServiceTypeFixtures, serviceTypeFixtures } from "@/lib/service-type-fixtures";
 import { GET, POST } from "./route";
@@ -9,6 +9,7 @@ afterEach(() => {
   delete process.env.M6_AUTH_MODE;
   delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
+  vi.restoreAllMocks();
 });
 
 
@@ -49,5 +50,18 @@ describe("/api/service-types", () => {
     const before = serviceTypeFixtures.length;
     await POST(new Request("http://localhost/api/service-types", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ code: "NEW", name: "Nuevo", category: "TREES", mode: "POINT", requiresVehicle: false }) }));
     expect(serviceTypeFixtures).toHaveLength(before + 1);
+  });
+
+  it("forwards an authenticated backend service-type list with GET", async () => {
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [] }));
+
+    const response = await GET(new Request("http://localhost/api/service-types", { headers: { cookie } }));
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/service-types");
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 });

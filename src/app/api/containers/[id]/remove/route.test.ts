@@ -71,4 +71,25 @@ describe("POST /api/containers/[id]/remove BFF route", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({ error: "Conflict" });
   });
+
+  it("forwards an authorized backend removal with its id and method", async () => {
+    const id = "container_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "REMOVED" }));
+
+    const response = await POST(
+      new Request(`http://localhost/api/containers/${id}/remove`, { method: "POST", headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/containers/${id}/remove`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+  });
 });

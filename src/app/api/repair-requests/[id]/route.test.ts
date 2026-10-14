@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetEnvironmentalInspectionFixtures } from "@/lib/environmental-report-fixtures";
 import { addRepairRequestFixture, getRepairRequestFixture, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
@@ -15,6 +15,9 @@ beforeEach(() => {
 });
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
+  delete process.env.M6_DEV_JWT;
+  delete process.env.M6_BACKEND_ORIGIN;
+  vi.restoreAllMocks();
   resetEnvironmentalInspectionFixtures();
   resetServiceFixtures();
 });
@@ -108,5 +111,50 @@ describe("repair request BFF detail and recovery routes", () => {
     });
     const forbidden = await GET(new Request("http://localhost/api/repair-requests/RR-INS-1005", { headers: { cookie: fieldCookie } }), { params: Promise.resolve({ id: "RR-INS-1005" }) });
     expect(forbidden.status).toBe(403);
+  });
+
+  it("forwards an authenticated backend repair request detail with its id and GET method", async () => {
+    const id = "RR-encoded_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "REQUESTED" }));
+
+    const response = await GET(
+      new Request(`http://localhost/api/repair-requests/${id}`, { headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/repair-requests/${id}`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+  });
+
+  it.each([
+    ["start", start],
+    ["close", close],
+  ] as const)("forwards the backend repair request %s action using POST", async (action, handler) => {
+    const id = "RR-encoded_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "IN_PROGRESS" }));
+
+    const response = await handler(transitionRequest(`/api/repair-requests/${id}/${action}`, cookie), {
+      params: Promise.resolve({ id }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/repair-requests/${id}/${action}`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body))).toEqual({});
   });
 });

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { POST } from "./route";
-import { loginAs } from "@/test/session";
+import { createSessionCookie, loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetContainerFixtures();
@@ -101,5 +101,61 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  it("forwards an authorized backend Container empty request with its id and method", async () => {
+    const id = "container_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "ACTIVE" }));
+
+    const response = await POST(
+      new Request(`http://localhost/api/containers/${id}/empty`, { method: "POST", headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/containers/${id}/empty`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+  });
+
+  it("denies a backend session without container:manage before forwarding", async () => {
+    const cookie = await loginAs("office-limited-intake", {
+      mode: "backend-development",
+      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch");
+
+    const response = await POST(
+      new Request("http://localhost/api/containers/cont-2/empty", { method: "POST", headers: { cookie } }),
+      { params: Promise.resolve({ id: "cont-2" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(backendFetch).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when backend mode has no backend origin", async () => {
+    const cookie = createSessionCookie("office-duty-queue", {
+      mode: "backend-development",
+      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      backendOrigin: "https://backend.internal",
+    });
+    delete process.env.M6_BACKEND_ORIGIN;
+    const backendFetch = vi.spyOn(globalThis, "fetch");
+
+    const response = await POST(
+      new Request("http://localhost/api/containers/cont-2/empty", { method: "POST", headers: { cookie } }),
+      { params: Promise.resolve({ id: "cont-2" }) },
+    );
+
+    expect(response.status).toBe(503);
+    expect(backendFetch).not.toHaveBeenCalled();
   });
 });

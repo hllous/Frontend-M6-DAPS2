@@ -38,6 +38,9 @@ describe("authenticated zones [id]/references BFF route", () => {
       `https://backend.internal/green-spaces?zoneId=${id}&pageSize=1`,
     ]);
     expect(backendFetch.mock.calls.every(([, init]) => (init?.method ?? "GET") === "GET")).toBe(true);
+    expect(backendFetch.mock.calls.every(([, init]) =>
+      new Headers(init?.headers).get("authorization") === `Bearer ${process.env.M6_DEV_JWT}`,
+    )).toBe(true);
   });
 
 
