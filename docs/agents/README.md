@@ -7,3 +7,4 @@ Estas guías amplían las instrucciones de [`AGENTS.md`](../../AGENTS.md), que s
 - [Triage labels](triage-labels.md): etiquetas canónicas para clasificar issues.
 - [Depuración e2e local](e2e-local-debugging.md): cómo reproducir fallos de Playwright con un servidor local.
 - [Domain docs](domain.md): cómo consultar y mantener contexto y decisiones del dominio.
+- [MSW y rutas BFF](msw-bff-tests.md): cómo probar rutas reales desde handlers Node y mantener el worker del navegador sin imports server-only.
