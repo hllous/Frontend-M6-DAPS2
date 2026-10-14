@@ -35,7 +35,7 @@ describe("crew membership BFF route", () => {
       .mockImplementation(async () => new Response(JSON.stringify({ id: "crew-membership" }), { status: 200, headers: { "content-type": "application/json" } }));
     const login_ = await login(new Request("http://localhost/api/session/login", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
       body: JSON.stringify({ scenarioId: "office-duty-queue" }),
     }));
     const sessionCookie = login_.headers.get("set-cookie") ?? "";
@@ -80,7 +80,7 @@ describe("crew membership BFF route", () => {
     process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     const session = await login(new Request("http://localhost/api/session/login", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
       body: JSON.stringify({ scenarioId: "office-duty-queue" }),
     }));
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 201, headers: { "content-type": "application/json" } }));

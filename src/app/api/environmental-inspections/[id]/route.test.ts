@@ -190,7 +190,7 @@ describe("GET /api/environmental-inspections/:id con fixtures", () => {
     process.env.M6_AUTH_MODE = "mock";
     const backendFetch = vi.spyOn(globalThis, "fetch");
     const loginResponse = await login(new Request("http://localhost/api/session/login", {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenarioId }),
+      method: "POST", headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" }, body: JSON.stringify({ scenarioId }),
     }));
     const response = await GET(new Request(`http://localhost/api/environmental-inspections/${id}`, {
       headers: { cookie: loginResponse.headers.get("set-cookie") ?? "" },

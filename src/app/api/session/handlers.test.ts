@@ -31,15 +31,68 @@ function backendCrews(crews: { id: string; name: string }[]) {
   });
 }
 
-function loginRequest(scenarioId: string) {
+function loginRequest(
+  scenarioId: string,
+  headers: Record<string, string> = { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
+) {
   return new Request("http://localhost/api/session/login", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers,
     body: JSON.stringify({ scenarioId }),
   });
 }
 
+function logoutRequest(
+  headers: Record<string, string> = { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
+  body = "{}",
+) {
+  return new Request("http://localhost/api/session/logout", { method: "POST", headers, body });
+}
+
 describe("session route handlers", () => {
+  it("rejects login without the custom CSRF header", async () => {
+    process.env.M6_AUTH_MODE = "mock";
+    const response = await login(loginRequest("office-duty-queue", { "content-type": "application/json" }));
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("rejects login with a non-JSON content type", async () => {
+    process.env.M6_AUTH_MODE = "mock";
+    const response = await login(loginRequest("office-duty-queue", {
+      "content-type": "text/plain",
+      "x-requested-with": "XMLHttpRequest",
+    }));
+
+    expect(response.status).toBe(415);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("rejects logout without the custom CSRF header", async () => {
+    const response = await logout(logoutRequest({ "content-type": "application/json" }));
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("rejects logout with a non-JSON content type", async () => {
+    const response = await logout(logoutRequest({
+      "content-type": "text/plain",
+      "x-requested-with": "XMLHttpRequest",
+    }));
+
+    expect(response.status).toBe(415);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("rejects logout with an invalid JSON body", async () => {
+    const response = await logout(logoutRequest(undefined, "{"));
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
   it.each(["constructor", "__proto__"])("rejects inherited scenario key %s without setting a session cookie", async (scenarioId) => {
     process.env.M6_AUTH_MODE = "mock";
     const response = await login(loginRequest(scenarioId));
@@ -198,7 +251,11 @@ describe("session route handlers", () => {
     expect(sessionResponse.status).toBe(200);
     expect(sessionBody.session).not.toHaveProperty("accessToken");
 
-    const logoutResponse = await logout(new Request("http://localhost/api/session/logout", { method: "POST", headers: { cookie } }));
+    const logoutResponse = await logout(new Request("http://localhost/api/session/logout", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
+      body: "{}",
+    }));
     expect(logoutResponse.headers.get("set-cookie")).toMatch(/Max-Age=0/i);
   });
 

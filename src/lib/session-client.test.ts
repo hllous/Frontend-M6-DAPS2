@@ -24,7 +24,15 @@ describe("cross-tab session logout", () => {
 
     await broadcastLogout();
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/session/logout", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/session/logout", expect.objectContaining({
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "content-type": "application/json",
+        "x-requested-with": "XMLHttpRequest",
+      },
+      body: "{}",
+    }));
     expect(assignMock).toHaveBeenCalledWith("/login");
     expect(localStorage.getItem("m6:field-draft:v2:actor-a:service:start")).toBeNull();
     await expect(receivedInOtherTab).resolves.toBe("logout");

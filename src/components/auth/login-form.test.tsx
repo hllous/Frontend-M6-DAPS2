@@ -19,6 +19,10 @@ describe("LoginForm", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/session/login", expect.objectContaining({
       method: "POST",
       body: JSON.stringify({ scenarioId: "field-crew-leader-route" }),
+      headers: {
+        "content-type": "application/json",
+        "x-requested-with": "XMLHttpRequest",
+      },
     }));
     expect(document.cookie).not.toContain("m6_session=");
     fetchMock.mockRestore();

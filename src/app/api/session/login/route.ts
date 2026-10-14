@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getSessionMutationRejection } from "@/lib/session-request";
 import { getScenario, isScenarioId, type ScenarioCrew } from "@/lib/scenarios";
 import {
   AUTH_COOKIE_NAME,
@@ -46,6 +47,9 @@ async function resolveBackendCrew(session: Session, origin: string | undefined):
 }
 
 export async function POST(request: Request) {
+  const rejection = getSessionMutationRejection(request);
+  if (rejection) return NextResponse.json({ message: rejection.message }, { status: rejection.status });
+
   let body: { scenarioId?: unknown };
   try {
     body = (await request.json()) as { scenarioId?: unknown };

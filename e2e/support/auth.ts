@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { AUTH_COOKIE_NAME, createSession, sealSession } from "../../src/lib/session";
+import { SESSION_MUTATION_HEADERS } from "../../src/lib/session-request";
 import type { ScenarioId } from "../../src/lib/scenarios";
 
 /** Drives the real login form — used by the journeys that must prove entry itself works. */
@@ -15,6 +16,7 @@ export async function loginViaUi(page: Page, scenarioLabel: string) {
 export async function loginViaApi(page: Page, scenarioId: ScenarioId) {
   const response = await page.request.post("/api/session/login", {
     data: { scenarioId },
+    headers: SESSION_MUTATION_HEADERS,
   });
   if (!response.ok()) {
     throw new Error(`Seeding a session for ${scenarioId} failed with status ${response.status()}`);
