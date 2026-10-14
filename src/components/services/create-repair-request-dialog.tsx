@@ -475,7 +475,7 @@ export function CreateRepairRequestDialog({
           {resolvedRequest ? (
             <Button type="button" onClick={() => handleOpenChange(false)}>Cerrar confirmación</Button>
           ) : (
-            <Button type="submit" form={formId} disabled={isSubmitting || outcome === "checking" || Boolean(conflict)} className="min-h-10">
+            <Button type="submit" form={formId} disabled={isSubmitting || outcome === "checking" || Boolean(conflict)}>
               {(isSubmitting || outcome === "checking") && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
               {isSubmitting
                 ? "Verificando y enviando..."
