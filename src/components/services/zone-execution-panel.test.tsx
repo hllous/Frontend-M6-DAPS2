@@ -295,6 +295,7 @@ describe("ZoneExecutionPanel component", () => {
 
     let uploadAttempts = 0;
     const capturedIdempotencyKeys: string[] = [];
+    const capturedServiceIds: (FormDataEntryValue | null)[] = [];
     let recordedResults: any[] = [];
 
     server.use(
@@ -315,6 +316,7 @@ describe("ZoneExecutionPanel component", () => {
       }),
       http.post("*/api/evidence", async ({ request }) => {
         uploadAttempts++;
+        capturedServiceIds.push((await request.formData()).get("serviceId"));
         const idempKey = request.headers.get("Idempotency-Key") || "";
         capturedIdempotencyKeys.push(idempKey);
 
@@ -406,6 +408,7 @@ describe("ZoneExecutionPanel component", () => {
     // Idempotency key reused
     expect(capturedIdempotencyKeys.length).toBe(2);
     expect(capturedIdempotencyKeys[0]).toBe(capturedIdempotencyKeys[1]);
+    expect(capturedServiceIds).toEqual([mockRouteService.id, mockRouteService.id]);
     expect(screen.getByText("Evidencia adjunta (1):")).toBeVisible();
   });
 

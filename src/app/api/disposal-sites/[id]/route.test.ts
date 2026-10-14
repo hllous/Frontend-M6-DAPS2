@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { disposalSiteFixtures, resetDisposalSiteFixtures } from "@/lib/disposal-site-fixtures";
-import { DELETE, PATCH } from "./route";
+import { DELETE, GET, PATCH } from "./route";
 import { loginAs } from "@/test/session";
 
 beforeEach(() => resetDisposalSiteFixtures());
@@ -10,6 +10,14 @@ afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT
 
 
 describe("/api/disposal-sites/[id]", () => {
+  it("returns the requested disposal site", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const response = await GET(new Request("http://localhost/api/disposal-sites/ds-transfer-north", { headers: { cookie } }), { params: { id: "ds-transfer-north" } });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ id: "ds-transfer-north", code: "RS-01", name: "Estación Norte" });
+  });
+
   it("does not allow Field actors to edit or deactivate", async () => {
     const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await PATCH(new Request("http://localhost/api/disposal-sites/ds-transfer-north", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ name: "Cambio", siteType: "TRANSFER_STATION", active: true }) }), { params: { id: "ds-transfer-north" } });

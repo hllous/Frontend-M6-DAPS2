@@ -14,12 +14,13 @@ test("groups inventory markers and progressively reveals numbered pins #215", as
   await expect(page.getByText("ARB-00442")).toBeVisible();
 
   const clusters = page.locator('[class*="markerCluster"]:visible');
+  const mapPane = page.locator(".leaflet-map-pane");
   await expect(clusters.first()).toBeVisible();
   await expect(clusters.first()).toHaveAttribute("aria-label", /elementos de inventario; acercar para verlos/);
 
   for (let attempt = 0; attempt < 4 && await clusters.count() > 0; attempt += 1) {
     await clusters.first().click();
-    await page.waitForTimeout(600);
+    await expect(mapPane).not.toHaveClass(/leaflet-zoom-anim/);
   }
 
   await expect.poll(async () => page.locator('[class*="markerPin"]:visible').count()).toBeGreaterThan(0);
