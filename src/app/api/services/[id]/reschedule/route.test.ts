@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetServiceFixtures, serviceFixtures } from "@/lib/services-fixtures";
 import { POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetServiceFixtures();
@@ -15,20 +15,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 const rescheduleBody = { reason: "Alerta meteorológica: vientos fuertes previstos." };
 
@@ -47,7 +34,7 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
   });
 
   it("returns 403 for a Field actor (reschedule is an Office decision)", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/reschedule", {
         method: "POST",
@@ -63,7 +50,7 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
   });
 
   it("returns 400 when reason is missing", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/reschedule", {
         method: "POST",
@@ -77,7 +64,7 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
   });
 
   it("returns 404 if the target service does not exist", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-NONEXISTENT/reschedule", {
         method: "POST",
@@ -92,7 +79,7 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
 
   it("returns 409 when the service is not SCHEDULED", async () => {
     // SVC-1042 is IN_PROGRESS
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1042/reschedule", {
         method: "POST",
@@ -111,7 +98,7 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
     const before = serviceFixtures.find((s) => s.id === "SVC-1050");
     const originalZoneIds = [...(before?.zoneIds ?? [])];
 
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/reschedule", {
         method: "POST",
@@ -137,7 +124,7 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
   it("forwards the status-change DTO with JSON content type", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
 
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/reschedule", {
@@ -155,10 +142,10 @@ describe("POST /api/services/[id]/reschedule BFF route", () => {
   });
 });
 
-it.each(["mock", "backend-development"])("denies limited Office planning before forwarding (%s)", async (mode) => {
+it.each(["mock", "backend-development"] as const)("denies limited Office planning before forwarding (%s)", async (mode) => {
   process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
   const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
-  const cookie = await authenticatedCookie("office-limited-intake", mode);
+  const cookie = await loginAs("office-limited-intake", { mode: mode, devJwt: ((mode) === "backend-development") ? ("header.eyJleHAiOjE4MDAwMDAwMDB9.signature") : undefined });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/reschedule", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(rescheduleBody),
@@ -168,7 +155,7 @@ it.each(["mock", "backend-development"])("denies limited Office planning before 
 });
 
 it("rejects malformed JSON with 400", async () => {
-  const cookie = await authenticatedCookie("office-duty-queue");
+  const cookie = await loginAs("office-duty-queue", { mode: "mock" });
   const response = await POST(new Request("http://localhost/api/services/real-service/reschedule", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: "{",
   }), { params: Promise.resolve({ id: "real-service" }) });
@@ -184,7 +171,7 @@ it.each([401, 403, 409, 503])("preserves backend error status and body (%s)", as
     if ((init?.method ?? "GET") === "GET") return Response.json({ crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
-  const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+  const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/reschedule", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(rescheduleBody),

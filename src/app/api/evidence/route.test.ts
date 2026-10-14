@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import {
   addZoneResultFixture,
   evidenceCache,
@@ -10,9 +9,9 @@ import {
   zoneResultFixtures,
 } from "@/lib/services-fixtures";
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
-import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 import { withNodeFile } from "@/mocks/node-file";
 import { GET, POST as rawPost } from "./route";
+import { createSessionCookie, loginAs } from "@/test/session";
 
 const POST = (request: Request) => withNodeFile(() => rawPost(request));
 
@@ -34,21 +33,6 @@ afterEach(() => {
   evidenceCache.clear();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
 
 function evidenceRequest(cookie: string, ownerType: string, ownerId: string, key?: string, serviceId?: string) {
   const body = new FormData();
@@ -74,25 +58,26 @@ function sizedMultipartRequest(cookie: string, fileBytes: number, contentLength:
   });
 }
 
-function backendCookie(crewId = "crew-real") {
-  process.env.M6_AUTH_MODE = "backend-development";
-  process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-  const session = createSession("field-crew-leader-route", {
-    mode: "backend-development", devJwt: process.env.M6_DEV_JWT, backendOrigin: process.env.M6_BACKEND_ORIGIN,
-  });
-  session.crew = { id: crewId, name: "Cuadrilla real" };
-  return `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
-}
+const backendSessionSettings = {
+  mode: "backend-development" as const,
+  devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+  backendOrigin: "https://backend.internal",
+};
+
+const backendFieldSession = {
+  ...backendSessionSettings,
+  crew: { id: "crew-real", name: "Cuadrilla real" },
+};
 
 describe("POST /api/evidence BFF route", () => {
   it("denies another Field crew replaying an authorized upload key", async () => {
-    const cookieA = await authenticatedCookie("field-crew-leader-route");
+    const cookieA = await loginAs("field-crew-leader-route", { mode: "mock" });
     const first = await POST(evidenceRequest(cookieA, "SERVICE", "SVC-1050", "shared-key"));
     expect(first.status).toBe(201);
-    const sessionB = createSession("field-crew-leader-route", { mode: "mock" });
-    sessionB.crew = { id: "crew-a", name: "Otra cuadrilla" };
-    const cookieB = `${AUTH_COOKIE_NAME}=${sealSession(sessionB)}`;
+    const cookieB = createSessionCookie("field-crew-leader-route", {
+      mode: "mock",
+      crew: { id: "crew-a", name: "Otra cuadrilla" },
+    });
 
     const replay = await POST(evidenceRequest(cookieB, "SERVICE", "SVC-1050", "shared-key"));
 
@@ -100,7 +85,7 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("rechecks the Service assignment before replaying a cached upload", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     expect((await POST(evidenceRequest(cookie, "SERVICE", "SVC-1050", "reassigned-key"))).status).toBe(201);
     serviceFixtures.find((service) => service.id === "SVC-1050")!.crewId = "crew-a";
 
@@ -108,25 +93,25 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("scopes authorized container retries to the actor and crew", async () => {
-    const field = await authenticatedCookie("field-crew-leader-route");
-    const office = await authenticatedCookie("office-duty-queue");
+    const field = await loginAs("field-crew-leader-route", { mode: "mock" });
+    const office = await loginAs("office-duty-queue", { mode: "mock" });
     expect((await POST(evidenceRequest(field, "CONTAINER", "cont-1", "actor-key"))).status).toBe(201);
     expect((await POST(evidenceRequest(office, "CONTAINER", "cont-1", "actor-key"))).status).toBe(201);
     expect((await POST(evidenceRequest(field, "CONTAINER", "cont-1", "actor-key"))).status).toBe(200);
   });
 
   it.each(["a".repeat(129), "key:bad", "key/bad", "key bad"])("rejects invalid Idempotency-Key %s", async (key) => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     expect((await POST(evidenceRequest(cookie, "SERVICE", "SVC-1050", key))).status).toBe(400);
   });
 
   it.each(["a".repeat(101), "../service", "service/1", "service bad"])("rejects malformed ownerId %s", async (ownerId) => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     expect((await POST(evidenceRequest(cookie, "SERVICE", ownerId, "owner-key"))).status).toBe(400);
   });
 
   it("requires Idempotency-Key in backend-development without contacting the backend", async () => {
-    const cookie = backendCookie();
+    const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
     const backendFetch = vi.spyOn(globalThis, "fetch");
 
     expect((await POST(evidenceRequest(cookie, "SERVICE", "d8a3a8e5-f7d7-4453-9095-e22478e0fc01"))).status).toBe(400);
@@ -134,7 +119,7 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("checks the real Service crew before forwarding an upload", async () => {
-    const cookie = backendCookie();
+    const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
     const ownerId = "d8a3a8e5-f7d7-4453-9095-e22478e0fc01";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id: ownerId, crewId: "another-crew" }));
 
@@ -151,7 +136,7 @@ describe("POST /api/evidence BFF route", () => {
     const ownerId = "79bcdbd4-e9fe-48e5-b011-643f6d13857b";
 
     it("checks Inspection ownership through its real Service", async () => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(Response.json({ id: ownerId, serviceId }))
         .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: "another-crew" }));
@@ -164,7 +149,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("uploads an owned ZoneResult with the optional serviceId fast path", async () => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: "crew-real" }))
         .mockResolvedValueOnce(Response.json([{ id: ownerId }]))
@@ -181,7 +166,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("rejects another crew's Service on the ZoneResult fast path", async () => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id: serviceId, crewId: "another-crew" }));
 
       expect((await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-fast-foreign", serviceId))).status).toBe(403);
@@ -189,7 +174,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("rejects a ZoneResult absent from the assigned-services fallback", async () => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ data: [], meta: { totalPages: 0 } }));
 
       expect((await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-not-found"))).status).toBe(403);
@@ -197,7 +182,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("rejects malformed optional serviceId before contacting the backend", async () => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch");
 
       expect((await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-invalid-parent", "../service"))).status).toBe(400);
@@ -205,11 +190,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("rejects a Field session without a resolved backend crew", async () => {
-      backendCookie();
-      const session = createSession("field-crew-leader-route", {
-        mode: "backend-development", devJwt: process.env.M6_DEV_JWT, backendOrigin: process.env.M6_BACKEND_ORIGIN,
-      });
-      const cookie = `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
+      const cookie = createSessionCookie("field-crew-leader-route", backendSessionSettings);
       const backendFetch = vi.spyOn(globalThis, "fetch");
 
       expect((await POST(evidenceRequest(cookie, "SERVICE", serviceId, "missing-crew"))).status).toBe(403);
@@ -217,7 +198,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("never reuses a stale mock cache entry in backend-development", async () => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       evidenceCache.set(`SERVICE:${serviceId}:stale-key`, {
         id: "mock-attachment", url: "/mock/evidence/photo.jpg", filename: "photo.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-05T10:00:00Z",
       });
@@ -234,7 +215,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("finds an owned ZoneResult across assigned service pages without serviceId", async () => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(Response.json({ data: [], meta: { totalPages: 2 } }))
         .mockResolvedValueOnce(Response.json({ data: [{ id: serviceId, crewId: "crew-real" }], meta: { totalPages: 2 } }))
@@ -251,7 +232,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("does not trust an unrelated crew returned by the assigned-services filter", async () => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({
         data: [{ id: serviceId, crewId: "another-crew" }], meta: { totalPages: 1 },
       }));
@@ -261,7 +242,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("rejects a ZoneResult absent from the selected assigned Service", async () => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: "crew-real" }))
         .mockResolvedValueOnce(Response.json([]));
@@ -276,7 +257,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("stops the ZoneResult fallback after ten service pages", async () => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ data: [], meta: { totalPages: 11 } }));
 
       expect((await POST(evidenceRequest(cookie, "ZONE_RESULT", ownerId, "zone-page-cap"))).status).toBe(403);
@@ -285,7 +266,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it.each([401, 403, 404, 503])("preserves owner lookup HTTP %s without uploading", async (status) => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ message: "Error de origen" }, { status }));
 
       expect((await POST(evidenceRequest(cookie, "SERVICE", serviceId, "upstream-error"))).status).toBe(status);
@@ -293,7 +274,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it.each([{ crewId: 42 }, { id: serviceId }, "not-json"])("rejects malformed owner responses without uploading: %j", async (payload) => {
-      const cookie = backendCookie();
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         typeof payload === "string" ? new Response(payload) : Response.json(payload),
       );
@@ -304,7 +285,7 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("evicts old mock retries when the bounded cache fills", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     for (let index = 0; index <= 256; index++) {
       expect((await POST(evidenceRequest(cookie, "SERVICE", "SVC-1050", `bounded-${index}`))).status).toBe(201);
     }
@@ -323,7 +304,7 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("returns 403 for an actor without service:execute (Evidence is a Crew Leader action)", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const formData = new FormData();
     formData.append("file", new Blob(["test"], { type: "image/jpeg" }), "test.jpg");
     formData.append("ownerType", "ZONE_RESULT");
@@ -354,7 +335,7 @@ describe("POST /api/evidence BFF route", () => {
       recordedAt: "2026-09-05 10:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const formData = new FormData();
     formData.append("file", new Blob(["test"], { type: "image/jpeg" }), "test.jpg");
     formData.append("ownerType", "ZONE_RESULT");
@@ -373,7 +354,7 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("requires Idempotency-Key header and returns 400 when missing", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const formData = new FormData();
     formData.append("file", new Blob(["test"], { type: "image/jpeg" }), "test.jpg");
     formData.append("ownerType", "ZONE_RESULT");
@@ -392,7 +373,7 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("returns 400 when ownerType is invalid", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const formData = new FormData();
     formData.append("file", new Blob(["test"], { type: "image/jpeg" }), "test.jpg");
     formData.append("ownerType", "INVALID_TYPE");
@@ -409,21 +390,21 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("returns 413 when file exceeds 4 MB despite understated size hints", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(sizedMultipartRequest(cookie, 4 * 1024 * 1024 + 1, "1"));
     expect(response.status).toBe(413);
     expect(await response.json()).toMatchObject({ error: "Payload Too Large", message: "El archivo supera el tamaño máximo permitido de 4 MB." });
   });
 
   it("accepts a file exactly 4 MB with room for multipart metadata", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(sizedMultipartRequest(cookie, 4 * 1024 * 1024, String(4 * 1024 * 1024 + 64 * 1024)));
 
     expect(response.status).toBe(201);
   });
 
   it("rejects an oversized Content-Length before reading the multipart body", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const request = new Request("http://localhost/api/evidence", {
       method: "POST",
       headers: { cookie, "Idempotency-Key": "large-body", "content-length": String(4 * 1024 * 1024 + 64 * 1024 + 1) },
@@ -438,7 +419,7 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("returns 400 when more than one file is sent", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const formData = new FormData();
     formData.append("file", new File(["first"], "first.jpg", { type: "image/jpeg" }));
     formData.append("file", new File(["second"], "second.jpg", { type: "image/jpeg" }));
@@ -458,7 +439,7 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("returns 400 when MIME type is not allowed", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const formData = new FormData();
     formData.append("file", new Blob(["text content"], { type: "text/plain" }), "test.txt");
     formData.append("ownerType", "ZONE_RESULT");
@@ -477,7 +458,7 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("returns 404 when owner ZONE_RESULT does not exist", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const formData = new FormData();
     formData.append("file", new Blob(["image-bytes"], { type: "image/jpeg" }), "photo.jpg");
     formData.append("ownerType", "ZONE_RESULT");
@@ -505,7 +486,7 @@ describe("POST /api/evidence BFF route", () => {
       recordedAt: "2026-09-05 10:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const formData = new FormData();
     const file = new File(
       ["image-bytes"],
@@ -542,7 +523,7 @@ describe("POST /api/evidence BFF route", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({
       data: [{ id: "crew-real", name: "Cuadrilla Belgrano — Recolección" }],
     }));
-    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     backendFetch.mockClear();
     let sentKeys: string[] = [];
     backendFetch.mockImplementation(async (input, init) => {
@@ -580,7 +561,7 @@ describe("POST /api/evidence BFF route", () => {
       recordedAt: "2026-09-05 10:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const formData1 = new FormData();
     formData1.append("file", new Blob(["image-bytes"], { type: "image/png" }), "foto.png");
     formData1.append("ownerType", "ZONE_RESULT");
@@ -617,7 +598,7 @@ describe("POST /api/evidence BFF route", () => {
 
   describe("ownerType=CONTAINER evidence flow", () => {
     it("allows Field crew member to upload evidence for a container without service assignment", async () => {
-      const cookie = await authenticatedCookie("field-crew-member-route");
+      const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
       const formData = new FormData();
       const file = new File(["img-data"], "desborde.jpg", { type: "image/jpeg" });
       formData.append("file", file);
@@ -642,7 +623,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("allows Office to upload evidence for a container", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const formData = new FormData();
       const file = new File(["img-data"], "dano.webp", { type: "image/webp" });
       formData.append("file", file);
@@ -664,7 +645,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("blocks actors without container:report from uploading container evidence", async () => {
-      const cookie = await authenticatedCookie("office-limited-intake");
+      const cookie = await loginAs("office-limited-intake", { mode: "mock" });
       const formData = new FormData();
       const file = new File(["img-data"], "test.jpg", { type: "image/jpeg" });
       formData.append("file", file);
@@ -686,7 +667,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("returns 404 if container ownerId does not exist", async () => {
-      const cookie = await authenticatedCookie("field-crew-leader-route");
+      const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
       const formData = new FormData();
       const file = new File(["img-data"], "test.jpg", { type: "image/jpeg" });
       formData.append("file", file);
@@ -706,7 +687,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("retrieves flat list of container attachments via GET /api/evidence", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       // First upload an attachment
       const formData = new FormData();
       const file = new File(["img-data"], "vista.jpg", { type: "image/jpeg" });

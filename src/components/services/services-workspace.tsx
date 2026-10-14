@@ -23,6 +23,7 @@ import {
 
 import { InventoryMapDrawer } from "@/components/map/inventory-map-drawer";
 import { Button } from "@/components/ui/button";
+import { FormControl } from "@/components/ui/form-control";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -880,14 +881,15 @@ export function ServicesWorkspace({
             {/* Global search */}
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden />
-              <input
+              <FormControl
+                as="input"
                 type="search"
                 value={search}
                 maxLength={MAX_SEARCH_LENGTH}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar servicio, zona o cuadrilla…"
                 aria-label="Buscar servicios por texto libre"
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] pl-8 pr-8 py-1.5 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                className="rounded-xl pl-8 pr-8 text-xs"
               />
               {search && (
                 <button

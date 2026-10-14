@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetServiceFixtures, serviceFixtures } from "@/lib/services-fixtures";
 import {
   resetStreetClosureRequestFixtures,
   updateStreetClosureRequestFixture,
 } from "@/lib/street-closure-request-fixtures";
 import { POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetServiceFixtures();
@@ -20,20 +20,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("POST /api/services/[id]/start BFF route", () => {
   it("requires an active session and returns 401", async () => {
@@ -51,7 +38,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
   });
 
   it("returns 403 when session lacks service:execute (Crew Member)", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/start", {
         method: "POST",
@@ -67,7 +54,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
   });
 
   it("returns 404 if the target service does not exist", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-NONEXISTENT/start", {
         method: "POST",
@@ -84,7 +71,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
 
   it("returns 409 when the service is not in SCHEDULED status", async () => {
     // SVC-1042 is already IN_PROGRESS
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1042/start", {
         method: "POST",
@@ -101,7 +88,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
 
   it("returns 409 when the service has no assigned crew", async () => {
     // SVC-1043 has crewId: null
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1043/start", {
         method: "POST",
@@ -118,7 +105,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
 
   it("returns 409 when the service requires a vehicle but none is assigned", async () => {
     // SVC-1054 has serviceTypeId st-container-repair (requiresVehicle: true) and vehicleId: null
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1054/start", {
         method: "POST",
@@ -135,7 +122,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
 
   it("returns 403 when the service is assigned to a different crew", async () => {
     // SVC-1072 is assigned to crew-c, whereas field-crew-leader-route is crew-b
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1072/start", {
         method: "POST",
@@ -153,7 +140,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
   it("successfully starts a scheduled service and transitions status to IN_PROGRESS", async () => {
     // SVC-1050 has the baseline pending request; an approved response permits execution.
     updateStreetClosureRequestFixture("SCR-1001", { status: "APPROVED" });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/start", {
         method: "POST",
@@ -176,7 +163,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
   });
 
   it("blocks the entire linked ROUTE while its closure request is pending", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/start", {
         method: "POST",
@@ -194,7 +181,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
 
   it.each(["APPROVED", "ENDED"] as const)("allows a linked Service to start after closure status %s", async (status) => {
     updateStreetClosureRequestFixture("SCR-1001", { status });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
 
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/start", {
@@ -210,7 +197,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
 
   it("leaves a rejected closure for Office's explicit reschedule-or-cancel decision", async () => {
     updateStreetClosureRequestFixture("SCR-1001", { status: "REJECTED" });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
 
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/start", {

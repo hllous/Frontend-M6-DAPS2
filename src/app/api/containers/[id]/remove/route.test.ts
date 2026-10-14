@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetContainerFixtures();
@@ -16,21 +16,11 @@ afterEach(() => {
   resetContainerFixtures();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("POST /api/containers/[id]/remove BFF route", () => {
   it("removes a damaged container and leaves it terminal", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-3/remove", {
         method: "POST",
@@ -56,7 +46,7 @@ describe("POST /api/containers/[id]/remove BFF route", () => {
   });
 
   it("allows only Office actors with container:manage", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-3/remove", {
         method: "POST",
@@ -69,7 +59,7 @@ describe("POST /api/containers/[id]/remove BFF route", () => {
   });
 
   it("rejects removal from any state other than damaged", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-1/remove", {
         method: "POST",

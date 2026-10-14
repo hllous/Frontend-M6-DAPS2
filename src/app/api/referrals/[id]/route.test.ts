@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { addRepairRequestFixture, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { resetStreetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
 import { GET } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   process.env.M6_AUTH_MODE = "mock";
@@ -20,20 +20,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("referral detail BFF", () => {
   it("lets Field open an assigned StreetClosureRequest detail", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route");
     const response = await GET(
       new Request("http://localhost/api/referrals/SCR-1001", { headers: { cookie } }),
       { params: Promise.resolve({ id: "SCR-1001" }) },
@@ -62,7 +53,7 @@ describe("referral detail BFF", () => {
       workOrderId: null,
       requestedAt: "2026-09-05T08:00:00.000Z",
     });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route");
     const response = await GET(
       new Request("http://localhost/api/referrals/RR-OTHER", { headers: { cookie } }),
       { params: Promise.resolve({ id: "RR-OTHER" }) },
@@ -79,7 +70,7 @@ describe("referral detail BFF", () => {
       status: 200,
       headers: { "content-type": "text/html" },
     }));
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue");
 
     const response = await GET(
       new Request("http://localhost/api/referrals/RR-NONJSON", { headers: { cookie } }),

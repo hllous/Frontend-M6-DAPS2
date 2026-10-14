@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { resetStreetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
 import { GET } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   process.env.M6_AUTH_MODE = "mock";
@@ -17,20 +17,11 @@ afterEach(() => {
   delete process.env.M6_AUTH_MODE;
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("referral workspace BFF", () => {
   it("returns both referral kinds to Office", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue");
     const response = await GET(new Request("http://localhost/api/referrals", { headers: { cookie } }));
     const body = await response.json();
 
@@ -42,7 +33,7 @@ describe("referral workspace BFF", () => {
   });
 
   it("returns only referrals attached to the Field crew's Services", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route");
     const response = await GET(new Request("http://localhost/api/referrals", { headers: { cookie } }));
     const body = await response.json();
 

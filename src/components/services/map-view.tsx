@@ -149,7 +149,7 @@ export function MapView({
               </EmptyHeader>
               {hasActiveFilters && onClearFilters ? (
                 <EmptyContent>
-                  <Button type="button" variant="outline" className="min-h-12" onClick={onClearFilters}>
+                  <Button type="button" variant="outline" onClick={onClearFilters}>
                     Limpiar filtros
                   </Button>
                 </EmptyContent>

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import {
   addZoneResultFixture,
   resetServiceFixtures,
@@ -10,6 +9,7 @@ import {
 } from "@/lib/services-fixtures";
 import { getContainerFixture, resetContainerFixtures } from "@/lib/containers-fixtures";
 import { POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetServiceFixtures();
@@ -24,20 +24,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("POST /api/services/[id]/complete BFF route", () => {
   it("requires an active session and returns 401", async () => {
@@ -51,7 +38,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
   });
 
   it("returns 403 when session lacks service:execute (Crew Member)", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -63,7 +50,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
   });
 
   it("returns 404 if the target service does not exist", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-NONEXISTENT/complete", {
         method: "POST",
@@ -75,7 +62,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
   });
 
   it("returns 409 if the service is not IN_PROGRESS", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     // SVC-1050 is SCHEDULED
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
@@ -104,7 +91,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       recordedAt: "2026-09-05 10:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -140,7 +127,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       recordedAt: "2026-09-05 11:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -180,7 +167,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       recordedAt: "2026-09-05 11:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -204,7 +191,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
     addZoneResultFixture({ id: "ZR-LONG-1", serviceId: "SVC-1050", zoneId: "zone-3", status: "PARTIAL", reason: "WEATHER", notes: "a".repeat(1500), attachments: [], recordedAt: "2026-09-05 10:00" });
     addZoneResultFixture({ id: "ZR-LONG-2", serviceId: "SVC-1050", zoneId: "zone-1", status: "NOT_SERVICED", reason: "WEATHER", notes: "b".repeat(1500), attachments: [], recordedAt: "2026-09-05 11:00" });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", { method: "POST", headers: { cookie } }),
       { params: Promise.resolve({ id: "SVC-1050" }) },
@@ -239,7 +226,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       recordedAt: "2026-09-05 11:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -274,7 +261,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       recordedAt: "2026-09-05 11:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",

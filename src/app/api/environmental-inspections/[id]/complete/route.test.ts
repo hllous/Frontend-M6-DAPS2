@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { POST } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -10,17 +10,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function backendCookie() {
-  process.env.M6_AUTH_MODE = "backend-development";
-  process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId: "field-crew-leader-route" }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("POST /api/environmental-inspections/:id/complete", () => {
   it("translates the form command to the documented backend DTO", async () => {
@@ -51,7 +41,7 @@ describe("POST /api/environmental-inspections/:id/complete", () => {
       if (init?.body) backendBody = JSON.parse(String(init.body));
       return new Response(JSON.stringify({ id: "INS-TEST-1" }), { status: 200, headers: { "content-type": "application/json" } });
     });
-    const cookie = await backendCookie();
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
 
     const response = await POST(new Request("http://localhost/api/environmental-inspections/INS-TEST-1/complete", {
       method: "POST",

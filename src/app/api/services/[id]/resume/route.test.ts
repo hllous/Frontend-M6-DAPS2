@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetServiceFixtures, serviceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetServiceFixtures();
@@ -15,20 +15,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("POST /api/services/[id]/resume BFF route", () => {
   it("requires an active session and returns 401", async () => {
@@ -41,7 +28,7 @@ describe("POST /api/services/[id]/resume BFF route", () => {
   });
 
   it("returns 403 when session lacks service:execute (Crew Member)", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1044/resume", {
         method: "POST",
@@ -56,7 +43,7 @@ describe("POST /api/services/[id]/resume BFF route", () => {
   });
 
   it("returns 404 if the target service does not exist", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-NONEXISTENT/resume", {
         method: "POST",
@@ -70,7 +57,7 @@ describe("POST /api/services/[id]/resume BFF route", () => {
 
   it("returns 403 when trying to resume another crew's service", async () => {
     // SVC-1044 belongs to crew-a; field-crew-leader-route is crew-b
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1044/resume", {
         method: "POST",
@@ -86,7 +73,7 @@ describe("POST /api/services/[id]/resume BFF route", () => {
 
   it("returns 409 when the service is not SUSPENDED", async () => {
     // SVC-1050 is SCHEDULED
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/resume", {
         method: "POST",
@@ -105,7 +92,7 @@ describe("POST /api/services/[id]/resume BFF route", () => {
       status: "SUSPENDED",
       statusReason: "Desperfecto vehicular: El camión no arranca.",
     });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/resume", {
         method: "POST",
@@ -136,7 +123,7 @@ it.each([403, 409, 500, 503])("preserves backend error status and body (%s)", as
     if ((init?.method ?? "GET") === "GET") return Response.json({ id: "real-service", crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
-  const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+  const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/resume", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(undefined),

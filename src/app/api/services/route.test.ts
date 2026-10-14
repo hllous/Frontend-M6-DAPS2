@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { ServiceRequestError, servicesAdapter } from "@/lib/services";
 import { GET, POST } from "./route";
 import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -12,18 +12,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("authenticated services BFF route", () => {
   it("requires an active session and returns the documented error envelope", async () => {
@@ -54,7 +43,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("serves deterministic fixtures in mock mode", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/services", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -64,7 +53,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("filters fixtures down to the named empty-results scenario", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/services?search=zzz-sin-servicios", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -81,7 +70,7 @@ describe("authenticated services BFF route", () => {
         headers: { "content-type": "application/json" },
       }),
     );
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const response = await GET(new Request("http://localhost/api/services?mode=ROUTE", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -112,7 +101,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("POST returns 403 for a Field actor (scheduling is an Office decision)", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -133,7 +122,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("POST returns 403 for an Office actor without the scheduling capability", async () => {
-    const cookie = await authenticatedCookie("office-limited-intake");
+    const cookie = await loginAs("office-limited-intake", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -155,7 +144,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("POST rejects malformed or invalid input with 400", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -176,7 +165,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("POST schedules a new unassigned service in mock mode and returns 201", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -226,7 +215,7 @@ describe("authenticated services BFF route", () => {
         { status: 201, headers: { "content-type": "application/json" } },
       ),
     );
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -322,7 +311,7 @@ describe("Services list pagination and crew scope", () => {
     expect(String(fetch.mock.calls[0][0])).toBe("https://backend.internal/services?crewId=crew-real");
   });
   it("returns only the Field crew services in mock mode even with another crew filter", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/services?crewId=crew-a", { headers: { cookie } }));
     expect(response.status).toBe(200);
     const payload = await response.json();
