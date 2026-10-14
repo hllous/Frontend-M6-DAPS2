@@ -38,7 +38,7 @@ describe("Container Service lookup", () => {
     server.use(http.get("*/api/services", () => failing
       ? HttpResponse.error()
       : HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } })));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
@@ -67,7 +67,7 @@ describe("Container Service lookup", () => {
         meta: { total: 101, page, pageSize: 100, totalPages: 2 },
       });
     }));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
@@ -84,7 +84,7 @@ describe("Container Service lookup", () => {
       requestedPages.push(page);
       return HttpResponse.json({ data: [], meta: { total: 2001, page, pageSize: 100, totalPages: 21 } });
     }));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
@@ -99,7 +99,7 @@ describe("Container Service lookup", () => {
     server.use(http.get("*/api/services", () => HttpResponse.json({
       data: [], meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
     })));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
@@ -114,7 +114,7 @@ describe("Container Service lookup", () => {
       lookups += 1;
       return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } });
     }));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await waitFor(() => expect(within(row).getByRole("button", { name: "Vaciar contenedor" })).toBeEnabled());
@@ -139,7 +139,7 @@ describe("Container Service lookup", () => {
       })),
       http.get("*/api/services", () => HttpResponse.error()),
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
@@ -152,7 +152,7 @@ describe("Container Service lookup", () => {
 
 describe("ContainerCatalogPanel", () => {
   it("lists Containers and filters them by status, type, zone, and search", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByRole("heading", { name: "Contenedores" })).toBeVisible();
@@ -193,7 +193,7 @@ describe("ContainerCatalogPanel", () => {
   });
 
   it("allows any actor to view Container detail including damage information", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.fieldCrewMember} />);
 
     expect(await screen.findByText("CONT-003")).toBeVisible();
@@ -211,8 +211,8 @@ describe("ContainerCatalogPanel", () => {
     expect(dialog).not.toBeVisible();
   });
 
-  it("allows Office to create and edit a Container", { timeout: 10000 }, async () => {
-    const user = userEvent.setup();
+  it("allows Office to create and edit a Container", async () => {
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByText("CONT-001");
@@ -223,7 +223,9 @@ describe("ContainerCatalogPanel", () => {
     await user.selectOptions(screen.getByLabelText("Tipo de contenedor en el formulario"), "RECYCLABLE");
     await user.selectOptions(screen.getByLabelText("Zona en el formulario"), "zone-2");
     await user.type(screen.getByLabelText("Capacidad (litros)"), "1500");
-    await user.type(screen.getByLabelText("Dirección"), "Av. Paseo Colón 850");
+    const address = screen.getByLabelText("Dirección");
+    await user.click(address);
+    await user.paste("Av. Paseo Colón 850");
     await user.type(screen.getByLabelText("Latitud"), "-34.618");
     await user.type(screen.getByLabelText("Longitud"), "-58.369");
 
@@ -242,7 +244,7 @@ describe("ContainerCatalogPanel", () => {
     expect(within(editDialog).getByLabelText("Tipo de contenedor en el formulario")).toBeDisabled();
 
     await user.clear(screen.getByLabelText("Dirección"));
-    await user.type(screen.getByLabelText("Dirección"), "Av. Paseo Colón 900");
+    await user.paste("Av. Paseo Colón 900");
     await user.click(screen.getByRole("button", { name: "Guardar contenedor" }));
 
     expect(await screen.findByText("Contenedor actualizado con éxito.")).toBeVisible();
@@ -278,8 +280,8 @@ describe("ContainerCatalogPanel", () => {
     expect(within(row).getByRole("button", { name: "Ver detalle" })).toHaveClass("max-[760px]:h-12");
   });
 
-  it("lets Office dispatch standalone repair and removal transitions", { timeout: 10000 }, async () => {
-    const user = userEvent.setup();
+  it("lets Office dispatch standalone repair and removal transitions", async () => {
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByText("CONT-003")).toBeVisible();
@@ -292,8 +294,10 @@ describe("ContainerCatalogPanel", () => {
 
     const repairRow = screen.getByRole("row", { name: /CONT-003/ });
     expect(within(repairRow).getByText("En reparación")).toBeVisible();
-    await user.click(within(repairRow).getByRole("button", { name: "Completar reparación independiente" }));
-    const completeDialog = screen.getByRole("dialog");
+    const completeRepairButton = within(repairRow).getByRole("button", { name: "Completar reparación independiente" });
+    await waitFor(() => expect(completeRepairButton).toBeEnabled());
+    await user.click(completeRepairButton);
+    const completeDialog = await screen.findByRole("dialog");
     expect(within(completeDialog).getByText(/no corresponde al completado de un Servicio/i)).toBeVisible();
     await user.click(within(completeDialog).getByRole("button", { name: "Confirmar reparación completa" }));
 
@@ -305,8 +309,8 @@ describe("ContainerCatalogPanel", () => {
     expect(within(activeRow).queryByRole("button", { name: "Retirar contenedor" })).not.toBeInTheDocument();
   });
 
-  it("keeps the repair action name stable and returns focus to container detail after repair starts", { timeout: 10000 }, async () => {
-    const user = userEvent.setup();
+  it("keeps the repair action name stable and returns focus to container detail after repair starts", async () => {
+    const user = userEvent.setup({ delay: null });
     const originalStartRepair = containersAdapter.startRepair.bind(containersAdapter);
     let releaseRepair!: () => void;
     const repairGate = new Promise<void>((resolve) => {
@@ -336,8 +340,8 @@ describe("ContainerCatalogPanel", () => {
     await waitFor(() => expect(detailButton).toHaveFocus());
   });
 
-  it("allows Office to remove a damaged container and hides lifecycle actions after removal", { timeout: 10000 }, async () => {
-    const user = userEvent.setup();
+  it("allows Office to remove a damaged container and hides lifecycle actions after removal", async () => {
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByText("CONT-003")).toBeVisible();
@@ -354,8 +358,8 @@ describe("ContainerCatalogPanel", () => {
     expect(within(removedRow).queryByRole("button", { name: /reparación|retirar/i })).not.toBeInTheDocument();
   });
 
-  it("uploads repair evidence as flat Container evidence", { timeout: 10000 }, async () => {
-    const user = userEvent.setup();
+  it("uploads repair evidence as flat Container evidence", async () => {
+    const user = userEvent.setup({ delay: null });
     const evidenceOwners: string[] = [];
     server.use(
       http.post("*/api/evidence", async ({ request }) => {
@@ -385,8 +389,8 @@ describe("ContainerCatalogPanel", () => {
     expect(evidenceOwners).toEqual(["CONTAINER"]);
   });
 
-  it("uploads removal evidence as flat Container evidence", { timeout: 10000 }, async () => {
-    const user = userEvent.setup();
+  it("uploads removal evidence as flat Container evidence", async () => {
+    const user = userEvent.setup({ delay: null });
     const evidenceOwners: string[] = [];
     server.use(
       http.post("*/api/evidence", async ({ request }) => {
@@ -438,8 +442,8 @@ describe("ContainerCatalogPanel", () => {
     expect(screen.getByRole("button", { name: "Reintentar carga" })).toBeVisible();
   });
 
-  it("allows Field and Office actors with container:report to report overflow, transitioning ACTIVE -> OVERFLOWED", { timeout: 10000 }, async () => {
-    const user = userEvent.setup();
+  it("allows Field and Office actors with container:report to report overflow, transitioning ACTIVE -> OVERFLOWED", async () => {
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
 
     expect(await screen.findByText("CONT-001")).toBeVisible();
@@ -466,8 +470,8 @@ describe("ContainerCatalogPanel", () => {
     expect(within(updatedRow).queryByRole("button", { name: "Reportar daño" })).not.toBeInTheDocument();
   });
 
-  it("allows reporting container damage with damageType, severity, and requiresPublicWorks", { timeout: 10000 }, async () => {
-    const user = userEvent.setup();
+  it("allows reporting container damage with damageType, severity, and requiresPublicWorks", async () => {
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByText("CONT-001")).toBeVisible();
@@ -509,7 +513,7 @@ describe("ContainerCatalogPanel", () => {
   });
 
   it("validates evidence file constraints as defense in depth", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.fieldCrewMember} />);
 
     expect(await screen.findByText("CONT-001")).toBeVisible();
@@ -551,8 +555,8 @@ describe("ContainerCatalogPanel", () => {
     expect(dialog.querySelector("#container-evidence-error")).toHaveAttribute("role", "alert");
   });
 
-  it("uploads evidence after report and reuses idempotencyKey on retry", { timeout: 10000 }, async () => {
-    const user = userEvent.setup();
+  it("uploads evidence after report and reuses idempotencyKey on retry", async () => {
+    const user = userEvent.setup({ delay: null });
     const interceptedKeys: string[] = [];
     let evidenceShouldFail = true;
 
@@ -619,7 +623,7 @@ describe("ContainerCatalogPanel", () => {
   });
 
   it("handles authoritative backend 409 conflict without presenting false success", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     server.use(
       http.post("*/api/containers/:id/report-overflow", () =>
@@ -660,8 +664,8 @@ describe("ContainerCatalogPanel", () => {
   });
 
   describe("Office emptying and relocation dispatch (#123)", () => {
-    it("allows Office actor to empty an OVERFLOWED container (OVERFLOWED -> ACTIVE)", { timeout: 10000 }, async () => {
-      const user = userEvent.setup();
+    it("allows Office actor to empty an OVERFLOWED container (OVERFLOWED -> ACTIVE)", async () => {
+      const user = userEvent.setup({ delay: null });
       render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
       expect(await screen.findByText("CONT-002")).toBeVisible();
@@ -683,7 +687,7 @@ describe("ContainerCatalogPanel", () => {
     });
 
     it("allows Office actor to initiate and confirm relocation (ACTIVE -> RELOCATING -> ACTIVE with new address)", { timeout: 15000 }, async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
       expect(await screen.findByText("CONT-001")).toBeVisible();
@@ -710,7 +714,9 @@ describe("ContainerCatalogPanel", () => {
       const confirmDialog = screen.getByRole("dialog");
       expect(within(confirmDialog).getByRole("heading", { name: /Confirmar nueva ubicación de contenedor CONT-001/i })).toBeVisible();
 
-      await user.type(within(confirmDialog).getByLabelText("Nueva dirección"), "Av. Callao 1500");
+      const newAddress = within(confirmDialog).getByLabelText("Nueva dirección");
+      await user.click(newAddress);
+      await user.paste("Av. Callao 1500");
       await user.type(within(confirmDialog).getByLabelText("Latitud"), "-34.595");
       await user.type(within(confirmDialog).getByLabelText("Longitud"), "-58.390");
 
@@ -781,7 +787,7 @@ describe("ContainerCatalogPanel", () => {
     });
 
     it("surfaces authoritative backend failure in emptying dialog without false success", async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
 
       server.use(
         http.post("*/api/containers/:id/empty", () =>
