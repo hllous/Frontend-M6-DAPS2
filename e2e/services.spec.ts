@@ -133,14 +133,39 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
     await expect(map).toBeVisible();
     await expect(table).not.toBeVisible();
+    const marker = map.locator("button[aria-label*='Poda de árbol — Av. Rivadavia 2200']");
+    await expect(marker).toBeVisible();
 
     // Activating a marker in map view opens the preview (operable via keyboard Enter)
-    const marker = map.locator("button[aria-label*='Poda de árbol — Av. Rivadavia 2200']");
     await marker.focus();
     await page.keyboard.press("Enter");
+    const drawer = page.getByRole("complementary", { name: "Vista previa del servicio" });
+    await expect(drawer).toHaveAttribute("data-expanded", "false");
+    await expect(drawer.getByRole("button", { name: "Mostrar lista" })).toContainText("Poda de árbol — Av. Rivadavia 2200");
+    const getMapSize = () => map.evaluate((element) => {
+      const { width, height } = element.getBoundingClientRect();
+      return { width, height };
+    });
+    let previousMapSize: Awaited<ReturnType<typeof getMapSize>> | null = null;
+    let stableMapSizeSamples = 0;
+    await expect.poll(async () => {
+      const currentMapSize = await getMapSize();
+      if (previousMapSize && currentMapSize.width === previousMapSize.width && currentMapSize.height === previousMapSize.height) {
+        stableMapSizeSamples += 1;
+      } else {
+        stableMapSizeSamples = 0;
+      }
+      previousMapSize = currentMapSize;
+      return stableMapSizeSamples;
+    }, { intervals: [200], timeout: 5000 }).toBeGreaterThanOrEqual(2);
+    const collapsedMapSize = await getMapSize();
+
+    await drawer.getByRole("button", { name: "Mostrar lista" }).click();
+    await expect(drawer).toHaveAttribute("data-expanded", "true");
     const preview = page.locator("aside[aria-labelledby='preview-title']");
     await expect(preview).toBeVisible();
     await expect(preview.getByText("Poda de árbol — Av. Rivadavia 2200")).toBeVisible();
+    await expect.poll(getMapSize).toEqual(collapsedMapSize);
   });
 
   test("generic create flow schedules an unassigned ROUTE service that appears immediately in the workspace", async ({ page }) => {
