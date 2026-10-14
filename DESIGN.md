@@ -9,7 +9,7 @@
 - **2026-09-03 — Type scale and density:** **B · Adaptativa equilibrada** was approved. Office uses compact data presentation without shrinking general reading text; Field uses larger touch controls. **C · Cómoda universal** was explicitly rejected as too spacious.
 - **2026-09-03 — Radius and elevation:** The revised **C · Suave sin sombras** was approved. Controls use 12 px radii, panels and overlays use 16 px radii, and content surfaces rely on borders instead of shadows.
 - **2026-09-03 — Desktop navigation:** The revised **A · Sidebar plegable** was approved. It opens as a 220 px labeled sidebar and can be collapsed by the user into a 72 px icon rail.
-- **2026-09-03 — Mobile navigation:** **C · Tareas + Más** was approved. The bottom bar keeps Inicio, Servicios, and Mapa visible, while secondary and future modules live under Más.
+- **2026-09-03 — Mobile navigation:** **C · Tareas + Más** was approved. The bottom bar keeps Mi trabajo, Servicios, and Mapa visible, while secondary and future modules live under Más.
 - **2026-09-03 — Operational statuses:** **A · Etiqueta semántica** was approved. Statuses use a soft semantic fill, a distinct icon, and a visible Spanish label; color never carries meaning alone.
 - **2026-09-03 — Route map markers:** The revised **A · Pin numerado** was approved. Route stops use numbered location pins; selecting one opens an anchored information card and synchronizes the corresponding list row.
 - **2026-09-03 — Mobile map/list workspace:** **B · Mapa + bandeja** was approved. The map remains visible while the synchronized service list occupies a resizable bottom sheet.
@@ -45,6 +45,7 @@ Use the approved **A · Azul institucional** palette as the visual foundation. K
 | `--color-border` | `#CBD5DF` | Border | Dividers and panel edges only |
 | `--color-border-strong` | `#70849A` | Strong border | Boundaries of interactive controls |
 | `--color-focus` | `#2377BD` | Focus | Keyboard focus indicator |
+| `--color-overlay` | `#000000` | Overlay | Backdrop tint, used at 40% for dialogs and 10% for sheets |
 | `--color-on-institutional` | `#FFFFFF` | Text on dark | Primary text on institutional or action fills |
 | `--color-on-institutional-secondary` | `#B7C6D8` | Secondary text on dark | Supporting text on institutional or action fills |
 
@@ -162,7 +163,7 @@ Use the approved **Sidebar plegable** app shell for Office-sized viewports:
 
 Use the approved **Tareas + Más** pattern for Field and narrow-screen navigation:
 
-- Keep four bottom-bar destinations: `Inicio`, `Servicios`, `Mapa`, and `Más`.
+- Keep four bottom-bar destinations: `Mi trabajo`, `Servicios`, `Mapa`, and `Más`.
 - Use `Más` to open a bottom sheet containing the complete module list, including `Inventario` and `Control ambiental`.
 - Preserve the active destination indicator when the current module also appears in the complete list.
 - Keep each bottom target at least 48 px high and provide both an icon and a visible Spanish label.
