@@ -2,7 +2,6 @@ import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, f
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
@@ -63,7 +62,6 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede crear recorridos.", capability: "route:manage", throwOnError: true });
 

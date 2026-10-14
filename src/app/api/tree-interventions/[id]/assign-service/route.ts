@@ -8,7 +8,6 @@ import {
   type TreeInterventionAssignServiceInput,
 } from "@/lib/tree-interventions";
 import { serviceFixtures } from "@/lib/services-fixtures";
-import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
@@ -47,7 +46,6 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
     authorize(session, { office: true, officeMessage: "Solo Oficina puede programar y asociar un servicio.", capability: "service:schedule", capabilityMessage: "La sesión no tiene capacidad para programar servicios.", throwOnError: true });
 
     let body: unknown;

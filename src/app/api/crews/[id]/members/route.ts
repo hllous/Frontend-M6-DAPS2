@@ -4,8 +4,7 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { crewFixtures } from "@/lib/crew-fixtures";
 import { addCrewMembersInputSchema } from "@/lib/crews";
-import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, InvalidSessionError } from "@/lib/session";
 
 
 type PostContext = { params: Promise<{ id: string }> };

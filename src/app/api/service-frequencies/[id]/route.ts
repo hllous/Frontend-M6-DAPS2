@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { serviceFrequencyResponseFixture, closeServiceFrequencyFixture, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
 import { serviceFrequencyUpdateInputSchema } from "@/lib/service-frequencies";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 

@@ -5,7 +5,6 @@ import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { updateTreeFixture } from "@/lib/tree-fixtures";
 import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures, paginateTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { treeHealthStatusSchema, treeSurveyCreateInputSchema, riskLevelSchema, type TreeSurveyQuery } from "@/lib/tree-surveys";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 

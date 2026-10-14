@@ -99,7 +99,6 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     // Permission check: scheduling is an Office decision, not a Field action.
     authorize(session, { office: true, officeMessage: "Solo Oficina puede programar un servicio.", capability: "service:schedule", throwOnError: true });

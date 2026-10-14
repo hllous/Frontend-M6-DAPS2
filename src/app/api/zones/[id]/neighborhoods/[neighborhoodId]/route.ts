@@ -2,7 +2,6 @@ import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
@@ -24,7 +23,6 @@ export async function DELETE(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede quitar barrios de una zona operativa.", capability: "zone:manage", throwOnError: true });
 

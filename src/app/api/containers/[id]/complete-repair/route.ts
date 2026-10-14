@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { completeRepairFixture, getContainerFixture } from "@/lib/containers-fixtures";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -24,7 +23,6 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     authorize(session, { office: true, officeMessage: "No tiene permisos para completar reparaciones de contenedores.", capability: "container:manage", capabilityMessage: "No tiene permisos para completar reparaciones de contenedores.", throwOnError: true });
 

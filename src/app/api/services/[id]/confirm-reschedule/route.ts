@@ -7,7 +7,6 @@ import {
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import { confirmRescheduleInputSchema, STATUS_LABEL, toConfirmRescheduleBackendInput } from "@/lib/services";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -25,7 +24,6 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     // Permission check: reprogramming is an Office decision, not a Field action.
     authorize(session, { office: true, officeMessage: "Solo Oficina puede confirmar la nueva fecha de un servicio.", capability: "service:reschedule", throwOnError: true });

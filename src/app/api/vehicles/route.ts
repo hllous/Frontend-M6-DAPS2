@@ -2,7 +2,6 @@ import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, f
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { createVehicleInputSchema, type VehicleQuery, vehicleTypeSchema } from "@/lib/vehicles";

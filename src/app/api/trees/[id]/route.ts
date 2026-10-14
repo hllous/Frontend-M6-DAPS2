@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { treeFixtures, updateTreeFixture } from "@/lib/tree-fixtures";
 import { treeUpdateInputSchema } from "@/lib/trees";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 

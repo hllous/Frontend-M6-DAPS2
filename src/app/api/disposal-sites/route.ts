@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { fetchBackend } from "@/lib/bff-backend";
 import { addDisposalSiteFixture, filterDisposalSiteFixtures, paginateDisposalSiteFixtures } from "@/lib/disposal-site-fixtures";
 import { disposalSiteCreateInputSchema, disposalSiteTypeSchema, type DisposalSiteQuery } from "@/lib/disposal-sites";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 

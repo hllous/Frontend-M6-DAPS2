@@ -2,7 +2,6 @@ import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { updateVehicleInputSchema } from "@/lib/vehicles";
@@ -18,8 +17,7 @@ async function requestContext(request: Request, context: Context) {
   const { id } = await context.params;
   const path = new URL(request.url).pathname;
   const session = getRequiredSession(request);
-  const scenario = getScenario(session);
-  return { id, path, session, scenario };
+  return { id, path, session };
 }
 
 function requireOfficeCapability(session: ReturnType<typeof getRequiredSession>) { authorize(session, { office: true, officeMessage: "Solo Oficina puede administrar vehículos.", capability: "vehicle:manage", throwOnError: true }); }
@@ -45,7 +43,7 @@ export async function GET(request: Request, context: Context) {
 export async function PATCH(request: Request, context: Context) {
   const path = new URL(request.url).pathname;
   try {
-    const { id, session, scenario } = await requestContext(request, context);
+    const { id, session } = await requestContext(request, context);
     requireOfficeCapability(session);
     let body: unknown;
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
@@ -68,7 +66,7 @@ export async function PATCH(request: Request, context: Context) {
 export async function DELETE(request: Request, context: Context) {
   const path = new URL(request.url).pathname;
   try {
-    const { id, session, scenario } = await requestContext(request, context);
+    const { id, session } = await requestContext(request, context);
     requireOfficeCapability(session);
     if (backendMode(session)) return forward(request, `/vehicles/${pathId(id)}`, "vehicle:manage", { method: "DELETE" });
     const vehicle = vehicleFixtures.find((item) => item.id === id);

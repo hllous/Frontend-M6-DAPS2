@@ -38,7 +38,7 @@ export async function GET(request: Request, routeContext: Context) {
 export async function PATCH(request: Request, routeContext: Context) {
   const path = new URL(request.url).pathname;
   try {
-    const { id, session, scenario } = await context(request, routeContext);
+    const { id, session } = await context(request, routeContext);
     requireOfficeCapability(session);
     let body: unknown;
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
@@ -60,7 +60,7 @@ export async function PATCH(request: Request, routeContext: Context) {
 export async function DELETE(request: Request, routeContext: Context) {
   const path = new URL(request.url).pathname;
   try {
-    const { id, session, scenario } = await context(request, routeContext);
+    const { id, session } = await context(request, routeContext);
     requireOfficeCapability(session);
     if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}`, "crew:manage", { method: "DELETE" }));
     const crew = crewFixtures.find((item) => item.id === id);

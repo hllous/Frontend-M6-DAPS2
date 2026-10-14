@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { greenPointFixtures, updateGreenPointFixture } from "@/lib/green-point-fixtures";
 import { greenPointUpdateInputSchema } from "@/lib/green-points";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 

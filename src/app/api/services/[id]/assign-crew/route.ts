@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { assignCrewFixture } from "@/lib/services-fixtures";
 import { assignCrewInputSchema } from "@/lib/services";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -22,7 +21,6 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     // Permission check: crew/vehicle assignment is an Office decision, not a Field action.
     authorize(session, { office: true, officeMessage: "Solo Oficina puede asignar cuadrilla y vehículo a un servicio.", capability: "service:assign", throwOnError: true });

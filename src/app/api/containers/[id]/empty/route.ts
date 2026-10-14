@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getContainerFixture, emptyContainerFixture } from "@/lib/containers-fixtures";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -24,7 +23,6 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     authorize(session, { capability: "container:manage", capabilityMessage: "No tiene permisos para vaciar contenedores.", throwOnError: true });
 

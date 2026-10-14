@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { fetchBackend } from "@/lib/bff-backend";
 import { addServiceTypeFixture, filterServiceTypeFixtures, paginateServiceTypeFixtures } from "@/lib/service-type-fixtures";
 import { serviceTypeCategorySchema, serviceTypeCreateInputSchema, serviceTypeModeSchema, type ServiceTypeQuery } from "@/lib/service-types";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 

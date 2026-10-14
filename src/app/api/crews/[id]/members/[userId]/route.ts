@@ -3,8 +3,7 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { crewFixtures } from "@/lib/crew-fixtures";
-import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, InvalidSessionError } from "@/lib/session";
 
 
 type Context = { params: Promise<{ id: string; userId: string }> };

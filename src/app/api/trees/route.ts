@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { fetchBackend } from "@/lib/bff-backend";
 import { addTreeFixture, filterTreeFixtures, paginateTreeFixtures, treeFixtures } from "@/lib/tree-fixtures";
 import { treeCreateInputSchema, type TreeQuery } from "@/lib/trees";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 

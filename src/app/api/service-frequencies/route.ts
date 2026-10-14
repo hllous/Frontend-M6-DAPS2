@@ -5,7 +5,6 @@ import { fetchBackend } from "@/lib/bff-backend";
 import { serviceFrequencyResponseFixture, addServiceFrequencyFixture, filterServiceFrequencyFixtures, paginateServiceFrequencyFixtures } from "@/lib/service-frequency-fixtures";
 import { serviceFrequencyCreateInputSchema, serviceFrequencyShiftSchema, type ServiceFrequencyQuery } from "@/lib/service-frequencies";
 import { serviceTypeFixtures } from "@/lib/service-type-fixtures";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";

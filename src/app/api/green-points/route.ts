@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { fetchBackend } from "@/lib/bff-backend";
 import { addGreenPointFixture, filterGreenPointFixtures, greenPointFixtures, paginateGreenPointFixtures } from "@/lib/green-point-fixtures";
 import { greenPointCreateInputSchema, wasteTypeSchema, type GreenPointQuery } from "@/lib/green-points";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 

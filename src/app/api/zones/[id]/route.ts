@@ -2,7 +2,6 @@ import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
@@ -67,7 +66,6 @@ export async function PATCH(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede editar zonas operativas.", capability: "zone:manage", throwOnError: true });
 
@@ -126,7 +124,6 @@ export async function DELETE(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede dar de baja zonas operativas.", capability: "zone:manage", throwOnError: true });
 

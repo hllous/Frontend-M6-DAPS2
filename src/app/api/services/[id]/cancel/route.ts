@@ -7,7 +7,6 @@ import {
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import { cancelServiceInputSchema, STATUS_LABEL } from "@/lib/services";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -27,7 +26,6 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     // Permission check: cancellation is an Office decision, not a Field action.
     authorize(session, { office: true, officeMessage: "Solo Oficina puede cancelar un servicio.", capability: "service:cancel", throwOnError: true });

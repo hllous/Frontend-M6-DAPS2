@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { disposalSiteUpdateInputSchema } from "@/lib/disposal-sites";
 import { disposalSiteFixtures, updateDisposalSiteFixture } from "@/lib/disposal-site-fixtures";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 
