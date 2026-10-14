@@ -295,7 +295,7 @@ describe("ZoneExecutionPanel component", () => {
 
     let uploadAttempts = 0;
     const capturedIdempotencyKeys: string[] = [];
-    const capturedServiceIds: FormDataEntryValue[] = [];
+    const capturedServiceIds: (FormDataEntryValue | null)[] = [];
     let recordedResults: any[] = [];
 
     server.use(
