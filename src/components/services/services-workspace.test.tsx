@@ -144,6 +144,34 @@ describe("ServicesWorkspace component", () => {
     }
   });
 
+  it("uses the shared two-state drawer for a selected phone map preview", async () => {
+    const originalWidth = window.innerWidth;
+    const user = userEvent.setup();
+    try {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+      render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+      await user.click(await screen.findByRole("button", { name: "Mapa" }));
+      const map = await screen.findByRole("region", { name: "Mapa territorial de Servicios" });
+      const marker = await within(map).findByRole("button", { name: /Poda de árbol — Av\. Rivadavia 2200/ });
+      await user.click(marker);
+
+      const drawer = await screen.findByRole("complementary", { name: "Vista previa del servicio" });
+      const toggle = within(drawer).getByRole("button", { name: "Mostrar lista" });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(map).toBeVisible();
+
+      await user.click(toggle);
+
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      expect(map).toBeVisible();
+      expect(within(drawer).getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200" })).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+      fireEvent(window, new Event("resize"));
+    }
+  });
+
   it("synchronizes map marker selection with table and opens preview", async () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
