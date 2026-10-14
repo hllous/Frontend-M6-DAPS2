@@ -14,17 +14,29 @@ type InventoryMapDrawerProps = {
   className?: string;
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
+  snapState?: InventoryMapDrawerSnapState;
+  onSnapStateChange?: (snapState: InventoryMapDrawerSnapState) => void;
   summary: string;
 };
 
+export type InventoryMapDrawerSnapState = "peek" | "half" | "full";
+
 type DragStart = {
-  expanded: boolean;
+  snapState: InventoryMapDrawerSnapState;
   pointerId: number;
   y: number;
 };
 
-const HANDLE_HEIGHT = 80;
+const HANDLE_HEIGHT = 52;
+const LEGACY_HANDLE_HEIGHT = 80;
 const DRAG_THRESHOLD = 6;
+const SNAP_STATES: InventoryMapDrawerSnapState[] = ["full", "half", "peek"];
+
+function snapOffset(snapState: InventoryMapDrawerSnapState, height: number, handleHeight = HANDLE_HEIGHT) {
+  if (snapState === "full") return 0;
+  if (snapState === "half") return height * 0.5;
+  return Math.max(0, height - handleHeight);
+}
 
 export function InventoryMapDrawer({
   ariaLabel,
@@ -32,6 +44,8 @@ export function InventoryMapDrawer({
   className,
   expanded: controlledExpanded,
   onExpandedChange,
+  snapState: controlledSnapState,
+  onSnapStateChange,
   summary,
 }: InventoryMapDrawerProps) {
   const contentId = useId();
@@ -39,16 +53,34 @@ export function InventoryMapDrawer({
   const drawerRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragStart | null>(null);
   const draggedRef = useRef(false);
+  const [localSnapState, setLocalSnapState] = useState<InventoryMapDrawerSnapState>("peek");
   const [localExpanded, setLocalExpanded] = useState(false);
-  const expanded = controlledExpanded ?? localExpanded;
+  const usesSnapPoints = controlledSnapState !== undefined || onSnapStateChange !== undefined;
+  const expanded = usesSnapPoints
+    ? (controlledSnapState ?? localSnapState) !== "peek"
+    : controlledExpanded ?? localExpanded;
+  const currentSnapState = usesSnapPoints
+    ? controlledSnapState ?? localSnapState
+    : expanded ? "full" : "peek";
   const [isCompact, setIsCompact] = useState(false);
-  const contentHidden = isCompact && !expanded;
+  const contentHidden = isCompact && currentSnapState === "peek";
   const [dragDelta, setDragDelta] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
-  function updateExpanded(nextExpanded: boolean) {
+  function updateSnapState(nextSnapState: InventoryMapDrawerSnapState) {
+    if (usesSnapPoints) {
+      if (controlledSnapState === undefined) setLocalSnapState(nextSnapState);
+      onSnapStateChange?.(nextSnapState);
+      return;
+    }
+
+    const nextExpanded = nextSnapState !== "peek";
     if (controlledExpanded === undefined) setLocalExpanded(nextExpanded);
     onExpandedChange?.(nextExpanded);
+  }
+
+  function updateExpanded(nextExpanded: boolean) {
+    updateSnapState(nextExpanded ? "full" : "peek");
   }
 
   useEffect(() => {
@@ -67,7 +99,7 @@ export function InventoryMapDrawer({
   function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
 
-    dragRef.current = { expanded, pointerId: event.pointerId, y: event.clientY };
+    dragRef.current = { snapState: currentSnapState, pointerId: event.pointerId, y: event.clientY };
     draggedRef.current = false;
     setIsDragging(true);
     setDragDelta(0);
@@ -90,13 +122,19 @@ export function InventoryMapDrawer({
     if (!drag || drag.pointerId !== event.pointerId) return;
 
     const delta = event.clientY - drag.y;
-    if (Math.abs(delta) > DRAG_THRESHOLD) {
+    if (event.type !== "pointercancel" && Math.abs(delta) > DRAG_THRESHOLD) {
       draggedRef.current = true;
-      const drawerHeight = drawerRef.current?.getBoundingClientRect().height ?? HANDLE_HEIGHT;
-      const closedOffset = Math.max(0, drawerHeight - HANDLE_HEIGHT);
-      const startOffset = drag.expanded ? 0 : closedOffset;
-      const finalOffset = Math.max(0, Math.min(closedOffset, startOffset + delta));
-      updateExpanded(finalOffset < closedOffset / 2);
+      const handleHeight = usesSnapPoints ? HANDLE_HEIGHT : LEGACY_HANDLE_HEIGHT;
+      const drawerHeight = drawerRef.current?.getBoundingClientRect().height || handleHeight;
+      const closedOffset = Math.max(0, drawerHeight - handleHeight);
+      const finalOffset = Math.max(0, Math.min(closedOffset, snapOffset(drag.snapState, drawerHeight, handleHeight) + delta));
+      const candidates = usesSnapPoints ? SNAP_STATES : ["full", "peek"] as const;
+      const nextSnapState = candidates.reduce((closest, candidate) =>
+        Math.abs(snapOffset(candidate, drawerHeight, handleHeight) - finalOffset) < Math.abs(snapOffset(closest, drawerHeight, handleHeight) - finalOffset)
+          ? candidate
+          : closest,
+      );
+      updateSnapState(nextSnapState);
     }
 
     if (event.type === "pointercancel") draggedRef.current = false;
@@ -110,8 +148,22 @@ export function InventoryMapDrawer({
       draggedRef.current = false;
       return;
     }
-    updateExpanded(!expanded);
+    if (!usesSnapPoints) {
+      updateExpanded(!expanded);
+      return;
+    }
+
+    const currentIndex = SNAP_STATES.indexOf(currentSnapState);
+    updateSnapState(SNAP_STATES[(currentIndex + SNAP_STATES.length - 1) % SNAP_STATES.length]);
   }
+
+  const handleLabel = !usesSnapPoints
+    ? expanded ? "Ocultar lista" : "Mostrar lista"
+    : currentSnapState === "peek"
+      ? "Expandir lista a media altura"
+      : currentSnapState === "half"
+        ? "Expandir lista a pantalla completa"
+        : "Reducir lista y mostrar mapa";
 
   return (
     <aside
@@ -120,8 +172,13 @@ export function InventoryMapDrawer({
       aria-label={ariaLabel}
       data-compact={isCompact}
       data-expanded={expanded}
+      data-snap={currentSnapState}
+      data-snap-points={usesSnapPoints}
       data-dragging={isDragging}
-      style={{ "--drawer-drag-offset": `${dragDelta}px` } as CSSProperties}
+      style={{
+        "--drawer-drag-offset": `${dragDelta}px`,
+        "--drawer-handle-height": `${usesSnapPoints ? HANDLE_HEIGHT : LEGACY_HANDLE_HEIGHT}px`,
+      } as CSSProperties}
       onFocusCapture={handleFocusCapture}
     >
       <Button
@@ -129,7 +186,7 @@ export function InventoryMapDrawer({
         variant="ghost"
         size="lg"
         type="button"
-        aria-label={expanded ? "Ocultar lista" : "Mostrar lista"}
+        aria-label={handleLabel}
         aria-expanded={expanded}
         aria-controls={contentId}
         aria-describedby={summary ? summaryId : undefined}

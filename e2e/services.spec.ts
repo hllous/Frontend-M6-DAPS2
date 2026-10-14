@@ -168,30 +168,30 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(row.locator("button[data-service-select]")).toBeFocused();
   });
 
-  test("narrow viewport keeps the map visible under a two-state service-list drawer", async ({ page }) => {
+  test("narrow viewport keeps the map behind a three-state service-list drawer", async ({ page }) => {
     await page.setViewportSize(NARROW_VIEWPORT);
     await openServices(page);
 
-    // List and map view switcher buttons within main content area
+    // The map stays behind the half-height list drawer without view-switcher tabs.
     const content = page.locator("#contenido-principal");
     await expect(content).toHaveCSS("overflow-y", "hidden");
     await expect(
       content.getByRole("button", { name: "Programar nuevo servicio" }).getByText("Programar", { exact: true }),
     ).toBeVisible();
-    const listToggle = content.getByRole("button", { name: /Lista/ });
-    const mapToggle = content.getByRole("button", { name: "Mapa" });
-    await expect(listToggle).toBeVisible();
-    await expect(mapToggle).toBeVisible();
+    await expect(content.getByRole("button", { name: "Lista", exact: true })).toHaveCount(0);
+    await expect(content.getByRole("button", { name: "Mapa", exact: true })).toHaveCount(0);
 
-    // The map stays mounted behind the expanded list drawer.
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
     await expect(table).toBeVisible();
     await expectNoHorizontalTableScroll(table);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(1);
     const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
     await expect(map).toBeVisible();
+    const mapFrame = content.locator('[role="region"][aria-label="Mapa territorial de Servicios"]');
+    const mapElement = await mapFrame.elementHandle();
     const listDrawer = page.getByRole("complementary", { name: "Lista de servicios" });
-    await expect(listDrawer).toHaveAttribute("data-expanded", "true");
+    const listDrawerElement = content.locator('aside[aria-label="Lista de servicios"]');
+    await expect(listDrawerElement).toHaveAttribute("data-snap", "half");
 
     const headerLabels = await table.locator("thead th").evaluateAll((headers) => headers.map((header) => {
       const label = header.querySelector("button span") ?? header;
@@ -209,10 +209,20 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     });
     expect(overlappingHeaderLabels).toEqual([]);
 
-    // Switch to Map view
-    await mapToggle.click();
+    await listDrawer.getByRole("button", { name: "Expandir lista a pantalla completa" }).click();
+    await expect(listDrawer).toHaveAttribute("data-snap", "full");
+    const fullDrawerBox = await listDrawer.boundingBox();
+    const mapBox = await mapFrame.boundingBox();
+    expect(fullDrawerBox).not.toBeNull();
+    expect(mapBox).not.toBeNull();
+    expect(Math.abs(fullDrawerBox!.y - mapBox!.y)).toBeLessThanOrEqual(1);
+
+    await listDrawer.getByRole("button", { name: "Reducir lista y mostrar mapa" }).click();
+    await expect(listDrawer).toHaveAttribute("data-snap", "peek");
+    await listDrawer.getByRole("button", { name: "Expandir lista a media altura" }).click();
+    await expect(listDrawerElement).toHaveAttribute("data-snap", "half");
     await expect(map).toBeVisible();
-    await expect(listDrawer).toHaveAttribute("data-expanded", "false");
+
     const unexpectedScrollports = await content.evaluate((main) =>
       Array.from(main.querySelectorAll<HTMLElement>("*"))
         .filter((element) => {
@@ -227,16 +237,20 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(marker).toBeVisible();
     await expect(map.getByText(/servicios? sin ubicaci[oó]n/i)).toHaveCount(0);
 
-    // Activating a marker in map view opens the preview (operable via keyboard Enter)
+    // Activating a marker opens the full-frame preview and keeps the same map mounted.
     await marker.focus();
     await page.keyboard.press("Enter");
-    await expect(listDrawer).toHaveAttribute("data-expanded", "true");
+    await expect(listDrawerElement).toHaveAttribute("data-snap", "half");
     const preview = page.locator("aside[aria-labelledby='preview-title']");
     await expect(preview).toBeVisible();
     await expect(preview.getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200", exact: true })).toHaveCount(1);
     await expect(preview.locator("xpath=..")).toHaveCSS("opacity", "1");
-    const getMapSize = () => map.evaluate((element) => {
+    await expect(preview.getByRole("button", { name: "Cerrar vista previa" })).toBeFocused();
+    await expect(preview.locator(".overflow-y-auto")).toHaveCount(1);
+    await expect(preview.locator(".overflow-y-auto")).toHaveCSS("overflow-y", "auto");
+    expect(await mapElement?.evaluate((element) => element.isConnected)).toBe(true);
+    const getMapSize = () => mapFrame.evaluate((element) => {
       const { width, height } = element.getBoundingClientRect();
       return { width, height };
     });
@@ -254,6 +268,9 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     }, { intervals: [200], timeout: 5000 }).toBeGreaterThanOrEqual(2);
     const collapsedMapSize = await getMapSize();
     await expect.poll(getMapSize).toEqual(collapsedMapSize);
+    await preview.getByRole("button", { name: "Cerrar vista previa" }).click();
+    await expect(preview.locator("xpath=..")).toHaveAttribute("aria-hidden", "true");
+    await expect(table.locator('tr[data-service-id="SVC-1043"] button[data-service-select]')).toBeFocused();
   });
 
   test("generic create flow schedules an unassigned ROUTE service that appears immediately in the workspace", async ({ page }) => {

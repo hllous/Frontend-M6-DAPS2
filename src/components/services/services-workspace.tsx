@@ -12,8 +12,6 @@ import {
 import { useSearchParams } from "next/navigation";
 import {
   FilterX,
-  LayoutList,
-  Map as MapIcon,
   Plus,
   RefreshCw,
   Search,
@@ -21,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 
-import { InventoryMapDrawer } from "@/components/map/inventory-map-drawer";
+import { InventoryMapDrawer, type InventoryMapDrawerSnapState } from "@/components/map/inventory-map-drawer";
 import { Button } from "@/components/ui/button";
 import { FormControl } from "@/components/ui/form-control";
 import {
@@ -102,12 +100,20 @@ export function ServicesWorkspace({
 
   // Load state
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const loadedScopeRef = useRef<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
   const [periodChoice, setPeriodChoice] = useState<Period | null>(() => {
     const value = getParam("periodo");
     return value === "semana" || value === "mes" || value === "todo" ? value : null;
   });
   const [activePeriod, setActivePeriod] = useState<Period>(periodChoice ?? "todo");
+
+  const handlePeriodChoiceChange = useCallback((period: Period) => {
+    setActivePeriod(period);
+    setPeriodChoice(period);
+  }, []);
 
   // Global search
   const [search, setSearch] = useState<string>(() => getParam("q") ?? "");
@@ -198,9 +204,7 @@ export function ServicesWorkspace({
   const [streetClosureServiceId, setStreetClosureServiceId] = useState<string | null>(null);
 
   // Layout presentation
-  const [mobileTab, setMobileTab] = useState<"list" | "map">(() => {
-    return getParam("view") === "map" ? "map" : "list";
-  });
+  const [mobileDrawerSnap, setMobileDrawerSnap] = useState<InventoryMapDrawerSnapState>("half");
   const [isNarrow, setIsNarrow] = useState(false);
 
   // Map resilience
@@ -219,16 +223,31 @@ export function ServicesWorkspace({
   // Fetch all services
   useEffect(() => {
     let isCurrent = true;
-    async function load() {
+    const scopeKey = scenario?.actor.kind === "FIELD"
+      ? `field:${scenario.actor.crewId ?? ""}`
+      : "office";
+    const keepCurrentWorkspace = loadedScopeRef.current === scopeKey;
+    if (keepCurrentWorkspace) {
+      setIsRefreshing(true);
+      setRefreshError(null);
+    } else {
       setLoadState({ status: "loading" });
+      setIsRefreshing(false);
+      setRefreshError(null);
+    }
+
+    async function load() {
       try {
         const base: ServiceQuery = {};
         if (scenario?.actor.kind === "FIELD" && scenario.actor.crewId) {
           base.crewId = scenario.actor.crewId;
         }
-        const count = await servicesAdapter.list({ ...base, pageSize: 1 });
-        if (!isCurrent) return;
-        const period = periodChoice ?? (count.total > 100 ? "semana" : "todo");
+        let period = periodChoice;
+        if (!period) {
+          const count = await servicesAdapter.list({ ...base, pageSize: 1 });
+          if (!isCurrent) return;
+          period = count.total > 100 ? "semana" : "todo";
+        }
         setActivePeriod(period);
         const query: ServiceQuery = { ...base, pageSize: 100 };
         if (period !== "todo") {
@@ -256,14 +275,24 @@ export function ServicesWorkspace({
           totalPages = next.totalPages;
         }
         if (totalPages > 20) throw new RangeError("El período tiene demasiados servicios; acote el período.");
-        if (isCurrent) setLoadState({ status: "ready", services });
+        if (isCurrent) {
+          loadedScopeRef.current = scopeKey;
+          setLoadState({ status: "ready", services });
+          setIsRefreshing(false);
+          setRefreshError(null);
+        }
       } catch (cause) {
         if (!isCurrent) return;
         const msg =
           cause instanceof RangeError ? cause.message : cause instanceof ServiceRequestError
             ? `Error del servidor (${cause.status}): ${cause.message}`
             : "No se pudieron cargar los servicios operativos.";
-        setLoadState({ status: "error", message: msg });
+        if (keepCurrentWorkspace) {
+          setIsRefreshing(false);
+          setRefreshError(msg);
+        } else {
+          setLoadState({ status: "error", message: msg });
+        }
       }
     }
     void load();
@@ -320,8 +349,6 @@ export function ServicesWorkspace({
     if (periodChoice) newParams.set("periodo", periodChoice);
     if (sortKey !== "status") newParams.set("sort", sortKey);
     if (sortDir !== "asc") newParams.set("dir", sortDir);
-    if (mobileTab !== "list") newParams.set("view", mobileTab);
-
     columnFilters.zones.forEach((z) => newParams.append("zone", z));
     columnFilters.statuses.forEach((st) => newParams.append("status", st));
     columnFilters.crews.forEach((cr) => newParams.append("crew", cr));
@@ -349,7 +376,6 @@ export function ServicesWorkspace({
     periodChoice,
     sortKey,
     sortDir,
-    mobileTab,
     columnFilters,
     isScheduleOpen,
     scheduleOrigin,
@@ -497,8 +523,7 @@ export function ServicesWorkspace({
   const handleSelect = useCallback((id: string) => {
     setRetainedPreviewId(id);
     setSelectedId((prev) => (prev === id ? null : id));
-    if (isNarrow) setMobileTab("list");
-  }, [isNarrow]);
+  }, []);
 
   const handleOpenDetail = useCallback((id: string) => {
     setStartErrors({});
@@ -736,12 +761,12 @@ export function ServicesWorkspace({
     <div className={cn(
       "flex flex-wrap items-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
       isNarrow ? "gap-2 px-2 py-1 text-xs" : "gap-3 px-4 py-2 text-sm",
-    )}>
+    )} aria-busy={isRefreshing}>
       <label className="flex items-center gap-2">
         <span>Período</span>
         <select
           value={activePeriod}
-          onChange={(event) => setPeriodChoice(event.target.value as Period)}
+          onChange={(event) => handlePeriodChoiceChange(event.target.value as Period)}
           className={cn(
             "rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 text-sm",
             isNarrow ? "h-10 min-h-10" : "min-h-10",
@@ -752,6 +777,16 @@ export function ServicesWorkspace({
           <option value="todo">Todo el período</option>
         </select>
       </label>
+      <span
+        className="inline-flex size-6 items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-label={isRefreshing ? "Actualizando servicios" : refreshError ? "No se pudieron actualizar los servicios" : undefined}
+        title={refreshError ?? undefined}
+      >
+        {isRefreshing ? <RefreshCw className="size-4 animate-spin" aria-hidden="true" /> : null}
+        {refreshError ? <span aria-hidden="true" className="font-bold text-[var(--color-danger)]">!</span> : null}
+      </span>
     </div>
   );
 
@@ -1002,57 +1037,38 @@ export function ServicesWorkspace({
           {loadState.services.length === 0 && (
             <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-[var(--color-text-secondary)]">
               <p>No hay servicios en este período.</p>
-              <Button variant="outline" onClick={() => setPeriodChoice("todo")}>Ver todo el período</Button>
+              <Button variant="outline" onClick={() => handlePeriodChoiceChange("todo")}>Ver todo el período</Button>
             </div>
+          )}
+          {refreshError && (
+            <p role="alert" className="px-4 py-2 text-xs text-[var(--color-danger)]">
+              No se pudieron actualizar los servicios. Se mantienen los resultados anteriores.
+            </p>
           )}
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]">
               {periodBar}
-              {isNarrow && (
-                <div className="flex w-full border-t border-[var(--color-border)] bg-[var(--color-surface)]">
-                  <button
-                    type="button"
-                    onClick={() => setMobileTab("list")}
-                    aria-pressed={mobileTab === "list"}
-                    className={cn(
-                      "flex flex-1 items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2",
-                      mobileTab === "list"
-                        ? "border-[var(--color-action)] text-[var(--color-action)] bg-[var(--color-surface-subtle)]"
-                        : "border-transparent text-[var(--color-text-secondary)]",
-                    )}
-                  >
-                    <LayoutList className="h-4 w-4" aria-hidden />
-                    <span>Lista</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMobileTab("map")}
-                    aria-pressed={mobileTab === "map"}
-                    className={cn(
-                      "flex flex-1 items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2",
-                      mobileTab === "map"
-                        ? "border-[var(--color-action)] text-[var(--color-action)] bg-[var(--color-surface-subtle)]"
-                        : "border-transparent text-[var(--color-text-secondary)]",
-                    )}
-                  >
-                    <MapIcon className="h-4 w-4" aria-hidden />
-                    <span>Mapa</span>
-                  </button>
-                </div>
-              )}
             </div>
 
             <div className={cn(
               "relative min-h-0 min-w-0 flex-1",
               isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout,
               !isNarrow && selectedService && styles.desktopWorkspaceLayoutOpen,
-            )}>
-              <ResizablePanelGroup direction="horizontal" className={cn("h-full min-w-0 flex-1", styles.panelGroup)}>
+              styles.workspaceResults,
+            )} data-refreshing={isRefreshing} aria-busy={isRefreshing}>
+              <ResizablePanelGroup
+                direction="horizontal"
+                className={cn("h-full min-w-0 flex-1", styles.panelGroup)}
+                aria-hidden={Boolean(isNarrow && selectedService) || undefined}
+                inert={Boolean(isNarrow && selectedService)}
+              >
                 <ResizablePanel
                   id="map-pane"
                   defaultSize="50%"
                   minSize="30%"
                   style={{ overflow: "hidden" }}
+                  aria-hidden={Boolean(isNarrow && mobileDrawerSnap === "full") || undefined}
+                  inert={Boolean(isNarrow && mobileDrawerSnap === "full")}
                   className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileMapPanel)}
                 >
                   <div className={cn("h-full min-h-0 min-w-0", !isNarrow && "p-3")}>
@@ -1088,33 +1104,18 @@ export function ServicesWorkspace({
                     {isNarrow ? (
                       <InventoryMapDrawer
                         ariaLabel="Lista de servicios"
-                        summary=""
-                        expanded={mobileTab === "list"}
-                        onExpandedChange={(expanded) => setMobileTab(expanded ? "list" : "map")}
+                        summary={`${sortedServices.length} servicios`}
+                        snapState={mobileDrawerSnap}
+                        onSnapStateChange={setMobileDrawerSnap}
                         className={styles.mobileServiceDrawer}
                       >
                         <div className={styles.mobileDrawerContent}>
                           <div
-                            className={cn(styles.mobileTablePane, previewService && styles.mobileTablePaneHidden)}
-                            aria-hidden={Boolean(previewService)}
-                            inert={Boolean(previewService)}
+                            className={cn(styles.mobileTablePane, selectedService && styles.mobileTablePaneHidden)}
+                            aria-hidden={Boolean(selectedService)}
+                            inert={Boolean(selectedService)}
                           >
                             {servicesTable}
-                          </div>
-                          <div
-                            className={cn(styles.mobilePreviewSurface, selectedService && styles.mobilePreviewSurfaceOpen)}
-                            aria-hidden={!selectedService}
-                            inert={!selectedService}
-                          >
-                            {previewService && (
-                              <ServicePreview
-                                service={previewService}
-                                onOpenDetail={handleOpenDetail}
-                                onAssignCrew={canAssignCrew ? (service) => setAssigningServiceId(service.id) : undefined}
-                                onClose={closePreview}
-                                className="select-text border-l-0"
-                              />
-                            )}
                           </div>
                         </div>
                       </InventoryMapDrawer>
@@ -1122,6 +1123,23 @@ export function ServicesWorkspace({
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
+
+              {isNarrow && previewService && (
+                <div
+                  className={cn(styles.mobilePreviewOverlay, selectedService && styles.mobilePreviewOverlayOpen)}
+                  aria-hidden={!selectedService}
+                  inert={!selectedService}
+                >
+                  <ServicePreview
+                    service={previewService}
+                    onOpenDetail={handleOpenDetail}
+                    onAssignCrew={canAssignCrew ? (service) => setAssigningServiceId(service.id) : undefined}
+                    onClose={closePreview}
+                    autoFocusCloseButton={isNarrow}
+                    className="select-text border-l-0"
+                  />
+                </div>
+              )}
 
               {!isNarrow && (
                 <div
