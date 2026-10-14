@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import { AlertCircle, CalendarCheck2, Check, Loader2, MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { FormControl } from "@/components/ui/form-control";
 import {
   Dialog,
   DialogContent,
@@ -146,7 +147,7 @@ function ConfirmRescheduleForm({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field className="sm:col-span-1">
             <FieldLabel htmlFor={`${formId}-date`}>Nueva fecha *</FieldLabel>
-            <input
+            <FormControl
               id={`${formId}-date`}
               type="date"
               min={minDate}
@@ -155,13 +156,13 @@ function ConfirmRescheduleForm({
               required
               aria-invalid={Boolean(fieldErrors.date)}
               aria-describedby={fieldErrors.date ? `${formId}-date-error` : undefined}
-              className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+              className="py-1.5 text-xs"
             />
             {fieldErrors.date && <FieldError id={`${formId}-date-error`}>{fieldErrors.date}</FieldError>}
           </Field>
           <Field className="sm:col-span-1">
             <FieldLabel htmlFor={`${formId}-start`}>Desde *</FieldLabel>
-            <input
+            <FormControl
               id={`${formId}-start`}
               type="time"
               value={windowStart}
@@ -169,13 +170,13 @@ function ConfirmRescheduleForm({
               required
               aria-invalid={Boolean(fieldErrors.start)}
               aria-describedby={fieldErrors.start ? `${formId}-start-error` : undefined}
-              className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+              className="py-1.5 text-xs"
             />
             {fieldErrors.start && <FieldError id={`${formId}-start-error`}>{fieldErrors.start}</FieldError>}
           </Field>
           <Field className="sm:col-span-1">
             <FieldLabel htmlFor={`${formId}-end`}>Hasta *</FieldLabel>
-            <input
+            <FormControl
               id={`${formId}-end`}
               type="time"
               value={windowEnd}
@@ -183,7 +184,7 @@ function ConfirmRescheduleForm({
               required
               aria-invalid={Boolean(fieldErrors.end)}
               aria-describedby={fieldErrors.end ? `${formId}-end-error` : undefined}
-              className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+              className="py-1.5 text-xs"
             />
             {fieldErrors.end && <FieldError id={`${formId}-end-error`}>{fieldErrors.end}</FieldError>}
           </Field>

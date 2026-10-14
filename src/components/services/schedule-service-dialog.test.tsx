@@ -40,6 +40,7 @@ describe("ScheduleServiceDialog component", () => {
     expect(screen.getByRole("heading", { name: "Programar nuevo servicio" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Origen del servicio/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Tipo de servicio/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Tipo de servicio/)).toHaveAttribute("data-slot", "form-control");
     expect(screen.getByText("Recorrido", { exact: true })).toBeInTheDocument();
     expect(screen.getByLabelText(/Recorrido asignado/)).toBeInTheDocument();
     expect(screen.getAllByText(/sin cuadrilla ni vehículo asignados/i).length).toBeGreaterThanOrEqual(1);

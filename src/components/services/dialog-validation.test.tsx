@@ -14,6 +14,7 @@ describe("service dialog validation associations", () => {
     render(<CancelServiceDialog open onOpenChange={() => undefined} service={service} onCancelled={() => undefined} />);
 
     const reason = screen.getByLabelText(/Motivo/);
+    expect(reason).toHaveAttribute("data-slot", "form-control");
     await user.click(screen.getByRole("button", { name: "Cancelar servicio" }));
 
     expect(reason).toHaveAttribute("aria-invalid", "true");
@@ -25,6 +26,7 @@ describe("service dialog validation associations", () => {
     render(<RescheduleReasonDialog open onOpenChange={() => undefined} service={service} onRescheduled={() => undefined} />);
 
     const reason = screen.getByLabelText(/Motivo/);
+    expect(reason).toHaveAttribute("data-slot", "form-control");
     await user.click(screen.getByRole("button", { name: "Mover a reprogramar" }));
 
     expect(reason).toHaveAttribute("aria-invalid", "true");

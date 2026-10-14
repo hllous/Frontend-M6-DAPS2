@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { FormControl } from "@/components/ui/form-control";
 import {
   Dialog,
   DialogContent,
@@ -328,7 +329,8 @@ function AssignCrewForm({
               <FieldLabel htmlFor={`${formId}-crew`}>
                 Cuadrilla asignada <span className="text-[var(--color-danger)]" aria-hidden>*</span>
               </FieldLabel>
-              <select
+              <FormControl
+                as="select"
                 id={`${formId}-crew`}
                 value={crewId}
                 onChange={(e) => {
@@ -341,7 +343,7 @@ function AssignCrewForm({
                 required
                 aria-invalid={Boolean(fieldErrors.crew)}
                 aria-describedby={fieldErrors.crew ? `${formId}-crew-desc ${formId}-crew-error` : `${formId}-crew-desc`}
-                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                className="text-xs"
               >
                 <option value="">Seleccione una cuadrilla…</option>
                 {crews.map((c) => (
@@ -349,7 +351,7 @@ function AssignCrewForm({
                     {c.name}
                   </option>
                 ))}
-              </select>
+              </FormControl>
               <FieldDescription id={`${formId}-crew-desc`}>
                 Equipo municipal o de cooperativa responsable de la ejecución del servicio.
               </FieldDescription>
@@ -366,7 +368,8 @@ function AssignCrewForm({
                   <span className="text-[var(--color-text-secondary)] font-normal text-xs">(opcional)</span>
                 )}
               </FieldLabel>
-              <select
+              <FormControl
+                as="select"
                 id={`${formId}-vehicle`}
                 value={vehicleId}
                 onChange={(e) => {
@@ -379,7 +382,7 @@ function AssignCrewForm({
                 aria-invalid={Boolean(fieldErrors.vehicle)}
                 aria-describedby={fieldErrors.vehicle ? `${formId}-vehicle-desc ${formId}-vehicle-error` : `${formId}-vehicle-desc`}
                 className={cn(
-                  "min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10",
+                  "text-xs",
                   requiresVehicle && !vehicleId && "border-[var(--color-warning-line)]",
                 )}
               >
@@ -391,7 +394,7 @@ function AssignCrewForm({
                     {v.plate}
                   </option>
                 ))}
-              </select>
+              </FormControl>
               <FieldDescription id={`${formId}-vehicle-desc`}>
                 {requiresVehicle
                   ? "Requerido por la especificación técnica del tipo de servicio (ej. recolección o barrido mecánico)."
@@ -449,7 +452,8 @@ function AssignCrewForm({
               <FieldLabel htmlFor={`${formId}-override-note`}>
                 Justificación del solapamiento <span className="text-[var(--color-danger)]" aria-hidden>*</span>
               </FieldLabel>
-              <textarea
+              <FormControl
+                as="textarea"
                 id={`${formId}-override-note`}
                 value={overrideNote}
                 onChange={(e) => {
@@ -462,7 +466,7 @@ function AssignCrewForm({
                 rows={3}
                 aria-invalid={Boolean(fieldErrors.overrideNote)}
                 aria-describedby={fieldErrors.overrideNote ? `${formId}-override-note-desc ${formId}-override-note-error` : `${formId}-override-note-desc`}
-                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                className="text-xs"
               />
               <FieldDescription id={`${formId}-override-note-desc`}>
                 Entre {OVERRIDE_NOTE_MIN} y {OVERRIDE_NOTE_MAX} caracteres. Ej.: la otra parada termina antes; se coordinó con el jefe de cuadrilla.
