@@ -11,7 +11,7 @@ import { vehicleFixtures } from "@/lib/vehicles-fixtures";
 
 
 
-type Context = { params: Promise<{ id: string }> | { id: string } };
+type Context = { params: Promise<{ id: string }> };
 
 async function requestContext(request: Request, context: Context) {
   const { id } = await context.params;

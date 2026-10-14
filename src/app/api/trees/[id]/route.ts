@@ -8,10 +8,10 @@ import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, Invali
 
 
 
-async function targetId(context: { params: Promise<{ id: string }> | { id: string } }) { return (await context.params).id; }
+async function targetId(context: { params: Promise<{ id: string }> }) { return (await context.params).id; }
 function requireOffice(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar árboles.", capability: "tree:manage", throwOnError: true }).session; }
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
@@ -29,7 +29,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
 }
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const path = new URL(request.url).pathname;
   try {
     const session = requireOffice(request);
@@ -52,7 +52,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 }
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   const path = new URL(request.url).pathname;
   try {
     const session = requireOffice(request);

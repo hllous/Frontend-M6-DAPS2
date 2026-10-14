@@ -26,7 +26,7 @@ describe("authenticated zones [id]/references BFF route", () => {
       .mockResolvedValueOnce(Response.json({ data: [], meta: { total: 12 } }))
       .mockResolvedValueOnce(Response.json({ data: [], meta: { total: 2 } }));
     const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
-    const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: { id } });
+    const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: Promise.resolve({ id }) });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ zoneId: id, activeRoutes: [{ id: "route-real", code: "R-01", name: "Norte" }, { id: "route-two", code: "R-01", name: "Norte" }], containersCount: 3, treesCount: 12, greenSpacesCount: 2, totalReferences: 19 });
     expect(backendFetch.mock.calls.map(([url]) => String(url))).toEqual([
@@ -50,7 +50,7 @@ describe("authenticated zones [id]/references BFF route", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({}, { status }));
     const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
     const id = "ceec08ae-67e7-4739-9677-150f5085bb1a";
-    const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: { id } });
+    const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: Promise.resolve({ id }) });
     expect(response.status).toBe(status);
     expect(await response.json()).toMatchObject({ statusCode: status });
     expect(backendFetch).toHaveBeenCalledTimes(1);
@@ -64,7 +64,7 @@ describe("authenticated zones [id]/references BFF route", () => {
     if (failure === "network") backendFetch.mockRejectedValueOnce(new Error("offline"));
     else backendFetch.mockResolvedValueOnce(Response.json(failure === "malformed" ? { data: [] } : {}, { status: failure === "http" ? 503 : 200 }));
     const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
-    const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: { id } });
+    const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: Promise.resolve({ id }) });
     expect(response.status).toBeGreaterThanOrEqual(500);
     expect(await response.json()).not.toHaveProperty("totalReferences");
     expect(backendFetch).toHaveBeenCalledTimes(2);
@@ -83,7 +83,7 @@ describe("authenticated zones [id]/references BFF route", () => {
       if (name === resource) break;
     }
     const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
-    const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: { id } });
+    const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: Promise.resolve({ id }) });
     expect(response.status).toBe(503);
     expect(await response.json()).not.toHaveProperty("totalReferences");
   });

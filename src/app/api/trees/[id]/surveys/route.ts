@@ -10,7 +10,7 @@ import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 
 
-async function treeId(context: { params: Promise<{ id: string }> | { id: string } }) { return (await context.params).id; }
+async function treeId(context: { params: Promise<{ id: string }> }) { return (await context.params).id; }
 function queryFromUrl(url: URL): TreeSurveyQuery { return { healthStatus: treeHealthStatusSchema.safeParse(url.searchParams.get("healthStatus")).data, riskLevel: riskLevelSchema.safeParse(url.searchParams.get("riskLevel")).data, page: pageParam(url.searchParams), pageSize: pageSizeParam(url.searchParams) }; }
 
 function queryString(query: TreeSurveyQuery) {
@@ -23,7 +23,7 @@ function queryString(query: TreeSurveyQuery) {
   return value ? `?${value}` : "";
 }
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
@@ -41,7 +41,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
 }
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);

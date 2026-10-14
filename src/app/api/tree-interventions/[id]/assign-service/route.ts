@@ -39,7 +39,7 @@ async function backendAssignService(
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
   const path = new URL(request.url).pathname;

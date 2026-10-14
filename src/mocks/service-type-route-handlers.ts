@@ -22,11 +22,11 @@ export function serviceTypeRouteHandlers(fallbackCookie: string) {
   return [
     http.get("*/api/service-types", ({ request }) => listServiceTypes(withSession(request, fallbackCookie))),
     http.get("*/api/service-types/:serviceTypeId", ({ params, request }) =>
-      getServiceType(withSession(request, fallbackCookie), { params: { id: params.serviceTypeId as string } })),
+      getServiceType(withSession(request, fallbackCookie), { params: Promise.resolve({ id: params.serviceTypeId as string }) })),
     http.post("*/api/service-types", ({ request }) => createServiceType(withSession(request, fallbackCookie))),
     http.patch("*/api/service-types/:serviceTypeId", ({ params, request }) =>
-      updateServiceType(withSession(request, fallbackCookie), { params: { id: params.serviceTypeId as string } })),
+      updateServiceType(withSession(request, fallbackCookie), { params: Promise.resolve({ id: params.serviceTypeId as string }) })),
     http.delete("*/api/service-types/:serviceTypeId", ({ params, request }) =>
-      deleteServiceType(withSession(request, fallbackCookie), { params: { id: params.serviceTypeId as string } })),
+      deleteServiceType(withSession(request, fallbackCookie), { params: Promise.resolve({ id: params.serviceTypeId as string }) })),
   ];
 }

@@ -13,14 +13,14 @@ import { getZoneFixture, getZoneReferences } from "@/lib/zones-fixtures";
 
 
 
-async function targetId(context: { params: Promise<{ id: string }> | { id: string } }) {
+async function targetId(context: { params: Promise<{ id: string }> }) {
   const resolved = await context.params;
   return resolved.id;
 }
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const path = new URL(request.url).pathname;
 
