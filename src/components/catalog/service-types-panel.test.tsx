@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
 import { serviceTypesAdapter } from "@/lib/service-types";
+import { createSessionCookie } from "@/test/session";
 import { ServiceTypesPanel } from "./service-types-panel";
 
 const server = setupServer(...handlers);
@@ -37,6 +38,23 @@ describe("ServiceTypesPanel", () => {
     expect(screen.queryByRole("button", { name: "Nuevo tipo de servicio" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Dar de baja" })).not.toBeInTheDocument();
     expect(screen.getByText(/puede consultar el catálogo/i)).toBeVisible();
+  });
+
+  it("returns the BFF forbidden envelope for a Field write", async () => {
+    const fieldCookie = createSessionCookie("field-crew-leader-route", { mode: "mock" });
+    const response = await fetch("http://localhost/api/service-types", {
+      method: "POST",
+      headers: { cookie: fieldCookie, "content-type": "application/json" },
+      body: JSON.stringify({ code: "NEW", name: "Nuevo", category: "TREES", mode: "POINT", requiresVehicle: false }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      statusCode: 403,
+      message: "Solo Oficina puede administrar tipos de servicio.",
+      error: "Forbidden",
+      path: "/api/service-types",
+    });
   });
 
   it("asks before deactivating a service type and announces a failed request as an alert", async () => {
