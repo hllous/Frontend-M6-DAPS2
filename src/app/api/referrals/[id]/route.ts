@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse, mapSessionError } from "@/lib/bff-route";
 import { getScenario } from "@/lib/scenarios";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { repairRequestSchema } from "@/lib/repair-requests";
@@ -30,8 +30,8 @@ export async function GET(
       for (const kind of ["repair-requests", "street-closure-requests"] as const) {
         const backendResponse = await fetchBackend(request, `/${kind}/${pathId(id)}`);
         if (backendResponse.status === 404) continue;
+        if (!backendResponse.ok) return forwardResponse(backendResponse, path);
         const payload = await backendResponse.text();
-        if (!backendResponse.ok) return new Response(payload, { status: backendResponse.status, headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" } });
         let backendPayload: unknown;
         try {
           backendPayload = JSON.parse(payload) as unknown;
