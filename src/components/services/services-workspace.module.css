@@ -362,3 +362,95 @@
     transition-duration: 1ms;
   }
 }
+
+.columnVariantSwitcher {
+  position: fixed;
+  z-index: 30;
+  right: 1rem;
+  bottom: 1rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 1rem;
+  background: var(--color-surface);
+}
+
+.desktopWorkspaceLayout[data-column-editor] {
+  position: relative;
+  display: block;
+}
+
+.desktopWorkspaceLayout[data-column-editor] > .panelGroup {
+  width: 100%;
+}
+
+.desktopWorkspaceLayout[data-column-editor] .panelGroup [data-panel] {
+  transition: flex-grow 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.desktopWorkspaceLayout[data-column-editor] .previewRail {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 0 auto;
+  width: min(24rem, 26vw);
+  pointer-events: none;
+}
+
+.desktopWorkspaceLayout[data-column-editor] .previewSurface {
+  clip-path: inset(10% 0 0);
+  opacity: 0;
+  transform: translateY(28px) scale(0.98);
+  transition:
+    clip-path 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.desktopWorkspaceLayout[data-column-editor][data-preview-open="true"] .previewRail {
+  pointer-events: auto;
+}
+
+.desktopWorkspaceLayout[data-column-editor][data-preview-open="true"] .previewSurface {
+  clip-path: inset(0);
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.desktopWorkspaceLayout[data-column-editor][data-preview-open="false"] .previewSurface {
+  transition-duration: 360ms;
+}
+
+.desktopWorkspaceLayout[data-column-editor] [data-prototype-table-content] {
+  filter: none;
+  opacity: 1;
+}
+
+.desktopWorkspaceLayout[data-column-editor] [data-prototype-table-content] tbody tr {
+  transition:
+    filter 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.desktopWorkspaceLayout[data-column-editor][data-preview-open="true"] [data-prototype-table-content] tbody tr:not([aria-selected="true"]) {
+  filter: grayscale(1);
+  opacity: 0.48;
+}
+
+.desktopWorkspaceLayout[data-column-editor][data-preview-open="true"] [data-prototype-table-content] tbody tr[aria-selected="true"] {
+  filter: none;
+  opacity: 1;
+}
+
+@media (max-width: 760px) {
+  .columnVariantSwitcher {
+    right: 0.5rem;
+    bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktopWorkspaceLayout[data-column-editor] .panelGroup [data-panel],
+  .desktopWorkspaceLayout[data-column-editor] .previewSurface,
+  .desktopWorkspaceLayout[data-column-editor] [data-prototype-table-content] tbody tr {
+    transition-duration: 1ms;
+  }
+}

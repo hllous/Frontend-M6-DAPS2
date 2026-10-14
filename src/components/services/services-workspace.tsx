@@ -9,6 +9,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { useGroupRef } from "react-resizable-panels";
 import { useSearchParams } from "next/navigation";
 import {
   FilterX,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { InventoryMapDrawer } from "@/components/map/inventory-map-drawer";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { FormControl } from "@/components/ui/form-control";
 import {
@@ -70,11 +72,19 @@ import styles from "./services-workspace.module.css";
 
 type Period = "semana" | "mes" | "todo";
 type MotionVariant = "a" | "b" | "c" | "d" | "e" | "f";
+type ColumnEditorVariant = "g" | "h" | "i";
+type PrototypeVariant = MotionVariant | ColumnEditorVariant;
 
 const motionVariants: MotionVariant[] = ["a", "b", "c", "d", "e", "f"];
+const columnEditorVariants: ColumnEditorVariant[] = ["g", "h", "i"];
+const prototypeVariants: PrototypeVariant[] = [...motionVariants, ...columnEditorVariants];
 
-function parseMotionVariant(value: string | null): MotionVariant {
-  return value === "b" || value === "c" || value === "d" || value === "e" || value === "f" ? value : "a";
+function parsePrototypeVariant(value: string | null): PrototypeVariant {
+  return prototypeVariants.includes(value as PrototypeVariant) ? value as PrototypeVariant : "a";
+}
+
+function isColumnEditorVariant(value: PrototypeVariant): value is ColumnEditorVariant {
+  return columnEditorVariants.includes(value as ColumnEditorVariant);
 }
 
 type LoadState =
@@ -208,7 +218,13 @@ export function ServicesWorkspace({
   const [mobileTab, setMobileTab] = useState<"list" | "map">(() => {
     return getParam("view") === "map" ? "map" : "list";
   });
-  const [motionVariant, setMotionVariant] = useState<MotionVariant>(() => parseMotionVariant(getParam("variant")));
+  const [prototypeVariant, setPrototypeVariant] = useState<PrototypeVariant>(() => parsePrototypeVariant(getParam("variant")));
+  const columnEditorVariant = isColumnEditorVariant(prototypeVariant) ? prototypeVariant : null;
+  const motionVariant: MotionVariant = columnEditorVariant ? "d" : prototypeVariant as MotionVariant;
+  const panelGroupRef = useGroupRef();
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const layoutBeforePreviewRef = useRef<Record<string, number> | null>(null);
+  const [mapFrameShrunkForPreview, setMapFrameShrunkForPreview] = useState(false);
   const [isNarrow, setIsNarrow] = useState(false);
 
   // Map resilience
@@ -325,7 +341,7 @@ export function ServicesWorkspace({
     if (search.trim()) newParams.set("q", search.trim());
     if (selectedId) newParams.set("selected", selectedId);
     if (detailId) newParams.set("detail", detailId);
-    newParams.set("variant", motionVariant);
+    newParams.set("variant", prototypeVariant);
     if (periodChoice) newParams.set("periodo", periodChoice);
     if (sortKey !== "status") newParams.set("sort", sortKey);
     if (sortDir !== "asc") newParams.set("dir", sortDir);
@@ -359,7 +375,7 @@ export function ServicesWorkspace({
     sortKey,
     sortDir,
     mobileTab,
-    motionVariant,
+    prototypeVariant,
     columnFilters,
     isScheduleOpen,
     scheduleOrigin,
@@ -434,6 +450,58 @@ export function ServicesWorkspace({
   const previewService = selectedService ?? (loadState.status === "ready" && retainedPreviewId
     ? loadState.services.find((service) => service.id === retainedPreviewId) ?? null
     : null);
+
+  useEffect(() => {
+    const group = panelGroupRef.current;
+    const workspace = workspaceRef.current;
+    if (!group || !workspace) return;
+
+    if (isNarrow || !columnEditorVariant || !selectedService) {
+      if (layoutBeforePreviewRef.current) {
+        group.setLayout(layoutBeforePreviewRef.current);
+        layoutBeforePreviewRef.current = null;
+      }
+      setMapFrameShrunkForPreview(false);
+      return;
+    }
+
+    const applyPreviewLayout = () => {
+      const baseLayout = layoutBeforePreviewRef.current ?? group.getLayout();
+      const workspaceWidth = workspace.getBoundingClientRect().width;
+      if (workspaceWidth <= 0) return;
+
+      const table = workspace.querySelector<HTMLTableElement>('table[aria-label="Servicios operativos"]');
+      const currentTableWidth = workspaceWidth * ((baseLayout["table-pane"] ?? 50) / 100);
+      const measuredTableWidth = table?.getBoundingClientRect().width ?? currentTableWidth;
+      const coreColumnWidth = ["ordinal", "service", "status"].reduce((width, key) => {
+        const cell = table?.querySelector<HTMLElement>(`[data-column-key="${key}"]`);
+        return width + (cell?.getBoundingClientRect().width ?? 0);
+      }, 0);
+      const coreColumnRatio = measuredTableWidth > 0 ? Math.min(0.78, coreColumnWidth / measuredTableWidth) : 0.52;
+      const previewWidth = Math.min(384, window.innerWidth * 0.26);
+      const requiredTableWidth = previewWidth / Math.max(0.22, 1 - coreColumnRatio);
+      const requiredTablePercent = Math.min(70, (requiredTableWidth / workspaceWidth) * 100);
+      const baseTablePercent = baseLayout["table-pane"] ?? 50;
+
+      if (currentTableWidth + 1 < requiredTableWidth && requiredTablePercent > baseTablePercent) {
+        if (!layoutBeforePreviewRef.current) layoutBeforePreviewRef.current = baseLayout;
+        group.setLayout({ "map-pane": 100 - requiredTablePercent, "table-pane": requiredTablePercent });
+        setMapFrameShrunkForPreview(true);
+      } else if (layoutBeforePreviewRef.current) {
+        group.setLayout(layoutBeforePreviewRef.current);
+        layoutBeforePreviewRef.current = null;
+        setMapFrameShrunkForPreview(false);
+      } else {
+        setMapFrameShrunkForPreview(false);
+      }
+    };
+
+    applyPreviewLayout();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(applyPreviewLayout);
+    observer.observe(workspace);
+    return () => observer.disconnect();
+  }, [columnEditorVariant, isNarrow, panelGroupRef, selectedService]);
 
   useEffect(() => {
     if (selectedService || !retainedPreviewId) return;
@@ -737,6 +805,8 @@ export function ServicesWorkspace({
     hasActiveFilters,
     onClearFilters: handleClearFilters,
     dense: isNarrow,
+    columnEditorVariant,
+    columnUserId: scenario?.id ?? "office-duty-queue",
   };
   const servicesTable = (
     <ServicesTable
@@ -1068,15 +1138,18 @@ export function ServicesWorkspace({
               isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout,
               !isNarrow && selectedService && !["d", "e", "f"].includes(motionVariant) && styles.desktopWorkspaceLayoutOpen,
             )}
+            ref={workspaceRef}
             data-motion-variant={motionVariant}
+            data-column-editor={columnEditorVariant ?? undefined}
             data-preview-open={selectedService ? "true" : "false"}
+            data-map-frame-shrunk={mapFrameShrunkForPreview ? "true" : "false"}
             onTransitionEnd={(event) => {
               if (event.target === event.currentTarget && event.propertyName === "grid-template-columns") {
                 window.dispatchEvent(new Event("services-workspace-layout-settled"));
               }
             }}
           >
-              <ResizablePanelGroup direction="horizontal" className={cn("h-full min-w-0 flex-1", styles.panelGroup)}>
+              <ResizablePanelGroup groupRef={panelGroupRef} direction="horizontal" className={cn("h-full min-w-0 flex-1", styles.panelGroup)}>
                 <ResizablePanel
                   id="map-pane"
                   defaultSize="50%"
@@ -1193,7 +1266,29 @@ export function ServicesWorkspace({
         </div>
       )}
 
-      {!isNarrow && (
+      {columnEditorVariant ? (
+        <div className={styles.columnVariantSwitcher}>
+          <ToggleGroup
+            value={[columnEditorVariant]}
+            onValueChange={(values) => {
+              const value = values[0];
+              if (value && columnEditorVariants.includes(value as ColumnEditorVariant)) {
+                setPrototypeVariant(value as ColumnEditorVariant);
+              }
+            }}
+            aria-label="Elegir editor de columnas"
+            variant="outline"
+            size="sm"
+            spacing={0}
+          >
+            {columnEditorVariants.map((variant) => (
+              <ToggleGroupItem key={variant} value={variant} aria-label={`Variante ${variant.toUpperCase()}`}>
+                {variant.toUpperCase()}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+      ) : !isNarrow && (
         <div className={styles.animationVariantSwitcher} role="group" aria-label="Comparar animaciones de vista previa">
           {motionVariants.map((variant) => (
             <Button
@@ -1203,7 +1298,7 @@ export function ServicesWorkspace({
               variant={motionVariant === variant ? "default" : "outline"}
               aria-label={`Variante ${variant.toUpperCase()}`}
               aria-pressed={motionVariant === variant}
-              onClick={() => setMotionVariant(variant)}
+              onClick={() => setPrototypeVariant(variant)}
               className={styles.animationVariantButton}
             >
               {variant.toUpperCase()}
