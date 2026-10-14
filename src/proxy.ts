@@ -4,7 +4,16 @@ import { AUTH_COOKIE_NAME } from "@/lib/session-config";
 
 export function proxy(request: NextRequest) {
   if (!request.cookies.has(AUTH_COOKIE_NAME)) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const loginUrl = new URL("/login", request.url);
+    const destination = request.nextUrl.searchParams.get("destination");
+    const variant = request.nextUrl.searchParams.get("variant");
+
+    if (destination === "services" && ["a", "b", "c"].includes(variant ?? "")) {
+      loginUrl.searchParams.set("destination", destination);
+      loginUrl.searchParams.set("variant", variant!);
+    }
+
+    return NextResponse.redirect(loginUrl);
   }
 }
 

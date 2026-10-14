@@ -13,9 +13,11 @@ import styles from "./login-form.module.css";
 export function LoginForm({
   scenarios,
   authMode,
+  redirectTo,
 }: {
   scenarios: OperationalScenario[];
   authMode: AuthMode;
+  redirectTo: string;
 }) {
   const [scenarioId, setScenarioId] = useState<ScenarioId>(scenarios[0]?.id ?? "office-duty-queue");
   const [error, setError] = useState<string>();
@@ -36,7 +38,7 @@ export function LoginForm({
         setError(body.message ?? "No se pudo iniciar la sesión.");
         return;
       }
-      window.location.assign("/app");
+      window.location.assign(redirectTo);
     } catch {
       setError("No se pudo conectar con la sesión local. Vuelva a intentarlo.");
     }

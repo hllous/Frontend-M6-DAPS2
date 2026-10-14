@@ -69,6 +69,13 @@ import { servicesMobileBreakpoint } from "@/lib/services-layout";
 import styles from "./services-workspace.module.css";
 
 type Period = "semana" | "mes" | "todo";
+type MotionVariant = "a" | "b" | "c";
+
+const motionVariants: MotionVariant[] = ["a", "b", "c"];
+
+function parseMotionVariant(value: string | null): MotionVariant {
+  return value === "b" || value === "c" ? value : "a";
+}
 
 type LoadState =
   | { status: "loading" }
@@ -201,6 +208,7 @@ export function ServicesWorkspace({
   const [mobileTab, setMobileTab] = useState<"list" | "map">(() => {
     return getParam("view") === "map" ? "map" : "list";
   });
+  const [motionVariant, setMotionVariant] = useState<MotionVariant>(() => parseMotionVariant(getParam("variant")));
   const [isNarrow, setIsNarrow] = useState(false);
 
   // Map resilience
@@ -317,6 +325,7 @@ export function ServicesWorkspace({
     if (search.trim()) newParams.set("q", search.trim());
     if (selectedId) newParams.set("selected", selectedId);
     if (detailId) newParams.set("detail", detailId);
+    newParams.set("variant", motionVariant);
     if (periodChoice) newParams.set("periodo", periodChoice);
     if (sortKey !== "status") newParams.set("sort", sortKey);
     if (sortDir !== "asc") newParams.set("dir", sortDir);
@@ -350,6 +359,7 @@ export function ServicesWorkspace({
     sortKey,
     sortDir,
     mobileTab,
+    motionVariant,
     columnFilters,
     isScheduleOpen,
     scheduleOrigin,
@@ -718,6 +728,7 @@ export function ServicesWorkspace({
       services={sortedServices}
       filterOptionsServices={loadState.status === "ready" ? loadState.services : []}
       compactOnPreview={!isNarrow && Boolean(selectedService)}
+      previewMotionVariant={motionVariant}
       serviceOrdinals={serviceOrdinals}
       selectedId={selectedId}
       onSelect={handleSelect}
@@ -889,7 +900,7 @@ export function ServicesWorkspace({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--color-canvas)]">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[var(--color-canvas)]">
       {/* Workspace Header & Toolbar */}
       <header className={cn(
         "border-b border-[var(--color-border)] bg-[var(--color-surface)]",
@@ -1046,7 +1057,7 @@ export function ServicesWorkspace({
               "relative min-h-0 min-w-0 flex-1",
               isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout,
               !isNarrow && selectedService && styles.desktopWorkspaceLayoutOpen,
-            )}>
+            )} data-motion-variant={motionVariant} data-preview-open={selectedService ? "true" : "false"}>
               <ResizablePanelGroup direction="horizontal" className={cn("h-full min-w-0 flex-1", styles.panelGroup)}>
                 <ResizablePanel
                   id="map-pane"
@@ -1084,7 +1095,7 @@ export function ServicesWorkspace({
                   style={{ overflow: "hidden" }}
                   className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}
                 >
-                  <div className={cn("h-full min-h-0", isNarrow && "pointer-events-none")}>
+                  <div data-prototype-table-content className={cn("h-full min-h-0", isNarrow && "pointer-events-none")}>
                     {isNarrow ? (
                       <InventoryMapDrawer
                         ariaLabel="Lista de servicios"
@@ -1144,6 +1155,25 @@ export function ServicesWorkspace({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {!isNarrow && (
+        <div className={styles.animationVariantSwitcher} role="group" aria-label="Comparar animaciones de vista previa">
+          {motionVariants.map((variant) => (
+            <Button
+              key={variant}
+              type="button"
+              size="sm"
+              variant={motionVariant === variant ? "default" : "outline"}
+              aria-label={`Variante ${variant.toUpperCase()}`}
+              aria-pressed={motionVariant === variant}
+              onClick={() => setMotionVariant(variant)}
+              className={styles.animationVariantButton}
+            >
+              {variant.toUpperCase()}
+            </Button>
+          ))}
         </div>
       )}
 

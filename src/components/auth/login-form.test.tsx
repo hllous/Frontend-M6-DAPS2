@@ -12,7 +12,7 @@ describe("LoginForm", () => {
       new Response(JSON.stringify({ session: { scenarioId: "office-duty-queue" } }), { status: 200 }),
     );
 
-    render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" />);
+    render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
     await user.selectOptions(screen.getByLabelText("Escenario operativo"), "field-crew-leader-route");
     await user.click(screen.getByRole("button", { name: "Ingresar al sistema" }));
 
@@ -29,7 +29,7 @@ describe("LoginForm", () => {
   });
 
   it("fails closed in unavailable real-M1 mode", () => {
-    render(<LoginForm scenarios={Object.values(scenarios)} authMode="real-m1" />);
+    render(<LoginForm scenarios={Object.values(scenarios)} authMode="real-m1" redirectTo="/app" />);
 
     expect(screen.getByText(/autenticación real de M1 no está disponible/i)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Ingresar al sistema" })).not.toBeInTheDocument();

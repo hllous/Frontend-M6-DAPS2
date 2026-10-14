@@ -172,6 +172,7 @@ export function ServicesTable({
   serviceOrdinals: suppliedServiceOrdinals,
   filterOptionsServices = services,
   compactOnPreview = false,
+  previewMotionVariant = "a",
   selectedId,
   onSelect,
   sortKey,
@@ -187,6 +188,7 @@ export function ServicesTable({
   serviceOrdinals?: ReadonlyMap<string, number>;
   filterOptionsServices?: Service[];
   compactOnPreview?: boolean;
+  previewMotionVariant?: "a" | "b" | "c";
   selectedId: string | null;
   onSelect: (id: string) => void;
   sortKey: SortKey;
@@ -199,7 +201,8 @@ export function ServicesTable({
   dense?: boolean;
 }) {
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
-  const compactColumns = dense || compactOnPreview;
+  const animatedColumnCollapse = !dense && compactOnPreview && previewMotionVariant === "a";
+  const compactColumns = dense || (compactOnPreview && !animatedColumnCollapse);
 
   // Auto-scroll selected row into view smoothly
   useEffect(() => {
@@ -261,11 +264,21 @@ export function ServicesTable({
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll [scrollbar-gutter:stable]">
         <table
+          data-motion-variant={previewMotionVariant}
           className="w-full min-w-0 table-fixed border-collapse text-left text-xs"
           aria-label="Servicios operativos"
         >
           <colgroup>
-            {compactColumns ? (
+            {animatedColumnCollapse ? (
+              <>
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "56%" }} />
+                <col data-preview-collapse-column style={{ width: "0%" }} />
+                <col style={{ width: "32%" }} />
+                <col data-preview-collapse-column style={{ width: "0%" }} />
+                <col data-preview-collapse-column style={{ width: "0%" }} />
+              </>
+            ) : compactColumns ? (
               <>
                 <col className="w-[12%]" />
                 <col className="w-[56%]" />
@@ -302,6 +315,9 @@ export function ServicesTable({
                     key={col.key}
                     scope="col"
                     aria-sort={ariaSort}
+                    data-preview-collapse-column={animatedColumnCollapse && col.hideWhenDense ? "true" : undefined}
+                    aria-hidden={animatedColumnCollapse && col.hideWhenDense ? true : undefined}
+                    inert={animatedColumnCollapse && col.hideWhenDense}
                     className="select-none px-1 py-2"
                   >
                     <div className={cn("flex items-center justify-between gap-1.5", dense && "gap-1")}>
@@ -498,7 +514,12 @@ export function ServicesTable({
                   </td>
 
                   {!compactColumns && (
-                    <td className="px-1.5 py-2 text-[var(--color-text)]">
+                    <td
+                      data-preview-collapse-column={animatedColumnCollapse ? "true" : undefined}
+                      aria-hidden={animatedColumnCollapse || undefined}
+                      inert={animatedColumnCollapse}
+                      className="px-1.5 py-2 text-[var(--color-text)]"
+                    >
                       {service.zoneNames.join(", ")}
                     </td>
                   )}
@@ -510,7 +531,12 @@ export function ServicesTable({
                   </td>
 
                   {!compactColumns && (
-                    <td className="px-1.5 py-2 text-[var(--color-text)]">
+                    <td
+                      data-preview-collapse-column={animatedColumnCollapse ? "true" : undefined}
+                      aria-hidden={animatedColumnCollapse || undefined}
+                      inert={animatedColumnCollapse}
+                      className="px-1.5 py-2 text-[var(--color-text)]"
+                    >
                       {service.crewName ?? (
                         <span className="italic text-[var(--color-text-secondary)]">Sin asignar</span>
                       )}
@@ -518,7 +544,12 @@ export function ServicesTable({
                   )}
 
                   {!compactColumns && (
-                    <td className="px-1.5 py-2 text-[var(--color-text)] tabular-nums">
+                    <td
+                      data-preview-collapse-column={animatedColumnCollapse ? "true" : undefined}
+                      aria-hidden={animatedColumnCollapse || undefined}
+                      inert={animatedColumnCollapse}
+                      className="px-1.5 py-2 text-[var(--color-text)] tabular-nums"
+                    >
                       <div>{formatCalendarDay(service.scheduledDate)}</div>
                       {service.windowFrom && (
                         <div className="text-[11px] text-[var(--color-text-secondary)]">
