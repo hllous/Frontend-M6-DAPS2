@@ -63,6 +63,7 @@ describe("owned BFF session", () => {
   });
 
   it("round-trips the server-only development credential through the sealed value", () => {
+    vi.stubEnv("M6_AUTH_MODE", "backend-development");
     const token = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     const session = createSession("field-crew-leader-route", {
       mode: "backend-development",
@@ -75,6 +76,26 @@ describe("owned BFF session", () => {
 
     expect(unsealed?.accessToken).toBe(token);
     expect(cookie).not.toContain(token);
+  });
+
+  it.each([
+    { sessionMode: "mock", runtimeMode: "backend-development" },
+    { sessionMode: "backend-development", runtimeMode: "mock" },
+  ] as const)("rejects a $sessionMode cookie after switching to $runtimeMode mode", ({ sessionMode, runtimeMode }) => {
+    vi.stubEnv("M6_AUTH_MODE", sessionMode);
+    const session = createSession("office-duty-queue", sessionMode === "mock"
+      ? { mode: sessionMode, now }
+      : {
+          mode: sessionMode,
+          now,
+          devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+          backendOrigin: "https://backend.internal",
+        });
+    const cookie = sealSession(session, secret);
+
+    vi.stubEnv("M6_AUTH_MODE", runtimeMode);
+
+    expect(getSessionFromCookieValue(cookie, secret, now)).toBeUndefined();
   });
 
   it("rejects a sealed cookie with a tampered authentication tag", () => {

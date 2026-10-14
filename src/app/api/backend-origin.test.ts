@@ -34,7 +34,7 @@ import * as treeFixtures from "@/lib/tree-fixtures";
 import * as vehicleFixtures from "@/lib/vehicles-fixtures";
 import * as zoneFixtures from "@/lib/zones-fixtures";
 import * as environmentalFixtures from "@/lib/environmental-report-fixtures";
-import { AUTH_COOKIE_NAME, sealSession, type Session } from "@/lib/session";
+import { createSessionCookie } from "@/test/session";
 
 const fixtureModules = [
   containerFixtures,
@@ -175,17 +175,12 @@ let backendCookie = "";
 
 beforeEach(() => {
   delete process.env.M6_BACKEND_ORIGIN;
-  const now = Date.now();
-  const session: Session = {
+  backendCookie = createSessionCookie("office-duty-queue", {
     mode: "backend-development",
-    scenarioId: "office-duty-queue",
-    issuedAt: now,
-    lastActivityAt: now,
-    absoluteExpiresAt: now + 60_000,
-    jwtExpiresAt: now + 60_000,
-    accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
-  };
-  backendCookie = `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
+    devJwt: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+    backendOrigin: "https://backend.internal",
+  });
+  delete process.env.M6_BACKEND_ORIGIN;
 });
 
 afterEach(() => {
