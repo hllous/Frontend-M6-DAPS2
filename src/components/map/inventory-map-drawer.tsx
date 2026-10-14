@@ -1,8 +1,9 @@
 "use client";
 
-import { useId, useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { servicesMobileBreakpoint } from "@/lib/services-layout";
 import { cn } from "@/lib/utils";
 
 import styles from "./inventory-map-drawer.module.css";
@@ -30,8 +31,16 @@ export function InventoryMapDrawer({ ariaLabel, children, className, summary }: 
   const dragRef = useRef<DragStart | null>(null);
   const draggedRef = useRef(false);
   const [expanded, setExpanded] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
   const [dragDelta, setDragDelta] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const updateViewport = () => setIsCompact(window.innerWidth <= servicesMobileBreakpoint());
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
 
   function handleFocusCapture(event: FocusEvent<HTMLElement>) {
     if (!(event.target instanceof HTMLElement) || event.target.dataset.inventoryMapDrawerHandle !== "true") {
@@ -93,6 +102,7 @@ export function InventoryMapDrawer({ ariaLabel, children, className, summary }: 
       ref={drawerRef}
       className={cn(styles.drawer, className)}
       aria-label={ariaLabel}
+      data-compact={isCompact}
       data-expanded={expanded}
       data-dragging={isDragging}
       style={{ "--drawer-drag-offset": `${dragDelta}px` } as CSSProperties}

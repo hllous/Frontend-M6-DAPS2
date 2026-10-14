@@ -5,6 +5,10 @@
   font-family: inherit;
 }
 
+.mapCompact {
+  min-height: 54vh;
+}
+
 .mapLayer {
   position: relative;
   height: 100%;
@@ -15,12 +19,20 @@
   isolation: isolate;
 }
 
+.mapLayerCompact {
+  min-height: 54vh;
+}
+
 .mapLoading {
   display: grid;
   min-height: 360px;
   place-content: center;
   color: var(--color-text-secondary);
   font-size: 0.875rem;
+}
+
+.mapLoadingCompact {
+  min-height: 54vh;
 }
 
 .marker {
@@ -311,28 +323,23 @@
   pointer-events: auto;
 }
 
-@media (max-width: 760px) {
-  .map {
-    min-height: 54vh;
-  }
-
-  .mapLayer,
-  .mapLoading {
-    min-height: 54vh;
-  }
-
-  .stateOverlay {
-    padding: var(--space-16);
-  }
-
-  .loadingIndex {
-    max-width: 280px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .serviceMarker,
   .zone {
     transition: none;
   }
+}
+
+/* Small-screen state is attached by ServicesWorkspace from its breakpoint token. */
+.stateOverlayCompact {
+  padding: var(--space-16);
+}
+
+/* Loading-index density follows the same JS-selected compact workspace state. */
+.mapLayerCompact .loadingIndex {
+  max-width: 280px;
+}
+
+.mapLayerCompact .mapLoading {
+  min-height: 54vh;
 }

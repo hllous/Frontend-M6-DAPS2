@@ -45,7 +45,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     // Close preview to test map interaction directly
     await preview.getByRole("button", { name: "Cerrar vista previa" }).click();
     await expect(preview).not.toBeVisible();
-    await expect(firstServiceRow).toBeFocused();
+    await expect(firstServiceRow.locator("button[data-service-select]")).toBeFocused();
 
     // Select a different marker directly on the map (SVC-1051) by targeting
     // the real, visible Leaflet marker pin — not the sr-only accessible
@@ -110,7 +110,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
     await expect(table).toBeVisible();
     await expect(page.locator("main")).toHaveCount(1);
-    await expect(row).toBeFocused();
+    await expect(row.locator("button[data-service-select]")).toBeFocused();
   });
 
   test("narrow viewport provides view switcher between list and map", async ({ page }) => {

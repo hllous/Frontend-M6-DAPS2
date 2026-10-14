@@ -30,7 +30,7 @@ import type { Service, ServiceStatus } from "@/lib/services";
 import { STATUS_LABEL } from "@/lib/services";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
-import { sortServices, type SortDir, type SortKey } from "./service-sorting";
+import { createServiceOrdinals, type SortDir, type SortKey } from "./service-sorting";
 
 export type { SortDir, SortKey } from "./service-sorting";
 
@@ -97,7 +97,7 @@ function ColumnFilterPopover({
         aria-expanded={open}
         aria-label={`Filtrar por ${label}`}
         className={cn(
-          "rounded-md p-1 transition-colors hover:bg-[var(--color-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]",
+          "inline-flex size-6 items-center justify-center rounded-md p-1 transition-colors hover:bg-[var(--color-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]",
           active ? "text-[var(--color-action)] font-bold" : "text-[var(--color-text-secondary)]",
         )}
       >
@@ -131,6 +131,7 @@ function ColumnFilterPopover({
 
 export function ServicesTable({
   services,
+  serviceOrdinals: suppliedServiceOrdinals,
   filterOptionsServices = services,
   selectedId,
   onSelect,
@@ -144,6 +145,7 @@ export function ServicesTable({
   dense = false,
 }: {
   services: Service[];
+  serviceOrdinals?: ReadonlyMap<string, number>;
   filterOptionsServices?: Service[];
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -157,9 +159,6 @@ export function ServicesTable({
   dense?: boolean;
 }) {
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
-  const [activeRow, setActiveRow] = useState<{ selectionId: string | null; rowId: string | null }>(
-    { selectionId: selectedId, rowId: selectedId },
-  );
 
   // Auto-scroll selected row into view smoothly
   useEffect(() => {
@@ -185,14 +184,8 @@ export function ServicesTable({
     return Array.from(set).sort();
   }, [filterOptionsServices, columnFilters.crews]);
 
-  const sortedServices = useMemo(() => {
-    return sortServices(services, sortKey, sortDir);
-  }, [services, sortKey, sortDir]);
-
-  const preferredTabStopId = activeRow.selectionId === selectedId ? activeRow.rowId : selectedId;
-  const tabStopId = sortedServices.some((service) => service.id === preferredTabStopId)
-    ? preferredTabStopId
-    : sortedServices[0]?.id ?? null;
+  const computedServiceOrdinals = useMemo(() => createServiceOrdinals(services), [services]);
+  const serviceOrdinals = suppliedServiceOrdinals ?? computedServiceOrdinals;
 
   const toggleZone = (zone: string) => {
     const next = new Set(columnFilters.zones);
@@ -224,11 +217,23 @@ export function ServicesTable({
   ];
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-left text-xs" role="grid" aria-rowcount={sortedServices.length + 1}>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll [scrollbar-gutter:stable]">
+        <table
+          className={cn("w-full table-fixed border-collapse text-left text-xs", dense ? "min-w-[24rem]" : "min-w-[40rem]")}
+          aria-label="Servicios operativos"
+        >
+          <colgroup>
+            <col className="w-[4%]" />
+            <col className={dense ? "w-[48%]" : "w-[28%]"} />
+            {!dense && <col className="w-[18%]" />}
+            <col className={dense ? "w-[20%]" : "w-[14%]"} />
+            {!dense && <col className="w-[16%]" />}
+            <col className={dense ? "w-[28%]" : "w-[20%]"} />
+          </colgroup>
           <thead className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
-            <tr role="row">
+            <tr>
+              <th scope="col" aria-label="Número de parada" className="w-12 p-3 text-center">Parada</th>
               {columns.map((col) => {
                 if (dense && col.hideWhenDense) return null;
                 const isSorted = sortKey === col.key;
@@ -366,69 +371,64 @@ export function ServicesTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-border)]">
-            {sortedServices.map((service, index) => {
+            {services.map((service) => {
               const isSelected = service.id === selectedId;
+              const ordinal = serviceOrdinals.get(service.id)!;
 
               return (
                 <tr
                   key={service.id}
                   data-service-id={service.id}
+                  data-service-ordinal={ordinal}
                   ref={(el) => {
                     rowRefs.current[service.id] = el;
                   }}
-                  tabIndex={service.id === tabStopId ? 0 : -1}
-                  role="row"
-                  aria-rowindex={index + 2}
                   aria-selected={isSelected}
                   onClick={() => onSelect(service.id)}
-                  onFocus={() => setActiveRow({ selectionId: selectedId, rowId: service.id })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelect(service.id);
-                      return;
-                    }
-                    const currentIndex = sortedServices.findIndex((candidate) => candidate.id === service.id);
-                    const nextIndex = e.key === "ArrowDown"
-                      ? Math.min(currentIndex + 1, sortedServices.length - 1)
-                      : e.key === "ArrowUp"
-                        ? Math.max(currentIndex - 1, 0)
-                        : e.key === "Home"
-                          ? 0
-                          : e.key === "End"
-                            ? sortedServices.length - 1
-                            : currentIndex;
-                    if (nextIndex === currentIndex) return;
-                    e.preventDefault();
-                    const nextService = sortedServices[nextIndex];
-                    setActiveRow({ selectionId: selectedId, rowId: nextService.id });
-                    rowRefs.current[nextService.id]?.focus();
-                  }}
                   className={cn(
-                    "cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-focus)]",
+                    "cursor-pointer select-none transition-colors",
                     isSelected
-                      ? "bg-[var(--color-action)]/10 font-medium"
+                      ? "bg-[var(--color-action)]/10"
                       : "hover:bg-[var(--color-canvas)]",
                   )}
                 >
+                  <td className="p-2 text-center tabular-nums">
+                    <span
+                      aria-label={`Parada ${ordinal}`}
+                      className="inline-flex size-7 items-center justify-center rounded-full bg-[var(--color-action)] text-xs font-bold text-[var(--color-on-institutional)]"
+                    >
+                      {ordinal}
+                    </span>
+                  </td>
                   <td className="p-3">
-                    <div className="flex items-start gap-2">
+                    <button
+                      type="button"
+                      data-service-select="true"
+                      data-service-id={service.id}
+                      aria-label={`Seleccionar servicio ${service.title}`}
+                      aria-pressed={isSelected}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSelect(service.id);
+                      }}
+                      className="flex w-full items-start gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                    >
                       {service.mode === "ROUTE" ? (
                         <Route className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
                       ) : (
                         <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
                       )}
-                      <div>
-                        <div className="font-semibold text-[var(--color-text)] leading-tight">
+                      <span>
+                        <span className="block font-semibold text-[var(--color-text)] leading-tight">
                           {service.title}
-                        </div>
+                        </span>
                         {dense && service.zoneNames.length > 0 && (
-                          <div className="mt-0.5 text-[11px] text-[var(--color-text-secondary)]">
+                          <span className="mt-0.5 block text-[11px] text-[var(--color-text-secondary)]">
                             {service.zoneNames.join(", ")}
-                          </div>
+                          </span>
                         )}
-                      </div>
-                    </div>
+                      </span>
+                    </button>
                   </td>
 
                   {!dense && (
@@ -463,9 +463,9 @@ export function ServicesTable({
               );
             })}
 
-            {sortedServices.length === 0 && (
+            {services.length === 0 && (
               <tr>
-                <td colSpan={columns.length} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
+                <td colSpan={columns.length + 1} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
                   <Empty className="mx-auto max-w-sm gap-3 rounded-none p-0" role="status">
                     <EmptyHeader>
                       <EmptyTitle>

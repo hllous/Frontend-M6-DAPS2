@@ -52,6 +52,28 @@ test.describe("automated WCAG checks @smoke", () => {
     await expectNoViolations(page);
   });
 
+  test("the Services workspace has no axe violations at desktop and mobile sizes", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=services");
+    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Mapa territorial de Servicios" })).toBeVisible();
+    await expectNoViolations(page);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    await expect(page.getByRole("button", { name: /Lista \(/ })).toBeVisible();
+    await expect(table).toBeVisible();
+    await expectNoViolations(page);
+
+    await page.getByRole("button", { name: "Mapa" }).click();
+    const map = page.getByRole("region", { name: "Mapa territorial de Servicios" });
+    await expect(map).toBeVisible();
+    await expect(table).not.toBeVisible();
+    await expectNoViolations(page);
+  });
+
   test("the mobile navigation sheet has no axe violations", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginViaApi(page, "office-duty-queue");
