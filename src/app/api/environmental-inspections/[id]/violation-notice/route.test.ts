@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import {
   addEnvironmentalInspectionFixture,
   getEnvironmentalReportFixture,
@@ -9,6 +8,7 @@ import {
 import type { EnvironmentalInspection } from "@/lib/environmental-reports";
 import { resetEstablishmentDirectoryAdapter, setEstablishmentDirectoryAdapter } from "@/lib/establishment-directory";
 import { GET, POST } from "./route";
+import { loginAs } from "@/test/session";
 
 const completedViolationInspection: EnvironmentalInspection = {
   id: "INS-1008",
@@ -52,15 +52,7 @@ afterEach(() => {
   resetEstablishmentDirectoryAdapter();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 function noticeRequest(cookie: string, body: unknown = noticeInput) {
   return new Request("http://localhost/api/environmental-inspections/INS-1008/violation-notice", {
@@ -78,7 +70,7 @@ const noticeContext = { params: Promise.resolve({ id: "INS-1008" }) };
 
 describe("/api/environmental-inspections/:id/violation-notice", () => {
   it("issues a server-owned notice only from a completed violation inspection", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(noticeRequest(cookie), noticeContext);
     const body = await response.json();
 
@@ -97,7 +89,7 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
   });
 
   it("records a non-forwarded notice and closes the M6 report locally", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(noticeRequest(cookie, { ...noticeInput, establishmentId: null }), noticeContext);
     const body = await response.json();
 
@@ -113,7 +105,7 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
   it("rejects an unknown establishment id through the local directory adapter", async () => {
     const resolve = vi.fn(async () => null);
     setEstablishmentDirectoryAdapter({ resolve });
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const establishmentId = "EST-DESCONOCIDO";
     const response = await POST(noticeRequest(cookie, { ...noticeInput, establishmentId }), noticeContext);
 
@@ -124,7 +116,7 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
   });
 
   it("rejects incomplete inspections, missing evidence, and malformed required fields", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     addEnvironmentalInspectionFixture({ ...completedViolationInspection, id: "INS-NO-EVIDENCE", attachments: [] });
 
     const noEvidence = await POST(noticeRequest(cookie, noticeInput), { params: Promise.resolve({ id: "INS-NO-EVIDENCE" }) });
@@ -140,15 +132,15 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
   });
 
   it("separates the Office issuance role and reports a second notice as 409", async () => {
-    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+    const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     expect((await POST(noticeRequest(fieldCookie), noticeContext)).status).toBe(403);
     expect((await GET(readNoticeRequest(fieldCookie), { params: Promise.resolve({ id: "INS-1008" }) })).status).toBe(403);
 
-    const limitedCookie = await authenticatedCookie("office-limited-intake");
+    const limitedCookie = await loginAs("office-limited-intake", { mode: "mock" });
     expect((await POST(noticeRequest(limitedCookie), noticeContext)).status).toBe(403);
     expect((await GET(readNoticeRequest(limitedCookie), { params: Promise.resolve({ id: "INS-1008" }) })).status).toBe(403);
 
-    const officeCookie = await authenticatedCookie("office-duty-queue");
+    const officeCookie = await loginAs("office-duty-queue", { mode: "mock" });
     expect((await POST(noticeRequest(officeCookie), noticeContext)).status).toBe(201);
     const duplicate = await POST(noticeRequest(officeCookie), noticeContext);
     expect(duplicate.status).toBe(409);

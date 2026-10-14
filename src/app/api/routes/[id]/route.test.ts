@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetRouteFixtures, routeFixtures } from "@/lib/routes-fixtures";
 import { DELETE, GET, PATCH } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   resetRouteFixtures();
@@ -12,20 +12,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("authenticated routes [id] BFF route", () => {
   describe("GET", () => {
@@ -38,7 +25,7 @@ describe("authenticated routes [id] BFF route", () => {
     });
 
     it("returns 404 when route is not found", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await GET(
         new Request("http://localhost/api/routes/nonexistent", {
           headers: { cookie },
@@ -50,7 +37,7 @@ describe("authenticated routes [id] BFF route", () => {
     });
 
     it("returns the route with its stops sequence for an authenticated actor", async () => {
-      const cookie = await authenticatedCookie("field-crew-member-route");
+      const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
       const response = await GET(
         new Request("http://localhost/api/routes/route-1", {
           headers: { cookie },
@@ -86,7 +73,7 @@ describe("authenticated routes [id] BFF route", () => {
     });
 
     it("blocks Field actors with 403 Forbidden (Office-only gate)", async () => {
-      const cookie = await authenticatedCookie("field-crew-member-route");
+      const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
       const response = await PATCH(
         new Request("http://localhost/api/routes/route-1", {
           method: "PATCH",
@@ -103,7 +90,7 @@ describe("authenticated routes [id] BFF route", () => {
     });
 
     it("returns 404 when route is not found", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await PATCH(
         new Request("http://localhost/api/routes/nonexistent", {
           method: "PATCH",
@@ -117,7 +104,7 @@ describe("authenticated routes [id] BFF route", () => {
     });
 
     it("updates route name and ensures code is immutable", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await PATCH(
         new Request("http://localhost/api/routes/route-1", {
           method: "PATCH",
@@ -145,7 +132,7 @@ describe("authenticated routes [id] BFF route", () => {
     });
 
     it("blocks Field actors with 403 Forbidden (Office-only gate)", async () => {
-      const cookie = await authenticatedCookie("field-crew-member-route");
+      const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
       const response = await DELETE(
         new Request("http://localhost/api/routes/route-1", {
           method: "DELETE",
@@ -161,7 +148,7 @@ describe("authenticated routes [id] BFF route", () => {
     });
 
     it("returns 404 when deleting a nonexistent route", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await DELETE(
         new Request("http://localhost/api/routes/nonexistent", {
           method: "DELETE",
@@ -174,7 +161,7 @@ describe("authenticated routes [id] BFF route", () => {
     });
 
     it("deactivates route logically (active = false) for Office actor", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await DELETE(
         new Request("http://localhost/api/routes/route-1", {
           method: "DELETE",

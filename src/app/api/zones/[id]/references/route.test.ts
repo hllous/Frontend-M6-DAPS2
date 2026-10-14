@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { GET } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -10,17 +10,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("authenticated zones [id]/references BFF route", () => {
   it("counts inventory and active routes across backend pages for a real zone", async () => {
@@ -35,7 +25,7 @@ describe("authenticated zones [id]/references BFF route", () => {
       .mockResolvedValueOnce(Response.json({ data: [], meta: { total: 3 } }))
       .mockResolvedValueOnce(Response.json({ data: [], meta: { total: 12 } }))
       .mockResolvedValueOnce(Response.json({ data: [], meta: { total: 2 } }));
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
     const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: { id } });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ zoneId: id, activeRoutes: [{ id: "route-real", code: "R-01", name: "Norte" }, { id: "route-two", code: "R-01", name: "Norte" }], containersCount: 3, treesCount: 12, greenSpacesCount: 2, totalReferences: 19 });
@@ -55,7 +45,7 @@ describe("authenticated zones [id]/references BFF route", () => {
     process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({}, { status }));
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
     const id = "ceec08ae-67e7-4739-9677-150f5085bb1a";
     const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: { id } });
     expect(response.status).toBe(status);
@@ -70,7 +60,7 @@ describe("authenticated zones [id]/references BFF route", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id }));
     if (failure === "network") backendFetch.mockRejectedValueOnce(new Error("offline"));
     else backendFetch.mockResolvedValueOnce(Response.json(failure === "malformed" ? { data: [] } : {}, { status: failure === "http" ? 503 : 200 }));
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
     const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: { id } });
     expect(response.status).toBeGreaterThanOrEqual(500);
     expect(await response.json()).not.toHaveProperty("totalReferences");
@@ -89,7 +79,7 @@ describe("authenticated zones [id]/references BFF route", () => {
       backendFetch.mockResolvedValueOnce(Response.json({ meta: { total: 0 } }, { status: name === resource ? 503 : 200 }));
       if (name === resource) break;
     }
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
     const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: { id } });
     expect(response.status).toBe(503);
     expect(await response.json()).not.toHaveProperty("totalReferences");
@@ -105,7 +95,7 @@ describe("authenticated zones [id]/references BFF route", () => {
   });
 
   it("returns 404 when zone is not found", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await GET(
       new Request("http://localhost/api/zones/missing/references", {
         headers: { cookie },
@@ -117,7 +107,7 @@ describe("authenticated zones [id]/references BFF route", () => {
   });
 
   it("returns reference counts for zone-1", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await GET(
       new Request("http://localhost/api/zones/zone-1/references", {
         headers: { cookie },

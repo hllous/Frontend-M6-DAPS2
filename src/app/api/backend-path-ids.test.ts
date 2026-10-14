@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { GET as getContainer } from "@/app/api/containers/[id]/route";
 import { GET as getCrew } from "@/app/api/crews/[id]/route";
 import { DELETE as deleteCrewMember } from "@/app/api/crews/[id]/members/[userId]/route";
@@ -22,6 +21,7 @@ import { GET as getTreeSurvey } from "@/app/api/trees/[id]/surveys/[surveyId]/ro
 import { GET as getVehicle } from "@/app/api/vehicles/[id]/route";
 import { GET as getZone } from "@/app/api/zones/[id]/route";
 import { DELETE as deleteZoneNeighborhood } from "@/app/api/zones/[id]/neighborhoods/[neighborhoodId]/route";
+import { loginAs } from "@/test/session";
 
 const invalidIds = ["..", "a/b", "a?b=c", "a#b", "%2e%2e"];
 const backendOrigin = "https://backend.internal";
@@ -60,17 +60,7 @@ const routeCases: RouteCase[] = [
   { family: "zone neighborhoods", handler: deleteZoneNeighborhood as unknown as RouteHandler, method: "DELETE", idParams: ["id", "neighborhoodId"] },
 ];
 
-async function backendCookie() {
-  process.env.M6_AUTH_MODE = "backend-development";
-  process.env.M6_DEV_JWT = devJwt;
-  process.env.M6_BACKEND_ORIGIN = backendOrigin;
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId: "office-duty-queue" }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -81,7 +71,7 @@ afterEach(() => {
 
 describe("backend path ids", () => {
   it.each(routeCases)("rejects invalid ids for $family before a backend call", async ({ handler, method, idParams }) => {
-    const cookie = await backendCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: devJwt, backendOrigin: backendOrigin });
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected backend call"));
 
     for (const idParam of idParams) {

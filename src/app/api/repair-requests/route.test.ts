@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetEnvironmentalInspectionFixtures } from "@/lib/environmental-report-fixtures";
 import { resetRepairRequestFixtures, repairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
 import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 import { GET, POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetRepairRequestFixtures();
@@ -21,15 +21,7 @@ afterEach(() => {
   delete process.env.M6_BACKEND_ORIGIN;
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 function createRequest(cookie: string, body: unknown) {
   return new Request("http://localhost/api/repair-requests", {
@@ -57,7 +49,7 @@ describe("repair request BFF collection routes", () => {
     it.each(["SERVICE", "INSPECTION"])("conserva el 404 local para un origen %s desconocido", async (detectedInType) => {
       const backendFetch = vi.spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(Response.json({ message: "Not found" }, { status: 404 }));
-      const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+      const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
       const response = await POST(createRequest(cookie, { ...body, detectedInType }));
 
       expect(response.status).toBe(404);
@@ -74,7 +66,7 @@ describe("repair request BFF collection routes", () => {
     it.each([401, 403, 500, 503])("conserva el error %s del origen sin crear la derivación", async (status) => {
       const error = { statusCode: status, message: "No se pudo consultar el origen." };
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(error, { status }));
-      const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+      const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
       const response = await POST(createRequest(cookie, body));
 
       expect(response.status).toBe(status);
@@ -85,7 +77,7 @@ describe("repair request BFF collection routes", () => {
 
     it("rechaza payloads del origen sin el contrato mínimo", async () => {
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ crewId: 42 }));
-      const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+      const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
       const response = await POST(createRequest(cookie, body));
 
       expect(response.status).toBe(500);
@@ -110,7 +102,7 @@ describe("repair request BFF collection routes", () => {
     it("Campo resuelve la cuadrilla de una inspección mediante su servicio real", async () => {
       const backendFetch = vi.spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: "Cuadrilla Belgrano — Recolección" }] }));
-      const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+      const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
       backendFetch.mockClear();
       backendFetch.mockResolvedValueOnce(Response.json({ serviceId }))
         .mockResolvedValueOnce(Response.json({ crewId }))
@@ -130,7 +122,7 @@ describe("repair request BFF collection routes", () => {
       "Campo solo crea desde servicios de su cuadrilla (%s)", async (sourceCrewId) => {
         const backendFetch = vi.spyOn(globalThis, "fetch")
           .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: "Cuadrilla Belgrano — Recolección" }] }));
-        const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+        const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
         backendFetch.mockClear();
         backendFetch.mockResolvedValueOnce(Response.json({ crewId: sourceCrewId }))
           .mockResolvedValueOnce(Response.json({ id: "derivacion-real" }, { status: 201 }));
@@ -162,7 +154,7 @@ describe("repair request BFF collection routes", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json({ crewId: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516" }))
       .mockResolvedValueOnce(Response.json({ id: "derivacion-real", ...body }, { status: 201 }));
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
 
     const response = await POST(createRequest(cookie, { ...body, ignored: "not forwarded" }));
 
@@ -192,7 +184,7 @@ describe("repair request BFF collection routes", () => {
         vehicleId: null, windowFrom: "08:00", windowTo: "12:00",
       }))
       .mockResolvedValueOnce(Response.json({ data: [], meta: { total: 0, page: 1, pageSize: 20 } }));
-    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
@@ -213,7 +205,7 @@ describe("repair request BFF collection routes", () => {
           name: "Cuadrilla Belgrano — Recolección",
         }] }))
         .mockResolvedValueOnce(Response.json({ id: "ceec08ae-67e7-4739-9677-150f5085bb1a", crewId }));
-      const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+      const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
 
       const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
@@ -233,7 +225,7 @@ describe("repair request BFF collection routes", () => {
         name: "Cuadrilla Belgrano — Recolección",
       }] }))
       .mockResolvedValueOnce(Response.json(error, { status }));
-    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
@@ -247,7 +239,7 @@ describe("repair request BFF collection routes", () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const payload = { data: [{ id: "derivacion-real", detectedInId: "servicio-real" }], meta: { total: 1 } };
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(payload));
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=servicio-real", { headers: { cookie } }));
 
@@ -263,7 +255,7 @@ describe("repair request BFF collection routes", () => {
   });
 
   it("scopes Field list and create to the actor's assigned crew", async () => {
-    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+    const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const assigned = await GET(new Request("http://localhost/api/repair-requests?detectedInId=SVC-1050", { headers: { cookie: fieldCookie } }));
     expect(assigned.status).toBe(200);
     expect((await assigned.json()).data).toEqual([
@@ -298,7 +290,7 @@ describe("repair request BFF collection routes", () => {
   });
 
   it("lists fixtures and creates a pending Service-sourced referral", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const list = await GET(new Request("http://localhost/api/repair-requests", { headers: { cookie } }));
     expect((await list.json()).meta).toMatchObject({ total: 1, page: 1 });
 
@@ -317,7 +309,7 @@ describe("repair request BFF collection routes", () => {
   });
 
   it("lets Office create a pending referral from an EnvironmentalInspection", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(createRequest(cookie, {
       damageType: "BLOCKED_DRAIN",
       address: "Av. Brasil 2450",
@@ -338,7 +330,7 @@ describe("repair request BFF collection routes", () => {
   });
 
   it("scopes Field inspection referrals to the linked Service crew", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const created = await POST(createRequest(cookie, {
       damageType: "BLOCKED_DRAIN",
       address: "Av. Brasil 2450",

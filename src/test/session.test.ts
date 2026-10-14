@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getRequiredSession } from "@/lib/session";
-import { backendEnv, loginAs } from "./session";
+import { backendEnv, createSessionCookie, loginAs } from "./session";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -13,6 +13,34 @@ describe("test session helpers", () => {
 
     expect(session.scenarioId).toBe("office-duty-queue");
     expect(cookie).not.toContain(";");
+  });
+
+  it("creates a session with the requested test auth settings", async () => {
+    vi.stubEnv("M6_AUTH_MODE", "mock");
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const session = getRequiredSession(new Request("http://localhost/api/test", { headers: { cookie } }));
+
+    expect(session).toMatchObject({ mode: "backend-development", accessToken: devJwt });
+  });
+
+  it("seals a Field session with a test-resolved crew", () => {
+    vi.stubEnv("M6_AUTH_MODE", "mock");
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const crew = { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla real" };
+    const cookie = createSessionCookie("field-crew-leader-route", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+      crew,
+    });
+    const session = getRequiredSession(new Request("http://localhost/api/test", { headers: { cookie } }));
+
+    expect(session).toMatchObject({ mode: "backend-development", accessToken: devJwt, crew });
   });
 
   it("configures backend login and restores both previous and absent env values", async () => {

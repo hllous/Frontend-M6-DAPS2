@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetServiceFixtures, serviceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetServiceFixtures();
@@ -15,20 +15,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 const suspendBody = { reason: "VEHICLE_BREAKDOWN", note: "El camión no arranca." };
 
@@ -47,7 +34,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
   });
 
   it("returns 403 when session lacks service:execute (Crew Member)", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1042/suspend", {
         method: "POST",
@@ -64,7 +51,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
 
   it("returns 400 when reason or note are missing", async () => {
     updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/suspend", {
         method: "POST",
@@ -78,7 +65,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
   });
 
   it("returns 404 if the target service does not exist", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-NONEXISTENT/suspend", {
         method: "POST",
@@ -93,7 +80,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
 
   it("returns 403 when trying to suspend another crew's service", async () => {
     // SVC-1042 belongs to crew-a; field-crew-leader-route is crew-b
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1042/suspend", {
         method: "POST",
@@ -110,7 +97,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
 
   it("returns 409 when the service is not IN_PROGRESS", async () => {
     // SVC-1050 is SCHEDULED
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/suspend", {
         method: "POST",
@@ -127,7 +114,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
 
   it("successfully suspends an in-progress service and records the reason and note", async () => {
     updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/suspend", {
         method: "POST",
@@ -157,7 +144,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     );
     // El login resuelve la cuadrilla de Campo contra GET /crews antes de la llamada bajo prueba.
     backendFetch.mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] }), { status: 200 }));
-    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     backendFetch.mockClear();
 
     const response = await POST(
@@ -177,7 +164,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
 });
 
 it("rejects malformed JSON with 400", async () => {
-  const cookie = await authenticatedCookie("field-crew-leader-route");
+  const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
   const response = await POST(new Request("http://localhost/api/services/real-service/suspend", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: "{",
   }), { params: Promise.resolve({ id: "real-service" }) });
@@ -193,7 +180,7 @@ it.each([403, 409, 500, 503])("preserves backend error status and body (%s)", as
     if ((init?.method ?? "GET") === "GET") return Response.json({ crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
-  const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+  const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/suspend", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(suspendBody),

@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetEnvironmentalInspectionFixtures } from "@/lib/environmental-report-fixtures";
 import { addRepairRequestFixture, getRepairRequestFixture, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
 import { POST as start } from "./start/route";
 import { POST as close } from "./close/route";
 import { GET } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetRepairRequestFixtures();
@@ -19,15 +19,7 @@ afterEach(() => {
   resetServiceFixtures();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 function transitionRequest(path: string, cookie: string, body: unknown = {}) {
   return new Request(`http://localhost${path}`, {
@@ -39,7 +31,7 @@ function transitionRequest(path: string, cookie: string, body: unknown = {}) {
 
 describe("repair request BFF detail and recovery routes", () => {
   it("returns canonical source detail and supports Office recovery transitions", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const detail = await GET(new Request("http://localhost/api/repair-requests/RR-1001", { headers: { cookie } }), { params: Promise.resolve({ id: "RR-1001" }) });
     expect(detail.status).toBe(200);
     expect((await detail.json()).sourceContext).toMatchObject({ type: "SERVICE", id: "SVC-1050" });
@@ -54,17 +46,17 @@ describe("repair request BFF detail and recovery routes", () => {
   });
 
   it("denies Field recovery and missing referrals", async () => {
-    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+    const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await start(transitionRequest("/api/repair-requests/RR-1001/start", fieldCookie), { params: Promise.resolve({ id: "RR-1001" }) });
     expect(response.status).toBe(403);
 
-    const officeCookie = await authenticatedCookie("office-duty-queue");
+    const officeCookie = await loginAs("office-duty-queue", { mode: "mock" });
     const missing = await GET(new Request("http://localhost/api/repair-requests/RR-404", { headers: { cookie: officeCookie } }), { params: Promise.resolve({ id: "RR-404" }) });
     expect(missing.status).toBe(404);
   });
 
   it("lets Field inspect only referrals attached to its assigned Services", async () => {
-    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+    const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const assigned = await GET(new Request("http://localhost/api/repair-requests/RR-1001", { headers: { cookie: fieldCookie } }), { params: Promise.resolve({ id: "RR-1001" }) });
     expect(assigned.status).toBe(200);
     expect((await assigned.json()).detectedInId).toBe("SVC-1050");
@@ -92,7 +84,7 @@ describe("repair request BFF detail and recovery routes", () => {
       workOrderId: null,
       requestedAt: "2026-09-05T08:00:00.000Z",
     });
-    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+    const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const assigned = await GET(new Request("http://localhost/api/repair-requests/RR-INS-1012", { headers: { cookie: fieldCookie } }), { params: Promise.resolve({ id: "RR-INS-1012" }) });
     expect(assigned.status).toBe(200);
 

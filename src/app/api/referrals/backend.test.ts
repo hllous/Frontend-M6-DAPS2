@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 import { GET as detail } from "./[id]/route";
 import { GET as list } from "./route";
+import { loginAs } from "@/test/session";
 
 const repairId = "15c86465-54d3-4e0a-83a5-26a3cc510017";
 const closureId = "ce0bbfaa-8720-4566-b9d1-738cb37a689b";
@@ -43,14 +43,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId = "office-duty-queue") {
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  expect(response.status).toBe(200);
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 function getDetail(cookie: string, id = repairId) {
   return detail(new Request(`http://localhost/api/referrals/${id}`, { headers: { cookie } }), {
@@ -80,7 +73,7 @@ describe("referrals against the backend", () => {
       if (url.pathname === "/street-closure-requests") return Response.json(page([], 0, 1, 0));
       throw new Error(`Unexpected backend URL: ${url}`);
     });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route");
     const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -119,7 +112,7 @@ describe("referrals against the backend", () => {
       if (url.pathname === `/repair-requests/${repairId}`) return Response.json({ ...repair, detectedInType: sourceType, detectedInId: sourceId });
       throw new Error(`Unexpected backend URL: ${url}`);
     });
-    const response = await getDetail(await authenticatedCookie("field-crew-leader-route"));
+    const response = await getDetail(await loginAs("field-crew-leader-route"));
     expect(response.status).toBe(status);
     if (status === 200) expect(await response.json()).toMatchObject({ id: repairId, sourceId });
     expect(backendFetch.mock.calls.map(([url]) => String(url))).toEqual([
@@ -140,7 +133,7 @@ describe("referrals against the backend", () => {
         sourceContext: { sourceType: "TREE_INTERVENTION", sourceId: serviceId, title: "Poda", interventionType: "SAFETY_PRUNING", address: "Rivadavia 2200" },
       } : closure);
     });
-    const response = await getDetail(await authenticatedCookie("field-crew-leader-route"), closureId);
+    const response = await getDetail(await loginAs("field-crew-leader-route"), closureId);
     expect(response.status).toBe(treeSource ? 404 : 200);
   });
 
@@ -165,7 +158,7 @@ describe("referrals against the backend", () => {
       ], 3));
       throw new Error(`Unexpected backend URL: ${url}`);
     });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route");
     const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
     const body = await response.json();
 
@@ -197,7 +190,7 @@ describe("referrals against the backend", () => {
       const currentPage = Number(url.searchParams.get("page") ?? 1);
       return Response.json(page(records.slice((currentPage - 1) * 100, currentPage * 100), 101, currentPage, 2));
     });
-    const cookie = await authenticatedCookie();
+    const cookie = await loginAs("office-duty-queue");
     const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
     const body = await response.json();
 
@@ -220,7 +213,7 @@ describe("referrals against the backend", () => {
   it("rejects malformed collection records at the backend boundary", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
       Response.json(page(String(input).includes("/repair-requests") ? [{ id: repairId }] : [], 1)));
-    const cookie = await authenticatedCookie();
+    const cookie = await loginAs("office-duty-queue");
     const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
     expect(response.status).toBe(500);
   });
@@ -232,7 +225,7 @@ describe("referrals against the backend", () => {
         ? page([repair], 51, Number(url.searchParams.get("page")), 51)
         : page([], 0, 1, 0));
     });
-    const cookie = await authenticatedCookie();
+    const cookie = await loginAs("office-duty-queue");
     const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
     expect(response.status).toBe(500);
     expect(backendFetch).toHaveBeenCalledTimes(51);
@@ -241,7 +234,7 @@ describe("referrals against the backend", () => {
 
   it("opens a RepairRequest UUID through the repair endpoint", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(repair));
-    const response = await getDetail(await authenticatedCookie());
+    const response = await getDetail(await loginAs("office-duty-queue"));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ id: repairId, kind: "REPAIR_REQUEST" });
@@ -254,7 +247,7 @@ describe("referrals against the backend", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json({ message: "No existe" }, { status: 404 }))
       .mockResolvedValueOnce(Response.json(closure));
-    const response = await getDetail(await authenticatedCookie(), closureId);
+    const response = await getDetail(await loginAs("office-duty-queue"), closureId);
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ id: closureId, kind: "STREET_CLOSURE_REQUEST" });
@@ -268,7 +261,7 @@ describe("referrals against the backend", () => {
   it.each([401, 403, 500, 503])("preserves repair errors (%s) without trying closures", async (status) => {
     const payload = { statusCode: status, message: "Error del backend" };
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(payload, { status }));
-    const response = await getDetail(await authenticatedCookie());
+    const response = await getDetail(await loginAs("office-duty-queue"));
 
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual(payload);
@@ -278,7 +271,7 @@ describe("referrals against the backend", () => {
   it("returns the existing not-found envelope when both resources are missing", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
       Response.json({ message: "No existe" }, { status: 404 }));
-    const response = await getDetail(await authenticatedCookie());
+    const response = await getDetail(await loginAs("office-duty-queue"));
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({
@@ -290,7 +283,7 @@ describe("referrals against the backend", () => {
 
   it("rejects malformed successful payloads without trying another kind", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id: repairId }));
-    const response = await getDetail(await authenticatedCookie());
+    const response = await getDetail(await loginAs("office-duty-queue"));
     expect(response.status).toBe(500);
     expect(backendFetch).toHaveBeenCalledTimes(1);
   });

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as login } from "@/app/api/session/login/route";
 import { POST } from "./route";
 import { DELETE } from "./[userId]/route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -11,21 +12,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function cookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("crew membership BFF route", () => {
   it("lets Office add members without using the crew update resource", async () => {
     const response = await POST(new Request("http://localhost/api/crews/crew-membership/members", {
       method: "POST",
-      headers: { cookie: await cookie("office-duty-queue"), "content-type": "application/json" },
+      headers: { cookie: await loginAs("office-duty-queue", { mode: "mock" }), "content-type": "application/json" },
       body: JSON.stringify({ memberUserIds: ["user-ana", "user-pedro"] }),
     }), { params: Promise.resolve({ id: "crew-membership" }) });
 
@@ -64,7 +57,7 @@ describe("crew membership BFF route", () => {
   it("rejects more than 100 members before reaching the backend (#251)", async () => {
     const response = await POST(new Request("http://localhost/api/crews/crew-membership/members", {
       method: "POST",
-      headers: { cookie: await cookie("office-duty-queue"), "content-type": "application/json" },
+      headers: { cookie: await loginAs("office-duty-queue", { mode: "mock" }), "content-type": "application/json" },
       body: JSON.stringify({ memberUserIds: Array.from({ length: 101 }, (_, index) => `user-${index}`) }),
     }), { params: Promise.resolve({ id: "crew-membership" }) });
 
@@ -74,7 +67,7 @@ describe("crew membership BFF route", () => {
   it("lets Office remove one member through the member resource", async () => {
     const response = await DELETE(new Request("http://localhost/api/crews/crew-membership/members/user-pedro", {
       method: "DELETE",
-      headers: { cookie: await cookie("office-duty-queue") },
+      headers: { cookie: await loginAs("office-duty-queue", { mode: "mock" }) },
     }), { params: Promise.resolve({ id: "crew-membership", userId: "user-pedro" }) });
 
     expect(response.status).toBe(200);
@@ -106,7 +99,7 @@ describe("crew membership BFF route", () => {
   it("keeps membership management Office-only, including for a Field actor's own crew", async () => {
     const request = new Request("http://localhost/api/crews/crew-b/members", {
       method: "POST",
-      headers: { cookie: await cookie("field-crew-member-route"), "content-type": "application/json" },
+      headers: { cookie: await loginAs("field-crew-member-route", { mode: "mock" }), "content-type": "application/json" },
       body: JSON.stringify({ memberUserIds: ["user-pedro"] }),
     });
 
