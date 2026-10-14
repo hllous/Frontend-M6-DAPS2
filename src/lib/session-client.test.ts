@@ -59,9 +59,12 @@ describe("cross-tab session logout", () => {
     expect(localStorage.getItem("m6:field-draft:v2:actor-a:service:start")).toBeNull();
 
     stopListening();
+    const deliveredAfterUnsubscribe = vi.fn();
+    const stopObserving = onRemoteLogout(deliveredAfterUnsubscribe);
     remoteTabChannel.postMessage("logout");
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => expect(deliveredAfterUnsubscribe).toHaveBeenCalledTimes(1));
     expect(onLogout).toHaveBeenCalledTimes(1);
+    stopObserving();
     remoteTabChannel.close();
   });
 });

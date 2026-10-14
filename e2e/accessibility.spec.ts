@@ -36,7 +36,9 @@ test.describe("automated WCAG checks @smoke", () => {
       .getByRole("dialog", { name: "Más módulos" })
       .getByRole("link", { name: "Mi trabajo", exact: true });
     await selectedNavigationItem.hover();
-    await page.waitForTimeout(200);
+    await expect.poll(() => selectedNavigationItem.evaluate((element) =>
+      element.getAnimations({ subtree: true }).every((animation) => animation.playState === "finished"),
+    )).toBe(true);
 
     await expectNoViolations(page);
   });
