@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
@@ -66,9 +67,7 @@ function EmptyContainerModalContent({
       updated = await containersAdapter.empty(container.id);
     } catch (err) {
       const msg =
-        err instanceof ContainerRequestError || err instanceof Error
-          ? err.message
-          : "No se pudo registrar el vaciado del contenedor.";
+        getErrorMessage(err, "No se pudo registrar el vaciado del contenedor.");
       setErrorMessage(msg);
       setIsSubmitting(false);
       return;

@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -76,7 +77,7 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
         }
         setState({ status: "ready", vehicles: result.vehicles, total: result.total, totalPages: result.totalPages });
       } catch (caught) {
-        if (isCurrent) setState({ status: "error", message: caught instanceof Error ? caught.message : "No se pudieron cargar los vehículos." });
+        if (isCurrent) setState({ status: "error", message: errorMessage(caught, "No se pudieron cargar los vehículos.") });
       }
     }
     void requestVehicles();
@@ -121,7 +122,7 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
       setNotice(editing ? "Vehículo actualizado." : "Vehículo registrado.");
       setRequestVersion((version) => version + 1);
     } catch (caught) {
-      setFormError(caught instanceof Error ? caught.message : "No se pudo guardar el vehículo.");
+      setFormError(errorMessage(caught, "No se pudo guardar el vehículo."));
     }
   }
 
@@ -140,7 +141,7 @@ export function VehicleCatalogPanel({ scenario }: { scenario: OperationalScenari
       setNotice(`Vehículo ${deactivatingVehicle.plate} dado de baja.`);
       setRequestVersion((version) => version + 1);
     } catch (caught) {
-      setDeactivateError(caught instanceof Error ? caught.message : "No se pudo dar de baja el vehículo.");
+      setDeactivateError(errorMessage(caught, "No se pudo dar de baja el vehículo."));
     } finally {
       setIsSubmittingDeactivate(false);
     }

@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useId, useState } from "react";
 import {
@@ -163,7 +164,7 @@ export function InspectionExecutionPanel({
         }
       })
       .catch((error: unknown) => {
-        if (current) setLoadError(error instanceof Error ? error.message : "No se pudo cargar la inspección ambiental.");
+        if (current) setLoadError(errorMessage(error, "No se pudo cargar la inspección ambiental."));
       });
 
     return () => {
@@ -201,7 +202,7 @@ export function InspectionExecutionPanel({
       setInspection((current) => current ? { ...current, attachments: [...(current.attachments ?? []).filter((file) => file.id !== attachment.id), attachment] } : current);
       return true;
     } catch (error: unknown) {
-      const message = error instanceof ServiceRequestError || error instanceof Error ? error.message : "No se pudo subir el archivo.";
+      const message = errorMessage(error, "No se pudo subir el archivo.");
       setQueuedFiles((current) => current.map((file) => file.id === item.id ? { ...file, status: "error", error: message } : file));
       if (error instanceof NetworkFailureError) throw error;
       return false;

@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -75,13 +75,7 @@ export async function POST(
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
 
-    if (!scenario.capabilities.includes("service:execute")) {
-      return errorResponse(
-        403,
-        "No tiene permisos para registrar resultados de zona. Solo la persona responsable de la cuadrilla puede hacerlo.",
-        path,
-      );
-    }
+    authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para registrar resultados de zona. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
 
     let body: unknown;
     try {

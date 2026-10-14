@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
 import { MapPin } from "lucide-react";
@@ -108,9 +109,7 @@ function ConfirmRelocationModalContent({
       });
     } catch (err) {
       const msg =
-        err instanceof ContainerRequestError || err instanceof Error
-          ? err.message
-          : "No se pudo confirmar la reubicación del contenedor.";
+        getErrorMessage(err, "No se pudo confirmar la reubicación del contenedor.");
       setErrorMessage(msg);
       setIsSubmitting(false);
       return;

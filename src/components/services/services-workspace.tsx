@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import {
   useCallback,
@@ -586,7 +587,7 @@ export function ServicesWorkspace({
         setStreetClosureDependencyState({
           serviceId: detailId,
           dependency: null,
-          error: cause instanceof Error ? cause.message : "No se pudo consultar la respuesta de M7.",
+          error: errorMessage(cause, "No se pudo consultar la respuesta de M7."),
         });
       });
 

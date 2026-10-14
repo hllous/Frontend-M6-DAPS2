@@ -1,11 +1,11 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalReportFixture, transitionEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
 import { reportDecisionInputSchema, type ReportDecisionInput } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 
 
@@ -16,7 +16,7 @@ export async function transitionReport(request: Request, id: string, action: "st
   try {
     const session = getRequiredSession(request);
     const scenario = getScenario(session.scenarioId);
-    requireCapability(session, action === "close" ? "environmentalReport:close" : "environmentalReport:review");
+    authorize(session, { capability: action === "close" ? "environmentalReport:close" : "environmentalReport:review", throwOnError: true });
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede revisar expedientes ambientales.", path);
 
     // forward and dismiss take a required reason (backend ReportStatusChangeDto); start-review and close take no body.

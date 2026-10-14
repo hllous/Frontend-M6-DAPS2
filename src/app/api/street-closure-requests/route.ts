@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -44,16 +44,6 @@ async function requireReadAccess(request: Request, path: string, sourceId?: stri
   return { session, scenario };
 }
 
-function backendQueryString(query: ReturnType<typeof streetClosureRequestQuerySchema.parse>): string {
-  const params = new URLSearchParams();
-  if (query.status) params.set("status", query.status);
-  if (query.sourceId) params.set("sourceId", query.sourceId);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
-}
-
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
@@ -73,7 +63,7 @@ export async function GET(request: Request) {
     if (access.session && backendMode(access.session)) {
       const backendResponse = await fetchBackend(
         request,
-        `/street-closure-requests${backendQueryString(queryResult.data)}`,
+        `/street-closure-requests${backendQuery(queryResult.data, ["status", "sourceId", "page", "pageSize"])}`,
       );
       return forwardResponse(backendResponse);
     }

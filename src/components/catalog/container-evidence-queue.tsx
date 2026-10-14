@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
 import { AlertTriangle, CheckCircle2, Paperclip, RefreshCw, Upload, X } from "lucide-react";
@@ -97,9 +98,7 @@ export function useEvidenceQueue() {
       return true;
     } catch (err) {
       const msg =
-        err instanceof ContainerRequestError || err instanceof Error
-          ? err.message
-          : "Error al subir el archivo";
+        errorMessage(err, "Error al subir el archivo");
       setQueuedFiles((prev) =>
         prev.map((f) => (f.id === item.id ? { ...f, status: "error", error: msg } : f)),
       );

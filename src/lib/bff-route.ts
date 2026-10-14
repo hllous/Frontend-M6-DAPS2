@@ -35,19 +35,89 @@ const ERROR_LABELS: Record<number, string> = {
 
 export function authorize(
   request: Request,
-  options: { office?: true; capability: Capability },
+  options: {
+    office?: true;
+    officeMessage?: string;
+    capability: Capability;
+    capabilityMessage?: string;
+    fallbackMessage?: string;
+    throwOnError: true;
+  },
+): { session: Session; scenario: OperationalScenario };
+export function authorize(
+  request: Request,
+  options: {
+    office?: true;
+    officeMessage?: string;
+    capability: Capability;
+    capabilityMessage?: string;
+    fallbackMessage?: string;
+    throwOnError?: false;
+  },
+): { session: Session; scenario: OperationalScenario } | NextResponse;
+/** Reuses a session already read by a route while sharing its capability checks. */
+export function authorize(
+  session: Session,
+  options: {
+    office?: true;
+    officeMessage?: string;
+    capability: Capability;
+    capabilityMessage?: string;
+    fallbackMessage?: string;
+    throwOnError: true;
+  },
+): { session: Session; scenario: OperationalScenario };
+export function authorize(
+  requestOrSession: Request | Session,
+  options: {
+    office?: true;
+    officeMessage?: string;
+    capability: Capability;
+    capabilityMessage?: string;
+    fallbackMessage?: string;
+    throwOnError?: boolean;
+  },
 ): { session: Session; scenario: OperationalScenario } | NextResponse {
+  const request = requestOrSession instanceof Request ? requestOrSession : undefined;
   try {
-    const session = getRequiredSession(request);
+    const session: Session = request ? getRequiredSession(request) : requestOrSession as Session;
     const scenario = getScenario(session);
     if (options.office && scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Esta acción requiere una sesión de Oficina.");
+      throw new ForbiddenSessionError(options.officeMessage ?? "Esta acción requiere una sesión de Oficina.");
+    }
+    if (options.capabilityMessage && !scenario.capabilities.includes(options.capability)) {
+      throw new ForbiddenSessionError(options.capabilityMessage);
     }
     requireCapability(session, options.capability);
     return { session, scenario };
   } catch (error) {
-    return mapSessionError(error, new URL(request.url).pathname, "No se pudo autorizar la solicitud.");
+    if (options.throwOnError) throw error;
+    if (!request) throw error;
+    return mapSessionError(
+      error,
+      new URL(request.url).pathname,
+      options.fallbackMessage ?? "No se pudo autorizar la solicitud.",
+    );
   }
+}
+
+export function backendQuery<T extends object>(query: T, allowedKeys: readonly string[]): string {
+  const params = new URLSearchParams();
+  const values = query as Record<string, unknown>;
+
+  for (const key of allowedKeys) {
+    const value = values[key];
+    if (value === undefined || value === null || value === "") continue;
+
+    if (Array.isArray(value)) {
+      for (const item of value) params.append(key, String(item));
+    } else {
+      params.set(key, String(value));
+    }
+  }
+
+  const value = params.toString();
+  return value ? `?${value}` : "";
 }
 
 // Scope checks need the ownership fields, not the view adapter's enriched Service.

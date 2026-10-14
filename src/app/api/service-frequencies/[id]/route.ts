@@ -1,17 +1,16 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { serviceFrequencyResponseFixture, closeServiceFrequencyFixture, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
 import { serviceFrequencyUpdateInputSchema } from "@/lib/service-frequencies";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
 
 
 async function targetId(context: { params: Promise<{ id: string }> | { id: string } }) { return (await context.params).id; }
-function requireOfficeCapability(request: Request) { const session = getRequiredSession(request); const scenario = getScenario(session); if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar frecuencias de servicio."); requireCapability(session, "serviceFrequency:manage"); return session; }
+function requireOfficeCapability(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar frecuencias de servicio.", capability: "serviceFrequency:manage", throwOnError: true }).session; }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
   const path = new URL(request.url).pathname;
