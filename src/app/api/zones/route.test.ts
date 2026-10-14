@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetZoneFixtures } from "@/lib/zones-fixtures";
 import { ZoneRequestError, zonesAdapter } from "@/lib/zones";
 import { GET, POST } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   resetZoneFixtures();
@@ -13,18 +13,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("authenticated zones BFF route", () => {
   it("requires an active session and returns the documented error envelope", async () => {
@@ -53,7 +42,7 @@ describe("authenticated zones BFF route", () => {
   });
 
   it("serves deterministic fixtures in mock mode without any capability requirement", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/zones", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -63,7 +52,7 @@ describe("authenticated zones BFF route", () => {
   });
 
   it("filters fixtures down to the named empty-results scenario", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/zones?search=zzz-sin-resultados", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -80,7 +69,7 @@ describe("authenticated zones BFF route", () => {
         headers: { "content-type": "application/json" },
       }),
     );
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const response = await GET(new Request("http://localhost/api/zones?active=true", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -105,7 +94,7 @@ describe("authenticated zones BFF route", () => {
   });
 
   it("POST blocks Field actors with 403 Forbidden (Office-only gate)", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/zones", {
         method: "POST",
@@ -121,7 +110,7 @@ describe("authenticated zones BFF route", () => {
   });
 
   it("POST validates request body and returns 400 on invalid input", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/zones", {
         method: "POST",
@@ -134,7 +123,7 @@ describe("authenticated zones BFF route", () => {
   });
 
   it("POST rejects duplicate code with 409 Conflict", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/zones", {
         method: "POST",
@@ -150,7 +139,7 @@ describe("authenticated zones BFF route", () => {
   });
 
   it("POST creates a new zone and returns 201 for Office actor", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/zones", {
         method: "POST",

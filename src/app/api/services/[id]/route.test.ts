@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 import { GET } from "./route";
+import { loginAs } from "@/test/session";
 
 const backendUnavailableMessage = "El backend no responde. Reintente en unos segundos.";
 
@@ -14,17 +14,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function backendCookie() {
-  process.env.M6_AUTH_MODE = "backend-development";
-  process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId: "office-duty-queue" }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 function serviceRequest(cookie: string) {
   return GET(
@@ -35,7 +25,7 @@ function serviceRequest(cookie: string) {
 
 describe("GET /api/services/:id backend availability", () => {
   it("returns 503 when fetch rejects with a network error", async () => {
-    const cookie = await backendCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
 
     const response = await serviceRequest(cookie);
@@ -45,7 +35,7 @@ describe("GET /api/services/:id backend availability", () => {
   });
 
   it("returns 503 when the backend does not respond before the timeout", async () => {
-    const cookie = await backendCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     vi.useFakeTimers();
     vi.spyOn(AbortSignal, "timeout").mockImplementation((timeoutMs) => {
       const controller = new AbortController();
@@ -83,7 +73,7 @@ describe("Service detail mock visibility", () => {
     if (status === 200) expect((await response.json()).crewId).toBe("crew-b");
   });
   it("preserves a backend detail 404", async () => {
-    const cookie = await backendCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     const error = { statusCode: 404, message: "Servicio no encontrado." };
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(error, { status: 404 }));
     const response = await serviceRequest(cookie);

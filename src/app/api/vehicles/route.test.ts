@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST as login } from "@/app/api/session/login/route";
 import { GET, POST } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -10,15 +11,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("vehicles BFF route", () => {
   it("requires an active session", async () => {
@@ -29,7 +22,7 @@ describe("vehicles BFF route", () => {
   });
 
   it("lists vehicles for an authenticated Field actor because assignment reads are not Office-only", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/vehicles?active=true&vehicleType=VAN", { headers: { cookie } }));
     const body = await response.json();
 
@@ -38,7 +31,7 @@ describe("vehicles BFF route", () => {
   });
 
   it("keeps vehicle management Office-only", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(new Request("http://localhost/api/vehicles", {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
@@ -50,7 +43,7 @@ describe("vehicles BFF route", () => {
   });
 
   it("creates a vehicle for Office and returns the documented resource", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(new Request("http://localhost/api/vehicles", {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },

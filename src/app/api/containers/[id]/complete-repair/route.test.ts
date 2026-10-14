@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetContainerFixtures();
@@ -16,17 +16,7 @@ afterEach(() => {
   resetContainerFixtures();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("POST /api/containers/[id]/complete-repair BFF route", () => {
   it("requires an active session and returns 401", async () => {
@@ -39,7 +29,7 @@ describe("POST /api/containers/[id]/complete-repair BFF route", () => {
   });
 
   it("transitions an under-repair container to active", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-4/complete-repair", {
         method: "POST",
@@ -56,7 +46,7 @@ describe("POST /api/containers/[id]/complete-repair BFF route", () => {
   });
 
   it("rejects standalone completion outside the under-repair state", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-3/complete-repair", {
         method: "POST",
@@ -70,7 +60,7 @@ describe("POST /api/containers/[id]/complete-repair BFF route", () => {
   });
 
   it("does not expose the standalone action to Field", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-4/complete-repair", {
         method: "POST",

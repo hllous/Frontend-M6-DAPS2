@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetRouteFixtures, getRouteFixture } from "@/lib/routes-fixtures";
 import { resetZoneFixtures } from "@/lib/zones-fixtures";
 import { PUT } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   resetRouteFixtures();
@@ -14,20 +14,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("authenticated routes [id]/stops BFF route", () => {
   it("requires an active session and returns 401", async () => {
@@ -44,7 +31,7 @@ describe("authenticated routes [id]/stops BFF route", () => {
   });
 
   it("blocks Field actors with 403 Forbidden (Office-only gate regression test)", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await PUT(
       new Request("http://localhost/api/routes/route-1/stops", {
         method: "PUT",
@@ -60,7 +47,7 @@ describe("authenticated routes [id]/stops BFF route", () => {
   });
 
   it("returns 400 when body is not valid JSON", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await PUT(
       new Request("http://localhost/api/routes/route-1/stops", {
         method: "PUT",
@@ -74,7 +61,7 @@ describe("authenticated routes [id]/stops BFF route", () => {
   });
 
   it("returns 400 when body contains duplicate zones", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await PUT(
       new Request("http://localhost/api/routes/route-1/stops", {
         method: "PUT",
@@ -95,7 +82,7 @@ describe("authenticated routes [id]/stops BFF route", () => {
   });
 
   it("returns 404 when route does not exist", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await PUT(
       new Request("http://localhost/api/routes/nonexistent-route/stops", {
         method: "PUT",
@@ -109,7 +96,7 @@ describe("authenticated routes [id]/stops BFF route", () => {
   });
 
   it("returns 404 when a referenced zone does not exist", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await PUT(
       new Request("http://localhost/api/routes/route-1/stops", {
         method: "PUT",
@@ -127,7 +114,7 @@ describe("authenticated routes [id]/stops BFF route", () => {
   });
 
   it("updates stops sequence atomically and returns 200 with full replaced stops in order", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await PUT(
       new Request("http://localhost/api/routes/route-1/stops", {
         method: "PUT",
@@ -164,7 +151,7 @@ describe("authenticated routes [id]/stops BFF route", () => {
   });
 
   it("allows replacing sequence with an empty array", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await PUT(
       new Request("http://localhost/api/routes/route-1/stops", {
         method: "PUT",
@@ -184,7 +171,7 @@ describe("authenticated routes [id]/stops BFF route", () => {
 
   it("proxies request to backend origin in backend-development mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "http://backend-test";
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(

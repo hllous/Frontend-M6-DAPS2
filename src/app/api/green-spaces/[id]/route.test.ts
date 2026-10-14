@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { DELETE, GET, PATCH } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -10,21 +10,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 const params = Promise.resolve({ id: "green-space-108-2" });
 
 describe("GreenSpace detail BFF route", () => {
   it("returns a GreenSpace detail to authenticated actors", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/green-spaces/green-space-108-2", { headers: { cookie } }), { params });
 
     expect(response.status).toBe(200);
@@ -32,7 +24,7 @@ describe("GreenSpace detail BFF route", () => {
   });
 
   it("updates and logically deletes a GreenSpace only for Office", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const update = await PATCH(new Request("http://localhost/api/green-spaces/green-space-108-2", {
       method: "PATCH",
       headers: { cookie, "content-type": "application/json" },
@@ -47,7 +39,7 @@ describe("GreenSpace detail BFF route", () => {
   });
 
   it("rejects Field edits and missing GreenSpaces", async () => {
-    const fieldCookie = await authenticatedCookie("field-crew-member-route");
+    const fieldCookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const forbidden = await PATCH(new Request("http://localhost/api/green-spaces/green-space-108-1", {
       method: "PATCH",
       headers: { cookie: fieldCookie, "content-type": "application/json" },
@@ -55,7 +47,7 @@ describe("GreenSpace detail BFF route", () => {
     }), { params: Promise.resolve({ id: "green-space-108-1" }) });
     expect(forbidden.status).toBe(403);
 
-    const officeCookie = await authenticatedCookie("office-duty-queue");
+    const officeCookie = await loginAs("office-duty-queue", { mode: "mock" });
     const missing = await GET(new Request("http://localhost/api/green-spaces/missing", { headers: { cookie: officeCookie } }), { params: Promise.resolve({ id: "missing" }) });
     expect(missing.status).toBe(404);
   });
