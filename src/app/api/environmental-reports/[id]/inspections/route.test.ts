@@ -57,7 +57,7 @@ describe("GET /api/environmental-reports/:id/inspections", () => {
     process.env.M6_AUTH_MODE = "mock";
     const mockLogin = await login(new Request("http://localhost/api/session/login", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
       body: JSON.stringify({ scenarioId: "office-duty-queue" }),
     }));
     const mockCookie = mockLogin.headers.get("set-cookie") ?? "";

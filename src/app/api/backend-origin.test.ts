@@ -214,7 +214,7 @@ describe("backend origin fail-closed behavior", () => {
 
     const response = await login(new Request("http://localhost/api/session/login", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
       body: JSON.stringify({ scenarioId: "office-duty-queue" }),
     }));
 

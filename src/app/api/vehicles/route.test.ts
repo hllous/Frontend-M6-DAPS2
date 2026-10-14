@@ -66,7 +66,7 @@ describe("vehicles BFF route pagination limits (#248)", () => {
       .mockImplementation(async () => new Response(JSON.stringify({ data: [] }), { status: 200, headers: { "content-type": "application/json" } }));
     const loginResponse = await login(new Request("http://localhost/api/session/login", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
       body: JSON.stringify({ scenarioId: "office-duty-queue" }),
     }));
     const cookie = loginResponse.headers.get("set-cookie") ?? "";

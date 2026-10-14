@@ -161,7 +161,7 @@ describe("/api/tree-interventions/[id]", () => {
     expect(invalidRemoval.status).toBe(409);
 
     process.env.M6_AUTH_MODE = "mock";
-    const loginResponse = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenarioId: "field-crew-member-route" }) }));
+    const loginResponse = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" }, body: JSON.stringify({ scenarioId: "field-crew-member-route" }) }));
     const fieldCookie = loginResponse.headers.get("set-cookie") ?? "";
     const forbidden = await authorize(
       transitionRequest("intervention-1", "authorize", fieldCookie, { authorizedByUserId: "user-sofia" }),
@@ -219,7 +219,7 @@ describe("/api/tree-interventions/[id]", () => {
 
     const fieldLogin = await login(new Request("http://localhost/api/session/login", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
       body: JSON.stringify({ scenarioId: "field-crew-member-route" }),
     }));
     const fieldCookie = fieldLogin.headers.get("set-cookie") ?? "";
