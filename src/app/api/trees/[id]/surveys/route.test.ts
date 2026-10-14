@@ -25,27 +25,35 @@ describe("/api/trees/[id]/surveys", () => {
     ["?page=0&pageSize=abc", "?page=1"],
     ["?healthStatus=HEALTHY&evil=1", "?healthStatus=HEALTHY"],
   ])("normalises backend list queries %s", async (query, expected) => {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_DEV_JWT = devJwt;
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0 } }));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
     const response = await GET(new Request(`http://localhost/trees/abc/surveys${query}`, { headers: { cookie } }), { params: { id: "abc" } });
     expect(response.status).toBe(200);
     expect(backendFetch).toHaveBeenCalledTimes(1);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/trees/abc/surveys${expected}`);
     expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 
 
   it.each(["GET", "POST"])("uses a valid tree path id for backend %s", async (method) => {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_DEV_JWT = devJwt;
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
     const request = new Request("http://localhost/api/trees/arbol-abc/surveys", { method, headers: { cookie, "content-type": "application/json" }, ...(method === "POST" ? { body: JSON.stringify(validInput) } : {}) });
     await (method === "GET" ? GET : POST)(request, { params: { id: "arbol-abc" } });
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/trees/arbol-abc/surveys");
     expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe(method);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    if (method === "POST") {
+      expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("content-type")).toBe("application/json");
+      expect(JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body))).toEqual(validInput);
+    }
   });
 
   it("lists newest-first history with documented filters for any authenticated actor", async () => {
