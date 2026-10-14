@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  CalendarClock,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -129,10 +130,48 @@ function ColumnFilterPopover({
   );
 }
 
+function ScheduledFilterPopover({
+  columnFilters,
+  onColumnFiltersChange,
+}: {
+  columnFilters: ColumnFilters;
+  onColumnFiltersChange: (filters: ColumnFilters) => void;
+}) {
+  return (
+    <ColumnFilterPopover
+      label="horario"
+      active={Boolean(columnFilters.timeFrom || columnFilters.timeTo)}
+      onClear={() => onColumnFiltersChange({ ...columnFilters, timeFrom: "", timeTo: "" })}
+    >
+      <div className="space-y-2 py-1 text-xs">
+        <label className="flex items-center justify-between gap-2">
+          <span className="text-[var(--color-text-secondary)]">Desde</span>
+          <input
+            type="time"
+            value={columnFilters.timeFrom}
+            onChange={(event) => onColumnFiltersChange({ ...columnFilters, timeFrom: event.target.value })}
+            className="rounded border border-[var(--color-border-strong)] px-1.5 py-0.5 text-xs text-[var(--color-text)]"
+          />
+        </label>
+        <label className="flex items-center justify-between gap-2">
+          <span className="text-[var(--color-text-secondary)]">Hasta</span>
+          <input
+            type="time"
+            value={columnFilters.timeTo}
+            onChange={(event) => onColumnFiltersChange({ ...columnFilters, timeTo: event.target.value })}
+            className="rounded border border-[var(--color-border-strong)] px-1.5 py-0.5 text-xs text-[var(--color-text)]"
+          />
+        </label>
+      </div>
+    </ColumnFilterPopover>
+  );
+}
+
 export function ServicesTable({
   services,
   serviceOrdinals: suppliedServiceOrdinals,
   filterOptionsServices = services,
+  compactOnPreview = false,
   selectedId,
   onSelect,
   sortKey,
@@ -147,6 +186,7 @@ export function ServicesTable({
   services: Service[];
   serviceOrdinals?: ReadonlyMap<string, number>;
   filterOptionsServices?: Service[];
+  compactOnPreview?: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
   sortKey: SortKey;
@@ -159,6 +199,7 @@ export function ServicesTable({
   dense?: boolean;
 }) {
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const compactColumns = dense || compactOnPreview;
 
   // Auto-scroll selected row into view smoothly
   useEffect(() => {
@@ -213,35 +254,47 @@ export function ServicesTable({
     { key: "zone", label: "Zona", hideWhenDense: true },
     { key: "status", label: "Estado" },
     { key: "crew", label: "Cuadrilla", hideWhenDense: true },
-    { key: "scheduled", label: "Programado" },
+    { key: "scheduled", label: "Programado", hideWhenDense: true },
   ];
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll [scrollbar-gutter:stable]">
         <table
-          className={cn("w-full table-fixed border-collapse text-left text-xs", dense ? "min-w-[22rem]" : "min-w-[40rem]")}
+          className="w-full min-w-0 table-fixed border-collapse text-left text-xs"
           aria-label="Servicios operativos"
         >
           <colgroup>
-            <col className={dense ? "w-[12%]" : "w-[8%]"} />
-            <col className={dense ? "w-[32%]" : "w-[28%]"} />
-            {!dense && <col className="w-[14%]" />}
-            <col className={dense ? "w-[26%]" : "w-[18%]"} />
-            {!dense && <col className="w-[18%]" />}
-            <col className={dense ? "w-[30%]" : "w-[14%]"} />
+            {compactColumns ? (
+              <>
+                <col className="w-[12%]" />
+                <col className="w-[56%]" />
+                <col className="w-[32%]" />
+              </>
+            ) : (
+              <>
+                <col className="w-[8%]" />
+                <col className="w-[25%]" />
+                <col className="w-[15%]" />
+                <col className="w-[18%]" />
+                <col className="w-[16%]" />
+                <col className="w-[18%]" />
+              </>
+            )}
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
             <tr>
               <th scope="col" aria-label="Número de parada" className="px-1 py-3 text-center">#</th>
               {columns.map((col) => {
-                if (dense && col.hideWhenDense) return null;
+                if (compactColumns && col.hideWhenDense) return null;
                 const isSorted = sortKey === col.key;
-                const ariaSort = isSorted
+                const isCompactDateSort = compactColumns && col.key === "service" && sortKey === "scheduled";
+                const ariaSort = isSorted || isCompactDateSort
                   ? sortDir === "asc"
                     ? "ascending"
                     : "descending"
                   : "none";
+                const sortButtonAriaSort = isSorted ? ariaSort : "none";
                 const directionLabel = sortDir === "asc" ? "ascendente" : "descendente";
 
                 return (
@@ -249,7 +302,7 @@ export function ServicesTable({
                     key={col.key}
                     scope="col"
                     aria-sort={ariaSort}
-                    className={cn("select-none px-1.5 py-3")}
+                    className="select-none px-1 py-2"
                   >
                     <div className={cn("flex items-center justify-between gap-1.5", dense && "gap-1")}>
                       <button
@@ -259,9 +312,9 @@ export function ServicesTable({
                           "flex min-w-0 items-center gap-1 hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] rounded",
                           dense && "gap-0.5",
                         )}
-                        aria-label={`Ordenar por ${col.label}, actualmente ${ariaSort === "none" ? "sin ordenar" : directionLabel}`}
+                        aria-label={`Ordenar por ${col.label}, actualmente ${sortButtonAriaSort === "none" ? "sin ordenar" : directionLabel}`}
                       >
-                        <span>{col.key === "scheduled" ? "Fecha" : col.label}</span>
+                        <span>{col.key === "scheduled" ? "Fecha" : col.key === "crew" ? "Equipo" : col.label}</span>
                         {isSorted ? (
                           sortDir === "asc" ? (
                             <ArrowUp className="h-3 w-3 text-[var(--color-action)]" aria-hidden />
@@ -272,6 +325,31 @@ export function ServicesTable({
                           <ArrowUpDown className="h-3 w-3 opacity-40 hover:opacity-100" aria-hidden />
                         )}
                       </button>
+
+                      {compactColumns && col.key === "service" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onSortChange("scheduled")}
+                            aria-label={`Ordenar por Fecha, actualmente ${sortKey === "scheduled" ? directionLabel : "sin ordenar"}`}
+                            className="inline-flex size-6 shrink-0 items-center justify-center rounded hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)]"
+                          >
+                            {sortKey === "scheduled" ? (
+                              sortDir === "asc" ? (
+                                <ArrowUp className="h-3 w-3 text-[var(--color-action)]" aria-hidden />
+                              ) : (
+                                <ArrowDown className="h-3 w-3 text-[var(--color-action)]" aria-hidden />
+                              )
+                            ) : (
+                              <CalendarClock className="h-3.5 w-3.5" aria-hidden />
+                            )}
+                          </button>
+                          <ScheduledFilterPopover
+                            columnFilters={columnFilters}
+                            onColumnFiltersChange={onColumnFiltersChange}
+                          />
+                        </>
+                      )}
 
                       {col.key === "zone" && (
                         <ColumnFilterPopover
@@ -340,32 +418,10 @@ export function ServicesTable({
                       )}
 
                       {col.key === "scheduled" && (
-                        <ColumnFilterPopover
-                          label="horario"
-                          active={Boolean(columnFilters.timeFrom || columnFilters.timeTo)}
-                          onClear={() => onColumnFiltersChange({ ...columnFilters, timeFrom: "", timeTo: "" })}
-                        >
-                          <div className="space-y-2 py-1 text-xs">
-                            <label className="flex items-center justify-between gap-2">
-                              <span className="text-[var(--color-text-secondary)]">Desde</span>
-                              <input
-                                type="time"
-                                value={columnFilters.timeFrom}
-                                onChange={(e) => onColumnFiltersChange({ ...columnFilters, timeFrom: e.target.value })}
-                                className="rounded border border-[var(--color-border-strong)] px-1.5 py-0.5 text-xs text-[var(--color-text)]"
-                              />
-                            </label>
-                            <label className="flex items-center justify-between gap-2">
-                              <span className="text-[var(--color-text-secondary)]">Hasta</span>
-                              <input
-                                type="time"
-                                value={columnFilters.timeTo}
-                                onChange={(e) => onColumnFiltersChange({ ...columnFilters, timeTo: e.target.value })}
-                                className="rounded border border-[var(--color-border-strong)] px-1.5 py-0.5 text-xs text-[var(--color-text)]"
-                              />
-                            </label>
-                          </div>
-                        </ColumnFilterPopover>
+                        <ScheduledFilterPopover
+                          columnFilters={columnFilters}
+                          onColumnFiltersChange={onColumnFiltersChange}
+                        />
                       )}
                     </div>
                   </th>
@@ -377,6 +433,13 @@ export function ServicesTable({
             {services.map((service) => {
               const isSelected = service.id === selectedId;
               const ordinal = serviceOrdinals.get(service.id)!;
+              const compactSecondaryInfo = [
+                service.zoneNames.join(", "),
+                formatCalendarDay(service.scheduledDate),
+                service.windowFrom
+                  ? `${service.windowFrom}${service.windowTo ? `–${service.windowTo}` : ""}`
+                  : "",
+              ].filter(Boolean).join(" · ");
 
               return (
                 <tr
@@ -414,64 +477,63 @@ export function ServicesTable({
                         event.stopPropagation();
                         onSelect(service.id);
                       }}
-                      className="flex w-full items-start gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                      className="flex min-w-0 w-full items-start gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
                     >
                       {service.mode === "ROUTE" ? (
                         <Route className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
                       ) : (
                         <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
                       )}
-                      <span>
-                        <span className="block font-semibold text-[var(--color-text)] leading-tight">
+                      <span className="min-w-0">
+                        <span className="block break-words font-semibold text-[var(--color-text)] leading-tight">
                           {service.title}
                         </span>
-                        {dense && service.zoneNames.length > 0 && (
+                        {dense && (
                           <span className="mt-0.5 block text-[11px] text-[var(--color-text-secondary)]">
-                            {service.zoneNames.join(", ")}
+                            {compactSecondaryInfo}
                           </span>
                         )}
                       </span>
                     </button>
                   </td>
 
-                  {!dense && (
-                    <td className="p-3 text-[var(--color-text)]">
+                  {!compactColumns && (
+                    <td className="px-1.5 py-2 text-[var(--color-text)]">
                       {service.zoneNames.join(", ")}
                     </td>
                   )}
 
                   <td className="px-1.5 py-2">
                     <div className="flex flex-col gap-1 items-start">
-                      <StatusBadge
-                        status={service.status}
-                        className={dense ? "gap-1 px-1.5 text-[10px] [&_svg]:h-3 [&_svg]:w-3" : undefined}
-                      />
+                      <StatusBadge status={service.status} className="gap-1 px-1.5 text-[11px] [&_svg]:h-3 [&_svg]:w-3" />
                     </div>
                   </td>
 
-                  {!dense && (
-                    <td className="p-3 text-[var(--color-text)]">
+                  {!compactColumns && (
+                    <td className="px-1.5 py-2 text-[var(--color-text)]">
                       {service.crewName ?? (
                         <span className="italic text-[var(--color-text-secondary)]">Sin asignar</span>
                       )}
                     </td>
                   )}
 
-                  <td className="px-1.5 py-2 text-[var(--color-text)] tabular-nums whitespace-nowrap">
-                    <div>{formatCalendarDay(service.scheduledDate)}</div>
-                    {service.windowFrom && (
-                      <div className="text-[11px] text-[var(--color-text-secondary)]">
-                        {service.windowFrom} – {service.windowTo ?? ""}
-                      </div>
-                    )}
-                  </td>
+                  {!compactColumns && (
+                    <td className="px-1.5 py-2 text-[var(--color-text)] tabular-nums">
+                      <div>{formatCalendarDay(service.scheduledDate)}</div>
+                      {service.windowFrom && (
+                        <div className="text-[11px] text-[var(--color-text-secondary)]">
+                          {service.windowFrom} – {service.windowTo ?? ""}
+                        </div>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
 
             {services.length === 0 && (
               <tr>
-                <td colSpan={columns.length + 1} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
+                <td colSpan={compactColumns ? 3 : columns.length + 1} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
                   <Empty className="mx-auto max-w-sm gap-3 rounded-none p-0" role="status">
                     <EmptyHeader>
                       <EmptyTitle>

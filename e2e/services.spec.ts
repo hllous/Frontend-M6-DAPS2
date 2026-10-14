@@ -11,6 +11,11 @@ async function openServices(page: import("@playwright/test").Page) {
   await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
 }
 
+async function expectNoHorizontalTableScroll(table: import("@playwright/test").Locator) {
+  const scrollport = table.locator("table").locator("xpath=..");
+  await expect.poll(() => scrollport.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+}
+
 test.describe("Servicios workspace responsive & interactive journeys @smoke", () => {
   test("wide viewport shows split pane with table, map, and synchronized selection", async ({ page }) => {
     await page.setViewportSize(WIDE_VIEWPORT);
@@ -22,6 +27,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
     await expect(table).toBeVisible();
     await expect(map).toBeVisible();
+    await expectNoHorizontalTableScroll(table);
     await expect(page.getByText(/Mostrando \d+ de \d+ servicios/)).toHaveCount(0);
     await expect(map.getByText(/servicios? visibles/i)).toHaveCount(0);
     await expect(map.getByText(/sin ubicaci[oó]n/i)).toHaveCount(0);
@@ -41,6 +47,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(previewTitle).toBeVisible();
     await expect(preview.locator("xpath=..")).toHaveCSS("opacity", "1");
     await expect(preview.getByRole("button", { name: "Ver detalle completo" })).toBeVisible();
+    await expectNoHorizontalTableScroll(table);
 
     // Assert the visible Leaflet pin itself, not the off-screen loading index.
     const marker1 = map.locator('.leaflet-marker-icon[data-service-id="SVC-1043"]');
@@ -50,6 +57,11 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const firstRowOrdinal = (await firstServiceRow.locator("td").first().innerText()).trim();
     await expect(marker1).toHaveText(firstRowOrdinal);
     await expect(map.locator('.leaflet-marker-icon[aria-pressed="true"]')).toHaveAttribute("data-service-id", "SVC-1043");
+    const marker18Id = await table.locator('tr[data-service-ordinal="18"]').getAttribute("data-service-id");
+    const marker18 = map.locator(`.leaflet-marker-icon[data-service-id="${marker18Id}"]`);
+    const selectedMarkerZIndex = await marker1.evaluate((element) => Number(getComputedStyle(element).zIndex));
+    const marker18ZIndex = await marker18.evaluate((element) => Number(getComputedStyle(element).zIndex));
+    expect(selectedMarkerZIndex).toBeGreaterThan(marker18ZIndex);
 
     // Close preview to test map interaction directly
     await preview.getByRole("button", { name: "Cerrar vista previa" }).click();
@@ -162,6 +174,10 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
 
     // List and map view switcher buttons within main content area
     const content = page.locator("#contenido-principal");
+    await expect(content).toHaveCSS("overflow-y", "hidden");
+    await expect(
+      content.getByRole("button", { name: "Programar nuevo servicio" }).getByText("Programar", { exact: true }),
+    ).toBeVisible();
     const listToggle = content.getByRole("button", { name: /Lista/ });
     const mapToggle = content.getByRole("button", { name: "Mapa" });
     await expect(listToggle).toBeVisible();
@@ -170,6 +186,8 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     // The map stays mounted behind the expanded list drawer.
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
     await expect(table).toBeVisible();
+    await expectNoHorizontalTableScroll(table);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(1);
     const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
     await expect(map).toBeVisible();
     const listDrawer = page.getByRole("complementary", { name: "Lista de servicios" });
@@ -195,6 +213,16 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await mapToggle.click();
     await expect(map).toBeVisible();
     await expect(listDrawer).toHaveAttribute("data-expanded", "false");
+    const unexpectedScrollports = await content.evaluate((main) =>
+      Array.from(main.querySelectorAll<HTMLElement>("*"))
+        .filter((element) => {
+          const style = getComputedStyle(element);
+          const scrollable = style.overflowY === "auto" || style.overflowY === "scroll";
+          return scrollable && element.scrollHeight > element.clientHeight + 2 && !element.closest('aside[aria-label="Lista de servicios"]');
+        })
+        .map((element) => element.className),
+    );
+    expect(unexpectedScrollports).toEqual([]);
     const marker = map.locator('.leaflet-marker-icon[data-service-id="SVC-1043"]');
     await expect(marker).toBeVisible();
     await expect(map.getByText(/servicios? sin ubicaci[oó]n/i)).toHaveCount(0);
@@ -206,6 +234,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const preview = page.locator("aside[aria-labelledby='preview-title']");
     await expect(preview).toBeVisible();
     await expect(preview.getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200", exact: true })).toHaveCount(1);
     await expect(preview.locator("xpath=..")).toHaveCSS("opacity", "1");
     const getMapSize = () => map.evaluate((element) => {
       const { width, height } = element.getBoundingClientRect();
@@ -334,8 +363,8 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     // Preview immediately reflects the assigned crew
     await expect(preview.getByText("Cuadrilla E - Membresia")).toBeVisible();
 
-    // Table row also shows the assigned crew
-    await expect(row.getByText("Cuadrilla E - Membresia")).toBeVisible();
+    // The selected row remains in place while its preview shows the assignment.
+    await expect(row).toHaveAttribute("aria-selected", "true");
   });
 
   test("enforces vehicle requirement and requires an overlap justification for service requiring vehicle", async ({ page }) => {
@@ -385,8 +414,8 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(preview.getByText("Cuadrilla A · López")).toBeVisible();
     await expect(preview.getByText("AA 123 AA")).toBeVisible();
 
-    // Table row also shows the assigned crew
-    await expect(row.getByText("Cuadrilla A · López")).toBeVisible();
+    // The selected row remains in place while its preview shows the assignment.
+    await expect(row).toHaveAttribute("aria-selected", "true");
   });
 });
 

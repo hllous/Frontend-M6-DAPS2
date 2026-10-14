@@ -652,8 +652,8 @@ describe("ServicesWorkspace component", () => {
       expect(screen.getByRole("complementary")).toHaveTextContent("Cuadrilla C · Ibáñez");
     });
 
-    // Table row also displays the assigned crew
-    expect(within(row).getByText("Cuadrilla C · Ibáñez")).toBeInTheDocument();
+    // The selected-row table uses its compact columns while the preview is open.
+    expect(within(row).queryByText("Cuadrilla C · Ibáñez")).not.toBeInTheDocument();
   });
 
   it("opens assign crew dialog via URL parameters and updates the service", async () => {

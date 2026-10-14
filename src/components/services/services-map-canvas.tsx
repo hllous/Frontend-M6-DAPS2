@@ -92,6 +92,7 @@ function AccessibleServiceMarker({
     <Marker
       ref={markerRef}
       position={location.coordinates!}
+      zIndexOffset={selected ? 1000 : 0}
       title={`${service.title} · ${locationLabel}`}
       alt={accessibleLabel}
       icon={serviceMarkerIcon(markerNumber, selected, greenSpace)}

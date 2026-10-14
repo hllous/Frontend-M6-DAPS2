@@ -717,6 +717,7 @@ export function ServicesWorkspace({
     <ServicesTable
       services={sortedServices}
       filterOptionsServices={loadState.status === "ready" ? loadState.services : []}
+      compactOnPreview={!isNarrow && Boolean(selectedService)}
       serviceOrdinals={serviceOrdinals}
       selectedId={selectedId}
       onSelect={handleSelect}
@@ -732,15 +733,18 @@ export function ServicesWorkspace({
   );
 
   const periodBar = (
-    <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm text-[var(--color-text-secondary)]">
+    <div className={cn(
+      "flex flex-wrap items-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
+      isNarrow ? "gap-2 px-2 py-1 text-xs" : "gap-3 px-4 py-2 text-sm",
+    )}>
       <label className="flex items-center gap-2">
         <span>Período</span>
         <select
           value={activePeriod}
           onChange={(event) => setPeriodChoice(event.target.value as Period)}
           className={cn(
-            "min-h-12 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 text-base",
-            !isNarrow && "min-h-10 text-sm",
+            "rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 text-sm",
+            isNarrow ? "h-10 min-h-10" : "min-h-10",
           )}
         >
           <option value="semana">Esta semana</option>
@@ -888,10 +892,10 @@ export function ServicesWorkspace({
     <div className="flex h-full flex-col overflow-hidden bg-[var(--color-canvas)]">
       {/* Workspace Header & Toolbar */}
       <header className={cn(
-        "border-b border-[var(--color-border)] bg-[var(--color-surface)] p-3",
-        !isNarrow && "px-5",
+        "border-b border-[var(--color-border)] bg-[var(--color-surface)]",
+        isNarrow ? "p-2" : "px-5 py-3",
       )}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-lg font-bold tracking-tight text-[var(--color-text)]">
               Servicios Urbanos
@@ -908,7 +912,7 @@ export function ServicesWorkspace({
                 value={search}
                 maxLength={MAX_SEARCH_LENGTH}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar servicio, zona o cuadrilla…"
+                placeholder={isNarrow ? "Buscar" : "Buscar servicio, zona o cuadrilla…"}
                 aria-label="Buscar servicios por texto libre"
                 className="rounded-xl pl-8 pr-8 text-xs"
               />
@@ -946,11 +950,11 @@ export function ServicesWorkspace({
                   setScheduleReferenceId(undefined);
                   setIsScheduleOpen(true);
                 }}
-                className="text-xs font-semibold gap-1.5 shrink-0"
+                className={cn("text-xs font-semibold gap-1.5 shrink-0", isNarrow && "h-12 px-3")}
                 aria-label="Programar nuevo servicio"
               >
                 <Plus className="h-3.5 w-3.5" aria-hidden />
-                <span>Programar servicio</span>
+                <span>{isNarrow ? "Programar" : "Programar servicio"}</span>
               </Button>
             )}
           </div>
@@ -1077,13 +1081,14 @@ export function ServicesWorkspace({
                   id="table-pane"
                   defaultSize="50%"
                   minSize="30%"
+                  style={{ overflow: "hidden" }}
                   className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}
                 >
                   <div className={cn("h-full min-h-0", isNarrow && "pointer-events-none")}>
                     {isNarrow ? (
                       <InventoryMapDrawer
                         ariaLabel="Lista de servicios"
-                        summary={selectedService?.title ?? "Lista de servicios"}
+                        summary=""
                         expanded={mobileTab === "list"}
                         onExpandedChange={(expanded) => setMobileTab(expanded ? "list" : "map")}
                         className={styles.mobileServiceDrawer}

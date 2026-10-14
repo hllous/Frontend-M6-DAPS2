@@ -68,6 +68,8 @@
 
 .serviceMarkerSelected {
   outline-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-text);
 }
 
 .serviceMarkerGreenSpace {

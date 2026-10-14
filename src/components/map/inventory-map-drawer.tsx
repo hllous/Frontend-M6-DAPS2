@@ -132,7 +132,7 @@ export function InventoryMapDrawer({
         aria-label={expanded ? "Ocultar lista" : "Mostrar lista"}
         aria-expanded={expanded}
         aria-controls={contentId}
-        aria-describedby={summaryId}
+        aria-describedby={summary ? summaryId : undefined}
         data-inventory-map-drawer-handle="true"
         onClick={handleClick}
         onPointerDown={handlePointerDown}
@@ -141,7 +141,7 @@ export function InventoryMapDrawer({
         onPointerCancel={finishDrag}
       >
         <span className={styles.grabber} aria-hidden="true" />
-        <span id={summaryId} className={styles.summary}>{summary}</span>
+        {summary ? <span id={summaryId} className={styles.summary}>{summary}</span> : null}
       </Button>
       <div
         id={contentId}
