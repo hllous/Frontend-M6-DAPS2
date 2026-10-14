@@ -84,6 +84,34 @@ describe("referral detail BFF", () => {
     });
   });
 
+  it("wraps non-JSON backend errors with the safe BFF envelope", async () => {
+    process.env.M6_AUTH_MODE = "backend-development";
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<html>internal proxy detail</html>", {
+      status: 503,
+      headers: { "content-type": "text/html" },
+    }));
+    const cookie = await loginAs("office-duty-queue");
+
+    const response = await GET(
+      new Request("http://localhost/api/referrals/RR-UPSTREAM-ERROR", { headers: { cookie } }),
+      { params: Promise.resolve({ id: "RR-UPSTREAM-ERROR" }) },
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("content-type")).toContain("application/json");
+    const body = await response.json();
+    expect(body).toMatchObject({
+      statusCode: 503,
+      error: "Service Unavailable",
+      message: "La respuesta del backend no tiene un tipo de contenido JSON válido.",
+      path: "/api/referrals/RR-UPSTREAM-ERROR",
+    });
+    expect(JSON.stringify(body)).not.toContain("internal proxy detail");
+  });
+
   it("checks backend referral sources with encoded ids using GET and the session bearer token", async () => {
     const id = "RR-encoded_42.3~";
     const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
