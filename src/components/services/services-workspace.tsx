@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 
+import { InventoryMapDrawer } from "@/components/map/inventory-map-drawer";
 import { Button } from "@/components/ui/button";
 import { FormControl } from "@/components/ui/form-control";
 import {
@@ -872,9 +873,6 @@ export function ServicesWorkspace({
             <h1 className="text-lg font-bold tracking-tight text-[var(--color-text)]">
               Servicios Urbanos
             </h1>
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              Programación y seguimiento territorial de recorridos y puntos
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -981,7 +979,7 @@ export function ServicesWorkspace({
             </div>
           )}
           {isNarrow ? (
-            /* Narrow Screens (< 760px): Focused List/Map Presentation */
+            /* Narrow Screens (<= 760px): Focused List/Map Presentation */
             <div className="flex flex-col flex-1 min-h-0">
               {periodBar}
               <div className="flex border-b border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -1046,21 +1044,36 @@ export function ServicesWorkspace({
                   </div>
                 )}
 
-                {/* Mobile live preview sheet/card when an item is selected */}
+                {/* The map preview overlays the map in the shared mobile drawer. */}
                 {selectedService && (
-                  <div className="absolute inset-x-0 bottom-0 z-40 max-h-[75%] rounded-t-2xl border-t border-[var(--color-border)] bg-[var(--color-surface)]">
-                    <ServicePreview
-                      service={selectedService}
-                      onOpenDetail={handleOpenDetail}
-                      onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
-                      onClose={closePreview}
-                    />
-                  </div>
+                  mobileTab === "map" ? (
+                    <InventoryMapDrawer
+                      ariaLabel="Vista previa del servicio"
+                      summary={selectedService.title}
+                    >
+                      <ServicePreview
+                        service={selectedService}
+                        onOpenDetail={handleOpenDetail}
+                        onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
+                        onClose={closePreview}
+                        className="border-l-0"
+                      />
+                    </InventoryMapDrawer>
+                  ) : (
+                    <div className="absolute inset-x-0 bottom-0 z-40 max-h-[75%] rounded-t-2xl border-t border-[var(--color-border)] bg-[var(--color-surface)]">
+                      <ServicePreview
+                        service={selectedService}
+                        onOpenDetail={handleOpenDetail}
+                        onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
+                        onClose={closePreview}
+                      />
+                    </div>
+                  )
                 )}
               </div>
             </div>
           ) : (
-            /* Wide Screens (>= 760px): Resizable, side-swappable split pane with live preview */
+            /* Office Screens (> 760px): Resizable, side-swappable split pane with live preview */
             <div className="relative flex flex-1 min-h-0 flex-col">
               {/* Split pane control bar */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]">
