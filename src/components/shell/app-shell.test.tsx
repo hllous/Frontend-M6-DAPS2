@@ -13,6 +13,7 @@ const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
   window.history.replaceState(null, "", "/");
+  document.title = "M6 — Ambiente e Higiene";
   resetTreeInterventionFixtures();
 });
 afterEach(() => server.resetHandlers());
@@ -45,6 +46,17 @@ describe("AppShell", () => {
     const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
     expect(within(moduleNavigation).getByRole("link", { name: "Servicios" })).toHaveAttribute("aria-current", "page");
     expect(within(moduleNavigation).getByRole("link", { name: "Mi trabajo" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("moves focus to main after a module change", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, "", "/app?destination=work");
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+
+    const main = screen.getByRole("main");
+    await user.click(within(screen.getByRole("navigation", { name: "Módulos" })).getByRole("link", { name: "Servicios" }));
+
+    await waitFor(() => expect(main).toHaveFocus());
   });
 
   it("keeps the catalog destination active on nested catalog routes", () => {
@@ -90,6 +102,7 @@ describe("AppShell", () => {
     await user.click(screen.getByRole("button", { name: "Más módulos" }));
     const sheet = await screen.findByRole("dialog");
 
+    expect(within(sheet).getByRole("button", { name: "Cerrar" })).toBeVisible();
     expect(within(sheet).getByRole("link", { name: "Catálogo" })).toHaveAttribute("href", "/app?destination=catalog");
     expect(within(sheet).getByRole("link", { name: "Tableros" })).toHaveAttribute("href", "/app?destination=dashboards");
   });

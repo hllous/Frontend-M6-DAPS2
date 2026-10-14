@@ -66,4 +66,19 @@ test.describe("automated WCAG checks @smoke", () => {
 
     await expectNoViolations(page);
   });
+
+  test("the portaled mobile sheet honors reduced motion and has a Spanish close name", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app");
+    await page.getByRole("button", { name: "Más módulos" }).click();
+
+    const sheet = page.getByRole("dialog", { name: "Más módulos" });
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toHaveCSS("transition-duration", "0s");
+    await expect(sheet).toHaveCSS("animation-name", "none");
+    await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCSS("background-color", "oklab(0 0 0 / 0.1)");
+    await expect(sheet.getByRole("button", { name: "Cerrar" })).toBeVisible();
+  });
 });

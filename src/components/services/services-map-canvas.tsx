@@ -148,6 +148,8 @@ function MapViewportController({
   filterFingerprint?: string;
 }) {
   const map = useMap();
+  const hasInitialFit = useRef(false);
+  const lastFilterFingerprint = useRef(filterFingerprint);
 
   useEffect(() => {
     const points = locations.flatMap((location) => [
@@ -159,9 +161,14 @@ function MapViewportController({
 
     if (points.length === 0) return;
 
+    const filtersChanged = lastFilterFingerprint.current !== filterFingerprint;
+    lastFilterFingerprint.current = filterFingerprint;
+    if (hasInitialFit.current && !filtersChanged) return;
+
     const bounds = new LatLngBounds(points);
     if (bounds.isValid()) {
       map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+      hasInitialFit.current = true;
     }
   }, [filterFingerprint, locations, map]);
 
@@ -175,14 +182,17 @@ export function ServicesMapCanvas({
   onSelect,
   filterFingerprint,
 }: ServicesMapCanvasProps) {
-  const servicesById = useMemo(() => new Map(services.map((service) => [service.id, service])), [services]);
+  const locationsByServiceId = useMemo(
+    () => new Map(locations.map((location) => [location.serviceId, location])),
+    [locations],
+  );
   // Every zone with a service gets its outline, so neighbouring barrios stay distinguishable.
   const serviceZones = useMemo(() => summarizeServiceZones(locations), [locations]);
-  const visibleMarkers = locations.flatMap((location) => {
-    const service = servicesById.get(location.serviceId);
-    if (!service || !location.coordinates) return [];
+  const visibleMarkers = services.flatMap((service, index) => {
+    const location = locationsByServiceId.get(service.id);
+    if (!location || !location.coordinates) return [];
 
-    return [{ service, location }];
+    return [{ service, location, markerNumber: index + 1 }];
   });
 
   return (
@@ -216,13 +226,13 @@ export function ServicesMapCanvas({
         )),
       )}
 
-      {visibleMarkers.map(({ service, location }, index) => {
+      {visibleMarkers.map(({ service, location, markerNumber }) => {
         return (
           <AccessibleServiceMarker
             key={service.id}
             service={service}
             location={location}
-            markerNumber={index + 1}
+            markerNumber={markerNumber}
             selected={service.id === selectedId}
             onSelect={onSelect}
           />

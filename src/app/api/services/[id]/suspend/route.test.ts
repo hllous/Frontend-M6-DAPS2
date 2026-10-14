@@ -139,11 +139,16 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
 
   it("forwards the reason label and note with JSON content type in backend-development mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
-    );
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      if (String(url).includes("/crews")) {
+        return Response.json({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] });
+      }
+      if ((init?.method ?? "GET") === "GET") {
+        return Response.json({ id: "SVC-1050", crewId: "11111111-1111-4111-8111-111111111111" });
+      }
+      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+    });
     // El login resuelve la cuadrilla de Campo contra GET /crews antes de la llamada bajo prueba.
-    backendFetch.mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] }), { status: 200 }));
     const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     backendFetch.mockClear();
 
@@ -157,7 +162,8 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     );
 
     expect(response.status).toBe(200);
-    const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    const actionCall = backendFetch.mock.calls.find(([, init]) => init?.method === "POST");
+    const requestInit = actionCall?.[1] as RequestInit;
     expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
     expect(JSON.parse(String(requestInit.body))).toEqual({ reason: "Desperfecto vehicular: El camión no arranca." });
   });
@@ -177,7 +183,7 @@ it.each([403, 409, 500, 503])("preserves backend error status and body (%s)", as
   const error = { statusCode: status, message: "El backend rechazó la operación." };
   const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
     if (String(url).includes("/crews")) return Response.json({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] });
-    if ((init?.method ?? "GET") === "GET") return Response.json({ crewId: "11111111-1111-4111-8111-111111111111" });
+    if ((init?.method ?? "GET") === "GET") return Response.json({ id: "real-service", crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
   const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });

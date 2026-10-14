@@ -130,6 +130,7 @@ test.describe("keyboard-only shell operation @smoke", () => {
 
     await page.keyboard.press("Enter");
     await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
-    await expect(page.locator(":focus")).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("main")).toBeFocused();
+    await expect(page).toHaveTitle("M6 — Servicios");
   });
 });

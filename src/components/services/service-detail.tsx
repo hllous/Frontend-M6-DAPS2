@@ -235,7 +235,8 @@ export function ServiceDetail({
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+        <section aria-labelledby="service-detail-content-heading" className="flex-1 overflow-y-auto p-6 min-[761px]:p-8 space-y-6">
+          <h2 id="service-detail-content-heading" className="sr-only">Detalle operativo del servicio</h2>
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
               {service.mode === "ROUTE" ? (
@@ -606,10 +607,10 @@ export function ServiceDetail({
               />
             )
           )}
-        </main>
+        </section>
 
         {/* Persistent Related items panel (per ADR and UI architecture) */}
-        <aside className="hidden w-72 shrink-0 border-l border-[var(--color-border)] bg-[var(--color-canvas)] p-5 md:block overflow-y-auto" aria-label="Elementos relacionados">
+        <aside className="hidden w-72 shrink-0 border-l border-[var(--color-border)] bg-[var(--color-canvas)] p-5 min-[761px]:block overflow-y-auto" aria-label="Elementos relacionados">
           <h3 className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">
             Contexto relacionado
           </h3>

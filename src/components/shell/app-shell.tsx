@@ -19,7 +19,7 @@ import {
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -135,11 +135,18 @@ export function AppShell({
     : requestedDestination && navigation.some((item) => item.id === requestedDestination)
       ? requestedDestination
       : "work";
+  const mainRef = useRef<HTMLElement>(null);
+  const previousDestination = useRef(destination);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const isTablet = useTabletNavigation();
   const navigationIsIconOnly = isCollapsed || isTablet;
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const availableItems = navigation.filter((item) => isAllowed(item, scenario));
+
+  useEffect(() => {
+    if (previousDestination.current !== destination) mainRef.current?.focus();
+    previousDestination.current = destination;
+  }, [destination]);
 
   return (
     <div className={`${styles.shell} ${isCollapsed ? styles.collapsed : ""}`}>
@@ -190,7 +197,7 @@ export function AppShell({
         </div>
       </header>
 
-      <main className={styles.main} id="contenido-principal" tabIndex={-1}>
+      <main ref={mainRef} className={styles.main} id="contenido-principal" tabIndex={-1}>
         {pathname.startsWith("/app/") ? (
           routeContent
         ) : destination === "work" ? (

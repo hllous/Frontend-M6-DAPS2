@@ -34,7 +34,7 @@ export function ServicePreview({
   return (
     <aside
       className={cn(
-        "flex h-full flex-col bg-[var(--color-surface)] border-l border-[var(--color-border)] shadow-md overflow-hidden",
+        "flex h-full flex-col bg-[var(--color-surface)] border-l border-[var(--color-border)] overflow-hidden",
         className,
       )}
       aria-labelledby="preview-title"

@@ -34,9 +34,11 @@ describe("ConfirmRescheduleDialog", () => {
   it("asks for a date when none was chosen, without calling the backend", async () => {
     let posts = 0;
     server.use(http.post("*/api/services/:id/confirm-reschedule", () => { posts += 1; return HttpResponse.json({}, { status: 500 }); }));
-    renderDialog();
+    const { dateInput } = renderDialog();
     await userEvent.click(screen.getByRole("button", { name: "Confirmar nueva fecha" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Seleccione la nueva fecha del servicio.");
+    expect(dateInput).toHaveAttribute("aria-invalid", "true");
+    expect(document.getElementById(dateInput.getAttribute("aria-describedby")!)).toHaveTextContent("Seleccione la nueva fecha del servicio.");
     expect(posts).toBe(0);
   });
 

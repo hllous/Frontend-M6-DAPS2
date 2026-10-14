@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   NOT_SERVICED_REASON_LABEL,
   NotServicedReason,
@@ -122,6 +122,7 @@ function SuspendServiceForm({
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ reason?: string; note?: string }>({});
   const pendingEvidenceCount = queuedFiles.filter((file) => file.status !== "success").length;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -244,14 +245,17 @@ function SuspendServiceForm({
     setErrorMessage(null);
 
     if (!reason) {
-      setErrorMessage("Debe seleccionar un motivo de suspensión.");
+      setErrorMessage(null);
+      setFieldErrors({ reason: "Debe seleccionar un motivo de suspensión." });
       return;
     }
     if (!note.trim()) {
-      setErrorMessage("Debe indicar una nota describiendo la suspensión.");
+      setErrorMessage(null);
+      setFieldErrors({ note: "Debe indicar una nota describiendo la suspensión." });
       return;
     }
 
+    setFieldErrors({});
     const payload: SuspendDraftPayload = { reason: reason as NotServicedReason, note: note.trim() };
     setIsSubmitting(true);
 
@@ -406,10 +410,13 @@ function SuspendServiceForm({
                   value={reason}
                   onChange={(e) => {
                     setReason(e.target.value as NotServicedReason);
+                    setFieldErrors((prev) => ({ ...prev, reason: undefined }));
                     setErrorMessage(null);
                   }}
                   required
-                  className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                  aria-invalid={Boolean(fieldErrors.reason)}
+                  aria-describedby={fieldErrors.reason ? `${formId}-reason-error` : undefined}
+                  className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                 >
                   <option value="">Seleccione un motivo…</option>
                   {(Object.keys(NOT_SERVICED_REASON_LABEL) as NotServicedReason[]).map((r) => (
@@ -418,6 +425,7 @@ function SuspendServiceForm({
                     </option>
                   ))}
                 </select>
+                {fieldErrors.reason && <FieldError id={`${formId}-reason-error`}>{fieldErrors.reason}</FieldError>}
               </Field>
 
               <Field>
@@ -430,22 +438,26 @@ function SuspendServiceForm({
                   value={note}
                   onChange={(e) => {
                     setNote(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, note: undefined }));
                     setErrorMessage(null);
                   }}
                   required
+                  aria-invalid={Boolean(fieldErrors.note)}
+                  aria-describedby={fieldErrors.note ? `${formId}-note-help ${formId}-note-error` : `${formId}-note-help`}
                   placeholder="Describa la causa de la interrupción y cualquier detalle relevante para Oficina…"
-                  className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                  className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
                 />
-                <FieldDescription>
+                <FieldDescription id={`${formId}-note-help`}>
                   Obligatoria. Se envía junto con el motivo seleccionado; entre ambos no pueden
                   superar los 500 caracteres.
                 </FieldDescription>
+                {fieldErrors.note && <FieldError id={`${formId}-note-error`}>{fieldErrors.note}</FieldError>}
               </Field>
             </>
           )}
 
           <div className="space-y-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4">
-            <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <span className="font-bold text-[var(--color-text)] block text-xs">
                   {suspendedService ? "Archivos de evidencia" : "Evidencia adjunta"}
@@ -458,21 +470,21 @@ function SuspendServiceForm({
               </div>
               {!suspendedService && (
                 <>
-                  <label
-                    htmlFor={`${formId}-evidence-input`}
-                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)] cursor-pointer"
-                  >
-                    <Upload className="h-3.5 w-3.5" aria-hidden />
-                    <span>Seleccionar archivo</span>
-                  </label>
                   <input
                     id={`${formId}-evidence-input`}
                     type="file"
                     multiple
                     accept="image/jpeg,image/png,image/webp,application/pdf"
                     onChange={handleFileSelect}
-                    className="sr-only"
+                    className="peer sr-only"
                   />
+                  <label
+                    htmlFor={`${formId}-evidence-input`}
+                    className="inline-flex min-h-12 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)] cursor-pointer peer-focus-visible:outline-none peer-focus-visible:ring-3 peer-focus-visible:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                  >
+                    <Upload aria-hidden />
+                    <span>Seleccionar archivo</span>
+                  </label>
                 </>
               )}
             </div>
@@ -548,7 +560,7 @@ function SuspendServiceForm({
           </div>
         </FieldGroup>
 
-        <DialogFooter className="border-t border-[var(--color-border)] pt-4 gap-2 sm:justify-end">
+        <DialogFooter className="flex-wrap border-t border-[var(--color-border)] pt-4 gap-2 sm:justify-end">
           {suspendedService ? (
             <>
               <Button
@@ -567,10 +579,11 @@ function SuspendServiceForm({
                 size="sm"
                 disabled={isSubmitting || pendingEvidenceCount === 0}
                 onClick={handleRetryPendingUploads}
-                className="text-xs font-semibold gap-1.5"
+                aria-busy={isSubmitting}
+                className="min-h-12 text-xs font-semibold gap-1.5 min-[761px]:min-h-10"
               >
-                <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-                <span>{isSubmitting ? "Reintentando cargas..." : "Reintentar archivos pendientes"}</span>
+                <RefreshCw data-icon="inline-start" className={isSubmitting ? "animate-spin" : ""} aria-hidden />
+                <span>Reintentar archivos pendientes</span>
               </Button>
             </>
           ) : (
@@ -591,16 +604,13 @@ function SuspendServiceForm({
                 variant="default"
                 size="sm"
                 disabled={isSubmitting}
-                className="text-xs font-semibold gap-1.5"
+                aria-busy={isSubmitting}
+                className="min-h-12 text-xs font-semibold gap-1.5 min-[761px]:min-h-10"
               >
-                <Pause className="h-3.5 w-3.5" aria-hidden />
-                <span>
-                  {isSubmitting
-                    ? "Suspendiendo..."
-                    : draftPending
-                      ? "Reintentar envío"
-                      : "Suspender servicio"}
-                </span>
+                {draftPending
+                  ? <RefreshCw data-icon="inline-start" className={isSubmitting ? "animate-spin" : ""} aria-hidden />
+                  : <Pause data-icon="inline-start" aria-hidden />}
+                <span>{draftPending ? "Reintentar envío" : "Suspender servicio"}</span>
               </Button>
             </>
           )}

@@ -216,9 +216,17 @@ describe("zone-results BFF route", () => {
 
   it("forwards the zone-result DTO with JSON content type", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 201, headers: { "content-type": "application/json" } }));
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/crews")) {
+        return new Response(JSON.stringify({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (url.endsWith("/services/SVC-1050")) {
+        return new Response(JSON.stringify({ id: "SVC-1050", crewId: "11111111-1111-4111-8111-111111111111" }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response("{}", { status: 201, headers: { "content-type": "application/json" } });
+    });
     // El login resuelve la cuadrilla de Campo contra GET /crews antes de la llamada bajo prueba.
-    backendFetch.mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] }), { status: 200 }));
     const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     backendFetch.mockClear();
     const input = { zoneId: "zone-3", status: "PARTIAL" as const, reason: "WEATHER" as const, notes: "Lluvia intensa" };
@@ -233,7 +241,12 @@ describe("zone-results BFF route", () => {
     );
 
     expect(response.status).toBe(201);
-    const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(backendFetch.mock.calls.map(([url]) => String(url))).toEqual([
+      "https://backend.internal/services/SVC-1050",
+      "https://backend.internal/services/SVC-1050/zone-results",
+    ]);
+    const requestInit = backendFetch.mock.calls[1]?.[1] as RequestInit;
+    expect(requestInit.method).toBe("POST");
     expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
     expect(JSON.parse(String(requestInit.body))).toEqual(input);
   });

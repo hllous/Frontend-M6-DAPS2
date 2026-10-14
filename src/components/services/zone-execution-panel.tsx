@@ -500,7 +500,7 @@ export function ZoneExecutionPanel({
     <div
       role="region"
       aria-labelledby="zone-execution-heading"
-      className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 md:p-6"
+      className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 min-[761px]:p-6"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-[var(--color-border)] pb-4">
         <div>
@@ -611,7 +611,7 @@ export function ZoneExecutionPanel({
       )}
 
       {/* Mobile Zone Navigation Disclosure */}
-      <div className="md:hidden mt-4">
+      <div className="min-[761px]:hidden mt-4">
         <button
           type="button"
           ref={mobileToggleRef}
@@ -696,11 +696,11 @@ export function ZoneExecutionPanel({
       </div>
 
       {/* Main Layout: Desktop Sidebar Nav + Uninterrupted Zone Form */}
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div className="mt-5 grid grid-cols-1 min-[761px]:grid-cols-12 gap-6">
         {/* Desktop Zone Navigation */}
         <aside
           aria-label="Navegación de zonas del servicio"
-          className="hidden md:block md:col-span-4 border-r border-[var(--color-border)] pr-4"
+          className="hidden min-[761px]:block min-[761px]:col-span-4 border-r border-[var(--color-border)] pr-4"
         >
           <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
             Zonas asignadas ({zoneResults.length}/{service.zoneIds.length})
@@ -719,7 +719,7 @@ export function ZoneExecutionPanel({
                     aria-current={isCurrent ? "true" : undefined}
                     className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-colors ${
                       isCurrent
-                        ? "bg-[var(--color-action)] text-white shadow-sm"
+                        ? "bg-[var(--color-action)] text-white"
                         : "text-[var(--color-text)] hover:bg-[var(--color-canvas)] border border-transparent hover:border-[var(--color-border)]"
                     }`}
                   >
@@ -747,7 +747,7 @@ export function ZoneExecutionPanel({
         </aside>
 
         {/* Zone Result Form or Detail View */}
-        <div className="md:col-span-8">
+        <div className="min-[761px]:col-span-8">
           <div className="flex items-center justify-between mb-4">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
