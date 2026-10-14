@@ -64,7 +64,7 @@ test.describe("Tree catalog management #126", () => {
     await detail.getByRole("link", { name: "Ver en el mapa" }).click();
 
     await expect(page).toHaveURL(/destination=map&tree=tree-1/);
-    const visibleItems = page.getByRole("region", { name: "Elementos visibles" });
+    const visibleItems = page.getByRole("region", { name: "Elementos" });
     await expect(visibleItems.getByRole("button", { name: /ARB-00442/ })).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("link", { name: "Ver ficha del árbol ARB-00442" }).click();
 
