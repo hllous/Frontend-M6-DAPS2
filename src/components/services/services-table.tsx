@@ -188,7 +188,7 @@ export function ServicesTable({
   serviceOrdinals?: ReadonlyMap<string, number>;
   filterOptionsServices?: Service[];
   compactOnPreview?: boolean;
-  previewMotionVariant?: "a" | "b" | "c";
+  previewMotionVariant?: "a" | "b" | "c" | "d" | "e" | "f";
   selectedId: string | null;
   onSelect: (id: string) => void;
   sortKey: SortKey;
@@ -202,7 +202,8 @@ export function ServicesTable({
 }) {
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const animatedColumnCollapse = !dense && compactOnPreview && previewMotionVariant === "a";
-  const compactColumns = dense || (compactOnPreview && !animatedColumnCollapse);
+  const compactColumns = dense || (compactOnPreview && (previewMotionVariant === "b" || previewMotionVariant === "c" || previewMotionVariant === "f"));
+  const stableDesktopPreviewTable = !dense && (previewMotionVariant === "d" || previewMotionVariant === "e" || previewMotionVariant === "f");
 
   // Auto-scroll selected row into view smoothly
   useEffect(() => {
@@ -262,10 +263,14 @@ export function ServicesTable({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
-      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll [scrollbar-gutter:stable]">
+      <div
+        data-preview-clip={stableDesktopPreviewTable ? "true" : undefined}
+        className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll [scrollbar-gutter:stable]"
+      >
         <table
           data-motion-variant={previewMotionVariant}
           className="w-full min-w-0 table-fixed border-collapse text-left text-xs"
+          style={stableDesktopPreviewTable ? { width: "calc(50vw - 134px)", minWidth: "calc(50vw - 134px)" } : undefined}
           aria-label="Servicios operativos"
         >
           <colgroup>
@@ -316,8 +321,9 @@ export function ServicesTable({
                     scope="col"
                     aria-sort={ariaSort}
                     data-preview-collapse-column={animatedColumnCollapse && col.hideWhenDense ? "true" : undefined}
-                    aria-hidden={animatedColumnCollapse && col.hideWhenDense ? true : undefined}
-                    inert={animatedColumnCollapse && col.hideWhenDense}
+                    data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" && col.key !== "service" ? "true" : undefined}
+                    aria-hidden={animatedColumnCollapse && col.hideWhenDense ? true : compactOnPreview && previewMotionVariant === "e" && col.key !== "service" ? true : undefined}
+                    inert={animatedColumnCollapse && col.hideWhenDense || compactOnPreview && previewMotionVariant === "e" && col.key !== "service"}
                     className="select-none px-1 py-2"
                   >
                     <div className={cn("flex items-center justify-between gap-1.5", dense && "gap-1")}>
@@ -516,15 +522,21 @@ export function ServicesTable({
                   {!compactColumns && (
                     <td
                       data-preview-collapse-column={animatedColumnCollapse ? "true" : undefined}
-                      aria-hidden={animatedColumnCollapse || undefined}
-                      inert={animatedColumnCollapse}
+                      data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" ? "true" : undefined}
+                      aria-hidden={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e" || undefined}
+                      inert={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e"}
                       className="px-1.5 py-2 text-[var(--color-text)]"
                     >
                       {service.zoneNames.join(", ")}
                     </td>
                   )}
 
-                  <td className="px-1.5 py-2">
+                  <td
+                    data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" ? "true" : undefined}
+                    aria-hidden={compactOnPreview && previewMotionVariant === "e" || undefined}
+                    inert={compactOnPreview && previewMotionVariant === "e"}
+                    className="px-1.5 py-2"
+                  >
                     <div className="flex flex-col gap-1 items-start">
                       <StatusBadge status={service.status} className="gap-1 px-1.5 text-[11px] [&_svg]:h-3 [&_svg]:w-3" />
                     </div>
@@ -533,8 +545,9 @@ export function ServicesTable({
                   {!compactColumns && (
                     <td
                       data-preview-collapse-column={animatedColumnCollapse ? "true" : undefined}
-                      aria-hidden={animatedColumnCollapse || undefined}
-                      inert={animatedColumnCollapse}
+                      data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" ? "true" : undefined}
+                      aria-hidden={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e" || undefined}
+                      inert={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e"}
                       className="px-1.5 py-2 text-[var(--color-text)]"
                     >
                       {service.crewName ?? (
@@ -546,8 +559,9 @@ export function ServicesTable({
                   {!compactColumns && (
                     <td
                       data-preview-collapse-column={animatedColumnCollapse ? "true" : undefined}
-                      aria-hidden={animatedColumnCollapse || undefined}
-                      inert={animatedColumnCollapse}
+                      data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" ? "true" : undefined}
+                      aria-hidden={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e" || undefined}
+                      inert={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e"}
                       className="px-1.5 py-2 text-[var(--color-text)] tabular-nums"
                     >
                       <div>{formatCalendarDay(service.scheduledDate)}</div>

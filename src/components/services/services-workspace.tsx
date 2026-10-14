@@ -69,12 +69,12 @@ import { servicesMobileBreakpoint } from "@/lib/services-layout";
 import styles from "./services-workspace.module.css";
 
 type Period = "semana" | "mes" | "todo";
-type MotionVariant = "a" | "b" | "c";
+type MotionVariant = "a" | "b" | "c" | "d" | "e" | "f";
 
-const motionVariants: MotionVariant[] = ["a", "b", "c"];
+const motionVariants: MotionVariant[] = ["a", "b", "c", "d", "e", "f"];
 
 function parseMotionVariant(value: string | null): MotionVariant {
-  return value === "b" || value === "c" ? value : "a";
+  return value === "b" || value === "c" || value === "d" || value === "e" || value === "f" ? value : "a";
 }
 
 type LoadState =
@@ -723,23 +723,33 @@ export function ServicesWorkspace({
     columnFilters.crews.size > 0 ||
     Boolean(columnFilters.timeFrom || columnFilters.timeTo);
 
+  const servicesTableProps = {
+    services: sortedServices,
+    filterOptionsServices: loadState.status === "ready" ? loadState.services : [],
+    serviceOrdinals,
+    selectedId,
+    onSelect: handleSelect,
+    sortKey,
+    sortDir,
+    onSortChange: handleSortChange,
+    columnFilters,
+    onColumnFiltersChange: setColumnFilters,
+    hasActiveFilters,
+    onClearFilters: handleClearFilters,
+    dense: isNarrow,
+  };
   const servicesTable = (
     <ServicesTable
-      services={sortedServices}
-      filterOptionsServices={loadState.status === "ready" ? loadState.services : []}
+      {...servicesTableProps}
       compactOnPreview={!isNarrow && Boolean(selectedService)}
       previewMotionVariant={motionVariant}
-      serviceOrdinals={serviceOrdinals}
-      selectedId={selectedId}
-      onSelect={handleSelect}
-      sortKey={sortKey}
-      sortDir={sortDir}
-      onSortChange={handleSortChange}
-      columnFilters={columnFilters}
-      onColumnFiltersChange={setColumnFilters}
-      hasActiveFilters={hasActiveFilters}
-      onClearFilters={handleClearFilters}
-      dense={isNarrow}
+    />
+  );
+  const servicesTableFull = (
+    <ServicesTable
+      {...servicesTableProps}
+      compactOnPreview={false}
+      previewMotionVariant={motionVariant}
     />
   );
 
@@ -1056,8 +1066,16 @@ export function ServicesWorkspace({
             <div className={cn(
               "relative min-h-0 min-w-0 flex-1",
               isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout,
-              !isNarrow && selectedService && styles.desktopWorkspaceLayoutOpen,
-            )} data-motion-variant={motionVariant} data-preview-open={selectedService ? "true" : "false"}>
+              !isNarrow && selectedService && !["d", "e", "f"].includes(motionVariant) && styles.desktopWorkspaceLayoutOpen,
+            )}
+            data-motion-variant={motionVariant}
+            data-preview-open={selectedService ? "true" : "false"}
+            onTransitionEnd={(event) => {
+              if (event.target === event.currentTarget && event.propertyName === "grid-template-columns") {
+                window.dispatchEvent(new Event("services-workspace-layout-settled"));
+              }
+            }}
+          >
               <ResizablePanelGroup direction="horizontal" className={cn("h-full min-w-0 flex-1", styles.panelGroup)}>
                 <ResizablePanel
                   id="map-pane"
@@ -1129,6 +1147,23 @@ export function ServicesWorkspace({
                           </div>
                         </div>
                       </InventoryMapDrawer>
+                    ) : motionVariant === "f" ? (
+                      <div className={styles.tableSnapshots}>
+                        <div
+                          className={styles.tableSnapshotFull}
+                          aria-hidden={Boolean(selectedService)}
+                          inert={Boolean(selectedService)}
+                        >
+                          {servicesTableFull}
+                        </div>
+                        <div
+                          className={styles.tableSnapshotCompact}
+                          aria-hidden={!selectedService}
+                          inert={!selectedService}
+                        >
+                          {servicesTable}
+                        </div>
+                      </div>
                     ) : servicesTable}
                   </div>
                 </ResizablePanel>

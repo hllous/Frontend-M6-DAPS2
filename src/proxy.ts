@@ -8,7 +8,7 @@ export function proxy(request: NextRequest) {
     const destination = request.nextUrl.searchParams.get("destination");
     const variant = request.nextUrl.searchParams.get("variant");
 
-    if (destination === "services" && ["a", "b", "c"].includes(variant ?? "")) {
+    if (destination === "services" && ["a", "b", "c", "d", "e", "f"].includes(variant ?? "")) {
       loginUrl.searchParams.set("destination", destination);
       loginUrl.searchParams.set("variant", variant!);
     }

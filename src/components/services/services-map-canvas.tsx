@@ -125,18 +125,25 @@ function MapResizeController() {
 
   useEffect(() => {
     const container = map.getContainer();
+    let frame = 0;
 
-    // El contenedor del mapa vive dentro de paneles redimensionables (react-resizable-panels)
-    // y de un layout con flex/grid. Leaflet no detecta esos cambios de tamaño por sí solo:
-    // si no se le avisa con invalidateSize(), sigue usando las dimensiones con las que
-    // midió por última vez, lo que rompe el renderizado al hacer zoom y limita el arrastre
-    // a la zona que sí alcanzó a medir correctamente.
-    const observer = new ResizeObserver(() => {
-      map.invalidateSize();
-    });
+    // El contenedor cambia con el layout. Agrupa la actualización de Leaflet en
+    // el siguiente frame y evita que invalidateSize centre el mapa durante el tween.
+    const scheduleInvalidate = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        map.invalidateSize({ pan: false, debounceMoveend: true });
+      });
+    };
+    const observer = new ResizeObserver(scheduleInvalidate);
     observer.observe(container);
+    window.addEventListener("services-workspace-layout-settled", scheduleInvalidate);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("services-workspace-layout-settled", scheduleInvalidate);
+      window.cancelAnimationFrame(frame);
+    };
   }, [map]);
 
   return null;

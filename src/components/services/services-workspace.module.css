@@ -176,6 +176,145 @@
   transform: translateY(0) scale(1);
 }
 
+.desktopWorkspaceLayout[data-motion-variant="d"],
+.desktopWorkspaceLayout[data-motion-variant="e"],
+.desktopWorkspaceLayout[data-motion-variant="f"] {
+  grid-template-columns: minmax(0, 100%) minmax(0, 0%);
+  transition: grid-template-columns 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.desktopWorkspaceLayout[data-motion-variant="d"][data-preview-open="true"],
+.desktopWorkspaceLayout[data-motion-variant="e"][data-preview-open="true"],
+.desktopWorkspaceLayout[data-motion-variant="f"][data-preview-open="true"] {
+  grid-template-columns: minmax(0, 67%) minmax(0, 33%);
+}
+
+.desktopWorkspaceLayout[data-motion-variant="d"] .previewSurface,
+.desktopWorkspaceLayout[data-motion-variant="e"] .previewSurface,
+.desktopWorkspaceLayout[data-motion-variant="f"] .previewSurface {
+  clip-path: inset(10% 0 0);
+  transform: translateY(28px) scale(0.98);
+  transition:
+    clip-path 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.desktopWorkspaceLayout[data-motion-variant="d"] .previewRailOpen .previewSurface,
+.desktopWorkspaceLayout[data-motion-variant="e"] .previewRailOpen .previewSurface,
+.desktopWorkspaceLayout[data-motion-variant="f"] .previewRailOpen .previewSurface {
+  clip-path: inset(0);
+  transform: translateY(0) scale(1);
+}
+
+.desktopWorkspaceLayout[data-motion-variant="d"] [data-preview-clip],
+.desktopWorkspaceLayout[data-motion-variant="e"] [data-preview-clip],
+.desktopWorkspaceLayout[data-motion-variant="f"] [data-preview-clip] {
+  overflow-x: hidden;
+}
+
+.desktopWorkspaceLayout[data-motion-variant="d"] [data-prototype-table-content] {
+  filter: grayscale(0);
+  opacity: 1;
+  transition:
+    filter 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.desktopWorkspaceLayout[data-motion-variant="d"][data-preview-open="true"] [data-prototype-table-content] {
+  filter: grayscale(0.72);
+  opacity: 0.58;
+}
+
+.desktopWorkspaceLayout[data-motion-variant="e"] [data-preview-trailing-column] {
+  clip-path: inset(0);
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    clip-path 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.desktopWorkspaceLayout[data-motion-variant="e"][data-preview-open="true"] [data-preview-trailing-column] {
+  clip-path: inset(0 0 0 100%);
+  opacity: 0;
+  transform: translateX(24px);
+}
+
+.desktopWorkspaceLayout[data-motion-variant="f"] [data-prototype-table-content] {
+  position: relative;
+  overflow: hidden;
+}
+
+.tableSnapshots {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tableSnapshotFull,
+.tableSnapshotCompact {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transition: opacity 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tableSnapshotFull {
+  opacity: 1;
+}
+
+.tableSnapshotCompact {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.desktopWorkspaceLayout[data-motion-variant="f"][data-preview-open="true"] .tableSnapshotFull {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.desktopWorkspaceLayout[data-motion-variant="f"][data-preview-open="true"] .tableSnapshotCompact {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.desktopWorkspaceLayout[data-motion-variant="f"] table tbody tr {
+  height: 3.25rem;
+}
+
+.desktopWorkspaceLayout[data-motion-variant="f"] [data-service-select] > span > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktopWorkspaceLayout[data-motion-variant="d"],
+  .desktopWorkspaceLayout[data-motion-variant="e"],
+  .desktopWorkspaceLayout[data-motion-variant="f"] {
+    transition-duration: 1ms;
+  }
+
+  .desktopWorkspaceLayout[data-motion-variant="d"] [data-prototype-table-content] {
+    filter: none;
+    transition-duration: 1ms;
+  }
+
+  .desktopWorkspaceLayout[data-motion-variant="e"] [data-preview-trailing-column] {
+    clip-path: inset(0);
+    opacity: 1;
+    transform: none;
+    transition-duration: 1ms;
+  }
+  .tableSnapshotFull,
+  .tableSnapshotCompact {
+    transition-duration: 1ms;
+  }
+}
 .animationVariantSwitcher {
   position: fixed;
   right: 20px;
