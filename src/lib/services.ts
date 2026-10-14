@@ -1184,6 +1184,7 @@ export const servicesAdapter = {
     file: File;
     ownerType: EvidenceOwnerType;
     ownerId: string;
+    serviceId?: string;
     idempotencyKey?: string;
   }): Promise<Attachment> {
     const key =
@@ -1196,6 +1197,9 @@ export const servicesAdapter = {
     formData.append("fileName", params.file.name);
     formData.append("ownerType", params.ownerType);
     formData.append("ownerId", params.ownerId);
+    if (params.ownerType === "ZONE_RESULT" && params.serviceId) {
+      formData.append("serviceId", params.serviceId);
+    }
 
     let response: Response;
     try {

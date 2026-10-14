@@ -254,6 +254,7 @@ export function ZoneExecutionPanel({
         file: item.file,
         ownerType: "ZONE_RESULT",
         ownerId: zoneResultId,
+        serviceId: service.id,
         idempotencyKey: item.idempotencyKey,
       });
 
