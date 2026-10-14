@@ -125,4 +125,34 @@ describe("POST /api/containers/[id]/confirm-relocation BFF route", () => {
 
     expect(response.status).toBe(404);
   });
+
+  it("forwards an authorized backend relocation confirmation with its id, method, and payload", async () => {
+    const id = "container_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "ACTIVE" }));
+
+    const response = await POST(
+      new Request(`http://localhost/api/containers/${id}/confirm-relocation`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ address: "Av. La Plata 1250", lat: -34.625, lng: -58.43 }),
+      }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/containers/${id}/confirm-relocation`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body))).toEqual({
+      address: "Av. La Plata 1250",
+      lat: -34.625,
+      lng: -58.43,
+    });
+  });
 });

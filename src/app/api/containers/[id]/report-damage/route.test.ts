@@ -136,4 +136,31 @@ describe("POST /api/containers/[id]/report-damage BFF route", () => {
 
     expect(response.status).toBe(404);
   });
+
+  it("forwards an authorized backend damage report with its id, method, and payload", async () => {
+    const id = "container_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const payload = { damageType: "STRUCTURAL", severity: "CRITICAL", requiresPublicWorks: true };
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "DAMAGED", ...payload }));
+
+    const response = await POST(
+      new Request(`http://localhost/api/containers/${id}/report-damage`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/containers/${id}/report-damage`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body))).toEqual(payload);
+  });
 });

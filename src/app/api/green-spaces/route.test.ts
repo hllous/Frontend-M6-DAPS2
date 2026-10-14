@@ -53,4 +53,17 @@ describe("green spaces BFF route", () => {
     expect(response.status).toBe(201);
     expect(body).toMatchObject({ name: "Plaza nueva #108", spaceType: "SQUARE", areaM2: 250, zoneId: "zone-2", active: true });
   });
+
+  it("forwards an authenticated backend green-space list with GET", async () => {
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [] }));
+
+    const response = await GET(new Request("http://localhost/api/green-spaces", { headers: { cookie } }));
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/green-spaces");
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+  });
 });

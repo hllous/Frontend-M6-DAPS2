@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetServiceTypeFixtures, serviceTypeFixtures } from "@/lib/service-type-fixtures";
 import { DELETE, GET, PATCH } from "./route";
@@ -9,6 +9,7 @@ afterEach(() => {
   delete process.env.M6_AUTH_MODE;
   delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
+  vi.restoreAllMocks();
 });
 
 
@@ -46,5 +47,43 @@ describe("/api/service-types/[id]", () => {
     const deleteResponse = await DELETE(new Request("http://localhost/api/service-types/st-waste-route", { method: "DELETE", headers: { cookie } }), { params: { id: "st-waste-route" } });
     expect(deleteResponse.status).toBe(200);
     expect(await deleteResponse.json()).toMatchObject({ id: "st-waste-route", active: false });
+  });
+
+  it("forwards an authorized backend service-type deactivation with its id and DELETE method", async () => {
+    const id = "st-encoded_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, active: false }));
+
+    const response = await DELETE(
+      new Request(`http://localhost/api/service-types/${id}`, { method: "DELETE", headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/service-types/${id}`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("DELETE");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+  });
+
+  it("denies a backend session without serviceType:manage before forwarding", async () => {
+    const cookie = await loginAs("office-limited-intake", {
+      mode: "backend-development",
+      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch");
+
+    const response = await PATCH(
+      new Request("http://localhost/api/service-types/st-waste-route", {
+        method: "PATCH",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ name: "Cambio rechazado" }),
+      }),
+      { params: Promise.resolve({ id: "st-waste-route" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(backendFetch).not.toHaveBeenCalled();
   });
 });

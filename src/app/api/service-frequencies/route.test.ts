@@ -64,3 +64,16 @@ async function fetchFrequency(method: "PATCH" | "DELETE", id: string, cookie: st
     ? PATCH(new Request(`http://localhost/api/service-frequencies/${id}`, { method, headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) })
     : DELETE(new Request(`http://localhost/api/service-frequencies/${id}`, { method, headers: { cookie } }), { params: Promise.resolve({ id }) });
 }
+
+it("forwards an authenticated backend service-frequency list with GET", async () => {
+  const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+  const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+  const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [] }));
+
+  const response = await GET(new Request("http://localhost/api/service-frequencies", { headers: { cookie } }));
+
+  expect(response.status).toBe(200);
+  expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/service-frequencies");
+  expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+  expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+});

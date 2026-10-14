@@ -8,7 +8,7 @@ import {
 import type { EnvironmentalInspection } from "@/lib/environmental-reports";
 import { resetEstablishmentDirectoryAdapter, setEstablishmentDirectoryAdapter } from "@/lib/establishment-directory";
 import { GET, POST } from "./route";
-import { loginAs } from "@/test/session";
+import { createSessionCookie, loginAs } from "@/test/session";
 
 const completedViolationInspection: EnvironmentalInspection = {
   id: "INS-1008",
@@ -48,6 +48,7 @@ afterEach(() => {
   delete process.env.M6_AUTH_MODE;
   delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
+  vi.restoreAllMocks();
   resetEnvironmentalReportFixtures();
   resetEstablishmentDirectoryAdapter();
 });
@@ -145,5 +146,51 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
     const duplicate = await POST(noticeRequest(officeCookie), noticeContext);
     expect(duplicate.status).toBe(409);
     expect((await duplicate.json()).message).toMatch(/nueva inspección|acta emitida/i);
+  });
+
+  it("forwards an authorized backend notice lookup with its id and GET method", async () => {
+    const id = "inspection_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, noticeNumber: "ACTA-2026-001" }));
+
+    const response = await GET(
+      new Request(`http://localhost/api/environmental-inspections/${id}/violation-notice`, { headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/environmental-inspections/${id}/violation-notice`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+  });
+
+  it("denies backend notice reads without violationNotice:view before forwarding", async () => {
+    const cookie = await loginAs("office-limited-intake", {
+      mode: "backend-development",
+      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch");
+
+    const response = await GET(readNoticeRequest(cookie), noticeContext);
+
+    expect(response.status).toBe(403);
+    expect(backendFetch).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when backend mode has no backend origin", async () => {
+    const cookie = createSessionCookie("office-duty-queue", {
+      mode: "backend-development",
+      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      backendOrigin: "https://backend.internal",
+    });
+    delete process.env.M6_BACKEND_ORIGIN;
+    const backendFetch = vi.spyOn(globalThis, "fetch");
+
+    const response = await GET(readNoticeRequest(cookie), noticeContext);
+
+    expect(response.status).toBe(503);
+    expect(backendFetch).not.toHaveBeenCalled();
   });
 });

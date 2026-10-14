@@ -83,4 +83,29 @@ describe("referral detail BFF", () => {
       path: "/api/referrals/RR-NONJSON",
     });
   });
+
+  it("checks backend referral sources with encoded ids using GET and the session bearer token", async () => {
+    const id = "RR-encoded_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ message: "No existe" }, { status: 404 }));
+
+    const response = await GET(
+      new Request(`http://localhost/api/referrals/${id}`, { headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual([
+      [`https://backend.internal/repair-requests/${id}`, "GET"],
+      [`https://backend.internal/street-closure-requests/${id}`, "GET"],
+    ]);
+    expect(backendFetch.mock.calls.every(([, init]) =>
+      new Headers(init?.headers).get("authorization") === `Bearer ${devJwt}`,
+    )).toBe(true);
+  });
 });
