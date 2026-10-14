@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
 import { AlertCircle, CalendarClock, Loader2 } from "lucide-react";
@@ -77,7 +78,7 @@ function RescheduleReasonForm({
       onOpenChange(false);
     } catch (cause) {
       const msg =
-        cause instanceof Error ? cause.message : "Ocurrió un error al reprogramar el servicio.";
+        getErrorMessage(cause, "Ocurrió un error al reprogramar el servicio.");
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);

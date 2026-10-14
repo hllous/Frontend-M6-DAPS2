@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -8,7 +8,6 @@ import {
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { getZoneFixture, removeNeighborhoodFixture } from "@/lib/zones-fixtures";
@@ -27,10 +26,7 @@ export async function DELETE(
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede quitar barrios de una zona operativa.");
-    }
-    requireCapability(session, "zone:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede quitar barrios de una zona operativa.", capability: "zone:manage", throwOnError: true });
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(

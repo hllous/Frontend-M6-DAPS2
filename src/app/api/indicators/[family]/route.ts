@@ -1,10 +1,10 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "@/lib/indicator-fixtures";
 import { defaultIndicatorQuery, familyAppliesCatalogFilters, indicatorQueryErrorMessage, indicatorQuerySchema } from "@/lib/indicators";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 const families = ["coverage", "compliance", "incidents", "waste"] as const;
 type IndicatorFamily = (typeof families)[number];
@@ -17,12 +17,10 @@ function queryString(request: Request, family: IndicatorFamily) {
   const raw = { from: url.searchParams.get("from") ?? undefined, to: url.searchParams.get("to") ?? undefined, zoneId: url.searchParams.get("zoneId") ?? undefined, serviceTypeId: url.searchParams.get("serviceTypeId") ?? undefined };
   const parsed = indicatorQuerySchema.safeParse(raw);
   if (!parsed.success) return { error: indicatorQueryErrorMessage(parsed.error) } as const;
-  const params = new URLSearchParams();
-  if (parsed.data.from) params.set("from", parsed.data.from);
-  if (parsed.data.to) params.set("to", parsed.data.to);
-  if (familyAppliesCatalogFilters(family) && parsed.data.zoneId) params.set("zoneId", parsed.data.zoneId);
-  if (familyAppliesCatalogFilters(family) && parsed.data.serviceTypeId) params.set("serviceTypeId", parsed.data.serviceTypeId);
-  return { value: params.toString() ? `?${params.toString()}` : "" } as const;
+  const allowedKeys = familyAppliesCatalogFilters(family)
+    ? ["from", "to", "zoneId", "serviceTypeId"]
+    : ["from", "to"];
+  return { value: backendQuery(parsed.data, allowedKeys) } as const;
 }
 
 function fixtureResponse(family: IndicatorFamily, request: Request) {
@@ -50,7 +48,7 @@ export async function GET(request: Request, context: { params: Promise<{ family:
 
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "indicator:view");
+    authorize(session, { capability: "indicator:view", throwOnError: true });
     const query = queryString(request, typedFamily);
     if ("error" in query && query.error) return errorResponse(400, query.error, path);
     if (backendMode(session)) {

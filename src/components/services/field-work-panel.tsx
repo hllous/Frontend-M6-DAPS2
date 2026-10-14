@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CloudOff, Play } from "lucide-react";
@@ -69,7 +70,7 @@ export function FieldWorkPanel({
         }
       } catch (cause) {
         // Retain existing services if refresh fails, but say so: an empty list would read as "nothing assigned".
-        if (isCurrent) setLoadError(cause instanceof Error ? cause.message : "No se pudieron cargar los servicios de la cuadrilla.");
+        if (isCurrent) setLoadError(errorMessage(cause, "No se pudieron cargar los servicios de la cuadrilla."));
       }
     }
     void load();

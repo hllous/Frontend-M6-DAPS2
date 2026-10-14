@@ -1,24 +1,18 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { crewFixtures } from "@/lib/crew-fixtures";
 import { addCrewMembersInputSchema } from "@/lib/crews";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 
 type PostContext = { params: Promise<{ id: string }> };
 
 
 
-function requireOfficeCapability(request: Request) {
-  const session = getRequiredSession(request);
-  const scenario = getScenario(session);
-  if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar integrantes de cuadrillas.");
-  requireCapability(session, "crew:manage");
-  return session;
-}
+function requireOfficeCapability(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar integrantes de cuadrillas.", capability: "crew:manage", throwOnError: true }).session; }
 
 // El backend nombra el campo userIds en POST /crews/{id}/members; adentro se sigue
 // llamando memberUserIds, asi que la traduccion queda en el borde, que es el BFF.

@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -14,7 +14,6 @@ import {
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 
 
@@ -49,13 +48,7 @@ export async function POST(
   try {
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede programar y asociar un servicio.", path);
-    }
-    if (!scenario.capabilities.includes("service:schedule")) {
-      return errorResponse(403, "La sesión no tiene capacidad para programar servicios.", path);
-    }
-    requireCapability(session, "service:schedule");
+    authorize(session, { office: true, officeMessage: "Solo Oficina puede programar y asociar un servicio.", capability: "service:schedule", capabilityMessage: "La sesión no tiene capacidad para programar servicios.", throwOnError: true });
 
     let body: unknown;
     try {

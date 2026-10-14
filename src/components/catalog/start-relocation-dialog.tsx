@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
 import { RotateCcw } from "lucide-react";
@@ -66,9 +67,7 @@ function StartRelocationModalContent({
       updated = await containersAdapter.relocate(container.id);
     } catch (err) {
       const msg =
-        err instanceof ContainerRequestError || err instanceof Error
-          ? err.message
-          : "No se pudo iniciar la reubicación del contenedor.";
+        getErrorMessage(err, "No se pudo iniciar la reubicación del contenedor.");
       setErrorMessage(msg);
       setIsSubmitting(false);
       return;

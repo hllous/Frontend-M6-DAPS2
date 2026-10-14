@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import {
   AlertTriangle,
@@ -219,12 +220,12 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
 
   const loadReports = useCallback(() => {
     setLoadState({ status: "loading" });
-    void fetchReports().then((result) => setLoadState({ status: "ready", ...result })).catch((error: unknown) => setLoadState({ status: "error", message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes." }));
+    void fetchReports().then((result) => setLoadState({ status: "ready", ...result })).catch((error: unknown) => setLoadState({ status: "error", message: getErrorMessage(error, "Intente nuevamente en unos instantes.") }));
   }, [fetchReports]);
 
   useEffect(() => {
     let current = true;
-    void fetchReports().then((result) => { if (current) setLoadState({ status: "ready", ...result }); }).catch((error: unknown) => { if (current) setLoadState({ status: "error", message: error instanceof Error ? error.message : "Intente nuevamente en unos instantes." }); });
+    void fetchReports().then((result) => { if (current) setLoadState({ status: "ready", ...result }); }).catch((error: unknown) => { if (current) setLoadState({ status: "error", message: getErrorMessage(error, "Intente nuevamente en unos instantes.") }); });
     return () => { current = false; };
   }, [fetchReports]);
 
@@ -273,7 +274,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
         setAnnouncement(message);
         return message;
       }
-      const message = error instanceof Error ? error.message : "No se pudo actualizar el expediente.";
+      const message = getErrorMessage(error, "No se pudo actualizar el expediente.");
       setAnnouncement(message);
       return message;
     }
@@ -371,7 +372,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
         setViolationNotice(null);
         return null;
       }
-      setNoticeError(error instanceof Error ? error.message : "No se pudo cargar el acta de infracción.");
+      setNoticeError(getErrorMessage(error, "No se pudo cargar el acta de infracción."));
       return null;
     } finally {
       setNoticeLoading(false);
@@ -408,7 +409,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
     let current = true;
     void environmentalReportsAdapter.listInspections(report.id)
       .then(async (items) => { if (current) { setInspections(items); setLoading(false); void loadInspectionSources(items); await loadViolationNotice(items); } })
-      .catch((error: unknown) => { if (current) { setHistoryError(error instanceof Error ? error.message : "No se pudo cargar la historia de inspecciones."); setLoading(false); } });
+      .catch((error: unknown) => { if (current) { setHistoryError(getErrorMessage(error, "No se pudo cargar la historia de inspecciones.")); setLoading(false); } });
     return () => { current = false; };
   }, [loadInspectionSources, loadViolationNotice, report.id]);
 
@@ -478,7 +479,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
       onReportUpdated(await environmentalReportsAdapter.get(report.id));
       await loadInspections();
     } catch (error) {
-      setScheduleError((current) => current ?? (error instanceof Error ? error.message : "No se pudo actualizar el expediente. Recargue la pantalla."));
+      setScheduleError((current) => current ?? (getErrorMessage(error, "No se pudo actualizar el expediente. Recargue la pantalla.")));
     }
   }
 
@@ -493,7 +494,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
       const inspection = await environmentalReportsAdapter.schedule(report.id, input);
       draft = { inspectionId: inspection.id, scheduledDate: input.scheduledDate, timeWindow: input.timeWindow, zoneId: input.zoneId, crewId, notes: input.notes };
     } catch (error) {
-      setScheduleError(error instanceof Error ? error.message : "No se pudo completar la programación. Revise el estado del expediente.");
+      setScheduleError(getErrorMessage(error, "No se pudo completar la programación. Revise el estado del expediente."));
       return;
     }
     try {
@@ -530,7 +531,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
       focusTitleAfterDialogRef.current = true;
       setIssueNoticeOpen(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "No se pudo emitir el acta de infracción.";
+      const message = getErrorMessage(error, "No se pudo emitir el acta de infracción.");
       if (error instanceof EnvironmentalReportRequestError && error.status === 409) {
         const conflictMessage = `Conflicto al emitir el acta: ${message}`;
         setNoticeError(conflictMessage);
@@ -730,7 +731,7 @@ function IssueViolationNoticeDialog({ open, inspection, onOpenChange, onSubmit, 
     try {
       await onSubmit(parsed.data);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "No se pudo emitir el acta de infracción.");
+      setSubmitError(getErrorMessage(error, "No se pudo emitir el acta de infracción."));
     } finally {
       setSubmitting(false);
     }
@@ -798,7 +799,7 @@ function InspectionSchedulingDialog({ open, mode, initial, onOpenChange, onSubmi
         setConflict(submitError.message);
         return;
       }
-      setError(submitError instanceof Error ? submitError.message : "No se pudo completar la programación.");
+      setError(getErrorMessage(submitError, "No se pudo completar la programación."));
     } finally {
       setSubmitting(false);
     }
@@ -832,7 +833,7 @@ function CreateReportDialog({ open, onOpenChange, onSuccess }: { open: boolean; 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
     setSubmitting(true); setErrorMessage(null);
-    try { const created = await environmentalReportsAdapter.create({ reportType: reportType as EnvironmentalReportType, address: address.trim(), description: description.trim(), lat: latResult.value ?? 0, lng: lngResult.value ?? 0 }); onSuccess(created); setReportType(""); setAddress(""); setDescription(""); setLat(""); setLng(""); setErrors({}); } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo abrir el reporte."); } finally { setSubmitting(false); }
+    try { const created = await environmentalReportsAdapter.create({ reportType: reportType as EnvironmentalReportType, address: address.trim(), description: description.trim(), lat: latResult.value ?? 0, lng: lngResult.value ?? 0 }); onSuccess(created); setReportType(""); setAddress(""); setDescription(""); setLat(""); setLng(""); setErrors({}); } catch (error) { setErrorMessage(getErrorMessage(error, "No se pudo abrir el reporte.")); } finally { setSubmitting(false); }
   };
 
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-lg"><DialogHeader><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-action)]"><MapPin className="h-4 w-4" aria-hidden />Detección de campo</div><DialogTitle>Abrir reporte ambiental</DialogTitle><DialogDescription>Registre el hallazgo observado en la vía pública. El expediente se abrirá como Recibido para su revisión.</DialogDescription></DialogHeader>{errorMessage && <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">{errorMessage}</div>}<form id="environmental-report-form" onSubmit={submit} className="overflow-y-auto"><FieldGroup><Field><FieldLabel htmlFor="environmental-report-type">Tipo de hallazgo <span aria-hidden="true">*</span></FieldLabel><select id="environmental-report-type" value={reportType} onChange={(event) => { setReportType(event.target.value as EnvironmentalReportType); setErrors((current) => ({ ...current, reportType: "" })); }} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-invalid={Boolean(errors.reportType)} aria-describedby={errors.reportType ? "environmental-report-type-error" : undefined}><option value="">Seleccione el tipo</option>{reportTypes.map((type) => <option key={type} value={type}>{ENVIRONMENTAL_REPORT_TYPE_LABELS[type]}</option>)}</select>{errors.reportType && <FieldError id="environmental-report-type-error">{errors.reportType}</FieldError>}</Field><Field><FieldLabel htmlFor="environmental-report-address">Dirección o referencia <span aria-hidden="true">*</span></FieldLabel><input id="environmental-report-address" value={address} onChange={(event) => setAddress(event.target.value)} disabled={submitting} placeholder="Ej.: Av. Warnes 1840" className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-invalid={Boolean(errors.address)} aria-describedby={errors.address ? "environmental-report-address-error" : undefined} />{errors.address && <FieldError id="environmental-report-address-error">{errors.address}</FieldError>}</Field><Field><FieldLabel htmlFor="environmental-report-description">Descripción del hallazgo <span aria-hidden="true">*</span></FieldLabel><textarea id="environmental-report-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={submitting} rows={4} placeholder="Describa qué observó y cuándo." className="w-full resize-y rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? "environmental-report-description-error" : undefined} />{errors.description && <FieldError id="environmental-report-description-error">{errors.description}</FieldError>}<FieldDescription>Incluya señales útiles para la clasificación posterior. No registre datos personales.</FieldDescription></Field><div className="grid gap-4 sm:grid-cols-2"><Field><FieldLabel htmlFor="environmental-report-lat">Latitud <span aria-hidden="true">*</span></FieldLabel><input id="environmental-report-lat" type="number" min="-90" max="90" step="any" value={lat} onChange={(event) => setLat(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-invalid={Boolean(errors.lat)} aria-describedby={errors.lat ? "environmental-report-lat-error" : undefined} />{errors.lat && <FieldError id="environmental-report-lat-error">{errors.lat}</FieldError>}</Field><Field><FieldLabel htmlFor="environmental-report-lng">Longitud <span aria-hidden="true">*</span></FieldLabel><input id="environmental-report-lng" type="number" min="-180" max="180" step="any" value={lng} onChange={(event) => setLng(event.target.value)} disabled={submitting} className="h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" aria-invalid={Boolean(errors.lng)} aria-describedby={errors.lng ? "environmental-report-lng-error" : undefined} />{errors.lng && <FieldError id="environmental-report-lng-error">{errors.lng}</FieldError>}</Field></div></FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button><Button type="submit" form="environmental-report-form" disabled={submitting} className="gap-2">{submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{submitting ? "Abriendo reporte…" : "Abrir reporte"}</Button></DialogFooter></DialogContent></Dialog>;

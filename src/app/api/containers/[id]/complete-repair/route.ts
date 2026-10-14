@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -26,9 +26,7 @@ export async function POST(
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE" || !scenario.capabilities.includes("container:manage")) {
-      return errorResponse(403, "No tiene permisos para completar reparaciones de contenedores.", path);
-    }
+    authorize(session, { office: true, officeMessage: "No tiene permisos para completar reparaciones de contenedores.", capability: "container:manage", capabilityMessage: "No tiene permisos para completar reparaciones de contenedores.", throwOnError: true });
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}/complete-repair`, "container:manage", {

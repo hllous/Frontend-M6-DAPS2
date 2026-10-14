@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -8,7 +8,6 @@ import {
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import {
@@ -34,18 +33,6 @@ function parseRouteQuery(url: URL): RouteQuery {
   };
 }
 
-function backendQueryString(query: RouteQuery): string {
-  const params = new URLSearchParams();
-  if (query.active !== undefined) params.set("active", String(query.active));
-  if (query.zoneId) params.set("zoneId", query.zoneId);
-  if (query.search) params.set("search", query.search);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
-}
-
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
 
@@ -54,7 +41,7 @@ export async function GET(request: Request) {
     const query = parseRouteQuery(new URL(request.url));
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/routes${backendQueryString(query)}`);
+      const backendResponse = await fetchBackend(request, `/routes${backendQuery(query, ["active", "zoneId", "search", "page", "pageSize"])}`);
             return forwardResponse(backendResponse);
     }
 
@@ -78,10 +65,7 @@ export async function POST(request: Request) {
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede crear recorridos.");
-    }
-    requireCapability(session, "route:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede crear recorridos.", capability: "route:manage", throwOnError: true });
 
     let body: unknown;
     try {

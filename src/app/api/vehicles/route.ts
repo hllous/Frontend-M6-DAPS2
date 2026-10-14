@@ -1,9 +1,9 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { createVehicleInputSchema, type VehicleQuery, vehicleTypeSchema } from "@/lib/vehicles";
 import { addVehicleFixture, filterVehicleFixtures, paginateVehicleFixtures } from "@/lib/vehicles-fixtures";
@@ -24,23 +24,7 @@ function parseVehicleQuery(url: URL): VehicleQuery {
   };
 }
 
-function queryString(query: VehicleQuery) {
-  const params = new URLSearchParams();
-  if (query.active !== undefined) params.set("active", String(query.active));
-  if (query.vehicleType) params.set("vehicleType", query.vehicleType);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-  const value = params.toString();
-  return value ? `?${value}` : "";
-}
-
-function requireOfficeCapability(request: Request) {
-  const session = getRequiredSession(request);
-  const scenario = getScenario(session);
-  if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar vehículos.");
-  requireCapability(session, "vehicle:manage");
-  return session;
-}
+function requireOfficeCapability(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar vehículos.", capability: "vehicle:manage", throwOnError: true }).session; }
 
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
@@ -48,7 +32,7 @@ export async function GET(request: Request) {
     const session = getRequiredSession(request);
     const query = parseVehicleQuery(new URL(request.url));
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/vehicles${queryString(query)}`);
+      const response = await fetchBackend(request, `/vehicles${backendQuery(query, ["active", "vehicleType", "page", "pageSize"])}`);
       return forwardResponse(response);
     }
     return NextResponse.json(paginateVehicleFixtures(filterVehicleFixtures(query), query.page, query.pageSize));

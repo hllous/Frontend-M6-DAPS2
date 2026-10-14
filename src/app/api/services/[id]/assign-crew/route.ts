@@ -1,11 +1,11 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { assignCrewFixture } from "@/lib/services-fixtures";
 import { assignCrewInputSchema } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
 
@@ -25,11 +25,7 @@ export async function POST(
     const scenario = getScenario(session);
 
     // Permission check: crew/vehicle assignment is an Office decision, not a Field action.
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede asignar cuadrilla y vehículo a un servicio.", path);
-    }
-
-    requireCapability(session, "service:assign");
+    authorize(session, { office: true, officeMessage: "Solo Oficina puede asignar cuadrilla y vehículo a un servicio.", capability: "service:assign", throwOnError: true });
 
     let body: unknown;
     try {

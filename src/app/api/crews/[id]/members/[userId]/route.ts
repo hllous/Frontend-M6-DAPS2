@@ -1,23 +1,17 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { crewFixtures } from "@/lib/crew-fixtures";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 
 type Context = { params: Promise<{ id: string; userId: string }> };
 
 
 
-function requireOfficeCapability(request: Request) {
-  const session = getRequiredSession(request);
-  const scenario = getScenario(session);
-  if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar integrantes de cuadrillas.");
-  requireCapability(session, "crew:manage");
-  return session;
-}
+function requireOfficeCapability(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar integrantes de cuadrillas.", capability: "crew:manage", throwOnError: true }).session; }
 
 export async function DELETE(request: Request, routeContext: Context) {
   const { id, userId } = await routeContext.params;

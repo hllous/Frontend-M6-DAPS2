@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -26,9 +26,7 @@ export async function POST(
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
 
-    if (!scenario.capabilities.includes("container:report")) {
-      return errorResponse(403, "No tiene permisos para reportar desbordes de contenedores.", path);
-    }
+    authorize(session, { capability: "container:report", capabilityMessage: "No tiene permisos para reportar desbordes de contenedores.", throwOnError: true });
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}/report-overflow`, "container:report", {

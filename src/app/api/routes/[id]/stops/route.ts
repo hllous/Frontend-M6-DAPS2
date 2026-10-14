@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -8,7 +8,6 @@ import {
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import {
@@ -33,10 +32,7 @@ export async function PUT(
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede editar la secuencia de paradas de recorridos.");
-    }
-    requireCapability(session, "route:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede editar la secuencia de paradas de recorridos.", capability: "route:manage", throwOnError: true });
 
     let body: unknown;
     try {

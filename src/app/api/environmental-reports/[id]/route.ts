@@ -1,11 +1,11 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
 import { environmentalReportSchema } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 
 
@@ -14,7 +14,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "environmentalReport:view");
+    authorize(session, { capability: "environmentalReport:view", throwOnError: true });
     const scenario = getScenario(session.scenarioId);
 
     if (backendMode(session)) {

@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useState, type FormEvent } from "react";
 
@@ -72,7 +73,7 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
         });
         if (isCurrent) setState({ status: "ready", items: result.serviceTypes });
       } catch (error) {
-        if (isCurrent) setState({ status: "error", message: error instanceof Error ? error.message : "No se pudieron cargar los tipos de servicio." });
+        if (isCurrent) setState({ status: "error", message: getErrorMessage(error, "No se pudieron cargar los tipos de servicio.") });
       }
     }
     void requestServiceTypes();
@@ -90,7 +91,7 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
       setMessage("Tipo de servicio creado.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "No se pudo crear el tipo de servicio.";
+      const errorMessage = getErrorMessage(error, "No se pudo crear el tipo de servicio.");
       setCreateError(errorMessage);
     }
   };
@@ -106,7 +107,7 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
       setMessage("Tipo de servicio actualizado.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "No se pudo actualizar el tipo de servicio.";
+      const errorMessage = getErrorMessage(error, "No se pudo actualizar el tipo de servicio.");
       setEditError(errorMessage);
     }
   };

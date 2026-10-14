@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -23,7 +23,7 @@ import {
   toCreateServiceBackendInput,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { zoneFixtures } from "@/lib/zones-fixtures";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
@@ -57,31 +57,6 @@ function parseServiceQuery(url: URL): ServiceQuery {
   });
 }
 
-function backendQueryString(query: ServiceQuery): string {
-  const params = new URLSearchParams();
-  if (query.status) {
-    if (Array.isArray(query.status)) {
-      query.status.forEach((st) => params.append("status", st));
-    } else {
-      params.set("status", query.status);
-    }
-  }
-  if (query.mode) params.set("mode", query.mode);
-  if (query.origin) params.set("origin", query.origin);
-  if (query.zoneId) params.set("zoneId", query.zoneId);
-  if (query.crewId) params.set("crewId", query.crewId);
-  if (query.serviceTypeId) params.set("serviceTypeId", query.serviceTypeId);
-  if (query.vehicleId) params.set("vehicleId", query.vehicleId);
-  if (query.ticketId) params.set("ticketId", query.ticketId);
-  if (query.scheduledFrom) params.set("scheduledFrom", query.scheduledFrom);
-  if (query.scheduledTo) params.set("scheduledTo", query.scheduledTo);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
-}
-
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
 
@@ -96,7 +71,7 @@ export async function GET(request: Request) {
     }
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/services${backendQueryString(query)}`);
+      const backendResponse = await fetchBackend(request, `/services${backendQuery(query, ["status", "mode", "origin", "zoneId", "crewId", "serviceTypeId", "vehicleId", "ticketId", "scheduledFrom", "scheduledTo", "page", "pageSize"])}`);
       if (!backendResponse.ok) return forwardResponse(backendResponse);
       const parsed = servicesEnvelopeSchema.safeParse(await backendResponse.json().catch(() => undefined));
       if (!parsed.success) {
@@ -127,10 +102,7 @@ export async function POST(request: Request) {
     const scenario = getScenario(session);
 
     // Permission check: scheduling is an Office decision, not a Field action.
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede programar un servicio.", path);
-    }
-    requireCapability(session, "service:schedule");
+    authorize(session, { office: true, officeMessage: "Solo Oficina puede programar un servicio.", capability: "service:schedule", throwOnError: true });
 
     let body: unknown;
     try {

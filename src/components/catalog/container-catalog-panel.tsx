@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
@@ -253,7 +254,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
           setState({
             status: "error",
             message:
-              caught instanceof Error ? caught.message : "No se pudieron cargar los contenedores.",
+              errorMessage(caught, "No se pudieron cargar los contenedores."),
           });
         }
       }
@@ -387,7 +388,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
     } catch (caught) {
       setFormErrors({
         general:
-          caught instanceof Error ? caught.message : "No se pudo completar la operación solicitada.",
+          errorMessage(caught, "No se pudo completar la operación solicitada."),
       });
     } finally {
       setIsSubmitting(false);

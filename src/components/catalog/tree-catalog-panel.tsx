@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -163,7 +164,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
         const result = await treesAdapter.list(query);
         if (isCurrent) setState({ status: "ready", items: result.trees, total: result.total, totalPages: result.totalPages });
       } catch (caught) {
-        if (isCurrent) setState({ status: "error", message: caught instanceof Error ? caught.message : "No se pudieron cargar los árboles." });
+        if (isCurrent) setState({ status: "error", message: errorMessage(caught, "No se pudieron cargar los árboles.") });
       }
     }
     void loadTrees();
@@ -197,7 +198,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
         ]);
         if (isCurrent) setLoadedDetail({ treeId, status: "ready", tree, surveys });
       } catch (caught) {
-        if (isCurrent) setLoadedDetail({ treeId, status: "error", message: caught instanceof Error ? caught.message : "No se pudo cargar el detalle del árbol." });
+        if (isCurrent) setLoadedDetail({ treeId, status: "error", message: errorMessage(caught, "No se pudo cargar el detalle del árbol.") });
       }
     }
     void loadDetail(detailId);
@@ -245,7 +246,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
       setFormOpen(false);
       setRequestVersion((version) => version + 1);
     } catch (caught) {
-      setFormError(caught instanceof TreeRequestError ? caught.message : caught instanceof Error ? caught.message : "No se pudo guardar el árbol.");
+      setFormError(caught instanceof TreeRequestError ? caught.message : errorMessage(caught, "No se pudo guardar el árbol."));
     } finally {
       setIsSubmitting(false);
     }

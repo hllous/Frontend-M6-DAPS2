@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -6,7 +6,7 @@ import { serviceFrequencyResponseFixture, addServiceFrequencyFixture, filterServ
 import { serviceFrequencyCreateInputSchema, serviceFrequencyShiftSchema, type ServiceFrequencyQuery } from "@/lib/service-frequencies";
 import { serviceTypeFixtures } from "@/lib/service-type-fixtures";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
@@ -28,26 +28,7 @@ function parseQuery(url: URL): ServiceFrequencyQuery {
   };
 }
 
-function queryString(query: ServiceFrequencyQuery) {
-  const params = new URLSearchParams();
-  if (query.serviceTypeId) params.set("serviceTypeId", query.serviceTypeId);
-  if (query.routeId) params.set("routeId", query.routeId);
-  if (query.shift) params.set("shift", query.shift);
-  if (query.weekday !== undefined) params.set("weekday", String(query.weekday));
-  if (query.validOn) params.set("validOn", query.validOn);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-  const value = params.toString();
-  return value ? `?${value}` : "";
-}
-
-function requireOfficeCapability(request: Request) {
-  const session = getRequiredSession(request);
-  const scenario = getScenario(session);
-  if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar frecuencias de servicio.");
-  requireCapability(session, "serviceFrequency:manage");
-  return session;
-}
+function requireOfficeCapability(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar frecuencias de servicio.", capability: "serviceFrequency:manage", throwOnError: true }).session; }
 
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
@@ -55,7 +36,7 @@ export async function GET(request: Request) {
     const session = getRequiredSession(request);
     const query = parseQuery(new URL(request.url));
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/service-frequencies${queryString(query)}`);
+      const response = await fetchBackend(request, `/service-frequencies${backendQuery(query, ["serviceTypeId", "routeId", "shift", "weekday", "validOn", "page", "pageSize"])}`);
       return forwardResponse(response);
     }
     return NextResponse.json(paginateServiceFrequencyFixtures(filterServiceFrequencyFixtures(query), query.page, query.pageSize));
