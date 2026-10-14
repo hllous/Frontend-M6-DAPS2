@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ContextMenu,
   ContextMenuContent,
+  ContextMenuGroup,
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
@@ -654,6 +655,7 @@ function ColumnContextMenu({
   const definition = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === columnKey)!;
   const index = controller.preferences.order.indexOf(columnKey);
   const visible = controller.preferences.visibility[columnKey];
+  const hiddenColumns = SERVICES_COLUMN_DEFINITIONS.filter(({ key }) => !controller.preferences.visibility[key]);
   const disabled = !controller.isHydrated;
 
   function move(direction: ServicesColumnMoveDirection) {
@@ -667,6 +669,18 @@ function ColumnContextMenu({
       <ContextMenuTrigger
         aria-haspopup="menu"
         aria-label={`Opciones de columna: ${definition.label}. Menú contextual disponible.`}
+        onKeyDown={(event) => {
+          const opensMenu = event.key === "Enter" || event.key === " " || event.key === "ContextMenu" || (event.shiftKey && event.key === "F10");
+          if (!opensMenu) return;
+          event.preventDefault();
+          const bounds = event.currentTarget.getBoundingClientRect();
+          event.currentTarget.dispatchEvent(new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            clientX: bounds.left + bounds.width / 2,
+            clientY: bounds.top + bounds.height / 2,
+          }));
+        }}
         render={
           <Button
             type="button"
@@ -686,13 +700,31 @@ function ColumnContextMenu({
         }
       />
       <ContextMenuContent className="max-h-[min(70vh,32rem)] min-w-52 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-none ring-0">
-        <ContextMenuLabel>{definition.label}</ContextMenuLabel>
+        <ContextMenuGroup>
+          <ContextMenuLabel>{definition.label}</ContextMenuLabel>
+        </ContextMenuGroup>
         <ContextMenuItem
           disabled={disabled || columnKey === "service"}
           onClick={() => controller.setVisible(columnKey, !visible)}
         >
           {visible ? "Ocultar columna" : "Mostrar columna"}
         </ContextMenuItem>
+        {hiddenColumns.length > 0 && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>Mostrar columna</ContextMenuSubTrigger>
+            <ContextMenuSubContent className="rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-none ring-0">
+              {hiddenColumns.map(({ key, label }) => (
+                <ContextMenuItem
+                  key={key}
+                  disabled={disabled}
+                  onClick={() => controller.setVisible(key, true)}
+                >
+                  {label}
+                </ContextMenuItem>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem disabled={disabled || index === 0} onClick={() => move("previous")}>
           <ArrowLeft data-icon="inline-start" aria-hidden="true" />

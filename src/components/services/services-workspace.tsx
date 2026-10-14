@@ -1185,7 +1185,12 @@ export function ServicesWorkspace({
               }
             }}
           >
-              <ResizablePanelGroup groupRef={panelGroupRef} direction="horizontal" className={cn("h-full min-w-0 flex-1", styles.panelGroup)}>
+              <ResizablePanelGroup
+                groupRef={panelGroupRef}
+                direction="horizontal"
+                defaultLayout={{ "map-pane": 50, "table-pane": 50 }}
+                className={cn("h-full min-w-0 flex-1", styles.panelGroup)}
+              >
                 <ResizablePanel
                   id="map-pane"
                   defaultSize="50%"

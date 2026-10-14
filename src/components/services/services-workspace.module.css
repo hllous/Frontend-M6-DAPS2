@@ -375,7 +375,7 @@
 .desktopWorkspaceLayout[data-column-editor] .previewRail,
 .desktopWorkspaceLayout[data-adaptive-preview] .previewRail {
   position: absolute;
-  z-index: 2;
+  z-index: 20;
   inset: 0 0 0 auto;
   width: min(20rem, 22vw);
   pointer-events: none;
