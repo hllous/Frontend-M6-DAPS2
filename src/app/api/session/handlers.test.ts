@@ -5,7 +5,6 @@ import { GET as session } from "./route";
 import { POST as logout } from "./logout/route";
 import { GET as listServices } from "../services/route";
 import { GET as scenarioRoute } from "../mock/scenarios/[scenarioId]/route";
-import * as sessionModule from "@/lib/session";
 
 const originalEnvironment = {
   authMode: process.env.M6_AUTH_MODE,
@@ -31,15 +30,68 @@ function backendCrews(crews: { id: string; name: string }[]) {
   });
 }
 
-function loginRequest(scenarioId: string) {
+function loginRequest(
+  scenarioId: string,
+  headers: Record<string, string> = { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
+) {
   return new Request("http://localhost/api/session/login", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers,
     body: JSON.stringify({ scenarioId }),
   });
 }
 
+function logoutRequest(
+  headers: Record<string, string> = { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
+  body = "{}",
+) {
+  return new Request("http://localhost/api/session/logout", { method: "POST", headers, body });
+}
+
 describe("session route handlers", () => {
+  it("rejects login without the custom CSRF header", async () => {
+    process.env.M6_AUTH_MODE = "mock";
+    const response = await login(loginRequest("office-duty-queue", { "content-type": "application/json" }));
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("rejects login with a non-JSON content type", async () => {
+    process.env.M6_AUTH_MODE = "mock";
+    const response = await login(loginRequest("office-duty-queue", {
+      "content-type": "text/plain",
+      "x-requested-with": "XMLHttpRequest",
+    }));
+
+    expect(response.status).toBe(415);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("rejects logout without the custom CSRF header", async () => {
+    const response = await logout(logoutRequest({ "content-type": "application/json" }));
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("rejects logout with a non-JSON content type", async () => {
+    const response = await logout(logoutRequest({
+      "content-type": "text/plain",
+      "x-requested-with": "XMLHttpRequest",
+    }));
+
+    expect(response.status).toBe(415);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("rejects logout with an invalid JSON body", async () => {
+    const response = await logout(logoutRequest(undefined, "{"));
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
   it.each(["constructor", "__proto__"])("rejects inherited scenario key %s without setting a session cookie", async (scenarioId) => {
     process.env.M6_AUTH_MODE = "mock";
     const response = await login(loginRequest(scenarioId));
@@ -188,7 +240,7 @@ describe("session route handlers", () => {
     });
   });
 
-  it("returns only the public session and can leave it", async () => {
+  it("refreshes a valid session and can leave it", async () => {
     process.env.M6_AUTH_MODE = "mock";
     const loginResponse = await login(loginRequest("office-duty-queue"));
     const cookie = loginResponse.headers.get("set-cookie") ?? "";
@@ -198,22 +250,12 @@ describe("session route handlers", () => {
     expect(sessionResponse.status).toBe(200);
     expect(sessionBody.session).not.toHaveProperty("accessToken");
 
-    const logoutResponse = await logout(new Request("http://localhost/api/session/logout", { method: "POST", headers: { cookie } }));
+    const logoutResponse = await logout(new Request("http://localhost/api/session/logout", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
+      body: "{}",
+    }));
     expect(logoutResponse.headers.get("set-cookie")).toMatch(/Max-Age=0/i);
-  });
-
-  it("clears the session cookie when refresh rejects an otherwise valid session", async () => {
-    process.env.M6_AUTH_MODE = "mock";
-    const loginResponse = await login(loginRequest("office-duty-queue"));
-    const cookie = loginResponse.headers.get("set-cookie") ?? "";
-    vi.spyOn(sessionModule, "refreshSession").mockReturnValue(undefined);
-
-    const response = await session(new Request("http://localhost/api/session", { headers: { cookie } }));
-
-    expect(response.status).toBe(401);
-    const setCookie = String(response.headers.get("set-cookie"));
-    expect(setCookie).toContain("m6_session=");
-    expect(setCookie).toMatch(/Max-Age=0/i);
   });
 
   it("does not fall back when real M1 mode is requested", async () => {

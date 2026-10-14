@@ -1,4 +1,5 @@
 import { POST as login } from "@/app/api/session/login/route";
+import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import {
   AUTH_COOKIE_NAME,
   createSession,
@@ -26,7 +27,7 @@ export async function loginAs(scenarioId: string, options: LoginAsOptions = {}):
 
   const response = await login(new Request("http://localhost/api/session/login", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: SESSION_MUTATION_HEADERS,
     body: JSON.stringify({ scenarioId }),
   }));
   const cookie = response.headers.get("set-cookie")?.split(";")[0];

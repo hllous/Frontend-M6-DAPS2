@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST as dismiss } from "./dismiss/route";
 import { POST as forward } from "./forward/route";
+import { POST as close } from "./close/route";
 import { POST as startReview } from "./start-review/route";
 import { loginAs } from "@/test/session";
 
@@ -72,6 +73,23 @@ describe("environmental report forward and dismiss BFF routes", () => {
     await startReview(postRequest("start-review", cookie), context);
 
     const [, init] = backendFetch.mock.calls[0];
+    expect(init?.body).toBeUndefined();
+  });
+
+  it("close sends no body to the backend", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "ER-1001", status: "CLOSED" }), { status: 201, headers: { "content-type": "application/json" } }),
+    );
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+
+    const response = await close(postRequest("close", cookie), context);
+
+    expect(response.status).toBe(201);
+    expect(backendFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = backendFetch.mock.calls[0];
+    expect(url).toEqual(new URL("/environmental-reports/ER-1001/close", "https://backend.internal"));
+    expect(init?.method).toBe("POST");
     expect(init?.body).toBeUndefined();
   });
 });

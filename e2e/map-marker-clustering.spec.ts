@@ -14,12 +14,13 @@ test("groups inventory markers and progressively reveals numbered pins #215", as
   await expect(page.getByText("ARB-00442")).toBeVisible();
 
   const clusters = page.locator('[class*="markerCluster"]:visible');
+  const mapPane = page.locator(".leaflet-map-pane");
   await expect(clusters.first()).toBeVisible();
   await expect(clusters.first()).toHaveAttribute("aria-label", /elementos de inventario; acercar para verlos/);
 
   for (let attempt = 0; attempt < 4 && await clusters.count() > 0; attempt += 1) {
     await clusters.first().click();
-    await page.waitForTimeout(600);
+    await expect(mapPane).not.toHaveClass(/leaflet-zoom-anim/);
   }
 
   await expect.poll(async () => page.locator('[class*="markerPin"]:visible').count()).toBeGreaterThan(0);
@@ -51,7 +52,7 @@ test("keeps the mobile map visible with a keyboard and drag accessible inventory
   await expect(handle).toHaveAccessibleName("Mostrar lista");
   await expect(handle).toHaveAttribute("aria-expanded", "false");
   await expect(handle).toHaveCSS("min-height", "80px");
-  await expect(drawer.getByRole("heading", { name: "Elementos visibles" })).toBeVisible();
+  await expect(drawer.getByRole("heading", { name: "Elementos" })).toBeVisible();
 
   await handle.focus();
   await page.keyboard.press("Tab");
@@ -74,6 +75,30 @@ test("keeps the mobile map visible with a keyboard and drag accessible inventory
   await expect(drawer.getByRole("button", { name: "Mostrar lista" })).toHaveAttribute("aria-expanded", "false");
 
   await expect(map).toBeVisible();
+});
+
+test("keeps map tabs on one scrollable row and reveals the keyboard-selected tab at 390 px", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginViaApi(page, "office-duty-queue");
+  await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
+
+  const tablist = page.getByRole("tablist", { name: "Vistas del mapa operativo" });
+  const lastTab = tablist.getByRole("tab", { name: "Atención hoy" });
+  await expect(page.getByRole("heading", { name: "Mapa operativo" })).toBeVisible();
+  await expect(lastTab).toBeVisible();
+  await expect(tablist).toHaveCSS("flex-wrap", "nowrap");
+  await expect.poll(() => tablist.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+
+  await tablist.getByRole("tab", { name: "Inventario" }).focus();
+  for (let index = 0; index < 4; index += 1) await page.keyboard.press("ArrowRight");
+  await expect(lastTab).toHaveAttribute("aria-selected", "true");
+  await expect.poll(() => lastTab.evaluate((tab) => {
+    const list = tab.parentElement;
+    if (!list) return false;
+    const tabBounds = tab.getBoundingClientRect();
+    const listBounds = list.getBoundingClientRect();
+    return tabBounds.left >= listBounds.left - 1 && tabBounds.right <= listBounds.right + 1;
+  })).toBe(true);
 });
 
 test("keeps the map box height constant across tabs on desktop and mobile #423", async ({ page }) => {

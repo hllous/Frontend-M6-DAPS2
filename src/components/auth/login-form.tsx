@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import type { AuthMode } from "@/lib/session";
+import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import type { OperationalScenario, ScenarioId } from "@/lib/scenarios";
 
 import styles from "./login-form.module.css";
@@ -27,7 +28,7 @@ export function LoginForm({
     try {
       const response = await fetch("/api/session/login", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: SESSION_MUTATION_HEADERS,
         body: JSON.stringify({ scenarioId }),
       });
       if (!response.ok) {

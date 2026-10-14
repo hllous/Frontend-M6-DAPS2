@@ -704,6 +704,21 @@
 @media (max-width: 760px) {
   .workspace { gap: var(--space-16); }
   .workspace .tabs { gap: var(--space-16); }
+  .viewSwitcher {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  .viewSwitcher > :global([role="tab"]) {
+    flex: 0 0 auto;
+    padding-right: var(--space-12);
+    padding-left: var(--space-12);
+    white-space: nowrap;
+  }
   .viewTab { min-height: 48px; }
   .heading .refreshButton {
     width: 48px;

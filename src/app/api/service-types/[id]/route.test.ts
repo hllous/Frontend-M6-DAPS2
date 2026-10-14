@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetServiceTypeFixtures, serviceTypeFixtures } from "@/lib/service-type-fixtures";
-import { DELETE, PATCH } from "./route";
+import { DELETE, GET, PATCH } from "./route";
 import { loginAs } from "@/test/session";
 
 beforeEach(() => resetServiceTypeFixtures());
@@ -15,6 +15,14 @@ afterEach(() => {
 
 
 describe("/api/service-types/[id]", () => {
+  it("returns the requested service type", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const response = await GET(new Request("http://localhost/api/service-types/st-waste-route", { headers: { cookie } }), { params: { id: "st-waste-route" } });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ id: "st-waste-route", code: "WASTE-ROUTE", name: "Recolección domiciliaria" });
+  });
+
   it("does not allow a Field actor to edit or deactivate", async () => {
     const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const request = new Request("http://localhost/api/service-types/st-waste-route", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ name: "Cambio", requiresVehicle: true, active: true }) });
