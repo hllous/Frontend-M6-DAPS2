@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -34,9 +34,7 @@ export async function POST(
   try {
     const session = getRequiredSession(request);
     const scenario = getScenario(session.scenarioId);
-    if (!scenario.capabilities.includes("environmentalInspection:execute")) {
-      return errorResponse(403, "Solo la persona responsable de la cuadrilla puede completar la inspección.", path);
-    }
+    authorize(session, { capability: "environmentalInspection:execute", capabilityMessage: "Solo la persona responsable de la cuadrilla puede completar la inspección.", throwOnError: true });
 
     const requestBody = await request.text();
     let parsedBody: unknown;

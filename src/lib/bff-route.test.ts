@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AuthUnavailableError, BackendUnavailableError, ForbiddenSessionError, InvalidSessionError } from "./session";
-import { backendMode, errorResponse, forwardResponse, mapSessionError } from "./bff-route";
+import { backendMode, backendQuery, errorResponse, forwardResponse, mapSessionError } from "./bff-route";
 
 describe("backendMode", () => {
   afterEach(() => {
@@ -76,5 +76,21 @@ describe("backendMode", () => {
 
     expect(response.status).toBe(204);
     expect(await response.text()).toBe("");
+  });
+});
+
+describe("backendQuery", () => {
+  it("serializes only allowed keys in the declared order", () => {
+    expect(backendQuery(
+      { active: false, page: 0, search: "Av. San Martín 12", internal: "omit" },
+      ["active", "page", "search"],
+    )).toBe("?active=false&page=0&search=Av.+San+Mart%C3%ADn+12");
+  });
+
+  it("repeats array values and omits empty or missing values", () => {
+    expect(backendQuery(
+      { status: ["SCHEDULED", "IN_PROGRESS"], mode: "", page: undefined },
+      ["status", "mode", "page"],
+    )).toBe("?status=SCHEDULED&status=IN_PROGRESS");
   });
 });

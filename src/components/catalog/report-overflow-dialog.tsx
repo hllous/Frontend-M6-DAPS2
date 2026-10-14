@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
@@ -67,9 +68,7 @@ function ReportOverflowModalContent({
       updated = await containersAdapter.reportOverflow(container.id);
     } catch (err) {
       const msg =
-        err instanceof ContainerRequestError || err instanceof Error
-          ? err.message
-          : "No se pudo reportar el desborde.";
+        getErrorMessage(err, "No se pudo reportar el desborde.");
       setErrorMessage(msg);
       setIsSubmitting(false);
       return;

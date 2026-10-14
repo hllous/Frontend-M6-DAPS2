@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Eye, HeartPulse, Info, Plus, ShieldAlert, Skull, TriangleAlert } from "lucide-react";
@@ -90,7 +91,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
         const loaded = await treeSurveysAdapter.getTreeSurveys(tree.id, query);
         if (current) setState({ status: "ready", page: loaded });
       } catch (caught) {
-        if (current) setState({ status: "error", message: caught instanceof Error ? caught.message : "No se pudo cargar el historial de relevamientos." });
+        if (current) setState({ status: "error", message: errorMessage(caught, "No se pudo cargar el historial de relevamientos.") });
       }
     }
     void load();
@@ -101,7 +102,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
   const openDetail = async (survey: TreeSurvey) => {
     setDetail(survey); setDetailError(null); setDetailLoading(true);
     try { setDetail(await treeSurveysAdapter.getTreeSurvey(tree.id, survey.id)); }
-    catch (caught) { setDetailError(caught instanceof Error ? caught.message : "No se pudo cargar el detalle del relevamiento."); }
+    catch (caught) { setDetailError(errorMessage(caught, "No se pudo cargar el detalle del relevamiento.")); }
     finally { setDetailLoading(false); }
   };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -115,7 +116,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
     }
     setIsSubmitting(true);
     try { await treeSurveysAdapter.createTreeSurvey(tree.id, parsed.data as TreeSurveyCreateInput); setFormOpen(false); setNotice("Relevamiento registrado con éxito."); setPage(1); setRequestVersion((version) => version + 1); }
-    catch (caught) { setFormError(caught instanceof Error ? caught.message : "No se pudo registrar el relevamiento."); setFormErrorField("form"); }
+    catch (caught) { setFormError(errorMessage(caught, "No se pudo registrar el relevamiento.")); setFormErrorField("form"); }
     finally { setIsSubmitting(false); }
   };
   const fieldHasError = (field: FormErrorField) => formErrorField === field;

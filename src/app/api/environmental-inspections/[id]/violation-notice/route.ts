@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -13,7 +13,7 @@ import {
 import { issueViolationNoticeInputSchema } from "@/lib/environmental-reports";
 import { establishmentDirectoryAdapter } from "@/lib/establishment-directory";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 
 
@@ -27,7 +27,7 @@ export async function GET(request: Request, context: NoticeContext) {
 
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "violationNotice:view");
+    authorize(session, { capability: "violationNotice:view", throwOnError: true });
     const scenario = getScenario(session.scenarioId);
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede consultar actas de infracción.", path);
 
@@ -54,7 +54,7 @@ export async function POST(request: Request, context: NoticeContext) {
 
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "violationNotice:issue");
+    authorize(session, { capability: "violationNotice:issue", throwOnError: true });
     const scenario = getScenario(session.scenarioId);
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede emitir actas de infracción.", path);
 

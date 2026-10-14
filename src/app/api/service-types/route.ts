@@ -1,11 +1,10 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { addServiceTypeFixture, filterServiceTypeFixtures, paginateServiceTypeFixtures } from "@/lib/service-type-fixtures";
 import { serviceTypeCategorySchema, serviceTypeCreateInputSchema, serviceTypeModeSchema, type ServiceTypeQuery } from "@/lib/service-types";
-import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 
@@ -26,25 +25,7 @@ function parseQuery(url: URL): ServiceTypeQuery {
   };
 }
 
-function backendQueryString(query: ServiceTypeQuery) {
-  const params = new URLSearchParams();
-  if (query.active !== undefined) params.set("active", String(query.active));
-  if (query.category) params.set("category", query.category);
-  if (query.mode) params.set("mode", query.mode);
-  if (query.search) params.set("search", query.search);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-  const value = params.toString();
-  return value ? `?${value}` : "";
-}
-
-function requireOfficeCapability(request: Request) {
-  const session = getRequiredSession(request);
-  const scenario = getScenario(session);
-  if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar tipos de servicio.");
-  requireCapability(session, "serviceType:manage");
-  return session;
-}
+function requireOfficeCapability(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar tipos de servicio.", capability: "serviceType:manage", throwOnError: true }).session; }
 
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
@@ -52,7 +33,7 @@ export async function GET(request: Request) {
     const session = getRequiredSession(request);
     const query = parseQuery(new URL(request.url));
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/service-types${backendQueryString(query)}`);
+      const response = await fetchBackend(request, `/service-types${backendQuery(query, ["active", "category", "mode", "search", "page", "pageSize"])}`);
       return forwardResponse(response);
     }
     return NextResponse.json(paginateServiceTypeFixtures(filterServiceTypeFixtures(query), query.page, query.pageSize));

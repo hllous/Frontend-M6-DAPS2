@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -35,17 +35,6 @@ function parseGreenSpaceQuery(url: URL): GreenSpaceQuery {
   };
 }
 
-function backendQueryString(query: GreenSpaceQuery): string {
-  const params = new URLSearchParams();
-  if (query.active !== undefined) params.set("active", String(query.active));
-  if (query.spaceType) params.set("spaceType", query.spaceType);
-  if (query.zoneId) params.set("zoneId", query.zoneId);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
-}
-
 function isOffice(scenario: OperationalScenario) {
   return scenario.actor.kind === "OFFICE";
 }
@@ -58,7 +47,7 @@ export async function GET(request: Request) {
     const query = parseGreenSpaceQuery(new URL(request.url));
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/green-spaces${backendQueryString(query)}`);
+      const backendResponse = await fetchBackend(request, `/green-spaces${backendQuery(query, ["active", "spaceType", "zoneId", "page", "pageSize"])}`);
             return forwardResponse(backendResponse);
     }
 

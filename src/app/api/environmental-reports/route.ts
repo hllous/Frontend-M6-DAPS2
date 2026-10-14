@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -19,7 +19,7 @@ import {
   type EnvironmentalReportQuery,
 } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 
@@ -110,7 +110,7 @@ export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "environmentalReport:view");
+    authorize(session, { capability: "environmentalReport:view", throwOnError: true });
     const scenario = getScenario(session.scenarioId);
     const query = queryFromUrl(new URL(request.url));
 
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "environmentalReport:create");
+    authorize(session, { capability: "environmentalReport:create", throwOnError: true });
     const scenario = getScenario(session.scenarioId);
     if (scenario.actor.kind !== "FIELD" && scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina o Campo puede abrir expedientes.", path);
     const body = await request.json().catch(() => undefined);

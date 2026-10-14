@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useCallback, useEffect, useId, useState } from "react";
 import { AlertCircle, CheckCircle2, ExternalLink, Info, Loader2 } from "lucide-react";
@@ -309,7 +310,7 @@ export function CreateRepairRequestDialog({
         setValues(parsed.data);
         setOutcome("unsent");
       } else {
-        setErrors({ form: cause instanceof Error ? cause.message : "No se pudo crear la derivación." });
+        setErrors({ form: errorMessage(cause, "No se pudo crear la derivación.") });
       }
     } finally {
       setIsSubmitting(false);

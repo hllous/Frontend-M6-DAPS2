@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useState, type FormEvent } from "react";
 
@@ -49,7 +50,7 @@ export function DisposalSitesPanel({ scenario }: { scenario: OperationalScenario
         const result = await disposalSitesAdapter.list({ active: active === "all" ? undefined : active === "true", siteType: siteType || undefined, search: search || undefined });
         if (isCurrent) setState({ status: "ready", items: result.disposalSites });
       } catch (error) {
-        if (isCurrent) setState({ status: "error", message: error instanceof Error ? error.message : "No se pudieron cargar los sitios de disposición." });
+        if (isCurrent) setState({ status: "error", message: getErrorMessage(error, "No se pudieron cargar los sitios de disposición.") });
       }
     }
     void requestSites();
@@ -59,12 +60,12 @@ export function DisposalSitesPanel({ scenario }: { scenario: OperationalScenario
   const submitCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setMessage(null); setCreateError(null);
     try { await disposalSitesAdapter.create(createDraft); setCreateDraft(initialCreate); setShowCreate(false); setMessage("Sitio de disposición creado."); setRequestVersion((version) => version + 1); }
-    catch (error) { const errorMessage = error instanceof Error ? error.message : "No se pudo crear el sitio de disposición."; setCreateError(errorMessage); }
+    catch (error) { const errorMessage = getErrorMessage(error, "No se pudo crear el sitio de disposición."); setCreateError(errorMessage); }
   };
   const submitEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (!editing) return; setMessage(null); setEditError(null);
     try { await disposalSitesAdapter.update(editing.id, { name: editing.name, siteType: editing.siteType, active: editing.active }); setEditing(null); setMessage("Sitio de disposición actualizado."); setRequestVersion((version) => version + 1); }
-    catch (error) { const errorMessage = error instanceof Error ? error.message : "No se pudo actualizar el sitio de disposición."; setEditError(errorMessage); }
+    catch (error) { const errorMessage = getErrorMessage(error, "No se pudo actualizar el sitio de disposición."); setEditError(errorMessage); }
   };
   const deactivate = (item: DisposalSite) => {
     setMessage(null);

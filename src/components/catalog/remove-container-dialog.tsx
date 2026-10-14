@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
 import { ArchiveX } from "lucide-react";
@@ -62,9 +63,7 @@ function RemoveContainerModalContent({
       updated = await containersAdapter.remove(container.id);
     } catch (error) {
       setErrorMessage(
-        error instanceof ContainerRequestError || error instanceof Error
-          ? error.message
-          : "No se pudo retirar el contenedor.",
+        getErrorMessage(error, "No se pudo retirar el contenedor."),
       );
       setIsSubmitting(false);
       return;
