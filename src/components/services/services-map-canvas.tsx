@@ -126,22 +126,40 @@ function MapResizeController() {
   useEffect(() => {
     const container = map.getContainer();
     let frame = 0;
+    let workspaceLayoutAnimating = false;
+    let lastWidth = container.clientWidth;
+    let lastHeight = container.clientHeight;
 
-    // El contenedor cambia con el layout. Agrupa la actualización de Leaflet en
-    // el siguiente frame y evita que invalidateSize centre el mapa durante el tween.
-    const scheduleInvalidate = () => {
+    const scheduleInvalidate = (force = false) => {
+      if (workspaceLayoutAnimating) return;
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      if (!force && width === lastWidth && height === lastHeight) return;
+      lastWidth = width;
+      lastHeight = height;
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
         map.invalidateSize({ pan: false, debounceMoveend: true });
       });
     };
-    const observer = new ResizeObserver(scheduleInvalidate);
+    const beginWorkspaceLayout = () => {
+      workspaceLayoutAnimating = true;
+      window.cancelAnimationFrame(frame);
+    };
+    const settleWorkspaceLayout = () => {
+      workspaceLayoutAnimating = false;
+      scheduleInvalidate(true);
+    };
+
+    const observer = new ResizeObserver(() => scheduleInvalidate());
     observer.observe(container);
-    window.addEventListener("services-workspace-layout-settled", scheduleInvalidate);
+    window.addEventListener("services-workspace-layout-changing", beginWorkspaceLayout);
+    window.addEventListener("services-workspace-layout-settled", settleWorkspaceLayout);
 
     return () => {
       observer.disconnect();
-      window.removeEventListener("services-workspace-layout-settled", scheduleInvalidate);
+      window.removeEventListener("services-workspace-layout-changing", beginWorkspaceLayout);
+      window.removeEventListener("services-workspace-layout-settled", settleWorkspaceLayout);
       window.cancelAnimationFrame(frame);
     };
   }, [map]);

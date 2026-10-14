@@ -224,7 +224,10 @@ export function ServicesWorkspace({
   const panelGroupRef = useGroupRef();
   const workspaceRef = useRef<HTMLDivElement>(null);
   const layoutBeforePreviewRef = useRef<Record<string, number> | null>(null);
+  const mapFrameResizePendingRef = useRef(false);
+  const mapFrameSettleTimerRef = useRef<number | null>(null);
   const [mapFrameShrunkForPreview, setMapFrameShrunkForPreview] = useState(false);
+  const [previewRailWidth, setPreviewRailWidth] = useState<number | null>(null);
   const [isNarrow, setIsNarrow] = useState(false);
 
   // Map resilience
@@ -451,14 +454,38 @@ export function ServicesWorkspace({
     ? loadState.services.find((service) => service.id === retainedPreviewId) ?? null
     : null);
 
+  const completeMapFrameResize = useCallback(() => {
+    if (!mapFrameResizePendingRef.current) return;
+    mapFrameResizePendingRef.current = false;
+    if (mapFrameSettleTimerRef.current !== null) {
+      window.clearTimeout(mapFrameSettleTimerRef.current);
+      mapFrameSettleTimerRef.current = null;
+    }
+    window.dispatchEvent(new Event("services-workspace-layout-settled"));
+  }, []);
+
   useEffect(() => {
     const group = panelGroupRef.current;
     const workspace = workspaceRef.current;
     if (!group || !workspace) return;
 
-    if (isNarrow || !columnEditorVariant || !selectedService) {
+    const setPanelLayout = (layout: Record<string, number>) => {
+      const current = group.getLayout();
+      const currentMapPercent = current["map-pane"] ?? 50;
+      const nextMapPercent = layout["map-pane"] ?? 50;
+      if (Math.abs(currentMapPercent - nextMapPercent) < 0.1) return;
+      mapFrameResizePendingRef.current = true;
+      window.dispatchEvent(new Event("services-workspace-layout-changing"));
+      group.setLayout(layout);
+      if (mapFrameSettleTimerRef.current !== null) {
+        window.clearTimeout(mapFrameSettleTimerRef.current);
+      }
+      mapFrameSettleTimerRef.current = window.setTimeout(completeMapFrameResize, 440);
+    };
+
+    if (isNarrow || motionVariant !== "d" || !selectedService) {
       if (layoutBeforePreviewRef.current) {
-        group.setLayout(layoutBeforePreviewRef.current);
+        setPanelLayout(layoutBeforePreviewRef.current);
         layoutBeforePreviewRef.current = null;
       }
       setMapFrameShrunkForPreview(false);
@@ -467,28 +494,32 @@ export function ServicesWorkspace({
 
     const applyPreviewLayout = () => {
       const baseLayout = layoutBeforePreviewRef.current ?? group.getLayout();
+      const currentLayout = group.getLayout();
       const workspaceWidth = workspace.getBoundingClientRect().width;
       if (workspaceWidth <= 0) return;
 
       const table = workspace.querySelector<HTMLTableElement>('table[aria-label="Servicios operativos"]');
-      const currentTableWidth = workspaceWidth * ((baseLayout["table-pane"] ?? 50) / 100);
-      const measuredTableWidth = table?.getBoundingClientRect().width ?? currentTableWidth;
       const coreColumnWidth = ["ordinal", "service", "status"].reduce((width, key) => {
-        const cell = table?.querySelector<HTMLElement>(`[data-column-key="${key}"]`);
+        const cell = table?.querySelector<HTMLElement>(`thead [data-column-key="${key}"]`);
         return width + (cell?.getBoundingClientRect().width ?? 0);
       }, 0);
-      const coreColumnRatio = measuredTableWidth > 0 ? Math.min(0.78, coreColumnWidth / measuredTableWidth) : 0.52;
-      const previewWidth = Math.min(384, window.innerWidth * 0.26);
-      const requiredTableWidth = previewWidth / Math.max(0.22, 1 - coreColumnRatio);
-      const requiredTablePercent = Math.min(70, (requiredTableWidth / workspaceWidth) * 100);
+      const desiredPreviewWidth = Math.min(320, window.innerWidth * 0.22);
+      const availablePreviewWidth = workspaceWidth * 0.7 - coreColumnWidth - 16;
+      const previewWidth = Math.max(220, Math.min(desiredPreviewWidth, availablePreviewWidth));
+      setPreviewRailWidth((current) => current !== null && Math.abs(current - previewWidth) < 1 ? current : previewWidth);
+      const requiredTableWidth = coreColumnWidth + previewWidth + 16;
+      const requiredTablePercent = Math.min(70, Math.max(baseLayout["table-pane"] ?? 50, (requiredTableWidth / workspaceWidth) * 100));
       const baseTablePercent = baseLayout["table-pane"] ?? 50;
+      const currentTablePercent = currentLayout["table-pane"] ?? baseTablePercent;
 
-      if (currentTableWidth + 1 < requiredTableWidth && requiredTablePercent > baseTablePercent) {
+      if (requiredTablePercent > baseTablePercent + 0.1) {
         if (!layoutBeforePreviewRef.current) layoutBeforePreviewRef.current = baseLayout;
-        group.setLayout({ "map-pane": 100 - requiredTablePercent, "table-pane": requiredTablePercent });
+        if (Math.abs(currentTablePercent - requiredTablePercent) > 0.5) {
+          setPanelLayout({ "map-pane": 100 - requiredTablePercent, "table-pane": requiredTablePercent });
+        }
         setMapFrameShrunkForPreview(true);
       } else if (layoutBeforePreviewRef.current) {
-        group.setLayout(layoutBeforePreviewRef.current);
+        setPanelLayout(layoutBeforePreviewRef.current);
         layoutBeforePreviewRef.current = null;
         setMapFrameShrunkForPreview(false);
       } else {
@@ -501,7 +532,7 @@ export function ServicesWorkspace({
     const observer = new ResizeObserver(applyPreviewLayout);
     observer.observe(workspace);
     return () => observer.disconnect();
-  }, [columnEditorVariant, isNarrow, panelGroupRef, selectedService]);
+  }, [columnEditorVariant, completeMapFrameResize, isNarrow, motionVariant, panelGroupRef, selectedService]);
 
   useEffect(() => {
     if (selectedService || !retainedPreviewId) return;
@@ -806,7 +837,7 @@ export function ServicesWorkspace({
     onClearFilters: handleClearFilters,
     dense: isNarrow,
     columnEditorVariant,
-    columnUserId: scenario?.id ?? "office-duty-queue",
+    columnUserId: scenario?.actor.userId ?? "user-lucia",
   };
   const servicesTable = (
     <ServicesTable
@@ -1141,11 +1172,16 @@ export function ServicesWorkspace({
             ref={workspaceRef}
             data-motion-variant={motionVariant}
             data-column-editor={columnEditorVariant ?? undefined}
+            data-adaptive-preview={motionVariant === "d" ? "true" : undefined}
             data-preview-open={selectedService ? "true" : "false"}
             data-map-frame-shrunk={mapFrameShrunkForPreview ? "true" : "false"}
             onTransitionEnd={(event) => {
-              if (event.target === event.currentTarget && event.propertyName === "grid-template-columns") {
-                window.dispatchEvent(new Event("services-workspace-layout-settled"));
+              if (
+                event.propertyName === "flex-grow" &&
+                event.target instanceof HTMLElement &&
+                event.target.closest("[data-panel]")?.id === "map-pane"
+              ) {
+                completeMapFrameResize();
               }
             }}
           >
@@ -1245,6 +1281,8 @@ export function ServicesWorkspace({
               {!isNarrow && (
                 <div
                   className={cn(styles.previewRail, selectedService && styles.previewRailOpen)}
+                  data-preview-rail="true"
+                  style={previewRailWidth !== null ? { width: `${previewRailWidth}px` } : undefined}
                   aria-hidden={!selectedService}
                   inert={!selectedService}
                 >

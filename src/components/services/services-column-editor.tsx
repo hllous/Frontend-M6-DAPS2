@@ -61,42 +61,42 @@ export const SERVICES_COLUMN_DEFINITIONS: readonly ServicesColumnDefinition[] = 
   {
     key: "service",
     label: "Servicio",
-    minimumWidth: 210,
-    maximumWidth: 500,
-    defaultWidth: 300,
-    presets: { compact: 240, balanced: 320, wide: 440 },
+    minimumWidth: 180,
+    maximumWidth: 380,
+    defaultWidth: 250,
+    presets: { compact: 180, balanced: 250, wide: 350 },
   },
   {
     key: "status",
     label: "Estado",
-    minimumWidth: 110,
-    maximumWidth: 220,
-    defaultWidth: 145,
-    presets: { compact: 120, balanced: 150, wide: 190 },
+    minimumWidth: 130,
+    maximumWidth: 240,
+    defaultWidth: 180,
+    presets: { compact: 130, balanced: 180, wide: 230 },
   },
   {
     key: "zone",
     label: "Zona",
-    minimumWidth: 120,
-    maximumWidth: 340,
-    defaultWidth: 190,
-    presets: { compact: 140, balanced: 190, wide: 270 },
+    minimumWidth: 110,
+    maximumWidth: 280,
+    defaultWidth: 150,
+    presets: { compact: 110, balanced: 150, wide: 240 },
   },
   {
     key: "crew",
     label: "Cuadrilla",
     minimumWidth: 120,
-    maximumWidth: 300,
-    defaultWidth: 165,
-    presets: { compact: 140, balanced: 180, wide: 250 },
+    maximumWidth: 280,
+    defaultWidth: 160,
+    presets: { compact: 120, balanced: 160, wide: 240 },
   },
   {
     key: "scheduled",
     label: "Programado",
     minimumWidth: 130,
-    maximumWidth: 300,
-    defaultWidth: 175,
-    presets: { compact: 150, balanced: 190, wide: 260 },
+    maximumWidth: 280,
+    defaultWidth: 180,
+    presets: { compact: 130, balanced: 180, wide: 240 },
   },
 ] as const;
 
@@ -118,8 +118,8 @@ export interface ServicesColumnPreferences {
 
 export interface UseServicesColumnPreferencesOptions {
   userId: string;
-  scenarioId: string;
   variant: ServicesColumnVariant;
+  enabled?: boolean;
 }
 
 export interface ServicesColumnPreferencesController {
@@ -240,10 +240,9 @@ export function moveServicesColumn(
 
 export function getServicesColumnStorageKey({
   userId,
-  scenarioId,
   variant,
-}: UseServicesColumnPreferencesOptions): string {
-  return `${STORAGE_PREFIX}:${encodeURIComponent(userId)}:${encodeURIComponent(scenarioId)}:${variant}`;
+}: Pick<UseServicesColumnPreferencesOptions, "userId" | "variant">): string {
+  return `${STORAGE_PREFIX}:${encodeURIComponent(userId)}:${variant}`;
 }
 
 function readPreferences(storageKey: string): ServicesColumnPreferences {
@@ -276,10 +275,10 @@ interface StoredPreferencesState {
 
 export function useServicesColumnPreferences({
   userId,
-  scenarioId,
   variant,
+  enabled = true,
 }: UseServicesColumnPreferencesOptions): ServicesColumnPreferencesController {
-  const storageKey = getServicesColumnStorageKey({ userId, scenarioId, variant });
+  const storageKey = getServicesColumnStorageKey({ userId, variant });
   const [state, setState] = useState<StoredPreferencesState>(() => ({
     storageKey: "",
     isHydrated: false,
@@ -287,18 +286,19 @@ export function useServicesColumnPreferences({
   }));
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!enabled || typeof window === "undefined") return;
     setState({
       storageKey,
       isHydrated: true,
       preferences: readPreferences(storageKey),
     });
-  }, [storageKey]);
+  }, [enabled, storageKey]);
 
   useEffect(() => {
-    if (!state.isHydrated || state.storageKey !== storageKey) return;
-    writePreferences(storageKey, state.preferences);
-  }, [state, storageKey]);
+    if (!enabled || !state.isHydrated || state.storageKey !== storageKey) return;
+    const timeout = window.setTimeout(() => writePreferences(storageKey, state.preferences), 120);
+    return () => window.clearTimeout(timeout);
+  }, [enabled, state, storageKey]);
 
   const update = useCallback(
     (change: (current: ServicesColumnPreferences) => ServicesColumnPreferences) => {
@@ -367,7 +367,7 @@ export function useServicesColumnPreferences({
 
   return {
     variant,
-    isHydrated: state.isHydrated && state.storageKey === storageKey,
+    isHydrated: enabled && state.isHydrated && state.storageKey === storageKey,
     preferences: state.storageKey === storageKey
       ? state.preferences
       : createDefaultServicesColumnPreferences(),
@@ -547,7 +547,7 @@ function ColumnRows({
 
             {showRangeControls && (
               <label htmlFor={rangeId} className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
-                <span>Ancho de {definition.label}: {currentWidth} px</span>
+                <span>Ancho de {definition.label}: {Math.round(currentWidth / Object.values(preferences.widths).reduce((sum, width) => sum + width, 0) * 100)} %</span>
                 <input
                   id={rangeId}
                   type="range"
@@ -556,7 +556,7 @@ function ColumnRows({
                   step={10}
                   value={currentWidth}
                   disabled={!controller.isHydrated}
-                  aria-valuetext={`${currentWidth} píxeles`}
+                  aria-valuetext={`${Math.round(currentWidth / Object.values(preferences.widths).reduce((sum, width) => sum + width, 0) * 100)} % del ancho de la tabla`}
                   onChange={(event) => controller.setWidth(key, Number(event.currentTarget.value))}
                   className="h-6 w-full cursor-pointer accent-[var(--color-action)] focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed"
                 />

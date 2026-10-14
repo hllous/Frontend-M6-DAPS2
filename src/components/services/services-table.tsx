@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import {
@@ -13,6 +14,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   Filter,
+  GripVertical,
   MapPin,
   Route,
   Search,
@@ -32,6 +34,14 @@ import { STATUS_LABEL } from "@/lib/services";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./status-badge";
 import { createServiceOrdinals, type SortDir, type SortKey } from "./service-sorting";
+import {
+  SERVICES_COLUMN_DEFINITIONS,
+  ServicesColumnEditor,
+  ServicesColumnHeaderMenu,
+  useServicesColumnPreferences,
+  type ServicesColumnKey,
+  type ServicesColumnVariant,
+} from "./services-column-editor";
 
 export type { SortDir, SortKey } from "./service-sorting";
 
@@ -52,6 +62,16 @@ const ALL_STATUSES: ServiceStatus[] = [
   "PARTIALLY_COMPLETED",
   "CANCELLED",
 ];
+
+const DEFAULT_COLUMN_ORDER: ServicesColumnKey[] = [
+  "service",
+  "status",
+  "zone",
+  "crew",
+  "scheduled",
+];
+const MOBILE_COMPACT_COLUMNS = new Set<ServicesColumnKey>(["service", "status", "zone"]);
+const LEGACY_COMPACT_COLUMNS = new Set<ServicesColumnKey>(["service", "status"]);
 
 function ColumnFilterPopover({
   label,
@@ -167,6 +187,98 @@ function ScheduledFilterPopover({
   );
 }
 
+function ColumnResizeHandle({
+  columnKey,
+  label,
+  width,
+  minimumWidth,
+  maximumWidth,
+  totalWidth,
+  dataWidthPercent,
+  onResize,
+}: {
+  columnKey: ServicesColumnKey;
+  label: string;
+  width: number;
+  minimumWidth: number;
+  maximumWidth: number;
+  totalWidth: number;
+  dataWidthPercent: number;
+  onResize: (key: ServicesColumnKey, width: number) => void;
+}) {
+  const drag = useRef<{
+    pointerId: number;
+    startX: number;
+    startWidth: number;
+    widthPerPixel: number;
+  } | null>(null);
+  const widthShare = Math.round(width / totalWidth * 100);
+
+  function startResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const tableWidth = event.currentTarget.closest("table")?.getBoundingClientRect().width ?? 0;
+    const dataWidth = tableWidth * dataWidthPercent / 100;
+    drag.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: width,
+      widthPerPixel: dataWidth > 0 ? totalWidth / dataWidth : 1,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function resize(event: ReactPointerEvent<HTMLButtonElement>) {
+    const activeDrag = drag.current;
+    if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
+    const nextWidth = activeDrag.startWidth + (event.clientX - activeDrag.startX) * activeDrag.widthPerPixel;
+    onResize(columnKey, nextWidth);
+  }
+
+  function finishResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (drag.current?.pointerId !== event.pointerId) return;
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      role="slider"
+      aria-label={`Ancho de columna ${label}`}
+      aria-orientation="vertical"
+      aria-valuemin={minimumWidth}
+      aria-valuemax={maximumWidth}
+      aria-valuenow={width}
+      aria-valuetext={`${widthShare} % del ancho de la tabla`}
+      aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
+      title="Arrastre para cambiar el ancho; use las flechas para ajustar"
+      onPointerDown={startResize}
+      onPointerMove={resize}
+      onPointerUp={finishResize}
+      onPointerCancel={finishResize}
+      onKeyDown={(event) => {
+        const delta = event.key === "ArrowRight" || event.key === "ArrowUp"
+          ? 10
+          : event.key === "ArrowLeft" || event.key === "ArrowDown"
+            ? -10
+            : 0;
+        if (delta === 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onResize(columnKey, width + delta);
+      }}
+      className="absolute right-0 top-0 h-full min-h-0 w-4 touch-none cursor-col-resize rounded-none px-0 text-[var(--color-text-secondary)] hover:text-[var(--color-action)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2"
+    >
+      <GripVertical data-icon="inline-start" aria-hidden="true" />
+    </Button>
+  );
+}
+
 export function ServicesTable({
   services,
   serviceOrdinals: suppliedServiceOrdinals,
@@ -183,6 +295,8 @@ export function ServicesTable({
   hasActiveFilters = false,
   onClearFilters,
   dense = false,
+  columnEditorVariant = null,
+  columnUserId = "user-lucia",
 }: {
   services: Service[];
   serviceOrdinals?: ReadonlyMap<string, number>;
@@ -199,8 +313,15 @@ export function ServicesTable({
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
   dense?: boolean;
+  columnEditorVariant?: ServicesColumnVariant | null;
+  columnUserId?: string;
 }) {
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const columnPreferences = useServicesColumnPreferences({
+    userId: columnUserId,
+    variant: columnEditorVariant ?? "g",
+    enabled: Boolean(columnEditorVariant),
+  });
   const animatedColumnCollapse = !dense && compactOnPreview && previewMotionVariant === "a";
   const compactColumns = dense || (compactOnPreview && (previewMotionVariant === "b" || previewMotionVariant === "c" || previewMotionVariant === "f"));
   const stableDesktopPreviewTable = !dense && (previewMotionVariant === "d" || previewMotionVariant === "e" || previewMotionVariant === "f");
@@ -253,16 +374,44 @@ export function ServicesTable({
     onColumnFiltersChange({ ...columnFilters, crews: next });
   };
 
-  const columns: Array<{ key: SortKey; label: string; hideWhenDense?: boolean }> = [
+  const columns: Array<{ key: ServicesColumnKey; label: string; hideWhenDense?: boolean }> = [
     { key: "service", label: "Servicio" },
-    { key: "zone", label: "Zona", hideWhenDense: true },
     { key: "status", label: "Estado" },
+    { key: "zone", label: "Zona", hideWhenDense: true },
     { key: "crew", label: "Cuadrilla", hideWhenDense: true },
     { key: "scheduled", label: "Programado", hideWhenDense: true },
   ];
+  const columnByKey = new Map(columns.map((column) => [column.key, column]));
+  const preferredOrder = columnEditorVariant
+    ? columnPreferences.preferences.order
+    : DEFAULT_COLUMN_ORDER;
+  const compactKeys = dense ? MOBILE_COMPACT_COLUMNS : LEGACY_COMPACT_COLUMNS;
+  const currentColumns = preferredOrder
+    .filter((key) => !columnEditorVariant || columnPreferences.preferences.visibility[key])
+    .filter((key) => columnByKey.has(key))
+    .filter((key) => !compactColumns || compactKeys.has(key))
+    .map((key) => columnByKey.get(key)!);
+  const sizingColumns = currentColumns.filter((column) => !(animatedColumnCollapse && column.hideWhenDense));
+  const widthTotal = sizingColumns.reduce((sum, column) => {
+    const definition = SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === column.key)!;
+    return sum + (columnEditorVariant ? columnPreferences.preferences.widths[column.key] : definition.defaultWidth);
+  }, 0);
+  const ordinalWidthPercent = dense || compactColumns ? 12 : 8;
+  const dataWidthPercent = 100 - ordinalWidthPercent;
+
+  function getDataColumnWidthPercent(key: ServicesColumnKey): number {
+    const definition = SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === key)!;
+    const width = columnEditorVariant ? columnPreferences.preferences.widths[key] : definition.defaultWidth;
+    return widthTotal > 0 ? (width / widthTotal) * dataWidthPercent : dataWidthPercent / Math.max(1, sizingColumns.length);
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
+      {columnEditorVariant && columnEditorVariant !== "i" && (
+        <div className="flex shrink-0 justify-end border-b border-[var(--color-border)] px-2 py-1.5">
+          <ServicesColumnEditor controller={columnPreferences} />
+        </div>
+      )}
       <div
         data-preview-clip={stableDesktopPreviewTable ? "true" : undefined}
         className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll [scrollbar-gutter:stable]"
@@ -274,37 +423,23 @@ export function ServicesTable({
           aria-label="Servicios operativos"
         >
           <colgroup>
-            {animatedColumnCollapse ? (
-              <>
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "56%" }} />
-                <col data-preview-collapse-column style={{ width: "0%" }} />
-                <col style={{ width: "32%" }} />
-                <col data-preview-collapse-column style={{ width: "0%" }} />
-                <col data-preview-collapse-column style={{ width: "0%" }} />
-              </>
-            ) : compactColumns ? (
-              <>
-                <col className="w-[12%]" />
-                <col className="w-[56%]" />
-                <col className="w-[32%]" />
-              </>
-            ) : (
-              <>
-                <col className="w-[8%]" />
-                <col className="w-[25%]" />
-                <col className="w-[15%]" />
-                <col className="w-[18%]" />
-                <col className="w-[16%]" />
-                <col className="w-[18%]" />
-              </>
-            )}
+            <col data-column-key="ordinal" style={{ width: `${ordinalWidthPercent}%` }} />
+            {currentColumns.map((column) => {
+              const collapsed = Boolean(animatedColumnCollapse && column.hideWhenDense);
+              return (
+                <col
+                  key={column.key}
+                  data-column-key={column.key}
+                  data-preview-collapse-column={collapsed ? "true" : undefined}
+                  style={{ width: collapsed ? "0%" : `${getDataColumnWidthPercent(column.key)}%` }}
+                />
+              );
+            })}
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
             <tr>
-              <th scope="col" aria-label="Número de parada" className="px-1 py-3 text-center">#</th>
-              {columns.map((col) => {
-                if (compactColumns && col.hideWhenDense) return null;
+              <th scope="col" data-column-key="ordinal" aria-label="Número de parada" className="px-1 py-3 text-center">#</th>
+              {currentColumns.map((col) => {
                 const isSorted = sortKey === col.key;
                 const isCompactDateSort = compactColumns && col.key === "service" && sortKey === "scheduled";
                 const ariaSort = isSorted || isCompactDateSort
@@ -320,13 +455,46 @@ export function ServicesTable({
                     key={col.key}
                     scope="col"
                     aria-sort={ariaSort}
+                    data-column-key={col.key}
                     data-preview-collapse-column={animatedColumnCollapse && col.hideWhenDense ? "true" : undefined}
                     data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" && col.key !== "service" ? "true" : undefined}
                     aria-hidden={animatedColumnCollapse && col.hideWhenDense ? true : compactOnPreview && previewMotionVariant === "e" && col.key !== "service" ? true : undefined}
                     inert={animatedColumnCollapse && col.hideWhenDense || compactOnPreview && previewMotionVariant === "e" && col.key !== "service"}
-                    className="select-none px-1 py-2"
+                    className={cn("relative select-none px-1 py-2", columnEditorVariant === "g" && "cursor-grab")}
+                    onDragOver={(event) => {
+                      if (columnEditorVariant === "g") event.preventDefault();
+                    }}
+                    onDrop={(event) => {
+                      if (columnEditorVariant !== "g") return;
+                      event.preventDefault();
+                      const source = event.dataTransfer?.getData("text/plain") as ServicesColumnKey | undefined;
+                      if (!source || source === col.key) return;
+                      const order = columnPreferences.preferences.order;
+                      const sourceIndex = order.indexOf(source);
+                      const targetIndex = order.indexOf(col.key);
+                      if (sourceIndex < 0 || targetIndex < 0) return;
+                      for (let index = sourceIndex; index < targetIndex; index += 1) {
+                        columnPreferences.moveColumn(source, "next");
+                      }
+                      for (let index = sourceIndex; index > targetIndex; index -= 1) {
+                        columnPreferences.moveColumn(source, "previous");
+                      }
+                    }}
                   >
                     <div className={cn("flex items-center justify-between gap-1.5", dense && "gap-1")}>
+                      {columnEditorVariant === "g" && (
+                        <span
+                          draggable
+                          title={`Arrastre para mover ${col.label}`}
+                          onDragStart={(event) => {
+                            event.dataTransfer?.setData("text/plain", col.key);
+                            if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+                          }}
+                          className="flex shrink-0 cursor-grab items-center text-[var(--color-text-secondary)] active:cursor-grabbing"
+                        >
+                          <GripVertical aria-hidden />
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => onSortChange(col.key)}
@@ -445,7 +613,24 @@ export function ServicesTable({
                           onColumnFiltersChange={onColumnFiltersChange}
                         />
                       )}
+
+                      {columnEditorVariant === "i" && (
+                        <ServicesColumnHeaderMenu controller={columnPreferences} columnKey={col.key} />
+                      )}
                     </div>
+
+                    {columnEditorVariant === "g" && !dense && (
+                      <ColumnResizeHandle
+                        columnKey={col.key}
+                        label={col.label}
+                        width={columnPreferences.preferences.widths[col.key]}
+                        minimumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.minimumWidth}
+                        maximumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.maximumWidth}
+                        totalWidth={widthTotal}
+                        dataWidthPercent={dataWidthPercent}
+                        onResize={columnPreferences.setWidth}
+                      />
+                    )}
                   </th>
                 );
               })}
@@ -456,12 +641,12 @@ export function ServicesTable({
               const isSelected = service.id === selectedId;
               const ordinal = serviceOrdinals.get(service.id)!;
               const compactSecondaryInfo = [
-                service.zoneNames.join(", "),
                 formatCalendarDay(service.scheduledDate),
                 service.windowFrom
                   ? `${service.windowFrom}${service.windowTo ? `–${service.windowTo}` : ""}`
                   : "",
               ].filter(Boolean).join(" · ");
+              const compactMetadataColumn = currentColumns.at(-1)?.key;
 
               return (
                 <tr
@@ -480,7 +665,7 @@ export function ServicesTable({
                       : "hover:bg-[var(--color-canvas)]",
                   )}
                 >
-                  <td className={cn("text-center tabular-nums", dense ? "px-1 py-2" : "px-1.5 py-2")}>
+                  <td data-column-key="ordinal" className={cn("text-center tabular-nums", dense ? "px-1 py-2" : "px-1.5 py-2")}>
                     <span
                       aria-label={`Parada ${ordinal}`}
                       className="inline-flex size-7 items-center justify-center rounded-full bg-[var(--color-action)] text-xs font-bold text-[var(--color-on-institutional)]"
@@ -488,97 +673,91 @@ export function ServicesTable({
                       {ordinal}
                     </span>
                   </td>
-                  <td className="px-1.5 py-2">
-                    <button
-                      type="button"
-                      data-service-select="true"
-                      data-service-id={service.id}
-                      aria-label={`Seleccionar servicio ${service.title}`}
-                      aria-pressed={isSelected}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onSelect(service.id);
-                      }}
-                      className="flex min-w-0 w-full items-start gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-                    >
-                      {service.mode === "ROUTE" ? (
-                        <Route className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
-                      ) : (
-                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
-                      )}
-                      <span className="min-w-0">
-                        <span className="block break-words font-semibold text-[var(--color-text)] leading-tight">
-                          {service.title}
-                        </span>
-                        {dense && (
+                  {currentColumns.map((column) => {
+                    const collapsed = Boolean(animatedColumnCollapse && column.hideWhenDense);
+                    const trailing = compactOnPreview && previewMotionVariant === "e" && column.key !== "service";
+                    const cellAttributes = {
+                      "data-column-key": column.key,
+                      "data-preview-collapse-column": collapsed ? "true" : undefined,
+                      "data-preview-trailing-column": trailing ? "true" : undefined,
+                      "aria-hidden": collapsed || trailing || undefined,
+                      inert: collapsed || trailing,
+                    };
+                    const content = (() => {
+                      switch (column.key) {
+                        case "service":
+                          return (
+                            <button
+                              type="button"
+                              data-service-select="true"
+                              data-service-id={service.id}
+                              aria-label={`Seleccionar servicio ${service.title}`}
+                              aria-pressed={isSelected}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onSelect(service.id);
+                              }}
+                              className="flex min-w-0 w-full items-start gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                            >
+                              {service.mode === "ROUTE" ? (
+                                <Route className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
+                              ) : (
+                                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
+                              )}
+                              <span className="min-w-0">
+                                <span className="block break-words font-semibold text-[var(--color-text)] leading-tight">
+                                  {service.title}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        case "status":
+                          return <StatusBadge status={service.status} className="gap-1 px-1.5 text-[11px] [&_svg]:h-3 [&_svg]:w-3" />;
+                        case "zone":
+                          return service.zoneNames.join(", ");
+                        case "crew":
+                          return service.crewName ?? <span className="italic text-[var(--color-text-secondary)]">Sin asignar</span>;
+                        case "scheduled":
+                          return (
+                            <>
+                              <div>{formatCalendarDay(service.scheduledDate)}</div>
+                              {service.windowFrom && (
+                                <div className="text-[11px] text-[var(--color-text-secondary)]">
+                                  {service.windowFrom} – {service.windowTo ?? ""}
+                                </div>
+                              )}
+                            </>
+                          );
+                      }
+                    })();
+                    const compactMetadata = dense && compactMetadataColumn === column.key && compactSecondaryInfo;
+
+                    return (
+                      <td
+                        key={column.key}
+                        {...cellAttributes}
+                        className={cn(
+                          "px-1.5 py-2 text-[var(--color-text)]",
+                          column.key === "status" && "text-left",
+                          column.key === "scheduled" && "tabular-nums",
+                        )}
+                      >
+                        {content}
+                        {compactMetadata && (
                           <span className="mt-0.5 block text-[11px] text-[var(--color-text-secondary)]">
-                            {compactSecondaryInfo}
+                            {compactMetadata}
                           </span>
                         )}
-                      </span>
-                    </button>
-                  </td>
-
-                  {!compactColumns && (
-                    <td
-                      data-preview-collapse-column={animatedColumnCollapse ? "true" : undefined}
-                      data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" ? "true" : undefined}
-                      aria-hidden={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e" || undefined}
-                      inert={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e"}
-                      className="px-1.5 py-2 text-[var(--color-text)]"
-                    >
-                      {service.zoneNames.join(", ")}
-                    </td>
-                  )}
-
-                  <td
-                    data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" ? "true" : undefined}
-                    aria-hidden={compactOnPreview && previewMotionVariant === "e" || undefined}
-                    inert={compactOnPreview && previewMotionVariant === "e"}
-                    className="px-1.5 py-2"
-                  >
-                    <div className="flex flex-col gap-1 items-start">
-                      <StatusBadge status={service.status} className="gap-1 px-1.5 text-[11px] [&_svg]:h-3 [&_svg]:w-3" />
-                    </div>
-                  </td>
-
-                  {!compactColumns && (
-                    <td
-                      data-preview-collapse-column={animatedColumnCollapse ? "true" : undefined}
-                      data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" ? "true" : undefined}
-                      aria-hidden={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e" || undefined}
-                      inert={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e"}
-                      className="px-1.5 py-2 text-[var(--color-text)]"
-                    >
-                      {service.crewName ?? (
-                        <span className="italic text-[var(--color-text-secondary)]">Sin asignar</span>
-                      )}
-                    </td>
-                  )}
-
-                  {!compactColumns && (
-                    <td
-                      data-preview-collapse-column={animatedColumnCollapse ? "true" : undefined}
-                      data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" ? "true" : undefined}
-                      aria-hidden={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e" || undefined}
-                      inert={animatedColumnCollapse || compactOnPreview && previewMotionVariant === "e"}
-                      className="px-1.5 py-2 text-[var(--color-text)] tabular-nums"
-                    >
-                      <div>{formatCalendarDay(service.scheduledDate)}</div>
-                      {service.windowFrom && (
-                        <div className="text-[11px] text-[var(--color-text-secondary)]">
-                          {service.windowFrom} – {service.windowTo ?? ""}
-                        </div>
-                      )}
-                    </td>
-                  )}
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}
 
             {services.length === 0 && (
               <tr>
-                <td colSpan={compactColumns ? 3 : columns.length + 1} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
+                <td colSpan={currentColumns.length + 1} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
                   <Empty className="mx-auto max-w-sm gap-3 rounded-none p-0" role="status">
                     <EmptyHeader>
                       <EmptyTitle>
