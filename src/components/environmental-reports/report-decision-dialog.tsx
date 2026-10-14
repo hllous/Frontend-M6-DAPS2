@@ -99,7 +99,7 @@ function ReportDecisionForm({ decision, reportId, onOpenChange, onConfirm }: { d
       </form>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Volver al expediente</Button>
-        <Button type="submit" form={formId} disabled={submitting} className="min-h-10 gap-2">
+        <Button type="submit" form={formId} disabled={submitting} className="gap-2">
           {submitting && <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden />}
           {submitting ? copy.submitting : copy.submit}
         </Button>

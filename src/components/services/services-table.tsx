@@ -479,7 +479,6 @@ export function ServicesTable({
                         <Button
                           type="button"
                           variant="outline"
-                          className={dense ? "min-h-12" : "min-h-10"}
                           onClick={onClearFilters}
                         >
                           Limpiar filtros

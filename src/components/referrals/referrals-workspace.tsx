@@ -348,7 +348,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
             <CircleAlert className="mx-auto h-8 w-8 text-[var(--color-danger)]" aria-hidden />
             <h2 className="mt-3 text-lg font-bold text-[var(--color-text)]">No se pudieron cargar las derivaciones</h2>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{loadState.message}</p>
-            <Button className="mt-5 min-h-10 gap-2" onClick={loadReferrals}>
+            <Button className="mt-5 gap-2" onClick={loadReferrals}>
               <RefreshCw className="h-4 w-4" aria-hidden />
               Reintentar carga
             </Button>
@@ -540,7 +540,7 @@ function ReferralDetail({
     <div className="flex min-h-full flex-col bg-[var(--color-surface)]" role="region" aria-label={`Detalle de ${referral.id}`}>
       <header className="border-b border-[var(--color-border)] bg-[var(--color-canvas)] px-4 py-3 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
-          <Button variant="outline" size="sm" onClick={onBack} className="min-h-10 gap-1.5 [@media(max-width:760px)]:min-h-12">
+          <Button variant="outline" size="sm" onClick={onBack} className="gap-1.5">
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Volver a derivaciones
           </Button>
@@ -727,7 +727,7 @@ function ReferralRecoveryPanel({
             key={`${action.kind}-${action.transition}`}
             type="button"
             variant="outline"
-            className="min-h-10 border-[var(--color-border-strong)] bg-[var(--color-surface)] font-semibold text-[var(--color-action)] hover:bg-[var(--color-surface)]"
+            className="border-[var(--color-border-strong)] bg-[var(--color-surface)] font-semibold text-[var(--color-action)] hover:bg-[var(--color-surface)]"
             onClick={() => setActiveAction(action)}
           >
             <ShieldCheck className="h-4 w-4" aria-hidden />
@@ -917,7 +917,7 @@ function ReferralRecoveryForm({
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
           Volver
         </Button>
-        <Button type="submit" form={formId} disabled={isSubmitting} className="min-h-10 font-semibold">
+        <Button type="submit" form={formId} disabled={isSubmitting} className="font-semibold">
           {isSubmitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
