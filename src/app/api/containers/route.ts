@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -41,18 +41,6 @@ function parseContainerQuery(url: URL): ContainerQuery {
   };
 }
 
-function backendQueryString(query: ContainerQuery): string {
-  const params = new URLSearchParams();
-  if (query.status) params.set("status", query.status);
-  if (query.containerType) params.set("containerType", query.containerType);
-  if (query.zoneId) params.set("zoneId", query.zoneId);
-  if (query.search) params.set("search", query.search);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
-}
-
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
 
@@ -61,7 +49,7 @@ export async function GET(request: Request) {
     const query = parseContainerQuery(new URL(request.url));
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/containers${backendQueryString(query)}`);
+      const backendResponse = await fetchBackend(request, `/containers${backendQuery(query, ["status", "containerType", "zoneId", "search", "page", "pageSize"])}`);
             return forwardResponse(backendResponse);
     }
 

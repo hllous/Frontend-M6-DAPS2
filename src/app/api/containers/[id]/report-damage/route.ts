@@ -1,10 +1,9 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getContainerFixture, reportDamageFixture } from "@/lib/containers-fixtures";
 import { reportDamageInputSchema } from "@/lib/containers";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -25,11 +24,8 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (!scenario.capabilities.includes("container:report")) {
-      return errorResponse(403, "No tiene permisos para reportar daños de contenedores.", path);
-    }
+    authorize(session, { capability: "container:report", capabilityMessage: "No tiene permisos para reportar daños de contenedores.", throwOnError: true });
 
     let body: unknown;
     try {

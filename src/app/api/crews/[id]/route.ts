@@ -1,11 +1,11 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { crewFixtures } from "@/lib/crew-fixtures";
 import { updateCrewInputSchema } from "@/lib/crews";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
 
@@ -17,10 +17,7 @@ async function context(request: Request, routeContext: Context) {
   const session = getRequiredSession(request);
   return { id, path: new URL(request.url).pathname, session, scenario: getScenario(session) };
 }
-function requireOfficeCapability(session: ReturnType<typeof getRequiredSession>, scenario: ReturnType<typeof getScenario>) {
-  if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar cuadrillas.");
-  requireCapability(session, "crew:manage");
-}
+function requireOfficeCapability(session: ReturnType<typeof getRequiredSession>) { authorize(session, { office: true, officeMessage: "Solo Oficina puede administrar cuadrillas.", capability: "crew:manage", throwOnError: true }); }
 
 export async function GET(request: Request, routeContext: Context) {
   const path = new URL(request.url).pathname;
@@ -41,8 +38,8 @@ export async function GET(request: Request, routeContext: Context) {
 export async function PATCH(request: Request, routeContext: Context) {
   const path = new URL(request.url).pathname;
   try {
-    const { id, session, scenario } = await context(request, routeContext);
-    requireOfficeCapability(session, scenario);
+    const { id, session } = await context(request, routeContext);
+    requireOfficeCapability(session);
     let body: unknown;
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = updateCrewInputSchema.safeParse(body);
@@ -63,8 +60,8 @@ export async function PATCH(request: Request, routeContext: Context) {
 export async function DELETE(request: Request, routeContext: Context) {
   const path = new URL(request.url).pathname;
   try {
-    const { id, session, scenario } = await context(request, routeContext);
-    requireOfficeCapability(session, scenario);
+    const { id, session } = await context(request, routeContext);
+    requireOfficeCapability(session);
     if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}`, "crew:manage", { method: "DELETE" }));
     const crew = crewFixtures.find((item) => item.id === id);
     if (!crew) return errorResponse(404, `La cuadrilla ${id} no existe.`, path);

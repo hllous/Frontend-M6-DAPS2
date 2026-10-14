@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -175,30 +175,12 @@ export async function POST(request: Request) {
 
     // Permission check by ownerType
     if (ownerType === "CONTAINER") {
-      if (!scenario.capabilities.includes("container:report")) {
-        return errorResponse(
-          403,
-          "No tiene permisos para subir evidencia de contenedores.",
-          path,
-        );
-      }
+      authorize(session, { capability: "container:report", capabilityMessage: "No tiene permisos para subir evidencia de contenedores.", throwOnError: true });
     } else if (ownerType === "INSPECTION") {
-      if (!scenario.capabilities.includes("environmentalInspection:execute")) {
-        return errorResponse(
-          403,
-          "No tiene permisos para subir evidencia de inspección.",
-          path,
-        );
-      }
+      authorize(session, { capability: "environmentalInspection:execute", capabilityMessage: "No tiene permisos para subir evidencia de inspección.", throwOnError: true });
     } else {
       // SERVICE or ZONE_RESULT
-      if (!scenario.capabilities.includes("service:execute")) {
-        return errorResponse(
-          403,
-          "No tiene permisos para subir evidencia. Solo la persona responsable de la cuadrilla puede hacerlo.",
-          path,
-        );
-      }
+      authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para subir evidencia. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
     }
 
     if (!ownerId || typeof ownerId !== "string" || !ownerId.trim()) {

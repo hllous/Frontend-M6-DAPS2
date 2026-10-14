@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -28,13 +28,7 @@ export async function POST(
     const scenario = getScenario(session);
 
     // Permission check: only actors with service:execute capability (Crew Leader of the assigned crew)
-    if (!scenario.capabilities.includes("service:execute")) {
-      return errorResponse(
-        403,
-        "No tiene permisos para reanudar el servicio. Solo la persona responsable de la cuadrilla puede hacerlo.",
-        path,
-      );
-    }
+    authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para reanudar el servicio. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
 
     if (backendMode(session)) {
       const scopedService = await requireCrewScope(request, session, { serviceId });

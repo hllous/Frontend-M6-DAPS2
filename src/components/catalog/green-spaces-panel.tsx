@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -88,7 +89,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
         }
         setState({ status: "ready", greenSpaces: result.greenSpaces, total: result.total, totalPages: result.totalPages });
       } catch (caught) {
-        if (isCurrent) setState({ status: "error", message: caught instanceof Error ? caught.message : "No se pudieron cargar los espacios verdes." });
+        if (isCurrent) setState({ status: "error", message: errorMessage(caught, "No se pudieron cargar los espacios verdes.") });
       }
     }
     void requestGreenSpaces();
@@ -129,7 +130,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
       setNotice(editing ? "Espacio verde actualizado." : "Espacio verde registrado.");
       setRequestVersion((version) => version + 1);
     } catch (caught) {
-      setFormError(caught instanceof Error ? caught.message : "No se pudo guardar el espacio verde.");
+      setFormError(errorMessage(caught, "No se pudo guardar el espacio verde."));
     }
   }
 
@@ -148,7 +149,7 @@ export function GreenSpacesPanel({ scenario }: { scenario: OperationalScenario }
       setNotice(`Espacio verde ${deactivating.name} dado de baja.`);
       setRequestVersion((version) => version + 1);
     } catch (caught) {
-      setDeactivateError(caught instanceof Error ? caught.message : "No se pudo dar de baja el espacio verde.");
+      setDeactivateError(errorMessage(caught, "No se pudo dar de baja el espacio verde."));
     } finally {
       setIsSubmittingDeactivate(false);
     }

@@ -1,11 +1,11 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { addCrewFixture, filterCrewFixtures, paginateCrewFixtures } from "@/lib/crew-fixtures";
 import { createCrewInputSchema, type CrewQuery, crewSchema, crewTypeSchema, shiftSchema } from "@/lib/crews";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
@@ -24,17 +24,6 @@ function parseQuery(url: URL): CrewQuery {
     page: pageParam(url.searchParams),
     pageSize: pageSizeParam(url.searchParams),
   };
-}
-
-function queryString(query: CrewQuery) {
-  const params = new URLSearchParams();
-  if (query.active !== undefined) params.set("active", String(query.active));
-  if (query.crewType) params.set("crewType", query.crewType);
-  if (query.defaultShift) params.set("defaultShift", query.defaultShift);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-  const value = params.toString();
-  return value ? `?${value}` : "";
 }
 
 function normalizeCrewPayload(payload: unknown): unknown {
@@ -56,13 +45,7 @@ function normalizeCrewPayload(payload: unknown): unknown {
   return raw;
 }
 
-function requireOfficeCapability(request: Request) {
-  const session = getRequiredSession(request);
-  const scenario = getScenario(session);
-  if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar cuadrillas.");
-  requireCapability(session, "crew:manage");
-  return session;
-}
+function requireOfficeCapability(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar cuadrillas.", capability: "crew:manage", throwOnError: true }).session; }
 
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
@@ -71,7 +54,7 @@ export async function GET(request: Request) {
     const query = parseQuery(new URL(request.url));
     const scenario = getScenario(session);
     if (backendMode(session)) {
-      if (scenario.actor.kind !== "FIELD") return forwardResponse(await fetchBackend(request, `/crews${queryString(query)}`));
+      if (scenario.actor.kind !== "FIELD") return forwardResponse(await fetchBackend(request, `/crews${backendQuery(query, ["active", "crewType", "defaultShift", "page", "pageSize"])}`));
 
       const crewId = session.crew?.id;
       if (!crewId) return errorResponse(403, "La sesión no tiene una cuadrilla asignada.", path);

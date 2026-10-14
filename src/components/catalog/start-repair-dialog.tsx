@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
 import { Wrench } from "lucide-react";
@@ -61,9 +62,7 @@ function StartRepairModalContent({
       onOpenChange(false);
     } catch (error) {
       setErrorMessage(
-        error instanceof ContainerRequestError || error instanceof Error
-          ? error.message
-          : "No se pudo iniciar la reparación del contenedor.",
+        getErrorMessage(error, "No se pudo iniciar la reparación del contenedor."),
       );
     } finally {
       setIsSubmitting(false);

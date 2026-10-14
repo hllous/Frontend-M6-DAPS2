@@ -1,10 +1,9 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getContainerFixture, confirmRelocationFixture } from "@/lib/containers-fixtures";
 import { confirmRelocationInputSchema } from "@/lib/containers";
-import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
@@ -25,11 +24,8 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (!scenario.capabilities.includes("container:manage")) {
-      return errorResponse(403, "No tiene permisos para confirmar la reubicación de contenedores.", path);
-    }
+    authorize(session, { capability: "container:manage", capabilityMessage: "No tiene permisos para confirmar la reubicación de contenedores.", throwOnError: true });
 
     let body: unknown;
     try {

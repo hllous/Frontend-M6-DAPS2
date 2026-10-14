@@ -1,14 +1,12 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import {
@@ -33,17 +31,6 @@ function parseZoneQuery(url: URL): ZoneQuery {
   };
 }
 
-function backendQueryString(query: ZoneQuery): string {
-  const params = new URLSearchParams();
-  if (query.active !== undefined) params.set("active", String(query.active));
-  if (query.search) params.set("search", query.search);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
-}
-
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
 
@@ -52,7 +39,7 @@ export async function GET(request: Request) {
     const query = parseZoneQuery(new URL(request.url));
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/zones${backendQueryString(query)}`);
+      const backendResponse = await fetchBackend(request, `/zones${backendQuery(query, ["active", "search", "page", "pageSize"])}`);
             return forwardResponse(backendResponse);
     }
 
@@ -74,12 +61,8 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede crear zonas operativas.");
-    }
-    requireCapability(session, "zone:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede crear zonas operativas.", capability: "zone:manage", throwOnError: true });
 
     let body: unknown;
     try {

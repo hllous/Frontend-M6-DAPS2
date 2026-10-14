@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CalendarClock, Check, X } from "lucide-react";
@@ -107,7 +108,7 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
       setServiceTypes(serviceTypePage.serviceTypes.filter((item) => item.mode === "ROUTE"));
       setRoutes(routePage.routes);
     }).catch((error: unknown) => {
-      if (isCurrent) setCatalogError(error instanceof Error ? error.message : "No se pudieron cargar los catálogos relacionados.");
+      if (isCurrent) setCatalogError(getErrorMessage(error, "No se pudieron cargar los catálogos relacionados."));
     });
     return () => { isCurrent = false; };
   }, []);
@@ -124,7 +125,7 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
     serviceFrequenciesAdapter.list(query).then((result) => {
       if (isCurrent) setState({ status: "ready", items: result.serviceFrequencies });
     }).catch((error: unknown) => {
-      if (isCurrent) setState({ status: "error", message: error instanceof Error ? error.message : "No se pudieron cargar las frecuencias." });
+      if (isCurrent) setState({ status: "error", message: getErrorMessage(error, "No se pudieron cargar las frecuencias.") });
     });
     return () => { isCurrent = false; };
   }, [requestVersion, routeId, serviceTypeId, shift, validOn, weekday]);
@@ -152,7 +153,7 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
       setMessage("Frecuencia creada. La regla queda almacenada para su configuración operativa.");
       refresh();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "No se pudo crear la frecuencia.";
+      const errorMessage = getErrorMessage(error, "No se pudo crear la frecuencia.");
       setCreateError(errorMessage);
     }
   }
@@ -168,7 +169,7 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
       setMessage("Frecuencia actualizada. Los servicios ya creados no se modifican.");
       refresh();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "No se pudo actualizar la frecuencia.";
+      const errorMessage = getErrorMessage(error, "No se pudo actualizar la frecuencia.");
       setEditError(errorMessage);
     }
   }
@@ -183,7 +184,7 @@ export function ServiceFrequenciesPanel({ scenario }: { scenario: OperationalSce
       setMessage("Vigencia cerrada. Los servicios ya creados no se modifican.");
       refresh();
     } catch (error) {
-      setCloseError(error instanceof Error ? error.message : "No se pudo cerrar la vigencia.");
+      setCloseError(getErrorMessage(error, "No se pudo cerrar la vigencia."));
     }
   }
 

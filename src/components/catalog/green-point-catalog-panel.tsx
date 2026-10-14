@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, Eye, Pencil, Plus, Trash2 } from "lucide-react";
@@ -130,7 +131,7 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
         const page = await greenPointsAdapter.list(query);
         if (isCurrent) setState({ status: "ready", items: page.greenPoints, total: page.total });
       } catch (caught) {
-        if (isCurrent) setState({ status: "error", message: caught instanceof Error ? caught.message : "No se pudieron cargar los puntos verdes." });
+        if (isCurrent) setState({ status: "error", message: errorMessage(caught, "No se pudieron cargar los puntos verdes.") });
       }
     }
     void loadPoints();
@@ -160,7 +161,7 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
     try {
       setDetailPoint(await greenPointsAdapter.get(point.id));
     } catch (caught) {
-      setDetailError(caught instanceof Error ? caught.message : "No se pudo cargar el detalle del punto verde.");
+      setDetailError(errorMessage(caught, "No se pudo cargar el detalle del punto verde."));
     } finally {
       setDetailLoading(false);
     }
@@ -214,7 +215,7 @@ export function GreenPointCatalogPanel({ scenario }: { scenario: OperationalScen
       setFormOpen(false);
       setRequestVersion((version) => version + 1);
     } catch (caught) {
-      setFormError(caught instanceof GreenPointRequestError ? caught.message : caught instanceof Error ? caught.message : "No se pudo guardar el punto verde.");
+      setFormError(caught instanceof GreenPointRequestError ? caught.message : errorMessage(caught, "No se pudo guardar el punto verde."));
     } finally {
       setIsSubmitting(false);
     }

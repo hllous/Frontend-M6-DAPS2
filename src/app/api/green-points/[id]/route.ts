@@ -1,16 +1,15 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { greenPointFixtures, updateGreenPointFixture } from "@/lib/green-point-fixtures";
 import { greenPointUpdateInputSchema } from "@/lib/green-points";
-import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 
 
 async function targetId(context: { params: Promise<{ id: string }> | { id: string } }) { return (await context.params).id; }
-function requireOffice(request: Request) { const session = getRequiredSession(request); const scenario = getScenario(session); if (scenario.actor.kind !== "OFFICE") throw new ForbiddenSessionError("Solo Oficina puede administrar puntos verdes."); requireCapability(session, "greenPoint:manage"); return session; }
+function requireOffice(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar puntos verdes.", capability: "greenPoint:manage", throwOnError: true }).session; }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
   const path = new URL(request.url).pathname;
