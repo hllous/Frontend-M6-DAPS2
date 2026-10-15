@@ -42,6 +42,21 @@ Single-context layout (GLOSSARY.md + docs/adr/ at repo root). See `docs/agents/d
 
 Changing a `.md` file: run `npx --yes markdownlint-cli2@0.23.3` (Node 22+) and `lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'`; CI runs both in the `docs` job. Details: [`docs/README.md`](docs/README.md).
 
+## UI components: shadcn as the base
+
+### Rule
+
+Build each UI element from its shadcn equivalent in `src/components/ui/`. Use a custom component only when shadcn has no equivalent; compose shadcn primitives, get PO approval, and document the exception.
+
+### Base first, then adapt
+
+1. Start with `npx shadcn add <component>` in `src/components/ui/`.
+2. Adapt in order: app-wide visuals through theme tokens in `src/app/globals.css`, project variants in `src/components/ui/`, then shared project compositions in `src/components/ui/`.
+3. Import from `src/components/ui/` in screens and add layout only.
+4. Keep shadcn structure, `data-slot` attributes, and accessibility behavior intact.
+5. Use CSS Modules for layout only; style component appearance through theme tokens or UI variants.
+6. Format dates and times for `es-AR`, with Monday-first weeks, `dd/mm/aaaa`, and 24-hour time; preserve API value formats.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
