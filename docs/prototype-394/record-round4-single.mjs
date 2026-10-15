@@ -194,22 +194,26 @@ async function reorderHeader(page) {
   return { moves, finalOrder, fixedColumn: "ordinal", screenshots: [`review-394-animations/round4-mid-drag-1440.png`, `review-394-animations/round4-live-drag-preview-${width}.png`] };
 }
 
+async function scrollResizeHandleIntoView(handle) {
+  await handle.evaluate((button) => {
+    const table = button.closest("table");
+    const scroller = table?.parentElement;
+    const marker = button.querySelector("span");
+    if (!scroller || !marker) return;
+    const scrollerBox = scroller.getBoundingClientRect();
+    const markerBox = marker.getBoundingClientRect();
+    const targetOffset = Math.min(220, Math.max(100, scrollerBox.width * 0.42));
+    const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+    const targetScroll = scroller.scrollLeft + markerBox.left + markerBox.width / 2 - (scrollerBox.left + targetOffset);
+    scroller.scrollLeft = Math.max(0, Math.min(maxScroll, targetScroll));
+  });
+}
+
 async function incrementalResize(page, columnKey, delta, speed, screenshotPath) {
   const labels = { service: "Servicio", status: "Estado", zone: "Zona", crew: "Equipo", scheduled: "Fecha" };
   const handle = page.getByRole("slider", { name: `Ancho de columna ${labels[columnKey]}` });
   await handle.waitFor({ state: "visible" });
-  await handle.evaluate((button) => {
-    const table = button.closest("table");
-    const scroller = table?.parentElement;
-    const header = button.closest("th");
-    const marker = button.querySelector("span");
-    if (!scroller || !header || !marker) return;
-    const scrollerBox = scroller.getBoundingClientRect();
-    const markerBox = marker.getBoundingClientRect();
-    const inset = 8;
-    if (markerBox.left < scrollerBox.left + inset) scroller.scrollLeft += markerBox.left - (scrollerBox.left + inset);
-    if (markerBox.right > scrollerBox.right - inset) scroller.scrollLeft += markerBox.right - (scrollerBox.right - inset);
-  });
+  await scrollResizeHandleIntoView(handle);
   await page.waitForTimeout(50);
   const header = page.locator(`table[aria-label="Servicios operativos"] thead th[data-column-key="${columnKey}"]`);
   const [headerBox, markerBox] = await Promise.all([header.boundingBox(), handle.locator("span").boundingBox()]);
@@ -288,6 +292,239 @@ async function incrementalResize(page, columnKey, delta, speed, screenshotPath) 
   const after = Number(await handle.getAttribute("aria-valuenow"));
   assert.notEqual(after, before, "dragging the column edge changes its width");
   return { columnKey, speed, delta, before, after, borderOffset, pointerLineAtEachStep, releaseX, releaseLineX };
+}
+
+async function stepwiseResizeTrace(page, columnKey, delta, screenshotPath) {
+  const labels = { service: "Servicio", status: "Estado", zone: "Zona", crew: "Equipo", scheduled: "Fecha" };
+  const handle = page.getByRole("slider", { name: "Ancho de columna " + labels[columnKey] });
+  await handle.waitFor({ state: "visible" });
+  await scrollResizeHandleIntoView(handle);
+  await page.waitForTimeout(50);
+  const measure = () => handle.evaluate((button) => {
+    const header = button.closest("th");
+    const table = button.closest("table");
+    const scroller = table?.parentElement;
+    const marker = button.querySelector("span");
+    const headerBox = header?.getBoundingClientRect();
+    const markerBox = marker?.getBoundingClientRect();
+    const scrollerBox = scroller?.getBoundingClientRect();
+    return {
+      thRightEdge: headerBox?.right ?? null,
+      markerCenter: markerBox ? markerBox.left + markerBox.width / 2 : null,
+      markerLeft: markerBox?.left ?? null,
+      markerWidth: markerBox?.width ?? null,
+      headerLeft: headerBox?.left ?? null,
+      headerWidth: headerBox?.width ?? null,
+      columnWidth: Number(button.getAttribute("aria-valuenow")),
+      minimumWidth: Number(button.getAttribute("aria-valuemin")),
+      maximumWidth: Number(button.getAttribute("aria-valuemax")),
+      tableWidth: table?.getBoundingClientRect().width ?? null,
+      scrollClientWidth: scroller?.clientWidth ?? null,
+      scrollWidth: scroller?.scrollWidth ?? null,
+      scrollLeft: scroller?.scrollLeft ?? null,
+      scrollerLeft: scrollerBox?.left ?? null,
+      scrollerRight: scrollerBox?.right ?? null,
+    };
+  });
+
+  const start = await measure();
+  assert.ok(start.thRightEdge !== null && start.markerCenter !== null, "trace starts with measurable column and marker geometry");
+  const startX = start.markerCenter;
+  const startY = await handle.evaluate((button) => {
+    const markerBox = button.querySelector("span")?.getBoundingClientRect();
+    return markerBox ? markerBox.top + markerBox.height / 2 : null;
+  });
+  assert.ok(startY !== null, "trace starts at the visible resize marker");
+  const startTarget = await page.evaluate(({ x, y }) => {
+    const element = document.elementFromPoint(x, y);
+    const handle = element?.closest("[data-column-resize-edge]");
+    return {
+      edge: handle?.getAttribute("data-column-resize-edge") ?? null,
+      tag: element?.tagName ?? null,
+      role: element?.getAttribute("role") ?? null,
+      pointerEvents: element ? getComputedStyle(element).pointerEvents : null,
+    };
+  }, { x: startX, y: startY });
+  const sign = Math.sign(delta);
+  const stepCount = Math.abs(delta) / 4;
+  assert.equal(Number.isInteger(stepCount), true, "trace uses exact four-pixel pointer steps");
+  const expectedStartOffset = start.thRightEdge - startX;
+  const violations = [];
+  if (Math.abs(expectedStartOffset) > 2) {
+    violations.push({ point: "start", pointerX: startX, thRightEdge: start.thRightEdge, markerCenter: start.markerCenter, error: expectedStartOffset });
+  }
+  if (startTarget.edge !== columnKey) {
+    violations.push({ point: "pointer-target", pointerX: startX, expectedEdge: columnKey, actualEdge: startTarget.edge, startTarget });
+  }
+  const steps = [];
+  const expectedWidthForStep = (step) => Math.max(
+    start.minimumWidth,
+    Math.min(start.maximumWidth, start.columnWidth + sign * 4 * step),
+  );
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  for (let step = 1; step <= stepCount; step += 1) {
+    const pointerX = startX + sign * 4 * step;
+    await page.mouse.move(pointerX, startY, { steps: 1 });
+    await page.waitForTimeout(8);
+    const current = await measure();
+    const expectedWidth = expectedWidthForStep(step);
+    const expectedEdge = startX + (expectedWidth - start.columnWidth);
+    const edgeError = current.thRightEdge - expectedEdge;
+    const markerError = current.markerCenter - current.thRightEdge;
+    const widthError = current.columnWidth - expectedWidth;
+    const record = {
+      step,
+      pointerX,
+      thRightEdge: current.thRightEdge,
+      markerCenter: current.markerCenter,
+      columnWidth: current.columnWidth,
+      expectedEdge,
+      edgeError,
+      markerError,
+      widthError,
+      tableWidth: current.tableWidth,
+      scrollClientWidth: current.scrollClientWidth,
+      scrollWidth: current.scrollWidth,
+      scrollLeft: current.scrollLeft,
+    };
+    steps.push(record);
+    if (Math.abs(edgeError) > 2) violations.push({ point: "step", ...record });
+    if (Math.abs(markerError) > 2) violations.push({ point: "marker", ...record });
+    if (Math.abs(widthError) > 1) violations.push({ point: "width", ...record });
+    if (screenshotPath && step === Math.ceil(stepCount / 2)) {
+      await page.screenshot({ path: path.join(output, screenshotPath) });
+    }
+  }
+  const expectedFinalWidth = expectedWidthForStep(stepCount);
+  const expectedFinalEdge = startX + (expectedFinalWidth - start.columnWidth);
+  await page.mouse.up();
+  await page.waitForTimeout(80);
+  const release = await measure();
+  const releaseEdgeError = release.thRightEdge - expectedFinalEdge;
+  const releaseMarkerError = release.markerCenter - release.thRightEdge;
+  if (Math.abs(releaseEdgeError) > 2) {
+    violations.push({ point: "release-edge", pointerX: startX + delta, thRightEdge: release.thRightEdge,
+      markerCenter: release.markerCenter, error: releaseEdgeError, columnWidth: release.columnWidth });
+  }
+  if (Math.abs(releaseMarkerError) > 2) {
+    violations.push({ point: "release-marker", pointerX: startX + delta, thRightEdge: release.thRightEdge,
+      markerCenter: release.markerCenter, error: releaseMarkerError, columnWidth: release.columnWidth });
+  }
+  if (release.columnWidth !== expectedFinalWidth) {
+    violations.push({ point: "release-width", expectedWidth: expectedFinalWidth, actualWidth: release.columnWidth });
+  }
+  return {
+    columnKey,
+    delta,
+    stepPixels: 4,
+    start: { ...start, pointerX: startX },
+    startTarget,
+    startX,
+    startY,
+    requestedFinalX: startX + delta,
+    expectedFinalWidth,
+    expectedFinalEdge,
+    release: {
+      pointerX: startX + delta,
+      thRightEdge: release.thRightEdge,
+      markerCenter: release.markerCenter,
+      columnWidth: release.columnWidth,
+      tableWidth: release.tableWidth,
+      scrollClientWidth: release.scrollClientWidth,
+      scrollWidth: release.scrollWidth,
+      scrollLeft: release.scrollLeft,
+    },
+    steps,
+    violations,
+    maxAbsEdgeError: Math.max(0, ...steps.map((item) => Math.abs(item.edgeError)), Math.abs(releaseEdgeError)),
+    maxAbsMarkerError: Math.max(0, ...steps.map((item) => Math.abs(item.markerError)), Math.abs(releaseMarkerError)),
+  };
+}
+
+async function traceResizeScenario(browserInstance, scenario) {
+  const context = await browserInstance.newContext({ viewport: scenario.viewport });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  try {
+    await signIn(page, scenario.mobile === true);
+    if (scenario.splitOffset) {
+      const separator = page.getByRole("separator", { name: "Ajustar ancho entre mapa y tabla" });
+      const box = await separator.boundingBox();
+      assert.ok(box, "split handle is available for the resize trace");
+      await dragElement(page, separator, { x: box.x + box.width / 2 + scenario.splitOffset, y: box.y + box.height / 2 });
+      await page.waitForTimeout(550);
+    }
+    if (scenario.detailsOpen) {
+      await page.locator('tr[data-service-id="SVC-1043"] button[data-service-select]').click();
+      await page.locator("aside[aria-labelledby='preview-title']").waitFor({ state: "visible" });
+      await page.waitForTimeout(500);
+    }
+    const split = await splitMetrics(page);
+    const screenshot = scenario.name === "default-map-open" ? "round4b-mid-resize-1440.png" : undefined;
+    const status = await stepwiseResizeTrace(page, "status", 80, screenshot);
+    let horizontalScroll = null;
+    if (scenario.name === "default-map-open") {
+      horizontalScroll = await page.locator('table[aria-label="Servicios operativos"]').evaluate((table) => {
+        const scroller = table.parentElement;
+        if (!scroller) return null;
+        scroller.scrollLeft = scroller.scrollWidth;
+        const ordinal = table.querySelector('th[data-column-key="ordinal"]');
+        const scrollerBox = scroller.getBoundingClientRect();
+        const ordinalBox = ordinal?.getBoundingClientRect();
+        return {
+          scrollLeft: scroller.scrollLeft,
+          scrollWidth: scroller.scrollWidth,
+          clientWidth: scroller.clientWidth,
+          ordinalPosition: ordinal ? getComputedStyle(ordinal).position : null,
+          ordinalLeftOffset: ordinalBox ? ordinalBox.left - scrollerBox.left : null,
+          ordinalText: ordinal?.textContent?.trim() ?? null,
+        };
+      });
+      if (horizontalScroll && horizontalScroll.scrollLeft < 4) {
+        pageErrors.push("horizontal scroll did not move the table content");
+      }
+      if (horizontalScroll && (horizontalScroll.ordinalPosition !== "sticky" || Math.abs(horizontalScroll.ordinalLeftOffset) > 2)) {
+        pageErrors.push("the fixed # column did not remain readable during horizontal scroll");
+      }
+      await page.waitForTimeout(50);
+      await page.screenshot({ path: path.join(output, "round4b-horizontal-scroll-1440.png") });
+      await page.locator('table[aria-label="Servicios operativos"]').evaluate((table) => {
+        if (table.parentElement) table.parentElement.scrollLeft = 0;
+      });
+    }
+    const zone = await stepwiseResizeTrace(page, "zone", -60);
+    return { name: scenario.name, viewport: scenario.viewport, detailsOpen: scenario.detailsOpen === true,
+      splitOffset: scenario.splitOffset ?? 0, split, status, zone, horizontalScroll, pageErrors };
+  } finally {
+    await context.close();
+  }
+}
+
+async function runResizeTraceSuite(browserInstance) {
+  const scenarios = [
+    { name: "default-map-open", viewport: { width: 1440, height: 900 } },
+    { name: "details-open", viewport: { width: 1440, height: 900 }, detailsOpen: true },
+    { name: "split-left", viewport: { width: 1440, height: 900 }, splitOffset: -120 },
+    { name: "split-right", viewport: { width: 1440, height: 900 }, splitOffset: 120 },
+    { name: "mobile-390", viewport: { width: 390, height: 844 }, mobile: true },
+  ];
+  const results = [];
+  for (const scenario of scenarios) results.push(await traceResizeScenario(browserInstance, scenario));
+  const violations = results.flatMap((scenario) => [
+    ...scenario.status.violations.map((violation) => ({ scenario: scenario.name, columnKey: "status", ...violation })),
+    ...scenario.zone.violations.map((violation) => ({ scenario: scenario.name, columnKey: "zone", ...violation })),
+    ...scenario.pageErrors.map((message) => ({ scenario: scenario.name, point: "page-error", message })),
+  ]);
+  return {
+    passed: violations.length === 0,
+    scenarioCount: results.length,
+    stepCount: results.reduce((sum, scenario) => sum + scenario.status.steps.length + scenario.zone.steps.length, 0),
+    violations,
+    scenarios: results,
+    screenshots: ["review-394-animations/round4b-mid-resize-1440.png", "review-394-animations/round4b-horizontal-scroll-1440.png"],
+  };
 }
 
 async function resizeColumn(page) {
@@ -1014,6 +1251,7 @@ async function runMobile(page, pageErrors) {
 }
 
 await fs.mkdir(output, { recursive: true });
+const traceOnly = process.argv.includes("--trace-only");
 const context = await browser.newContext({
   viewport: { width: 1440, height: 900 },
   recordVideo: { dir: output, size: { width: 1440, height: 900 } },
@@ -1023,7 +1261,20 @@ const pageErrors = [];
 page.on("pageerror", (error) => pageErrors.push(error.message));
 let result;
 let failure = null;
+let resizeTraces = null;
 try {
+  resizeTraces = await runResizeTraceSuite(browser);
+  if (!resizeTraces.passed) {
+    throw new Error("Resize trace failed: " + JSON.stringify(resizeTraces.violations[0]));
+  }
+  if (traceOnly) {
+    result = {
+      status: "pass",
+      controls: [{ control: "Four-pixel resize traces across desktop, details, split positions, and mobile", result: "pass" }],
+      resizeTraces,
+      evidence: { screenshots: resizeTraces.screenshots },
+    };
+  } else {
   const desktop = await runDesktop(page, pageErrors);
   const mobile = await runMobile(page, pageErrors);
   const screenshots = [
@@ -1064,15 +1315,18 @@ try {
     ],
     desktop,
     mobile,
+    resizeTraces,
     pageErrors,
     evidence: { screenshots, webm: "review-394-animations/round4-single-option.webm" },
   };
+  }
 } catch (error) {
   failure = error;
   await page.screenshot({ path: path.join(output, "round4-single-failure.png"), fullPage: true }).catch(() => {});
   result = {
     status: "fail",
     controls: [{ control: "Walkthrough", result: "fail", detail: error instanceof Error ? error.message : String(error) }],
+    resizeTraces,
     pageErrors,
     evidence: { screenshot: "review-394-animations/round4-single-failure.png" },
   };
@@ -1080,10 +1334,12 @@ try {
   const video = page.video();
   await context.close();
   try {
-    const videoPath = path.join(output, "round4-single-option.webm");
-    await fs.rm(videoPath, { force: true });
-    await fs.rename(await video.path(), videoPath);
-    if (result) result.evidence.webm = "review-394-animations/round4-single-option.webm";
+    if (!traceOnly) {
+      const videoPath = path.join(output, "round4-single-option.webm");
+      await fs.rm(videoPath, { force: true });
+      await fs.rename(await video.path(), videoPath);
+      if (result) result.evidence.webm = "review-394-animations/round4-single-option.webm";
+    }
   } catch (error) {
     if (result) result.videoError = error instanceof Error ? error.message : String(error);
     failure ??= error;
@@ -1095,6 +1351,20 @@ await fs.writeFile(path.join(output, "round4-single-verification.json"), JSON.st
 console.log(JSON.stringify({
   status: result.status,
   controls: result.controls.map(({ control, result: controlResult, detail }) => ({ control, result: controlResult, detail })),
+  resizeTraces: resizeTraces ? {
+    passed: resizeTraces.passed,
+    scenarioCount: resizeTraces.scenarioCount,
+    stepCount: resizeTraces.stepCount,
+    violations: resizeTraces.violations.slice(0, 5),
+    scenarios: resizeTraces.scenarios.map((scenario) => ({
+      name: scenario.name,
+      status: { steps: scenario.status.steps.length, maxAbsEdgeError: scenario.status.maxAbsEdgeError,
+        maxAbsMarkerError: scenario.status.maxAbsMarkerError, violations: scenario.status.violations.length },
+      zone: { steps: scenario.zone.steps.length, maxAbsEdgeError: scenario.zone.maxAbsEdgeError,
+        maxAbsMarkerError: scenario.zone.maxAbsMarkerError, violations: scenario.zone.violations.length },
+      horizontalScroll: scenario.horizontalScroll,
+    })),
+  } : null,
   pageErrors: result.pageErrors,
   evidence: result.evidence,
   videoError: result.videoError,
