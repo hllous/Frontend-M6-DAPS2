@@ -519,7 +519,7 @@ async function verifySearch(page) {
   return { query: "Recorrido 4", before, filtered, cleared: await countServiceRows(page) };
 }
 
-async function verifyFixedRowHeight(page) {
+async function verifyFixedRowHeight(page, { requirePaneFill = false } = {}) {
   const table = page.locator('table[aria-label="Servicios operativos"]');
   const rowMetrics = () => table.locator("tbody tr[data-service-id]").evaluateAll((rows) => rows.map((row) => ({
     id: row.getAttribute("data-service-id"),
@@ -584,6 +584,41 @@ async function verifyFixedRowHeight(page) {
   const width = page.viewportSize()?.width ?? 0;
   assert.ok(emptySpace >= 0, `short filtered tables do not overlap their scrolling region (${emptySpace}px)`);
   if (width > 760) assert.ok(emptySpace >= 40, `desktop short filtered tables leave blank space below (${emptySpace}px)`);
+  const paneFill = await page.evaluate(() => {
+    const tableElement = document.querySelector('table[aria-label="Servicios operativos"]');
+    const scrollRegion = tableElement?.parentElement;
+    const pane = tableElement?.closest('[aria-label="Tabla operativa de Servicios"]');
+    const lastRow = tableElement?.querySelector('tbody tr[data-service-id]:last-child');
+    if (!tableElement || !scrollRegion || !pane) return null;
+    const scrollBox = scrollRegion.getBoundingClientRect();
+    const paneBox = pane.getBoundingClientRect();
+    const tableBox = tableElement.getBoundingClientRect();
+    const lastRowBox = lastRow?.getBoundingClientRect();
+    return {
+      scrollRegionWidth: scrollBox.width,
+      scrollRegionHeight: scrollBox.height,
+      paneWidth: pane.clientWidth,
+      paneHeight: pane.clientHeight,
+      bottomGap: paneBox.bottom - scrollBox.bottom,
+      background: getComputedStyle(scrollRegion).backgroundColor,
+      tableBackground: getComputedStyle(tableElement).backgroundColor,
+      belowLastRow: lastRowBox ? scrollBox.bottom - lastRowBox.bottom : null,
+      tableBottom: tableBox.bottom,
+    };
+  });
+  if (requirePaneFill) {
+    assert.ok(paneFill, "maximized table pane metrics are available");
+    assert.ok(Math.abs(paneFill.scrollRegionWidth - paneFill.paneWidth) <= 2,
+      `the table scroll region fills the maximized pane width (${paneFill.scrollRegionWidth}/${paneFill.paneWidth}px)`);
+    assert.ok(Math.abs(paneFill.scrollRegionHeight - paneFill.paneHeight) <= 2,
+      `the table scroll region fills the maximized pane height (${paneFill.scrollRegionHeight}/${paneFill.paneHeight}px)`);
+    assert.ok(Math.abs(paneFill.bottomGap) <= 2,
+      `the table scroll region reaches the bottom of the maximized pane (${paneFill.bottomGap}px gap)`);
+    assert.equal(paneFill.background, paneFill.tableBackground,
+      "the table background continues below the fixed-height rows");
+    assert.ok((paneFill.belowLastRow ?? 0) >= 40,
+      `the table background extends below filtered rows (${paneFill.belowLastRow}px)`);
+  }
   const screenshot = `round4-filtered-rows-${width}.png`;
   await page.screenshot({ path: path.join(output, screenshot) });
 
@@ -600,7 +635,7 @@ async function verifyFixedRowHeight(page) {
     assert.ok(Math.abs(item.height - baselineHeights.get(item.id)) <= 1,
       `service ${item.id} restores its original row height after clearing filters`);
   }
-  return { baselineCount, filteredCount, baselineRows, filteredRows, emptySpace, appliedFilters, screenshot: `review-394-animations/${screenshot}` };
+  return { baselineCount, filteredCount, baselineRows, filteredRows, emptySpace, paneFill, appliedFilters, screenshot: `review-394-animations/${screenshot}` };
 }
 
 async function inspectDataMenu(page) {
@@ -752,6 +787,7 @@ async function verifySplitAndClose(page) {
   await page.getByRole("region", { name: "Tabla operativa de Servicios" }).screenshot({
     path: path.join(output, "round4-table-max-1440.png"),
   });
+  const maximizedRowHeight = await verifyFixedRowHeight(page, { requirePaneFill: true });
 
   const firstPaneGestures = {
     reorder: await moveServiceAcrossTable(page, "fast"),
@@ -816,7 +852,7 @@ async function verifySplitAndClose(page) {
   assert.ok(Math.abs((closed.map?.width ?? 0) - mapWidthBeforeSelect) <= 2,
     "closing details does not reset the split");
   const closedTones = await verifyTint(page, "false");
-  return { start, maximized, secondPosition, restoredMaximized, firstPaneGestures, secondPaneGestures, open, detailsOpenGestures, closed, openTones, closedTones, badgeGeometry };
+  return { start, maximized, maximizedRowHeight, secondPosition, restoredMaximized, firstPaneGestures, secondPaneGestures, open, detailsOpenGestures, closed, openTones, closedTones, badgeGeometry };
 }
 
 async function verifyPeriodInPlace(page) {
@@ -1013,7 +1049,7 @@ try {
       { control: "Sort every sortable column ascending, descending, and clear", result: "pass", evidence: desktop.sorting },
       { control: "Open, apply, and clear every header filter with row-count changes", result: "pass", evidence: desktop.filters },
       { control: "Estado filter colors match table badges", result: "pass", evidence: desktop.filters.status.statusColors },
-      { control: "Filtered rows keep their unfiltered height", result: "pass", evidence: { desktop: desktop.rowHeight, mobile: mobile.rowHeight } },
+      { control: "Filtered rows keep their unfiltered height and maximized pane stays filled", result: "pass", evidence: { desktop: desktop.rowHeight, maximizedPane: desktop.split.maximizedRowHeight, mobile: mobile.rowHeight } },
       { control: "Categorías toggles each optional column", result: "pass", evidence: desktop.editor },
       { control: "Stepwise pointer drag crosses each midpoint once and drop matches preview", result: "pass", evidence: { desktop: desktop.reorder, mobile: mobile.gestures.reorder } },
       { control: "Keyboard reorder and column resize", result: "pass", evidence: desktop.keyboard },
