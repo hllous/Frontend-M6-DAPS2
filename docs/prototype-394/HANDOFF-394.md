@@ -198,3 +198,8 @@ Expected (PO round 1: "feel like Excel"): resizing never stalls before a sane pe
 - Browser verification: the round 4 walkthrough passed all 15 controls with 245 pointer samples, maximum measured drift 1 px, zero steps over 2 px, zero trace violations, and zero page errors. The added checks cover the opaque ordinal header at scrollLeft 60 and the Estado minimum-width release. Typecheck, ESLint, and focused Services Vitest passed; ESLint reported only the two existing `window.location.assign()` warnings.
 - Inspected screenshots: `review-394-animations/round4c-header-after-1440.png`, `review-394-animations/round4c-release-width-after-1440.png`, and `review-394-animations/round4-workspace-390.png`.
 - Commit `e5cf140` is pushed to `fix/394-services-workspace`; no PR was created.
+
+## PO review of rounds 4b and 4c (2026-10-15)
+
+- Verdict: functionally approved ("Functionally it is OK"). The orchestrator's independent check before review: edge follows the pointer until the column limit (Estado 130-240 px, Zona min 110 px), table settles at 918 px after narrowing, sticky `#` header opaque at scrollLeft 60, widths persist across reload, typecheck and lint pass.
+- New PO finding, outside the resize work: controls across the whole frontend are hand-rolled instead of being built on shadcn and adapted to the project (examples: native date inputs instead of a shadcn date picker; `src/components/ui/field.tsx` and `form-control.tsx` are custom, not shadcn's Field/Input/Select/Textarea). To be tracked as a project-wide issue; sequencing relative to the #394 PR is pending the PO's decision.
