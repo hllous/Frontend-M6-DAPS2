@@ -1,0 +1,349 @@
+{
+  "desktop": {
+    "viewport": "1440x900",
+    "header": {
+      "toolbarText": "Período\nEsta semana\nEste mes\nTodo el período\nDatos",
+      "headingCount": 1,
+      "searchCount": 1
+    },
+    "reorder": {
+      "before": [
+        "ordinal",
+        "service",
+        "status",
+        "zone",
+        "crew",
+        "scheduled"
+      ],
+      "after": [
+        "ordinal",
+        "zone",
+        "service",
+        "status",
+        "crew",
+        "scheduled"
+      ],
+      "ghost": {
+        "text": "ZonaZona NorteZona Centro, Zona NorteZona CentroZona Centro, Zona NorteZona CentroZona SurZona SurZona NorteZona NorteZona CentroZona Norte",
+        "cells": 11
+      }
+    },
+    "resize": {
+      "before": 150,
+      "after": 227,
+      "verticalOffset": -0.25,
+      "borderOffset": -1
+    },
+    "keyboard": {
+      "beforeOrder": [
+        "ordinal",
+        "zone",
+        "service",
+        "status",
+        "crew",
+        "scheduled"
+      ],
+      "afterOrder": [
+        "ordinal",
+        "zone",
+        "status",
+        "service",
+        "crew",
+        "scheduled"
+      ],
+      "beforeWidth": 227,
+      "afterWidth": 237
+    },
+    "editor": {
+      "visibleChoices": [
+        "Estado",
+        "Zona",
+        "Equipo",
+        "Fecha"
+      ],
+      "fixedColumnsLocked": true,
+      "uncheckedIndicatorCount": 0
+    },
+    "split": {
+      "start": {
+        "map": {
+          "x": 256,
+          "y": 250,
+          "width": 561.5,
+          "height": 606
+        },
+        "tableRegion": {
+          "x": 830.5,
+          "y": 238,
+          "width": 585.5,
+          "height": 630
+        },
+        "table": {
+          "x": 830.5,
+          "y": 238,
+          "width": 570.5,
+          "height": 1404.1875
+        },
+        "tableFill": 0.9743808710503843
+      },
+      "maximized": {
+        "map": {
+          "x": 256,
+          "y": 250,
+          "width": 327.296875,
+          "height": 606
+        },
+        "tableRegion": {
+          "x": 596.296875,
+          "y": 238,
+          "width": 819.703125,
+          "height": 630
+        },
+        "table": {
+          "x": 596.296875,
+          "y": 238,
+          "width": 804.703125,
+          "height": 1231.40625
+        },
+        "tableFill": 0.9817006919425859
+      },
+      "open": {
+        "map": {
+          "x": 256,
+          "y": 250,
+          "width": 327.296875,
+          "height": 606
+        },
+        "tableRegion": {
+          "x": 596.296875,
+          "y": 238,
+          "width": 819.703125,
+          "height": 630
+        },
+        "table": {
+          "x": 596.296875,
+          "y": 238,
+          "width": 804.703125,
+          "height": 1231.40625
+        },
+        "tableFill": 0.9817006919425859
+      },
+      "closed": {
+        "map": {
+          "x": 256,
+          "y": 250,
+          "width": 327.296875,
+          "height": 606
+        },
+        "tableRegion": {
+          "x": 596.296875,
+          "y": 238,
+          "width": 819.703125,
+          "height": 630
+        },
+        "table": {
+          "x": 596.296875,
+          "y": 238,
+          "width": 804.703125,
+          "height": 1231.40625
+        },
+        "tableFill": 0.9817006919425859
+      },
+      "openTones": {
+        "selected": {
+          "backgroundColor": "rgb(255, 255, 255)",
+          "filter": "none",
+          "opacity": "1",
+          "isNormal": true,
+          "isLightTint": false
+        },
+        "unselected": {
+          "backgroundColor": "color(srgb 0.968941 0.977412 0.985882)",
+          "filter": "none",
+          "opacity": "1",
+          "isNormal": false,
+          "isLightTint": true
+        },
+        "normalSurface": "rgb(255, 255, 255)"
+      },
+      "closedTones": {
+        "selected": null,
+        "unselected": {
+          "backgroundColor": "color(srgb 0.968941 0.977412 0.985882)",
+          "filter": "none",
+          "opacity": "1",
+          "isNormal": false,
+          "isLightTint": true
+        },
+        "normalSurface": "rgb(255, 255, 255)"
+      }
+    },
+    "period": {
+      "before": "todo",
+      "after": "semana",
+      "sameDocument": true,
+      "emptyStateCount": 1
+    },
+    "persistence": {
+      "preferenceKeys": [
+        "m6:services-columns:v1:user-lucia:1"
+      ],
+      "savedSplit": "{\"map-pane\":30,\"table-pane\":70}",
+      "reloadedOrder": [
+        "ordinal",
+        "zone",
+        "status",
+        "service",
+        "scheduled"
+      ],
+      "reloadedSplit": {
+        "map": {
+          "x": 256,
+          "y": 250,
+          "width": 327.296875,
+          "height": 606
+        },
+        "tableRegion": {
+          "x": 596.296875,
+          "y": 238,
+          "width": 819.703125,
+          "height": 630
+        },
+        "table": {
+          "x": 596.296875,
+          "y": 238,
+          "width": 804.703125,
+          "height": 630
+        },
+        "tableFill": 0.9817006919425859
+      }
+    },
+    "pageErrors": [],
+    "video": "D:\\Uade\\2C2026\\Desarrollo de Aplicaciones 2\\TPO\\Frontend-M6-DAPS2\\.orca\\worktrees\\Frontend-M6-DAPS2\\prototype-394-services-workspace-motion\\review-394-animations\\round2-single-option.webm"
+  },
+  "mobile": {
+    "viewport": "390x844",
+    "header": {
+      "toolbarText": "Período\nEsta semana\nEste mes\nTodo el período\nDatos\nLista\nMapa",
+      "headingCount": 1,
+      "searchCount": 1
+    },
+    "reorder": {
+      "before": [
+        "ordinal",
+        "service",
+        "status",
+        "zone",
+        "crew",
+        "scheduled"
+      ],
+      "after": [
+        "ordinal",
+        "zone",
+        "service",
+        "status",
+        "crew",
+        "scheduled"
+      ],
+      "ghost": {
+        "text": "ZonaZona NorteZona Centro, Zona Norte",
+        "cells": 2
+      }
+    },
+    "resize": {
+      "before": 150,
+      "after": 279,
+      "verticalOffset": -0.25,
+      "borderOffset": -1
+    },
+    "keyboard": {
+      "beforeOrder": [
+        "ordinal",
+        "zone",
+        "service",
+        "status",
+        "crew",
+        "scheduled"
+      ],
+      "afterOrder": [
+        "ordinal",
+        "zone",
+        "status",
+        "service",
+        "crew",
+        "scheduled"
+      ],
+      "beforeWidth": 279,
+      "afterWidth": 280
+    },
+    "editor": {
+      "visibleChoices": [
+        "Estado",
+        "Zona",
+        "Equipo",
+        "Fecha"
+      ],
+      "fixedColumnsLocked": true,
+      "uncheckedIndicatorCount": 0
+    },
+    "openTint": {
+      "selected": {
+        "backgroundColor": "rgb(255, 255, 255)",
+        "filter": "none",
+        "opacity": "1",
+        "isNormal": true,
+        "isLightTint": false
+      },
+      "unselected": {
+        "backgroundColor": "color(srgb 0.968941 0.977412 0.985882)",
+        "filter": "none",
+        "opacity": "1",
+        "isNormal": false,
+        "isLightTint": true
+      },
+      "normalSurface": "rgb(255, 255, 255)"
+    },
+    "closedTint": {
+      "selected": null,
+      "unselected": {
+        "backgroundColor": "color(srgb 0.968941 0.977412 0.985882)",
+        "filter": "none",
+        "opacity": "1",
+        "isNormal": false,
+        "isLightTint": true
+      },
+      "normalSurface": "rgb(255, 255, 255)"
+    },
+    "drawerBefore": {
+      "x": 16,
+      "y": 402.96875,
+      "width": 358,
+      "height": 307.03125
+    },
+    "drawerAfter": {
+      "x": 16,
+      "y": 402.96875,
+      "width": 358,
+      "height": 307.03125
+    },
+    "period": {
+      "before": "todo",
+      "after": "semana",
+      "sameDocument": true,
+      "emptyStateCount": 1
+    },
+    "persistence": {
+      "preferenceKeys": [
+        "m6:services-columns:v1:user-lucia:1"
+      ],
+      "reloadedOrder": [
+        "ordinal",
+        "zone",
+        "status",
+        "service",
+        "scheduled"
+      ]
+    },
+    "pageErrors": []
+  }
+}

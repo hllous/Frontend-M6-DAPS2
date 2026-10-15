@@ -1,0 +1,123 @@
+# Handoff: Issue #394 Services workspace
+
+Updated 2026-10-14 after the product owner chose D and requested three column-editor concepts.
+
+## Worktrees and saved work
+
+- Production: `D:/Uade/2C2026/Desarrollo de Aplicaciones 2/TPO/Frontend-M6-DAPS2/.codex/worktrees/b4-services-a11y`, branch `fix/394-design-a11y`.
+- The previously uncommitted production implementation is saved in WIP commit `579cdae` (`wip: save services mobile and period work`). This commit contains 11 implementation/test files. Nothing was pushed. `HANDOFF-394.md`, `review-394/`, and `public/mockServiceWorker.js` were not staged.
+- Prototype: `D:/Uade/2C2026/Desarrollo de Aplicaciones 2/TPO/Frontend-M6-DAPS2/.orca/worktrees/Frontend-M6-DAPS2/prototype-394-services-workspace-motion`, branch `hllous/prototype-394-services-workspace-motion`. Commits: `7bdb8ca` (A-C motion comparison), `d5cba50` (D-F motion comparison), and `7b160d2` (WIP D + g/h/i foundation). The generated `public/mockServiceWorker.js` and `review-394-animations/` remain unstaged.
+- Port 4314 is still listening (PID 88736). It serves the existing A-F motion prototype, not the new g/h/i column-editor concepts. Keep it running and reuse that port.
+
+## Product-owner decisions and status
+
+### Original Services workspace decisions
+
+- Keep the variant-B interaction: selecting a table row pans to that service's map marker; the preview belongs over/in the table area, never over the map. This base behavior and the original map/table requirements are implemented on the production branch.
+- The original acceptance items for one ordinal source, row/marker number correlation, accessible desktop resizing, stable table geometry, row text-selection prevention, in-place map selection/filter/sort updates, calmer no-refit behavior, ascending/descending sort cycle with `aria-sort`, and no unnecessary workspace remount/refetch were implemented and covered before the latest mobile WIP commit. Do not add prototype query handling to production. The planned refit behavior is the calmer option: do not reset a map the user has panned when filters/sort change.
+- Still not implemented in production: the newly chosen D motion and the PO's refinements below. The current D-F prototype is reference material and must be updated to the new rules before presenting g/h/i.
+
+### Chosen D motion and refinements
+
+1. D is the motion base: **not yet ported** to production; prototype code now has the D-style overlay motion and adaptive panel sizing, but it is not yet visually re-verified against the latest rules.
+2. Row emphasis: prototype CSS now keeps the selected row normal and grays out the other rows; **not yet visually re-verified** against the latest PO rules.
+3. Column order must be `#`, `Servicio`, `Estado`, `Zona`, then remaining columns, on desktop and mobile compact rows. **Not yet applied**.
+4. Prototype code measures the detail pane and the `#`, `Servicio`, and `Estado` columns before shrinking the map frame; otherwise the preview overlays the trailing table area. The code is present but **not yet visually re-verified**.
+
+### New column editor: prototype and get one PO choice
+
+Build three visibly distinct, keyboard-accessible, Spanish, shadcn-based options behind `?variant=g|h|i` on the prototype branch only. A draft `services-column-editor.tsx` now contains shared preference handling and G/H/I controls, and the workspace has variant URL/switcher wiring; the editor is **not integrated into the table, typechecked, or visually verified**, and no g/h/i recordings or PO ask exist. Reconcile the draft API during integration. All options must reorder columns, resize widths, hide/show columns, persist per user in localStorage with try/catch, and make `#` and `Servicio` non-hideable. Then record a webm for each and send one blocking Orca `ask` with the three signed-out URLs, a neutral one-line description per option, and video paths. Suggested concepts from the PO:
+
+- G: drag headers to reorder, drag header edges to resize, and a `Columnas` checkbox popover.
+- H: a `Columnas` panel/sheet with a keyboard-accessible sortable checklist and width presets; no in-header dragging.
+- I: an alternative such as a header context menu with keyboard-accessible move-left/right, hide, and reset-width actions.
+
+After the PO chooses, implement that option on production; do not ship `?variant` code.
+
+### Mobile M1-M7 and Periodo B1
+
+The current mobile pass is complete in the WIP commit. The previous dispatch used the M1-M7 shorthand; this handoff records the seven behaviors covered in the code/tests:
+
+- M1: responsive workspace and shell fill a 390px viewport without document-level vertical overflow.
+- M2: map remains mounted and visible behind the mobile service-list drawer.
+- M3: accessible three-snap list drawer supports peek, half, and full states.
+- M4: mobile Services does not switch between Lista/Mapa tabs; the map remains available behind the drawer.
+- M5: drawer/list expansion controls are responsive and keyboard operable.
+- M6: selecting a service opens a full-workspace preview with its own scroll area.
+- M7: preview close/focus restoration, drawer semantics, and inert background are handled; existing non-Services inventory map remains two-state.
+
+B1 (Periodo): selecting an explicit period refreshes the workspace in place, preserving the map/table DOM and scroll and avoiding an unnecessary count fetch. **Implemented and covered by `services-workspace-period.test.tsx`.**
+
+## #394 checklist outside the newly chosen interaction
+
+The existing production branch also carries the prior fixes for the issue's planning-dialog/accessibility items: FormControl use, error associations, stable pending submit labels/widths, DESIGN tokens/palette, visible file-input focus, RESCHEDULED primary-action cleanup, focus restoration, landmark/live-region cleanup, and workspace style/breakpoint issues. The remaining work is the D refinements and column editor described above, followed by the final full acceptance pass and PO review.
+
+## Relevant code and evidence
+
+Production paths:
+
+- Workspace/layout, selection and period refresh: `src/components/services/services-workspace.tsx`, `src/components/services/services-workspace.module.css`.
+- Mobile drawer: `src/components/map/inventory-map-drawer.tsx`, `src/components/map/inventory-map-drawer.module.css` and `src/components/map/inventory-map-drawer.test.tsx`.
+- Preview: `src/components/services/service-preview.tsx`.
+- Period tests: `src/components/services/services-workspace-period.test.tsx`.
+- Browser coverage: `e2e/services.spec.ts`, `e2e/accessibility.spec.ts`.
+- Desktop/mobile screenshots: `review-394/` (untracked evidence; do not stage by default).
+- Latest D baseline screenshots: `review-394/d-before-desktop-closed.png`, `d-before-desktop-selected.png`, `d-before-mobile-closed.png`, and `d-before-mobile-selected.png`. These are pre-fix evidence only; after screenshots still need capture and manual inspection.
+- Motion prototype recordings/screenshots/checks: `review-394-animations/` in the prototype worktree, including `variant-a.webm` through `variant-f.webm`, open/closed PNGs, `verification.json`, and recording/reduced-motion scripts. These are for the earlier D-F round, not the pending g/h/i comparison.
+
+## Checks already run
+
+On the production branch before the latest WIP commit: `npm run typecheck` passed; ESLint with `.agents/**` and `.claude/**` ignored passed (0 errors, 3 pre-existing `window.location.assign()` warnings); full Vitest passed (167 files, 1,614 tests); Services and accessibility Playwright passed (29 tests) on a freshly restarted server; `git diff --check` passed; the Impeccable detector returned `[]`. These checks validate the pre-D-refinement implementation, not future D/editor changes.
+
+On the A-F prototype before its latest commit: typecheck passed; lint passed (0 errors, 2 pre-existing warnings); `src/proxy.test.ts` passed (3 tests); Playwright recordings for A-F completed; reduced-motion check reported 0s computed transitions and no page errors. A-F had older layout behavior and needs the new D refinements before g/h/i are presented.
+
+## Exact next step
+
+The current D + g/h/i prototype foundation is checkpointed on `hllous/prototype-394-services-workspace-motion`; no tests were run for this partial handoff, and port 4314 must stay running. Next, inspect `services-column-editor.tsx`, reconcile its exported API with the table integration, wire G/H/I into `services-table.tsx`, apply the default column order on desktop/mobile, finish D refinements 1-4, and capture/inspect post-change desktop and mobile screenshots while logged in as `office-duty-queue`. Verify the signed-out `http://127.0.0.1:4314/app?destination=services&variant=g` (and `h`, `i`) redirect preserves each variant, record all three webm options, then send one blocking Orca ask and wait for the PO's choice. Port D plus the chosen editor to production, run typecheck, lint, full Vitest, Services desktop + 390px e2e, accessibility e2e, and Impeccable. Keep port 4314 running on the final production branch and send the final signed-out review ask with exact URL, login scenario, 4-6 things to try, and screenshots. Wait for approval before push/PR. PR targets `develop`, and its first body line must be `Issue: #394`; use the `pr` skill, wait for CI, and fix failures.
+
+## Current checkpoint — latest handoff (2026-10-14)
+
+This section supersedes the earlier “not integrated” and “Exact next step” status above. The latest D refinements and G/H/I draft are integrated in the prototype worktree and committed as a WIP checkpoint; the prototype remains unapproved and is not ported to production.
+
+- D: adaptive map/table panel sizing measures the detail pane plus `#`, `Servicio`, and `Estado` columns before shrinking the map; the preview rail stays over the table. Leaflet resize invalidation waits until the panel transition settles. Selected rows remain normal while unselected rows are grayed. The default order is `#`, `Servicio`, `Estado`, `Zona`, then remaining columns, including mobile compact rows.
+- G/H/I: editor is now integrated into the table: G uses header drag/resize plus a `Columnas` popover, H uses a `Columnas` sheet, and I uses per-header context menus. Reorder/visibility/width preferences are per user and variant in guarded localStorage; `#` and `Servicio` are fixed. These concepts still need interactive and visual verification, recordings, and the PO choice.
+- Verification: prototype `npm run typecheck` exited 0. `git diff --check` passed before the checkpoint. No post-change Playwright screenshots, recordings, lint, Vitest, or e2e have been run. Existing `review-394/` images are before-only baseline evidence; inspect new screenshots at 1440×900 and 390×844 while logged in as `office-duty-queue`.
+- Port 4314 remains running (previously PID 88736) and is serving the prototype worktree. Keep it alive.
+- Context was used mostly by reading the handoff/spec/coordination material and reviewing the five-file UI implementation/diff; a few baseline screenshots were inspected. No large test logs were read.
+- Exact next step: capture and inspect the two post-change viewport sizes; test G/H/I interactions and signed-out redirect preservation for `?variant=g|h|i`; record one webm per option; send one blocking Orca ask with signed-out URLs, neutral descriptions, and video paths. After the PO picks, implement only that editor option plus D on production; then run the requested complete verification and final review ask. No PR or CI exists yet.
+
+## PO review of G/H/I (2026-10-14)
+
+PO decision on the column editor: NONE of G/H/I.
+1. Column editing should feel like Excel: resize columns, drag columns to reorder, enable/disable columns. NO icons at all (no 6-dot drag handles, no other icons): direct drag only.
+2. Build 3 new options: option 1 = shadcn Data Table (column visibility + resizing + drag reorder); options 2 and 3 = two other approaches of the worker's choice. The column on/off control must sit OUTSIDE the table/map frame, e.g. next to the "Periodo" filter.
+3. Gray-out of non-selected rows is too strong: use a lighter gray or a light tint, subtle.
+4. The middle map/table resize handle must ALWAYS persist the user's chosen split. Today clicking a row resets it. It must not (including when the details pane opens or closes).
+5. When the handle is dragged to maximize the table, a white empty section appears. The table must fill all available space.
+6. "Periodo" reloads the page; it must not (verify on the production branch, where B1 was implemented, and in whatever the PO reviews).
+7. Feedback loop: verify every point with Playwright before asking the PO.
+
+## PO review of round 2 (2026-10-14)
+
+It is Ok, but there are still some bugs
+- column marker for expansion are not centered
+- when details pop, gray out area is not available, it does not appear
+- Columnas should be instead "Datos", always on columns should not appear in selection, button should be right, not next to "periodo", selection should be like data table in shadcn, use the cli and or skill.
+- Dragging the column should drag the "block" of that column, for visual feedback
+- There are duplicate texts, remember that duplication or unnecessary information is bad? here the case is duplication, on top of periodo and below "Servicios Urbanos / Buscar servicio, zona o cuadrilla...". "No hay servicios para mostrar en este periodo." in table is fine.
+Remember that agent should use playwright for feedback loop, and can spawn subagents if needed
+
+## TanStack dependency approval (2026-10-14)
+
+PO approved @tanstack/react-table for #394 (2026-10-14); production port must add it.
+
+## Checkpoint 4f
+- Direction: converged on the single shadcn Data Table option with TanStack; column options 2 and 3 and their switcher were removed.
+- Prototype branch: hllous/prototype-394-services-workspace-motion at commit 15d9909; no push; production implementation was not changed.
+- Editing: direct header drag reorders the full column block; edge drag and keyboard resize work; Datos toggles optional columns outside the map/table frame.
+- Persistence: guarded localStorage is scoped per user; # and Servicio stay fixed; signed-out destination returns to the default option after login.
+- Visuals: selected row uses the normal surface and other rows use a subtle tint; closed preview clears selection and keeps the subtle tint on remaining rows.
+- Workspace: split stayed at 30/70 through row select, details open/close, and reload; table filled 98.2 percent of the pane at maximum share.
+- Periodo: selection updates without a document reload and shows one table empty-state message.
+- Verification: Playwright passed at 1440x900 and 390x844; 47 focused Vitest tests passed; TypeScript and ESLint passed.
+- Evidence: review-394-animations/round2-single-option.webm plus uncommitted screenshots and JSON; PO was offline, so no blocking ask was sent.
