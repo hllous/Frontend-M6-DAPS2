@@ -462,7 +462,7 @@ export function ServicesColumnEditor({
   const columns = controller.preferences.order.filter((key) => key !== "service");
   const trigger = (
     <Button type="button" variant="outline" disabled={!controller.isHydrated} className="ml-auto">
-      Datos
+      Categorías
     </Button>
   );
 

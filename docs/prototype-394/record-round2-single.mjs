@@ -152,12 +152,12 @@ async function inspectHeaderAndFilters(page) {
   assert.equal(await page.getByPlaceholder(isMobile ? "Buscar" : /Buscar servicio, zona o cuadrilla/).count(), 1,
     "the service search copy appears once");
   assert.equal(await page.getByLabel("Período").count(), 1, "the period filter appears once");
-  assert.equal(await page.getByRole("button", { name: "Datos", exact: true }).count(), 1,
+  assert.equal(await page.getByRole("button", { name: "Categorías", exact: true }).count(), 1,
     "the data control appears once");
   const toolbar = page.locator("[data-services-filter-toolbar]");
   const toolbarText = await toolbar.innerText();
   assert.ok(toolbarText.includes("Período"), "the filter bar contains the period control");
-  assert.ok(toolbarText.includes("Datos"), "the filter bar contains the data control");
+  assert.ok(toolbarText.includes("Categorías"), "the filter bar contains the data control");
   assert.equal(/Servicios Urbanos|Buscar servicio/.test(toolbarText), false,
     "the title and search copy are not repeated below the period filter");
   assert.equal(await page.getByText("Servicios Urbanos / Buscar servicio, zona o cuadrilla…", { exact: true }).count(), 0,
@@ -178,17 +178,17 @@ async function inspectHeaderAndFilters(page) {
 }
 
 async function inspectDataMenu(page) {
-  const toolbar = page.getByRole("button", { name: "Datos", exact: true });
+  const toolbar = page.getByRole("button", { name: "Categorías", exact: true });
   const [toolbarBox, periodBox, toolbarRegion] = await Promise.all([
     toolbar.boundingBox(),
     page.getByLabel("Período").boundingBox(),
     page.locator("[data-services-filter-toolbar]").boundingBox(),
   ]);
   assert.ok(toolbarBox && periodBox && toolbarRegion, "the period and data controls are visible");
-  assert.ok(toolbarBox.x > periodBox.x, "Datos sits to the right of Periodo");
+  assert.ok(toolbarBox.x > periodBox.x, "Categorías sits to the right of Periodo");
   assert.ok(toolbarBox.x + toolbarBox.width >= toolbarRegion.x + toolbarRegion.width - 20,
-    "Datos is aligned to the right edge of the filter bar");
-  assert.equal(await toolbar.locator("svg").count(), 0, "the Datos button is text-only");
+    "Categorías is aligned to the right edge of the filter bar");
+  assert.equal(await toolbar.locator("svg").count(), 0, "the Categorías button is text-only");
 
   await toolbar.click();
   const menu = page.locator('[data-slot="dropdown-menu-content"]');

@@ -112,6 +112,7 @@ Remember that agent should use playwright for feedback loop, and can spawn subag
 PO approved @tanstack/react-table for #394 (2026-10-14); production port must add it.
 
 ## Checkpoint 4f
+
 - Direction: converged on the single shadcn Data Table option with TanStack; column options 2 and 3 and their switcher were removed.
 - Prototype branch: hllous/prototype-394-services-workspace-motion at commit 15d9909; no push; production implementation was not changed.
 - Editing: direct header drag reorders the full column block; edge drag and keyboard resize work; Datos toggles optional columns outside the map/table frame.
@@ -131,3 +132,11 @@ Converged prototype reviewed at ef68d8e. Better, but corrections required (singl
 4. Estado filter: its options must show the same status colors as the Estado badges in the table.
 5. Orchestrator pre-check findings to fix too: the non-selected-row tint is invisible with details open at 1440x900 (keep it subtle but perceivable); the Estado badge truncates ("Programad") when details are open.
 Workers may spawn subagents and must use feedback loops (Playwright, Vitest) before asking the PO.
+
+## Checkpoint round 3 (2026-10-15)
+
+- Convergence: one shadcn/TanStack column editor remains; the button/menu now says `Categorías`.
+- Changes: header drag previews the whole table in place with animated column movement; `#` and `Servicio` stay fixed. Delayed pointer capture and a reserved resize edge let sorting and filters work alongside resizing. Sorting cycles ascending, descending, then clear. Estado filter choices reuse the table's status badges, non-selected rows use the canvas tint, and Estado labels stay on one line. The mobile table uses its compact service/status/zone columns.
+- Verification: the round 3 Playwright walkthrough passed at 1440x900 and 390x844 with no page errors. It checked all five sortable columns in all three states; zone, status, crew, and schedule filters; every Categorías toggle; pointer and keyboard reorder; desktop pointer and keyboard resize; row selection and details open/close; split resizing and persistence; Periodo without document reload; search; and mobile Lista/Mapa. The 40 focused Services workspace Vitest tests and `npm run typecheck` passed. ESLint exited 0 with two existing warnings outside the Services workspace.
+- Evidence: `review-394-animations/round3-single-verification.json` lists control results. The walkthrough recording is `review-394-animations/round3-single-option.webm`; screenshots include `round3-live-drag-preview-1440.png`, `round3-details-open-1440.png`, `round3-workspace-390.png`, and `round3-mobile-map-390.png` in `review-394-animations/`.
+- Runtime: `npm run dev -- --port 4314` remains running for PO review.

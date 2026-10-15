@@ -400,7 +400,12 @@
 .mobileWorkspaceLayout[data-column-editor] [data-prototype-table-content] tbody tr[aria-selected="false"] {
   filter: none;
   opacity: 1;
-  background-color: color-mix(in srgb, var(--color-canvas) 72%, var(--color-surface));
+  background-color: var(--color-canvas);
+}
+
+.desktopWorkspaceLayout [data-column-dragging="true"],
+.mobileWorkspaceLayout [data-column-dragging="true"] {
+  background-color: var(--color-surface-subtle);
 }
 
 .desktopWorkspaceLayout[data-column-editor] [data-prototype-table-content] tbody tr[aria-selected="true"],

@@ -45,6 +45,7 @@ export function StatusBadge({
 
   return (
     <span
+      data-status={status}
       className={cn(
         "inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs tracking-tight",
         STATUS_CLASSES[status],
@@ -52,7 +53,7 @@ export function StatusBadge({
       )}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span className="min-w-0 whitespace-normal">{label}</span>
+      <span className="min-w-0 whitespace-nowrap">{label}</span>
     </span>
   );
 }

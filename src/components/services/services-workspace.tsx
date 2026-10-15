@@ -166,7 +166,7 @@ export function ServicesWorkspace({
   const [search, setSearch] = useState<string>(() => getParam("q") ?? "");
 
   // Sorting
-  const [sortKey, setSortKey] = useState<SortKey>(() => {
+  const [sortKey, setSortKey] = useState<SortKey | null>(() => {
     const s = getParam("sort") as SortKey | null;
     return s && ["service", "zone", "status", "crew", "scheduled"].includes(s) ? s : "status";
   });
@@ -421,8 +421,8 @@ export function ServicesWorkspace({
     if (detailId) newParams.set("detail", detailId);
     if (prototypeVariant !== "a" && prototypeVariant !== "1") newParams.set("variant", prototypeVariant);
     if (periodChoice) newParams.set("periodo", periodChoice);
-    if (sortKey !== "status") newParams.set("sort", sortKey);
-    if (sortDir !== "asc") newParams.set("dir", sortDir);
+    if (sortKey && sortKey !== "status") newParams.set("sort", sortKey);
+    if (sortKey && sortDir !== "asc") newParams.set("dir", sortDir);
     if (mobileTab !== "list") newParams.set("view", mobileTab);
 
     columnFilters.zones.forEach((z) => newParams.append("zone", z));
@@ -513,7 +513,7 @@ export function ServicesWorkspace({
   }, [loadState, search, columnFilters]);
 
   const sortedServices = useMemo(
-    () => sortServices(filteredServices, sortKey, sortDir),
+    () => sortKey ? sortServices(filteredServices, sortKey, sortDir) : filteredServices,
     [filteredServices, sortKey, sortDir],
   );
   const serviceOrdinals = useMemo(
@@ -611,12 +611,17 @@ export function ServicesWorkspace({
 
   const handleSortChange = useCallback((key: SortKey) => {
     if (sortKey === key) {
-      setSortDir((direction) => (direction === "asc" ? "desc" : "asc"));
+      if (sortDir === "asc") {
+        setSortDir("desc");
+      } else {
+        setSortKey(null);
+        setSortDir("asc");
+      }
       return;
     }
     setSortKey(key);
     setSortDir("asc");
-  }, [sortKey]);
+  }, [sortKey, sortDir]);
 
   const handleClearFilters = useCallback(() => {
     setSearch("");
