@@ -121,3 +121,13 @@ PO approved @tanstack/react-table for #394 (2026-10-14); production port must ad
 - Periodo: selection updates without a document reload and shows one table empty-state message.
 - Verification: Playwright passed at 1440x900 and 390x844; 47 focused Vitest tests passed; TypeScript and ESLint passed.
 - Evidence: review-394-animations/round2-single-option.webm plus uncommitted screenshots and JSON; PO was offline, so no blocking ask was sent.
+
+## PO review of round 3 (2026-10-15)
+
+Converged prototype reviewed at ef68d8e. Better, but corrections required (single version, no variants):
+1. Rename the "Datos" button/menu to "Categorias" (UI copy with accent: "Categorías").
+2. Column drag must show a live preview of the resulting table: the other columns shift into place while dragging. No floating/pop-up column ghost.
+3. Sort ("ordenar por") does not work and the header filters cannot be clicked. Fix both, and verify EVERY interactive control end to end before any PO review.
+4. Estado filter: its options must show the same status colors as the Estado badges in the table.
+5. Orchestrator pre-check findings to fix too: the non-selected-row tint is invisible with details open at 1440x900 (keep it subtle but perceivable); the Estado badge truncates ("Programad") when details are open.
+Workers may spawn subagents and must use feedback loops (Playwright, Vitest) before asking the PO.
