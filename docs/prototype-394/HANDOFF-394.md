@@ -140,3 +140,13 @@ Workers may spawn subagents and must use feedback loops (Playwright, Vitest) bef
 - Verification: the round 3 Playwright walkthrough passed at 1440x900 and 390x844 with no page errors. It checked all five sortable columns in all three states; zone, status, crew, and schedule filters; every Categorías toggle; pointer and keyboard reorder; desktop pointer and keyboard resize; row selection and details open/close; split resizing and persistence; Periodo without document reload; search; and mobile Lista/Mapa. The 40 focused Services workspace Vitest tests and `npm run typecheck` passed. ESLint exited 0 with two existing warnings outside the Services workspace.
 - Evidence: `review-394-animations/round3-single-verification.json` lists control results. The walkthrough recording is `review-394-animations/round3-single-option.webm`; screenshots include `round3-live-drag-preview-1440.png`, `round3-details-open-1440.png`, `round3-workspace-390.png`, and `round3-mobile-map-390.png` in `review-394-animations/`.
 - Runtime: `npm run dev -- --port 4314` remains running for PO review.
+
+## PO review of round 4 (2026-10-15)
+
+Round 3 (679da2c) reviewed. Still bugs, single version, no variants:
+1. Column drag is buggy: often columns cannot be moved, and when they do move they swap back and forth repeatedly (oscillation). Reorder must be stable: a column changes place once per crossed midpoint, never flickers.
+2. Servicio must be movable too (supersedes "# and Servicio stay fixed"; only # stays fixed).
+3. Resize: the grabbed line does not match where the user drops it. The resize line must follow the cursor horizontally, 1:1, at every pane size.
+4. Layout across sizes: use `impeccable` adapt to make the table/editor behave at different viewport and pane sizes (likely root cause of 1 and 3).
+5. Fixed row height: when filters leave too few rows to fill the table, rows must keep their normal height and leave empty space below; rows must never stretch.
+Out of this ticket (PO, for the orchestrator): skeleton loaders with shadcn wherever something loads (separate issue, alongside #520 TanStack).
