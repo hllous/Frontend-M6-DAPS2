@@ -1236,20 +1236,48 @@ async function runMobile(page, pageErrors) {
       path: path.join(output, "round4-table-390.png"),
     });
     const keyboard = await verifyKeyboardEditing(page, false);
-    const drawerBefore = await drawer.boundingBox();
+    const drawerFrame = page.locator('[aria-label="Lista de servicios"]');
+    const drawerFrameHandle = drawerFrame.locator('[data-inventory-map-drawer-handle="true"]');
+    let snapBeforeSelection = await drawerFrame.getAttribute("data-snap");
+    if (snapBeforeSelection === "full") {
+      await drawerHandle.click();
+      await page.waitForFunction(() => document.querySelector('[aria-label="Lista de servicios"]')?.getAttribute("data-snap") === "peek");
+      snapBeforeSelection = "peek";
+    }
+    if (snapBeforeSelection === "peek") {
+      await drawerHandle.click();
+      await page.waitForFunction(() => document.querySelector('[aria-label="Lista de servicios"]')?.getAttribute("data-snap") === "half");
+      snapBeforeSelection = "half";
+    }
+    assert.equal(snapBeforeSelection, "half", "service selection starts from the half-height snap");
+    await page.waitForTimeout(320);
+    const drawerBefore = await drawerFrame.boundingBox();
+    const handleBeforeSelection = await drawerFrameHandle.boundingBox();
+    assert.ok(drawerBefore && handleBeforeSelection, "the half-height drawer handle has measurable geometry");
     const selectedRow = page.locator('table[aria-label="Servicios operativos"] tbody tr[data-service-id]').first();
     const mobileSelectedId = await selectedRow.getAttribute("data-service-id");
     assert.ok(mobileSelectedId, "the mobile period shows a selectable service row");
     await selectedRow.locator("button[data-service-select]").click();
     await page.locator("aside[aria-labelledby='preview-title']").waitFor({ state: "visible" });
+    await page.waitForFunction(() => document.querySelector('[aria-label="Lista de servicios"]')?.getAttribute("data-snap") === "full");
+    await page.waitForTimeout(320);
+    const snapAfterSelection = await drawerFrame.getAttribute("data-snap");
+    const handleAfterSelection = await drawerFrameHandle.boundingBox();
+    assert.equal(snapAfterSelection, "full", "service selection moves the drawer to its full-height snap");
+    assert.ok(handleAfterSelection && handleAfterSelection.y < handleBeforeSelection.y - 2,
+      "the drawer handle moves to the full-height snap position");
     const openTint = await verifyTint(page, "true");
     const close = page.getByRole("button", { name: "Cerrar vista previa" });
     await close.click();
     await page.locator("aside[aria-labelledby='preview-title']").waitFor({ state: "hidden" });
     await drawer.waitFor({ state: "visible" });
-    const drawerAfter = await drawer.boundingBox();
+    await page.waitForTimeout(320);
+    const drawerAfter = await drawerFrame.boundingBox();
+    const handleAfterClose = await drawerFrameHandle.boundingBox();
     assert.ok(drawerBefore && drawerAfter, "the mobile list drawer returns after closing the preview");
-    assert.equal(await drawer.getAttribute("data-snap"), "full", "closing the preview keeps the list at full height");
+    assert.equal(await drawerFrame.getAttribute("data-snap"), "full", "closing the preview keeps the list at full height");
+    assert.ok(handleAfterSelection && handleAfterClose && Math.abs(handleAfterClose.y - handleAfterSelection.y) <= 2,
+      "the full-height drawer handle stays in place after closing the preview");
     const closedTint = await verifyTint(page, "false");
     const period = await verifyPeriodInPlace(page);
     const orderBeforeReload = await columnOrder(page);
