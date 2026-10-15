@@ -207,7 +207,7 @@
   pointer-events: none;
 }
 
-:global(.leaflet-control-attribution a) {
+.map :global(.leaflet-control-attribution a) {
   pointer-events: auto;
 }
 
