@@ -426,7 +426,8 @@
   background-color: var(--color-surface-subtle);
 }
 
-.desktopWorkspaceLayout table[data-column-resizing="true"] col {
+.desktopWorkspaceLayout table[data-column-resizing="true"] col,
+.mobileWorkspaceLayout table[data-column-resizing="true"] col {
   transition: none !important;
 }
 

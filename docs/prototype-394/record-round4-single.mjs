@@ -7,7 +7,7 @@ const base = "http://localhost:4314";
 const output = path.resolve("review-394-animations");
 const browser = await chromium.launch({ headless: true });
 
-async function signIn(page, mobile = false) {
+async function signIn(page) {
   await page.goto(`${base}/app?destination=services`, { waitUntil: "domcontentloaded" });
   assert.equal(new URL(page.url()).pathname, "/login", "signed-out visits redirect to login");
   assert.equal(new URL(page.url()).searchParams.get("destination"), "services");
@@ -28,7 +28,6 @@ async function signIn(page, mobile = false) {
   assert.equal(await page.getByRole("group", { name: "Elegir opción de columnas" }).count(), 0,
     "there is no floating column-option switcher");
 
-  if (mobile) await page.getByRole("button", { name: "Lista", exact: true }).click();
   const tableRegion = page.getByRole("region", { name: "Tabla operativa de Servicios" });
   await tableRegion.locator('table[aria-label="Servicios operativos"]').waitFor({ timeout: 45000 });
   await tableRegion.locator('tr[data-service-id="SVC-1043"] button[data-service-select]')
@@ -448,7 +447,15 @@ async function traceResizeScenario(browserInstance, scenario) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   try {
-    await signIn(page, scenario.mobile === true);
+    await signIn(page);
+    if (scenario.mobile) {
+      const drawer = page.getByRole("complementary", { name: "Lista de servicios" });
+      await drawer.waitFor({ state: "visible" });
+      assert.equal(await drawer.getAttribute("data-snap"), "half", "mobile list starts at half height");
+      await drawer.getByRole("button", { name: "Expandir lista a pantalla completa" }).click();
+      await page.waitForFunction(() => document.querySelector('[aria-label="Lista de servicios"]')?.getAttribute("data-snap") === "full");
+      await page.screenshot({ path: path.join(output, "round4b-mobile-390.png") });
+    }
     if (scenario.splitOffset) {
       const separator = page.getByRole("separator", { name: "Ajustar ancho entre mapa y tabla" });
       const box = await separator.boundingBox();
@@ -523,7 +530,7 @@ async function runResizeTraceSuite(browserInstance) {
     stepCount: results.reduce((sum, scenario) => sum + scenario.status.steps.length + scenario.zone.steps.length, 0),
     violations,
     scenarios: results,
-    screenshots: ["review-394-animations/round4b-mid-resize-1440.png", "review-394-animations/round4b-horizontal-scroll-1440.png"],
+    screenshots: ["review-394-animations/round4b-mid-resize-1440.png", "review-394-animations/round4b-horizontal-scroll-1440.png", "review-394-animations/round4b-mobile-390.png"],
   };
 }
 
@@ -1188,7 +1195,7 @@ async function verifyMobilePersistence(page, orderBeforeReload) {
   assert.ok(preferenceKeys.some((key) => key.endsWith(":1")), "mobile preferences are scoped to the user");
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Servicios Urbanos", exact: true }).waitFor({ timeout: 45000 });
-  await page.getByRole("button", { name: "Lista", exact: true }).click();
+  await page.getByRole("complementary", { name: "Lista de servicios" }).waitFor({ state: "visible" });
   await page.getByRole("region", { name: "Tabla operativa de Servicios" })
     .locator('table[aria-label="Servicios operativos"]')
     .waitFor({ timeout: 15000 });
@@ -1205,25 +1212,30 @@ async function runMobile(page, pageErrors) {
   await page.waitForTimeout(350);
   try {
     const header = await inspectHeaderAndFilters(page);
-    const listTab = page.getByRole("button", { name: "Lista", exact: true });
-    const mapTab = page.getByRole("button", { name: "Mapa", exact: true });
-    await listTab.click();
-    assert.equal(await listTab.getAttribute("aria-pressed"), "true", "Lista opens the mobile list");
+    const drawer = page.getByRole("complementary", { name: "Lista de servicios" });
+    const drawerHandle = drawer.locator('button[data-inventory-map-drawer-handle="true"]');
+    const map = page.locator('[aria-label="Mapa territorial de Servicios"]');
+    await drawer.waitFor({ state: "visible" });
+    assert.equal(await drawer.getAttribute("data-snap"), "half", "the mobile drawer starts at half height");
+    assert.equal(await map.isVisible(), true, "the map remains visible beside the half-height drawer");
+    await drawerHandle.click();
+    await page.waitForFunction(() => document.querySelector('[aria-label="Lista de servicios"]')?.getAttribute("data-snap") === "full");
+    assert.equal(await map.isVisible(), true, "the map remains mounted under the full-height drawer");
     const rowHeight = await verifyFixedRowHeight(page);
     const gestures = await verifyMobileGestures(page);
-    await page.screenshot({ path: path.join(output, "round4-mobile-list-390.png") });
-    await mapTab.click();
-    assert.equal(await mapTab.getAttribute("aria-pressed"), "true", "Mapa opens the mobile map");
-    assert.equal(await listTab.getAttribute("aria-pressed"), "false");
-    assert.equal(await page.locator('[aria-label="Mapa territorial de Servicios"]').isVisible(), true);
+    await page.screenshot({ path: path.join(output, "round4-mobile-full-list-390.png") });
+    await drawerHandle.click();
+    await page.waitForFunction(() => document.querySelector('[aria-label="Lista de servicios"]')?.getAttribute("data-snap") === "peek");
+    assert.equal(await page.getByRole("region", { name: "Tabla operativa de Servicios" }).isVisible(), false,
+      "the peek snap hides list content while keeping the map visible");
+    assert.equal(await map.isVisible(), true, "the map remains visible at peek height");
     await page.screenshot({ path: path.join(output, "round4-mobile-map-390.png") });
-    await listTab.click();
-    assert.equal(await listTab.getAttribute("aria-pressed"), "true", "Lista returns from Mapa");
+    await drawerHandle.click();
+    await page.waitForFunction(() => document.querySelector('[aria-label="Lista de servicios"]')?.getAttribute("data-snap") === "half");
     await page.getByRole("region", { name: "Tabla operativa de Servicios" }).screenshot({
       path: path.join(output, "round4-table-390.png"),
     });
     const keyboard = await verifyKeyboardEditing(page, false);
-    const drawer = page.locator('[aria-label="Lista de servicios"]');
     const drawerBefore = await drawer.boundingBox();
     const selectedRow = page.locator('table[aria-label="Servicios operativos"] tbody tr[data-service-id]').first();
     const mobileSelectedId = await selectedRow.getAttribute("data-service-id");
@@ -1231,19 +1243,20 @@ async function runMobile(page, pageErrors) {
     await selectedRow.locator("button[data-service-select]").click();
     await page.locator("aside[aria-labelledby='preview-title']").waitFor({ state: "visible" });
     const openTint = await verifyTint(page, "true");
-    const drawerAfter = await drawer.boundingBox();
-    assert.ok(drawerBefore && drawerAfter, "the mobile list drawer remains available");
-    assert.ok(Math.abs(drawerBefore.height - drawerAfter.height) <= 2, "row selection does not resize the mobile list");
     const close = page.getByRole("button", { name: "Cerrar vista previa" });
     await close.click();
     await page.locator("aside[aria-labelledby='preview-title']").waitFor({ state: "hidden" });
+    await drawer.waitFor({ state: "visible" });
+    const drawerAfter = await drawer.boundingBox();
+    assert.ok(drawerBefore && drawerAfter, "the mobile list drawer returns after closing the preview");
+    assert.equal(await drawer.getAttribute("data-snap"), "full", "closing the preview keeps the list at full height");
     const closedTint = await verifyTint(page, "false");
     const period = await verifyPeriodInPlace(page);
     const orderBeforeReload = await columnOrder(page);
     const persistence = await verifyMobilePersistence(page, orderBeforeReload);
     await page.screenshot({ path: path.join(output, "round4-workspace-390.png") });
     assert.deepEqual(pageErrors, [], "the mobile page has no browser errors");
-    return { viewport: "390x844", header, rowHeight, gestures, mobileTabs: { list: true, map: true }, selectedId: mobileSelectedId, keyboard, openTint, closedTint, drawerBefore, drawerAfter, period, persistence, pageErrors };
+    return { viewport: "390x844", header, rowHeight, gestures, drawerSnaps: { half: true, full: true, peek: true }, selectedId: mobileSelectedId, keyboard, openTint, closedTint, drawerBefore, drawerAfter, period, persistence, pageErrors };
   } catch (error) {
     await page.screenshot({ path: path.join(output, "round4-single-mobile-failure.png"), fullPage: true }).catch(() => {});
     throw error;
@@ -1310,7 +1323,7 @@ try {
       { control: "Periodo changes without document reload", result: "pass", evidence: desktop.period },
       { control: "Global search apply and clear", result: "pass", evidence: desktop.search },
       { control: "Subtle row tint with details open and closed", result: "pass", evidence: { open: desktop.split.openTones.unselected, closed: desktop.split.closedTones.unselected } },
-      { control: "Mobile Lista and Mapa at 390x844", result: "pass", evidence: mobile.mobileTabs },
+      { control: "Three-snap service drawer at 390x844", result: "pass", evidence: mobile.drawerSnaps },
       { control: "Column and split preferences persist after reload", result: "pass", evidence: { desktop: desktop.persistence, mobile: mobile.persistence } },
     ],
     desktop,
@@ -1347,26 +1360,21 @@ try {
   await browser.close();
 }
 
-await fs.writeFile(path.join(output, "round4-single-verification.json"), JSON.stringify(result, null, 2));
-console.log(JSON.stringify({
-  status: result.status,
-  controls: result.controls.map(({ control, result: controlResult, detail }) => ({ control, result: controlResult, detail })),
-  resizeTraces: resizeTraces ? {
-    passed: resizeTraces.passed,
-    scenarioCount: resizeTraces.scenarioCount,
-    stepCount: resizeTraces.stepCount,
-    violations: resizeTraces.violations.slice(0, 5),
-    scenarios: resizeTraces.scenarios.map((scenario) => ({
-      name: scenario.name,
-      status: { steps: scenario.status.steps.length, maxAbsEdgeError: scenario.status.maxAbsEdgeError,
-        maxAbsMarkerError: scenario.status.maxAbsMarkerError, violations: scenario.status.violations.length },
-      zone: { steps: scenario.zone.steps.length, maxAbsEdgeError: scenario.zone.maxAbsEdgeError,
-        maxAbsMarkerError: scenario.zone.maxAbsMarkerError, violations: scenario.zone.violations.length },
-      horizontalScroll: scenario.horizontalScroll,
-    })),
-  } : null,
-  pageErrors: result.pageErrors,
-  evidence: result.evidence,
-  videoError: result.videoError,
-}, null, 2));
+const resultPath = process.argv.includes("--baseline")
+  ? "round4b-before-trace.json"
+  : traceOnly ? "round4b-trace.json" : "round4b-verification.json";
+await fs.writeFile(path.join(output, resultPath), JSON.stringify(result, null, 2));
+console.log(JSON.stringify(resizeTraces?.scenarios.map((scenario) => {
+  const summarize = (trace) => ({
+    steps: trace.steps.length,
+    maxPointerEdgeDriftPx: Number(Math.max(0, ...trace.steps.map((step) => Math.abs(step.edgeError))).toFixed(2)),
+    maxMarkerOffsetPx: Number(Math.max(0, ...trace.steps.map((step) => Math.abs(step.markerError))).toFixed(2)),
+    stepsOver2Px: trace.steps.filter((step) => Math.abs(step.edgeError) > 2 || Math.abs(step.markerError) > 2).length,
+  });
+  return {
+    scenario: scenario.name,
+    status: summarize(scenario.status),
+    zone: summarize(scenario.zone),
+  };
+}) ?? [], null, 2));
 if (failure) process.exitCode = 1;

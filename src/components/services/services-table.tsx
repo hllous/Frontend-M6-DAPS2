@@ -235,18 +235,34 @@ function ColumnResizeHandle({
   dense: boolean;
   onResize: (key: ServicesColumnKey, width: number) => void;
 }) {
-  const drag = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null);
+  const drag = useRef<{
+    pointerId: number;
+    startX: number;
+    startWidth: number;
+    scroller: HTMLElement | null;
+    previousOverflowAnchor: string;
+  } | null>(null);
 
   function startResize(event: ReactPointerEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
     const table = event.currentTarget.closest<HTMLTableElement>("table");
     if (!table) return;
+    const scroller = table.parentElement;
+    const previousOverflowAnchor = scroller?.style.getPropertyValue("overflow-anchor") ?? "";
+    if (scroller) {
+      const tableWidth = table.getBoundingClientRect().width;
+      const visibleWidth = scroller.scrollLeft + scroller.clientWidth;
+      table.style.setProperty("--column-resize-width-floor", `${Math.max(tableWidth, visibleWidth)}px`);
+      scroller.style.setProperty("overflow-anchor", "none");
+    }
     table.dataset.columnResizing = "true";
     drag.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startWidth: width,
+      scroller,
+      previousOverflowAnchor,
     };
     if (typeof event.currentTarget.setPointerCapture === "function") {
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -260,10 +276,24 @@ function ColumnResizeHandle({
   }
 
   function finishResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (drag.current?.pointerId !== event.pointerId) return;
+    const activeDrag = drag.current;
+    if (activeDrag?.pointerId !== event.pointerId) return;
     drag.current = null;
     const table = event.currentTarget.closest<HTMLTableElement>("table");
-    if (table) delete table.dataset.columnResizing;
+    if (table) {
+      delete table.dataset.columnResizing;
+      const tableWidth = Number.parseFloat(table.style.width);
+      if (activeDrag.scroller && tableWidth <= activeDrag.scroller.clientWidth) {
+        table.style.removeProperty("--column-resize-width-floor");
+      }
+    }
+    if (activeDrag.scroller) {
+      if (activeDrag.previousOverflowAnchor) {
+        activeDrag.scroller.style.setProperty("overflow-anchor", activeDrag.previousOverflowAnchor);
+      } else {
+        activeDrag.scroller.style.removeProperty("overflow-anchor");
+      }
+    }
     if (typeof event.currentTarget.hasPointerCapture === "function" && event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -483,6 +513,25 @@ export function ServicesTable({
   const ordinalWidth = dense || compactColumns ? 40 : 48;
   const tablePixelWidth = ordinalWidth + widthTotal;
 
+  useLayoutEffect(() => {
+    const table = tableRef.current;
+    const scroller = table?.parentElement;
+    if (!table || !scroller) return;
+
+    const clearUnusedResizeFloor = () => {
+      if (table.dataset.columnResizing === "true") return;
+      const tableWidth = Number.parseFloat(table.style.width);
+      if (tableWidth <= scroller.clientWidth) {
+        table.style.removeProperty("--column-resize-width-floor");
+      }
+    };
+
+    clearUnusedResizeFloor();
+    const observer = new ResizeObserver(clearUnusedResizeFloor);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [tablePixelWidth]);
+
   function getDataColumnWidth(key: ServicesColumnKey): number {
     const definition = SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === key)!;
     return activeColumnPreferences?.variant === "1"
@@ -641,9 +690,12 @@ export function ServicesTable({
         <table
           ref={tableRef}
           data-motion-variant={previewMotionVariant}
-          className="w-max table-fixed border-collapse bg-[var(--color-surface)] text-left text-xs"
+          className="min-w-full table-fixed border-collapse bg-[var(--color-surface)] text-left text-xs"
           aria-label="Servicios operativos"
-          style={{ width: tablePixelWidth }}
+          style={{
+            width: tablePixelWidth,
+            minWidth: "max(100%, var(--column-resize-width-floor, 0px))",
+          }}
         >
           <colgroup>
             <col data-column-key="ordinal" style={{ width: `${ordinalWidth}px` }} />
@@ -658,10 +710,11 @@ export function ServicesTable({
                 />
               );
             })}
+            <col data-column-filler />
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
             <tr>
-              <th scope="col" data-column-key="ordinal" aria-label="Número de parada" className="px-1 py-3 text-center">#</th>
+              <th scope="col" data-column-key="ordinal" aria-label="Número de parada" className="sticky left-0 top-0 z-20 bg-inherit px-1 py-3 text-center">#</th>
               {currentColumns.map((col) => {
                 const isSorted = sortKey === col.key;
                 const isCompactDateSort = compactColumns && col.key === "service" && sortKey === "scheduled";
@@ -849,8 +902,6 @@ export function ServicesTable({
                           : activeColumnPreferences.preferences.widths[col.key]}
                         minimumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.minimumWidth}
                         maximumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.maximumWidth}
-                        totalWidth={widthTotal}
-                        dataWidthPercent={dataWidthPercent}
                         dense={dense}
                         onResize={setColumnWidth}
                       />
@@ -892,7 +943,7 @@ export function ServicesTable({
                     ? { backgroundColor: "var(--color-surface)" }
                     : undefined}
                 >
-                  <td data-column-key="ordinal" className={cn("text-center tabular-nums", dense ? "px-1 py-2" : "px-1.5 py-2")}>
+                  <td data-column-key="ordinal" className={cn("sticky left-0 z-10 bg-inherit text-center tabular-nums", dense ? "px-1 py-2" : "px-1.5 py-2")}>
                     <span
                       aria-label={`Parada ${ordinal}`}
                       className="inline-flex size-7 items-center justify-center rounded-full bg-[var(--color-action)] text-xs font-bold text-[var(--color-on-institutional)]"
@@ -988,13 +1039,14 @@ export function ServicesTable({
                       </td>
                     );
                   })}
+                  <td aria-hidden="true" className="p-0" />
                 </tr>
               );
             })}
 
             {services.length === 0 && (
               <tr>
-                <td colSpan={currentColumns.length + 1} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
+                <td colSpan={currentColumns.length + 2} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
                   <Empty className="mx-auto max-w-sm gap-3 rounded-none p-0" role="status">
                     <EmptyHeader>
                       <EmptyTitle>
