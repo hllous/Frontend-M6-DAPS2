@@ -45,7 +45,7 @@ Estado revisado el 01/10/2026 contra el código frontend y Backend `develop` `30
 | Gate | Type | Affects | Tracking |
 |---|---|---|---|
 | M1's token verification and refresh contract (JWKS/keys, algorithm, issuer/audience, claims, TTL and rotation) is unpublished; real-M1 login fails closed in the frontend; M1's 2026-10-13 login description returns `{ user_id, dni, role, auth }` with no token, so where the JWT travels is also unconfirmed | Blocks production authentication | Phase 0 / Phase 8 | [#17](https://github.com/hllous/Frontend-M6-DAPS2/issues/17), [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md) |
-| M1 role-to-Capability mapping is unconfirmed; Backend has no domain `@Roles()` restrictions in use | Unresolved authorization hypothesis | Every phase's capability gating; production readiness | [#8](https://github.com/hllous/Frontend-M6-DAPS2/issues/8), `CONTEXT.md`'s `Capability` term |
+| M1 role-to-Capability mapping is unconfirmed; Backend has no domain `@Roles()` restrictions in use | Unresolved authorization hypothesis | Every phase's capability gating; production readiness | [#8](https://github.com/hllous/Frontend-M6-DAPS2/issues/8), `GLOSSARY.md`'s `Capability` term |
 | Backend's development JWT verifier uses an HS256 stopgap, not M1's final contract | Development integration only | Phase 0 `backend-development` mode | [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md) |
 | M9's neighborhood catalog is unpublished; the frontend adapter still uses replaceable data | External data source pending | Phase 2c neighborhood assignment | [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36) |
 | M4's establishment lookup contract is unpublished; frontend uses a local adapter | External data source pending | Phase 6 notice issuance | `CONTRACTS.md` → Remaining contract gaps |
@@ -80,9 +80,9 @@ Estado revisado el 01/10/2026 contra el código frontend y Backend `develop` `30
 **Depends on**: Phase 0; [Define the central Service planning and field-execution workflow](https://github.com/hllous/Frontend-M6-DAPS2/issues/10) (carrying its corrected cancellation rule); the validated [map/table workspace](https://github.com/hllous/Frontend-M6-DAPS2/issues/14) and [operational form](https://github.com/hllous/Frontend-M6-DAPS2/issues/20) prototypes as reference, not as code to promote — neither prototype branch was ever merged, consistent with their "throwaway" status on the map.
 
 **Acceptance evidence**: see `CONTRACTS.md` → [Service workflow](CONTRACTS.md#service-workflow) and → [Required contract and workflow coverage](CONTRACTS.md#required-contract-and-workflow-coverage) for the binding cancellation/reason/`IN_PROGRESS` rules and their required test coverage — not restated here. Additionally:
-- Office can schedule and separately assign a ROUTE or POINT Service (scheduling and assignment are distinct steps per the `Assignment` term in `CONTEXT.md`).
+- Office can schedule and separately assign a ROUTE or POINT Service (scheduling and assignment are distinct steps per the `Assignment` term in `GLOSSARY.md`).
 - A ROUTE Service reaches `COMPLETED` only once every zone reaches `SERVICED`; a `PARTIAL`/`NOT_SERVICED` `ZoneResult` requires Evidence.
-- Local Drafts persist field input without connectivity and require manual resubmission; a stale-server `Conflict` (per `CONTEXT.md`) is surfaced explicitly, never silently overwritten.
+- Local Drafts persist field input without connectivity and require manual resubmission; a stale-server `Conflict` (per `GLOSSARY.md`) is surfaced explicitly, never silently overwritten.
 
 **Unblocks**: Phases 2a–2d, 3, 4, 5, 7 (fixture-based start).
 
@@ -141,7 +141,7 @@ A vertical slice attached to Phase 1, not a horizontal sweep across every domain
 - Referral creation is available from a Service; attempting it from an EnvironmentalInspection or a TreeIntervention has no entry point yet.
 - Office sees and manages all referrals; Field sees only referrals attached to its assigned Services.
 - A pending `StreetClosureRequest` blocks its whole Service (a ROUTE Service is blocked entirely, not per-zone) from starting; approval unblocks it; rejection forces an explicit Office reschedule-or-cancel choice; ending the closure releases the block.
-- A stale referral (per `CONTEXT.md`'s `Stale external referral` term) renders as a warning only — never an automatic transition. A duplicate candidate surfaces for human review — never an automatic merge.
+- A stale referral (per `GLOSSARY.md`'s `Stale external referral` term) renders as a warning only — never an automatic transition. A duplicate candidate surfaces for human review — never an automatic merge.
 - A submission that fails before a record is created renders as "unsent," distinct from a created-but-pending referral that may later become stale.
 - Manual recovery transitions are Office-only, require the external identifier (`workOrderId`/`closureId`), and require explicit confirmation.
 
@@ -226,7 +226,7 @@ A vertical slice attached to Phase 1, not a horizontal sweep across every domain
 
 - Phase sequence numbers express dependency order, not a fixed schedule or required team size, per the ticket's own mandate.
 - ADR-0007 ([recovered in this same effort](https://github.com/hllous/Frontend-M6-DAPS2/pull/71)) has no recorded alternatives — issue #66's resolution never discussed any, and none are invented here.
-- The `Zone (M6)` / M9 "zona" naming collision (`CONTEXT.md`) remains unresolved; Phase 2c may need a rename if M9 retains ownership of "Zone."
+- The `Zone (M6)` / M9 "zona" naming collision (`GLOSSARY.md`) remains unresolved; Phase 2c may need a rename if M9 retains ownership of "Zone."
 - Exact CI/tooling gate thresholds for Phase 8 live in #19 and #64's own decisions; this document cites them rather than restating them, per the source-of-truth boundaries above.
 - Splitting Phase 1 into separate "schedule+assign" and "execute+complete" increments was considered and set aside — a single Service-loop phase was judged to better prove the map/table workspace and operational-form patterns end-to-end in one pass. Revisit if Phase 1 proves too large for one implementation pass in practice.
 - Phase 5 and Phase 6 have no dependency on each other and may run in either order or in parallel; both were sequenced before Phase 7 only because Phase 7 needs their data.
