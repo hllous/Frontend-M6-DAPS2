@@ -323,16 +323,16 @@ describe("ServicesWorkspace component", () => {
       render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
       await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-      await user.click(screen.getByRole("button", { name: "Filtrar por cuadrilla" }));
+      await user.click(screen.getByRole("button", { name: "Filtrar por equipo" }));
 
-      let crewFilter = screen.getByRole("dialog", { name: "Filtro de cuadrilla" });
+      let crewFilter = screen.getByRole("dialog", { name: "Filtro de equipo" });
       await user.click(within(crewFilter).getByRole("checkbox", { name: "Cuadrilla A" }));
-      crewFilter = screen.getByRole("dialog", { name: "Filtro de cuadrilla" });
+      crewFilter = screen.getByRole("dialog", { name: "Filtro de equipo" });
       expect(within(crewFilter).getByRole("checkbox", { name: "Cuadrilla B" })).toBeInTheDocument();
       expect(within(crewFilter).getByRole("checkbox", { name: "Cuadrilla C" })).toBeInTheDocument();
       await user.click(within(crewFilter).getByRole("button", { name: "Limpiar" }));
       await user.keyboard("{Escape}");
-      expect(screen.getByRole("button", { name: "Filtrar por cuadrilla" })).toHaveFocus();
+      expect(screen.getByRole("button", { name: "Filtrar por equipo" })).toHaveFocus();
 
       await user.click(screen.getByRole("button", { name: "Filtrar por zona" }));
 
@@ -652,8 +652,8 @@ describe("ServicesWorkspace component", () => {
       expect(screen.getByRole("complementary")).toHaveTextContent("Cuadrilla C · Ibáñez");
     });
 
-    // The selected-row table uses its compact columns while the preview is open.
-    expect(within(row).queryByText("Cuadrilla C · Ibáñez")).not.toBeInTheDocument();
+    // The selected-row table keeps the user's visible columns while the preview is open.
+    expect(within(row).getByText("Cuadrilla C · Ibáñez")).toBeInTheDocument();
   });
 
   it("opens assign crew dialog via URL parameters and updates the service", async () => {

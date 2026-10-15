@@ -10,9 +10,14 @@ type LoginSearchParams = Promise<{ destination?: string | string[]; variant?: st
 function getPrototypeReturnPath(searchParams: Awaited<LoginSearchParams>) {
   const destination = Array.isArray(searchParams.destination) ? searchParams.destination[0] : searchParams.destination;
   const variant = Array.isArray(searchParams.variant) ? searchParams.variant[0] : searchParams.variant;
+  const isValidVariant = ["a", "b", "c", "d", "e", "f", "1"].includes(variant ?? "");
 
-  return ["a", "b", "c", "d", "e", "f", "1", "2", "3"].includes(variant ?? "") && (!destination || destination === "services")
-    ? `/app?destination=services&variant=${variant}`
+  if (destination === "services") {
+    return `/app?destination=services${isValidVariant && variant !== "1" ? `&variant=${variant}` : ""}`;
+  }
+
+  return !destination && isValidVariant
+    ? `/app?destination=services${variant === "1" ? "" : `&variant=${variant}`}`
     : "/app";
 }
 

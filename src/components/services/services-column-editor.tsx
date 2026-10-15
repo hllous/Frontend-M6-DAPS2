@@ -19,20 +19,6 @@ import {
 import { Button } from "@/components/ui/button";
 import type { Service } from "@/lib/services";
 import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -46,7 +32,7 @@ export type ServicesColumnKey =
   | "crew"
   | "scheduled";
 
-export type ServicesColumnVariant = "1" | "2" | "3";
+export type ServicesColumnVariant = "1";
 export type ServicesColumnMoveDirection = "previous" | "next";
 export type ServicesColumnWidthPreset = "compact" | "balanced" | "wide";
 
@@ -480,48 +466,6 @@ export function ServicesColumnEditor({
     </Button>
   );
 
-  if (controller.variant === "2") {
-    return (
-      <Sheet>
-        <SheetTrigger render={trigger} />
-        <SheetContent
-          side="right"
-          className="w-[min(24rem,calc(100vw-1rem))] rounded-l-2xl border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-none"
-        >
-          <SheetHeader className="border-b border-[var(--color-border)] px-4 pb-3 pt-5">
-            <SheetTitle>Datos</SheetTitle>
-          </SheetHeader>
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-3">
-            {columns.map((key) => (
-              <ColumnVisibilityCheckbox key={key} columnKey={key} controller={controller} />
-            ))}
-          </div>
-        </SheetContent>
-      </Sheet>
-    );
-  }
-
-  if (controller.variant === "3") {
-    return (
-      <Popover>
-        <PopoverTrigger render={trigger} />
-        <PopoverContent
-          align="end"
-          className="w-[min(20rem,calc(100vw-1rem))] rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-[var(--color-text)] shadow-none ring-0"
-        >
-          <PopoverHeader className="border-b border-[var(--color-border)] pb-2">
-            <PopoverTitle>Datos</PopoverTitle>
-          </PopoverHeader>
-          <div className="flex flex-col gap-1 pt-2">
-            {columns.map((key) => (
-              <ColumnVisibilityCheckbox key={key} columnKey={key} controller={controller} />
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-    );
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={trigger} />
@@ -542,33 +486,5 @@ export function ServicesColumnEditor({
         })}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-function ColumnVisibilityCheckbox({
-  columnKey,
-  controller,
-}: {
-  columnKey: ServicesColumnKey;
-  controller: ServicesColumnPreferencesController;
-}) {
-  const definition = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === columnKey)!;
-  const id = `service-column-${controller.variant}-${columnKey}`;
-
-  return (
-    <label
-      htmlFor={id}
-      className="flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--color-surface-subtle)]"
-    >
-      <input
-        id={id}
-        type="checkbox"
-        checked={controller.preferences.visibility[columnKey]}
-        disabled={!controller.isHydrated}
-        onChange={(event) => controller.setVisible(columnKey, event.currentTarget.checked)}
-        className="size-4 shrink-0 accent-[var(--color-action)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
-      />
-      <span className="min-w-0 flex-1 truncate">{definition.label}</span>
-    </label>
   );
 }

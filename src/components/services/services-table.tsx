@@ -39,7 +39,6 @@ import {
   type ServicesColumnKey,
   type ServicesColumnVariant,
 } from "./services-column-editor";
-import cardsStyles from "./services-table-cards.module.css";
 
 export type { SortDir, SortKey } from "./service-sorting";
 
@@ -316,7 +315,9 @@ function ColumnResizeHandle({
       startWidth: width,
       widthPerPixel: dataWidth > 0 ? totalWidth / dataWidth : 1,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (typeof event.currentTarget.setPointerCapture === "function") {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
   }
 
   function resize(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -329,7 +330,7 @@ function ColumnResizeHandle({
   function finishResize(event: ReactPointerEvent<HTMLButtonElement>) {
     if (drag.current?.pointerId !== event.pointerId) return;
     drag.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+    if (typeof event.currentTarget.hasPointerCapture === "function" && event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
   }
@@ -551,7 +552,9 @@ export function ServicesTable({
       moved: false,
       ghost: null,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (typeof event.currentTarget.setPointerCapture === "function") {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
   }
 
   function moveColumnPointerDrag(event: ReactPointerEvent<HTMLTableHeaderCellElement>) {
@@ -584,7 +587,7 @@ export function ServicesTable({
     drag.ghost?.remove();
     columnPointerDrag.current = null;
     setDraggedColumn(null);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+    if (typeof event.currentTarget.hasPointerCapture === "function" && event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
   }
@@ -597,10 +600,7 @@ export function ServicesTable({
       >
         <table
           data-motion-variant={previewMotionVariant}
-          className={cn(
-            "h-full min-h-full w-full min-w-0 table-fixed border-collapse text-left text-xs",
-            columnEditorVariant === "3" && cardsStyles.serviceCardsTable,
-          )}
+          className="h-full min-h-full w-full min-w-0 table-fixed border-collapse text-left text-xs"
           aria-label="Servicios operativos"
         >
           <colgroup>
@@ -839,9 +839,12 @@ export function ServicesTable({
                   className={cn(
                     "cursor-pointer select-none transition-colors",
                     isSelected
-                      ? "bg-[var(--color-action)]/10"
+                      ? activeColumnPreferences ? "bg-[var(--color-surface)]" : "bg-[var(--color-action)]/10"
                       : "hover:bg-[var(--color-canvas)]",
                   )}
+                  style={columnEditorVariant && isSelected
+                    ? { backgroundColor: "var(--color-surface)" }
+                    : undefined}
                 >
                   <td data-column-key="ordinal" className={cn("text-center tabular-nums", dense ? "px-1 py-2" : "px-1.5 py-2")}>
                     <span

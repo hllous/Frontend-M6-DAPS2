@@ -19,11 +19,19 @@ describe("optimistic session proxy", () => {
     );
   });
 
-  it.each(["1", "2", "3"])("preserves column option %s across the signed-out redirect", (variant) => {
+  it("preserves the Services destination when no prototype variant is supplied", () => {
+    const response = proxy(new NextRequest("http://localhost/app?destination=services"));
+
+    expect(response?.headers.get("location")).toBe(
+      "http://localhost/login?destination=services",
+    );
+  });
+
+  it.each(["1", "2", "3"])("returns removed column option %s to the single default", (variant) => {
     const response = proxy(new NextRequest(`http://localhost/app?destination=services&variant=${variant}`));
 
     expect(response?.headers.get("location")).toBe(
-      `http://localhost/login?destination=services&variant=${variant}`,
+      "http://localhost/login?destination=services",
     );
   });
 

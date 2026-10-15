@@ -79,15 +79,14 @@ type ColumnEditorVariant = ServicesColumnVariant;
 type PrototypeVariant = MotionVariant | ColumnEditorVariant;
 
 const motionVariants: MotionVariant[] = ["a", "b", "c", "d", "e", "f"];
-const columnEditorVariants: ColumnEditorVariant[] = ["1", "2", "3"];
-const prototypeVariants: PrototypeVariant[] = [...motionVariants, ...columnEditorVariants];
+const prototypeVariants: PrototypeVariant[] = [...motionVariants, "1"];
 
 function parsePrototypeVariant(value: string | null): PrototypeVariant {
-  return prototypeVariants.includes(value as PrototypeVariant) ? value as PrototypeVariant : "a";
+  return prototypeVariants.includes(value as PrototypeVariant) ? value as PrototypeVariant : "1";
 }
 
 function isColumnEditorVariant(value: PrototypeVariant): value is ColumnEditorVariant {
-  return columnEditorVariants.includes(value as ColumnEditorVariant);
+  return value === "1";
 }
 
 function getWorkspaceSplitStorageKey(userId: string): string {
@@ -420,7 +419,7 @@ export function ServicesWorkspace({
     if (search.trim()) newParams.set("q", search.trim());
     if (selectedId) newParams.set("selected", selectedId);
     if (detailId) newParams.set("detail", detailId);
-    if (prototypeVariant !== "a") newParams.set("variant", prototypeVariant);
+    if (prototypeVariant !== "a" && prototypeVariant !== "1") newParams.set("variant", prototypeVariant);
     if (periodChoice) newParams.set("periodo", periodChoice);
     if (sortKey !== "status") newParams.set("sort", sortKey);
     if (sortDir !== "asc") newParams.set("dir", sortDir);
@@ -1302,25 +1301,7 @@ export function ServicesWorkspace({
         </div>
       )}
 
-      {columnEditorVariant ? (
-        <div className={styles.columnVariantSwitcher}>
-          <div role="group" aria-label="Elegir opción de columnas" className="flex gap-1">
-            {columnEditorVariants.map((variant) => (
-              <Button
-                key={variant}
-                type="button"
-                size="sm"
-                variant={columnEditorVariant === variant ? "default" : "outline"}
-                aria-label={`Opción ${variant}`}
-                aria-pressed={columnEditorVariant === variant}
-                onClick={() => setPrototypeVariant(variant)}
-              >
-                Opción {variant}
-              </Button>
-            ))}
-          </div>
-        </div>
-      ) : !isNarrow && (
+      {!columnEditorVariant && !isNarrow && (
         <div className={styles.animationVariantSwitcher} role="group" aria-label="Comparar animaciones de vista previa">
           {motionVariants.map((variant) => (
             <Button
