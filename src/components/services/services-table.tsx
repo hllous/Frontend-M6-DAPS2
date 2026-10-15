@@ -224,8 +224,6 @@ function ColumnResizeHandle({
   width,
   minimumWidth,
   maximumWidth,
-  totalWidth,
-  dataWidthPercent,
   dense,
   onResize,
 }: {
@@ -234,22 +232,21 @@ function ColumnResizeHandle({
   width: number;
   minimumWidth: number;
   maximumWidth: number;
-  totalWidth: number;
-  dataWidthPercent: number;
   dense: boolean;
   onResize: (key: ServicesColumnKey, width: number) => void;
 }) {
-  const drag = useRef<{ pointerId: number } | null>(null);
-  const widthShare = Math.round(width / totalWidth * 100);
+  const drag = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null);
 
   function startResize(event: ReactPointerEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
     const table = event.currentTarget.closest<HTMLTableElement>("table");
     if (!table) return;
-    if (table) table.dataset.columnResizing = "true";
+    table.dataset.columnResizing = "true";
     drag.current = {
       pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: width,
     };
     if (typeof event.currentTarget.setPointerCapture === "function") {
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -259,16 +256,7 @@ function ColumnResizeHandle({
   function resize(event: ReactPointerEvent<HTMLButtonElement>) {
     const activeDrag = drag.current;
     if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
-    const table = event.currentTarget.closest<HTMLTableElement>("table");
-    const marker = event.currentTarget.querySelector<HTMLElement>("span");
-    const markerBox = marker?.getBoundingClientRect();
-    const dataPixels = (table?.getBoundingClientRect().width ?? 0) * dataWidthPercent / 100;
-    const remainingWidth = totalWidth - width;
-    const slope = totalWidth > 0 ? dataPixels * remainingWidth / (totalWidth * totalWidth) : 0;
-    if (!markerBox || slope <= 0) return;
-    const markerX = markerBox.left + markerBox.width / 2;
-    const nextWidth = width + (event.clientX - markerX) / slope;
-    onResize(columnKey, nextWidth);
+    onResize(columnKey, activeDrag.startWidth + event.clientX - activeDrag.startX);
   }
 
   function finishResize(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -292,7 +280,7 @@ function ColumnResizeHandle({
       aria-valuemin={minimumWidth}
       aria-valuemax={maximumWidth}
       aria-valuenow={width}
-      aria-valuetext={`${widthShare} % del ancho de la tabla`}
+      aria-valuetext={`${width} px`}
       aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
       title="Arrastre para cambiar el ancho; use las flechas para ajustar"
       onPointerDown={startResize}
@@ -315,11 +303,11 @@ function ColumnResizeHandle({
         minHeight: dense ? 48 : 0,
         minWidth: 0,
         width: dense ? 44 : 24,
-        right: -1,
+        right: 0,
       }}
       className="absolute right-0 top-0 h-full min-h-0 min-w-0 w-6 touch-none cursor-col-resize rounded-none px-0 text-[var(--color-text-secondary)] hover:text-[var(--color-action)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2"
     >
-      <span aria-hidden="true" className="pointer-events-none absolute right-px top-1/2 h-5 w-px translate-x-1/2 -translate-y-1/2 bg-current opacity-60" />
+      <span aria-hidden="true" className="pointer-events-none absolute right-0 top-1/2 h-5 w-px translate-x-1/2 -translate-y-1/2 bg-current opacity-60" />
     </Button>
   );
 }
@@ -492,15 +480,14 @@ export function ServicesTable({
       ? activeColumnPreferences.table.getColumn(column.key)?.getSize() ?? definition.defaultWidth
       : activeColumnPreferences ? activeColumnPreferences.preferences.widths[column.key] : definition.defaultWidth);
   }, 0);
-  const ordinalWidthPercent = dense || compactColumns ? 12 : 8;
-  const dataWidthPercent = 100 - ordinalWidthPercent;
+  const ordinalWidth = dense || compactColumns ? 40 : 48;
+  const tablePixelWidth = ordinalWidth + widthTotal;
 
-  function getDataColumnWidthPercent(key: ServicesColumnKey): number {
+  function getDataColumnWidth(key: ServicesColumnKey): number {
     const definition = SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === key)!;
-    const width = activeColumnPreferences?.variant === "1"
+    return activeColumnPreferences?.variant === "1"
       ? activeColumnPreferences.table.getColumn(key)?.getSize() ?? definition.defaultWidth
       : activeColumnPreferences ? activeColumnPreferences.preferences.widths[key] : definition.defaultWidth;
-    return widthTotal > 0 ? (width / widthTotal) * dataWidthPercent : dataWidthPercent / Math.max(1, sizingColumns.length);
   }
 
   function setColumnWidth(key: ServicesColumnKey, width: number) {
@@ -654,11 +641,12 @@ export function ServicesTable({
         <table
           ref={tableRef}
           data-motion-variant={previewMotionVariant}
-          className="w-full min-w-0 table-fixed border-collapse bg-[var(--color-surface)] text-left text-xs"
+          className="w-max table-fixed border-collapse bg-[var(--color-surface)] text-left text-xs"
           aria-label="Servicios operativos"
+          style={{ width: tablePixelWidth }}
         >
           <colgroup>
-            <col data-column-key="ordinal" style={{ width: `${ordinalWidthPercent}%` }} />
+            <col data-column-key="ordinal" style={{ width: `${ordinalWidth}px` }} />
             {currentColumns.map((column) => {
               const collapsed = Boolean(animatedColumnCollapse && column.hideWhenDense);
               return (
@@ -666,7 +654,7 @@ export function ServicesTable({
                   key={column.key}
                   data-column-key={column.key}
                   data-preview-collapse-column={collapsed ? "true" : undefined}
-                  style={{ width: collapsed ? "0%" : `${getDataColumnWidthPercent(column.key)}%` }}
+                  style={{ width: collapsed ? "0px" : `${getDataColumnWidth(column.key)}px` }}
                 />
               );
             })}
