@@ -262,6 +262,7 @@ export function ServicesWorkspace({
     userId: scenario?.actor.userId ?? "user-lucia",
     variant: columnEditorVariant ?? "1",
     enabled: Boolean(columnEditorVariant),
+    data: loadState.status === "ready" ? loadState.services : [],
   });
   const panelGroupRef = useGroupRef();
   const workspaceSplitStorageKey = getWorkspaceSplitStorageKey(scenario?.actor.userId ?? "user-lucia");
@@ -869,9 +870,6 @@ export function ServicesWorkspace({
           <option value="todo">Todo el período</option>
         </select>
       </label>
-      {columnEditorVariant && (
-        <ServicesColumnEditor controller={columnPreferences} />
-      )}
       <span
         className="text-xs text-[var(--color-text-secondary)]"
         role="status"
@@ -1129,20 +1127,15 @@ export function ServicesWorkspace({
       {outsideDetail?.error && <p role="alert" className="px-4 py-3 text-sm text-[var(--color-danger)]">{outsideDetail.error}</p>}
       {loadState.status === "ready" && (
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-          {loadState.services.length === 0 && (
-            <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-[var(--color-text-secondary)]">
-              <p>No hay servicios en este período.</p>
-              <Button variant="outline" onClick={() => handlePeriodChoiceChange("todo")}>Ver todo el período</Button>
-            </div>
-          )}
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]">
+            <div data-services-filter-toolbar className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]">
               {periodBar}
               {refreshError && (
                 <p role="alert" className="px-4 py-1.5 text-xs text-[var(--color-danger)]">
                   No se pudieron actualizar los servicios. Se mantienen los resultados anteriores.
                 </p>
               )}
+              {columnEditorVariant && <ServicesColumnEditor controller={columnPreferences} />}
               {isNarrow && (
                 <div className="flex w-full border-t border-[var(--color-border)] bg-[var(--color-surface)]">
                   <button
@@ -1210,8 +1203,6 @@ export function ServicesWorkspace({
                       error={mapError}
                       onRetry={() => setMapError(false)}
                       compact={isNarrow}
-                      hasActiveFilters={hasActiveFilters}
-                      onClearFilters={handleClearFilters}
                     />
                   </div>
                 </ResizablePanel>

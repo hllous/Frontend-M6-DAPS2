@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { ServiceRequestError, servicesAdapter } from "@/lib/services";
@@ -62,18 +62,22 @@ describe("Services workspace period", () => {
     expect(get).toHaveBeenCalledWith(service.id);
   });
 
-  it("offers the whole period when the selected window is empty", async () => {
+  it("keeps one empty-state message in the table when the selected window is empty", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-02T01:00:00Z"));
     window.history.replaceState(null, "", "/app?periodo=semana");
     const list = vi.spyOn(servicesAdapter, "list").mockImplementation(async (query) => ({
       services: query?.scheduledFrom || query?.pageSize === 1 ? [] : [serviceFixtures[0]],
       total: query?.pageSize === 1 ? 54 : 0, totalPages: 1, page: 1, pageSize: 100,
     }));
     render(<ServicesWorkspace />);
-    expect(await screen.findByText("No hay servicios en este período.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Ver todo el período" }));
-    expect(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
-    expect(list).toHaveBeenCalledWith({ pageSize: 100 });
-    expect(new URLSearchParams(window.location.search).get("periodo")).toBe("todo");
+    const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    expect(await screen.findByText("No hay servicios para mostrar en este período.")).toBeInTheDocument();
+    expect(within(table).getAllByText("No hay servicios para mostrar en este período.")).toHaveLength(1);
+    expect(screen.queryByText("No hay servicios en este período.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ver todo el período" })).not.toBeInTheDocument();
+    expect(list).toHaveBeenCalledWith({ pageSize: 100, scheduledFrom: "2026-10-26", scheduledTo: "2026-11-01" });
+    expect(new URLSearchParams(window.location.search).get("periodo")).toBe("semana");
   });
 
   it("retains the Field crew filter in every window page", async () => {

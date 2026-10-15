@@ -2,15 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2, MapPin, RefreshCw } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { operationalMapAdapter, type OperationalMapData } from "@/lib/operational-map";
 import { operationalZonesAdapter, type OperationalZone } from "@/lib/operational-zones";
 import { resolveServiceMapLocations } from "@/lib/services-map";
@@ -45,8 +38,6 @@ type MapViewProps = {
   error?: boolean;
   onRetry?: () => void;
   compact?: boolean;
-  hasActiveFilters?: boolean;
-  onClearFilters?: () => void;
   className?: string;
 };
 
@@ -59,8 +50,6 @@ export function MapView({
   error = false,
   onRetry,
   compact = false,
-  hasActiveFilters = false,
-  onClearFilters,
   className,
 }: MapViewProps) {
   const [referenceData, setReferenceData] = useState<ReferenceDataState>({ status: "loading" });
@@ -128,28 +117,6 @@ export function MapView({
             onSelect={onSelect}
             compact={compact}
           />
-
-          {services.length === 0 ? (
-            <Empty className={styles.emptyNotice} role="status">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <MapPin aria-hidden="true" />
-                </EmptyMedia>
-                <EmptyTitle>
-                  {hasActiveFilters
-                    ? "No hay servicios que coincidan con los filtros aplicados"
-                    : "No hay servicios para mostrar en este período"}
-                </EmptyTitle>
-              </EmptyHeader>
-              {hasActiveFilters && onClearFilters ? (
-                <EmptyContent>
-                  <Button type="button" variant="outline" onClick={onClearFilters}>
-                    Limpiar filtros
-                  </Button>
-                </EmptyContent>
-              ) : null}
-            </Empty>
-          ) : null}
 
         </div>
       ) : null}

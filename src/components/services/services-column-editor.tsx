@@ -3,12 +3,21 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useState,
 } from "react";
+import {
+  columnOrderingFeature,
+  columnResizingFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  tableFeatures,
+  useTable,
+  type ColumnDef,
+  type ReactTable,
+} from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import type { Service } from "@/lib/services";
 import {
   Popover,
   PopoverContent,
@@ -23,6 +32,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export type ServicesColumnKey =
   | "service"
@@ -88,6 +103,42 @@ export const SERVICES_COLUMN_DEFINITIONS: readonly ServicesColumnDefinition[] = 
   },
 ] as const;
 
+const SERVICES_TABLE_FEATURES = tableFeatures({
+  columnVisibilityFeature,
+  columnOrderingFeature,
+  columnSizingFeature,
+  columnResizingFeature,
+});
+
+type ServicesTanStackTable = ReactTable<typeof SERVICES_TABLE_FEATURES, Service>;
+
+const TANSTACK_SERVICE_COLUMNS: ColumnDef<typeof SERVICES_TABLE_FEATURES, Service>[] = [
+  {
+    id: "ordinal",
+    accessorFn: (_service, index) => index + 1,
+    enableHiding: false,
+    enableResizing: false,
+    size: 56,
+  },
+  ...SERVICES_COLUMN_DEFINITIONS.map((column) => ({
+    id: column.key,
+    header: column.label,
+    accessorFn: (service: Service) => {
+      switch (column.key) {
+        case "service": return service.title;
+        case "status": return service.status;
+        case "zone": return service.zoneNames.join(", ");
+        case "crew": return service.crewName ?? "Sin asignar";
+        case "scheduled": return service.scheduledDate;
+      }
+    },
+    enableHiding: column.key !== "service",
+    size: column.defaultWidth,
+    minSize: column.minimumWidth,
+    maxSize: column.maximumWidth,
+  })),
+];
+
 const COLUMN_KEYS = SERVICES_COLUMN_DEFINITIONS.map(({ key }) => key);
 
 export interface ServicesColumnPreferences {
@@ -100,13 +151,16 @@ export interface UseServicesColumnPreferencesOptions {
   userId: string;
   variant: ServicesColumnVariant;
   enabled?: boolean;
+  data?: Service[];
 }
 
 export interface ServicesColumnPreferencesController {
   variant: ServicesColumnVariant;
   isHydrated: boolean;
   preferences: ServicesColumnPreferences;
+  table: ServicesTanStackTable;
   setVisible: (key: ServicesColumnKey, visible: boolean) => void;
+  setOrder: (order: readonly ServicesColumnKey[]) => void;
   moveColumn: (
     key: ServicesColumnKey,
     direction: ServicesColumnMoveDirection,
@@ -257,6 +311,7 @@ export function useServicesColumnPreferences({
   userId,
   variant,
   enabled = true,
+  data = [],
 }: UseServicesColumnPreferencesOptions): ServicesColumnPreferencesController {
   const storageKey = getServicesColumnStorageKey({ userId, variant });
   const [state, setState] = useState<StoredPreferencesState>(() => ({
@@ -316,6 +371,13 @@ export function useServicesColumnPreferences({
     [update],
   );
 
+  const setOrder = useCallback(
+    (order: readonly ServicesColumnKey[]) => {
+      update((current) => ({ ...current, order: [...order] }));
+    },
+    [update],
+  );
+
   const setWidth = useCallback(
     (key: ServicesColumnKey, width: number) => {
       if (!Number.isFinite(width)) return;
@@ -347,13 +409,57 @@ export function useServicesColumnPreferences({
     update(() => createDefaultServicesColumnPreferences());
   }, [update]);
 
+  const preferences = state.storageKey === storageKey
+    ? state.preferences
+    : createDefaultServicesColumnPreferences();
+  const table = useTable({
+    features: SERVICES_TABLE_FEATURES,
+    data,
+    columns: TANSTACK_SERVICE_COLUMNS,
+    enableColumnResizing: true,
+    columnResizeMode: "onChange",
+    state: {
+      columnOrder: ["ordinal", ...preferences.order],
+      columnVisibility: { ...preferences.visibility, ordinal: true },
+      columnSizing: preferences.widths,
+    },
+    onColumnOrderChange: (updater) => {
+      update((current) => {
+        const currentOrder = ["ordinal", ...current.order];
+        const next = typeof updater === "function" ? updater(currentOrder) : updater;
+        return { ...current, order: next.filter(isColumnKey) };
+      });
+    },
+    onColumnVisibilityChange: (updater) => {
+      update((current) => {
+        const currentVisibility = { ...current.visibility, ordinal: true };
+        const next = typeof updater === "function" ? updater(currentVisibility) : updater;
+        const visibility = { ...current.visibility };
+        for (const key of COLUMN_KEYS) {
+          if (key !== "service") visibility[key] = next[key] !== false;
+        }
+        return { ...current, visibility };
+      });
+    },
+    onColumnSizingChange: (updater) => {
+      update((current) => {
+        const next = typeof updater === "function" ? updater(current.widths) : updater;
+        const widths = { ...current.widths };
+        for (const key of COLUMN_KEYS) {
+          if (typeof next[key] === "number") widths[key] = clampWidth(key, next[key]);
+        }
+        return { ...current, widths };
+      });
+    },
+  });
+
   return {
     variant,
     isHydrated: enabled && state.isHydrated && state.storageKey === storageKey,
-    preferences: state.storageKey === storageKey
-      ? state.preferences
-      : createDefaultServicesColumnPreferences(),
+    preferences,
+    table,
     setVisible,
+    setOrder,
     moveColumn,
     setWidth,
     applyWidthPreset,
@@ -367,118 +473,102 @@ export function ServicesColumnEditor({
 }: {
   controller: ServicesColumnPreferencesController;
 }) {
+  const columns = controller.preferences.order.filter((key) => key !== "service");
+  const trigger = (
+    <Button type="button" variant="outline" disabled={!controller.isHydrated} className="ml-auto">
+      Datos
+    </Button>
+  );
+
   if (controller.variant === "2") {
-    return <DrawerColumnPicker controller={controller} />;
+    return (
+      <Sheet>
+        <SheetTrigger render={trigger} />
+        <SheetContent
+          side="right"
+          className="w-[min(24rem,calc(100vw-1rem))] rounded-l-2xl border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-none"
+        >
+          <SheetHeader className="border-b border-[var(--color-border)] px-4 pb-3 pt-5">
+            <SheetTitle>Datos</SheetTitle>
+          </SheetHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-3">
+            {columns.map((key) => (
+              <ColumnVisibilityCheckbox key={key} columnKey={key} controller={controller} />
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  if (controller.variant === "3") {
+    return (
+      <Popover>
+        <PopoverTrigger render={trigger} />
+        <PopoverContent
+          align="end"
+          className="w-[min(20rem,calc(100vw-1rem))] rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-[var(--color-text)] shadow-none ring-0"
+        >
+          <PopoverHeader className="border-b border-[var(--color-border)] pb-2">
+            <PopoverTitle>Datos</PopoverTitle>
+          </PopoverHeader>
+          <div className="flex flex-col gap-1 pt-2">
+            {columns.map((key) => (
+              <ColumnVisibilityCheckbox key={key} columnKey={key} controller={controller} />
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
   }
 
   return (
-    <Popover>
-      <PopoverTrigger
-        render={
-          <Button type="button" variant="outline" disabled={!controller.isHydrated}>
-            Columnas
-          </Button>
-        }
-      />
-      <PopoverContent
-        align="start"
-        className="max-h-[min(70vh,38rem)] w-[min(22rem,calc(100vw-1rem))] overflow-y-auto rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-[var(--color-text)] shadow-none ring-0"
-      >
-        <PopoverHeader className="border-b border-[var(--color-border)] pb-2">
-          <PopoverTitle>Columnas</PopoverTitle>
-        </PopoverHeader>
-        <CheckboxList
-          controller={controller}
-          layout={controller.variant === "1" ? "data-table" : "cards"}
-        />
-      </PopoverContent>
-    </Popover>
-  );
-}
+    <DropdownMenu>
+      <DropdownMenuTrigger render={trigger} />
+      <DropdownMenuContent align="end" className="w-48">
+        {columns.map((key) => {
+          const definition = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === key)!;
 
-function DrawerColumnPicker({
-  controller,
-}: {
-  controller: ServicesColumnPreferencesController;
-}) {
-  return (
-    <Sheet>
-      <SheetTrigger
-        render={
-          <Button type="button" variant="outline" disabled={!controller.isHydrated}>
-            Columnas
-          </Button>
-        }
-      />
-      <SheetContent
-        side="right"
-        className="w-[min(26rem,calc(100vw-1rem))] rounded-l-2xl border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-none"
-      >
-        <SheetHeader className="border-b border-[var(--color-border)] px-4 pb-3 pt-5">
-          <SheetTitle>Columnas</SheetTitle>
-        </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-          <CheckboxList controller={controller} layout="drawer" />
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function CheckboxList({
-  controller,
-  layout,
-}: {
-  controller: ServicesColumnPreferencesController;
-  layout: "data-table" | "drawer" | "cards";
-}) {
-  const id = useId();
-
-  return (
-    <fieldset
-      className={
-        layout === "cards"
-          ? "grid grid-cols-2 gap-2 border-0 p-0 pt-3"
-          : layout === "drawer"
-            ? "flex flex-col gap-2 border-0 p-0 pt-3"
-            : "flex flex-col gap-1 border-0 p-0 pt-2"
-      }
-    >
-      <legend className="sr-only">Columnas visibles</legend>
-      {controller.preferences.order.map((key) => {
-        const definition = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === key)!;
-        const checkboxId = `${id}-${key}-visible`;
-        const locked = key === "service";
-
-        return (
-          <label
-            key={key}
-            htmlFor={checkboxId}
-            className={
-              layout === "cards"
-                ? `${locked ? "col-span-2 " : ""}flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-[var(--color-border)] px-2.5 py-2 text-sm`
-                : layout === "drawer"
-                  ? "flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-sm"
-                  : "flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--color-surface-subtle)]"
-            }
-          >
-            <Checkbox
-              id={checkboxId}
-              checked={controller.preferences.visibility[key]}
-              disabled={!controller.isHydrated || locked}
-              onCheckedChange={(checked) => controller.setVisible(key, checked === true)}
-            />
-            <span className={locked && layout === "cards" ? "min-w-0 flex-1 whitespace-nowrap" : "min-w-0 flex-1 truncate"}>
+          return (
+            <DropdownMenuCheckboxItem
+              key={key}
+              checked={controller.table.getColumn(key)?.getIsVisible() ?? controller.preferences.visibility[key]}
+              disabled={!controller.isHydrated}
+              onCheckedChange={(checked) => controller.table.getColumn(key)?.toggleVisibility(checked)}
+            >
               {definition.label}
-            </span>
-            {locked && (
-              <span className="shrink-0 whitespace-nowrap text-xs text-[var(--color-text-secondary)]">
-                Siempre visible
-              </span>
-            )}
-          </label>
-        );
-      })}
-    </fieldset>
+            </DropdownMenuCheckboxItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ColumnVisibilityCheckbox({
+  columnKey,
+  controller,
+}: {
+  columnKey: ServicesColumnKey;
+  controller: ServicesColumnPreferencesController;
+}) {
+  const definition = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === columnKey)!;
+  const id = `service-column-${controller.variant}-${columnKey}`;
+
+  return (
+    <label
+      htmlFor={id}
+      className="flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--color-surface-subtle)]"
+    >
+      <input
+        id={id}
+        type="checkbox"
+        checked={controller.preferences.visibility[columnKey]}
+        disabled={!controller.isHydrated}
+        onChange={(event) => controller.setVisible(columnKey, event.currentTarget.checked)}
+        className="size-4 shrink-0 accent-[var(--color-action)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
+      />
+      <span className="min-w-0 flex-1 truncate">{definition.label}</span>
+    </label>
   );
 }

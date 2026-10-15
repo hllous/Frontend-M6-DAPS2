@@ -58,7 +58,91 @@ type ColumnPointerDrag = {
   startY: number;
   target: ServicesColumnKey;
   moved: boolean;
+  ghost: HTMLDivElement | null;
 };
+
+function positionColumnDragGhost(ghost: HTMLDivElement, pointerX: number) {
+  const width = ghost.getBoundingClientRect().width;
+  const left = Math.max(8, Math.min(window.innerWidth - width - 8, pointerX - width / 2));
+  ghost.style.left = `${left}px`;
+}
+
+function createColumnDragGhost(header: HTMLTableHeaderCellElement, key: ServicesColumnKey): HTMLDivElement | null {
+  const table = header.closest("table");
+  const scroller = table?.parentElement;
+  if (!table || !scroller) return null;
+
+  const headerRect = header.getBoundingClientRect();
+  const scrollerRect = scroller.getBoundingClientRect();
+  const visibleCells = Array.from(table.querySelectorAll<HTMLTableCellElement>(`tbody td[data-column-key="${key}"]`))
+    .filter((cell) => {
+      const rect = cell.getBoundingClientRect();
+      return rect.bottom > scrollerRect.top && rect.top < scrollerRect.bottom;
+    });
+  const ghost = document.createElement("div");
+  ghost.dataset.columnDragGhost = key;
+  ghost.setAttribute("aria-hidden", "true");
+  Object.assign(ghost.style, {
+    position: "fixed",
+    top: `${Math.max(8, headerRect.top)}px`,
+    left: "0px",
+    zIndex: "80",
+    width: `${headerRect.width}px`,
+    maxHeight: `${Math.max(80, Math.min(520, window.innerHeight - headerRect.top - 12))}px`,
+    overflow: "hidden",
+    pointerEvents: "none",
+    border: "1px solid var(--color-focus)",
+    borderRadius: "8px",
+    background: "var(--color-surface)",
+    boxShadow: "0 10px 24px rgb(23 35 55 / 18%)",
+    opacity: "0.96",
+  });
+
+  const ghostTable = document.createElement("table");
+  Object.assign(ghostTable.style, {
+    width: `${headerRect.width}px`,
+    tableLayout: "fixed",
+    borderCollapse: "collapse",
+  });
+  const ghostHead = document.createElement("thead");
+  const ghostHeaderRow = document.createElement("tr");
+  const ghostBody = document.createElement("tbody");
+
+  const cloneCell = (source: HTMLTableCellElement) => {
+    const clone = source.cloneNode(true) as HTMLTableCellElement;
+    clone.removeAttribute("aria-hidden");
+    clone.removeAttribute("aria-sort");
+    clone.removeAttribute("data-preview-collapse-column");
+    clone.removeAttribute("data-preview-trailing-column");
+    clone.removeAttribute("inert");
+    clone.removeAttribute("tabindex");
+    clone.querySelectorAll("[data-column-resize-edge]").forEach((edge) => edge.remove());
+    clone.querySelectorAll<HTMLElement>("button").forEach((button) => button.setAttribute("tabindex", "-1"));
+    Object.assign(clone.style, {
+      width: `${headerRect.width}px`,
+      minWidth: "0",
+      maxWidth: "none",
+      boxSizing: "border-box",
+      overflow: "hidden",
+      borderBottom: "1px solid var(--color-border)",
+      backgroundColor: getComputedStyle(source.parentElement ?? source).backgroundColor,
+    });
+    return clone;
+  };
+
+  ghostHeaderRow.appendChild(cloneCell(header));
+  ghostHead.appendChild(ghostHeaderRow);
+  for (const cell of visibleCells) {
+    const row = document.createElement("tr");
+    row.appendChild(cloneCell(cell));
+    ghostBody.appendChild(row);
+  }
+  ghostTable.append(ghostHead, ghostBody);
+  ghost.appendChild(ghostTable);
+  document.body.appendChild(ghost);
+  positionColumnDragGhost(ghost, headerRect.left + headerRect.width / 2);
+  return ghost;
+}
 
 const ALL_STATUSES: ServiceStatus[] = [
   "SCHEDULED",
@@ -280,9 +364,10 @@ function ColumnResizeHandle({
         onResize(columnKey, width + delta);
       }}
       data-column-resize-edge={columnKey}
-      className="absolute right-0 top-0 h-full min-h-0 w-4 touch-none cursor-col-resize rounded-none px-0 text-[var(--color-text-secondary)] hover:text-[var(--color-action)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2"
+      style={{ minHeight: 0, minWidth: 0 }}
+      className="absolute right-0 top-0 h-full min-h-0 min-w-0 w-6 touch-none cursor-col-resize rounded-none px-0 text-[var(--color-text-secondary)] hover:text-[var(--color-action)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2"
     >
-      <span aria-hidden="true" className="pointer-events-none absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-current opacity-50" />
+      <span aria-hidden="true" className="pointer-events-none absolute right-0 top-1/2 h-5 w-px translate-x-1/2 -translate-y-1/2 bg-current opacity-60" />
     </Button>
   );
 }
@@ -333,6 +418,8 @@ export function ServicesTable({
   const animatedColumnCollapse = !dense && compactOnPreview && previewMotionVariant === "a";
   const compactColumns = !activeColumnPreferences && (dense || (compactOnPreview && (previewMotionVariant === "b" || previewMotionVariant === "c" || previewMotionVariant === "f")));
   const stableDesktopPreviewTable = !dense && (previewMotionVariant === "d" || previewMotionVariant === "e" || previewMotionVariant === "f");
+
+  useEffect(() => () => columnPointerDrag.current?.ghost?.remove(), []);
 
   // Auto-scroll selected row into view smoothly
   useEffect(() => {
@@ -386,31 +473,52 @@ export function ServicesTable({
     { key: "service", label: "Servicio" },
     { key: "status", label: "Estado" },
     { key: "zone", label: "Zona", hideWhenDense: true },
-    { key: "crew", label: "Cuadrilla", hideWhenDense: true },
-    { key: "scheduled", label: "Programado", hideWhenDense: true },
+    { key: "crew", label: "Equipo", hideWhenDense: true },
+    { key: "scheduled", label: "Fecha", hideWhenDense: true },
   ];
   const columnByKey = new Map(columns.map((column) => [column.key, column]));
   const preferredOrder = activeColumnPreferences
     ? activeColumnPreferences.preferences.order
     : DEFAULT_COLUMN_ORDER;
   const compactKeys = dense ? MOBILE_COMPACT_COLUMNS : LEGACY_COMPACT_COLUMNS;
-  const currentColumns = preferredOrder
-    .filter((key) => !activeColumnPreferences || activeColumnPreferences.preferences.visibility[key])
-    .filter((key) => columnByKey.has(key))
-    .filter((key) => !compactColumns || compactKeys.has(key))
-    .map((key) => columnByKey.get(key)!);
+  const currentColumns = activeColumnPreferences?.variant === "1"
+    ? activeColumnPreferences.table.getVisibleLeafColumns()
+      .filter((column) => column.id !== "ordinal")
+      .map((column) => columnByKey.get(column.id as ServicesColumnKey))
+      .filter((column): column is NonNullable<typeof column> => Boolean(column))
+    : preferredOrder
+      .filter((key) => !activeColumnPreferences || activeColumnPreferences.preferences.visibility[key])
+      .filter((key) => columnByKey.has(key))
+      .filter((key) => !compactColumns || compactKeys.has(key))
+      .map((key) => columnByKey.get(key)!);
   const sizingColumns = currentColumns.filter((column) => !(animatedColumnCollapse && column.hideWhenDense));
   const widthTotal = sizingColumns.reduce((sum, column) => {
     const definition = SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === column.key)!;
-    return sum + (activeColumnPreferences ? activeColumnPreferences.preferences.widths[column.key] : definition.defaultWidth);
+    return sum + (activeColumnPreferences?.variant === "1"
+      ? activeColumnPreferences.table.getColumn(column.key)?.getSize() ?? definition.defaultWidth
+      : activeColumnPreferences ? activeColumnPreferences.preferences.widths[column.key] : definition.defaultWidth);
   }, 0);
   const ordinalWidthPercent = dense || compactColumns ? 12 : 8;
   const dataWidthPercent = 100 - ordinalWidthPercent;
 
   function getDataColumnWidthPercent(key: ServicesColumnKey): number {
     const definition = SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === key)!;
-    const width = activeColumnPreferences ? activeColumnPreferences.preferences.widths[key] : definition.defaultWidth;
+    const width = activeColumnPreferences?.variant === "1"
+      ? activeColumnPreferences.table.getColumn(key)?.getSize() ?? definition.defaultWidth
+      : activeColumnPreferences ? activeColumnPreferences.preferences.widths[key] : definition.defaultWidth;
     return widthTotal > 0 ? (width / widthTotal) * dataWidthPercent : dataWidthPercent / Math.max(1, sizingColumns.length);
+  }
+
+  function setColumnWidth(key: ServicesColumnKey, width: number) {
+    if (!activeColumnPreferences) return;
+    if (activeColumnPreferences.variant === "1") {
+      activeColumnPreferences.table.setColumnSizing((current) => ({
+        ...current,
+        [key]: width,
+      }));
+      return;
+    }
+    activeColumnPreferences.setWidth(key, width);
   }
 
   function moveColumnTo(source: ServicesColumnKey, target: ServicesColumnKey) {
@@ -419,14 +527,16 @@ export function ServicesTable({
     const sourceIndex = order.indexOf(source);
     const targetIndex = order.indexOf(target);
     if (sourceIndex < 0 || targetIndex < 0) return;
-    for (let index = sourceIndex; index < targetIndex; index += 1) {
-      activeColumnPreferences.moveColumn(source, "next");
-    }
-    for (let index = sourceIndex; index > targetIndex; index -= 1) {
-      activeColumnPreferences.moveColumn(source, "previous");
+    const nextOrder = [...order];
+    nextOrder.splice(sourceIndex, 1);
+    nextOrder.splice(targetIndex, 0, source);
+    if (activeColumnPreferences.variant === "1") {
+      activeColumnPreferences.table.setColumnOrder(["ordinal", ...nextOrder]);
+    } else {
+      activeColumnPreferences.setOrder(nextOrder);
     }
     const label = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === source)?.label ?? source;
-    setReorderAnnouncement(`${label}, posición ${targetIndex + 1} de ${order.length}.`);
+    setReorderAnnouncement(`${label}, posición ${targetIndex + 1} de ${nextOrder.length}.`);
   }
 
   function startColumnPointerDrag(event: ReactPointerEvent<HTMLTableHeaderCellElement>, key: ServicesColumnKey) {
@@ -439,6 +549,7 @@ export function ServicesTable({
       startY: event.clientY,
       target: key,
       moved: false,
+      ghost: null,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -451,7 +562,9 @@ export function ServicesTable({
     if (!drag.moved) {
       drag.moved = true;
       setDraggedColumn(drag.source);
+      drag.ghost = createColumnDragGhost(event.currentTarget, drag.source);
     }
+    if (drag.ghost) positionColumnDragGhost(drag.ghost, event.clientX);
     const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("thead th[data-column-key]");
     const targetKey = target?.dataset.columnKey;
     if (targetKey && targetKey !== "ordinal" && SERVICES_COLUMN_DEFINITIONS.some((column) => column.key === targetKey)) {
@@ -468,6 +581,7 @@ export function ServicesTable({
       window.setTimeout(() => { suppressSortClick.current = false; }, 0);
       moveColumnTo(drag.source, drag.target);
     }
+    drag.ghost?.remove();
     columnPointerDrag.current = null;
     setDraggedColumn(null);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -552,10 +666,11 @@ export function ServicesTable({
                       if (!activeColumnPreferences || event.target !== event.currentTarget || !event.altKey) return;
                       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
                       event.preventDefault();
-                      activeColumnPreferences.moveColumn(col.key, event.key === "ArrowLeft" ? "previous" : "next");
-                      const index = activeColumnPreferences.preferences.order.indexOf(col.key);
-                      const nextIndex = Math.max(0, Math.min(activeColumnPreferences.preferences.order.length - 1, index + (event.key === "ArrowLeft" ? -1 : 1)));
-                      setReorderAnnouncement(`${col.label}, posición ${nextIndex + 1} de ${activeColumnPreferences.preferences.order.length}.`);
+                      const order = activeColumnPreferences.preferences.order;
+                      const index = order.indexOf(col.key);
+                      const targetIndex = index + (event.key === "ArrowLeft" ? -1 : 1);
+                      const target = order[targetIndex];
+                      if (target) moveColumnTo(col.key, target);
                     }}
                   >
                     <div className={cn("flex items-center justify-between gap-1.5", dense && "gap-1")}>
@@ -651,7 +766,7 @@ export function ServicesTable({
 
                       {col.key === "crew" && (
                         <ColumnFilterPopover
-                          label="cuadrilla"
+                          label="equipo"
                           active={columnFilters.crews.size > 0}
                           onClear={() => onColumnFiltersChange({ ...columnFilters, crews: new Set() })}
                         >
@@ -684,12 +799,14 @@ export function ServicesTable({
                       <ColumnResizeHandle
                         columnKey={col.key}
                         label={col.label}
-                        width={activeColumnPreferences.preferences.widths[col.key]}
+                        width={activeColumnPreferences.variant === "1"
+                          ? activeColumnPreferences.table.getColumn(col.key)?.getSize() ?? activeColumnPreferences.preferences.widths[col.key]
+                          : activeColumnPreferences.preferences.widths[col.key]}
                         minimumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.minimumWidth}
                         maximumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.maximumWidth}
                         totalWidth={widthTotal}
                         dataWidthPercent={dataWidthPercent}
-                        onResize={activeColumnPreferences.setWidth}
+                        onResize={setColumnWidth}
                       />
                     )}
                   </th>
@@ -801,6 +918,7 @@ export function ServicesTable({
                           "px-1.5 py-2 text-[var(--color-text)]",
                           column.key === "status" && "text-left",
                           column.key === "scheduled" && "tabular-nums",
+                          draggedColumn === column.key && "opacity-40",
                         )}
                       >
                         {content}

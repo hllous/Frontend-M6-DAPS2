@@ -115,22 +115,18 @@ describe("MapView", () => {
     expect(screen.queryByText(/sin ubicación|no pudo verificarse/i)).not.toBeInTheDocument();
   });
 
-  it("distinguishes an empty filtered map and lets the user clear filters", async () => {
-    const user = userEvent.setup();
-    const onClearFilters = vi.fn();
+  it("does not repeat the service empty-state over the map", async () => {
     render(
       <MapView
         services={[]}
         selectedId={null}
         onSelect={vi.fn()}
-        hasActiveFilters
-        onClearFilters={onClearFilters}
       />,
     );
 
-    expect(await screen.findByText("No hay servicios que coincidan con los filtros aplicados")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Limpiar filtros" }));
-    expect(onClearFilters).toHaveBeenCalledOnce();
+    expect(await screen.findByTestId("services-map-canvas")).toBeVisible();
+    expect(screen.queryByText(/No hay servicios/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Limpiar filtros" })).not.toBeInTheDocument();
   });
 
   it("keeps the map retry action when territorial data fails", async () => {
