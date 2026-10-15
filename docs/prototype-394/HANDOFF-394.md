@@ -171,3 +171,11 @@ This update supersedes the interim remaining checklist above. All five PO round 
 - Impeccable adapt was applied to compact and variable pane sizes. The detector reports one existing variant-A preview-collapse `transition: width 420ms` at `services-workspace.module.css:129`; it remains for the preview animation and is disabled during resize.
 - Evidence: `review-394-animations/round4-single-option.webm`; step frames `round4-mid-drag-1440.png`, `round4-mid-resize-1440.png`, `round4-details-open-mid-drag-1440.png`, `round4-mid-resize-details-open-1440.png`, `round4-mobile-mid-drag-390.png`, `round4-mid-resize-390.png`; filtered rows `round4-filtered-rows-1440.png` and `round4-filtered-rows-390.png`; the JSON lists all walkthrough screenshots and measurements at `review-394-animations/round4-single-verification.json`.
 - Runtime: port 4314 is still served by PID 17692 from this worktree. Commits `b8ae87f` and `c0678e9` are pushed to this branch; no PR was created. `public/mockServiceWorker.js` remains untouched by these commits, and `review-394-animations/` remains untracked evidence.
+
+## Orchestrator pre-check of round 4 (2026-10-15, before PO review)
+
+Pass: stepwise slow and fast header drags reorder with zero A-B-A flips, Servicio is movable, # stays fixed; one-row search keeps row height (62 -> 61.5 px) and the table area still fills the pane.
+Fail, item 3 (resize must follow the cursor 1:1):
+- At 1440x900 default split, map open, widening Estado follows the pointer for only +18 px, then the column stops while the pointer keeps moving (50+ px gap). Narrowing Zona stops after 8 px. Cause: all columns sit near their minimum widths, so the fixed-width table has no room to redistribute.
+- The resize marker's center sits about 11 px left of the real column boundary (th right edge); round 2 asked for centered markers.
+Expected (PO round 1: "feel like Excel"): resizing never stalls before a sane per-column minimum; widening pushes the following columns right and the table pane scrolls horizontally when columns exceed its width (no squeezing of other columns, no clamp at the pane width). The marker is centered on the column line. The marker and the column edge track the pointer within 2 px on every step until the column's own minimum is reached.
