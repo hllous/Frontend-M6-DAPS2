@@ -19,6 +19,14 @@ describe("optimistic session proxy", () => {
     );
   });
 
+  it.each(["1", "2", "3"])("preserves column option %s across the signed-out redirect", (variant) => {
+    const response = proxy(new NextRequest(`http://localhost/app?destination=services&variant=${variant}`));
+
+    expect(response?.headers.get("location")).toBe(
+      `http://localhost/login?destination=services&variant=${variant}`,
+    );
+  });
+
   it("lets requests with a session cookie reach the server page", () => {
     const response = proxy(new NextRequest("http://localhost/app", {
       headers: { cookie: "m6_session=opaque" },

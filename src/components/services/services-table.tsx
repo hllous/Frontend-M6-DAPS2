@@ -14,7 +14,6 @@ import {
   ArrowUp,
   ArrowUpDown,
   Filter,
-  GripVertical,
   MapPin,
   Route,
   Search,
@@ -36,12 +35,11 @@ import { StatusBadge } from "./status-badge";
 import { createServiceOrdinals, type SortDir, type SortKey } from "./service-sorting";
 import {
   SERVICES_COLUMN_DEFINITIONS,
-  ServicesColumnEditor,
-  ServicesColumnHeaderMenu,
-  useServicesColumnPreferences,
+  type ServicesColumnPreferencesController,
   type ServicesColumnKey,
   type ServicesColumnVariant,
 } from "./services-column-editor";
+import cardsStyles from "./services-table-cards.module.css";
 
 export type { SortDir, SortKey } from "./service-sorting";
 
@@ -51,6 +49,15 @@ export type ColumnFilters = {
   crews: Set<string>;
   timeFrom: string;
   timeTo: string;
+};
+
+type ColumnPointerDrag = {
+  pointerId: number;
+  source: ServicesColumnKey;
+  startX: number;
+  startY: number;
+  target: ServicesColumnKey;
+  moved: boolean;
 };
 
 const ALL_STATUSES: ServiceStatus[] = [
@@ -272,9 +279,10 @@ function ColumnResizeHandle({
         event.stopPropagation();
         onResize(columnKey, width + delta);
       }}
+      data-column-resize-edge={columnKey}
       className="absolute right-0 top-0 h-full min-h-0 w-4 touch-none cursor-col-resize rounded-none px-0 text-[var(--color-text-secondary)] hover:text-[var(--color-action)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2"
     >
-      <GripVertical data-icon="inline-start" aria-hidden="true" />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-current opacity-50" />
     </Button>
   );
 }
@@ -296,7 +304,7 @@ export function ServicesTable({
   onClearFilters,
   dense = false,
   columnEditorVariant = null,
-  columnUserId = "user-lucia",
+  columnPreferences = null,
 }: {
   services: Service[];
   serviceOrdinals?: ReadonlyMap<string, number>;
@@ -314,16 +322,16 @@ export function ServicesTable({
   onClearFilters?: () => void;
   dense?: boolean;
   columnEditorVariant?: ServicesColumnVariant | null;
-  columnUserId?: string;
+  columnPreferences?: ServicesColumnPreferencesController | null;
 }) {
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
-  const columnPreferences = useServicesColumnPreferences({
-    userId: columnUserId,
-    variant: columnEditorVariant ?? "g",
-    enabled: Boolean(columnEditorVariant),
-  });
+  const [draggedColumn, setDraggedColumn] = useState<ServicesColumnKey | null>(null);
+  const columnPointerDrag = useRef<ColumnPointerDrag | null>(null);
+  const suppressSortClick = useRef(false);
+  const [reorderAnnouncement, setReorderAnnouncement] = useState("");
+  const activeColumnPreferences = columnEditorVariant ? columnPreferences : null;
   const animatedColumnCollapse = !dense && compactOnPreview && previewMotionVariant === "a";
-  const compactColumns = dense || (compactOnPreview && (previewMotionVariant === "b" || previewMotionVariant === "c" || previewMotionVariant === "f"));
+  const compactColumns = !activeColumnPreferences && (dense || (compactOnPreview && (previewMotionVariant === "b" || previewMotionVariant === "c" || previewMotionVariant === "f")));
   const stableDesktopPreviewTable = !dense && (previewMotionVariant === "d" || previewMotionVariant === "e" || previewMotionVariant === "f");
 
   // Auto-scroll selected row into view smoothly
@@ -382,44 +390,103 @@ export function ServicesTable({
     { key: "scheduled", label: "Programado", hideWhenDense: true },
   ];
   const columnByKey = new Map(columns.map((column) => [column.key, column]));
-  const preferredOrder = columnEditorVariant
-    ? columnPreferences.preferences.order
+  const preferredOrder = activeColumnPreferences
+    ? activeColumnPreferences.preferences.order
     : DEFAULT_COLUMN_ORDER;
   const compactKeys = dense ? MOBILE_COMPACT_COLUMNS : LEGACY_COMPACT_COLUMNS;
   const currentColumns = preferredOrder
-    .filter((key) => !columnEditorVariant || columnPreferences.preferences.visibility[key])
+    .filter((key) => !activeColumnPreferences || activeColumnPreferences.preferences.visibility[key])
     .filter((key) => columnByKey.has(key))
     .filter((key) => !compactColumns || compactKeys.has(key))
     .map((key) => columnByKey.get(key)!);
   const sizingColumns = currentColumns.filter((column) => !(animatedColumnCollapse && column.hideWhenDense));
   const widthTotal = sizingColumns.reduce((sum, column) => {
     const definition = SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === column.key)!;
-    return sum + (columnEditorVariant ? columnPreferences.preferences.widths[column.key] : definition.defaultWidth);
+    return sum + (activeColumnPreferences ? activeColumnPreferences.preferences.widths[column.key] : definition.defaultWidth);
   }, 0);
   const ordinalWidthPercent = dense || compactColumns ? 12 : 8;
   const dataWidthPercent = 100 - ordinalWidthPercent;
 
   function getDataColumnWidthPercent(key: ServicesColumnKey): number {
     const definition = SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === key)!;
-    const width = columnEditorVariant ? columnPreferences.preferences.widths[key] : definition.defaultWidth;
+    const width = activeColumnPreferences ? activeColumnPreferences.preferences.widths[key] : definition.defaultWidth;
     return widthTotal > 0 ? (width / widthTotal) * dataWidthPercent : dataWidthPercent / Math.max(1, sizingColumns.length);
+  }
+
+  function moveColumnTo(source: ServicesColumnKey, target: ServicesColumnKey) {
+    if (!activeColumnPreferences || source === target) return;
+    const order = activeColumnPreferences.preferences.order;
+    const sourceIndex = order.indexOf(source);
+    const targetIndex = order.indexOf(target);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    for (let index = sourceIndex; index < targetIndex; index += 1) {
+      activeColumnPreferences.moveColumn(source, "next");
+    }
+    for (let index = sourceIndex; index > targetIndex; index -= 1) {
+      activeColumnPreferences.moveColumn(source, "previous");
+    }
+    const label = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === source)?.label ?? source;
+    setReorderAnnouncement(`${label}, posición ${targetIndex + 1} de ${order.length}.`);
+  }
+
+  function startColumnPointerDrag(event: ReactPointerEvent<HTMLTableHeaderCellElement>, key: ServicesColumnKey) {
+    if (!activeColumnPreferences || event.button !== 0) return;
+    if (event.target instanceof HTMLElement && event.target.closest('[role="slider"]')) return;
+    columnPointerDrag.current = {
+      pointerId: event.pointerId,
+      source: key,
+      startX: event.clientX,
+      startY: event.clientY,
+      target: key,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveColumnPointerDrag(event: ReactPointerEvent<HTMLTableHeaderCellElement>) {
+    const drag = columnPointerDrag.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 7) return;
+    event.preventDefault();
+    if (!drag.moved) {
+      drag.moved = true;
+      setDraggedColumn(drag.source);
+    }
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("thead th[data-column-key]");
+    const targetKey = target?.dataset.columnKey;
+    if (targetKey && targetKey !== "ordinal" && SERVICES_COLUMN_DEFINITIONS.some((column) => column.key === targetKey)) {
+      drag.target = targetKey as ServicesColumnKey;
+    }
+  }
+
+  function finishColumnPointerDrag(event: ReactPointerEvent<HTMLTableHeaderCellElement>) {
+    const drag = columnPointerDrag.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.moved) {
+      event.preventDefault();
+      suppressSortClick.current = true;
+      window.setTimeout(() => { suppressSortClick.current = false; }, 0);
+      moveColumnTo(drag.source, drag.target);
+    }
+    columnPointerDrag.current = null;
+    setDraggedColumn(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
-      {columnEditorVariant && columnEditorVariant !== "i" && (
-        <div className="flex shrink-0 justify-end border-b border-[var(--color-border)] px-2 py-1.5">
-          <ServicesColumnEditor controller={columnPreferences} />
-        </div>
-      )}
       <div
         data-preview-clip={stableDesktopPreviewTable ? "true" : undefined}
-        className="min-h-0 flex-1 overflow-x-auto overflow-y-scroll [scrollbar-gutter:stable]"
+        className="min-h-0 flex-1 overflow-x-auto overflow-y-auto [scrollbar-gutter:stable]"
       >
         <table
           data-motion-variant={previewMotionVariant}
-          className="w-full min-w-0 table-fixed border-collapse text-left text-xs"
-          style={stableDesktopPreviewTable ? { width: "calc(50vw - 134px)", minWidth: "calc(50vw - 134px)" } : undefined}
+          className={cn(
+            "h-full min-h-full w-full min-w-0 table-fixed border-collapse text-left text-xs",
+            columnEditorVariant === "3" && cardsStyles.serviceCardsTable,
+          )}
           aria-label="Servicios operativos"
         >
           <colgroup>
@@ -455,46 +522,43 @@ export function ServicesTable({
                     key={col.key}
                     scope="col"
                     aria-sort={ariaSort}
+                    aria-label={activeColumnPreferences
+                      ? `${col.label}. Arrastre para reordenar. Use Alt y las flechas izquierda o derecha para mover.`
+                      : undefined}
+                    aria-keyshortcuts={activeColumnPreferences ? "Alt+ArrowLeft Alt+ArrowRight" : undefined}
+                    tabIndex={activeColumnPreferences ? 0 : undefined}
                     data-column-key={col.key}
                     data-preview-collapse-column={animatedColumnCollapse && col.hideWhenDense ? "true" : undefined}
                     data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" && col.key !== "service" ? "true" : undefined}
                     aria-hidden={animatedColumnCollapse && col.hideWhenDense ? true : compactOnPreview && previewMotionVariant === "e" && col.key !== "service" ? true : undefined}
                     inert={animatedColumnCollapse && col.hideWhenDense || compactOnPreview && previewMotionVariant === "e" && col.key !== "service"}
-                    className={cn("relative select-none px-1 py-2", columnEditorVariant === "g" && "cursor-grab")}
-                    onDragOver={(event) => {
-                      if (columnEditorVariant === "g") event.preventDefault();
-                    }}
-                    onDrop={(event) => {
-                      if (columnEditorVariant !== "g") return;
+                    className={cn(
+                      "relative select-none px-1 py-2",
+                      activeColumnPreferences && "cursor-grab active:cursor-grabbing",
+                      draggedColumn === col.key && "opacity-60",
+                    )}
+                    style={activeColumnPreferences ? { touchAction: "pan-y" } : undefined}
+                    onPointerDown={(event) => startColumnPointerDrag(event, col.key)}
+                    onPointerMove={moveColumnPointerDrag}
+                    onPointerUp={finishColumnPointerDrag}
+                    onPointerCancel={finishColumnPointerDrag}
+                    onClickCapture={(event) => {
+                      if (!suppressSortClick.current) return;
                       event.preventDefault();
-                      const source = event.dataTransfer?.getData("text/plain") as ServicesColumnKey | undefined;
-                      if (!source || source === col.key) return;
-                      const order = columnPreferences.preferences.order;
-                      const sourceIndex = order.indexOf(source);
-                      const targetIndex = order.indexOf(col.key);
-                      if (sourceIndex < 0 || targetIndex < 0) return;
-                      for (let index = sourceIndex; index < targetIndex; index += 1) {
-                        columnPreferences.moveColumn(source, "next");
-                      }
-                      for (let index = sourceIndex; index > targetIndex; index -= 1) {
-                        columnPreferences.moveColumn(source, "previous");
-                      }
+                      event.stopPropagation();
+                      suppressSortClick.current = false;
+                    }}
+                    onKeyDown={(event) => {
+                      if (!activeColumnPreferences || event.target !== event.currentTarget || !event.altKey) return;
+                      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                      event.preventDefault();
+                      activeColumnPreferences.moveColumn(col.key, event.key === "ArrowLeft" ? "previous" : "next");
+                      const index = activeColumnPreferences.preferences.order.indexOf(col.key);
+                      const nextIndex = Math.max(0, Math.min(activeColumnPreferences.preferences.order.length - 1, index + (event.key === "ArrowLeft" ? -1 : 1)));
+                      setReorderAnnouncement(`${col.label}, posición ${nextIndex + 1} de ${activeColumnPreferences.preferences.order.length}.`);
                     }}
                   >
                     <div className={cn("flex items-center justify-between gap-1.5", dense && "gap-1")}>
-                      {columnEditorVariant === "g" && (
-                        <span
-                          draggable
-                          title={`Arrastre para mover ${col.label}`}
-                          onDragStart={(event) => {
-                            event.dataTransfer?.setData("text/plain", col.key);
-                            if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-                          }}
-                          className="flex shrink-0 cursor-grab items-center text-[var(--color-text-secondary)] active:cursor-grabbing"
-                        >
-                          <GripVertical aria-hidden />
-                        </span>
-                      )}
                       <button
                         type="button"
                         onClick={() => onSortChange(col.key)}
@@ -614,21 +678,18 @@ export function ServicesTable({
                         />
                       )}
 
-                      {columnEditorVariant === "i" && (
-                        <ServicesColumnHeaderMenu controller={columnPreferences} columnKey={col.key} />
-                      )}
                     </div>
 
-                    {columnEditorVariant === "g" && !dense && (
+                    {activeColumnPreferences && (
                       <ColumnResizeHandle
                         columnKey={col.key}
                         label={col.label}
-                        width={columnPreferences.preferences.widths[col.key]}
+                        width={activeColumnPreferences.preferences.widths[col.key]}
                         minimumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.minimumWidth}
                         maximumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.maximumWidth}
                         totalWidth={widthTotal}
                         dataWidthPercent={dataWidthPercent}
-                        onResize={columnPreferences.setWidth}
+                        onResize={activeColumnPreferences.setWidth}
                       />
                     )}
                   </th>
@@ -783,6 +844,11 @@ export function ServicesTable({
             )}
           </tbody>
         </table>
+        {activeColumnPreferences && (
+          <span className="sr-only" aria-live="polite" aria-atomic="true">
+            {reorderAnnouncement}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useTransition,
 } from "react";
 import { useGroupRef } from "react-resizable-panels";
 import { useSearchParams } from "next/navigation";
@@ -23,7 +22,6 @@ import {
 } from "lucide-react";
 
 import { InventoryMapDrawer } from "@/components/map/inventory-map-drawer";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { FormControl } from "@/components/ui/form-control";
 import {
@@ -69,14 +67,19 @@ import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { servicesMobileBreakpoint } from "@/lib/services-layout";
 import styles from "./services-workspace.module.css";
+import {
+  ServicesColumnEditor,
+  useServicesColumnPreferences,
+  type ServicesColumnVariant,
+} from "./services-column-editor";
 
 type Period = "semana" | "mes" | "todo";
 type MotionVariant = "a" | "b" | "c" | "d" | "e" | "f";
-type ColumnEditorVariant = "g" | "h" | "i";
+type ColumnEditorVariant = ServicesColumnVariant;
 type PrototypeVariant = MotionVariant | ColumnEditorVariant;
 
 const motionVariants: MotionVariant[] = ["a", "b", "c", "d", "e", "f"];
-const columnEditorVariants: ColumnEditorVariant[] = ["g", "h", "i"];
+const columnEditorVariants: ColumnEditorVariant[] = ["1", "2", "3"];
 const prototypeVariants: PrototypeVariant[] = [...motionVariants, ...columnEditorVariants];
 
 function parsePrototypeVariant(value: string | null): PrototypeVariant {
@@ -85,6 +88,33 @@ function parsePrototypeVariant(value: string | null): PrototypeVariant {
 
 function isColumnEditorVariant(value: PrototypeVariant): value is ColumnEditorVariant {
   return columnEditorVariants.includes(value as ColumnEditorVariant);
+}
+
+function getWorkspaceSplitStorageKey(userId: string): string {
+  return `m6:services-workspace-split:v1:${encodeURIComponent(userId)}`;
+}
+
+function readWorkspaceSplit(storageKey: string): Record<string, number> | null {
+  try {
+    const saved = window.localStorage.getItem(storageKey);
+    if (!saved) return null;
+    const parsed = JSON.parse(saved) as Record<string, unknown>;
+    const mapSize = parsed["map-pane"];
+    if (typeof mapSize !== "number" || !Number.isFinite(mapSize) || mapSize < 30 || mapSize > 70) {
+      return null;
+    }
+    return { "map-pane": mapSize, "table-pane": 100 - mapSize };
+  } catch {
+    return null;
+  }
+}
+
+function writeWorkspaceSplit(storageKey: string, layout: Record<string, number>): void {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(layout));
+  } catch {
+    // The current split remains usable if storage is unavailable.
+  }
 }
 
 type LoadState =
@@ -119,12 +149,19 @@ export function ServicesWorkspace({
 
   // Load state
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const loadedScopeRef = useRef<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
   const [periodChoice, setPeriodChoice] = useState<Period | null>(() => {
     const value = getParam("periodo");
     return value === "semana" || value === "mes" || value === "todo" ? value : null;
   });
   const [activePeriod, setActivePeriod] = useState<Period>(periodChoice ?? "todo");
+  const handlePeriodChoiceChange = useCallback((period: Period) => {
+    setActivePeriod(period);
+    setPeriodChoice(period);
+  }, []);
 
   // Global search
   const [search, setSearch] = useState<string>(() => getParam("q") ?? "");
@@ -221,14 +258,27 @@ export function ServicesWorkspace({
   const [prototypeVariant, setPrototypeVariant] = useState<PrototypeVariant>(() => parsePrototypeVariant(getParam("variant")));
   const columnEditorVariant = isColumnEditorVariant(prototypeVariant) ? prototypeVariant : null;
   const motionVariant: MotionVariant = columnEditorVariant ? "d" : prototypeVariant as MotionVariant;
+  const columnPreferences = useServicesColumnPreferences({
+    userId: scenario?.actor.userId ?? "user-lucia",
+    variant: columnEditorVariant ?? "1",
+    enabled: Boolean(columnEditorVariant),
+  });
   const panelGroupRef = useGroupRef();
-  const workspaceRef = useRef<HTMLDivElement>(null);
-  const layoutBeforePreviewRef = useRef<Record<string, number> | null>(null);
-  const mapFrameResizePendingRef = useRef(false);
-  const mapFrameSettleTimerRef = useRef<number | null>(null);
-  const [mapFrameShrunkForPreview, setMapFrameShrunkForPreview] = useState(false);
-  const [previewRailWidth, setPreviewRailWidth] = useState<number | null>(null);
+  const workspaceSplitStorageKey = getWorkspaceSplitStorageKey(scenario?.actor.userId ?? "user-lucia");
+  const loadedSplitStorageKeyRef = useRef<string | null>(null);
   const [isNarrow, setIsNarrow] = useState(false);
+
+  useEffect(() => {
+    loadedSplitStorageKeyRef.current = null;
+    const savedLayout = readWorkspaceSplit(workspaceSplitStorageKey);
+    if (savedLayout) panelGroupRef.current?.setLayout(savedLayout);
+    loadedSplitStorageKeyRef.current = workspaceSplitStorageKey;
+  }, [loadState.status, panelGroupRef, workspaceSplitStorageKey]);
+
+  const handlePanelLayoutChanged = useCallback((layout: Record<string, number>, meta: { isUserInteraction: boolean }) => {
+    if (!meta.isUserInteraction || loadedSplitStorageKeyRef.current !== workspaceSplitStorageKey) return;
+    writeWorkspaceSplit(workspaceSplitStorageKey, layout);
+  }, [workspaceSplitStorageKey]);
 
   // Map resilience
   const [mapError, setMapError] = useState(initialMapError);
@@ -246,16 +296,31 @@ export function ServicesWorkspace({
   // Fetch all services
   useEffect(() => {
     let isCurrent = true;
-    async function load() {
+    const scopeKey = scenario?.actor.kind === "FIELD"
+      ? `field:${scenario.actor.crewId ?? ""}`
+      : "office";
+    const keepCurrentWorkspace = loadedScopeRef.current === scopeKey;
+    if (keepCurrentWorkspace) {
+      setIsRefreshing(true);
+      setRefreshError(null);
+    } else {
       setLoadState({ status: "loading" });
+      setIsRefreshing(false);
+      setRefreshError(null);
+    }
+
+    async function load() {
       try {
         const base: ServiceQuery = {};
         if (scenario?.actor.kind === "FIELD" && scenario.actor.crewId) {
           base.crewId = scenario.actor.crewId;
         }
-        const count = await servicesAdapter.list({ ...base, pageSize: 1 });
-        if (!isCurrent) return;
-        const period = periodChoice ?? (count.total > 100 ? "semana" : "todo");
+        let period = periodChoice;
+        if (!period) {
+          const count = await servicesAdapter.list({ ...base, pageSize: 1 });
+          if (!isCurrent) return;
+          period = count.total > 100 ? "semana" : "todo";
+        }
         setActivePeriod(period);
         const query: ServiceQuery = { ...base, pageSize: 100 };
         if (period !== "todo") {
@@ -283,14 +348,24 @@ export function ServicesWorkspace({
           totalPages = next.totalPages;
         }
         if (totalPages > 20) throw new RangeError("El período tiene demasiados servicios; acote el período.");
-        if (isCurrent) setLoadState({ status: "ready", services });
+        if (isCurrent) {
+          loadedScopeRef.current = scopeKey;
+          setLoadState({ status: "ready", services });
+          setIsRefreshing(false);
+          setRefreshError(null);
+        }
       } catch (cause) {
         if (!isCurrent) return;
         const msg =
           cause instanceof RangeError ? cause.message : cause instanceof ServiceRequestError
             ? `Error del servidor (${cause.status}): ${cause.message}`
             : "No se pudieron cargar los servicios operativos.";
-        setLoadState({ status: "error", message: msg });
+        if (keepCurrentWorkspace) {
+          setIsRefreshing(false);
+          setRefreshError(msg);
+        } else {
+          setLoadState({ status: "error", message: msg });
+        }
       }
     }
     void load();
@@ -344,7 +419,7 @@ export function ServicesWorkspace({
     if (search.trim()) newParams.set("q", search.trim());
     if (selectedId) newParams.set("selected", selectedId);
     if (detailId) newParams.set("detail", detailId);
-    newParams.set("variant", prototypeVariant);
+    if (prototypeVariant !== "a") newParams.set("variant", prototypeVariant);
     if (periodChoice) newParams.set("periodo", periodChoice);
     if (sortKey !== "status") newParams.set("sort", sortKey);
     if (sortDir !== "asc") newParams.set("dir", sortDir);
@@ -453,86 +528,6 @@ export function ServicesWorkspace({
   const previewService = selectedService ?? (loadState.status === "ready" && retainedPreviewId
     ? loadState.services.find((service) => service.id === retainedPreviewId) ?? null
     : null);
-
-  const completeMapFrameResize = useCallback(() => {
-    if (!mapFrameResizePendingRef.current) return;
-    mapFrameResizePendingRef.current = false;
-    if (mapFrameSettleTimerRef.current !== null) {
-      window.clearTimeout(mapFrameSettleTimerRef.current);
-      mapFrameSettleTimerRef.current = null;
-    }
-    window.dispatchEvent(new Event("services-workspace-layout-settled"));
-  }, []);
-
-  useEffect(() => {
-    const group = panelGroupRef.current;
-    const workspace = workspaceRef.current;
-    if (!group || !workspace) return;
-
-    const setPanelLayout = (layout: Record<string, number>) => {
-      const current = group.getLayout();
-      const currentMapPercent = current["map-pane"] ?? 50;
-      const nextMapPercent = layout["map-pane"] ?? 50;
-      if (Math.abs(currentMapPercent - nextMapPercent) < 0.1) return;
-      mapFrameResizePendingRef.current = true;
-      window.dispatchEvent(new Event("services-workspace-layout-changing"));
-      group.setLayout(layout);
-      if (mapFrameSettleTimerRef.current !== null) {
-        window.clearTimeout(mapFrameSettleTimerRef.current);
-      }
-      mapFrameSettleTimerRef.current = window.setTimeout(completeMapFrameResize, 440);
-    };
-
-    if (isNarrow || motionVariant !== "d" || !selectedService) {
-      if (layoutBeforePreviewRef.current) {
-        setPanelLayout(layoutBeforePreviewRef.current);
-        layoutBeforePreviewRef.current = null;
-      }
-      setMapFrameShrunkForPreview(false);
-      return;
-    }
-
-    const applyPreviewLayout = () => {
-      const baseLayout = layoutBeforePreviewRef.current ?? group.getLayout();
-      const currentLayout = group.getLayout();
-      const workspaceWidth = workspace.getBoundingClientRect().width;
-      if (workspaceWidth <= 0) return;
-
-      const table = workspace.querySelector<HTMLTableElement>('table[aria-label="Servicios operativos"]');
-      const coreColumnWidth = ["ordinal", "service", "status"].reduce((width, key) => {
-        const cell = table?.querySelector<HTMLElement>(`thead [data-column-key="${key}"]`);
-        return width + (cell?.getBoundingClientRect().width ?? 0);
-      }, 0);
-      const desiredPreviewWidth = Math.min(320, window.innerWidth * 0.22);
-      const availablePreviewWidth = workspaceWidth * 0.7 - coreColumnWidth - 16;
-      const previewWidth = Math.max(220, Math.min(desiredPreviewWidth, availablePreviewWidth));
-      setPreviewRailWidth((current) => current !== null && Math.abs(current - previewWidth) < 1 ? current : previewWidth);
-      const requiredTableWidth = coreColumnWidth + previewWidth + 16;
-      const requiredTablePercent = Math.min(70, Math.max(baseLayout["table-pane"] ?? 50, (requiredTableWidth / workspaceWidth) * 100));
-      const baseTablePercent = baseLayout["table-pane"] ?? 50;
-      const currentTablePercent = currentLayout["table-pane"] ?? baseTablePercent;
-
-      if (requiredTablePercent > baseTablePercent + 0.1) {
-        if (!layoutBeforePreviewRef.current) layoutBeforePreviewRef.current = baseLayout;
-        if (Math.abs(currentTablePercent - requiredTablePercent) > 0.5) {
-          setPanelLayout({ "map-pane": 100 - requiredTablePercent, "table-pane": requiredTablePercent });
-        }
-        setMapFrameShrunkForPreview(true);
-      } else if (layoutBeforePreviewRef.current) {
-        setPanelLayout(layoutBeforePreviewRef.current);
-        layoutBeforePreviewRef.current = null;
-        setMapFrameShrunkForPreview(false);
-      } else {
-        setMapFrameShrunkForPreview(false);
-      }
-    };
-
-    applyPreviewLayout();
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(applyPreviewLayout);
-    observer.observe(workspace);
-    return () => observer.disconnect();
-  }, [columnEditorVariant, completeMapFrameResize, isNarrow, motionVariant, panelGroupRef, selectedService]);
 
   useEffect(() => {
     if (selectedService || !retainedPreviewId) return;
@@ -837,7 +832,7 @@ export function ServicesWorkspace({
     onClearFilters: handleClearFilters,
     dense: isNarrow,
     columnEditorVariant,
-    columnUserId: scenario?.actor.userId ?? "user-lucia",
+    columnPreferences: columnEditorVariant ? columnPreferences : null,
   };
   const servicesTable = (
     <ServicesTable
@@ -858,12 +853,12 @@ export function ServicesWorkspace({
     <div className={cn(
       "flex flex-wrap items-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
       isNarrow ? "gap-2 px-2 py-1 text-xs" : "gap-3 px-4 py-2 text-sm",
-    )}>
+    )} aria-busy={isRefreshing}>
       <label className="flex items-center gap-2">
         <span>Período</span>
         <select
           value={activePeriod}
-          onChange={(event) => setPeriodChoice(event.target.value as Period)}
+          onChange={(event) => handlePeriodChoiceChange(event.target.value as Period)}
           className={cn(
             "rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 text-sm",
             isNarrow ? "h-10 min-h-10" : "min-h-10",
@@ -874,6 +869,19 @@ export function ServicesWorkspace({
           <option value="todo">Todo el período</option>
         </select>
       </label>
+      {columnEditorVariant && (
+        <ServicesColumnEditor controller={columnPreferences} />
+      )}
+      <span
+        className="text-xs text-[var(--color-text-secondary)]"
+        role="status"
+        aria-live="polite"
+        aria-label={isRefreshing ? "Actualizando servicios" : refreshError ? "No se pudieron actualizar los servicios" : undefined}
+        title={refreshError ?? undefined}
+      >
+        {isRefreshing ? "Actualizando" : null}
+        {refreshError ? "Error al actualizar" : null}
+      </span>
     </div>
   );
 
@@ -1124,12 +1132,17 @@ export function ServicesWorkspace({
           {loadState.services.length === 0 && (
             <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-[var(--color-text-secondary)]">
               <p>No hay servicios en este período.</p>
-              <Button variant="outline" onClick={() => setPeriodChoice("todo")}>Ver todo el período</Button>
+              <Button variant="outline" onClick={() => handlePeriodChoiceChange("todo")}>Ver todo el período</Button>
             </div>
           )}
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]">
               {periodBar}
+              {refreshError && (
+                <p role="alert" className="px-4 py-1.5 text-xs text-[var(--color-danger)]">
+                  No se pudieron actualizar los servicios. Se mantienen los resultados anteriores.
+                </p>
+              )}
               {isNarrow && (
                 <div className="flex w-full border-t border-[var(--color-border)] bg-[var(--color-surface)]">
                   <button
@@ -1169,26 +1182,16 @@ export function ServicesWorkspace({
               isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout,
               !isNarrow && selectedService && !["d", "e", "f"].includes(motionVariant) && styles.desktopWorkspaceLayoutOpen,
             )}
-            ref={workspaceRef}
             data-motion-variant={motionVariant}
             data-column-editor={columnEditorVariant ?? undefined}
             data-adaptive-preview={motionVariant === "d" ? "true" : undefined}
             data-preview-open={selectedService ? "true" : "false"}
-            data-map-frame-shrunk={mapFrameShrunkForPreview ? "true" : "false"}
-            onTransitionEnd={(event) => {
-              if (
-                event.propertyName === "flex-grow" &&
-                event.target instanceof HTMLElement &&
-                event.target.closest("[data-panel]")?.id === "map-pane"
-              ) {
-                completeMapFrameResize();
-              }
-            }}
           >
               <ResizablePanelGroup
                 groupRef={panelGroupRef}
                 direction="horizontal"
                 defaultLayout={{ "map-pane": 50, "table-pane": 50 }}
+                onLayoutChanged={handlePanelLayoutChanged}
                 className={cn("h-full min-w-0 flex-1", styles.panelGroup)}
               >
                 <ResizablePanel
@@ -1214,7 +1217,7 @@ export function ServicesWorkspace({
                 </ResizablePanel>
 
                 <ResizableHandle
-                  withHandle
+                  withHandle={!columnEditorVariant}
                   disabled={isNarrow}
                   aria-label="Ajustar ancho entre mapa y tabla"
                   className={cn(styles.mobileResizeHandle, isNarrow && "hidden")}
@@ -1287,7 +1290,6 @@ export function ServicesWorkspace({
                 <div
                   className={cn(styles.previewRail, selectedService && styles.previewRailOpen)}
                   data-preview-rail="true"
-                  style={previewRailWidth !== null ? { width: `${previewRailWidth}px` } : undefined}
                   aria-hidden={!selectedService}
                   inert={!selectedService}
                 >
@@ -1311,25 +1313,21 @@ export function ServicesWorkspace({
 
       {columnEditorVariant ? (
         <div className={styles.columnVariantSwitcher}>
-          <ToggleGroup
-            value={[columnEditorVariant]}
-            onValueChange={(values) => {
-              const value = values[0];
-              if (value && columnEditorVariants.includes(value as ColumnEditorVariant)) {
-                setPrototypeVariant(value as ColumnEditorVariant);
-              }
-            }}
-            aria-label="Elegir editor de columnas"
-            variant="outline"
-            size="sm"
-            spacing={0}
-          >
+          <div role="group" aria-label="Elegir opción de columnas" className="flex gap-1">
             {columnEditorVariants.map((variant) => (
-              <ToggleGroupItem key={variant} value={variant} aria-label={`Variante ${variant.toUpperCase()}`}>
-                {variant.toUpperCase()}
-              </ToggleGroupItem>
+              <Button
+                key={variant}
+                type="button"
+                size="sm"
+                variant={columnEditorVariant === variant ? "default" : "outline"}
+                aria-label={`Opción ${variant}`}
+                aria-pressed={columnEditorVariant === variant}
+                onClick={() => setPrototypeVariant(variant)}
+              >
+                Opción {variant}
+              </Button>
             ))}
-          </ToggleGroup>
+          </div>
         </div>
       ) : !isNarrow && (
         <div className={styles.animationVariantSwitcher} role="group" aria-label="Comparar animaciones de vista previa">

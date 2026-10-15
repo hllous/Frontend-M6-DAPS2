@@ -11,7 +11,7 @@ function getPrototypeReturnPath(searchParams: Awaited<LoginSearchParams>) {
   const destination = Array.isArray(searchParams.destination) ? searchParams.destination[0] : searchParams.destination;
   const variant = Array.isArray(searchParams.variant) ? searchParams.variant[0] : searchParams.variant;
 
-  return ["a", "b", "c", "d", "e", "f", "g", "h", "i"].includes(variant ?? "") && (!destination || destination === "services")
+  return ["a", "b", "c", "d", "e", "f", "1", "2", "3"].includes(variant ?? "") && (!destination || destination === "services")
     ? `/app?destination=services&variant=${variant}`
     : "/app";
 }

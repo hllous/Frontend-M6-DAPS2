@@ -76,14 +76,13 @@ describe("Services workspace period", () => {
     expect(new URLSearchParams(window.location.search).get("periodo")).toBe("todo");
   });
 
-  it("retains the Field crew filter in the count and every window page", async () => {
+  it("retains the Field crew filter in every window page", async () => {
     window.history.replaceState(null, "", "/app?periodo=todo");
     const list = vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 240, totalPages: 3, page: 1, pageSize: 100 });
     render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
     await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
     expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("todo");
     expect(list.mock.calls).toEqual([
-      [{ crewId: "crew-b", pageSize: 1 }],
       [{ crewId: "crew-b", pageSize: 100 }],
       [{ crewId: "crew-b", pageSize: 100, page: 2 }],
       [{ crewId: "crew-b", pageSize: 100, page: 3 }],
@@ -95,7 +94,7 @@ describe("Services workspace period", () => {
     const list = vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 2100, totalPages: 21, page: 1, pageSize: 100 });
     render(<ServicesWorkspace />);
     expect(await screen.findByText("El período tiene demasiados servicios; acote el período.")).toBeInTheDocument();
-    expect(list).toHaveBeenCalledTimes(21); // Count plus twenty result pages.
+    expect(list).toHaveBeenCalledTimes(20); // Twenty result pages; the explicit URL period needs no count request.
     expect(list).not.toHaveBeenCalledWith(expect.objectContaining({ page: 21 }));
     expect(screen.getByRole("combobox", { name: "Período" })).toBeEnabled();
   });

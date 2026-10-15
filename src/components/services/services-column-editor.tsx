@@ -6,22 +6,9 @@ import {
   useId,
   useState,
 } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, MoreHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuGroup,
-  ContextMenuItem,
-  ContextMenuLabel,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
 import {
   Popover,
   PopoverContent,
@@ -44,7 +31,7 @@ export type ServicesColumnKey =
   | "crew"
   | "scheduled";
 
-export type ServicesColumnVariant = "g" | "h" | "i";
+export type ServicesColumnVariant = "1" | "2" | "3";
 export type ServicesColumnMoveDirection = "previous" | "next";
 export type ServicesColumnWidthPreset = "compact" | "balanced" | "wide";
 
@@ -102,14 +89,6 @@ export const SERVICES_COLUMN_DEFINITIONS: readonly ServicesColumnDefinition[] = 
 ] as const;
 
 const COLUMN_KEYS = SERVICES_COLUMN_DEFINITIONS.map(({ key }) => key);
-const WIDTH_PRESETS: readonly {
-  key: ServicesColumnWidthPreset;
-  label: string;
-}[] = [
-  { key: "compact", label: "Compacto" },
-  { key: "balanced", label: "Equilibrado" },
-  { key: "wide", label: "Amplio" },
-];
 
 export interface ServicesColumnPreferences {
   order: ServicesColumnKey[];
@@ -212,7 +191,7 @@ export function sanitizeServicesColumnPreferences(
     }
   }
 
-  // The service column is required by the agreed table layout.
+  // Servicio is required by the agreed table layout.
   visibility.service = true;
 
   return { order, visibility, widths };
@@ -288,6 +267,8 @@ export function useServicesColumnPreferences({
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
+    // Storage is read after hydration so the server and initial client render use the same defaults.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState({
       storageKey,
       isHydrated: true,
@@ -381,47 +362,14 @@ export function useServicesColumnPreferences({
   };
 }
 
-interface ServicesColumnEditorProps {
-  controller: ServicesColumnPreferencesController;
-  columnKey?: ServicesColumnKey;
-}
-
 export function ServicesColumnEditor({
   controller,
-  columnKey,
-}: ServicesColumnEditorProps) {
-  if (controller.variant === "g") return <PopoverEditor controller={controller} />;
-  if (controller.variant === "h") return <SheetEditor controller={controller} />;
-
-  if (columnKey) {
-    return <ColumnContextMenu controller={controller} columnKey={columnKey} compact />;
+}: {
+  controller: ServicesColumnPreferencesController;
+}) {
+  if (controller.variant === "2") {
+    return <DrawerColumnPicker controller={controller} />;
   }
-
-  return (
-    <div className="flex flex-wrap gap-2" role="group" aria-label="Opciones de columnas">
-      {SERVICES_COLUMN_DEFINITIONS.map(({ key }) => (
-        <ColumnContextMenu key={key} controller={controller} columnKey={key} />
-      ))}
-    </div>
-  );
-}
-
-export function ServicesColumnHeaderMenu({
-  controller,
-  columnKey,
-}: {
-  controller: ServicesColumnPreferencesController;
-  columnKey: ServicesColumnKey;
-}) {
-  return <ColumnContextMenu controller={controller} columnKey={columnKey} compact />;
-}
-
-function PopoverEditor({
-  controller,
-}: {
-  controller: ServicesColumnPreferencesController;
-}) {
-  const [announcement, setAnnouncement] = useState("");
 
   return (
     <Popover>
@@ -433,331 +381,102 @@ function PopoverEditor({
         }
       />
       <PopoverContent
-        align="end"
-        className="max-h-[min(70vh,38rem)] w-[min(24rem,calc(100vw-1rem))] overflow-y-auto rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-[var(--color-text)] shadow-none ring-0"
+        align="start"
+        className="max-h-[min(70vh,38rem)] w-[min(22rem,calc(100vw-1rem))] overflow-y-auto rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-[var(--color-text)] shadow-none ring-0"
       >
         <PopoverHeader className="border-b border-[var(--color-border)] pb-2">
           <PopoverTitle>Columnas</PopoverTitle>
         </PopoverHeader>
-        <fieldset className="flex flex-col gap-3 border-0 p-0">
-          <legend className="sr-only">Columnas visibles y orden</legend>
-          <ColumnRows
-            controller={controller}
-            showRangeControls
-            onAnnounce={setAnnouncement}
-          />
-        </fieldset>
-        <span className="sr-only" aria-live="polite" aria-atomic="true">
-          {announcement}
-        </span>
+        <CheckboxList
+          controller={controller}
+          layout={controller.variant === "1" ? "data-table" : "cards"}
+        />
       </PopoverContent>
     </Popover>
   );
 }
 
-function SheetEditor({
+function DrawerColumnPicker({
   controller,
 }: {
   controller: ServicesColumnPreferencesController;
 }) {
-  const [announcement, setAnnouncement] = useState("");
-
   return (
     <Sheet>
       <SheetTrigger
         render={
           <Button type="button" variant="outline" disabled={!controller.isHydrated}>
-            Editar columnas
+            Columnas
           </Button>
         }
       />
       <SheetContent
         side="right"
-        className="w-[min(28rem,calc(100vw-1rem))] rounded-l-2xl border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-none"
+        className="w-[min(26rem,calc(100vw-1rem))] rounded-l-2xl border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-none"
       >
         <SheetHeader className="border-b border-[var(--color-border)] px-4 pb-3 pt-5">
           <SheetTitle>Columnas</SheetTitle>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-          <fieldset className="flex flex-col gap-3 border-0 p-0">
-            <legend className="sr-only">Columnas visibles, orden y ancho</legend>
-            <ColumnRows
-              controller={controller}
-              showWidthPresets
-              onAnnounce={setAnnouncement}
-            />
-          </fieldset>
-          <span className="sr-only" aria-live="polite" aria-atomic="true">
-            {announcement}
-          </span>
+          <CheckboxList controller={controller} layout="drawer" />
         </div>
       </SheetContent>
     </Sheet>
   );
 }
 
-function ColumnRows({
+function CheckboxList({
   controller,
-  showRangeControls = false,
-  showWidthPresets = false,
-  onAnnounce,
+  layout,
 }: {
   controller: ServicesColumnPreferencesController;
-  showRangeControls?: boolean;
-  showWidthPresets?: boolean;
-  onAnnounce: (message: string) => void;
+  layout: "data-table" | "drawer" | "cards";
 }) {
   const id = useId();
-  const { preferences } = controller;
 
   return (
-    <ol className="m-0 flex list-none flex-col gap-2 p-0">
-      {preferences.order.map((key, index) => {
+    <fieldset
+      className={
+        layout === "cards"
+          ? "grid grid-cols-2 gap-2 border-0 p-0 pt-3"
+          : layout === "drawer"
+            ? "flex flex-col gap-2 border-0 p-0 pt-3"
+            : "flex flex-col gap-1 border-0 p-0 pt-2"
+      }
+    >
+      <legend className="sr-only">Columnas visibles</legend>
+      {controller.preferences.order.map((key) => {
         const definition = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === key)!;
         const checkboxId = `${id}-${key}-visible`;
-        const rangeId = `${id}-${key}-width`;
-        const currentWidth = preferences.widths[key];
+        const locked = key === "service";
 
         return (
-          <li
+          <label
             key={key}
-            className="flex flex-col gap-2 rounded-xl border border-[var(--color-border)] p-2.5"
+            htmlFor={checkboxId}
+            className={
+              layout === "cards"
+                ? "flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-[var(--color-border)] px-2.5 py-2 text-sm"
+                : layout === "drawer"
+                  ? "flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-sm"
+                  : "flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--color-surface-subtle)]"
+            }
           >
-            <div className="flex min-h-10 items-center gap-2">
-              <Checkbox
-                id={checkboxId}
-                checked={preferences.visibility[key]}
-                disabled={!controller.isHydrated || key === "service"}
-                onCheckedChange={(checked) => controller.setVisible(key, checked === true)}
-              />
-              <label
-                htmlFor={checkboxId}
-                className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--color-text)]"
-              >
-                {definition.label}
-              </label>
-              <ColumnOrderButtons
-                columnKey={key}
-                index={index}
-                total={preferences.order.length}
-                disabled={!controller.isHydrated}
-                onMove={controller.moveColumn}
-                onAnnounce={onAnnounce}
-              />
-            </div>
-
-            {showRangeControls && (
-              <label htmlFor={rangeId} className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
-                <span>Ancho de {definition.label}: {Math.round(currentWidth / Object.values(preferences.widths).reduce((sum, width) => sum + width, 0) * 100)} %</span>
-                <input
-                  id={rangeId}
-                  type="range"
-                  min={definition.minimumWidth}
-                  max={definition.maximumWidth}
-                  step={10}
-                  value={currentWidth}
-                  disabled={!controller.isHydrated}
-                  aria-valuetext={`${Math.round(currentWidth / Object.values(preferences.widths).reduce((sum, width) => sum + width, 0) * 100)} % del ancho de la tabla`}
-                  onChange={(event) => controller.setWidth(key, Number(event.currentTarget.value))}
-                  className="h-6 w-full cursor-pointer accent-[var(--color-action)] focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed"
-                />
-              </label>
+            <Checkbox
+              id={checkboxId}
+              checked={controller.preferences.visibility[key]}
+              disabled={!controller.isHydrated || locked}
+              onCheckedChange={(checked) => controller.setVisible(key, checked === true)}
+            />
+            <span className="min-w-0 flex-1 truncate">{definition.label}</span>
+            {locked && (
+              <span className="text-xs text-[var(--color-text-secondary)]">
+                Siempre visible
+              </span>
             )}
-
-            {showWidthPresets && (
-              <fieldset className="flex flex-col gap-1.5 border-0 p-0">
-                <legend className="text-xs font-medium text-[var(--color-text-secondary)]">
-                  Ancho de {definition.label}
-                </legend>
-                <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Ancho de ${definition.label}`}>
-                  {WIDTH_PRESETS.map(({ key: preset, label }) => (
-                    <Button
-                      key={preset}
-                      type="button"
-                      size="sm"
-                      variant={currentWidth === definition.presets[preset] ? "default" : "outline"}
-                      disabled={!controller.isHydrated}
-                      aria-pressed={currentWidth === definition.presets[preset]}
-                      onClick={() => controller.applyWidthPreset(key, preset)}
-                    >
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              </fieldset>
-            )}
-          </li>
+          </label>
         );
       })}
-    </ol>
-  );
-}
-
-function ColumnOrderButtons({
-  columnKey,
-  index,
-  total,
-  disabled,
-  onMove,
-  onAnnounce,
-}: {
-  columnKey: ServicesColumnKey;
-  index: number;
-  total: number;
-  disabled: boolean;
-  onMove: ServicesColumnPreferencesController["moveColumn"];
-  onAnnounce: (message: string) => void;
-}) {
-  const label = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === columnKey)!.label;
-
-  function move(direction: ServicesColumnMoveDirection) {
-    onMove(columnKey, direction);
-    const nextPosition = index + (direction === "previous" ? 0 : 2);
-    onAnnounce(`${label}, posición ${nextPosition} de ${total}.`);
-  }
-
-  return (
-    <div className="flex shrink-0 items-center gap-1">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        disabled={disabled || index === 0}
-        aria-label={`Mover ${label} hacia arriba`}
-        onClick={() => move("previous")}
-      >
-        <ArrowUp data-icon="inline-start" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        disabled={disabled || index === total - 1}
-        aria-label={`Mover ${label} hacia abajo`}
-        onClick={() => move("next")}
-      >
-        <ArrowDown data-icon="inline-start" />
-      </Button>
-    </div>
-  );
-}
-
-function ColumnContextMenu({
-  controller,
-  columnKey,
-  compact = false,
-}: {
-  controller: ServicesColumnPreferencesController;
-  columnKey: ServicesColumnKey;
-  compact?: boolean;
-}) {
-  const [announcement, setAnnouncement] = useState("");
-  const definition = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === columnKey)!;
-  const index = controller.preferences.order.indexOf(columnKey);
-  const visible = controller.preferences.visibility[columnKey];
-  const hiddenColumns = SERVICES_COLUMN_DEFINITIONS.filter(({ key }) => !controller.preferences.visibility[key]);
-  const disabled = !controller.isHydrated;
-
-  function move(direction: ServicesColumnMoveDirection) {
-    controller.moveColumn(columnKey, direction);
-    const nextPosition = index + (direction === "previous" ? 0 : 2);
-    setAnnouncement(`${definition.label}, posición ${nextPosition} de ${controller.preferences.order.length}.`);
-  }
-
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger
-        aria-haspopup="menu"
-        aria-label={`Opciones de columna: ${definition.label}. Menú contextual disponible.`}
-        onKeyDown={(event) => {
-          const opensMenu = event.key === "Enter" || event.key === " " || event.key === "ContextMenu" || (event.shiftKey && event.key === "F10");
-          if (!opensMenu) return;
-          event.preventDefault();
-          const bounds = event.currentTarget.getBoundingClientRect();
-          event.currentTarget.dispatchEvent(new MouseEvent("contextmenu", {
-            bubbles: true,
-            cancelable: true,
-            clientX: bounds.left + bounds.width / 2,
-            clientY: bounds.top + bounds.height / 2,
-          }));
-        }}
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size={compact ? "icon-sm" : "sm"}
-            disabled={disabled}
-          >
-            {compact ? (
-              <MoreHorizontal data-icon="inline-start" aria-hidden="true" />
-            ) : (
-              <>
-                <span>{definition.label}</span>
-                <MoreHorizontal data-icon="inline-end" aria-hidden="true" />
-              </>
-            )}
-          </Button>
-        }
-      />
-      <ContextMenuContent className="max-h-[min(70vh,32rem)] min-w-52 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-none ring-0">
-        <ContextMenuGroup>
-          <ContextMenuLabel>{definition.label}</ContextMenuLabel>
-        </ContextMenuGroup>
-        <ContextMenuItem
-          disabled={disabled || columnKey === "service"}
-          onClick={() => controller.setVisible(columnKey, !visible)}
-        >
-          {visible ? "Ocultar columna" : "Mostrar columna"}
-        </ContextMenuItem>
-        {hiddenColumns.length > 0 && (
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>Mostrar columna</ContextMenuSubTrigger>
-            <ContextMenuSubContent className="rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-none ring-0">
-              {hiddenColumns.map(({ key, label }) => (
-                <ContextMenuItem
-                  key={key}
-                  disabled={disabled}
-                  onClick={() => controller.setVisible(key, true)}
-                >
-                  {label}
-                </ContextMenuItem>
-              ))}
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-        )}
-        <ContextMenuSeparator />
-        <ContextMenuItem disabled={disabled || index === 0} onClick={() => move("previous")}>
-          <ArrowLeft data-icon="inline-start" aria-hidden="true" />
-          Mover a la izquierda
-        </ContextMenuItem>
-        <ContextMenuItem
-          disabled={disabled || index === controller.preferences.order.length - 1}
-          onClick={() => move("next")}
-        >
-          <ArrowRight data-icon="inline-start" aria-hidden="true" />
-          Mover a la derecha
-        </ContextMenuItem>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>Ancho</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-none ring-0">
-            {WIDTH_PRESETS.map(({ key: preset, label }) => (
-              <ContextMenuItem
-                key={preset}
-                onClick={() => controller.applyWidthPreset(columnKey, preset)}
-              >
-                {label}
-              </ContextMenuItem>
-            ))}
-            <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => controller.resetWidth(columnKey)}>
-              Restablecer ancho
-            </ContextMenuItem>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-      </ContextMenuContent>
-      <span className="sr-only" aria-live="polite" aria-atomic="true">
-        {announcement}
-      </span>
-    </ContextMenu>
+    </fieldset>
   );
 }
