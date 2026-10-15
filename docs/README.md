@@ -4,11 +4,11 @@ Este índice indica dónde encontrar cada tipo de documentación y cuál es su f
 
 ## Documentos principales
 
-Los documentos centrales están en la raíz. En particular, el dominio sigue la convención de contexto único: `CONTEXT.md` en la raíz y las decisiones en `docs/adr/`.
+Los documentos centrales están en la raíz. En particular, el dominio sigue la convención de contexto único: `GLOSSARY.md` en la raíz y las decisiones en `docs/adr/`.
 
 - [README](../README.md): stack, ejecución local y estructura del repositorio.
 - [PRODUCT](../PRODUCT.md): propósito, usuarios, principios y evidencia de producto.
-- [CONTEXT](../CONTEXT.md): vocabulario y conceptos del dominio M6.
+- [CONTEXT](../GLOSSARY.md): vocabulario y conceptos del dominio M6.
 - [CONTRACTS](../CONTRACTS.md): contratos frontend/backend, hipótesis y criterios de aceptación.
 - [DESIGN](../DESIGN.md): estándar visual y de interacción.
 - [ROADMAP](../ROADMAP.md): fases, dependencias y preparación de entregas.
@@ -23,7 +23,7 @@ Los documentos centrales están en la raíz. En particular, el dominio sigue la 
 
 ## Dónde agregar documentación
 
-- Vocabulario del dominio: `CONTEXT.md`.
+- Vocabulario del dominio: `GLOSSARY.md`.
 - Decisión técnica difícil de revertir: `docs/adr/`, a partir de la [plantilla](adr/0000-template.md).
 - Contratos y reglas de integración del frontend: `CONTRACTS.md`.
 - Reglas visuales: `DESIGN.md`; ejemplos verificables, `docs/design/examples/`.

@@ -49,7 +49,7 @@ Backend shipped this as **one generic endpoint**, not a per-resource sub-route �
 - Backend returns `{ id, url, filename, contentType, uploadedAt }`. `filename` is the uploaded name sanitized to remove paths/control characters and capped at 120 characters; the object key in storage is a UUID. The original name is therefore not returned verbatim, but the response filename is not a UUID.
 - Backend strips Exif, XMP, and comments from JPEG, PNG, and WebP before upload when the container is understood, without re-encoding pixels. An unrecognized image structure is stored untouched. PDFs are accepted and stored without metadata cleanup, and no malware scan is performed. Frontend file-type/size checks remain UX safeguards, not a security boundary. Backend issue #90 is closed as **NOT_PLANNED**, but its comments explicitly leave PDF cleanup and malware scanning unimplemented and defer Tier-2 auditing; see [ADR-0006](docs/adr/0006-frontend-security-controls-are-defense-in-depth-only.md) for the remaining release posture.
 - `size` records the bytes stored after metadata cleanup (or the original bytes when no cleanup applies); it is not returned in the response. The backend 10 MB admission limit is checked against the incoming file before cleanup; the frontend/BFF applies its stricter 4 MB cap to the incoming file.
-- An exception outcome still carries an **array** of evidence refs, not a single one ("reason + note, photo where feasible" doesn't cap the count — see the `Evidence` term in `CONTEXT.md`). With a one-file-per-call endpoint, that means N sequential uploads, each with its own idempotency key.
+- An exception outcome still carries an **array** of evidence refs, not a single one ("reason + note, photo where feasible" doesn't cap the count — see the `Evidence` term in `GLOSSARY.md`). With a one-file-per-call endpoint, that means N sequential uploads, each with its own idempotency key.
 - Storage is Cloudflare R2 (S3-compatible, public bucket); `url` is directly renderable.
 
 ## Adapter seam (pattern, applies to every resource)
@@ -123,7 +123,7 @@ stateDiagram-v2
 
 ## Worked example: Zones, Routes and Service Frequencies
 
-Drawn from [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36). `Zone` and `Route` are plain catalog CRUD, same alta/baja `status` posture as the other catalogs — codes are immutable after creation. `ServiceFrequency` is the one exception: it has no `active` column at all, closing via `validTo` instead (see the **Validity (ServiceFrequency)** term in `CONTEXT.md`). Capability names (`zone:manage`, `route:manage`, `serviceFrequency:manage`) are a frontend hypothesis, same rationale as the catalogs above.
+Drawn from [#36](https://github.com/hllous/Frontend-M6-DAPS2/issues/36). `Zone` and `Route` are plain catalog CRUD, same alta/baja `status` posture as the other catalogs — codes are immutable after creation. `ServiceFrequency` is the one exception: it has no `active` column at all, closing via `validTo` instead (see the **Validity (ServiceFrequency)** term in `GLOSSARY.md`). Capability names (`zone:manage`, `route:manage`, `serviceFrequency:manage`) are a frontend hypothesis, same rationale as the catalogs above.
 
 | Endpoint | Capability | Purpose | Status |
 |---|---|---|---|
