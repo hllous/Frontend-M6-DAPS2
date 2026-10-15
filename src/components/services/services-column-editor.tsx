@@ -72,7 +72,7 @@ export const SERVICES_COLUMN_DEFINITIONS: readonly ServicesColumnDefinition[] = 
   },
   {
     key: "crew",
-    label: "Cuadrilla",
+    label: "Equipo",
     minimumWidth: 120,
     maximumWidth: 280,
     defaultWidth: 160,
@@ -80,7 +80,7 @@ export const SERVICES_COLUMN_DEFINITIONS: readonly ServicesColumnDefinition[] = 
   },
   {
     key: "scheduled",
-    label: "Programado",
+    label: "Fecha",
     minimumWidth: 130,
     maximumWidth: 280,
     defaultWidth: 180,
@@ -456,7 +456,7 @@ function CheckboxList({
             htmlFor={checkboxId}
             className={
               layout === "cards"
-                ? "flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-[var(--color-border)] px-2.5 py-2 text-sm"
+                ? `${locked ? "col-span-2 " : ""}flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-[var(--color-border)] px-2.5 py-2 text-sm`
                 : layout === "drawer"
                   ? "flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-sm"
                   : "flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--color-surface-subtle)]"
@@ -468,9 +468,11 @@ function CheckboxList({
               disabled={!controller.isHydrated || locked}
               onCheckedChange={(checked) => controller.setVisible(key, checked === true)}
             />
-            <span className="min-w-0 flex-1 truncate">{definition.label}</span>
+            <span className={locked && layout === "cards" ? "min-w-0 flex-1 whitespace-nowrap" : "min-w-0 flex-1 truncate"}>
+              {definition.label}
+            </span>
             {locked && (
-              <span className="text-xs text-[var(--color-text-secondary)]">
+              <span className="shrink-0 whitespace-nowrap text-xs text-[var(--color-text-secondary)]">
                 Siempre visible
               </span>
             )}
