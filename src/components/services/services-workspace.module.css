@@ -408,6 +408,10 @@
   background-color: var(--color-surface-subtle);
 }
 
+.desktopWorkspaceLayout table[data-column-resizing="true"] col {
+  transition: none !important;
+}
+
 .desktopWorkspaceLayout[data-column-editor] [data-prototype-table-content] tbody tr[aria-selected="true"],
 .mobileWorkspaceLayout[data-column-editor] [data-prototype-table-content] tbody tr[aria-selected="true"] {
   filter: none;

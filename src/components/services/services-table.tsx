@@ -58,15 +58,19 @@ type ColumnPointerDrag = {
   startY: number;
   initialOrder: ServicesColumnKey[];
   previewOrder: ServicesColumnKey[];
+  crossedColumns: Array<{ key: ServicesColumnKey; midpoint: number }>;
+  targetIndex: number;
   moved: boolean;
 };
+
+const COLUMN_DRAG_HYSTERESIS_PX = 6;
 
 function moveColumnOrder(
   order: ServicesColumnKey[],
   source: ServicesColumnKey,
   target: ServicesColumnKey,
 ): ServicesColumnKey[] {
-  if (source === "service" || target === "service" || source === target) return order;
+  if (source === target) return order;
   const sourceIndex = order.indexOf(source);
   const targetIndex = order.indexOf(target);
   if (sourceIndex < 0 || targetIndex < 0) return order;
@@ -222,6 +226,7 @@ function ColumnResizeHandle({
   maximumWidth,
   totalWidth,
   dataWidthPercent,
+  dense,
   onResize,
 }: {
   columnKey: ServicesColumnKey;
@@ -231,26 +236,20 @@ function ColumnResizeHandle({
   maximumWidth: number;
   totalWidth: number;
   dataWidthPercent: number;
+  dense: boolean;
   onResize: (key: ServicesColumnKey, width: number) => void;
 }) {
-  const drag = useRef<{
-    pointerId: number;
-    startX: number;
-    startWidth: number;
-    widthPerPixel: number;
-  } | null>(null);
+  const drag = useRef<{ pointerId: number } | null>(null);
   const widthShare = Math.round(width / totalWidth * 100);
 
   function startResize(event: ReactPointerEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
-    const tableWidth = event.currentTarget.closest("table")?.getBoundingClientRect().width ?? 0;
-    const dataWidth = tableWidth * dataWidthPercent / 100;
+    const table = event.currentTarget.closest<HTMLTableElement>("table");
+    if (!table) return;
+    if (table) table.dataset.columnResizing = "true";
     drag.current = {
       pointerId: event.pointerId,
-      startX: event.clientX,
-      startWidth: width,
-      widthPerPixel: dataWidth > 0 ? totalWidth / dataWidth : 1,
     };
     if (typeof event.currentTarget.setPointerCapture === "function") {
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -260,13 +259,23 @@ function ColumnResizeHandle({
   function resize(event: ReactPointerEvent<HTMLButtonElement>) {
     const activeDrag = drag.current;
     if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
-    const nextWidth = activeDrag.startWidth + (event.clientX - activeDrag.startX) * activeDrag.widthPerPixel;
+    const table = event.currentTarget.closest<HTMLTableElement>("table");
+    const marker = event.currentTarget.querySelector<HTMLElement>("span");
+    const markerBox = marker?.getBoundingClientRect();
+    const dataPixels = (table?.getBoundingClientRect().width ?? 0) * dataWidthPercent / 100;
+    const remainingWidth = totalWidth - width;
+    const slope = totalWidth > 0 ? dataPixels * remainingWidth / (totalWidth * totalWidth) : 0;
+    if (!markerBox || slope <= 0) return;
+    const markerX = markerBox.left + markerBox.width / 2;
+    const nextWidth = width + (event.clientX - markerX) / slope;
     onResize(columnKey, nextWidth);
   }
 
   function finishResize(event: ReactPointerEvent<HTMLButtonElement>) {
     if (drag.current?.pointerId !== event.pointerId) return;
     drag.current = null;
+    const table = event.currentTarget.closest<HTMLTableElement>("table");
+    if (table) delete table.dataset.columnResizing;
     if (typeof event.currentTarget.hasPointerCapture === "function" && event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -302,10 +311,15 @@ function ColumnResizeHandle({
         onResize(columnKey, width + delta);
       }}
       data-column-resize-edge={columnKey}
-      style={{ minHeight: 0, minWidth: 0 }}
+      style={{
+        minHeight: dense ? 48 : 0,
+        minWidth: 0,
+        width: dense ? 44 : 24,
+        right: -1,
+      }}
       className="absolute right-0 top-0 h-full min-h-0 min-w-0 w-6 touch-none cursor-col-resize rounded-none px-0 text-[var(--color-text-secondary)] hover:text-[var(--color-action)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2"
     >
-      <span aria-hidden="true" className="pointer-events-none absolute right-0 top-1/2 h-5 w-px translate-x-1/2 -translate-y-1/2 bg-current opacity-60" />
+      <span aria-hidden="true" className="pointer-events-none absolute right-px top-1/2 h-5 w-px translate-x-1/2 -translate-y-1/2 bg-current opacity-60" />
     </Button>
   );
 }
@@ -352,6 +366,7 @@ export function ServicesTable({
   const [draggedColumn, setDraggedColumn] = useState<ServicesColumnKey | null>(null);
   const [dragPreviewOrder, setDragPreviewOrder] = useState<ServicesColumnKey[] | null>(null);
   const columnPointerDrag = useRef<ColumnPointerDrag | null>(null);
+  const columnDragListenersCleanup = useRef<(() => void) | null>(null);
   const priorColumnPositions = useRef<Map<HTMLElement, number> | null>(null);
   const columnAnimationId = useRef(0);
   const suppressSortClick = useRef(false);
@@ -360,6 +375,8 @@ export function ServicesTable({
   const animatedColumnCollapse = !dense && compactOnPreview && previewMotionVariant === "a";
   const compactColumns = dense || (!activeColumnPreferences && compactOnPreview && (previewMotionVariant === "b" || previewMotionVariant === "c" || previewMotionVariant === "f"));
   const stableDesktopPreviewTable = !dense && (previewMotionVariant === "d" || previewMotionVariant === "e" || previewMotionVariant === "f");
+
+  useEffect(() => () => columnDragListenersCleanup.current?.(), []);
 
   useLayoutEffect(() => {
     const previous = priorColumnPositions.current;
@@ -510,7 +527,7 @@ export function ServicesTable({
   }
 
   function moveColumnTo(source: ServicesColumnKey, target: ServicesColumnKey) {
-    if (!activeColumnPreferences || source === "service") return;
+    if (!activeColumnPreferences) return;
     const nextOrder = moveColumnOrder(activeColumnPreferences.preferences.order, source, target);
     if (sameColumnOrder(nextOrder, activeColumnPreferences.preferences.order)) return;
     applyColumnOrder(nextOrder, source);
@@ -527,9 +544,32 @@ export function ServicesTable({
   }
 
   function startColumnPointerDrag(event: ReactPointerEvent<HTMLTableHeaderCellElement>, key: ServicesColumnKey) {
-    if (!activeColumnPreferences || event.button !== 0 || key === "service") return;
-    if (event.target instanceof HTMLElement && event.target.closest('[role="slider"]')) return;
+    if (!activeColumnPreferences || event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest('[role="slider"]')) return;
+    const table = tableRef.current;
+    if (!table) return;
+    columnAnimationId.current += 1;
+    table.querySelectorAll<HTMLElement>("[data-column-reorder-animating]").forEach((cell) => {
+      cell.style.removeProperty("transition");
+      cell.style.removeProperty("transform");
+      delete cell.dataset.columnReorderAnimating;
+    });
+    const sourceIndex = currentColumns.findIndex((column) => column.key === key);
+    if (sourceIndex < 0) return;
     const initialOrder = [...activeColumnPreferences.preferences.order];
+    const headerMidpoints = new Map<string, number>();
+    table.querySelectorAll<HTMLElement>("thead th[data-column-key]").forEach((header) => {
+      const columnKey = header.dataset.columnKey;
+      if (!columnKey || columnKey === "ordinal") return;
+      const box = header.getBoundingClientRect();
+      headerMidpoints.set(columnKey, box.left + box.width / 2);
+    });
+    const crossedColumns = currentColumns
+      .filter((column) => column.key !== key)
+      .flatMap((column) => {
+        const midpoint = headerMidpoints.get(column.key);
+        return midpoint === undefined ? [] : [{ key: column.key, midpoint }];
+      });
     columnPointerDrag.current = {
       pointerId: event.pointerId,
       source: key,
@@ -537,56 +577,72 @@ export function ServicesTable({
       startY: event.clientY,
       initialOrder,
       previewOrder: initialOrder,
+      crossedColumns,
+      targetIndex: sourceIndex,
       moved: false,
     };
-  }
 
-  function moveColumnPointerDrag(event: ReactPointerEvent<HTMLTableHeaderCellElement>) {
-    const drag = columnPointerDrag.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 7) return;
-    event.preventDefault();
-    if (!drag.moved) {
-      drag.moved = true;
-      setDraggedColumn(drag.source);
-      if (typeof event.currentTarget.setPointerCapture === "function") {
-        event.currentTarget.setPointerCapture(event.pointerId);
+    const handlePointerMove = (pointerEvent: PointerEvent) => {
+      const activeDrag = columnPointerDrag.current;
+      if (!activeDrag || activeDrag.pointerId !== pointerEvent.pointerId) return;
+      if (!activeDrag.moved && Math.hypot(pointerEvent.clientX - activeDrag.startX, pointerEvent.clientY - activeDrag.startY) < 7) return;
+      pointerEvent.preventDefault();
+      if (!activeDrag.moved) {
+        activeDrag.moved = true;
+        setDraggedColumn(activeDrag.source);
       }
-    }
-    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("thead th[data-column-key]");
-    const targetKey = target?.dataset.columnKey;
-    if (targetKey && targetKey !== "ordinal" && SERVICES_COLUMN_DEFINITIONS.some((column) => column.key === targetKey)) {
-      const nextOrder = targetKey === drag.source
-        ? drag.initialOrder
-        : moveColumnOrder(drag.initialOrder, drag.source, targetKey as ServicesColumnKey);
-      if (!sameColumnOrder(nextOrder, drag.previewOrder)) {
+
+      let nextIndex = activeDrag.targetIndex;
+      let nextOrder = activeDrag.previewOrder;
+      while (
+        nextIndex < activeDrag.crossedColumns.length &&
+        pointerEvent.clientX > activeDrag.crossedColumns[nextIndex].midpoint + COLUMN_DRAG_HYSTERESIS_PX
+      ) {
+        nextOrder = moveColumnOrder(nextOrder, activeDrag.source, activeDrag.crossedColumns[nextIndex].key);
+        nextIndex += 1;
+      }
+      while (
+        nextIndex > 0 &&
+        pointerEvent.clientX < activeDrag.crossedColumns[nextIndex - 1].midpoint - COLUMN_DRAG_HYSTERESIS_PX
+      ) {
+        nextIndex -= 1;
+        nextOrder = moveColumnOrder(nextOrder, activeDrag.source, activeDrag.crossedColumns[nextIndex].key);
+      }
+
+      if (nextIndex !== activeDrag.targetIndex && !sameColumnOrder(nextOrder, activeDrag.previewOrder)) {
         captureColumnPositions();
-        drag.previewOrder = nextOrder;
-        setDragPreviewOrder(sameColumnOrder(nextOrder, drag.initialOrder) ? null : nextOrder);
+        activeDrag.targetIndex = nextIndex;
+        activeDrag.previewOrder = nextOrder;
+        setDragPreviewOrder(sameColumnOrder(nextOrder, activeDrag.initialOrder) ? null : nextOrder);
       }
-    }
-  }
+    };
+    const finishPointerDrag = (pointerEvent: PointerEvent) => {
+      const activeDrag = columnPointerDrag.current;
+      if (!activeDrag || activeDrag.pointerId !== pointerEvent.pointerId) return;
+      if (activeDrag.moved) {
+        pointerEvent.preventDefault();
+        suppressSortClick.current = true;
+        window.setTimeout(() => { suppressSortClick.current = false; }, 0);
+        if (pointerEvent.type !== "pointercancel" && !sameColumnOrder(activeDrag.previewOrder, activeDrag.initialOrder)) {
+          applyColumnOrder(activeDrag.previewOrder, activeDrag.source);
+        }
+        captureColumnPositions();
+        setDragPreviewOrder(null);
+      }
+      columnPointerDrag.current = null;
+      setDraggedColumn(null);
+      columnDragListenersCleanup.current?.();
+      columnDragListenersCleanup.current = null;
+    };
 
-  function finishColumnPointerDrag(event: ReactPointerEvent<HTMLTableHeaderCellElement>) {
-    const drag = columnPointerDrag.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    if (drag.moved) {
-      event.preventDefault();
-      suppressSortClick.current = true;
-      window.setTimeout(() => { suppressSortClick.current = false; }, 0);
-      if (event.type !== "pointercancel" && !sameColumnOrder(drag.previewOrder, drag.initialOrder)) {
-        applyColumnOrder(drag.previewOrder, drag.source);
-      }
-    }
-    if (drag.moved) {
-      captureColumnPositions();
-      setDragPreviewOrder(null);
-    }
-    columnPointerDrag.current = null;
-    setDraggedColumn(null);
-    if (typeof event.currentTarget.hasPointerCapture === "function" && event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", finishPointerDrag);
+    window.addEventListener("pointercancel", finishPointerDrag);
+    columnDragListenersCleanup.current = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", finishPointerDrag);
+      window.removeEventListener("pointercancel", finishPointerDrag);
+    };
   }
 
   return (
@@ -598,7 +654,7 @@ export function ServicesTable({
         <table
           ref={tableRef}
           data-motion-variant={previewMotionVariant}
-          className="h-full min-h-full w-full min-w-0 table-fixed border-collapse text-left text-xs"
+          className="w-full min-w-0 table-fixed border-collapse text-left text-xs"
           aria-label="Servicios operativos"
         >
           <colgroup>
@@ -651,9 +707,6 @@ export function ServicesTable({
                     )}
                     style={activeColumnPreferences ? { touchAction: "pan-y" } : undefined}
                     onPointerDown={(event) => startColumnPointerDrag(event, col.key)}
-                    onPointerMove={moveColumnPointerDrag}
-                    onPointerUp={finishColumnPointerDrag}
-                    onPointerCancel={finishColumnPointerDrag}
                     onClickCapture={(event) => {
                       if (!suppressSortClick.current) return;
                       event.preventDefault();
@@ -664,7 +717,7 @@ export function ServicesTable({
                       if (!activeColumnPreferences || event.target !== event.currentTarget || !event.altKey) return;
                       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
                       event.preventDefault();
-                      const order = activeColumnPreferences.preferences.order;
+                      const order = currentColumns.map((column) => column.key);
                       const index = order.indexOf(col.key);
                       const targetIndex = index + (event.key === "ArrowLeft" ? -1 : 1);
                       const target = order[targetIndex];
@@ -674,7 +727,7 @@ export function ServicesTable({
                     <div className={cn(
                       "flex items-center justify-between gap-1.5",
                       dense && "gap-1",
-                      activeColumnPreferences && !dense && "pr-7",
+                      activeColumnPreferences && (dense ? "pr-11" : "pr-7"),
                     )}>
                       <button
                         type="button"
@@ -799,7 +852,7 @@ export function ServicesTable({
 
                     </div>
 
-                    {activeColumnPreferences && !dense && (
+                    {activeColumnPreferences && (
                       <ColumnResizeHandle
                         columnKey={col.key}
                         label={col.label}
@@ -810,6 +863,7 @@ export function ServicesTable({
                         maximumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.maximumWidth}
                         totalWidth={widthTotal}
                         dataWidthPercent={dataWidthPercent}
+                        dense={dense}
                         onResize={setColumnWidth}
                       />
                     )}
