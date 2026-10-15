@@ -17,7 +17,7 @@ afterEach(() => {
 describe("/api/service-types/[id]", () => {
   it("returns the requested service type", async () => {
     const cookie = await loginAs("office-duty-queue", { mode: "mock" });
-    const response = await GET(new Request("http://localhost/api/service-types/st-waste-route", { headers: { cookie } }), { params: { id: "st-waste-route" } });
+    const response = await GET(new Request("http://localhost/api/service-types/st-waste-route", { headers: { cookie } }), { params: Promise.resolve({ id: "st-waste-route" }) });
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ id: "st-waste-route", code: "WASTE-ROUTE", name: "Recolección domiciliaria" });
@@ -26,8 +26,8 @@ describe("/api/service-types/[id]", () => {
   it("does not allow a Field actor to edit or deactivate", async () => {
     const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const request = new Request("http://localhost/api/service-types/st-waste-route", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ name: "Cambio", requiresVehicle: true, active: true }) });
-    expect((await PATCH(request, { params: { id: "st-waste-route" } })).status).toBe(403);
-    const deleteResponse = await DELETE(new Request(request, { method: "DELETE" }), { params: { id: "st-waste-route" } });
+    expect((await PATCH(request, { params: Promise.resolve({ id: "st-waste-route" }) })).status).toBe(403);
+    const deleteResponse = await DELETE(new Request(request, { method: "DELETE" }), { params: Promise.resolve({ id: "st-waste-route" }) });
     expect(deleteResponse.status).toBe(403);
   });
 
@@ -40,11 +40,11 @@ describe("/api/service-types/[id]", () => {
 
   it("updates only editable fields and makes DELETE a logical deactivation", async () => {
     const cookie = await loginAs("office-duty-queue", { mode: "mock" });
-    const response = await PATCH(new Request("http://localhost/api/service-types/st-waste-route", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ name: "Recolección nocturna", requiresVehicle: true, active: true }) }), { params: { id: "st-waste-route" } });
+    const response = await PATCH(new Request("http://localhost/api/service-types/st-waste-route", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ name: "Recolección nocturna", requiresVehicle: true, active: true }) }), { params: Promise.resolve({ id: "st-waste-route" }) });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ code: "WASTE-ROUTE", category: "WASTE_COLLECTION", mode: "ROUTE", name: "Recolección nocturna" });
 
-    const deleteResponse = await DELETE(new Request("http://localhost/api/service-types/st-waste-route", { method: "DELETE", headers: { cookie } }), { params: { id: "st-waste-route" } });
+    const deleteResponse = await DELETE(new Request("http://localhost/api/service-types/st-waste-route", { method: "DELETE", headers: { cookie } }), { params: Promise.resolve({ id: "st-waste-route" }) });
     expect(deleteResponse.status).toBe(200);
     expect(await deleteResponse.json()).toMatchObject({ id: "st-waste-route", active: false });
   });

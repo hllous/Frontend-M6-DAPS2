@@ -21,7 +21,7 @@ import { recordTelemetryEvent } from "@/lib/telemetry";
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const params = await context.params;
   const serviceId = params.id;
@@ -65,7 +65,7 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const params = await context.params;
   const serviceId = params.id;

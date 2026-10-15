@@ -9,9 +9,9 @@ import { serviceTypeFixtures, updateServiceTypeFixture } from "@/lib/service-typ
 
 
 
-async function targetId(context: { params: Promise<{ id: string }> | { id: string } }) { return (await context.params).id; }
+async function targetId(context: { params: Promise<{ id: string }> }) { return (await context.params).id; }
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
@@ -29,7 +29,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
 }
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
@@ -55,7 +55,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 }
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);

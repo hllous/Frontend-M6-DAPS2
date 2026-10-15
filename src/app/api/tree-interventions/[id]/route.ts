@@ -8,7 +8,7 @@ import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@
 
 
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);

@@ -34,7 +34,7 @@ describe("/api/tree-interventions/[id]", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "intervention-backend-1" }));
 
     const response = await GET(new Request("http://localhost/api/tree-interventions/intervention-backend-1", { headers: { cookie } }), {
-      params: { id: "intervention-backend-1" },
+      params: Promise.resolve({ id: "intervention-backend-1" }),
     });
 
     expect(response.status).toBe(200);
@@ -96,7 +96,7 @@ describe("/api/tree-interventions/[id]", () => {
 
   it("returns not found for an unknown intervention", async () => {
     const cookie = await loginAs("office-duty-queue", { mode: "mock" });
-    const response = await GET(new Request("http://localhost/api/tree-interventions/missing", { headers: { cookie } }), { params: { id: "missing" } });
+    const response = await GET(new Request("http://localhost/api/tree-interventions/missing", { headers: { cookie } }), { params: Promise.resolve({ id: "missing" }) });
     expect(response.status).toBe(404);
   });
 

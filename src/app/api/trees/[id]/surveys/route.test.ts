@@ -30,7 +30,7 @@ describe("/api/trees/[id]/surveys", () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0 } }));
     const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
-    const response = await GET(new Request(`http://localhost/trees/abc/surveys${query}`, { headers: { cookie } }), { params: { id: "abc" } });
+    const response = await GET(new Request(`http://localhost/trees/abc/surveys${query}`, { headers: { cookie } }), { params: Promise.resolve({ id: "abc" }) });
     expect(response.status).toBe(200);
     expect(backendFetch).toHaveBeenCalledTimes(1);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/trees/abc/surveys${expected}`);
@@ -46,7 +46,7 @@ describe("/api/trees/[id]/surveys", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
     const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
     const request = new Request("http://localhost/api/trees/arbol-abc/surveys", { method, headers: { cookie, "content-type": "application/json" }, ...(method === "POST" ? { body: JSON.stringify(validInput) } : {}) });
-    await (method === "GET" ? GET : POST)(request, { params: { id: "arbol-abc" } });
+    await (method === "GET" ? GET : POST)(request, { params: Promise.resolve({ id: "arbol-abc" }) });
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/trees/arbol-abc/surveys");
     expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe(method);
     expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
@@ -58,7 +58,7 @@ describe("/api/trees/[id]/surveys", () => {
 
   it("lists newest-first history with documented filters for any authenticated actor", async () => {
     const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
-    const response = await GET(new Request("http://localhost/api/trees/tree-2/surveys?healthStatus=WEAKENED&riskLevel=HIGH&pageSize=10", { headers: { cookie } }), { params: { id: "tree-2" } });
+    const response = await GET(new Request("http://localhost/api/trees/tree-2/surveys?healthStatus=WEAKENED&riskLevel=HIGH&pageSize=10", { headers: { cookie } }), { params: Promise.resolve({ id: "tree-2" }) });
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data[0]).toMatchObject({ id: "survey-2", riskLevel: "HIGH" });
@@ -67,7 +67,7 @@ describe("/api/trees/[id]/surveys", () => {
 
   it("allows Field and Office with tree:survey to create an ambient record without a Service", async () => {
     const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
-    const fieldResponse = await POST(new Request("http://localhost/api/trees/tree-2/surveys", { method: "POST", headers: { cookie: fieldCookie, "content-type": "application/json" }, body: JSON.stringify(validInput) }), { params: { id: "tree-2" } });
+    const fieldResponse = await POST(new Request("http://localhost/api/trees/tree-2/surveys", { method: "POST", headers: { cookie: fieldCookie, "content-type": "application/json" }, body: JSON.stringify(validInput) }), { params: Promise.resolve({ id: "tree-2" }) });
     expect(fieldResponse.status).toBe(201);
     expect(await fieldResponse.json()).toMatchObject({ treeId: "tree-2", riskLevel: "LOW" });
     expect(treeSurveyFixtures.every((survey) => !("serviceId" in survey))).toBe(true);
@@ -79,7 +79,7 @@ describe("/api/trees/[id]/surveys", () => {
 
   it("rejects a high-risk submission without riskType at the route boundary", async () => {
     const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
-    const response = await POST(new Request("http://localhost/api/trees/tree-2/surveys", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ ...validInput, riskLevel: "CRITICAL" }) }), { params: { id: "tree-2" } });
+    const response = await POST(new Request("http://localhost/api/trees/tree-2/surveys", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ ...validInput, riskLevel: "CRITICAL" }) }), { params: Promise.resolve({ id: "tree-2" }) });
     expect(response.status).toBe(400);
   });
 });

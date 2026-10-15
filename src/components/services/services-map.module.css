@@ -203,7 +203,7 @@
  * clicks meant for the marker underneath. Disable pointer events on the
  * control itself but keep the actual credit link clickable.
  */
-:global(.leaflet-control-attribution) {
+.map :global(.leaflet-control-attribution) {
   pointer-events: none;
 }
 
