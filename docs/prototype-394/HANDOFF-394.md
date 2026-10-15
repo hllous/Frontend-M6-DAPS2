@@ -190,3 +190,11 @@ Expected (PO round 1: "feel like Excel"): resizing never stalls before a sane pe
 - Checks: focused Services Vitest passes (14 files, 128 tests); `node --check` passes. ESLint passes with 0 errors and 2 existing warnings when untracked review folders are excluded; the exact command without those exclusions also scanned `review-394-animations/record-gh-i.mjs` and reported 2 hook-rule errors there. The edited TSX and browser harness pass targeted ESLint.
 - Visual inspection passed for `review-394-animations/round4b-mid-resize-1440.png`, `review-394-animations/round4b-horizontal-scroll-1440.png`, and `review-394-animations/round4b-mobile-390.png`.
 - Final verification: Markdown lint reports 0 issues; lychee reports 140 OK, 0 errors, and 74 excluded. The follow-up assertion and this checkpoint are included in the pushed `fix/394-services-workspace` branch; the server remains on port 4314 and no PR has been created.
+
+## Checkpoint round 4c (2026-10-15)
+
+- Before: at `scrollLeft=60`, the sticky `#` header computed to `rgba(0, 0, 0, 0)`. After Estado reached its 130 px minimum, the table stayed 1028 px wide while columns summed to 918 px in a 571 px pane, leaving 110 px of stale width.
+- Fix: the ordinal header now uses the existing opaque `--color-surface-subtle` header surface. Resize release always clears the temporary width floor; the reproduced Estado sequence now settles at 918 px (`max(918, 571)`) with no release scroll delta.
+- Browser verification: the round 4 walkthrough passed all 15 controls with 245 pointer samples, maximum measured drift 1 px, zero steps over 2 px, zero trace violations, and zero page errors. The added checks cover the opaque ordinal header at scrollLeft 60 and the Estado minimum-width release. Typecheck, ESLint, and focused Services Vitest passed; ESLint reported only the two existing `window.location.assign()` warnings.
+- Inspected screenshots: `review-394-animations/round4c-header-after-1440.png`, `review-394-animations/round4c-release-width-after-1440.png`, and `review-394-animations/round4-workspace-390.png`.
+- Commit `e5cf140` is pushed to `fix/394-services-workspace`; no PR was created.
