@@ -10,7 +10,7 @@ import { recordTelemetryEvent } from "@/lib/telemetry";
 
 
 
-type Context = { params: Promise<{ id: string }> | { id: string } };
+type Context = { params: Promise<{ id: string }> };
 
 async function context(request: Request, routeContext: Context) {
   const { id } = await routeContext.params;

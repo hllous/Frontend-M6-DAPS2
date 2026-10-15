@@ -19,7 +19,7 @@ import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, Invali
 
 
 
-type NoticeContext = { params: Promise<{ id: string }> | { id: string } };
+type NoticeContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, context: NoticeContext) {
   const { id } = await context.params;

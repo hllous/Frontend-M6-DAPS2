@@ -303,7 +303,7 @@
  * control itself (matches .counter's convention above) but keep the actual
  * credit link clickable.
  */
-:global(.leaflet-control-attribution) {
+.map :global(.leaflet-control-attribution) {
   pointer-events: none;
 }
 

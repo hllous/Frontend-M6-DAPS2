@@ -16,7 +16,7 @@ describe("/api/trees/[id]/surveys/[surveyId]", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ id: "survey-2", treeId: "tree-2" });
 
-    const missing = await GET(new Request("http://localhost/api/trees/tree-2/surveys/missing", { headers: { cookie } }), { params: { id: "tree-2", surveyId: "missing" } });
+    const missing = await GET(new Request("http://localhost/api/trees/tree-2/surveys/missing", { headers: { cookie } }), { params: Promise.resolve({ id: "tree-2", surveyId: "missing" }) });
     expect(missing.status).toBe(404);
   });
 
@@ -26,7 +26,7 @@ describe("/api/trees/[id]/surveys/[surveyId]", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "survey-backend-1", treeId: "tree-backend-1" }));
 
     const response = await GET(new Request("http://localhost/api/trees/tree-backend-1/surveys/survey-backend-1", { headers: { cookie } }), {
-      params: { id: "tree-backend-1", surveyId: "survey-backend-1" },
+      params: Promise.resolve({ id: "tree-backend-1", surveyId: "survey-backend-1" }),
     });
 
     expect(response.status).toBe(200);

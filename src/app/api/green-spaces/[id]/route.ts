@@ -11,7 +11,7 @@ import { recordTelemetryEvent } from "@/lib/telemetry";
 
 
 
-async function greenSpaceId(context: { params: Promise<{ id: string }> | { id: string } }) {
+async function greenSpaceId(context: { params: Promise<{ id: string }> }) {
   return (await context.params).id;
 }
 
@@ -20,7 +20,7 @@ function isOffice(request: Request) {
   return getScenario(session).actor.kind === "OFFICE";
 }
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const id = await greenSpaceId(context);
   const path = new URL(request.url).pathname;
 
@@ -42,7 +42,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
 }
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const id = await greenSpaceId(context);
   const path = new URL(request.url).pathname;
 
@@ -75,7 +75,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 }
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   const id = await greenSpaceId(context);
   const path = new URL(request.url).pathname;
 
