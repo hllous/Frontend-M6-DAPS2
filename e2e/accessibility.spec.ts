@@ -63,14 +63,16 @@ test.describe("automated WCAG checks @smoke", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
-    await expect(page.getByRole("button", { name: "Lista", exact: true })).toBeVisible();
+    const map = page.getByRole("region", { name: "Mapa territorial de Servicios" });
+    await expect(page.getByRole("button", { name: "Expandir lista a pantalla completa" })).toBeVisible();
     await expect(table).toBeVisible();
+    await expect(map).toBeVisible();
+    await expect(page.getByRole("button", { name: "Lista", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Mapa", exact: true })).toHaveCount(0);
     await expectNoViolations(page);
 
-    await page.getByRole("button", { name: "Mapa" }).click();
-    const map = page.getByRole("region", { name: "Mapa territorial de Servicios" });
-    await expect(map).toBeVisible();
-    await expect(table).not.toBeVisible();
+    await page.getByRole("button", { name: "Expandir lista a pantalla completa" }).click();
+    await expect(page.getByRole("complementary", { name: "Lista de servicios" })).toHaveAttribute("data-snap", "full");
     await expectNoViolations(page);
   });
 

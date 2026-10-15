@@ -8,10 +8,19 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, min(24rem, 28vw));
 }
 
+.workspaceResults {
+  transition: opacity 150ms ease-out;
+}
+
+.workspaceResults[data-refreshing="true"] {
+  opacity: 0.86;
+}
+
 .mobileWorkspaceLayout {
-  flex: 0 0 auto;
-  height: min(65vh, calc(100dvh - 440px));
-  min-height: 190px;
+  width: 100%;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
   isolation: isolate;
   overflow: hidden;
 }
@@ -58,8 +67,7 @@
   overflow: hidden;
 }
 
-.mobileTablePane,
-.mobilePreviewSurface {
+.mobileTablePane {
   position: absolute;
   inset: 0;
   transition:
@@ -77,16 +85,25 @@
   transform: translateY(-8px);
 }
 
-.mobilePreviewSurface {
+.mobilePreviewOverlay {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  overflow: hidden;
+  background: var(--color-surface);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(8px);
+  transform: translateY(10px);
+  transition:
+    opacity 160ms ease-out,
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.mobilePreviewSurfaceOpen {
+.mobilePreviewOverlayOpen {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
+  transition-duration: 280ms;
 }
 
 .previewRail {
@@ -318,11 +335,12 @@
     transition-duration: 1ms;
   }
 
+  .workspaceResults,
   .previewSurface,
   .mobileTablePane,
-  .mobilePreviewSurface {
+  .mobilePreviewOverlay {
     transform: none;
-    transition-duration: 150ms;
+    transition-duration: 1ms;
   }
 
   .desktopWorkspaceLayout[data-motion-variant] .previewSurface {
