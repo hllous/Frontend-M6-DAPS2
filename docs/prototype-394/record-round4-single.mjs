@@ -201,7 +201,9 @@ async function scrollResizeHandleIntoView(handle) {
     if (!scroller || !marker) return;
     const scrollerBox = scroller.getBoundingClientRect();
     const markerBox = marker.getBoundingClientRect();
-    const targetOffset = Math.min(220, Math.max(100, scrollerBox.width * 0.42));
+    const hasPreview = document.querySelector('[data-preview-open="true"]') !== null;
+    const offsetRatio = window.innerWidth < 600 ? 0.88 : hasPreview ? 0.46 : 0.68;
+    const targetOffset = Math.min(scroller.clientWidth - 36, Math.max(100, scroller.clientWidth * offsetRatio));
     const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
     const targetScroll = scroller.scrollLeft + markerBox.left + markerBox.width / 2 - (scrollerBox.left + targetOffset);
     scroller.scrollLeft = Math.max(0, Math.min(maxScroll, targetScroll));
@@ -293,7 +295,7 @@ async function incrementalResize(page, columnKey, delta, speed, screenshotPath) 
   return { columnKey, speed, delta, before, after, borderOffset, pointerLineAtEachStep, releaseX, releaseLineX };
 }
 
-async function stepwiseResizeTrace(page, columnKey, delta, screenshotPath) {
+async function stepwiseResizeTrace(page, columnKey, delta, screenshotPath, verifySettledWidth = false) {
   const labels = { service: "Servicio", status: "Estado", zone: "Zona", crew: "Equipo", scheduled: "Fecha" };
   const handle = page.getByRole("slider", { name: "Ancho de columna " + labels[columnKey] });
   await handle.waitFor({ state: "visible" });
@@ -317,6 +319,8 @@ async function stepwiseResizeTrace(page, columnKey, delta, screenshotPath) {
       columnWidth: Number(button.getAttribute("aria-valuenow")),
       minimumWidth: Number(button.getAttribute("aria-valuemin")),
       maximumWidth: Number(button.getAttribute("aria-valuemax")),
+      columnSum: Array.from(table?.querySelectorAll("thead th[data-column-key]") ?? [])
+        .reduce((sum, header) => sum + header.getBoundingClientRect().width, 0),
       tableWidth: table?.getBoundingClientRect().width ?? null,
       scrollClientWidth: scroller?.clientWidth ?? null,
       scrollWidth: scroller?.scrollWidth ?? null,
@@ -402,6 +406,10 @@ async function stepwiseResizeTrace(page, columnKey, delta, screenshotPath) {
   const release = await measure();
   const releaseEdgeError = release.thRightEdge - expectedFinalEdge;
   const releaseMarkerError = release.markerCenter - release.thRightEdge;
+  const expectedSettledTableWidth = Math.max(release.columnSum, release.scrollClientWidth);
+  const settledWidthError = release.tableWidth - expectedSettledTableWidth;
+  const preReleaseScrollLeft = steps.at(-1)?.scrollLeft ?? start.scrollLeft;
+  const releaseScrollDelta = release.scrollLeft - preReleaseScrollLeft;
   if (Math.abs(releaseEdgeError) > 2) {
     violations.push({ point: "release-edge", pointerX: startX + delta, thRightEdge: release.thRightEdge,
       markerCenter: release.markerCenter, error: releaseEdgeError, columnWidth: release.columnWidth });
@@ -412,6 +420,15 @@ async function stepwiseResizeTrace(page, columnKey, delta, screenshotPath) {
   }
   if (release.columnWidth !== expectedFinalWidth) {
     violations.push({ point: "release-width", expectedWidth: expectedFinalWidth, actualWidth: release.columnWidth });
+  }
+  if (verifySettledWidth && Math.abs(settledWidthError) > 1) {
+    violations.push({ point: "settled-table-width", expectedWidth: expectedSettledTableWidth,
+      actualWidth: release.tableWidth, columnSum: release.columnSum, clientWidth: release.scrollClientWidth,
+      error: settledWidthError });
+  }
+  if (verifySettledWidth && Math.abs(releaseScrollDelta) > 1) {
+    violations.push({ point: "release-scroll-jump", preReleaseScrollLeft, releaseScrollLeft: release.scrollLeft,
+      error: releaseScrollDelta });
   }
   return {
     columnKey,
@@ -429,11 +446,17 @@ async function stepwiseResizeTrace(page, columnKey, delta, screenshotPath) {
       thRightEdge: release.thRightEdge,
       markerCenter: release.markerCenter,
       columnWidth: release.columnWidth,
+      columnSum: release.columnSum,
       tableWidth: release.tableWidth,
       scrollClientWidth: release.scrollClientWidth,
       scrollWidth: release.scrollWidth,
       scrollLeft: release.scrollLeft,
     },
+    settledWidthCheck: verifySettledWidth
+      ? { expectedWidth: expectedSettledTableWidth, actualWidth: release.tableWidth, columnSum: release.columnSum,
+        clientWidth: release.scrollClientWidth, error: settledWidthError, preReleaseScrollLeft,
+        releaseScrollLeft: release.scrollLeft, releaseScrollDelta }
+      : null,
     steps,
     violations,
     maxAbsEdgeError: Math.max(0, ...steps.map((item) => Math.abs(item.edgeError)), Math.abs(releaseEdgeError)),
@@ -448,6 +471,18 @@ async function traceResizeScenario(browserInstance, scenario) {
   page.on("pageerror", (error) => pageErrors.push(error.message));
   try {
     await signIn(page);
+    if (scenario.releaseWidthCheck) {
+      const status = await stepwiseResizeTrace(page, "status", 80);
+      const statusNarrow = await stepwiseResizeTrace(page, "status", -200, undefined, true);
+      return {
+        name: scenario.name,
+        viewport: scenario.viewport,
+        status,
+        statusNarrow,
+        zone: { steps: [], violations: [] },
+        pageErrors,
+      };
+    }
     if (scenario.mobile) {
       const drawer = page.getByRole("complementary", { name: "Lista de servicios" });
       await drawer.waitFor({ state: "visible" });
@@ -497,13 +532,34 @@ async function traceResizeScenario(browserInstance, scenario) {
       }
       await page.waitForTimeout(50);
       await page.screenshot({ path: path.join(output, "round4b-horizontal-scroll-1440.png") });
+      const ordinalHeader = await page.locator('table[aria-label="Servicios operativos"]').evaluate((table) => {
+        const scroller = table.parentElement;
+        if (!scroller) return null;
+        scroller.scrollLeft = 60;
+        const ordinal = table.querySelector('thead th[data-column-key="ordinal"]');
+        return {
+          scrollLeft: scroller.scrollLeft,
+          background: ordinal ? getComputedStyle(ordinal).backgroundColor : null,
+          text: ordinal?.textContent?.trim() ?? null,
+        };
+      });
+      horizontalScroll.ordinalHeader = ordinalHeader;
+      const ordinalAlpha = ordinalHeader?.background.startsWith("rgba(")
+        ? Number(ordinalHeader.background.match(/,\s*([\d.]+)\)$/)?.[1] ?? 1)
+        : ordinalHeader?.background === "transparent" ? 0 : 1;
+      if (ordinalAlpha < 1) {
+        pageErrors.push(`sticky # header background is transparent at scrollLeft ${ordinalHeader.scrollLeft}: ${ordinalHeader.background}`);
+      }
+      await page.screenshot({ path: path.join(output, "round4c-sticky-header-1440.png") });
       await page.locator('table[aria-label="Servicios operativos"]').evaluate((table) => {
         if (table.parentElement) table.parentElement.scrollLeft = 0;
       });
     }
-    const zone = await stepwiseResizeTrace(page, "zone", -60);
+    const trailingResizeColumn = scenario.detailsOpen || scenario.mobile ? "status" : "zone";
+    const zone = await stepwiseResizeTrace(page, trailingResizeColumn, -60);
+    const statusNarrow = null;
     return { name: scenario.name, viewport: scenario.viewport, detailsOpen: scenario.detailsOpen === true,
-      splitOffset: scenario.splitOffset ?? 0, split, status, zone, horizontalScroll, pageErrors };
+      splitOffset: scenario.splitOffset ?? 0, split, status, statusNarrow, zone, horizontalScroll, pageErrors };
   } finally {
     await context.close();
   }
@@ -515,22 +571,26 @@ async function runResizeTraceSuite(browserInstance) {
     { name: "details-open", viewport: { width: 1440, height: 900 }, detailsOpen: true },
     { name: "split-left", viewport: { width: 1440, height: 900 }, splitOffset: -120 },
     { name: "split-right", viewport: { width: 1440, height: 900 }, splitOffset: 120 },
+    { name: "release-width-check", viewport: { width: 1440, height: 900 }, releaseWidthCheck: true },
     { name: "mobile-390", viewport: { width: 390, height: 844 }, mobile: true },
   ];
   const results = [];
   for (const scenario of scenarios) results.push(await traceResizeScenario(browserInstance, scenario));
   const violations = results.flatMap((scenario) => [
     ...scenario.status.violations.map((violation) => ({ scenario: scenario.name, columnKey: "status", ...violation })),
-    ...scenario.zone.violations.map((violation) => ({ scenario: scenario.name, columnKey: "zone", ...violation })),
+    ...(scenario.statusNarrow?.violations ?? []).map((violation) => ({ scenario: scenario.name, columnKey: "status", ...violation })),
+    ...scenario.zone.violations.map((violation) => ({ scenario: scenario.name, columnKey: scenario.zone.columnKey, ...violation })),
     ...scenario.pageErrors.map((message) => ({ scenario: scenario.name, point: "page-error", message })),
   ]);
   return {
     passed: violations.length === 0,
     scenarioCount: results.length,
-    stepCount: results.reduce((sum, scenario) => sum + scenario.status.steps.length + scenario.zone.steps.length, 0),
+    stepCount: results.reduce((sum, scenario) => sum + scenario.status.steps.length +
+      (scenario.statusNarrow?.steps.length ?? 0) + scenario.zone.steps.length, 0),
     violations,
     scenarios: results,
-    screenshots: ["review-394-animations/round4b-mid-resize-1440.png", "review-394-animations/round4b-horizontal-scroll-1440.png", "review-394-animations/round4b-mobile-390.png"],
+    screenshots: ["review-394-animations/round4b-mid-resize-1440.png", "review-394-animations/round4b-horizontal-scroll-1440.png",
+      "review-394-animations/round4c-sticky-header-1440.png", "review-394-animations/round4b-mobile-390.png"],
   };
 }
 
@@ -1402,6 +1462,8 @@ console.log(JSON.stringify(resizeTraces?.scenarios.map((scenario) => {
   return {
     scenario: scenario.name,
     status: summarize(scenario.status),
+    statusNarrow: scenario.statusNarrow ? summarize(scenario.statusNarrow) : null,
+    trailingResizeColumn: scenario.zone.columnKey,
     zone: summarize(scenario.zone),
   };
 }) ?? [], null, 2));

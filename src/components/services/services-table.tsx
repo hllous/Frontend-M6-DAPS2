@@ -279,20 +279,17 @@ function ColumnResizeHandle({
     const activeDrag = drag.current;
     if (activeDrag?.pointerId !== event.pointerId) return;
     drag.current = null;
-    const table = event.currentTarget.closest<HTMLTableElement>("table");
-    if (table) {
-      delete table.dataset.columnResizing;
-      const tableWidth = Number.parseFloat(table.style.width);
-      if (activeDrag.scroller && tableWidth <= activeDrag.scroller.clientWidth) {
-        table.style.removeProperty("--column-resize-width-floor");
-      }
-    }
     if (activeDrag.scroller) {
       if (activeDrag.previousOverflowAnchor) {
         activeDrag.scroller.style.setProperty("overflow-anchor", activeDrag.previousOverflowAnchor);
       } else {
         activeDrag.scroller.style.removeProperty("overflow-anchor");
       }
+    }
+    const table = event.currentTarget.closest<HTMLTableElement>("table");
+    if (table) {
+      delete table.dataset.columnResizing;
+      table.style.removeProperty("--column-resize-width-floor");
     }
     if (typeof event.currentTarget.hasPointerCapture === "function" && event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -714,7 +711,7 @@ export function ServicesTable({
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
             <tr>
-              <th scope="col" data-column-key="ordinal" aria-label="Número de parada" className="sticky left-0 top-0 z-20 bg-inherit px-1 py-3 text-center">#</th>
+              <th scope="col" data-column-key="ordinal" aria-label="Número de parada" className="sticky left-0 top-0 z-20 bg-[var(--color-surface-subtle)] px-1 py-3 text-center">#</th>
               {currentColumns.map((col) => {
                 const isSorted = sortKey === col.key;
                 const isCompactDateSort = compactColumns && col.key === "service" && sortKey === "scheduled";
