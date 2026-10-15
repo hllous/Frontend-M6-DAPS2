@@ -68,24 +68,9 @@ import styles from "./services-workspace.module.css";
 import {
   ServicesColumnEditor,
   useServicesColumnPreferences,
-  type ServicesColumnVariant,
 } from "./services-column-editor";
 
 type Period = "semana" | "mes" | "todo";
-type MotionVariant = "a" | "b" | "c" | "d" | "e" | "f";
-type ColumnEditorVariant = ServicesColumnVariant;
-type PrototypeVariant = MotionVariant | ColumnEditorVariant;
-
-const motionVariants: MotionVariant[] = ["a", "b", "c", "d", "e", "f"];
-const prototypeVariants: PrototypeVariant[] = [...motionVariants, "1"];
-
-function parsePrototypeVariant(value: string | null): PrototypeVariant {
-  return prototypeVariants.includes(value as PrototypeVariant) ? value as PrototypeVariant : "1";
-}
-
-function isColumnEditorVariant(value: PrototypeVariant): value is ColumnEditorVariant {
-  return value === "1";
-}
 
 function getWorkspaceSplitStorageKey(userId: string): string {
   return `m6:services-workspace-split:v1:${encodeURIComponent(userId)}`;
@@ -250,13 +235,9 @@ export function ServicesWorkspace({
 
   // Layout presentation
   const [mobileDrawerSnap, setMobileDrawerSnap] = useState<InventoryMapDrawerSnapState>("half");
-  const [prototypeVariant, setPrototypeVariant] = useState<PrototypeVariant>(() => parsePrototypeVariant(getParam("variant")));
-  const columnEditorVariant = isColumnEditorVariant(prototypeVariant) ? prototypeVariant : null;
-  const motionVariant: MotionVariant = columnEditorVariant ? "d" : prototypeVariant as MotionVariant;
   const columnPreferences = useServicesColumnPreferences({
     userId: scenario?.actor.userId ?? "user-lucia",
-    variant: columnEditorVariant ?? "1",
-    enabled: Boolean(columnEditorVariant),
+    variant: "1",
     data: loadState.status === "ready" ? loadState.services : [],
   });
   const panelGroupRef = useGroupRef();
@@ -415,7 +396,6 @@ export function ServicesWorkspace({
     if (search.trim()) newParams.set("q", search.trim());
     if (selectedId) newParams.set("selected", selectedId);
     if (detailId) newParams.set("detail", detailId);
-    if (prototypeVariant !== "a" && prototypeVariant !== "1") newParams.set("variant", prototypeVariant);
     if (periodChoice) newParams.set("periodo", periodChoice);
     if (sortKey && sortKey !== "status") newParams.set("sort", sortKey);
     if (sortKey && sortDir !== "asc") newParams.set("dir", sortDir);
@@ -446,7 +426,6 @@ export function ServicesWorkspace({
     periodChoice,
     sortKey,
     sortDir,
-    prototypeVariant,
     columnFilters,
     isScheduleOpen,
     scheduleOrigin,
@@ -828,21 +807,11 @@ export function ServicesWorkspace({
     hasActiveFilters,
     onClearFilters: handleClearFilters,
     dense: isNarrow,
-    columnEditorVariant,
-    columnPreferences: columnEditorVariant ? columnPreferences : null,
+    columnPreferences,
   };
   const servicesTable = (
     <ServicesTable
       {...servicesTableProps}
-      compactOnPreview={!isNarrow && Boolean(selectedService)}
-      previewMotionVariant={motionVariant}
-    />
-  );
-  const servicesTableFull = (
-    <ServicesTable
-      {...servicesTableProps}
-      compactOnPreview={false}
-      previewMotionVariant={motionVariant}
     />
   );
 
@@ -1131,19 +1100,14 @@ export function ServicesWorkspace({
                   No se pudieron actualizar los servicios. Se mantienen los resultados anteriores.
                 </p>
               )}
-              {columnEditorVariant && <ServicesColumnEditor controller={columnPreferences} />}
+              <ServicesColumnEditor controller={columnPreferences} />
             </div>
 
             <div className={cn(
               "relative min-h-0 min-w-0 flex-1",
               isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout,
-              !isNarrow && selectedService && !["d", "e", "f"].includes(motionVariant) && styles.desktopWorkspaceLayoutOpen,
               styles.workspaceResults,
             )}
-            data-motion-variant={motionVariant}
-            data-column-editor={columnEditorVariant ?? undefined}
-            data-adaptive-preview={motionVariant === "d" ? "true" : undefined}
-            data-preview-open={selectedService ? "true" : "false"}
             data-refreshing={isRefreshing}
             aria-busy={isRefreshing}
           >
@@ -1179,7 +1143,7 @@ export function ServicesWorkspace({
                 </ResizablePanel>
 
                 <ResizableHandle
-                  withHandle={!columnEditorVariant}
+                  withHandle={false}
                   disabled={isNarrow}
                   aria-label="Ajustar ancho entre mapa y tabla"
                   className={cn(styles.mobileResizeHandle, isNarrow && "hidden")}
@@ -1192,7 +1156,7 @@ export function ServicesWorkspace({
                   style={{ overflow: "hidden" }}
                   className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}
                 >
-                  <div data-prototype-table-content className={cn("h-full min-h-0", isNarrow && "pointer-events-none")}>
+                  <div className={cn("h-full min-h-0", styles.tableContent, isNarrow && "pointer-events-none")}>
                     {isNarrow ? (
                       <InventoryMapDrawer
                         ariaLabel="Lista de servicios"
@@ -1211,23 +1175,6 @@ export function ServicesWorkspace({
                           </div>
                         </div>
                       </InventoryMapDrawer>
-                    ) : motionVariant === "f" ? (
-                      <div className={styles.tableSnapshots}>
-                        <div
-                          className={styles.tableSnapshotFull}
-                          aria-hidden={Boolean(selectedService)}
-                          inert={Boolean(selectedService)}
-                        >
-                          {servicesTableFull}
-                        </div>
-                        <div
-                          className={styles.tableSnapshotCompact}
-                          aria-hidden={!selectedService}
-                          inert={!selectedService}
-                        >
-                          {servicesTable}
-                        </div>
-                      </div>
                     ) : servicesTable}
                   </div>
                 </ResizablePanel>
@@ -1272,25 +1219,6 @@ export function ServicesWorkspace({
               )}
             </div>
           </div>
-        </div>
-      )}
-
-      {!columnEditorVariant && !isNarrow && (
-        <div className={styles.animationVariantSwitcher} role="group" aria-label="Comparar animaciones de vista previa">
-          {motionVariants.map((variant) => (
-            <Button
-              key={variant}
-              type="button"
-              size="sm"
-              variant={motionVariant === variant ? "default" : "outline"}
-              aria-label={`Variante ${variant.toUpperCase()}`}
-              aria-pressed={motionVariant === variant}
-              onClick={() => setPrototypeVariant(variant)}
-              className={styles.animationVariantButton}
-            >
-              {variant.toUpperCase()}
-            </Button>
-          ))}
         </div>
       )}
 

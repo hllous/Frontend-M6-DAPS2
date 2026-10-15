@@ -11,24 +11,8 @@ describe("optimistic session proxy", () => {
     expect(response?.headers.get("location")).toBe("http://localhost/login");
   });
 
-  it("preserves a Services motion variant across the signed-out redirect", () => {
-    const response = proxy(new NextRequest("http://localhost/app?destination=services&variant=b"));
-
-    expect(response?.headers.get("location")).toBe(
-      "http://localhost/login?destination=services&variant=b",
-    );
-  });
-
-  it("preserves the Services destination when no prototype variant is supplied", () => {
+  it("preserves the Services destination across the signed-out redirect", () => {
     const response = proxy(new NextRequest("http://localhost/app?destination=services"));
-
-    expect(response?.headers.get("location")).toBe(
-      "http://localhost/login?destination=services",
-    );
-  });
-
-  it.each(["1", "2", "3"])("returns removed column option %s to the single default", (variant) => {
-    const response = proxy(new NextRequest(`http://localhost/app?destination=services&variant=${variant}`));
 
     expect(response?.headers.get("location")).toBe(
       "http://localhost/login?destination=services",

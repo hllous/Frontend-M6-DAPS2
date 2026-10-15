@@ -1,11 +1,6 @@
 .desktopWorkspaceLayout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0fr);
-  transition: grid-template-columns 420ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.desktopWorkspaceLayoutOpen {
-  grid-template-columns: minmax(0, 1fr) minmax(0, min(24rem, 28vw));
+  position: relative;
+  display: block;
 }
 
 .workspaceResults {
@@ -127,255 +122,11 @@
   transform: translateX(0);
 }
 
-.desktopWorkspaceLayout[data-motion-variant="a"] {
-  transition: grid-template-columns 420ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="a"] .previewSurface {
-  transform: translateX(32px);
-  transition:
-    opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="a"] .previewRailOpen .previewSurface {
-  transform: translateX(0);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="a"] table[data-motion-variant="a"] col {
-  transition: width 420ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="a"] table[data-motion-variant="a"] th,
-.desktopWorkspaceLayout[data-motion-variant="a"] table[data-motion-variant="a"] td {
-  transition:
-    opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
-    padding-inline 420ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="a"] table[data-motion-variant="a"] [data-preview-collapse-column] {
-  overflow: hidden;
-  padding-inline: 0;
-  opacity: 0;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-.desktopWorkspaceLayout[data-motion-variant="b"] {
-  transition: grid-template-columns 520ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="b"] [data-prototype-table-content] {
-  opacity: 1;
-  transition: opacity 280ms ease-out;
-}
-
-.desktopWorkspaceLayout[data-motion-variant="b"][data-preview-open="true"] [data-prototype-table-content] {
-  opacity: 0.58;
-}
-
-.desktopWorkspaceLayout[data-motion-variant="b"] .previewSurface {
-  transform: none;
-  transition: opacity 280ms ease-in;
-}
-
-.desktopWorkspaceLayout[data-motion-variant="c"] .previewSurface {
-  clip-path: inset(10% 0 0);
-  transform: translateY(28px) scale(0.98);
-  transition:
-    clip-path 420ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="c"] .previewRailOpen .previewSurface {
-  clip-path: inset(0);
-  transform: translateY(0) scale(1);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="e"],
-.desktopWorkspaceLayout[data-motion-variant="f"] {
-  grid-template-columns: minmax(0, 100%) minmax(0, 0%);
-  transition: grid-template-columns 520ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="e"][data-preview-open="true"],
-.desktopWorkspaceLayout[data-motion-variant="f"][data-preview-open="true"] {
-  grid-template-columns: minmax(0, 67%) minmax(0, 33%);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="e"] .previewSurface,
-.desktopWorkspaceLayout[data-motion-variant="f"] .previewSurface {
-  clip-path: inset(10% 0 0);
-  transform: translateY(28px) scale(0.98);
-  transition:
-    clip-path 520ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 520ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="e"] .previewRailOpen .previewSurface,
-.desktopWorkspaceLayout[data-motion-variant="f"] .previewRailOpen .previewSurface {
-  clip-path: inset(0);
-  transform: translateY(0) scale(1);
-}
-
-.desktopWorkspaceLayout[data-adaptive-preview] [data-preview-clip],
-.desktopWorkspaceLayout[data-motion-variant="e"] [data-preview-clip],
-.desktopWorkspaceLayout[data-motion-variant="f"] [data-preview-clip] {
-  overflow-x: hidden;
-}
-
-.desktopWorkspaceLayout[data-motion-variant="e"] [data-preview-trailing-column] {
-  clip-path: inset(0);
-  opacity: 1;
-  transform: translateX(0);
-  transition:
-    clip-path 520ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 520ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="e"][data-preview-open="true"] [data-preview-trailing-column] {
-  clip-path: inset(0 0 0 100%);
-  opacity: 0;
-  transform: translateX(24px);
-}
-
-.desktopWorkspaceLayout[data-motion-variant="f"] [data-prototype-table-content] {
-  position: relative;
-  overflow: hidden;
-}
-
-.tableSnapshots {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.tableSnapshotFull,
-.tableSnapshotCompact {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  transition: opacity 520ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.tableSnapshotFull {
-  opacity: 1;
-}
-
-.tableSnapshotCompact {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.desktopWorkspaceLayout[data-motion-variant="f"][data-preview-open="true"] .tableSnapshotFull {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.desktopWorkspaceLayout[data-motion-variant="f"][data-preview-open="true"] .tableSnapshotCompact {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.desktopWorkspaceLayout[data-motion-variant="f"] table tbody tr {
-  height: 3.25rem;
-}
-
-.desktopWorkspaceLayout[data-motion-variant="f"] [data-service-select] > span > span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .desktopWorkspaceLayout[data-motion-variant="e"],
-  .desktopWorkspaceLayout[data-motion-variant="f"] {
-    transition-duration: 1ms;
-  }
-
-  .desktopWorkspaceLayout[data-motion-variant="e"] [data-preview-trailing-column] {
-    clip-path: inset(0);
-    opacity: 1;
-    transform: none;
-    transition-duration: 1ms;
-  }
-  .tableSnapshotFull,
-  .tableSnapshotCompact {
-    transition-duration: 1ms;
-  }
-}
-.animationVariantSwitcher {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 50;
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
-  background: var(--color-surface);
-}
-
-.animationVariantButton {
-  width: 32px;
-  min-width: 32px;
-  padding-inline: 0;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .desktopWorkspaceLayout {
-    transition-duration: 1ms;
-  }
-
-  .workspaceResults,
-  .previewSurface,
-  .mobileTablePane,
-  .mobilePreviewOverlay {
-    transform: none;
-    transition-duration: 1ms;
-  }
-
-  .desktopWorkspaceLayout[data-motion-variant] .previewSurface {
-    clip-path: none;
-    transform: none;
-    transition-duration: 1ms;
-  }
-
-  .desktopWorkspaceLayout[data-motion-variant] [data-prototype-table-content] {
-    clip-path: none;
-    opacity: 1;
-    transform: none;
-    transition-duration: 1ms;
-  }
-
-  .desktopWorkspaceLayout[data-motion-variant="a"] table[data-motion-variant="a"] col,
-  .desktopWorkspaceLayout[data-motion-variant="a"] table[data-motion-variant="a"] th,
-  .desktopWorkspaceLayout[data-motion-variant="a"] table[data-motion-variant="a"] td {
-    transition-duration: 1ms;
-  }
-}
-
-.desktopWorkspaceLayout[data-column-editor],
-.desktopWorkspaceLayout[data-adaptive-preview] {
-  position: relative;
-  display: block;
-}
-
-.desktopWorkspaceLayout[data-column-editor] > .panelGroup,
-.desktopWorkspaceLayout[data-adaptive-preview] > .panelGroup {
+.desktopWorkspaceLayout > .panelGroup {
   width: 100%;
 }
 
-.desktopWorkspaceLayout[data-column-editor] .previewRail,
-.desktopWorkspaceLayout[data-adaptive-preview] .previewRail {
+.desktopWorkspaceLayout .previewRail {
   position: absolute;
   z-index: 20;
   inset: 0 0 0 auto;
@@ -383,8 +134,7 @@
   pointer-events: none;
 }
 
-.desktopWorkspaceLayout[data-column-editor] .previewSurface,
-.desktopWorkspaceLayout[data-adaptive-preview] .previewSurface {
+.desktopWorkspaceLayout .previewSurface {
   opacity: 0;
   transform: translateX(24px);
   transition:
@@ -392,30 +142,25 @@
     transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.desktopWorkspaceLayout[data-column-editor][data-preview-open="true"] .previewRail,
-.desktopWorkspaceLayout[data-adaptive-preview][data-preview-open="true"] .previewRail {
+.desktopWorkspaceLayout .previewRailOpen {
   pointer-events: auto;
 }
 
-.desktopWorkspaceLayout[data-column-editor][data-preview-open="true"] .previewSurface,
-.desktopWorkspaceLayout[data-adaptive-preview][data-preview-open="true"] .previewSurface {
+.desktopWorkspaceLayout .previewRailOpen .previewSurface {
   opacity: 1;
   transform: translateX(0);
 }
 
-.desktopWorkspaceLayout[data-column-editor][data-preview-open="false"] .previewSurface,
-.desktopWorkspaceLayout[data-adaptive-preview][data-preview-open="false"] .previewSurface {
+.desktopWorkspaceLayout .previewRail:not(.previewRailOpen) .previewSurface {
   transition-duration: 280ms;
 }
 
-.desktopWorkspaceLayout[data-column-editor] [data-prototype-table-content],
-.desktopWorkspaceLayout[data-adaptive-preview] [data-prototype-table-content] {
-  filter: none;
-  opacity: 1;
+.desktopWorkspaceLayout [data-preview-clip] {
+  overflow-x: hidden;
 }
 
-.desktopWorkspaceLayout[data-column-editor] [data-prototype-table-content] tbody tr[aria-selected="false"],
-.mobileWorkspaceLayout[data-column-editor] [data-prototype-table-content] tbody tr[aria-selected="false"] {
+.desktopWorkspaceLayout .tableContent tbody tr[aria-selected="false"],
+.mobileWorkspaceLayout .tableContent tbody tr[aria-selected="false"] {
   filter: none;
   opacity: 1;
   background-color: var(--color-canvas);
@@ -431,16 +176,23 @@
   transition: none !important;
 }
 
-.desktopWorkspaceLayout[data-column-editor] [data-prototype-table-content] tbody tr[aria-selected="true"],
-.mobileWorkspaceLayout[data-column-editor] [data-prototype-table-content] tbody tr[aria-selected="true"] {
+.desktopWorkspaceLayout .tableContent tbody tr[aria-selected="true"],
+.mobileWorkspaceLayout .tableContent tbody tr[aria-selected="true"] {
   filter: none;
   opacity: 1;
   background-color: var(--color-surface);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .desktopWorkspaceLayout[data-column-editor] .previewSurface,
-  .desktopWorkspaceLayout[data-adaptive-preview] .previewSurface {
+  .workspaceResults,
+  .previewSurface,
+  .mobileTablePane,
+  .mobilePreviewOverlay {
+    transform: none;
+    transition-duration: 1ms;
+  }
+
+  .desktopWorkspaceLayout .previewSurface {
     transition-duration: 1ms;
   }
 }

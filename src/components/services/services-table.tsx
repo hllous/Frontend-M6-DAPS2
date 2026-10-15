@@ -38,7 +38,6 @@ import {
   SERVICES_COLUMN_DEFINITIONS,
   type ServicesColumnPreferencesController,
   type ServicesColumnKey,
-  type ServicesColumnVariant,
 } from "./services-column-editor";
 
 export type { SortDir, SortKey } from "./service-sorting";
@@ -343,8 +342,6 @@ export function ServicesTable({
   services,
   serviceOrdinals: suppliedServiceOrdinals,
   filterOptionsServices = services,
-  compactOnPreview = false,
-  previewMotionVariant = "a",
   selectedId,
   onSelect,
   sortKey,
@@ -355,14 +352,11 @@ export function ServicesTable({
   hasActiveFilters = false,
   onClearFilters,
   dense = false,
-  columnEditorVariant = null,
   columnPreferences = null,
 }: {
   services: Service[];
   serviceOrdinals?: ReadonlyMap<string, number>;
   filterOptionsServices?: Service[];
-  compactOnPreview?: boolean;
-  previewMotionVariant?: "a" | "b" | "c" | "d" | "e" | "f";
   selectedId: string | null;
   onSelect: (id: string) => void;
   sortKey: SortKey | null;
@@ -373,7 +367,6 @@ export function ServicesTable({
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
   dense?: boolean;
-  columnEditorVariant?: ServicesColumnVariant | null;
   columnPreferences?: ServicesColumnPreferencesController | null;
 }) {
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
@@ -386,10 +379,8 @@ export function ServicesTable({
   const columnAnimationId = useRef(0);
   const suppressSortClick = useRef(false);
   const [reorderAnnouncement, setReorderAnnouncement] = useState("");
-  const activeColumnPreferences = columnEditorVariant ? columnPreferences : null;
-  const animatedColumnCollapse = !dense && compactOnPreview && previewMotionVariant === "a";
-  const compactColumns = dense || (!activeColumnPreferences && compactOnPreview && (previewMotionVariant === "b" || previewMotionVariant === "c" || previewMotionVariant === "f"));
-  const stableDesktopPreviewTable = !dense && (previewMotionVariant === "d" || previewMotionVariant === "e" || previewMotionVariant === "f");
+  const activeColumnPreferences = columnPreferences;
+  const compactColumns = dense;
 
   useEffect(() => () => columnDragListenersCleanup.current?.(), []);
 
@@ -478,36 +469,32 @@ export function ServicesTable({
     onColumnFiltersChange({ ...columnFilters, crews: next });
   };
 
-  const columns: Array<{ key: ServicesColumnKey; label: string; hideWhenDense?: boolean }> = [
+  const columns: Array<{ key: ServicesColumnKey; label: string }> = [
     { key: "service", label: "Servicio" },
     { key: "status", label: "Estado" },
-    { key: "zone", label: "Zona", hideWhenDense: true },
-    { key: "crew", label: "Equipo", hideWhenDense: true },
-    { key: "scheduled", label: "Fecha", hideWhenDense: true },
+    { key: "zone", label: "Zona" },
+    { key: "crew", label: "Equipo" },
+    { key: "scheduled", label: "Fecha" },
   ];
   const columnByKey = new Map(columns.map((column) => [column.key, column]));
-  const tableOrder = activeColumnPreferences?.variant === "1"
-    ? activeColumnPreferences.table.getVisibleLeafColumns()
-      .filter((column) => column.id !== "ordinal")
-      .map((column) => column.id as ServicesColumnKey)
-    : null;
+  const tableOrder = activeColumnPreferences?.table.getVisibleLeafColumns()
+    .filter((column) => column.id !== "ordinal")
+    .map((column) => column.id as ServicesColumnKey);
   const preferredOrder = dragPreviewOrder ?? tableOrder ?? activeColumnPreferences?.preferences.order ?? DEFAULT_COLUMN_ORDER;
   const compactKeys = dense ? MOBILE_COMPACT_COLUMNS : LEGACY_COMPACT_COLUMNS;
   const currentColumns = preferredOrder
-    .filter((key) => !activeColumnPreferences || (activeColumnPreferences.variant === "1"
-      ? activeColumnPreferences.table.getColumn(key)?.getIsVisible() ?? activeColumnPreferences.preferences.visibility[key]
-      : activeColumnPreferences.preferences.visibility[key]))
+    .filter((key) => !activeColumnPreferences || (activeColumnPreferences.table.getColumn(key)?.getIsVisible()
+      ?? activeColumnPreferences.preferences.visibility[key]))
     .filter((key) => columnByKey.has(key))
     .filter((key) => !compactColumns || compactKeys.has(key))
     .map((key) => columnByKey.get(key)!);
-  const sizingColumns = currentColumns.filter((column) => !(animatedColumnCollapse && column.hideWhenDense));
-  const widthTotal = sizingColumns.reduce((sum, column) => {
+  const widthTotal = currentColumns.reduce((sum, column) => {
     const definition = SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === column.key)!;
-    return sum + (activeColumnPreferences?.variant === "1"
-      ? activeColumnPreferences.table.getColumn(column.key)?.getSize() ?? definition.defaultWidth
-      : activeColumnPreferences ? activeColumnPreferences.preferences.widths[column.key] : definition.defaultWidth);
+    return sum + (activeColumnPreferences?.table.getColumn(column.key)?.getSize()
+      ?? activeColumnPreferences?.preferences.widths[column.key]
+      ?? definition.defaultWidth);
   }, 0);
-  const ordinalWidth = dense || compactColumns ? 40 : 48;
+  const ordinalWidth = dense ? 40 : 48;
   const tablePixelWidth = ordinalWidth + widthTotal;
 
   useLayoutEffect(() => {
@@ -531,30 +518,22 @@ export function ServicesTable({
 
   function getDataColumnWidth(key: ServicesColumnKey): number {
     const definition = SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === key)!;
-    return activeColumnPreferences?.variant === "1"
-      ? activeColumnPreferences.table.getColumn(key)?.getSize() ?? definition.defaultWidth
-      : activeColumnPreferences ? activeColumnPreferences.preferences.widths[key] : definition.defaultWidth;
+    return activeColumnPreferences?.table.getColumn(key)?.getSize()
+      ?? activeColumnPreferences?.preferences.widths[key]
+      ?? definition.defaultWidth;
   }
 
   function setColumnWidth(key: ServicesColumnKey, width: number) {
     if (!activeColumnPreferences) return;
-    if (activeColumnPreferences.variant === "1") {
-      activeColumnPreferences.table.setColumnSizing((current) => ({
-        ...current,
-        [key]: width,
-      }));
-      return;
-    }
-    activeColumnPreferences.setWidth(key, width);
+    activeColumnPreferences.table.setColumnSizing((current) => ({
+      ...current,
+      [key]: width,
+    }));
   }
 
   function applyColumnOrder(order: ServicesColumnKey[], source: ServicesColumnKey) {
     if (!activeColumnPreferences) return;
-    if (activeColumnPreferences.variant === "1") {
-      activeColumnPreferences.table.setColumnOrder(["ordinal", ...order]);
-    } else {
-      activeColumnPreferences.setOrder(order);
-    }
+    activeColumnPreferences.table.setColumnOrder(["ordinal", ...order]);
     const label = SERVICES_COLUMN_DEFINITIONS.find((column) => column.key === source)?.label ?? source;
     setReorderAnnouncement(`${label}, posición ${order.indexOf(source) + 1} de ${order.length}.`);
   }
@@ -681,12 +660,11 @@ export function ServicesTable({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
       <div
-        data-preview-clip={stableDesktopPreviewTable ? "true" : undefined}
+        data-preview-clip={!dense ? "true" : undefined}
         className="min-h-0 flex-1 overflow-x-auto overflow-y-auto bg-[var(--color-surface)] [scrollbar-gutter:stable]"
       >
         <table
           ref={tableRef}
-          data-motion-variant={previewMotionVariant}
           className="min-w-full table-fixed border-collapse bg-[var(--color-surface)] text-left text-xs"
           aria-label="Servicios operativos"
           style={{
@@ -696,17 +674,13 @@ export function ServicesTable({
         >
           <colgroup>
             <col data-column-key="ordinal" style={{ width: `${ordinalWidth}px` }} />
-            {currentColumns.map((column) => {
-              const collapsed = Boolean(animatedColumnCollapse && column.hideWhenDense);
-              return (
-                <col
-                  key={column.key}
-                  data-column-key={column.key}
-                  data-preview-collapse-column={collapsed ? "true" : undefined}
-                  style={{ width: collapsed ? "0px" : `${getDataColumnWidth(column.key)}px` }}
-                />
-              );
-            })}
+            {currentColumns.map((column) => (
+              <col
+                key={column.key}
+                data-column-key={column.key}
+                style={{ width: `${getDataColumnWidth(column.key)}px` }}
+              />
+            ))}
             <col data-column-filler />
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
@@ -734,10 +708,6 @@ export function ServicesTable({
                     aria-keyshortcuts={activeColumnPreferences ? "Alt+ArrowLeft Alt+ArrowRight" : undefined}
                     tabIndex={activeColumnPreferences ? 0 : undefined}
                     data-column-key={col.key}
-                    data-preview-collapse-column={animatedColumnCollapse && col.hideWhenDense ? "true" : undefined}
-                    data-preview-trailing-column={compactOnPreview && previewMotionVariant === "e" && col.key !== "service" ? "true" : undefined}
-                    aria-hidden={animatedColumnCollapse && col.hideWhenDense ? true : compactOnPreview && previewMotionVariant === "e" && col.key !== "service" ? true : undefined}
-                    inert={animatedColumnCollapse && col.hideWhenDense || compactOnPreview && previewMotionVariant === "e" && col.key !== "service"}
                     data-column-dragging={draggedColumn === col.key ? "true" : undefined}
                     className={cn(
                       "relative select-none px-1 py-2",
@@ -894,9 +864,8 @@ export function ServicesTable({
                       <ColumnResizeHandle
                         columnKey={col.key}
                         label={col.label}
-                        width={activeColumnPreferences.variant === "1"
-                          ? activeColumnPreferences.table.getColumn(col.key)?.getSize() ?? activeColumnPreferences.preferences.widths[col.key]
-                          : activeColumnPreferences.preferences.widths[col.key]}
+                        width={activeColumnPreferences.table.getColumn(col.key)?.getSize()
+                          ?? activeColumnPreferences.preferences.widths[col.key]}
                         minimumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.minimumWidth}
                         maximumWidth={SERVICES_COLUMN_DEFINITIONS.find((item) => item.key === col.key)!.maximumWidth}
                         dense={dense}
@@ -936,9 +905,6 @@ export function ServicesTable({
                       ? activeColumnPreferences ? "bg-[var(--color-surface)]" : "bg-[var(--color-action)]/10"
                       : "hover:bg-[var(--color-canvas)]",
                   )}
-                  style={columnEditorVariant && isSelected
-                    ? { backgroundColor: "var(--color-surface)" }
-                    : undefined}
                 >
                   <td data-column-key="ordinal" className={cn("sticky left-0 z-10 bg-inherit text-center tabular-nums", dense ? "px-1 py-2" : "px-1.5 py-2")}>
                     <span
@@ -949,14 +915,8 @@ export function ServicesTable({
                     </span>
                   </td>
                   {currentColumns.map((column) => {
-                    const collapsed = Boolean(animatedColumnCollapse && column.hideWhenDense);
-                    const trailing = compactOnPreview && previewMotionVariant === "e" && column.key !== "service";
                     const cellAttributes = {
                       "data-column-key": column.key,
-                      "data-preview-collapse-column": collapsed ? "true" : undefined,
-                      "data-preview-trailing-column": trailing ? "true" : undefined,
-                      "aria-hidden": collapsed || trailing || undefined,
-                      inert: collapsed || trailing,
                     };
                     const content = (() => {
                       switch (column.key) {
