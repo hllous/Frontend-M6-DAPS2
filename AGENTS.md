@@ -26,6 +26,8 @@ Running `npm run dev` yourself against a Playwright `PLAYWRIGHT_BASE_URL` (repro
 
 Issues live in GitHub Issues (hllous/Frontend), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
+At triage, have the orchestrator or a human run `to-spec` on every issue before implementation and publish it as a spec labelled `ready-for-agent`; when the work does not fit one worker context or one reviewable PR, also run `to-tickets` to publish `ready-for-agent` sub-issues with `Blocked by` edges. Let those skills ask the PO questions, assign one ticket to each implementing agent, and keep fixes found while reviewing an existing ticket under that ticket's spec.
+
 ### Cross-repo changes
 
 Frontend and Backend are separate repos with separate issue trackers. When work here surfaces something the *other* repo needs to fix, add, or confirm — a backend gap, a contract question, a stale doc — file a GitHub issue in `hllous/Backend-M6-DAPS2` rather than only noting it locally (e.g. as a `CONTRACTS.md` "gap identified" row). Link back to whatever ticket/issue surfaced it. The same rule applies in reverse, from Backend to Frontend.
@@ -56,6 +58,8 @@ Build each UI element from its shadcn equivalent in `src/components/ui/`. Use a 
 4. Keep shadcn structure, `data-slot` attributes, and accessibility behavior intact.
 5. Use CSS Modules for layout only; style component appearance through theme tokens or UI variants.
 6. Format dates and times for `es-AR`, with Monday-first weeks, `dd/mm/aaaa`, and 24-hour time; preserve API value formats.
+
+`eslint-suppressions.json` only shrinks; run `npx eslint . --prune-suppressions` after fixing violations; adding entries needs PO approval; tables are owned by #520 and skeletons by #525.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
