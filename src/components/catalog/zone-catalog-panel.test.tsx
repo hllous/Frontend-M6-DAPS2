@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
+import { createSessionCookie } from "@/test/session";
 import { resetZoneFixtures, zoneFixtures } from "@/lib/zones-fixtures";
 import { ZoneCatalogPanel } from "./zone-catalog-panel";
 
@@ -273,5 +274,22 @@ describe("ZoneCatalogPanel component", () => {
     expect(screen.queryByRole("button", { name: /editar/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /dar de baja/i })).not.toBeInTheDocument();
     expect(screen.getAllByText("Solo lectura").length).toBeGreaterThan(0);
+  });
+
+  it("returns the BFF forbidden envelope for a Field write", async () => {
+    const fieldCookie = createSessionCookie("field-crew-leader-route", { mode: "mock" });
+    const response = await fetch("http://localhost/api/zones", {
+      method: "POST",
+      headers: { cookie: fieldCookie, "content-type": "application/json" },
+      body: JSON.stringify({ code: "Z-NEW", name: "Nueva" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      statusCode: 403,
+      message: "Solo el rol de Oficina puede crear zonas operativas.",
+      error: "Forbidden",
+      path: "/api/zones",
+    });
   });
 });
