@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
+import { createSessionCookie } from "@/test/session";
 import { paginateRouteFixtures, resetRouteFixtures, routeFixtures } from "@/lib/routes-fixtures";
 import { routesAdapter } from "@/lib/routes";
 import { resetZoneFixtures } from "@/lib/zones-fixtures";
@@ -590,6 +591,23 @@ describe("RouteCatalogPanel component", () => {
         expect(screen.queryByTestId("staleness-warning-dialog")).not.toBeInTheDocument();
         expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
       });
+    });
+  });
+
+  it("returns the BFF forbidden envelope for a Field write", async () => {
+    const fieldCookie = createSessionCookie("field-crew-leader-route", { mode: "mock" });
+    const response = await fetch("http://localhost/api/routes", {
+      method: "POST",
+      headers: { cookie: fieldCookie, "content-type": "application/json" },
+      body: JSON.stringify({ code: "R-NEW", name: "Nuevo" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      statusCode: 403,
+      message: "Solo el rol de Oficina puede crear recorridos.",
+      error: "Forbidden",
+      path: "/api/routes",
     });
   });
 });
