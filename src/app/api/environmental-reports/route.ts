@@ -7,6 +7,7 @@ import {
   addEnvironmentalReportFixture,
   createEnvironmentalReportFixture,
   filterEnvironmentalReportFixtures,
+  getSanctionOutcomeIntegrationExceptions,
   paginateEnvironmentalReportFixtures,
 } from "@/lib/environmental-report-fixtures";
 import {
@@ -121,7 +122,8 @@ export async function GET(request: Request) {
     }
 
     const filtered = filterEnvironmentalReportFixtures(query).filter((report) => visibleToField(report, scenario));
-    return NextResponse.json(paginateEnvironmentalReportFixtures(filtered, query.page, query.pageSize));
+    const page = paginateEnvironmentalReportFixtures(filtered, query.page, query.pageSize);
+    return NextResponse.json(scenario.actor.kind === "OFFICE" ? { ...page, sanctionOutcomeIntegrationExceptions: getSanctionOutcomeIntegrationExceptions() } : page);
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
