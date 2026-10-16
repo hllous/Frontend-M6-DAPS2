@@ -1,3 +1,5 @@
+"use client"
+
 import * as React from "react"
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
@@ -6,17 +8,23 @@ import { cn } from "@/lib/utils"
 
 import { Separator } from "@/components/ui/separator"
 
+// Project adaptation: Items inside an ItemGroup must expose listitem, or the group's
+// role="list" has no required children (axe aria-required-children).
+const ItemGroupContext = React.createContext(false)
+
 function ItemGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div
-      role="list"
-      data-slot="item-group"
-      className={cn(
-        "group/item-group flex w-full flex-col gap-4 has-data-[size=sm]:gap-2.5 has-data-[size=xs]:gap-2",
-        className
-      )}
-      {...props}
-    />
+    <ItemGroupContext.Provider value>
+      <div
+        role="list"
+        data-slot="item-group"
+        className={cn(
+          "group/item-group flex w-full flex-col gap-4 has-data-[size=sm]:gap-2.5 has-data-[size=xs]:gap-2",
+          className
+        )}
+        {...props}
+      />
+    </ItemGroupContext.Provider>
   )
 }
 
@@ -27,6 +35,8 @@ function ItemSeparator({
   return (
     <Separator
       data-slot="item-separator"
+      role="none"
+      aria-orientation={undefined}
       orientation="horizontal"
       className={cn("my-2", className)}
       {...props}
@@ -63,11 +73,15 @@ function Item({
   render,
   ...props
 }: useRender.ComponentProps<"div"> & VariantProps<typeof itemVariants>) {
-  return useRender({
+  const inGroup = React.useContext(ItemGroupContext)
+  // A rendered Item is an interactive element (link, button): it keeps its own role and
+  // listitem goes on a wrapper. A static Item carries listitem itself.
+  const element = useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(
       {
         className: cn(itemVariants({ variant, size, className })),
+        ...(inGroup && !render ? { role: "listitem" } : {}),
       },
       props
     ),
@@ -78,6 +92,15 @@ function Item({
       size,
     },
   })
+
+  if (inGroup && render) {
+    return (
+      <div role="listitem" data-slot="item-listitem" className="w-full">
+        {element}
+      </div>
+    )
+  }
+  return element
 }
 
 const itemMediaVariants = cva(

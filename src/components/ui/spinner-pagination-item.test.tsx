@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { Item, ItemContent, ItemDescription, ItemTitle } from "./item";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "./item";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./pagination";
 import { Spinner } from "./spinner";
 
@@ -106,5 +106,34 @@ describe("shadcn Item", () => {
     await userEvent.setup().tab();
     expect(link).toHaveFocus();
     expect(link).toHaveClass("focus-visible:outline-[3px]", "focus-visible:outline-[var(--color-focus)]", "[a]:min-h-10");
+  });
+});
+
+describe("shadcn ItemGroup list semantics", () => {
+  it("exposes every Item in a group as a listitem, keeping links as links", () => {
+    render(
+      <ItemGroup>
+        <Item>
+          <ItemContent>
+            <ItemTitle>Estática</ItemTitle>
+          </ItemContent>
+        </Item>
+        <ItemSeparator />
+        <Item render={<a href="#x" />}>
+          <ItemContent>
+            <ItemTitle>Enlace</ItemTitle>
+          </ItemContent>
+        </Item>
+      </ItemGroup>,
+    );
+    const list = screen.getByRole("list");
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(list).getByRole("link", { name: "Enlace" })).toHaveAttribute("data-slot", "item");
+    expect(within(list).queryByRole("separator")).toBeNull();
+  });
+
+  it("adds no role to an Item outside a group", () => {
+    render(<Item>Suelta</Item>);
+    expect(screen.queryByRole("listitem")).toBeNull();
   });
 });

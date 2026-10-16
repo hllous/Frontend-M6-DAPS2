@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 // Real components on the dev-only fixture route (src/app/prototype/ui-components).
@@ -68,4 +69,14 @@ test.describe("shadcn Spinner, Pagination and Item", () => {
     await expect(page).toHaveURL(/#detalle$/);
     await expect(section(page).getByText("Fila estática")).toBeVisible();
   });
+});
+
+test("the fixture section has no axe violations, including the Item list", async ({ page }) => {
+  await page.goto("/prototype/ui-components");
+  const results = await new AxeBuilder({ page })
+    .include('[data-testid="ui-spinner-pagination-item"]')
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
+  await expect(section(page).locator("[data-slot=item-group]").getByRole("listitem")).toHaveCount(2);
 });
