@@ -6,6 +6,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { handlers } from "@/mocks/handlers";
+import { serviceRouteHandlers } from "@/mocks/service-route-handlers";
+import { createSessionCookie } from "@/test/session";
 import { withNodeFile } from "@/mocks/node-file";
 import { servicesAdapter, type Service } from "@/lib/services";
 import { resetServiceFixtures, resetZoneResultFixtures, updateServiceFixture } from "@/lib/services-fixtures";
@@ -242,6 +244,11 @@ describe("InspectionExecutionPanel", () => {
   it("guides the crew to close the still-open POINT service with the zone result after the inspection (#295)", async () => {
     const user = userEvent.setup();
     const complete = vi.spyOn(servicesAdapter, "complete");
+    // Zone results and completion are Field crew actions; SVC-1072 belongs to Cuadrilla C.
+    server.use(...serviceRouteHandlers(createSessionCookie("field-crew-leader-route", {
+      mode: "mock",
+      crew: { id: "crew-c", name: "Cuadrilla C · Ibáñez" },
+    })));
     const openService = updateServiceFixture("SVC-1072", { status: "IN_PROGRESS" })!;
     updateEnvironmentalInspectionFixture("INS-1005", { outcome: "NO_VIOLATION", nextStep: "CASE_CLOSED", conclusion: "Sin emisiones al momento de la visita.", inspectedAt: "2026-09-05T14:00:00.000Z" });
     function Harness() {
