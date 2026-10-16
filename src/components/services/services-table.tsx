@@ -28,6 +28,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatCalendarDay } from "@/lib/argentina-date";
 import type { Service, ServiceStatus } from "@/lib/services";
 import { STATUS_LABEL } from "@/lib/services";
@@ -115,37 +116,12 @@ function ColumnFilterPopover({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      e.stopPropagation();
-      setOpen(false);
-      triggerRef.current?.focus();
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
 
   return (
-    <div className="relative inline-block" ref={ref}>
-      <button
-        ref={triggerRef}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
+        onPointerDown={(event) => event.stopPropagation()}
         aria-label={`Filtrar por ${label}`}
         className={cn(
           "inline-flex size-6 items-center justify-center rounded-md p-1 transition-colors hover:bg-[var(--color-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]",
@@ -153,30 +129,30 @@ function ColumnFilterPopover({
         )}
       >
         <Filter className={cn("h-3.5 w-3.5", active && "fill-[var(--color-action)]/20")} aria-hidden />
-      </button>
+      </PopoverTrigger>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label={`Filtro de ${label}`}
-          className="absolute right-0 top-full z-50 mt-1 min-w-[220px] rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-left"
-        >
-          <div className="mb-2 flex items-center justify-between border-b border-[var(--color-border)] pb-2 text-xs font-semibold text-[var(--color-text)]">
-            <span className="capitalize">{label}</span>
-            {active && (
-              <button
-                type="button"
-                onClick={onClear}
-                className="text-[11px] text-[var(--color-action)] hover:underline"
-              >
-                Limpiar
-              </button>
-            )}
-          </div>
-          {children}
+      <PopoverContent
+        align="end"
+        side="bottom"
+        sideOffset={4}
+        aria-label={`Filtro de ${label}`}
+        className="w-auto min-w-[220px] gap-0 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-left text-xs text-[var(--color-text)] shadow-none ring-0"
+      >
+        <div className="mb-2 flex items-center justify-between border-b border-[var(--color-border)] pb-2 text-xs font-semibold text-[var(--color-text)]">
+          <span className="capitalize">{label}</span>
+          {active && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="text-[11px] text-[var(--color-action)] hover:underline"
+            >
+              Limpiar
+            </button>
+          )}
         </div>
-      )}
-    </div>
+        {children}
+      </PopoverContent>
+    </Popover>
   );
 }
 
