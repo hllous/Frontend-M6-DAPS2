@@ -188,7 +188,7 @@ A vertical slice attached to Phase 1, not a horizontal sweep across every domain
 **Acceptance evidence**: see `CONTRACTS.md` → [EnvironmentalReport workflow](CONTRACTS.md#environmentalreport-workflow) and → [Evidence workflow](CONTRACTS.md#evidence-workflow) for the binding reopen/late-update/terminal-state and evidence-upload rules — not restated here. Additionally:
 - Creating a `RepairRequest` from an EnvironmentalInspection is now available (Phase 3's extension).
 - Notice issuance is blocked without a resolved `establishmentId` until the M4 establishment-directory adapter is real; until then it runs against the typed, replaceable stub the gate describes.
-- The Office possible-duplicate warning for EnvironmentalReports is deferred until Backend exposes a signal ([Backend #285](https://github.com/hllous/Backend-M6-DAPS2/issues/285); tracked by [Frontend #413](https://github.com/hllous/Frontend-M6-DAPS2/issues/413)).
+- No possible-duplicate warning for EnvironmentalReports (PO decision 2026-10-16, [#413](https://github.com/hllous/Frontend-M6-DAPS2/issues/413)): only exact duplicates matter, and those are already prevented (backend-generated IDs; the create dialog blocks double submit).
 
 **Unblocks**: Phase 7.
 
