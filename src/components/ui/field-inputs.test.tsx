@@ -19,9 +19,9 @@ function renderForm({ invalid = false }: { invalid?: boolean } = {}) {
     <FieldGroup>
       <Field data-invalid={invalid || undefined}>
         <FieldLabel htmlFor="name">Nombre</FieldLabel>
-        <Input id="name" aria-invalid={invalid || undefined} aria-describedby="name-help" />
+        <Input id="name" aria-invalid={invalid || undefined} aria-describedby={invalid ? "name-help name-error" : "name-help"} />
         <FieldDescription id="name-help">Como figura en el padrón</FieldDescription>
-        {invalid ? <FieldError>El nombre es obligatorio</FieldError> : null}
+        {invalid ? <FieldError id="name-error">El nombre es obligatorio</FieldError> : null}
       </Field>
       <Field>
         <FieldLabel htmlFor="notes">Notas</FieldLabel>
@@ -102,6 +102,44 @@ describe("shadcn Field, Label, Input and Textarea", () => {
   it("renders no alert without an error", () => {
     renderForm();
 
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("describes the control with its error when wired through aria-describedby", () => {
+    renderForm({ invalid: true });
+
+    expect(screen.getByRole("textbox", { name: "Nombre" })).toHaveAccessibleDescription(
+      "Como figura en el padrón El nombre es obligatorio",
+    );
+  });
+
+  it("styles the invalid Field and its label with the destructive token", () => {
+    const { container } = renderForm({ invalid: true });
+
+    expect(container.querySelector('[data-slot="field"]')).toHaveClass("data-[invalid=true]:text-destructive", "flex", "gap-2");
+    expect(container.querySelector('[data-slot="label"]')).toHaveClass("text-sm", "font-medium");
+    expect(container.querySelector('[data-slot="field-error"]')).toHaveClass("text-destructive");
+  });
+
+  it("labels a control by wrapping it", () => {
+    render(
+      <Label>
+        Teléfono
+        <Input />
+      </Label>,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Teléfono" })).toBeInTheDocument();
+  });
+
+  it("renders FieldError from an errors list: one message, deduplicated lists, nothing when empty", () => {
+    const { rerender } = render(<FieldError errors={[{ message: "Obligatorio" }]} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Obligatorio");
+
+    rerender(<FieldError errors={[{ message: "Obligatorio" }, { message: "Obligatorio" }, { message: "Muy corto" }]} />);
+    expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Obligatorio", "Muy corto"]);
+
+    rerender(<FieldError errors={[]} />);
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });

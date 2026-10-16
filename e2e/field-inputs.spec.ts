@@ -53,8 +53,8 @@ const markup = renderToStaticMarkup(
           Field,
           { "data-invalid": true },
           h(FieldLabel, { htmlFor: "fx-email" }, "Correo"),
-          h(Input, { id: "fx-email", "aria-invalid": true }),
-          h(FieldError, null, "El correo es obligatorio"),
+          h(Input, { id: "fx-email", "aria-invalid": true, "aria-errormessage": "fx-email-error" }),
+          h(FieldError, { id: "fx-email-error" }, "El correo es obligatorio"),
         ),
         h(Field, null, h(FieldLabel, { htmlFor: "fx-notes" }, "Notas"), h(Textarea, { id: "fx-notes" })),
         h(Label, { htmlFor: "fx-solo" }, "Etiqueta suelta"),
@@ -90,6 +90,9 @@ test.describe("shadcn Field, Label, Input and Textarea", () => {
 
       const fontSize = await page.locator("#fx-name").evaluate((el) => getComputedStyle(el).fontSize);
       expect(fontSize).toBe(width <= 760 ? "16px" : "14px");
+
+      const label = await page.locator('[data-slot="field-label"]').first().evaluate((el) => getComputedStyle(el).fontSize);
+      expect(label).toBe("14px");
 
       const border = await page.locator("#fx-name").evaluate((el) => getComputedStyle(el).borderTopColor);
       expect(border).toBe("rgb(112, 132, 154)");
@@ -136,6 +139,7 @@ test.describe("shadcn Field, Label, Input and Textarea", () => {
 
     await expect(page.getByRole("alert")).toHaveText("El correo es obligatorio");
     await expect(page.getByRole("textbox", { name: "Correo" })).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByRole("textbox", { name: "Correo" })).toHaveAccessibleErrorMessage("El correo es obligatorio");
     await expect(page.locator('[data-slot="field"][data-invalid="true"]')).toHaveCount(1);
   });
 });
