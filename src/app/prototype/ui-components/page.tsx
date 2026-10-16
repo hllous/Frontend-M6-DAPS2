@@ -8,6 +8,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@/components/ui/item";
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Spinner } from "@/components/ui/spinner";
+import { InboxIcon } from "lucide-react";
 
 /**
  * Review surface and Playwright fixture for the shared shadcn components in
@@ -155,6 +159,54 @@ export default function UiComponentsPage() {
             </FieldContent>
           </Field>
         </FieldGroup>
+      </section>
+
+      {/* Section: spinner, pagination, item (#545) */}
+      <section data-testid="ui-spinner-pagination-item" aria-labelledby="ui-spi-title" className="flex max-w-md flex-col gap-6">
+        <h2 id="ui-spi-title" className="text-lg font-semibold">
+          Indicador de carga, paginación y fila
+        </h2>
+        <Spinner />
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious href="#pagina-1" />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationLink href="#pagina-1">1</PaginationLink>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationLink href="#pagina-2" isActive>
+                2
+              </PaginationLink>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationEllipsis />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext href="#pagina-3" />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+        <ItemGroup>
+          <Item variant="outline">
+            <ItemMedia variant="icon">
+              <InboxIcon />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>Fila estática</ItemTitle>
+              <ItemDescription>Sin acción</ItemDescription>
+            </ItemContent>
+          </Item>
+          <ItemSeparator />
+          <Item variant="outline" render={<a href="#detalle" />}>
+            <ItemContent>
+              <ItemTitle>Fila con enlace</ItemTitle>
+              <ItemDescription>Se activa con el teclado</ItemDescription>
+            </ItemContent>
+            <ItemActions>Abrir</ItemActions>
+          </Item>
+        </ItemGroup>
       </section>
     </main>
   );
