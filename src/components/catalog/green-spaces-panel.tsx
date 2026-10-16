@@ -9,7 +9,7 @@ import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
 import { formControlClass } from "@/components/ui/form-control";
 import { greenSpacesAdapter, greenSpaceTypeSchema, type GreenSpace, type GreenSpaceQuery, type GreenSpaceType } from "@/lib/green-spaces";
 import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";

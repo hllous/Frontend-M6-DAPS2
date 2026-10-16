@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/legacy-field";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { confirmRescheduleInputSchema, servicesAdapter, type Service } from "@/lib/services";
 

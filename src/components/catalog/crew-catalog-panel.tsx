@@ -9,7 +9,7 @@ import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { crewsAdapter, crewTypeSchema, shiftSchema, type Crew, type CrewQuery, type CrewType, type Shift } from "@/lib/crews";
 import { m1IdentityAdapter, type M1IdentityReference } from "@/lib/m1-identity";

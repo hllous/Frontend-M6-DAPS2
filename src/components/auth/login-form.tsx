@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
 import type { AuthMode } from "@/lib/session";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import type { OperationalScenario, ScenarioId } from "@/lib/scenarios";

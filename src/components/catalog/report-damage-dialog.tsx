@@ -19,7 +19,7 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field";
+} from "@/components/ui/legacy-field";
 import {
   containersAdapter,
   ContainerRequestError,

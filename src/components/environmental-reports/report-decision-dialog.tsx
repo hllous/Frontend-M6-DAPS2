@@ -5,7 +5,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/legacy-field";
 import { MAX_REASON_LENGTH } from "@/lib/input-limits";
 
 export type ReportDecision = "forward" | "dismiss";

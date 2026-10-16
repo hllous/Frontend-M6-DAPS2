@@ -7,7 +7,7 @@ import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
 import { formControlClass } from "@/components/ui/form-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { disposalSiteTypeSchema, disposalSitesAdapter, DisposalSiteRequestError, type DisposalSite, type DisposalSiteType } from "@/lib/disposal-sites";
