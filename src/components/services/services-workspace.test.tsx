@@ -5,6 +5,8 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
+import { serviceRouteHandlers } from "@/mocks/service-route-handlers";
+import { createSessionCookie } from "@/test/session";
 import { scenarios } from "@/lib/scenarios";
 import {
   resetStreetClosureRequestFixtures,
@@ -779,6 +781,8 @@ describe("ServicesWorkspace component", () => {
   });
 
   it("reflects the closed POINT service in the detail after the crew completes it from the inspection guide (#295)", async () => {
+    // Zone results and completion are Field crew actions on the crew's own service.
+    server.use(...serviceRouteHandlers(createSessionCookie("field-crew-leader-route", { mode: "mock" })));
     updateServiceFixture("SVC-1112", { status: "IN_PROGRESS" });
     updateEnvironmentalInspectionFixture("INS-1012", { outcome: "NO_VIOLATION", nextStep: "CASE_CLOSED", conclusion: "Sin emisiones.", inspectedAt: "2026-09-07T11:00:00.000Z" });
     window.history.replaceState(null, "", "/app?detail=SVC-1112");
