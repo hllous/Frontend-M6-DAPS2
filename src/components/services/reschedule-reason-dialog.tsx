@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/legacy-field";
 import { servicesAdapter, type Service } from "@/lib/services";
 import { MAX_REASON_LENGTH } from "@/lib/input-limits";
 
