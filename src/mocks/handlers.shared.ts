@@ -96,7 +96,6 @@ import {
 } from "@/lib/green-spaces";
 import { addGreenPointFixture, filterGreenPointFixtures, greenPointFixtures, paginateGreenPointFixtures, updateGreenPointFixture } from "@/lib/green-point-fixtures";
 import { greenPointCreateInputSchema, greenPointUpdateInputSchema, wasteTypeSchema, type GreenPointQuery } from "@/lib/green-points";
-import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "@/lib/indicator-fixtures";
 import { addTreeFixture, filterTreeFixtures, paginateTreeFixtures, treeFixtures, updateTreeFixture } from "@/lib/tree-fixtures";
 import { treeCreateInputSchema, treeUpdateInputSchema, type TreeQuery } from "@/lib/trees";
 import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures, getTreeSurveyFixture, paginateTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
@@ -159,40 +158,11 @@ import {
   streetClosureRequestQuerySchema,
 } from "@/lib/street-closure-requests";
 import {
-  referralFromRepairRequest,
-  referralFromStreetClosureRequest,
-} from "@/lib/referrals";
-import { repairRequestFixtures } from "@/lib/repair-request-fixtures";
-import { streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
-import {
   addAttachmentToInspection,
-  addEnvironmentalInspectionFixture,
-  addEnvironmentalReportFixture,
-  createEnvironmentalInspectionFixture,
-  createEnvironmentalReportFixture,
-  filterEnvironmentalReportFixtures,
   getEnvironmentalInspectionFixture,
   getInspectionAttachments,
-  getEnvironmentalReportFixture,
-  getSanctionOutcomeIntegrationExceptions,
-  getViolationNoticeFixture,
-  listEnvironmentalInspectionFixtures,
-  paginateEnvironmentalReportFixtures,
-  addViolationNoticeFixture,
-  createViolationNoticeFixture,
   updateEnvironmentalInspectionFixture,
-  transitionEnvironmentalReportFixture,
 } from "@/lib/environmental-report-fixtures";
-import {
-  createEnvironmentalReportInputSchema,
-  environmentalInspectionCompleteInputSchema,
-  environmentalInspectionScheduleInputSchema,
-  issueViolationNoticeInputSchema,
-  environmentalReportPrioritySchema,
-  environmentalReportStatusSchema,
-  environmentalReportTypeSchema,
-  type EnvironmentalReportStatus,
-} from "@/lib/environmental-reports";
 
 const scenarioIds = new Set(Object.values(scenarios).map((scenario) => scenario.id));
 
@@ -347,18 +317,6 @@ function streetClosureRequestQueryFromUrl(url: string) {
   });
 }
 
-function environmentalReportTransitionResponse(
-  id: string,
-  expected: EnvironmentalReportStatus | EnvironmentalReportStatus[],
-  next: EnvironmentalReportStatus,
-) {
-  const report = getEnvironmentalReportFixture(id);
-  if (!report) return HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${id}` }, { status: 404 });
-  const expectedStatuses = Array.isArray(expected) ? expected : [expected];
-  if (!expectedStatuses.includes(report.status)) return HttpResponse.json({ statusCode: 409, message: `La transición no es válida para el estado actual: ${report.status}.`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${id}` }, { status: 409 });
-  return HttpResponse.json(transitionEnvironmentalReportFixture(id, next));
-}
-
 export const handlers = [
   http.get("*/api/mock/scenarios", () => HttpResponse.json(Object.values(scenarios))),
   http.get("*/api/mock/scenarios/:scenarioId", ({ params }) => {
@@ -370,129 +328,6 @@ export const handlers = [
 
     return HttpResponse.json(getScenario(scenarioId as ScenarioId));
   }),
-  http.get("*/api/referrals", () => HttpResponse.json({
-    data: [
-      ...repairRequestFixtures.map(referralFromRepairRequest),
-      ...streetClosureRequestFixtures.map(referralFromStreetClosureRequest),
-    ],
-    meta: { total: repairRequestFixtures.length + streetClosureRequestFixtures.length },
-  })),
-  // ── EnvironmentalReport case file (#132) ─────────────────────────────────
-  http.get("*/api/environmental-reports", ({ request }) => {
-    const params = new URL(request.url).searchParams;
-    const query = {
-      status: environmentalReportStatusSchema.safeParse(params.get("status")).data,
-      reportType: environmentalReportTypeSchema.safeParse(params.get("reportType")).data,
-      priority: environmentalReportPrioritySchema.safeParse(params.get("priority")).data,
-      publicId: params.get("publicId") ?? undefined,
-      ticketId: params.get("ticketId") ?? undefined,
-      search: params.get("search") ?? undefined,
-      page: params.has("page") ? Number(params.get("page")) : undefined,
-      pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
-    };
-    const page = paginateEnvironmentalReportFixtures(filterEnvironmentalReportFixtures(query), query.page, query.pageSize);
-    return HttpResponse.json({ ...page, sanctionOutcomeIntegrationExceptions: getSanctionOutcomeIntegrationExceptions() });
-  }),
-  http.get("*/api/environmental-reports/:reportId", ({ params }) => {
-    const report = getEnvironmentalReportFixture(params.reportId as string);
-    return report ? HttpResponse.json(report) : HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${params.reportId}` }, { status: 404 });
-  }),
-  http.post("*/api/environmental-reports", async ({ request }) => {
-    const parsed = createEnvironmentalReportInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/environmental-reports" }, { status: 400 });
-    const created = createEnvironmentalReportFixture(parsed.data, "crew-b");
-    addEnvironmentalReportFixture(created);
-    return HttpResponse.json(created, { status: 201 });
-  }),
-  http.get("*/api/environmental-reports/:reportId/inspections", ({ params }) => {
-    const report = getEnvironmentalReportFixture(params.reportId as string);
-    if (!report) return HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${params.reportId}/inspections` }, { status: 404 });
-    return HttpResponse.json(listEnvironmentalInspectionFixtures(params.reportId as string));
-  }),
-  http.post("*/api/environmental-reports/:reportId/inspections", async ({ params, request }) => {
-    const reportId = params.reportId as string;
-    const report = getEnvironmentalReportFixture(reportId);
-    if (!report) return HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${reportId}/inspections` }, { status: 404 });
-    const parsed = environmentalInspectionScheduleInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${reportId}/inspections` }, { status: 400 });
-
-    const active = listEnvironmentalInspectionFixtures(reportId).find((inspection) => !inspection.outcome);
-    if (active && report.status === "INSPECTION_SCHEDULED") {
-      return HttpResponse.json(updateEnvironmentalInspectionFixture(active.id, {
-        scheduledDate: parsed.data.scheduledDate,
-        timeWindow: parsed.data.timeWindow,
-        checklistVersion: parsed.data.checklistVersion,
-        checklist: parsed.data.checklist,
-        notes: parsed.data.notes ?? null,
-      }));
-    }
-    const isFirstSchedule = report.status === "UNDER_REVIEW";
-    const isReinspection = report.status === "INSPECTED" && listEnvironmentalInspectionFixtures(reportId).some((inspection) => inspection.outcome === "INCONCLUSIVE");
-    if (!isFirstSchedule && !isReinspection) return HttpResponse.json({ statusCode: 409, message: `Solo se puede programar una inspección desde el estado actual: ${report.status}.`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/environmental-reports/${reportId}/inspections` }, { status: 409 });
-    const created = createEnvironmentalInspectionFixture(reportId, parsed.data);
-    addEnvironmentalInspectionFixture(created);
-    transitionEnvironmentalReportFixture(reportId, "INSPECTION_SCHEDULED");
-    return HttpResponse.json(created, { status: 201 });
-  }),
-  // ── EnvironmentalInspection execution / M6 issue #134 ────────────────────
-  http.get("*/api/environmental-inspections/:inspectionId", ({ params }) => {
-    const inspection = getEnvironmentalInspectionFixture(params.inspectionId as string);
-    return inspection
-      ? HttpResponse.json(inspection)
-      : HttpResponse.json({ statusCode: 404, message: "Inspección no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${params.inspectionId}` }, { status: 404 });
-  }),
-  http.post("*/api/environmental-inspections/:inspectionId/complete", async ({ params, request }) => {
-    const inspectionId = params.inspectionId as string;
-    const inspection = getEnvironmentalInspectionFixture(inspectionId);
-    if (!inspection) return HttpResponse.json({ statusCode: 404, message: "Inspección no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 404 });
-    const parsed = environmentalInspectionCompleteInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
-    if (parsed.data.outcome !== "NO_VIOLATION" && !(inspection.attachments?.length ?? 0)) return HttpResponse.json({ statusCode: 400, message: "Debe adjuntar al menos una evidencia para este resultado.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
-    const nextStep = parsed.data.outcome === "NO_VIOLATION" ? "CASE_CLOSED" : parsed.data.outcome === "VIOLATION_FOUND" ? "NOTICE_TO_BE_ISSUED" : "REINSPECTION";
-    const expectedChecklistIds = new Set((inspection.checklist ?? []).map((item) => item.id));
-    if (parsed.data.checklist.length !== expectedChecklistIds.size || parsed.data.checklist.some((item) => !expectedChecklistIds.has(item.id))) return HttpResponse.json({ statusCode: 400, message: "El checklist enviado no coincide con el checklist asignado.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${inspectionId}/complete` }, { status: 400 });
-    const updated = updateEnvironmentalInspectionFixture(inspectionId, {
-      inspectedAt: parsed.data.inspectedAt,
-      outcome: parsed.data.outcome,
-      nextStep: parsed.data.nextStep ?? nextStep,
-      findings: parsed.data.findings ?? null,
-      violationType: parsed.data.violationType ?? null,
-      severity: parsed.data.severity ?? null,
-      suggestedAction: parsed.data.suggestedAction ?? null,
-      conclusion: parsed.data.conclusion ?? inspection.conclusion,
-    });
-    if (updated?.serviceId) updateServiceFixture(updated.serviceId, { status: "COMPLETED" });
-    transitionEnvironmentalReportFixture(inspection.reportId, parsed.data.outcome === "NO_VIOLATION" ? "NO_VIOLATION" : parsed.data.outcome === "VIOLATION_FOUND" ? "VIOLATION_FOUND" : "INSPECTED");
-    return HttpResponse.json(updated);
-  }),
-  // ── ViolationNotice issuance / M6 issue #135 ─────────────────────────────
-  http.get("*/api/environmental-inspections/:inspectionId/violation-notice", ({ params }) => {
-    const notice = getViolationNoticeFixture(params.inspectionId as string);
-    return notice
-      ? HttpResponse.json(notice)
-      : HttpResponse.json({ statusCode: 404, message: "La inspección no tiene un acta emitida.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/environmental-inspections/${params.inspectionId}/violation-notice` }, { status: 404 });
-  }),
-  http.post("*/api/environmental-inspections/:inspectionId/violation-notice", async ({ params, request }) => {
-    const inspectionId = params.inspectionId as string;
-    const path = `/api/environmental-inspections/${inspectionId}/violation-notice`;
-    const inspection = getEnvironmentalInspectionFixture(inspectionId);
-    if (!inspection) return HttpResponse.json({ statusCode: 404, message: "Inspección no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path }, { status: 404 });
-    const parsed = issueViolationNoticeInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path }, { status: 400 });
-    if (inspection.outcome !== "VIOLATION_FOUND") return HttpResponse.json({ statusCode: 409, message: "Solo se puede emitir un acta sobre una inspección completada con infracción constatada.", error: "Conflict", timestamp: new Date().toISOString(), path }, { status: 409 });
-    if (!(inspection.attachments?.length ?? 0)) return HttpResponse.json({ statusCode: 400, message: "Debe adjuntar al menos una evidencia a la inspección antes de emitir el acta.", error: "Bad Request", timestamp: new Date().toISOString(), path }, { status: 400 });
-    if (getViolationNoticeFixture(inspectionId)) return HttpResponse.json({ statusCode: 409, message: "La inspección ya tiene un acta emitida. Las correcciones requieren una nueva inspección.", error: "Conflict", timestamp: new Date().toISOString(), path }, { status: 409 });
-    if (!getEnvironmentalReportFixture(inspection.reportId)) return HttpResponse.json({ statusCode: 404, message: "Expediente ambiental no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path }, { status: 404 });
-
-    const notice = createViolationNoticeFixture(inspectionId, parsed.data);
-    addViolationNoticeFixture(notice);
-    transitionEnvironmentalReportFixture(inspection.reportId, notice.establishmentId ? "NOTICE_ISSUED" : "CLOSED");
-    return HttpResponse.json(notice, { status: 201 });
-  }),
-  http.post("*/api/environmental-reports/:reportId/start-review", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "RECEIVED", "UNDER_REVIEW")),
-  http.post("*/api/environmental-reports/:reportId/forward", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "UNDER_REVIEW", "FORWARDED")),
-  http.post("*/api/environmental-reports/:reportId/dismiss", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, "UNDER_REVIEW", "DISMISSED")),
-  http.post("*/api/environmental-reports/:reportId/close", ({ params }) => environmentalReportTransitionResponse(params.reportId as string, ["FORWARDED", "DISMISSED", "NO_VIOLATION", "SANCTIONED"], "CLOSED")),
   // StreetClosureRequest adapter contract and deterministic scenario handlers.
   http.get("*/api/street-closure-requests", ({ request }) => {
     const query = streetClosureRequestQueryFromUrl(request.url);
@@ -2595,35 +2430,6 @@ export const handlers = [
     }
     const updated = confirmRelocationFixture(params.containerId as string, parsed.data);
     return HttpResponse.json(updated, { status: 200 });
-  }),
-  // ── Indicators / #138 ─────────────────────────────────────────────────────
-  http.get("*/api/indicators/coverage", ({ request }) => {
-    const params = new URL(request.url).searchParams;
-    const zoneId = params.get("zoneId");
-    const serviceTypeId = params.get("serviceTypeId");
-    return HttpResponse.json({
-      ...coverageIndicatorFixture,
-      period: { from: params.get("from") ?? coverageIndicatorFixture.period.from, to: params.get("to") ?? coverageIndicatorFixture.period.to },
-      byZone: zoneId ? coverageIndicatorFixture.byZone.filter((item) => item.id === zoneId) : coverageIndicatorFixture.byZone,
-      byServiceType: serviceTypeId ? coverageIndicatorFixture.byServiceType.filter((item) => item.id === serviceTypeId) : coverageIndicatorFixture.byServiceType,
-    });
-  }),
-  http.get("*/api/indicators/compliance", ({ request }) => {
-    const params = new URL(request.url).searchParams;
-    const zoneId = params.get("zoneId");
-    return HttpResponse.json({
-      ...complianceIndicatorFixture,
-      period: { from: params.get("from") ?? complianceIndicatorFixture.period.from, to: params.get("to") ?? complianceIndicatorFixture.period.to },
-      notServicedRanking: zoneId ? complianceIndicatorFixture.notServicedRanking.filter((item) => item.zoneId === zoneId) : complianceIndicatorFixture.notServicedRanking,
-    });
-  }),
-  http.get("*/api/indicators/incidents", ({ request }) => {
-    const params = new URL(request.url).searchParams;
-    return HttpResponse.json({ ...incidentsIndicatorFixture, period: { from: params.get("from") ?? incidentsIndicatorFixture.period.from, to: params.get("to") ?? incidentsIndicatorFixture.period.to } });
-  }),
-  http.get("*/api/indicators/waste", ({ request }) => {
-    const params = new URL(request.url).searchParams;
-    return HttpResponse.json({ ...wasteIndicatorFixture, period: { from: params.get("from") ?? wasteIndicatorFixture.period.from, to: params.get("to") ?? wasteIndicatorFixture.period.to } });
   }),
   http.post("*/api/session/logout", () => new HttpResponse(null, { status: 200 })),
 ];
