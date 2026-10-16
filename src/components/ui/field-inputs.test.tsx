@@ -49,6 +49,14 @@ describe("shadcn Field, Label, Input and Textarea", () => {
     expect(screen.getByRole("textbox", { name: "Notas" })).toHaveClass("min-h-24");
   });
 
+  it("keeps reading text at 16 px on the Field posture", () => {
+    renderForm();
+
+    for (const name of ["Nombre", "Notas"]) {
+      expect(screen.getByRole("textbox", { name })).toHaveClass("text-sm", "[@media(max-width:760px)]:text-base");
+    }
+  });
+
   it("applies the border, surface and focus tokens", () => {
     renderForm();
 

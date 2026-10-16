@@ -88,6 +88,9 @@ test.describe("shadcn Field, Label, Input and Textarea", () => {
       expect(await box("fx-solo")).toBe(input);
       expect(await box("fx-notes")).toBeGreaterThanOrEqual(96);
 
+      const fontSize = await page.locator("#fx-name").evaluate((el) => getComputedStyle(el).fontSize);
+      expect(fontSize).toBe(width <= 760 ? "16px" : "14px");
+
       const border = await page.locator("#fx-name").evaluate((el) => getComputedStyle(el).borderTopColor);
       expect(border).toBe("rgb(112, 132, 154)");
       const invalidBorder = await page.locator("#fx-email").evaluate((el) => getComputedStyle(el).borderTopColor);
