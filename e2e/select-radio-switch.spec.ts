@@ -132,6 +132,7 @@ test.describe("shadcn Select, Native Select, Radio Group and Switch", () => {
     await expect(terms).toHaveAccessibleDescription("Confirmá para continuar");
 
     await expect(section(page).getByRole("radio", { name: "Semanal" })).toHaveAttribute("aria-invalid", "true");
+    await expect(section(page).getByRole("radiogroup", { name: "Frecuencia" })).toHaveAccessibleDescription("Elegí una frecuencia");
     await expect(section(page).getByRole("alert")).toHaveCount(4);
   });
 });

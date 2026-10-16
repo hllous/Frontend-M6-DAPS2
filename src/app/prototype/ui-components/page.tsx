@@ -128,7 +128,7 @@ export default function UiComponentsPage() {
           </FieldSet>
           <FieldSet>
             <FieldLegend variant="label">Frecuencia</FieldLegend>
-            <RadioGroup aria-label="Frecuencia" aria-invalid>
+            <RadioGroup aria-label="Frecuencia" aria-invalid aria-describedby="srs-freq-error">
               <Field orientation="horizontal" data-invalid>
                 <RadioGroupItem value="semanal" id="srs-freq-semanal" aria-invalid />
                 <FieldLabel htmlFor="srs-freq-semanal">Semanal</FieldLabel>
@@ -138,7 +138,7 @@ export default function UiComponentsPage() {
                 <FieldLabel htmlFor="srs-freq-mensual">Mensual</FieldLabel>
               </Field>
             </RadioGroup>
-            <FieldError>Elegí una frecuencia</FieldError>
+            <FieldError id="srs-freq-error">Elegí una frecuencia</FieldError>
           </FieldSet>
           <Field orientation="horizontal">
             <Switch id="srs-notify" aria-describedby="srs-notify-help" />
