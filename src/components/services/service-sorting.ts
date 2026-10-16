@@ -4,6 +4,10 @@ import { STATUS_ORDER } from "@/lib/services";
 export type SortKey = "service" | "zone" | "status" | "crew" | "scheduled";
 export type SortDir = "asc" | "desc";
 
+export function createServiceOrdinals(services: readonly Service[]): ReadonlyMap<string, number> {
+  return new Map(services.map((service, index) => [service.id, index + 1]));
+}
+
 function compareServices(a: Service, b: Service, key: SortKey): number {
   switch (key) {
     case "status":

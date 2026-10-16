@@ -23,12 +23,14 @@ export function ServicePreview({
   onOpenDetail,
   onAssignCrew,
   onClose,
+  autoFocusCloseButton = false,
   className,
 }: {
   service: Service;
   onOpenDetail: (id: string) => void;
   onAssignCrew?: (service: Service) => void;
   onClose?: () => void;
+  autoFocusCloseButton?: boolean;
   className?: string;
 }) {
   return (
@@ -76,6 +78,7 @@ export function ServicePreview({
             variant="ghost"
             size="icon"
             onClick={onClose}
+            autoFocus={autoFocusCloseButton}
             aria-label="Cerrar vista previa"
             className="h-8 w-8 rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
           >

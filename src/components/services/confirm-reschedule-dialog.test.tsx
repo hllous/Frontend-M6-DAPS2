@@ -27,6 +27,7 @@ function renderDialog(onConfirmed = vi.fn()) {
 describe("ConfirmRescheduleDialog", () => {
   it("does not prefill the previous (past) date and restricts the input to today in Argentina onwards", () => {
     const { dateInput } = renderDialog();
+    expect(dateInput).toHaveAttribute("data-slot", "form-control");
     expect(dateInput).toHaveValue("");
     expect(dateInput).toHaveAttribute("min", todayInArgentina());
   });

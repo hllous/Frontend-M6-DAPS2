@@ -52,6 +52,30 @@ test.describe("automated WCAG checks @smoke", () => {
     await expectNoViolations(page);
   });
 
+  test("the Services workspace has no axe violations at desktop and mobile sizes", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=services");
+    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Mapa territorial de Servicios" })).toBeVisible();
+    await expectNoViolations(page);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const map = page.getByRole("region", { name: "Mapa territorial de Servicios" });
+    await expect(page.getByRole("button", { name: "Expandir lista a pantalla completa" })).toBeVisible();
+    await expect(table).toBeVisible();
+    await expect(map).toBeVisible();
+    await expect(page.getByRole("button", { name: "Lista", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Mapa", exact: true })).toHaveCount(0);
+    await expectNoViolations(page);
+
+    await page.getByRole("button", { name: "Expandir lista a pantalla completa" }).click();
+    await expect(page.getByRole("complementary", { name: "Lista de servicios" })).toHaveAttribute("data-snap", "full");
+    await expectNoViolations(page);
+  });
+
   test("the mobile navigation sheet has no axe violations", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginViaApi(page, "office-duty-queue");

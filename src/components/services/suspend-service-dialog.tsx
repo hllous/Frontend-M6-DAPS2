@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { FormControl } from "@/components/ui/form-control";
 import {
   Dialog,
   DialogContent,
@@ -405,7 +406,8 @@ function SuspendServiceForm({
                 <FieldLabel htmlFor={`${formId}-reason`}>
                   Motivo de suspensión <span className="text-[var(--color-danger)]" aria-hidden>*</span>
                 </FieldLabel>
-                <select
+                <FormControl
+                  as="select"
                   id={`${formId}-reason`}
                   value={reason}
                   onChange={(e) => {
@@ -416,7 +418,7 @@ function SuspendServiceForm({
                   required
                   aria-invalid={Boolean(fieldErrors.reason)}
                   aria-describedby={fieldErrors.reason ? `${formId}-reason-error` : undefined}
-                  className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                  className="text-xs"
                 >
                   <option value="">Seleccione un motivo…</option>
                   {(Object.keys(NOT_SERVICED_REASON_LABEL) as NotServicedReason[]).map((r) => (
@@ -424,7 +426,7 @@ function SuspendServiceForm({
                       {NOT_SERVICED_REASON_LABEL[r]}
                     </option>
                   ))}
-                </select>
+                </FormControl>
                 {fieldErrors.reason && <FieldError id={`${formId}-reason-error`}>{fieldErrors.reason}</FieldError>}
               </Field>
 
@@ -432,7 +434,8 @@ function SuspendServiceForm({
                 <FieldLabel htmlFor={`${formId}-note`}>
                   Nota <span className="text-[var(--color-danger)]" aria-hidden>*</span>
                 </FieldLabel>
-                <textarea
+                <FormControl
+                  as="textarea"
                   id={`${formId}-note`}
                   rows={3}
                   value={note}
@@ -445,7 +448,7 @@ function SuspendServiceForm({
                   aria-invalid={Boolean(fieldErrors.note)}
                   aria-describedby={fieldErrors.note ? `${formId}-note-help ${formId}-note-error` : `${formId}-note-help`}
                   placeholder="Describa la causa de la interrupción y cualquier detalle relevante para Oficina…"
-                  className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                  className="text-xs"
                 />
                 <FieldDescription id={`${formId}-note-help`}>
                   Obligatoria. Se envía junto con el motivo seleccionado; entre ambos no pueden

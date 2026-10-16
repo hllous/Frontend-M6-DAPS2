@@ -91,6 +91,8 @@ describe("SuspendServiceDialog", () => {
     render(<ControlledSuspendServiceDialog onOpenChange={vi.fn()} onSuspended={vi.fn()} />);
     const reason = screen.getByLabelText(/Motivo de suspensión/i);
     const note = screen.getByLabelText(/^Nota/i);
+    expect(reason).toHaveAttribute("data-slot", "form-control");
+    expect(note).toHaveAttribute("data-slot", "form-control");
 
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
     expect(reason).toHaveAttribute("aria-invalid", "true");

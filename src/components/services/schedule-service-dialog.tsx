@@ -5,6 +5,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { AlertCircle, Calendar, Check, Clock, Info, Loader2, MapPin, Route as RouteIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { FormControl } from "@/components/ui/form-control";
 import {
   Dialog,
   DialogContent,
@@ -419,11 +420,11 @@ export function ScheduleServiceDialog({
                 {origin === "TICKET" && !hasTrustedTicketContext && (
                   <Field>
                     <FieldLabel htmlFor="linked-ticket-id">UUID del ticket de M2 *</FieldLabel>
-                    <input
+                    <FormControl
                       id="linked-ticket-id"
                       value={manualTicketId}
                       onChange={(event) => { setManualTicketId(event.target.value); setFieldErrors((prev) => ({ ...prev, reference: undefined })); }}
-                      className="mt-1 min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 font-mono text-xs text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                      className="mt-1 font-mono text-xs"
                       aria-invalid={Boolean(fieldErrors.reference)}
                       aria-describedby={fieldErrors.reference ? "linked-ticket-id-help linked-ticket-id-error" : "linked-ticket-id-help"}
                     />
@@ -437,15 +438,16 @@ export function ScheduleServiceDialog({
             /* Generic Origin Selector */
             <Field>
               <FieldLabel htmlFor="service-origin">Origen del servicio *</FieldLabel>
-              <select
+              <FormControl
+                as="select"
                 id="service-origin"
                 value={genericOrigin}
                 onChange={(e) => setGenericOrigin(e.target.value as ServiceOrigin)}
-                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                className="text-xs"
               >
                 <option value="MANUAL">Manual (operación a demanda)</option>
                 <option value="PLANNED">Planificado (programa regular de servicio)</option>
-              </select>
+              </FormControl>
               <FieldDescription>
                 Los servicios planificados corresponden al cronograma habitual; los manuales a intervenciones no rutinarias.
               </FieldDescription>
@@ -455,20 +457,21 @@ export function ScheduleServiceDialog({
           {/* Service Type Selection */}
           <Field>
             <FieldLabel htmlFor="service-type">Tipo de servicio *</FieldLabel>
-            <select
+            <FormControl
+              as="select"
               id="service-type"
               value={serviceTypeId}
               onChange={(e) => { setServiceTypeId(e.target.value); setFieldErrors((prev) => ({ ...prev, serviceType: undefined })); }}
               aria-invalid={Boolean(fieldErrors.serviceType)}
               aria-describedby={fieldErrors.serviceType ? "service-type-error" : undefined}
-              className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs font-medium text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+              className="text-xs font-medium"
             >
               {serviceTypes.map((st) => (
                 <option key={st.id} value={st.id}>
                   {st.name} ({SERVICE_MODE_LABEL[st.mode]})
                 </option>
               ))}
-            </select>
+            </FormControl>
             {fieldErrors.serviceType && <FieldError id="service-type-error">{fieldErrors.serviceType}</FieldError>}
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="text-xs text-[var(--color-text-secondary)]">
@@ -505,20 +508,21 @@ export function ScheduleServiceDialog({
             <div className="rounded-xl border border-[var(--color-info-line)] bg-[var(--color-info-fill)]/30 p-3.5 flex flex-col gap-2.5">
               <Field>
                 <FieldLabel htmlFor="service-route">Recorrido asignado *</FieldLabel>
-                <select
+                <FormControl
+                  as="select"
                   id="service-route"
                   value={routeId}
                   onChange={(e) => { setRouteId(e.target.value); setFieldErrors((prev) => ({ ...prev, route: undefined })); }}
                   aria-invalid={Boolean(fieldErrors.route)}
                   aria-describedby={fieldErrors.route ? "service-route-error" : undefined}
-                  className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                  className="text-xs"
                 >
                   {routes.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.name} ({r.code})
                     </option>
                   ))}
-                </select>
+                </FormControl>
                 {fieldErrors.route && <FieldError id="service-route-error">{fieldErrors.route}</FieldError>}
               </Field>
 
@@ -545,36 +549,38 @@ export function ScheduleServiceDialog({
             <div className="rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-info-fill)]/30 p-3.5 flex flex-col gap-3">
               <Field>
                 <FieldLabel htmlFor="target-type">Tipo de objetivo *</FieldLabel>
-                <select
+                <FormControl
+                  as="select"
                   id="target-type"
                   value={targetType}
                   onChange={(e) => handleTargetTypeChange(e.target.value as TargetKind)}
-                  className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                  className="text-xs"
                 >
                   {(Object.keys(TARGET_KIND_LABELS) as TargetKind[]).map((kind) => (
                     <option key={kind} value={kind}>
                       {TARGET_KIND_LABELS[kind]}
                     </option>
                   ))}
-                </select>
+                </FormControl>
               </Field>
 
               {inventoryType ? (
                 <>
                   <Field>
                     <FieldLabel htmlFor="target-search">Buscar {TARGET_KIND_LABELS[inventoryType].toLocaleLowerCase("es")}</FieldLabel>
-                    <input
+                    <FormControl
                       id="target-search"
                       type="search"
                       value={targetSearch}
                       onChange={(e) => setTargetSearch(e.target.value)}
                       placeholder={inventoryType === "GREEN_SPACE" ? "Nombre del espacio" : "Código o dirección"}
-                      className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                      className="text-xs"
                     />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="target-id">Bien del inventario *</FieldLabel>
-                    <select
+                    <FormControl
+                      as="select"
                       id="target-id"
                       value={selectedTarget?.id ?? ""}
                       onChange={(e) => { setSelectedTarget(visibleTargetOptions.find((o) => o.id === e.target.value) ?? null); setFieldErrors((prev) => ({ ...prev, target: undefined })); }}
@@ -582,7 +588,7 @@ export function ScheduleServiceDialog({
                       aria-invalid={Boolean(fieldErrors.target)}
                       aria-describedby={fieldErrors.target ? "target-id-status target-id-error" : "target-id-status"}
                       aria-busy={targetOptions.status === "loading"}
-                      className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                      className="text-xs"
                     >
                       <option value="">Seleccione un bien…</option>
                       {visibleTargetOptions.map((option) => (
@@ -590,7 +596,7 @@ export function ScheduleServiceDialog({
                           {option.label}
                         </option>
                       ))}
-                    </select>
+                    </FormControl>
                     <FieldDescription id="target-id-status" aria-live="polite">
                       {targetOptions.status === "loading" && "Buscando en el inventario…"}
                       {targetOptions.status === "ready" && targetOptions.options.length === 0 && "No hay bienes que coincidan con la búsqueda."}
@@ -607,13 +613,14 @@ export function ScheduleServiceDialog({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field>
                     <FieldLabel htmlFor="point-zone">Zona operativa *</FieldLabel>
-                    <select
+                    <FormControl
+                      as="select"
                       id="point-zone"
                       value={pointZoneId}
                       onChange={(e) => { setPointZoneId(e.target.value); setFieldErrors((prev) => ({ ...prev, zone: undefined })); }}
                       aria-invalid={Boolean(fieldErrors.zone)}
                       aria-describedby={fieldErrors.zone ? "point-zone-error" : undefined}
-                      className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                      className="text-xs"
                     >
                       {zones
                         .filter((z) => z.active)
@@ -622,12 +629,12 @@ export function ScheduleServiceDialog({
                             {z.name} ({z.code})
                           </option>
                         ))}
-                    </select>
+                    </FormControl>
                     {fieldErrors.zone && <FieldError id="point-zone-error">{fieldErrors.zone}</FieldError>}
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="target-ref">Dirección o referencia *</FieldLabel>
-                    <input
+                    <FormControl
                       id="target-ref"
                       type="text"
                       value={targetRef}
@@ -636,7 +643,7 @@ export function ScheduleServiceDialog({
                       required
                       aria-invalid={Boolean(fieldErrors.targetRef)}
                       aria-describedby={fieldErrors.targetRef ? "target-ref-error" : undefined}
-                      className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                      className="text-xs"
                     />
                     {fieldErrors.targetRef && <FieldError id="target-ref-error">{fieldErrors.targetRef}</FieldError>}
                     <FieldDescription>Sin bien del inventario el servicio se ubica por zona; la referencia queda en las notas.</FieldDescription>
@@ -650,7 +657,7 @@ export function ScheduleServiceDialog({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Field className="sm:col-span-1" data-invalid={Boolean(scheduledDateError)}>
               <FieldLabel htmlFor="scheduled-date">Fecha programada *</FieldLabel>
-              <input
+              <FormControl
                 id="scheduled-date"
                 type="date"
                 value={scheduledDate}
@@ -668,32 +675,32 @@ export function ScheduleServiceDialog({
                   }
                 }}
                 required
-                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                className="py-1.5 text-xs"
               />
               {scheduledDateError && <FieldError id="scheduled-date-error">{scheduledDateError}</FieldError>}
             </Field>
 
             <Field className="sm:col-span-1">
               <FieldLabel htmlFor="window-start">Desde *</FieldLabel>
-              <input
+              <FormControl
                 id="window-start"
                 type="time"
                 value={windowStart}
                 onChange={(e) => setWindowStart(e.target.value)}
                 required
-                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                className="py-1.5 text-xs"
               />
             </Field>
 
             <Field className="sm:col-span-1">
               <FieldLabel htmlFor="window-end">Hasta *</FieldLabel>
-              <input
+              <FormControl
                 id="window-end"
                 type="time"
                 value={windowEnd}
                 onChange={(e) => setWindowEnd(e.target.value)}
                 required
-                className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+                className="py-1.5 text-xs"
               />
             </Field>
           </div>
@@ -701,14 +708,15 @@ export function ScheduleServiceDialog({
           {/* Notes */}
           <Field>
             <FieldLabel htmlFor="service-notes">Notas e instrucciones operativas (opcional)</FieldLabel>
-            <textarea
+            <FormControl
+              as="textarea"
               id="service-notes"
               rows={2}
               maxLength={MAX_NOTES_LENGTH}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Instrucciones especiales para la cuadrilla o restricciones de acceso…"
-              className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] resize-none min-[761px]:min-h-10"
+              className="resize-none text-xs"
             />
           </Field>
 

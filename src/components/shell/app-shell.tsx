@@ -149,7 +149,11 @@ export function AppShell({
   }, [destination]);
 
   return (
-    <div className={`${styles.shell} ${isCollapsed ? styles.collapsed : ""}`}>
+    <div className={cn(
+      styles.shell,
+      isCollapsed && styles.collapsed,
+      destination === "services" && styles.servicesShell,
+    )}>
       <a className={styles.skipLink} href="#contenido-principal">
         Saltar al contenido principal
       </a>
@@ -197,7 +201,12 @@ export function AppShell({
         </div>
       </header>
 
-      <main ref={mainRef} className={styles.main} id="contenido-principal" tabIndex={-1}>
+      <main
+        ref={mainRef}
+        className={cn(styles.main, destination === "services" && styles.servicesMain)}
+        id="contenido-principal"
+        tabIndex={-1}
+      >
         {pathname.startsWith("/app/") ? (
           routeContent
         ) : destination === "work" ? (
