@@ -5,9 +5,9 @@ Use Node MSW handlers to call migrated Next.js route exports in component tests.
 For each domain migration:
 
 1. Remove that domain's handwritten `http.*` handlers from `src/mocks/handlers.shared.ts`.
-2. Add a Node-only handler module that calls the exported `GET`, `POST`, `PATCH`, and `DELETE` route functions with the intercepted `Request` and dynamic route params.
-3. Compose those handlers in `src/mocks/handlers.ts`. Give tests without a session cookie a signed mock cookie from `src/test/session.ts`; use the actor's own signed cookie when testing authorization.
+2. Add a Node-only handler module: a short declarative list of routes passed to `routeHandlers(fallbackCookie, routes)` from `src/mocks/route-handlers.ts`. Each entry is `{ method, path, route, params? }`; `params` maps the route's dynamic param name to the MSW path param (`{ id: "serviceTypeId" }`). The helper calls the route export with the intercepted `Request` and those params.
+3. Compose those handlers in `src/mocks/handlers.ts`. The `fallbackCookie` (signed, from `src/test/session.ts`) is the actor of that handler set and is added only when the request has no session cookie, so pass a Field crew cookie to build a Field-crew set; a request's own cookie always wins, which is how authorization tests send their actor.
 4. Keep `src/mocks/browser.ts` on `handlers.shared.ts`. With `onUnhandledRequest: "bypass"`, migrated browser requests reach the real BFF route instead of importing server modules into the service worker.
 5. Keep route and mock behavior on the same fixture module in mock mode.
 
-The service-type handlers are the reference implementation for this pattern.
+`src/mocks/service-type-route-handlers.ts` is the reference implementation for this pattern.
