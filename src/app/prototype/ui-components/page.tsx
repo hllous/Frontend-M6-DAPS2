@@ -1,8 +1,12 @@
 import { notFound } from "next/navigation";
 
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@/components/ui/item";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -51,6 +55,108 @@ export default function UiComponentsPage() {
           <Field>
             <Label htmlFor="fx-solo">Etiqueta suelta</Label>
             <Input id="fx-solo" />
+          </Field>
+        </FieldGroup>
+      </section>
+
+      {/* Section: select, native select, radio group, switch (#544) */}
+      <section data-testid="ui-select-radio-switch" aria-labelledby="ui-select-radio-switch-title" className="flex max-w-md flex-col gap-4">
+        <h2 id="ui-select-radio-switch-title" className="text-lg font-semibold">
+          Selector, selector nativo, opciones y interruptor
+        </h2>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="srs-zone">Zona</FieldLabel>
+            <Select defaultValue="norte" items={{ norte: "Norte", sur: "Sur", este: "Este", oeste: "Oeste" }}>
+              <SelectTrigger id="srs-zone" aria-describedby="srs-zone-help">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="norte">Norte</SelectItem>
+                  <SelectItem value="sur">Sur</SelectItem>
+                  <SelectItem value="este">Este</SelectItem>
+                  <SelectItem value="oeste">Oeste</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <FieldDescription id="srs-zone-help">Zona de trabajo</FieldDescription>
+          </Field>
+          <Field data-invalid>
+            <FieldLabel htmlFor="srs-type">Tipo</FieldLabel>
+            <Select items={{ poda: "Poda", extraccion: "Extracción" }}>
+              <SelectTrigger id="srs-type" aria-invalid aria-describedby="srs-type-error">
+                <SelectValue placeholder="Elegí un tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="poda">Poda</SelectItem>
+                  <SelectItem value="extraccion">Extracción</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <FieldError id="srs-type-error">El tipo es obligatorio</FieldError>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="srs-native">Estado</FieldLabel>
+            <NativeSelect id="srs-native" aria-describedby="srs-native-help">
+              <NativeSelectOption value="abierto">Abierto</NativeSelectOption>
+              <NativeSelectOption value="cerrado">Cerrado</NativeSelectOption>
+            </NativeSelect>
+            <FieldDescription id="srs-native-help">Selector del sistema</FieldDescription>
+          </Field>
+          <Field data-invalid>
+            <FieldLabel htmlFor="srs-native-invalid">Prioridad</FieldLabel>
+            <NativeSelect id="srs-native-invalid" aria-invalid aria-describedby="srs-native-error" defaultValue="">
+              <NativeSelectOption value="" disabled>
+                Elegí una prioridad
+              </NativeSelectOption>
+              <NativeSelectOption value="alta">Alta</NativeSelectOption>
+            </NativeSelect>
+            <FieldError id="srs-native-error">La prioridad es obligatoria</FieldError>
+          </Field>
+          <FieldSet>
+            <FieldLegend variant="label">Turno</FieldLegend>
+            <RadioGroup defaultValue="manana" aria-label="Turno">
+              {[
+                ["manana", "Mañana"],
+                ["tarde", "Tarde"],
+                ["noche", "Noche"],
+              ].map(([value, label]) => (
+                <Field key={value} orientation="horizontal">
+                  <RadioGroupItem value={value} id={`srs-shift-${value}`} />
+                  <FieldLabel htmlFor={`srs-shift-${value}`}>{label}</FieldLabel>
+                </Field>
+              ))}
+            </RadioGroup>
+          </FieldSet>
+          <FieldSet>
+            <FieldLegend variant="label">Frecuencia</FieldLegend>
+            <RadioGroup aria-label="Frecuencia" aria-invalid aria-describedby="srs-freq-error">
+              <Field orientation="horizontal" data-invalid>
+                <RadioGroupItem value="semanal" id="srs-freq-semanal" aria-invalid />
+                <FieldLabel htmlFor="srs-freq-semanal">Semanal</FieldLabel>
+              </Field>
+              <Field orientation="horizontal" data-invalid>
+                <RadioGroupItem value="mensual" id="srs-freq-mensual" aria-invalid />
+                <FieldLabel htmlFor="srs-freq-mensual">Mensual</FieldLabel>
+              </Field>
+            </RadioGroup>
+            <FieldError id="srs-freq-error">Elegí una frecuencia</FieldError>
+          </FieldSet>
+          <Field orientation="horizontal">
+            <Switch id="srs-notify" aria-describedby="srs-notify-help" />
+            <FieldContent>
+              <FieldLabel htmlFor="srs-notify">Avisar al vecino</FieldLabel>
+              <FieldDescription id="srs-notify-help">Envía un SMS</FieldDescription>
+            </FieldContent>
+          </Field>
+          <Field orientation="horizontal" data-invalid>
+            <Switch id="srs-terms" aria-invalid aria-describedby="srs-terms-error" />
+            <FieldContent>
+              <FieldLabel htmlFor="srs-terms">Confirmo los datos</FieldLabel>
+              <FieldError id="srs-terms-error">Confirmá para continuar</FieldError>
+            </FieldContent>
           </Field>
         </FieldGroup>
       </section>
