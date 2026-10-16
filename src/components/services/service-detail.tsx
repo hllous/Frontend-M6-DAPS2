@@ -103,7 +103,7 @@ export function ServiceDetail({
 
   return (
     <div className="flex h-full flex-col bg-[var(--color-surface)] overflow-hidden" role="region" aria-label={`Detalle completo de ${service.title}`}>
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-3 bg-[var(--color-canvas)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] px-6 py-3 bg-[var(--color-canvas)]">
         <Button
           variant="outline"
           size="sm"
@@ -113,7 +113,7 @@ export function ServiceDetail({
           <ArrowLeft className="h-4 w-4" aria-hidden />
           {backLabel}
         </Button>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {canStartService && onStartService && service.status === "SCHEDULED" && (
             <Button
               variant="default"
@@ -155,7 +155,7 @@ export function ServiceDetail({
           )}
           {onAssignCrew && (service.status === "SCHEDULED" || service.status === "RESCHEDULED") && (
             <Button
-              variant="default"
+              variant={service.status === "RESCHEDULED" ? "outline" : "default"}
               size="sm"
               onClick={() => onAssignCrew(service)}
               className="gap-1.5 text-xs font-semibold"

@@ -20,6 +20,7 @@ describe("shared UI primitive targets", () => {
       <>
         <Button>Acción</Button>
         <FormControl aria-label="Buscar" />
+        <FormControl as="textarea" aria-label="Notas" rows={3} />
         <Tabs defaultValue="summary">
           <TabsList aria-label="Secciones">
             <TabsTrigger value="summary">Resumen</TabsTrigger>
@@ -30,12 +31,15 @@ describe("shared UI primitive targets", () => {
 
     const button = screen.getByRole("button", { name: "Acción" });
     const field = screen.getByRole("textbox", { name: "Buscar" });
+    const notes = screen.getByRole("textbox", { name: "Notas" });
     const tabsList = screen.getByRole("tablist", { name: "Secciones" });
     const tab = screen.getByRole("tab", { name: "Resumen" });
 
     expect(button).toHaveClass("h-10", "min-h-10", "min-w-10");
     expect(button).toHaveClass("[@media(max-width:760px)]:min-h-12", "[@media(max-width:760px)]:min-w-12");
     expect(field).toHaveClass("h-10", "[@media(max-width:760px)]:h-12");
+    expect(notes).toHaveAttribute("data-slot", "form-control");
+    expect(notes).toHaveClass("min-h-24", ...focusClasses);
     expect(tabsList).toHaveClass("group-data-horizontal/tabs:h-10", "[@media(max-width:760px)]:group-data-horizontal/tabs:min-h-12");
     expect(tab).toHaveClass("min-h-10", "[@media(max-width:760px)]:min-h-12");
   });
@@ -50,6 +54,7 @@ describe("shared UI primitive targets", () => {
           </TabsList>
         </Tabs>
         <FormControl aria-label="Buscar" />
+        <FormControl as="textarea" aria-label="Notas" rows={3} />
         <Checkbox aria-label="Confirmar" />
         <ResizablePanelGroup>
           <ResizablePanel defaultSize={50}>Panel</ResizablePanel>
@@ -62,6 +67,7 @@ describe("shared UI primitive targets", () => {
       screen.getByRole("button", { name: "Acción" }),
       screen.getByRole("tab", { name: "Resumen" }),
       screen.getByRole("textbox", { name: "Buscar" }),
+      screen.getByRole("textbox", { name: "Notas" }),
       screen.getByRole("checkbox", { name: "Confirmar" }),
       screen.getByRole("separator", { name: "Redimensionar" }),
     ];

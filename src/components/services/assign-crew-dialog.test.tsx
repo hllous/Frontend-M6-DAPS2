@@ -128,7 +128,9 @@ describe("AssignCrewDialog", () => {
     expect(screen.queryByRole("option", { name: /Cuadrilla A · López/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /AF 123 CD/ })).not.toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText(/Cuadrilla asignada/i), CREW_ID);
+    const crew = screen.getByLabelText(/Cuadrilla asignada/i);
+    expect(crew).toHaveAttribute("data-slot", "form-control");
+    await user.selectOptions(crew, CREW_ID);
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
     expect(screen.getByText(/requiere la asignación obligatoria de un vehículo/i)).toBeInTheDocument();
     const vehicle = screen.getByLabelText(/Vehículo operativo/i);

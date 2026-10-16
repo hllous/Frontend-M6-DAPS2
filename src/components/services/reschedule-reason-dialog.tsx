@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import { AlertCircle, CalendarClock, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { FormControl } from "@/components/ui/form-control";
 import {
   Dialog,
   DialogContent,
@@ -114,7 +115,8 @@ function RescheduleReasonForm({
           <FieldLabel htmlFor={`${formId}-reason`}>
             Motivo <span className="text-[var(--color-danger)]" aria-hidden>*</span>
           </FieldLabel>
-          <textarea
+          <FormControl
+            as="textarea"
             id={`${formId}-reason`}
             rows={3}
             maxLength={MAX_REASON_LENGTH}
@@ -125,10 +127,10 @@ function RescheduleReasonForm({
               setErrorMessage(null);
             }}
             required
-          aria-invalid={Boolean(reasonError)}
-          aria-describedby={reasonError ? `${formId}-reason-help ${formId}-reason-error` : `${formId}-reason-help`}
+            aria-invalid={Boolean(reasonError)}
+            aria-describedby={reasonError ? `${formId}-reason-help ${formId}-reason-error` : `${formId}-reason-help`}
             placeholder="Ej. Alerta meteorológica, rechazo de corte de calle por Tránsito…"
-          className="min-h-12 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] min-[761px]:min-h-10"
+            className="text-xs"
           />
           <FieldDescription id={`${formId}-reason-help`}>
             La nueva fecha y ventana horaria se definen en un segundo paso, una vez confirmado el motivo.
