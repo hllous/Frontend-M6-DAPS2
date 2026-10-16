@@ -46,6 +46,10 @@ import { cn, normalizeForSearch } from "@/lib/utils";
 import { MapView } from "./map-view";
 import { AssignCrewDialog } from "./assign-crew-dialog";
 import { ScheduleServiceDialog } from "./schedule-service-dialog";
+// PROTOTYPE #529 (throwaway)
+import { PageNotice } from "@/components/prototype-529/feedback";
+import { PROTOTYPE_PARAMS } from "@/components/prototype-529/preserve-params";
+import { PatternSwitcher } from "@/components/prototype-529/pattern-switcher";
 import { ServiceDetail } from "./service-detail";
 import { ServicePreview } from "./service-preview";
 import { SuspendServiceDialog } from "./suspend-service-dialog";
@@ -392,6 +396,11 @@ export function ServicesWorkspace({
     // Clear previous filters/workspace params
     const newParams = new URLSearchParams();
     if (currentDest) newParams.set("destination", currentDest);
+    // PROTOTYPE #529 (throwaway): keep the pattern params.
+    for (const key of PROTOTYPE_PARAMS) {
+      const value = p.get(key);
+      if (value) newParams.set(key, value);
+    }
 
     if (search.trim()) newParams.set("q", search.trim());
     if (selectedId) newParams.set("selected", selectedId);
@@ -983,6 +992,8 @@ export function ServicesWorkspace({
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[var(--color-canvas)]">
+      <PageNotice />
+      <PatternSwitcher />
       {/* Workspace Header & Toolbar */}
       <header className={cn(
         "border-b border-[var(--color-border)] bg-[var(--color-surface)]",

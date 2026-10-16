@@ -27,6 +27,10 @@ import { todayInArgentina } from "@/lib/argentina-date";
 import { cn } from "@/lib/utils";
 import { MAX_NOTES_LENGTH } from "@/lib/input-limits";
 import { SERVICE_MODE_LABEL, SERVICE_ORIGIN_LABEL } from "./service-ui-labels";
+// PROTOTYPE #529 (throwaway)
+import { DateField } from "@/components/prototype-529/date-field";
+import { announceSuccess, InlineError, useErrorFeedback } from "@/components/prototype-529/feedback";
+import { ListSelect } from "@/components/prototype-529/list-select";
 
 interface ScheduleServiceDialogProps {
   open: boolean;
@@ -172,6 +176,9 @@ export function ScheduleServiceDialog({
     route?: string;
     zone?: string;
   }>({});
+
+  const feedbackMessage = errorMessage ?? Object.values(fieldErrors).find(Boolean) ?? scheduledDateError ?? null;
+  const feedback = useErrorFeedback(feedbackMessage);
 
   // Los tipos de servicio, recorridos y zonas son los del backend (UUID): no se pueden fijar en el código.
   useEffect(() => {
@@ -358,6 +365,7 @@ export function ScheduleServiceDialog({
     try {
       const createdService = await servicesAdapter.create(payload);
       onCreated(createdService);
+      announceSuccess(feedback.variant, "Servicio programado");
       handleOpenChange(false);
     } catch (cause) {
       const msg =
@@ -382,7 +390,7 @@ export function ScheduleServiceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {errorMessage && (
+        {feedback.variant === null && errorMessage && (
           <div
             role="alert"
             className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
@@ -457,21 +465,14 @@ export function ScheduleServiceDialog({
           {/* Service Type Selection */}
           <Field>
             <FieldLabel htmlFor="service-type">Tipo de servicio *</FieldLabel>
-            <FormControl
-              as="select"
+            <ListSelect
               id="service-type"
               value={serviceTypeId}
-              onChange={(e) => { setServiceTypeId(e.target.value); setFieldErrors((prev) => ({ ...prev, serviceType: undefined })); }}
-              aria-invalid={Boolean(fieldErrors.serviceType)}
-              aria-describedby={fieldErrors.serviceType ? "service-type-error" : undefined}
-              className="text-xs font-medium"
-            >
-              {serviceTypes.map((st) => (
-                <option key={st.id} value={st.id}>
-                  {st.name} ({SERVICE_MODE_LABEL[st.mode]})
-                </option>
-              ))}
-            </FormControl>
+              onChange={(value) => { setServiceTypeId(value); setFieldErrors((prev) => ({ ...prev, serviceType: undefined })); }}
+              invalid={Boolean(fieldErrors.serviceType)}
+              describedBy={fieldErrors.serviceType ? "service-type-error" : undefined}
+              options={serviceTypes.map((st) => ({ value: st.id, label: `${st.name} (${SERVICE_MODE_LABEL[st.mode]})` }))}
+            />
             {fieldErrors.serviceType && <FieldError id="service-type-error">{fieldErrors.serviceType}</FieldError>}
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="text-xs text-[var(--color-text-secondary)]">
@@ -508,21 +509,14 @@ export function ScheduleServiceDialog({
             <div className="rounded-xl border border-[var(--color-info-line)] bg-[var(--color-info-fill)]/30 p-3.5 flex flex-col gap-2.5">
               <Field>
                 <FieldLabel htmlFor="service-route">Recorrido asignado *</FieldLabel>
-                <FormControl
-                  as="select"
+                <ListSelect
                   id="service-route"
                   value={routeId}
-                  onChange={(e) => { setRouteId(e.target.value); setFieldErrors((prev) => ({ ...prev, route: undefined })); }}
-                  aria-invalid={Boolean(fieldErrors.route)}
-                  aria-describedby={fieldErrors.route ? "service-route-error" : undefined}
-                  className="text-xs"
-                >
-                  {routes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.code})
-                    </option>
-                  ))}
-                </FormControl>
+                  onChange={(value) => { setRouteId(value); setFieldErrors((prev) => ({ ...prev, route: undefined })); }}
+                  invalid={Boolean(fieldErrors.route)}
+                  describedBy={fieldErrors.route ? "service-route-error" : undefined}
+                  options={routes.map((r) => ({ value: r.id, label: `${r.name} (${r.code})` }))}
+                />
                 {fieldErrors.route && <FieldError id="service-route-error">{fieldErrors.route}</FieldError>}
               </Field>
 
@@ -549,19 +543,12 @@ export function ScheduleServiceDialog({
             <div className="rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-info-fill)]/30 p-3.5 flex flex-col gap-3">
               <Field>
                 <FieldLabel htmlFor="target-type">Tipo de objetivo *</FieldLabel>
-                <FormControl
-                  as="select"
+                <ListSelect
                   id="target-type"
                   value={targetType}
-                  onChange={(e) => handleTargetTypeChange(e.target.value as TargetKind)}
-                  className="text-xs"
-                >
-                  {(Object.keys(TARGET_KIND_LABELS) as TargetKind[]).map((kind) => (
-                    <option key={kind} value={kind}>
-                      {TARGET_KIND_LABELS[kind]}
-                    </option>
-                  ))}
-                </FormControl>
+                  onChange={(value) => handleTargetTypeChange(value as TargetKind)}
+                  options={(Object.keys(TARGET_KIND_LABELS) as TargetKind[]).map((kind) => ({ value: kind, label: TARGET_KIND_LABELS[kind] }))}
+                />
               </Field>
 
               {inventoryType ? (
@@ -579,24 +566,17 @@ export function ScheduleServiceDialog({
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="target-id">Bien del inventario *</FieldLabel>
-                    <FormControl
-                      as="select"
+                    <ListSelect
                       id="target-id"
                       value={selectedTarget?.id ?? ""}
-                      onChange={(e) => { setSelectedTarget(visibleTargetOptions.find((o) => o.id === e.target.value) ?? null); setFieldErrors((prev) => ({ ...prev, target: undefined })); }}
+                      onChange={(value) => { setSelectedTarget(visibleTargetOptions.find((o) => o.id === value) ?? null); setFieldErrors((prev) => ({ ...prev, target: undefined })); }}
                       required
-                      aria-invalid={Boolean(fieldErrors.target)}
-                      aria-describedby={fieldErrors.target ? "target-id-status target-id-error" : "target-id-status"}
-                      aria-busy={targetOptions.status === "loading"}
-                      className="text-xs"
-                    >
-                      <option value="">Seleccione un bien…</option>
-                      {visibleTargetOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </FormControl>
+                      invalid={Boolean(fieldErrors.target)}
+                      describedBy={fieldErrors.target ? "target-id-status target-id-error" : "target-id-status"}
+                      busy={targetOptions.status === "loading"}
+                      placeholder="Seleccione un bien…"
+                      options={visibleTargetOptions.map((option) => ({ value: option.id, label: option.label }))}
+                    />
                     <FieldDescription id="target-id-status" aria-live="polite">
                       {targetOptions.status === "loading" && "Buscando en el inventario…"}
                       {targetOptions.status === "ready" && targetOptions.options.length === 0 && "No hay bienes que coincidan con la búsqueda."}
@@ -613,23 +593,14 @@ export function ScheduleServiceDialog({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field>
                     <FieldLabel htmlFor="point-zone">Zona operativa *</FieldLabel>
-                    <FormControl
-                      as="select"
+                    <ListSelect
                       id="point-zone"
                       value={pointZoneId}
-                      onChange={(e) => { setPointZoneId(e.target.value); setFieldErrors((prev) => ({ ...prev, zone: undefined })); }}
-                      aria-invalid={Boolean(fieldErrors.zone)}
-                      aria-describedby={fieldErrors.zone ? "point-zone-error" : undefined}
-                      className="text-xs"
-                    >
-                      {zones
-                        .filter((z) => z.active)
-                        .map((z) => (
-                          <option key={z.id} value={z.id}>
-                            {z.name} ({z.code})
-                          </option>
-                        ))}
-                    </FormControl>
+                      onChange={(value) => { setPointZoneId(value); setFieldErrors((prev) => ({ ...prev, zone: undefined })); }}
+                      invalid={Boolean(fieldErrors.zone)}
+                      describedBy={fieldErrors.zone ? "point-zone-error" : undefined}
+                      options={zones.filter((z) => z.active).map((z) => ({ value: z.id, label: `${z.name} (${z.code})` }))}
+                    />
                     {fieldErrors.zone && <FieldError id="point-zone-error">{fieldErrors.zone}</FieldError>}
                   </Field>
                   <Field>
@@ -657,25 +628,22 @@ export function ScheduleServiceDialog({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Field className="sm:col-span-1" data-invalid={Boolean(scheduledDateError)}>
               <FieldLabel htmlFor="scheduled-date">Fecha programada *</FieldLabel>
-              <FormControl
+              <DateField
                 id="scheduled-date"
-                type="date"
                 value={scheduledDate}
                 min={today}
-                aria-invalid={Boolean(scheduledDateError)}
-                aria-describedby={scheduledDateError ? "scheduled-date-error" : undefined}
-                onChange={(event) => {
-                  setScheduledDate(event.target.value);
-                  setScheduledDateError(null);
-                }}
+                invalid={Boolean(scheduledDateError)}
+                describedBy={scheduledDateError ? "scheduled-date-error" : undefined}
                 onInvalid={(event) => {
                   if (scheduledDate < today) {
                     event.preventDefault();
                     setScheduledDateError(PAST_DATE_ERROR);
                   }
                 }}
-                required
-                className="py-1.5 text-xs"
+                onChange={(value) => {
+                  setScheduledDate(value);
+                  setScheduledDateError(null);
+                }}
               />
               {scheduledDateError && <FieldError id="scheduled-date-error">{scheduledDateError}</FieldError>}
             </Field>
@@ -729,7 +697,8 @@ export function ScheduleServiceDialog({
           </div>
         </form>
 
-        <DialogFooter className="flex-wrap">
+        {feedback.variant !== null && feedback.inline && feedbackMessage ? <InlineError message={feedbackMessage} /> : null}
+        <DialogFooter className="flex-wrap max-sm:mb-12">
           <Button
             type="button"
             variant="outline"
