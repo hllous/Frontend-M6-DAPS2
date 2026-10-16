@@ -11,9 +11,37 @@ async function openServices(page: import("@playwright/test").Page) {
   await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
 }
 
-async function expectNoHorizontalTableScroll(table: import("@playwright/test").Locator) {
+async function expectTablePaneScrollingToKeepPageAndOrdinalVisible(
+  table: import("@playwright/test").Locator,
+  page: import("@playwright/test").Page,
+) {
   const scrollport = table.locator("table").locator("xpath=..");
-  await expect.poll(() => scrollport.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+  const pageOverflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+
+  await expect.poll(pageOverflow).toBeLessThanOrEqual(1);
+  await expect.poll(() => scrollport.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeGreaterThan(1);
+  await scrollport.evaluate((element) => {
+    element.scrollTo({ left: element.scrollWidth, behavior: "instant" });
+  });
+  await expect.poll(() => scrollport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(1);
+  await expect.poll(() => scrollport.evaluate((element) => {
+    const visibleLeft = element.getBoundingClientRect().left + element.clientLeft;
+    const visibleRight = visibleLeft + element.clientWidth;
+    const lastHeader = element.querySelector("thead th:last-child")?.getBoundingClientRect();
+    return Boolean(lastHeader && lastHeader.left >= visibleLeft - 1 && lastHeader.right <= visibleRight + 1);
+  })).toBe(true);
+  await expect.poll(() => scrollport.evaluate((element) => {
+    const visibleLeft = element.getBoundingClientRect().left + element.clientLeft;
+    const ordinalCells = [
+      element.querySelector<HTMLElement>('thead th[data-column-key="ordinal"]'),
+      element.querySelector<HTMLElement>('tbody td[data-column-key="ordinal"]'),
+    ];
+    return ordinalCells.every((cell) => cell && Math.abs(cell.getBoundingClientRect().left - visibleLeft) <= 1);
+  })).toBe(true);
+  await expect.poll(pageOverflow).toBeLessThanOrEqual(1);
+  await scrollport.evaluate((element) => {
+    element.scrollLeft = 0;
+  });
 }
 
 test.describe("Servicios workspace responsive & interactive journeys @smoke", () => {
@@ -27,7 +55,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
     await expect(table).toBeVisible();
     await expect(map).toBeVisible();
-    await expectNoHorizontalTableScroll(table);
+    await expectTablePaneScrollingToKeepPageAndOrdinalVisible(table, page);
     await expect(page.getByText(/Mostrando \d+ de \d+ servicios/)).toHaveCount(0);
     await expect(map.getByText(/servicios? visibles/i)).toHaveCount(0);
     await expect(map.getByText(/sin ubicaci[oó]n/i)).toHaveCount(0);
@@ -47,7 +75,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(previewTitle).toBeVisible();
     await expect(preview.locator("xpath=..")).toHaveCSS("opacity", "1");
     await expect(preview.getByRole("button", { name: "Ver detalle completo" })).toBeVisible();
-    await expectNoHorizontalTableScroll(table);
+    await expectTablePaneScrollingToKeepPageAndOrdinalVisible(table, page);
 
     // Assert the visible Leaflet pin itself, not the off-screen loading index.
     const marker1 = map.locator('.leaflet-marker-icon[data-service-id="SVC-1043"]');
@@ -183,7 +211,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
 
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
     await expect(table).toBeVisible();
-    await expectNoHorizontalTableScroll(table);
+    await expectTablePaneScrollingToKeepPageAndOrdinalVisible(table, page);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(1);
     const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
     await expect(map).toBeVisible();
@@ -215,7 +243,12 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const mapBox = await mapFrame.boundingBox();
     expect(fullDrawerBox).not.toBeNull();
     expect(mapBox).not.toBeNull();
-    expect(Math.abs(fullDrawerBox!.y - mapBox!.y)).toBeLessThanOrEqual(1);
+    await expect.poll(async () => {
+      const settledDrawerBox = await listDrawer.boundingBox();
+      const settledMapBox = await mapFrame.boundingBox();
+      if (!settledDrawerBox || !settledMapBox) return Number.POSITIVE_INFINITY;
+      return Math.abs(settledDrawerBox.y - settledMapBox.y);
+    }).toBeLessThanOrEqual(1);
 
     await listDrawer.getByRole("button", { name: "Reducir lista y mostrar mapa" }).click();
     await expect(listDrawer).toHaveAttribute("data-snap", "peek");

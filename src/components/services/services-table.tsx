@@ -661,7 +661,7 @@ export function ServicesTable({
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]" role="region" aria-label="Tabla operativa de Servicios">
       <div
         data-preview-clip={!dense ? "true" : undefined}
-        className="min-h-0 flex-1 overflow-x-auto overflow-y-auto bg-[var(--color-surface)] [scrollbar-gutter:stable]"
+        className="min-h-0 flex-1 overflow-x-auto overflow-y-auto bg-[var(--color-surface)] [scrollbar-gutter:auto]"
       >
         <table
           ref={tableRef}
