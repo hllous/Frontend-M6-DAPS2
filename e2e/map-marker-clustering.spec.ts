@@ -46,16 +46,20 @@ test("keeps the mobile map visible with a keyboard and drag accessible inventory
   const drawer = page.getByRole("complementary", { name: "Controles de la vista Inventario" });
   const map = page.locator(".leaflet-container");
   const handle = drawer.locator('[data-inventory-map-drawer-handle="true"]');
+  const contentId = await handle.getAttribute("aria-controls");
+  if (!contentId) throw new Error("Expected the inventory drawer handle to identify its content.");
+  const content = drawer.locator(`#${contentId}`);
 
   await expect(map).toBeVisible();
   await expect(handle).toBeInViewport({ ratio: 0.95 });
   await expect(handle).toHaveAccessibleName("Mostrar lista");
   await expect(handle).toHaveAttribute("aria-expanded", "false");
   await expect(handle).toHaveCSS("min-height", "80px");
-  await expect(drawer.getByRole("heading", { name: "Elementos" })).toBeVisible();
+  await expect(handle.getByText("Elementos")).toBeVisible();
 
   await handle.focus();
   await page.keyboard.press("Tab");
+  await expect(content.locator(":focus")).toBeFocused();
   await expect(handle).toHaveAttribute("aria-expanded", "true");
   await expect(handle).toHaveAccessibleName("Ocultar lista");
   const firstItem = drawer.getByRole("button", { name: /CONT-002/ });

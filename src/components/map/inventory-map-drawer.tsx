@@ -31,6 +31,7 @@ const HANDLE_HEIGHT = 52;
 const LEGACY_HANDLE_HEIGHT = 80;
 const DRAG_THRESHOLD = 6;
 const SNAP_STATES: InventoryMapDrawerSnapState[] = ["full", "half", "peek"];
+const FOCUSABLE_ELEMENT_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function snapOffset(snapState: InventoryMapDrawerSnapState, height: number, handleHeight = HANDLE_HEIGHT) {
   if (snapState === "full") return 0;
@@ -53,6 +54,7 @@ export function InventoryMapDrawer({
   const drawerRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragStart | null>(null);
   const draggedRef = useRef(false);
+  const focusContentOnExpandRef = useRef(false);
   const [localSnapState, setLocalSnapState] = useState<InventoryMapDrawerSnapState>("peek");
   const [localExpanded, setLocalExpanded] = useState(false);
   const usesSnapPoints = controlledSnapState !== undefined || onSnapStateChange !== undefined;
@@ -89,6 +91,14 @@ export function InventoryMapDrawer({
     window.addEventListener("resize", updateViewport);
     return () => window.removeEventListener("resize", updateViewport);
   }, []);
+
+  useEffect(() => {
+    if (!expanded || !focusContentOnExpandRef.current) return;
+
+    focusContentOnExpandRef.current = false;
+    const content = document.getElementById(contentId);
+    content?.querySelector<HTMLElement>(FOCUSABLE_ELEMENT_SELECTOR)?.focus();
+  }, [contentId, expanded]);
 
   function handleFocusCapture(event: FocusEvent<HTMLElement>) {
     if (!(event.target instanceof HTMLElement) || event.target.dataset.inventoryMapDrawerHandle !== "true") {
@@ -192,6 +202,13 @@ export function InventoryMapDrawer({
         aria-describedby={summary ? summaryId : undefined}
         data-inventory-map-drawer-handle="true"
         onClick={handleClick}
+        onKeyDown={(event) => {
+          if (event.key !== "Tab" || event.shiftKey || expanded) return;
+
+          event.preventDefault();
+          focusContentOnExpandRef.current = true;
+          updateExpanded(true);
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={finishDrag}
