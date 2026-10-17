@@ -2,69 +2,79 @@
 
 import { useState, type ComponentProps } from "react";
 
-import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
-const COMPLETE_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-const LOOSE_TIME = /^([01]?\d|2[0-3]):([0-5]?\d)$/;
+const pad = (n: number) => String(n).padStart(2, "0");
+const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
+const MINUTES = Array.from({ length: 60 }, (_, i) => pad(i));
 
 type TimePickerProps = {
-  /** `HH:mm`, the same value a native time input holds; `""` when empty or incomplete. */
+  /** `HH:mm`, the same value a native time input holds; `""` until both parts are chosen. */
   value: string;
   onChange: (value: string) => void;
+  /** Goes on the hour select. */
+  id?: string;
   invalid?: boolean;
-} & Omit<ComponentProps<typeof Input>, "value" | "defaultValue" | "onChange" | "type">;
+  disabled?: boolean;
+  className?: string;
+} & Pick<ComponentProps<"div">, "aria-describedby" | "aria-label" | "aria-labelledby">;
 
-/** Typed 24-hour time: digits get their colon, a short entry is padded on blur. */
-function formatTyping(raw: string) {
-  const cleaned = raw.replace(/[^\d:]/g, "");
-  if (cleaned.includes(":")) return cleaned.slice(0, 5);
-  return cleaned.length > 2 ? `${cleaned.slice(0, 2)}:${cleaned.slice(2, 4)}` : cleaned;
+function splitTime(value: string) {
+  const [hour = "", minute = ""] = value.split(":");
+  return { hour, minute };
 }
 
-function padTime(text: string) {
-  const match = LOOSE_TIME.exec(text);
-  return match ? `${match[1].padStart(2, "0")}:${match[2].padStart(2, "0")}` : text;
-}
-
-function TimePicker({ value, onChange, invalid, onBlur, ...props }: TimePickerProps) {
-  const [text, setText] = useState(value);
+/** 24-hour time as two shadcn Selects: hours 00-23 and every minute 00-59. */
+function TimePicker({ value, onChange, id, invalid, disabled, className, ...groupProps }: TimePickerProps) {
+  const [parts, setParts] = useState(() => splitTime(value));
   const [formValue, setFormValue] = useState(value);
-  const [touched, setTouched] = useState(false);
 
-  // A value changed by the form (reset, load) replaces the text; one we emitted ourselves does not.
+  // A value changed by the form (reset, load) replaces the parts; one we emitted ourselves does not.
   if (value !== formValue) {
     setFormValue(value);
-    if (value !== (COMPLETE_TIME.test(text) ? text : "")) setText(value);
+    if (value !== (parts.hour && parts.minute ? `${parts.hour}:${parts.minute}` : "")) setParts(splitTime(value));
   }
 
-  const incomplete = text !== "" && !COMPLETE_TIME.test(text);
-  const showInvalid = invalid || (incomplete && (touched || text.length >= 5));
-
-  function commit(next: string) {
-    setText(next);
-    const emitted = COMPLETE_TIME.test(next) ? next : "";
+  function choose(next: { hour: string; minute: string }) {
+    setParts(next);
+    const emitted = next.hour && next.minute ? `${next.hour}:${next.minute}` : "";
     setFormValue(emitted);
     if (emitted !== value) onChange(emitted);
   }
 
   return (
-    <Input
-      {...props}
-      type="text"
-      inputMode="numeric"
-      autoComplete="off"
-      placeholder="hh:mm"
-      maxLength={5}
-      value={text}
-      aria-invalid={showInvalid || undefined}
-      data-slot="time-picker"
-      onChange={(event) => commit(formatTyping(event.target.value))}
-      onBlur={(event) => {
-        setTouched(true);
-        commit(padTime(text));
-        onBlur?.(event);
-      }}
-    />
+    <div role="group" data-slot="time-picker" className={cn("flex items-center gap-2", className)} {...groupProps}>
+      <Select value={parts.hour || null} disabled={disabled} onValueChange={(hour) => choose({ ...parts, hour: String(hour) })}>
+        <SelectTrigger id={id} aria-label="Hora" aria-invalid={invalid || undefined}>
+          <SelectValue placeholder="hh" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {HOURS.map((hour) => (
+              <SelectItem key={hour} value={hour}>
+                {hour}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <span aria-hidden="true">:</span>
+      <Select value={parts.minute || null} disabled={disabled} onValueChange={(minute) => choose({ ...parts, minute: String(minute) })}>
+        <SelectTrigger aria-label="Minutos" aria-invalid={invalid || undefined}>
+          <SelectValue placeholder="mm" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {MINUTES.map((minute) => (
+              <SelectItem key={minute} value={minute}>
+                {minute}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 
