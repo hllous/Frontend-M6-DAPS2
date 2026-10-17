@@ -9,7 +9,7 @@ import {
   sealSessionValue,
   SESSION_ABSOLUTE_MS as SESSION_ABSOLUTE_DURATION_MS,
   SESSION_IDLE_MS as SESSION_IDLE_DURATION_MS,
-} from "./session-cookie.mjs";
+} from "./session-cookie.cjs";
 
 export { AUTH_COOKIE_NAME } from "./session-config";
 

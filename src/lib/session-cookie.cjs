@@ -1,14 +1,14 @@
-import {
+const {
   createCipheriv,
   createDecipheriv,
   hkdfSync,
   randomBytes,
-} from "node:crypto";
-import { AUTH_COOKIE_NAME } from "./session-config.mjs";
+} = require("node:crypto");
+const { AUTH_COOKIE_NAME } = require("./session-config.cjs");
 
-export const DEFAULT_LOCAL_SESSION_SECRET = "m6-local-development-session-secret";
-export const SESSION_IDLE_MS = 30 * 60 * 1000;
-export const SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000;
+const DEFAULT_LOCAL_SESSION_SECRET = "m6-local-development-session-secret";
+const SESSION_IDLE_MS = 30 * 60 * 1000;
+const SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000;
 
 const sessionKeySalt = Buffer.from("m6-bff-session-key-salt-v1", "utf8");
 const sessionKeyInfo = Buffer.from("aes-256-gcm cookie encryption v1", "utf8");
@@ -19,7 +19,7 @@ const sessionKeyInfo = Buffer.from("aes-256-gcm cookie encryption v1", "utf8");
  * @param {number} now
  * @returns {{ mode: "mock", scenarioId: TScenarioId, issuedAt: number, lastActivityAt: number, absoluteExpiresAt: number, jwtExpiresAt: number }}
  */
-export function createMockSessionState(scenarioId, now) {
+function createMockSessionState(scenarioId, now) {
   return {
     mode: "mock",
     scenarioId,
@@ -31,7 +31,7 @@ export function createMockSessionState(scenarioId, now) {
 }
 
 /** @param {object} session @param {string} secret */
-export function sealSessionValue(session, secret) {
+function sealSessionValue(session, secret) {
   const key = deriveKey(secret);
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
@@ -45,7 +45,7 @@ export function sealSessionValue(session, secret) {
 }
 
 /** @param {string} cookieValue @param {string} secret */
-export function openSessionValue(cookieValue, secret) {
+function openSessionValue(cookieValue, secret) {
   const [encodedIv, encodedAuthTag, encodedCiphertext] = cookieValue.split(".");
   if (!encodedIv || !encodedAuthTag || !encodedCiphertext) throw new Error("Invalid session cookie.");
 
@@ -65,7 +65,7 @@ export function openSessionValue(cookieValue, secret) {
  * @param {{ NODE_ENV?: string, M6_AUTH_MODE?: string, M6_SESSION_SECRET?: string }} environment
  * @param {number} [now]
  */
-export function createLocalMockWarmupCookie(environment, now = Date.now()) {
+function createLocalMockWarmupCookie(environment, now = Date.now()) {
   if (environment.NODE_ENV === "production") {
     throw new Error("Authenticated warm-up is available only in local development.");
   }
@@ -87,3 +87,13 @@ function deriveKey(secret) {
     32,
   ));
 }
+
+module.exports = {
+  createLocalMockWarmupCookie,
+  createMockSessionState,
+  DEFAULT_LOCAL_SESSION_SECRET,
+  openSessionValue,
+  sealSessionValue,
+  SESSION_ABSOLUTE_MS,
+  SESSION_IDLE_MS,
+};

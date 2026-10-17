@@ -1,8 +1,10 @@
 import nextEnv from "@next/env";
 import { fileURLToPath } from "node:url";
 
-import { createLocalMockWarmupCookie } from "../../src/lib/session-cookie.mjs";
+import sessionCookie from "../../src/lib/session-cookie.cjs";
 import { DEV_SERVER_ENV } from "./server-config.mjs";
+
+const { createLocalMockWarmupCookie } = sessionCookie;
 
 const CATALOG_SLUGS = [
   "containers",

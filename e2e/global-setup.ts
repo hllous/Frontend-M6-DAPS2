@@ -1,5 +1,4 @@
 import { request, type FullConfig } from "@playwright/test";
-import { warmMainRoutes } from "../scripts/dev/warm-routes.mjs";
 
 // `next dev` compiles each route lazily, on the server, the first time any
 // client (browser or plain HTTP) requests it — so a lightweight request
@@ -11,6 +10,7 @@ export default async function globalSetup(config: FullConfig) {
   const baseURL = config.projects[0]?.use.baseURL;
   if (!baseURL) return;
 
+  const { warmMainRoutes } = await import("../scripts/dev/warm-routes.mjs");
   const context = await request.newContext({ baseURL });
   try {
     // API action routes can mutate mock state, so warm only read-only page GETs.

@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "commit": "006a10e8a98bfe2862db395cc7fcfa038b12fa8f",
+    "branch": "infra/574-dev-server-script",
+    "date": "2026-10-17T22:02:51.392Z",
+    "machine": {
+      "os": "Windows_NT 10.0.26300",
+      "cpuCores": 16,
+      "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+      "node": "v22.19.0"
+    }
+  },
+  "results": [
+    {
+      "step": "dev-server-ready",
+      "run": 1,
+      "seconds": 74.87,
+      "commit": "006a10e8a98bfe2862db395cc7fcfa038b12fa8f",
+      "date": "2026-10-17T22:04:35.698Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "cold .next to GET /login rendered; warmed 15 main page routes",
+      "serverPid": 93064,
+      "portOwnerPid": 96340,
+      "warmSeconds": 24.8406434,
+      "warmFailureCount": 0,
+      "startCommandSeconds": 101.9241904,
+      "warmedRouteCount": 15,
+      "portFreeAfterStop": true
+    },
+    {
+      "step": "dev-server-ready",
+      "run": 2,
+      "seconds": 4.21,
+      "commit": "006a10e8a98bfe2862db395cc7fcfa038b12fa8f",
+      "date": "2026-10-17T22:04:45.924Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "cold .next to GET /login rendered; warmed 15 main page routes",
+      "serverPid": 95832,
+      "portOwnerPid": 88796,
+      "warmSeconds": 3.6987627,
+      "warmFailureCount": 0,
+      "startCommandSeconds": 8.5004778,
+      "warmedRouteCount": 15,
+      "portFreeAfterStop": true
+    },
+    {
+      "step": "dev-server-ready",
+      "run": 3,
+      "seconds": 4.34,
+      "commit": "006a10e8a98bfe2862db395cc7fcfa038b12fa8f",
+      "date": "2026-10-17T22:04:55.618Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "cold .next to GET /login rendered; warmed 15 main page routes",
+      "serverPid": 94388,
+      "portOwnerPid": 96896,
+      "warmSeconds": 2.9627163,
+      "warmFailureCount": 0,
+      "startCommandSeconds": 7.9047382,
+      "warmedRouteCount": 15,
+      "portFreeAfterStop": true
+    }
+  ]
+}

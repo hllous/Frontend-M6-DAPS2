@@ -1,1 +1,1 @@
-export { AUTH_COOKIE_NAME } from "./session-config.mjs";
+export { AUTH_COOKIE_NAME } from "./session-config.cjs";

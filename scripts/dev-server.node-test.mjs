@@ -6,12 +6,65 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { killTree, listeningPids, processStartIdentity } from "./dev/server-process.mjs";
+import { requestPageBeforeDeadline } from "./dev/server-readiness.mjs";
 import { readServerState, serverStatePath, writeServerState } from "./dev/server-state.mjs";
 import { warmMainRoutes } from "./dev/warm-routes.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const serverScript = path.join(root, "scripts", "dev-server.mjs");
 const assignedPort = 4314;
+
+test("readiness deadline aborts an in-flight page request", async () => {
+  let requestSignal;
+  const result = await requestPageBeforeDeadline(
+    "http://127.0.0.1:4314/login",
+    Date.now() + 20,
+    (_url, { signal }) => {
+      requestSignal = signal;
+      return new Promise((_, reject) => {
+        signal.addEventListener("abort", () => reject(new Error("request aborted")), { once: true });
+      });
+    },
+  );
+
+  assert.equal(result.timedOut, true);
+  assert.equal(requestSignal.aborted, true);
+});
+
+test("readiness deadline includes reading the rendered page body", async () => {
+  let bodySignal;
+  const result = await requestPageBeforeDeadline(
+    "http://127.0.0.1:4314/login",
+    Date.now() + 20,
+    async (_url, { signal }) => {
+      bodySignal = signal;
+      return {
+        status: 200,
+        text: () => new Promise((_, reject) => {
+          signal.addEventListener("abort", () => reject(new Error("body read aborted")), { once: true });
+        }),
+      };
+    },
+  );
+
+  assert.equal(result.timedOut, true);
+  assert.equal(bodySignal.aborted, true);
+});
+
+test("readiness deadline never issues a request after it has expired", async () => {
+  let requested = false;
+  const result = await requestPageBeforeDeadline(
+    "http://127.0.0.1:4314/login",
+    Date.now() - 1,
+    async () => {
+      requested = true;
+      return { status: 200, text: async () => "<html><body>late</body></html>" };
+    },
+  );
+
+  assert.equal(result.timedOut, true);
+  assert.equal(requested, false);
+});
 
 function runServerCommand(command, extraArgs = [], timeout = 10_000) {
   return spawnSync(process.execPath, [serverScript, command, ...extraArgs], {

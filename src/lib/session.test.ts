@@ -15,7 +15,7 @@ import {
   sessionCookieOptions,
   type Session,
 } from "./session";
-import { createLocalMockWarmupCookie } from "./session-cookie.mjs";
+import { createLocalMockWarmupCookie } from "./session-cookie.cjs";
 
 const now = Date.parse("2026-09-05T15:00:00.000Z");
 const secret = "test-session-secret-that-is-long-enough";

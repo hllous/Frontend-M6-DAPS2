@@ -226,3 +226,33 @@ timestamp were not captured, so it is excluded from the schedule medians.
 
 The schedule comparison's raw results are in
 [the #573 batch](../perf/verify-schedule-2026-10-17.json).
+
+## #574 managed dev server
+
+The managed server starts Next.js on an owned local port, reports readiness
+only after `GET /login` renders, and warms the main read-only page routes. The
+readiness batch uses the unchanged baseline from
+[`baseline-2026-10-17-readiness-fixed.json`](../perf/baseline-2026-10-17-readiness-fixed.json)
+and the after batch at commit `006a10e` in
+[`after-2026-10-17-managed-server.json`](../perf/after-2026-10-17-managed-server.json).
+It measured 4.36 s (4.24–4.39) before and 4.34 s (4.21–74.87) after, a median
+change of -0.02 s (-0.46%), minimum change of -0.03 s (-0.71%), and maximum
+change of +70.48 s (+1605.5%). The first after row followed a clean `.next`
+removal and took 74.87 s to render `/login`; the next two rows also started
+with clean `.next` directories and took 4.21 s and 4.34 s. The cause of the
+first row is not established, and this batch does not meet the issue's under
+60 s acceptance target for every run. The follow-up code now aborts the
+in-flight request and response-body read at the 60 s deadline; a new three-run
+measurement on that fixed code is pending.
+
+Each after run warmed the same 15 page routes with zero failures:
+`/login`, `/app`, `/app/dashboard`, `/app/catalog/containers`,
+`/app/catalog/crews`, `/app/catalog/disposal-sites`,
+`/app/catalog/green-points`, `/app/catalog/green-spaces`,
+`/app/catalog/routes`, `/app/catalog/service-frequencies`,
+`/app/catalog/service-types`, `/app/catalog/tree-interventions`,
+`/app/catalog/trees`, `/app/catalog/vehicles`, and `/app/catalog/zones`.
+The focused login accessibility e2e passed 3/3 against the warmed server
+after the Playwright CommonJS/ESM loader fix; the readiness deadline fix was
+made afterward and is not covered by that local run. See the PR for the exact
+run times and CI run IDs.

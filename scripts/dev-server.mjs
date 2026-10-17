@@ -22,6 +22,7 @@ import {
   writeServerState,
 } from "./dev/server-state.mjs";
 import { warmMainRoutes } from "./dev/warm-routes.mjs";
+import { requestPageBeforeDeadline } from "./dev/server-readiness.mjs";
 import { DEV_SERVER_ENV } from "./dev/server-config.mjs";
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -160,7 +161,10 @@ function pageIsRendered(response, html) {
 }
 
 async function waitForRenderedPage(state) {
-  const deadline = Date.now() + READY_TIMEOUT_MS;
+  const startedAtMs = Date.parse(state.startedAt);
+  const deadline = Number.isFinite(startedAtMs)
+    ? startedAtMs + READY_TIMEOUT_MS
+    : Date.now() + READY_TIMEOUT_MS;
   const url = `http://127.0.0.1:${state.port}/login`;
   while (Date.now() < deadline) {
     if (!processIsAlive(state.serverPid)) {
@@ -168,8 +172,9 @@ async function waitForRenderedPage(state) {
     }
 
     try {
-      const response = await fetch(url, { redirect: "manual" });
-      const html = response.status === 200 ? await response.text() : "";
+      const result = await requestPageBeforeDeadline(url, deadline);
+      if (result.timedOut) break;
+      const { response, html } = result;
       if (pageIsRendered(response, html)) {
         const owners = listeningPids(state.port);
         const parents = processParents();
@@ -271,6 +276,7 @@ async function startServer(port, options = {}) {
   if (owners.length) throw new Error(`port ${port} is already in use by pid(s) ${owners.join(", ")}`);
 
   const nextCli = path.join(projectRoot, "node_modules", "next", "dist", "bin", "next");
+  const startedAtMs = Date.now();
   const startedAtNs = process.hrtime.bigint();
   const logPath = serverLogPath(projectRoot, port);
   mkdirSync(path.dirname(logPath), { recursive: true });
@@ -310,7 +316,7 @@ async function startServer(port, options = {}) {
     serverStartedAt,
     portOwnerPid: null,
     portOwnerStartedAt: null,
-    startedAt: new Date().toISOString(),
+    startedAt: new Date(startedAtMs).toISOString(),
     startedAtNs,
   };
   // The nanosecond clock value is useful only in this process; persist a stable wall-clock timestamp instead.
