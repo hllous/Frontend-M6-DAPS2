@@ -4,6 +4,21 @@ Use these scripts when recording development-loop timing changes. Run them
 on an otherwise idle machine so another test run does not affect the result.
 Keep failed runs in the raw data; a failed check is not a passing timing.
 
+## Run related tests
+
+To run tests that depend on changed source files through static imports, pass
+those source paths relative to the repository root:
+
+```bash
+npm run test:related -- src/components/services/field-work-panel.tsx
+```
+
+Vitest follows static imports, not dynamic imports. Shared modules can select a
+large part of the suite: `src/lib/authenticated-fetch.ts` selected 1,526 tests
+in 152 files. When changing a test file, run it directly with
+`npm test -- src/components/services/field-work-panel.test.tsx`. Run the full
+suite before merging.
+
 ## Measure local steps
 
 Run every step at least three times; `--runs` values below 3 are rejected.
@@ -226,3 +241,27 @@ timestamp were not captured, so it is excluded from the schedule medians.
 
 The schedule comparison's raw results are in
 [the #573 batch](../perf/verify-schedule-2026-10-17.json).
+
+## Issue #572 pool experiment
+
+The baseline `forks` config passed 1,734 tests across 183 files in three runs:
+58.08 s, 57.05 s, and 54.50 s (median 57.05 s). A one-run forks memory
+reference measured 3,604.7 MiB peak process-tree working set.
+
+| Pool | Full-suite seconds | Test result per run | Peak process-tree RSS |
+| --- | --- | --- | --- |
+| forks | 58.08, 57.05, 54.50 (median 57.05) | 1,734 passed; 183 files passed | 3,604.7 MiB (one run) |
+| vmThreads | 9.23, 9.17, 9.09 (median 9.17; invalid) | 1,090 passed, 10 failed, only 1,100 tests total; 119 files passed and 64 failed | 4,702, 4,520.5, 4,813.3 MiB |
+
+Reject `vmThreads`: each run reported only 1,100 of 1,734 tests and had 64
+failed files, so the 9.17 s median is invalid. Sampled peak RSS was 25-35%
+higher than the forks reference. The sorted `vitest list` inventories were
+identical at 1,468 collected names, but static collection is not the full
+executed test count. The deliberate failure probe still failed as expected.
+
+Raw data: [forks timing](../perf/before-2026-10-17-572-vitest.json),
+[vmThreads timing](../perf/after-2026-10-17-572-vitest.json),
+[forks RSS](../perf/rss-before-2026-10-17-572-vitest.json),
+[vmThreads RSS](../perf/rss-after-2026-10-17-572-vitest.json),
+[forks test list](../perf/test-names-before-2026-10-17-572-vitest.json), and
+[vmThreads test list](../perf/test-names-after-2026-10-17-572-vitest.json).

@@ -13,6 +13,7 @@ const require = createRequire(import.meta.url);
 const { isDocsOnlyChange } = require("./docs-only.cjs");
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const scripts = path.join(root, "scripts", "perf");
+const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
 
 function run(script, args, cwd = root) {
   return spawnSync(process.execPath, [path.join(scripts, script), ...args], {
@@ -65,6 +66,10 @@ test("measure-loop rejects fewer than three runs before starting a step", () => 
   } finally {
     rmSync(path.dirname(out), { recursive: true, force: true });
   }
+});
+
+test("package exposes a one-shot related-tests command", () => {
+  assert.equal(packageJson.scripts["test:related"], "vitest related --run");
 });
 
 test("compare rejects a step with fewer than three rows", () => {

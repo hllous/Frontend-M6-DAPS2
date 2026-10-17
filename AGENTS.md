@@ -24,6 +24,8 @@ Running `npm run dev` yourself against a Playwright `PLAYWRIGHT_BASE_URL` (repro
 
 Full Vitest takes a median of 50.15 s (81.12 s before #571 excluded the copied `.agents/` and `.claude/` skills; same 1,734 tests across 183 files). Local full e2e still fails 12–19 tests per run, and which ones varies; shared mutable mock fixtures are one shown cause (#575). Commands, raw data and the failure probe: [`docs/agents/measuring-the-loop.md`](docs/agents/measuring-the-loop.md).
 
+Run tests related to changed source files with `npm run test:related -- <paths>`; see [`docs/agents/measuring-the-loop.md#run-related-tests`](docs/agents/measuring-the-loop.md#run-related-tests).
+
 ## Agent skills
 
 ### Issue tracker

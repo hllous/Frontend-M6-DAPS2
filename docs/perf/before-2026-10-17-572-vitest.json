@@ -1,0 +1,102 @@
+{
+  "meta": {
+    "commit": "2167eb30348a1a714e9d47623ba6c12bfb3c54ba",
+    "branch": "infra/572-faster-vitest",
+    "date": "2026-10-17T21:28:43.643Z",
+    "machine": {
+      "os": "Windows_NT 10.0.26300",
+      "cpuCores": 16,
+      "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+      "node": "v22.19.0"
+    }
+  },
+  "results": [
+    {
+      "step": "vitest-full",
+      "run": 1,
+      "seconds": 58.08,
+      "commit": "2167eb30348a1a714e9d47623ba6c12bfb3c54ba",
+      "date": "2026-10-17T21:29:41.730Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "1734 passed, 0 failed (1734 tests, 183 files)",
+      "testResults": {
+        "passed": 1734,
+        "failed": 0,
+        "total": 1734,
+        "flaky": 0,
+        "skipped": 0,
+        "failedTests": [],
+        "failedFiles": [],
+        "files": {
+          "passed": 183,
+          "failed": 0,
+          "total": 183
+        }
+      }
+    },
+    {
+      "step": "vitest-full",
+      "run": 2,
+      "seconds": 57.05,
+      "commit": "2167eb30348a1a714e9d47623ba6c12bfb3c54ba",
+      "date": "2026-10-17T21:30:38.786Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "1734 passed, 0 failed (1734 tests, 183 files)",
+      "testResults": {
+        "passed": 1734,
+        "failed": 0,
+        "total": 1734,
+        "flaky": 0,
+        "skipped": 0,
+        "failedTests": [],
+        "failedFiles": [],
+        "files": {
+          "passed": 183,
+          "failed": 0,
+          "total": 183
+        }
+      }
+    },
+    {
+      "step": "vitest-full",
+      "run": 3,
+      "seconds": 54.5,
+      "commit": "2167eb30348a1a714e9d47623ba6c12bfb3c54ba",
+      "date": "2026-10-17T21:31:33.285Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "1734 passed, 0 failed (1734 tests, 183 files)",
+      "testResults": {
+        "passed": 1734,
+        "failed": 0,
+        "total": 1734,
+        "flaky": 0,
+        "skipped": 0,
+        "failedTests": [],
+        "failedFiles": [],
+        "files": {
+          "passed": 183,
+          "failed": 0,
+          "total": 183
+        }
+      }
+    }
+  ]
+}

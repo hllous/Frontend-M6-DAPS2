@@ -9,6 +9,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    pool: "threads",
+    isolate: true,
     setupFiles: ["./src/test/setup.ts"],
     exclude: [
       ...configDefaults.exclude,

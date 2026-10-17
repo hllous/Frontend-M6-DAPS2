@@ -1,0 +1,32 @@
+﻿{
+    "label":  "vmThreads-vitest-full-x3",
+    "command":  "C:\\WINDOWS\\system32\\cmd.exe /d /s /c \"node scripts/perf/measure-loop.mjs --out docs/perf/after-2026-10-17-572-vitest.json --runs 3 --steps vitest-full\"",
+    "workingDirectory":  "D:\\Uade\\2C2026\\Desarrollo de Aplicaciones 2\\TPO\\Frontend-wt\\572-faster-vitest",
+    "samplingIntervalMs":  250,
+    "rssMethod":  "Peak sampled sum of descendant Win32_Process.WorkingSetSize values",
+    "testSummaryStatus":  "failed",
+    "exitCodeObserved":  null,
+    "summaryLines":  [
+
+                     ],
+    "runs":  [
+                 {
+                     "run":  1,
+                     "peakWorkingSetBytes":  4930428928,
+                     "peakWorkingSetMiB":  4702,
+                     "samples":  24
+                 },
+                 {
+                     "run":  2,
+                     "peakWorkingSetBytes":  4740128768,
+                     "peakWorkingSetMiB":  4520.5,
+                     "samples":  24
+                 },
+                 {
+                     "run":  3,
+                     "peakWorkingSetBytes":  5047099392,
+                     "peakWorkingSetMiB":  4813.3,
+                     "samples":  24
+                 }
+             ]
+}
