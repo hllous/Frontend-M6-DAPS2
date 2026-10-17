@@ -18,7 +18,11 @@ Rare cases (PR checklist, branch protection reference, the `hotfix/*` exception)
 
 ## Local e2e debugging
 
-Running `npm run dev` yourself against a Playwright `PLAYWRIGHT_BASE_URL` (reproducing a CI e2e failure, rather than letting Playwright start and stop its own server) needs env vars `playwright.config.ts` only sets automatically for its own server, and stopping that server doesn't reliably free the port on Windows. See [`docs/agents/e2e-local-debugging.md`](docs/agents/e2e-local-debugging.md).
+Running `pnpm dev` yourself against a Playwright `PLAYWRIGHT_BASE_URL` (reproducing a CI e2e failure, rather than letting Playwright start and stop its own server) needs env vars `playwright.config.ts` only sets automatically for its own server, and stopping that server doesn't reliably free the port on Windows. See [`docs/agents/e2e-local-debugging.md`](docs/agents/e2e-local-debugging.md).
+
+## Orca worktree setup
+
+The Orca setup script runs `pnpm install --frozen-lockfile`, then copies `.env.local`, `.agents/` and `.claude/skills/` from the main clone into the worktree so it is ready to run tests.
 
 ## Agent skills
 
@@ -42,7 +46,7 @@ Single-context layout (GLOSSARY.md + docs/adr/ at repo root). See `docs/agents/d
 
 ## Verify docs
 
-Changing a `.md` file: run `npx --yes markdownlint-cli2@0.23.3` (Node 22+) and `lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'`; CI runs both in the `docs` job; a PR that only touches `docs/`, `.md` files, `.markdownlint-cli2.jsonc` or `lychee.toml` skips the app jobs (`scripts/ci/docs-only.cjs`). Details: [`docs/README.md`](docs/README.md).
+Changing a `.md` file: run `pnpm dlx markdownlint-cli2@0.23.3` (Node 22+) and `lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'`; CI runs both in the `docs` job; a PR that only touches `docs/`, `.md` files, `.markdownlint-cli2.jsonc` or `lychee.toml` skips the app jobs (`scripts/ci/docs-only.cjs`). Details: [`docs/README.md`](docs/README.md).
 
 ## UI components: shadcn as the base
 
@@ -52,14 +56,14 @@ Build each UI element from its shadcn equivalent in `src/components/ui/`. Use a 
 
 ### Base first, then adapt
 
-1. Start with `npx shadcn add <component>` in `src/components/ui/`.
+1. Start with `pnpm exec shadcn add <component>` in `src/components/ui/`.
 2. Adapt in order: app-wide visuals through theme tokens in `src/app/globals.css`, project variants in `src/components/ui/`, then shared project compositions in `src/components/ui/`.
 3. Import from `src/components/ui/` in screens and add layout only.
 4. Keep shadcn structure, `data-slot` attributes, and accessibility behavior intact.
 5. Use CSS Modules for layout only; style component appearance through theme tokens or UI variants.
 6. Format dates and times for `es-AR`, with Monday-first weeks, `dd/mm/aaaa`, and 24-hour time; preserve API value formats.
 
-`eslint-suppressions.json` only shrinks; run `npx eslint . --prune-suppressions` after fixing violations; adding entries needs PO approval; tables are owned by #520 and skeletons by #525.
+`eslint-suppressions.json` only shrinks; run `pnpm exec eslint . --prune-suppressions` after fixing violations; adding entries needs PO approval; tables are owned by #520 and skeletons by #525.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

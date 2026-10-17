@@ -43,7 +43,7 @@ Ambos excluyen `docs/backend-context/`: es un espejo de solo lectura y parcial, 
 Para correrlos en local:
 
 ```bash
-npx --yes markdownlint-cli2@0.23.3
+pnpm dlx markdownlint-cli2@0.23.3
 lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'
 ```
 

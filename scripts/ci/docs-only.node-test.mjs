@@ -28,8 +28,8 @@ test("a mixed documentation and source change is not docs-only", () => {
   assert.equal(isDocsOnlyChange({ changedFiles: files.length, files }), false);
 });
 
-test("workflow-only and package-lock changes are not docs-only", () => {
-  for (const filename of [".github/workflows/ci.yml", "package-lock.json"]) {
+test("workflow-only and pnpm-lock changes are not docs-only", () => {
+  for (const filename of [".github/workflows/ci.yml", "pnpm-lock.yaml"]) {
     assert.equal(isDocsOnlyChange({ changedFiles: 1, files: [{ filename }] }), false, filename);
   }
 });
