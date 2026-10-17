@@ -1,0 +1,102 @@
+{
+  "meta": {
+    "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+    "branch": "infra/571-measure-dev-loop",
+    "date": "2026-10-17T18:34:48.524Z",
+    "machine": {
+      "os": "Windows_NT 10.0.26300",
+      "cpuCores": 16,
+      "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+      "node": "v22.19.0"
+    }
+  },
+  "results": [
+    {
+      "step": "e2e-full",
+      "run": 1,
+      "seconds": 212.04,
+      "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+      "date": "2026-10-17T18:38:25.408Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 1,
+      "detail": "167 passed, 13 failed"
+    },
+    {
+      "step": "e2e-full",
+      "run": 2,
+      "seconds": 220.46,
+      "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+      "date": "2026-10-17T18:42:10.948Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 1,
+      "detail": "167 passed, 13 failed"
+    },
+    {
+      "step": "e2e-full",
+      "run": 3,
+      "seconds": 230.4,
+      "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+      "date": "2026-10-17T18:46:08.238Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 1,
+      "detail": "162 passed, 18 failed"
+    },
+    {
+      "step": "build",
+      "run": 1,
+      "seconds": 93,
+      "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+      "date": "2026-10-17T18:47:42.005Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0
+    },
+    {
+      "step": "build",
+      "run": 2,
+      "seconds": 28.16,
+      "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+      "date": "2026-10-17T18:48:13.950Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0
+    },
+    {
+      "step": "build",
+      "run": 3,
+      "seconds": 19.76,
+      "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+      "date": "2026-10-17T18:48:35.072Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0
+    }
+  ]
+}

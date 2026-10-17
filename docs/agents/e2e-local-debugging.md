@@ -58,3 +58,17 @@ restart in between: if two otherwise-identical local runs disagree,
 suspect leftover state first. Restart the server fresh, then run every
 spec file relevant to the change in a single command rather than
 iterating call-by-call.
+
+## Failures on a fresh server
+
+A fresh server rules out state left by an earlier server process, but it
+does not isolate tests that run in parallel against the same mutable mock
+fixtures. In the #571 diagnostic, three focused runs each started a new
+server on port 4311; the port was free after every shutdown. The runs
+reported 2 passed/27 failed, 26 passed/3 failed, and 27 passed/2 failed.
+The failing Services workspace stayed at `Cargando escenario`, and the
+specs mutate overlapping seeded services while Playwright uses
+`fullyParallel: true`. This is the fixture ownership and reset work in
+[#575](https://github.com/hllous/Frontend-M6-DAPS2/issues/575), not evidence
+that the previous server was reused. The [diagnostic JSON](../perf/focused-e2e-fresh-servers-2026-10-17.json)
+records the counts and port checks.
