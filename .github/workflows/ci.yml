@@ -20,10 +20,61 @@ on:
   push:
     branches: [develop, test, main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+    steps:
+      - name: Detect documentation-only pull request
+        id: detect
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pullNumber = context.payload.pull_request.number;
+            const [{ data: pull }, files] = await Promise.all([
+              github.rest.pulls.get({ owner, repo, pull_number: pullNumber }),
+              github.paginate(github.rest.pulls.listFiles, {
+                owner,
+                repo,
+                pull_number: pullNumber,
+                per_page: 100,
+              }),
+            ]);
+
+            const isDocumentation = (filename) =>
+              filename.startsWith("docs/") ||
+              filename.toLowerCase().endsWith(".md") ||
+              filename === ".markdownlint-cli2.jsonc" ||
+              filename === "lychee.toml";
+            const docsOnly =
+              pull.changed_files > 0 &&
+              files.length === pull.changed_files &&
+              files.every(
+                ({ filename, previous_filename }) =>
+                  isDocumentation(filename) &&
+                  (!previous_filename || isDocumentation(previous_filename)),
+              );
+
+            core.setOutput("docs_only", String(docsOnly));
+            core.info(`Documentation-only pull request: ${docsOnly}`);
+
   # Todos los jobs usan Ubuntu 24.04 para evitar la migración de ubuntu-latest a Ubuntu 26 el 2026-10-19.
   build:
     name: build
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -35,8 +86,24 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Restore node_modules cache
+        id: cache-node-modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Restore Next.js build cache
+        uses: actions/cache@v6
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}-
 
       - name: Type check
         run: npm run typecheck
@@ -46,6 +113,8 @@ jobs:
 
   test:
     name: test
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -57,7 +126,15 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Restore node_modules cache
+        id: cache-node-modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Lint
@@ -84,6 +161,8 @@ jobs:
 
   e2e-shard:
     name: e2e shard ${{ matrix.shard }}/3
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -99,11 +178,36 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Restore node_modules cache
+        id: cache-node-modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Read Playwright version
+        id: playwright-version
+        run: |
+          version=$(node -p "require('@playwright/test/package.json').version")
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browser cache
+        id: cache-playwright
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright system dependencies
+        run: npx playwright install-deps chromium
+
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
 
       # Smoke journeys, failure journeys, and axe/WCAG checks run against deterministic
       # mock scenarios and fixture data only — no production or Tier 2 data ever enters
@@ -122,16 +226,24 @@ jobs:
   e2e:
     name: e2e
     runs-on: ubuntu-24.04
-    needs: [e2e-shard]
+    needs: [changes, e2e-shard]
     if: ${{ always() }}
     steps:
       - name: Require every Playwright shard to succeed
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           SHARDS_RESULT: ${{ needs.e2e-shard.result }}
-        run: test "$SHARDS_RESULT" = "success"
+        run: |
+          if [ "$CHANGES_RESULT" = "success" ] && [ "$DOCS_ONLY" = "true" ]; then
+            exit 0
+          fi
+          test "$SHARDS_RESULT" = "success"
 
   security:
     name: security
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -143,7 +255,15 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Restore node_modules cache
+        id: cache-node-modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Dependency vulnerability scan
