@@ -36,7 +36,7 @@ describe("evidence mock handler", () => {
       method: "POST", headers: { "Idempotency-Key": "oversize-mock", "content-type": `multipart/form-data; boundary=${boundary}` }, body,
     }));
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(413);
     expect(await response.json()).toMatchObject({ message: "El archivo supera el tamaño máximo permitido de 4 MB." });
   });
 });
