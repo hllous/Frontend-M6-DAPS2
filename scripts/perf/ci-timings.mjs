@@ -3,15 +3,11 @@
 // Usage: node scripts/perf/ci-timings.mjs --out docs/perf/ci-baseline-<date>.json [--branch develop] [--runs 5]
 import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
+import { readArg } from "./cli-args.mjs";
 
-function arg(name, fallback) {
-  const i = process.argv.indexOf(`--${name}`);
-  return i === -1 ? fallback : process.argv[i + 1];
-}
-
-const out = arg("out");
-const branch = arg("branch", "develop");
-const count = Number(arg("runs", "5"));
+const out = readArg(process.argv, "out");
+const branch = readArg(process.argv, "branch", "develop");
+const count = Number(readArg(process.argv, "runs", "5"));
 if (!out) throw new Error("--out <file.json> is required");
 
 const gh = (args) => JSON.parse(execSync(`gh ${args}`, { encoding: "utf8", maxBuffer: 1 << 26 }));

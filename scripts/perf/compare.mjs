@@ -11,6 +11,9 @@ function stats(file) {
   for (const row of JSON.parse(readFileSync(file, "utf8")).results) {
     byStep.set(row.step, [...(byStep.get(row.step) ?? []), row.seconds]);
   }
+  for (const [step, values] of byStep) {
+    if (values.length < 3) throw new Error(`${file}: ${step} has ${values.length} rows; at least 3 rows are required`);
+  }
   return new Map(
     [...byStep].map(([step, values]) => {
       const s = [...values].sort((a, b) => a - b);
@@ -23,7 +26,7 @@ function stats(file) {
 
 const before = stats(beforeFile);
 const after = stats(afterFile);
-const f = (n) => n.toFixed(1);
+const formatSeconds = (seconds) => seconds.toFixed(1);
 console.log("| Step | Runs | Before median (min-max) s | After median (min-max) s | Change s | Change % |");
 console.log("| --- | --- | --- | --- | --- | --- |");
 for (const [step, b] of before) {
@@ -32,6 +35,6 @@ for (const [step, b] of before) {
   const d = a.median - b.median;
   const sign = d > 0 ? "+" : "";
   console.log(
-    `| ${step} | ${b.n}/${a.n} | ${f(b.median)} (${f(b.min)}-${f(b.max)}) | ${f(a.median)} (${f(a.min)}-${f(a.max)}) | ${sign}${f(d)} | ${sign}${f((d / b.median) * 100)}% |`,
+    `| ${step} | ${b.n}/${a.n} | ${formatSeconds(b.median)} (${formatSeconds(b.min)}-${formatSeconds(b.max)}) | ${formatSeconds(a.median)} (${formatSeconds(a.min)}-${formatSeconds(a.max)}) | ${sign}${formatSeconds(d)} | ${sign}${formatSeconds((d / b.median) * 100)}% |`,
   );
 }
