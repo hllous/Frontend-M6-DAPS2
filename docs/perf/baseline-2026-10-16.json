@@ -447,7 +447,7 @@
         "node": "v22.19.0"
       },
       "exitCode": 0,
-      "detail": "cold Next build; .next removed before every run"
+      "detail": "clean .next build; .next removed before every run"
     },
     {
       "step": "build",
@@ -462,7 +462,7 @@
         "node": "v22.19.0"
       },
       "exitCode": 0,
-      "detail": "cold Next build; .next removed before every run"
+      "detail": "clean .next build; .next removed before every run"
     },
     {
       "step": "build",
@@ -477,7 +477,7 @@
         "node": "v22.19.0"
       },
       "exitCode": 0,
-      "detail": "cold Next build; .next removed before every run"
+      "detail": "clean .next build; .next removed before every run"
     }
   ]
 }

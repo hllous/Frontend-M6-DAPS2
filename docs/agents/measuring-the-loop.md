@@ -29,10 +29,9 @@ PIDs for the readiness step.
 with a warm npm cache. It does not include `.env.local`, copied skill folders,
 or hooks, so treat it as a partial measurement of the #541 setup target.
 
-The `build` step removes `.next` before every run. Run 1 is the first cold
-machine build; runs 2 and 3 are repeat builds with a warm OS/process cache,
-but still start with a cleared `.next`. Do not describe them as warm Next
-builds.
+The `build` step removes `.next` before every run, so each run starts with a
+clean Next cache. Runs 2 and 3 reuse machine caches warmed by earlier work;
+the timing data does not establish a cold OS/process cache for run 1.
 
 Run the script regressions with:
 
@@ -94,7 +93,7 @@ readiness](../perf/after-2026-10-17-readiness.json).
 | Full Vitest ([before](../perf/baseline-2026-10-16.json), [after](../perf/after-2026-10-17-vitest-exclusions.json)) | 81.12 s (76.46–83.84) | 50.15 s (50.13–50.89) | -30.97 s (-38.2%) | 1,734 tests / 183 files; after passes |
 | Dev server ready ([before](../perf/baseline-2026-10-17-readiness-fixed.json), [after](../perf/after-2026-10-17-readiness.json)) | 4.36 s (4.24–4.39) | 4.38 s (4.22–4.61) | +0.02 s (+0.5%) | `GET /login` rendered by the owned listener |
 | Full e2e ([before](../perf/baseline-2026-10-17-e2e-fixed.json), [after](../perf/after-2026-10-17-loop-parser.json)) | 243.36 s (240.63–246.82) | 232.66 s (224.28–241.49) | -10.70 s (-4.4%) | Both sets fail; counts and names vary under shared mutable fixtures |
-| Build, clean `.next` each run ([before](../perf/baseline-2026-10-16.json), [after](../perf/after-2026-10-17-loop-parser.json)) | 28.16 s (19.76–93.00) | 24.24 s (20.33–65.97) | -3.92 s (-13.9%) | All six builds pass; only the first run starts with cold machine caches |
+| Build, clean `.next` each run ([before](../perf/baseline-2026-10-16.json), [after](../perf/after-2026-10-17-loop-parser.json)) | 28.16 s (19.76–93.00) | 24.24 s (20.33–65.97) | -3.92 s (-13.9%) | All six pass; `.next` cleared before every run |
 
 The full e2e baseline runs failed 16, 12, and 19 tests; the after runs failed
 19, 12, and 17 tests (the first two after runs also skipped one test). The
@@ -105,8 +104,7 @@ stored counts only; the corrected baseline is the name-bearing comparison.
 
 The build table groups three runs per step. Run 1 before/after was 93.00/65.97
 seconds; runs 2–3 were 28.16/19.76 and 20.33/24.24 seconds. All six rows
-cleared `.next`, so the repeat runs are machine-warm, not warm-cache Next
-builds.
+cleared `.next`; runs 2–3 reuse machine caches warmed by earlier work.
 
 The before and after Vitest rows both used `npm test` with Vitest's default
 reporter. The current measurement script uses the verbose reporter to retain

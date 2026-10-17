@@ -304,7 +304,7 @@ const stepRunners = {
     const r = timed("npm run build");
     record("build", run, r.seconds, {
       exitCode: r.exitCode,
-      detail: "cold Next build; .next removed before every run",
+      detail: "clean .next build; .next removed before every run",
     });
   },
 };
