@@ -13,7 +13,6 @@ import { withNodeFile } from "./node-file";
 
 const server = setupServer(...handlers);
 
-const officeCookie = createSessionCookie("office-duty-queue", { mode: "mock" });
 const crewCookie = createSessionCookie("field-crew-leader-route", { mode: "mock" });
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
