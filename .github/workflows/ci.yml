@@ -44,7 +44,7 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
-            const { isDocsOnlyChange } = require("./scripts/perf/docs-only.cjs");
+            const { isDocsOnlyChange } = require("./scripts/ci/docs-only.cjs");
             const { owner, repo } = context.repo;
             const pullNumber = context.payload.pull_request.number;
             const [{ data: pull }, files] = await Promise.all([
@@ -138,21 +138,8 @@ jobs:
       - name: Unit and component tests
         run: npm test
 
-      - name: Performance measurement script tests
-        run: npm run test:perf
-
-      - name: Verify the intentional Vitest failure probe
-        shell: bash
-        run: |
-          set +e
-          output=$(npm run test:failure-probe 2>&1)
-          status=$?
-          set -e
-          printf '%s\n' "$output"
-          if [ "$status" -eq 0 ] || ! grep -Fq "PERF_FAILURE_PROBE" <<<"$output"; then
-            echo "Expected the dedicated failure probe to fail on its intentional assertion"
-            exit 1
-          fi
+      - name: Documentation-only classifier tests
+        run: node --test scripts/ci/docs-only.node-test.mjs
 
   e2e-shard:
     name: e2e shard ${{ matrix.shard }}/3

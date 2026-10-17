@@ -19,7 +19,6 @@ export default defineConfig({
       ".claude*/**",
       ".codex/**",
       ".codex*/**",
-      "scripts/perf/failure-probe.test.ts",
     ],
   },
 });
