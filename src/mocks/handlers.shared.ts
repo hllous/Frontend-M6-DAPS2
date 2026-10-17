@@ -54,19 +54,13 @@ import {
   greenSpaceFixtures,
   paginateGreenSpaceFixtures,
 } from "@/lib/green-space-fixtures";
-import {
-  createGreenSpaceInputSchema,
-  greenSpaceTypeSchema,
-  updateGreenSpaceInputSchema,
-  type GreenSpaceQuery,
-} from "@/lib/green-spaces";
+import { greenSpaceTypeSchema, type GreenSpaceQuery } from "@/lib/green-spaces";
 import { addGreenPointFixture, filterGreenPointFixtures, greenPointFixtures, paginateGreenPointFixtures, updateGreenPointFixture } from "@/lib/green-point-fixtures";
-import { greenPointCreateInputSchema, greenPointUpdateInputSchema, wasteTypeSchema, type GreenPointQuery } from "@/lib/green-points";
+import { wasteTypeSchema, type GreenPointQuery } from "@/lib/green-points";
 import { addTreeFixture, filterTreeFixtures, paginateTreeFixtures, treeFixtures, updateTreeFixture } from "@/lib/tree-fixtures";
-import { treeCreateInputSchema, treeUpdateInputSchema, type TreeQuery } from "@/lib/trees";
 import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures, getTreeSurveyFixture, paginateTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { treeHealthStatusSchema, treeSurveyCreateInputSchema, riskLevelSchema } from "@/lib/tree-surveys";
-import { addTreeInterventionFixture, createTreeInterventionFixture, filterTreeInterventionFixtures, getTreeInterventionFixture, paginateTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
+import { getTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 import { treeInterventionAssignServiceInputSchema, treeInterventionAuthorizeInputSchema, treeInterventionCreateInputSchema, treeInterventionStatusSchema, treeInterventionTypeSchema } from "@/lib/tree-interventions";
 import {
   addRepairRequestFixture,
@@ -197,43 +191,6 @@ function serviceFrequencyQueryFromUrl(url: string): ServiceFrequencyQuery {
   };
 }
 
-function greenSpaceQueryFromUrl(url: string): GreenSpaceQuery {
-  const params = new URL(url).searchParams;
-  return {
-    active: params.has("active") ? params.get("active") === "true" : undefined,
-    spaceType: greenSpaceTypeSchema.safeParse(params.get("spaceType")).success
-      ? (params.get("spaceType") as GreenSpaceQuery["spaceType"])
-      : undefined,
-    zoneId: params.get("zoneId") ?? undefined,
-    page: params.has("page") ? Number(params.get("page")) : undefined,
-    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
-  };
-}
-
-function greenPointQueryFromUrl(url: string): GreenPointQuery {
-  const params = new URL(url).searchParams;
-  const wasteType = wasteTypeSchema.safeParse(params.get("wasteType"));
-  return {
-    active: params.has("active") ? params.get("active") === "true" : undefined,
-    zoneId: params.get("zoneId") ?? undefined,
-    wasteType: wasteType.success ? wasteType.data : undefined,
-    search: params.get("search") ?? undefined,
-    page: params.has("page") ? Number(params.get("page")) : undefined,
-    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
-  };
-}
-
-function treeQueryFromUrl(url: string): TreeQuery {
-  const params = new URL(url).searchParams;
-  return {
-    active: params.has("active") ? params.get("active") === "true" : undefined,
-    zoneId: params.get("zoneId") ?? undefined,
-    search: params.get("search") ?? undefined,
-    page: params.has("page") ? Number(params.get("page")) : undefined,
-    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
-  };
-}
-
 function containerQueryFromUrl(url: string): ContainerQuery {
   const params = new URL(url).searchParams;
   const rawStatus = params.get("status");
@@ -266,11 +223,9 @@ export const handlers = [
   http.get("*/api/mock/scenarios", () => HttpResponse.json(Object.values(scenarios))),
   http.get("*/api/mock/scenarios/:scenarioId", ({ params }) => {
     const scenarioId = params.scenarioId;
-
     if (typeof scenarioId !== "string" || !scenarioIds.has(scenarioId as ScenarioId)) {
       return HttpResponse.json({ message: "Escenario no encontrado." }, { status: 404 });
     }
-
     return HttpResponse.json(getScenario(scenarioId as ScenarioId));
   }),
   // StreetClosureRequest adapter contract and deterministic scenario handlers.
@@ -362,176 +317,10 @@ export const handlers = [
     if (!item) return HttpResponse.json({ statusCode: 404, message: "Solicitud no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/end` }, { status: 404 });
     return HttpResponse.json(updateStreetClosureRequestFixture(item.id, { status: "ENDED", updatedAt: new Date().toISOString() }));
   }),
-  http.get("*/api/disposal-sites", ({ request }) => { const query = disposalSiteQueryFromUrl(request.url); return HttpResponse.json(paginateDisposalSiteFixtures(filterDisposalSiteFixtures(query), query.page, query.pageSize)); }),
-  http.get("*/api/disposal-sites/:disposalSiteId", ({ params }) => { const item = disposalSiteFixtures.find((candidate) => candidate.id === params.disposalSiteId); return item ? HttpResponse.json(item) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 404 }); }),
-  http.post("*/api/disposal-sites", async ({ request }) => { const parsed = disposalSiteCreateInputSchema.safeParse(await request.json()); if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 400 }); const created = { id: `ds-${Date.now()}`, ...parsed.data, active: true }; addDisposalSiteFixture(created); return HttpResponse.json(created, { status: 201 }); }),
-  http.patch("*/api/disposal-sites/:disposalSiteId", async ({ params, request }) => { const parsed = disposalSiteUpdateInputSchema.safeParse(await request.json()); if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 400 }); const updated = updateDisposalSiteFixture(params.disposalSiteId as string, parsed.data); return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 404 }); }),
-  http.delete("*/api/disposal-sites/:disposalSiteId", ({ params }) => { const updated = updateDisposalSiteFixture(params.disposalSiteId as string, { active: false }); return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/disposal-sites" }, { status: 404 }); }),
-  http.get("*/api/service-frequencies", ({ request }) => {
-    const query = serviceFrequencyQueryFromUrl(request.url);
-    return HttpResponse.json(paginateServiceFrequencyFixtures(filterServiceFrequencyFixtures(query), query.page, query.pageSize));
-  }),
-  http.get("*/api/service-frequencies/:serviceFrequencyId", ({ params }) => {
-    const item = serviceFrequencyFixtures.find((candidate) => candidate.id === params.serviceFrequencyId);
-    return item ? HttpResponse.json(serviceFrequencyResponseFixture(item)) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
-  }),
-  http.post("*/api/service-frequencies", async ({ request }) => {
-    const parsed = serviceFrequencyCreateInputSchema.safeParse(await request.json());
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
-    const serviceType = serviceTypeFixtures.find((item) => item.id === parsed.data.serviceTypeId);
-    if (!serviceType || serviceType.mode !== "ROUTE") return HttpResponse.json({ statusCode: 400, message: "El tipo de servicio debe ser de modo ROUTE.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
-    const created = { id: `freq-${Date.now()}`, ...parsed.data, validTo: parsed.data.validTo ?? null };
-    addServiceFrequencyFixture(created);
-    return HttpResponse.json(serviceFrequencyResponseFixture(created), { status: 201 });
-  }),
-  http.patch("*/api/service-frequencies/:serviceFrequencyId", async ({ params, request }) => {
-    const parsed = serviceFrequencyUpdateInputSchema.safeParse(await request.json());
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos inválidos", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 400 });
-    const updated = updateServiceFrequencyFixture(params.serviceFrequencyId as string, parsed.data);
-    return updated ? HttpResponse.json(serviceFrequencyResponseFixture(updated)) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
-  }),
-  http.delete("*/api/service-frequencies/:serviceFrequencyId", ({ params }) => {
-    const updated = closeServiceFrequencyFixture(params.serviceFrequencyId as string, "2026-09-06");
-    return updated ? HttpResponse.json(serviceFrequencyResponseFixture(updated)) : HttpResponse.json({ statusCode: 404, message: "No encontrado", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/service-frequencies" }, { status: 404 });
-  }),
-  http.get("*/api/vehicles", ({ request }) => HttpResponse.json(paginateVehicleFixtures(filterVehicleFixtures(vehicleQueryFromUrl(request.url))))),
-  http.get("*/api/vehicles/:vehicleId", ({ params }) => {
-    const vehicle = vehicleFixtures.find((item) => item.id === params.vehicleId);
-    return vehicle ? HttpResponse.json(vehicle) : HttpResponse.json({ statusCode: 404, message: "Vehículo no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/vehicles/${params.vehicleId}` }, { status: 404 });
-  }),
-  http.post("*/api/vehicles", async ({ request }) => {
-    const parsed = createVehicleInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de vehículo inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/vehicles" }, { status: 400 });
-    const vehicle = { id: `vehicle-${vehicleFixtures.length + 1}`, ...parsed.data, active: true };
-    addVehicleFixture(vehicle);
-    return HttpResponse.json(vehicle, { status: 201 });
-  }),
-  http.patch("*/api/vehicles/:vehicleId", async ({ params, request }) => {
-    const vehicle = vehicleFixtures.find((item) => item.id === params.vehicleId);
-    const parsed = updateVehicleInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!vehicle) return HttpResponse.json({ statusCode: 404, message: "Vehículo no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/vehicles/${params.vehicleId}` }, { status: 404 });
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de vehículo inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/vehicles/${params.vehicleId}` }, { status: 400 });
-    Object.assign(vehicle, parsed.data);
-    return HttpResponse.json(vehicle);
-  }),
-  http.delete("*/api/vehicles/:vehicleId", ({ params }) => {
-    const vehicle = vehicleFixtures.find((item) => item.id === params.vehicleId);
-    if (!vehicle) return HttpResponse.json({ statusCode: 404, message: "Vehículo no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/vehicles/${params.vehicleId}` }, { status: 404 });
-    vehicle.active = false;
-    return HttpResponse.json(vehicle);
-  }),
-  http.get("*/api/crews", ({ request }) => HttpResponse.json(paginateCrewFixtures(filterCrewFixtures(crewQueryFromUrl(request.url))))),
-  http.get("*/api/crews/:crewId", ({ params }) => {
-    const crew = crewFixtures.find((item) => item.id === params.crewId);
-    return crew ? HttpResponse.json(crew) : HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 404 });
-  }),
-  http.post("*/api/crews", async ({ request }) => {
-    const parsed = createCrewInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de cuadrilla inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/crews" }, { status: 400 });
-    const crew = { id: `crew-${crewFixtures.length + 1}`, ...parsed.data, memberUserIds: [parsed.data.leaderUserId], active: true };
-    addCrewFixture(crew);
-    return HttpResponse.json(crew, { status: 201 });
-  }),
-  http.patch("*/api/crews/:crewId", async ({ params, request }) => {
-    const crew = crewFixtures.find((item) => item.id === params.crewId);
-    const parsed = updateCrewInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 404 });
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de cuadrilla inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 400 });
-    Object.assign(crew, parsed.data);
-    return HttpResponse.json(crew);
-  }),
-  http.delete("*/api/crews/:crewId", ({ params }) => {
-    const crew = crewFixtures.find((item) => item.id === params.crewId);
-    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}` }, { status: 404 });
-    crew.active = false;
-    return HttpResponse.json(crew);
-  }),
-  http.post("*/api/crews/:crewId/members", async ({ params, request }) => {
-    const crew = crewFixtures.find((item) => item.id === params.crewId);
-    const parsed = addCrewMembersInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}/members` }, { status: 404 });
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Los integrantes de la cuadrilla son inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}/members` }, { status: 400 });
-    crew.memberUserIds = [...new Set([...crew.memberUserIds, ...parsed.data.memberUserIds])];
-    return HttpResponse.json(crew);
-  }),
-  http.delete("*/api/crews/:crewId/members/:userId", ({ params }) => {
-    const crew = crewFixtures.find((item) => item.id === params.crewId);
-    if (!crew) return HttpResponse.json({ statusCode: 404, message: "Cuadrilla no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/crews/${params.crewId}/members/${params.userId}` }, { status: 404 });
-    crew.memberUserIds = crew.memberUserIds.filter((memberUserId) => memberUserId !== params.userId);
-    return HttpResponse.json(crew);
-  }),
-  // --- Containers catalog (#120) ---
-  http.get("*/api/containers", ({ request }) => {
-    const query = containerQueryFromUrl(request.url);
-    return HttpResponse.json(paginateContainerFixtures(filterContainerFixtures(query), query.page, query.pageSize));
-  }),
-  http.get("*/api/containers/:containerId", ({ params }) => {
-    const container = containerFixtures.find((item) => item.id === params.containerId);
-    return container
-      ? HttpResponse.json(container)
-      : HttpResponse.json(
-          {
-            statusCode: 404,
-            message: "Contenedor no encontrado.",
-            error: "Not Found",
-            timestamp: new Date().toISOString(),
-            path: `/api/containers/${params.containerId}`,
-          },
-          { status: 404 },
-        );
-  }),
-  http.post("*/api/containers", async ({ request }) => {
-    const parsed = createContainerInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) {
-      return HttpResponse.json(
-        {
-          statusCode: 400,
-          message: "Datos de contenedor inválidos.",
-          error: "Bad Request",
-          timestamp: new Date().toISOString(),
-          path: "/api/containers",
-        },
-        { status: 400 },
-      );
-    }
-    const newContainer = {
-      id: `cont-${Date.now()}`,
-      ...parsed.data,
-      status: "ACTIVE" as const,
-    };
-    addContainerFixture(newContainer);
-    return HttpResponse.json(newContainer, { status: 201 });
-  }),
-  http.patch("*/api/containers/:containerId", async ({ params, request }) => {
-    const container = containerFixtures.find((item) => item.id === params.containerId);
-    const parsed = updateContainerInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!container) {
-      return HttpResponse.json(
-        {
-          statusCode: 404,
-          message: "Contenedor no encontrado.",
-          error: "Not Found",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}`,
-        },
-        { status: 404 },
-      );
-    }
-    if (!parsed.success) {
-      return HttpResponse.json(
-        {
-          statusCode: 400,
-          message: "Datos de contenedor inválidos.",
-          error: "Bad Request",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}`,
-        },
-        { status: 400 },
-      );
-    }
-    const updated = updateContainerFixture(params.containerId as string, parsed.data);
-    return HttpResponse.json(updated);
-  }),
+  // --- Green Point catalog (#124) ---
+  // --- Tree catalog (#126) ---
+  // --- Tree surveys (#127) ---
+  // --- Tree interventions (#128) ---
   http.post("*/api/evidence", async ({ request }) => {
     const idempotencyKey = request.headers.get("Idempotency-Key") || request.headers.get("idempotency-key");
     if (!idempotencyKey || !idempotencyKey.trim()) {
@@ -546,7 +335,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     let formData: FormData;
     try {
       formData = await request.formData();
@@ -562,11 +350,9 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     const file = formData.get("file");
     const rawOwnerType = formData.get("ownerType");
     const ownerId = formData.get("ownerId");
-
     if (!file || typeof file === "string" || !(file instanceof Blob)) {
       return HttpResponse.json(
         {
@@ -579,7 +365,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     if (!rawOwnerType || typeof rawOwnerType !== "string") {
       return HttpResponse.json(
         {
@@ -592,7 +377,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     const parsedOwnerType = evidenceOwnerTypeSchema.safeParse(rawOwnerType);
     if (!parsedOwnerType.success) {
       return HttpResponse.json(
@@ -606,7 +390,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     if (!ownerId || typeof ownerId !== "string" || !ownerId.trim()) {
       return HttpResponse.json(
         {
@@ -619,7 +402,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     if (file.size > MAX_EVIDENCE_FILE_SIZE_BYTES) {
       return HttpResponse.json(
         {
@@ -632,7 +414,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     const allowedMime = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
     const mimeType = file.type || "application/octet-stream";
     if (!allowedMime.has(mimeType)) {
@@ -647,12 +428,10 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     const cacheKey = `${parsedOwnerType.data}:${ownerId}:${idempotencyKey}`;
     if (evidenceCache.has(cacheKey)) {
       return HttpResponse.json(evidenceCache.get(cacheKey)!, { status: 200 });
     }
-
     if (parsedOwnerType.data === "ZONE_RESULT") {
       const zoneResult = zoneResultFixtures.find((zr) => zr.id === ownerId);
       if (!zoneResult) {
@@ -689,7 +468,6 @@ export const handlers = [
         return HttpResponse.json({ statusCode: 404, message: `La inspección ${ownerId} no existe.`, error: "Not Found", timestamp: new Date().toISOString(), path: "/api/evidence" }, { status: 404 });
       }
     }
-
     const rawNameFromForm = formData.get("fileName");
     const fileObjName = (file as { name?: string }).name;
     const fileName =
@@ -697,7 +475,6 @@ export const handlers = [
       (fileObjName && fileObjName !== "blob" ? fileObjName : null) ||
       "archivo";
     const sanitizedFilename = sanitizeFilename(fileName, mimeType);
-
     const attachment: Attachment = {
       id: `att-${Math.floor(1000 + Math.random() * 9000)}`,
       url: `/mock/evidence/${sanitizedFilename}`,
@@ -705,7 +482,6 @@ export const handlers = [
       contentType: mimeType,
       uploadedAt: new Date().toISOString(),
     };
-
     if (parsedOwnerType.data === "ZONE_RESULT") {
       addAttachmentToZoneResult(ownerId, attachment);
     }
@@ -718,9 +494,7 @@ export const handlers = [
     if (parsedOwnerType.data === "INSPECTION") {
       addAttachmentToInspection(ownerId, attachment);
     }
-
     evidenceCache.set(cacheKey, attachment);
-
     return HttpResponse.json(attachment, { status: 201 });
   }),
   // ── RepairRequest / M3 (issue #113) ─────────────────────────────────────
@@ -777,142 +551,6 @@ export const handlers = [
     if (current.status !== "IN_PROGRESS") return HttpResponse.json({ statusCode: 409, message: "La derivación no está en curso.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/repair-requests/${params.requestId}/close` }, { status: 409 });
     return HttpResponse.json(transitionRepairRequestFixture(params.requestId as string, "CLOSED", parsed.data));
   }),
-  // ── Containers: Overflow and Damage (#121) ────────────────────────────────
-  http.post("*/api/containers/:containerId/report-overflow", async ({ params }) => {
-    const container = getContainerFixture(params.containerId as string);
-    if (!container) {
-      return HttpResponse.json(
-        {
-          statusCode: 404,
-          message: "Contenedor no encontrado.",
-          error: "Not Found",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/report-overflow`,
-        },
-        { status: 404 },
-      );
-    }
-    if (container.status !== "ACTIVE") {
-      return HttpResponse.json(
-        {
-          statusCode: 409,
-          message: `Solo se puede reportar desborde en contenedores activos. Estado actual: ${container.status}`,
-          error: "Conflict",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/report-overflow`,
-        },
-        { status: 409 },
-      );
-    }
-    const updated = reportOverflowFixture(params.containerId as string);
-    return HttpResponse.json(updated, { status: 200 });
-  }),
-  http.post("*/api/containers/:containerId/report-damage", async ({ params, request }) => {
-    const container = getContainerFixture(params.containerId as string);
-    if (!container) {
-      return HttpResponse.json(
-        {
-          statusCode: 404,
-          message: "Contenedor no encontrado.",
-          error: "Not Found",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/report-damage`,
-        },
-        { status: 404 },
-      );
-    }
-    if (container.status !== "ACTIVE") {
-      return HttpResponse.json(
-        {
-          statusCode: 409,
-          message: `Solo se puede reportar daño en contenedores activos. Estado actual: ${container.status}`,
-          error: "Conflict",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/report-damage`,
-        },
-        { status: 409 },
-      );
-    }
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return HttpResponse.json(
-        {
-          statusCode: 400,
-          message: "El cuerpo de la solicitud debe ser un JSON válido.",
-          error: "Bad Request",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/report-damage`,
-        },
-        { status: 400 },
-      );
-    }
-    const parsed = reportDamageInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return HttpResponse.json(
-        {
-          statusCode: 400,
-          message: parsed.error.issues.map((i) => i.message).join(" "),
-          error: "Bad Request",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/report-damage`,
-        },
-        { status: 400 },
-      );
-    }
-    const updated = reportDamageFixture(params.containerId as string, parsed.data);
-    return HttpResponse.json(updated, { status: 200 });
-  }),
-  // ── Containers: Office repair/removal dispatch (#122) ───────────────────
-  http.post("*/api/containers/:containerId/start-repair", ({ params }) => {
-    const container = getContainerFixture(params.containerId as string);
-    if (!container) {
-      return HttpResponse.json(
-        { statusCode: 404, message: "Contenedor no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/start-repair` },
-        { status: 404 },
-      );
-    }
-    if (container.status !== "DAMAGED") {
-      return HttpResponse.json(
-        { statusCode: 409, message: `Solo se puede iniciar la reparación de contenedores dañados. Estado actual: ${container.status}`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/start-repair` },
-        { status: 409 },
-      );
-    }
-    return HttpResponse.json(startRepairFixture(params.containerId as string), { status: 200 });
-  }),
-  http.post("*/api/containers/:containerId/complete-repair", ({ params }) => {
-    const container = getContainerFixture(params.containerId as string);
-    if (!container) {
-      return HttpResponse.json(
-        { statusCode: 404, message: "Contenedor no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/complete-repair` },
-        { status: 404 },
-      );
-    }
-    if (container.status !== "UNDER_REPAIR") {
-      return HttpResponse.json(
-        { statusCode: 409, message: `Solo se puede completar la reparación de contenedores en reparación. Estado actual: ${container.status}`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/complete-repair` },
-        { status: 409 },
-      );
-    }
-    return HttpResponse.json(completeRepairFixture(params.containerId as string), { status: 200 });
-  }),
-  http.post("*/api/containers/:containerId/remove", ({ params }) => {
-    const container = getContainerFixture(params.containerId as string);
-    if (!container) {
-      return HttpResponse.json(
-        { statusCode: 404, message: "Contenedor no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/remove` },
-        { status: 404 },
-      );
-    }
-    if (container.status !== "DAMAGED") {
-      return HttpResponse.json(
-        { statusCode: 409, message: `Solo se pueden retirar contenedores dañados. Estado actual: ${container.status}`, error: "Conflict", timestamp: new Date().toISOString(), path: `/api/containers/${params.containerId}/remove` },
-        { status: 409 },
-      );
-    }
-    return HttpResponse.json(removeContainerFixture(params.containerId as string), { status: 200 });
-  }),
   http.get("*/api/evidence", ({ request }) => {
     const url = new URL(request.url);
     const ownerType = url.searchParams.get("ownerType");
@@ -954,122 +592,6 @@ export const handlers = [
       return HttpResponse.json(attachments);
     }
     return HttpResponse.json([]);
-  }),
-  // ── Containers: Emptying and Relocation (#123) ────────────────────────────
-  http.post("*/api/containers/:containerId/empty", async ({ params }) => {
-    const container = getContainerFixture(params.containerId as string);
-    if (!container) {
-      return HttpResponse.json(
-        {
-          statusCode: 404,
-          message: "Contenedor no encontrado.",
-          error: "Not Found",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/empty`,
-        },
-        { status: 404 },
-      );
-    }
-    if (container.status !== "OVERFLOWED") {
-      return HttpResponse.json(
-        {
-          statusCode: 409,
-          message: `Solo se puede vaciar un contenedor en estado desbordado. Estado actual: ${container.status}`,
-          error: "Conflict",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/empty`,
-        },
-        { status: 409 },
-      );
-    }
-    const updated = emptyContainerFixture(params.containerId as string);
-    return HttpResponse.json(updated, { status: 200 });
-  }),
-  http.post("*/api/containers/:containerId/relocate", async ({ params }) => {
-    const container = getContainerFixture(params.containerId as string);
-    if (!container) {
-      return HttpResponse.json(
-        {
-          statusCode: 404,
-          message: "Contenedor no encontrado.",
-          error: "Not Found",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/relocate`,
-        },
-        { status: 404 },
-      );
-    }
-    if (container.status !== "ACTIVE") {
-      return HttpResponse.json(
-        {
-          statusCode: 409,
-          message: `Solo se puede iniciar la reubicación en contenedores activos. Estado actual: ${container.status}`,
-          error: "Conflict",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/relocate`,
-        },
-        { status: 409 },
-      );
-    }
-    const updated = startRelocationFixture(params.containerId as string);
-    return HttpResponse.json(updated, { status: 200 });
-  }),
-  http.post("*/api/containers/:containerId/confirm-relocation", async ({ params, request }) => {
-    const container = getContainerFixture(params.containerId as string);
-    if (!container) {
-      return HttpResponse.json(
-        {
-          statusCode: 404,
-          message: "Contenedor no encontrado.",
-          error: "Not Found",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/confirm-relocation`,
-        },
-        { status: 404 },
-      );
-    }
-    if (container.status !== "RELOCATING") {
-      return HttpResponse.json(
-        {
-          statusCode: 409,
-          message: `Solo se puede confirmar la reubicación en contenedores en estado de reubicación. Estado actual: ${container.status}`,
-          error: "Conflict",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/confirm-relocation`,
-        },
-        { status: 409 },
-      );
-    }
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return HttpResponse.json(
-        {
-          statusCode: 400,
-          message: "El cuerpo de la solicitud debe ser un JSON válido.",
-          error: "Bad Request",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/confirm-relocation`,
-        },
-        { status: 400 },
-      );
-    }
-    const parsed = confirmRelocationInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return HttpResponse.json(
-        {
-          statusCode: 400,
-          message: parsed.error.issues.map((i) => i.message).join(" "),
-          error: "Bad Request",
-          timestamp: new Date().toISOString(),
-          path: `/api/containers/${params.containerId}/confirm-relocation`,
-        },
-        { status: 400 },
-      );
-    }
-    const updated = confirmRelocationFixture(params.containerId as string, parsed.data);
-    return HttpResponse.json(updated, { status: 200 });
   }),
   http.post("*/api/session/logout", () => new HttpResponse(null, { status: 200 })),
 ];
