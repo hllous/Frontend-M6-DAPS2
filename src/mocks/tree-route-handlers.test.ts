@@ -1,6 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { setupServer } from "msw/node";
 
+import { resetGreenPointFixtures } from "@/lib/green-point-fixtures";
+import { resetGreenSpaceFixtures } from "@/lib/green-space-fixtures";
+import { serviceFixtures } from "@/lib/services-fixtures";
+import { resetTreeFixtures } from "@/lib/tree-fixtures";
+import { resetTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
+import { resetTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import { createSessionCookie } from "@/test/session";
 
@@ -12,7 +18,14 @@ const crewCookie = createSessionCookie("field-crew-leader-route", { mode: "mock"
 const limitedOfficeCookie = createSessionCookie("office-limited-intake", { mode: "mock" });
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  resetTreeFixtures();
+  resetTreeSurveyFixtures();
+  resetTreeInterventionFixtures();
+  resetGreenSpaceFixtures();
+  resetGreenPointFixtures();
+});
 afterAll(() => server.close());
 
 function call(method: string, path: string, cookie?: string, body?: unknown) {
@@ -63,5 +76,50 @@ describe("tree, green space and green point handlers delegate to the real BFF ro
   it("serves the green space and green point lists", async () => {
     expect((await (await call("GET", "/api/green-spaces")).json()).data.length).toBeGreaterThan(0);
     expect((await (await call("GET", "/api/green-points")).json()).data.length).toBeGreaterThan(0);
+  });
+
+  it("walks a removal through submit, authorize and assign-service with the real transitions", async () => {
+    const submitted = await call("POST", "/api/tree-interventions/intervention-3/submit-for-authorization");
+    expect(await submitted.json()).toMatchObject({ status: "PENDING_AUTHORIZATION" });
+
+    const authorized = await call("POST", "/api/tree-interventions/intervention-3/authorize", undefined, { authorizedByUserId: "user-carlos" });
+    expect(await authorized.json()).toMatchObject({ status: "AUTHORIZED", authorizedByUserId: "user-carlos" });
+
+    const pointService = serviceFixtures.find((service) => service.mode === "POINT");
+    const assigned = await call("POST", "/api/tree-interventions/intervention-3/assign-service", undefined, { serviceId: pointService?.id });
+    expect(await assigned.json()).toMatchObject({ serviceId: pointService?.id });
+  });
+
+  it("rejects a pending removal and answers a real 409 when it is not pending", async () => {
+    await call("POST", "/api/tree-interventions/intervention-3/submit-for-authorization");
+
+    const rejected = await call("POST", "/api/tree-interventions/intervention-3/reject");
+    expect(await rejected.json()).toMatchObject({ status: "REJECTED" });
+    expect((await call("POST", "/api/tree-interventions/intervention-3/reject")).status).toBe(409);
+  });
+
+  it("creates a tree intervention and answers a real 400 for an invalid payload", async () => {
+    expect((await call("POST", "/api/tree-interventions", undefined, {})).status).toBe(400);
+    const created = await call("POST", "/api/tree-interventions", undefined, {
+      interventionType: "TREATMENT",
+      treeIds: ["tree-1"],
+      address: "Av. Mitre 1140",
+      requiresStreetClosure: false,
+      priority: "LOW",
+    });
+    expect(created.status).toBe(201);
+  });
+
+  it("updates and deactivates a tree, a green space and a green point", async () => {
+    const tree = (await (await call("GET", "/api/trees")).json()).data[0];
+    const space = (await (await call("GET", "/api/green-spaces")).json()).data[0];
+    const point = (await (await call("GET", "/api/green-points")).json()).data[0];
+
+    expect((await call("PATCH", `/api/trees/${tree.id}`, undefined, { species: "Jacarandá" })).status).toBe(200);
+    expect((await call("DELETE", `/api/trees/${tree.id}`)).status).toBeLessThan(300);
+    expect((await call("PATCH", `/api/green-spaces/${space.id}`, undefined, { name: "Plaza renovada" })).status).toBe(200);
+    expect((await call("DELETE", `/api/green-spaces/${space.id}`)).status).toBeLessThan(300);
+    expect((await call("PATCH", `/api/green-points/${point.id}`, undefined, { name: "Punto renovado" })).status).toBe(200);
+    expect((await call("DELETE", `/api/green-points/${point.id}`)).status).toBeLessThan(300);
   });
 });
