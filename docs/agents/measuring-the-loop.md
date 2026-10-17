@@ -6,33 +6,49 @@ Keep failed runs in the raw data; a failed check is not a passing timing.
 
 ## Measure local steps
 
-Run every step three times:
+Run every step at least three times; `--runs` values below 3 are rejected.
+The step subset may be selected with `--steps`, and dev-server steps use the
+chosen `--port`:
 
 ```bash
 node scripts/perf/measure-loop.mjs --out docs/perf/after-YYYY-MM-DD.json --runs 3
-```
-
-Use `--steps` to select a subset and `--port` to choose the dev-server port:
-
-```bash
-node scripts/perf/measure-loop.mjs --out docs/perf/after-YYYY-MM-DD-vitest.json --runs 3 --steps vitest-full
-node scripts/perf/measure-loop.mjs --out docs/perf/after-YYYY-MM-DD-e2e.json --runs 3 --steps e2e-focused,e2e-full --port 4311
+node scripts/perf/measure-loop.mjs --out docs/perf/after-YYYY-MM-DD-e2e.json --runs 3 --steps dev-server-ready,e2e-focused,e2e-full --port 4311
 ```
 
 The available steps are `worktree-setup`, `dev-server-ready`,
 `typecheck-cold`, `typecheck-warm`, `lint-cold`, `lint-warm`, `vitest-full`,
 `e2e-focused`, `e2e-full`, and `build`. The e2e steps start and stop a
-separate `next dev` process for every run. The JSON records each step's
-duration, commit, date, machine, exit code, and test summary.
+separate `next dev` process for every run. They fail before launch when the
+port is already in use, verify that the listener belongs to the spawned
+process tree, stop the listener and launcher, and wait for the port to become
+free before recording a passing setup. The JSON records test counts and
+failed test names for Vitest and Playwright, plus the launcher and listener
+PIDs for the readiness step.
 
-## Compare local results
+`worktree-setup` currently measures only `git worktree add` plus `npm ci`
+with a warm npm cache. It does not include `.env.local`, copied skill folders,
+or hooks, so treat it as a partial measurement of the #541 setup target.
 
-The comparison script reports median, minimum, maximum, absolute change,
-and percentage change for steps present in both files:
+The `build` step removes `.next` before every run. Run 1 is the first cold
+machine build; runs 2 and 3 are repeat builds with a warm OS/process cache,
+but still start with a cleared `.next`. Do not describe them as warm Next
+builds.
+
+Run the script regressions with:
+
+```bash
+npm run test:perf
+```
+
+The comparator also rejects any step with fewer than three rows in either
+input file:
 
 ```bash
 node scripts/perf/compare.mjs docs/perf/baseline-2026-10-16.json docs/perf/after-YYYY-MM-DD.json
 ```
+
+It reports median, minimum, maximum, absolute change, and percentage change
+for steps present in both files.
 
 ## Collect CI timings
 
@@ -47,53 +63,92 @@ The file records each GitHub Actions run ID, commit, wall time, job time,
 and step time. Link the run IDs in the PR so the CI measurements can be
 checked against their original runs.
 
-## #571 baseline and current results
+## #571 provenance and results
 
-The local baseline was measured on Windows 10.0.26300, an AMD Ryzen 7
-9800X3D workstation with 16 logical cores, and Node.js 22.19.0. The base
-application code was `680b11f`; the appended full e2e and build rows were
-measured on the same application tree with the measurement tooling at
-`c838ada`.
+The base application tree is `680b11f`. The first measurement rows (worktree
+setup through focused e2e) ran at `680b11f`; the appended full e2e and build
+rows ran at tool commit `c838ada` with the same app and e2e source tree. Both
+segments are listed in the metadata of
+[`baseline-2026-10-16.json`](../perf/baseline-2026-10-16.json). The original
+full e2e batch did not log the listener PID or verify port release. Since the
+old launcher only called `taskkill /T /F` and did not check the port afterward,
+those rows could have reused a previous server; they remain historical data.
 
-| Step | Baseline median (min–max) | Result |
-| --- | --- | --- |
-| Worktree setup | 199.93 s (188.86–218.07) | `git worktree add` plus `npm ci` with a warm npm cache |
-| Dev server ready | 4.20 s (4.06–5.62) | Cold `.next`, until `GET /login` renders |
-| Typecheck cold | 10.78 s (10.71–11.52) | `npm run typecheck` |
-| Typecheck warm | 4.08 s (4.08–4.09) | `npm run typecheck` |
-| Lint cold | 14.63 s (14.28–15.15) | ESLint has no cache enabled |
-| Lint warm | 14.04 s (13.74–14.49) | ESLint has no cache enabled |
-| Full Vitest before #571 | 81.12 s (76.46–83.84) | 1,734 tests/183 files; baseline rows exit 1 |
-| Full Vitest after #571 | 50.15 s (50.13–50.89) | 1,734 tests/183 files; all pass; -30.97 s (-38.2%) median |
-| Focused e2e | 127.55 s (115.50–173.58) | The recorded runs failed 3, 9, and 14 tests |
-| Full e2e | 220.46 s (212.04–230.40) | Fresh-server runs failed 13, 13, and 18 tests; not a passing-suite timing |
-| Build | 28.16 s (19.76–93.00) | All passed; the first run was the cold outlier |
+The baseline e2e suite was rerun three times with the fixed launcher against
+the same `680b11f` app/e2e tree. The after batch used the same reporter and
+fixed server lifecycle. Both raw files record failed spec names and confirm
+that each server stopped before the next run:
+[`corrected baseline`](../perf/baseline-2026-10-17-e2e-fixed.json) and
+[`after measurements`](../perf/after-2026-10-17-loop-parser.json).
 
-Raw local data: [baseline](../perf/baseline-2026-10-16.json),
-[full-suite after-runs](../perf/after-2026-10-17-vitest-exclusions.json), and
-[fresh-server e2e diagnostics](../perf/focused-e2e-fresh-servers-2026-10-17.json).
-The CI baseline contains five successful run IDs in
-[`ci-baseline-2026-10-16.json`](../perf/ci-baseline-2026-10-16.json).
+| Step | Before median (min–max) | After median (min–max) | Change | Verdict |
+| --- | --- | --- | --- | --- |
+| Full Vitest | 81.12 s (76.46–83.84) | 50.15 s (50.13–50.89) | -30.97 s (-38.2%) | 1,734 tests / 183 files; after passes |
+| Dev server ready | 4.20 s (4.06–5.62) | 4.38 s (4.22–4.61) | +0.18 s (+4.3%) | `GET /login` rendered by the owned listener |
+| Full e2e | 243.36 s (240.63–246.82) | 232.66 s (224.28–241.49) | -10.70 s (-4.4%) | Both sets fail; counts and names vary under shared mutable fixtures |
+| Build, clean `.next` each run | 28.16 s (19.76–93.00) | 24.24 s (20.33–65.97) | -3.92 s (-13.9%) | All six builds pass; only the first run starts with cold machine caches |
 
-### Vitest exclusions and probe
+The full e2e baseline runs failed 16, 12, and 19 tests; the after runs failed
+19, 12, and 17 tests (the first two after runs also skipped one test). The
+complete names are in the raw JSON. These changing results do not meet #541's
+repeatability target and remain owned by #575. The earlier baseline's
+“13/13/18” rows cannot be matched to exact spec names because that batch
+stored counts only; the corrected baseline is the name-bearing comparison.
+
+The build table groups three runs per step. Run 1 before/after was 93.00/65.97
+seconds; runs 2–3 were 28.16/19.76 and 20.33/24.24 seconds. All six rows
+cleared `.next`, so the repeat runs are machine-warm, not warm-cache Next
+builds.
+
+The measured worktree setup median is 199.93 s (188.86–218.07), limited to
+`git worktree add` plus `npm ci` with a warm npm cache. The full setup target
+still needs measurements for `.env.local`, copied skills, and hooks.
+
+CI baseline: five successful `develop` runs are in
+[`ci-baseline-2026-10-16.json`](../perf/ci-baseline-2026-10-16.json). The
+current PR's own run ID is added to its PR body after CI finishes.
+
+## Vitest exclusions and probe
 
 In a worktree with copied `.claude` skills, the unfiltered run collected 115
 additional tests under `.claude/skills/archify/test`; they failed collection
 because Vitest could not bundle the Node.js built-in `node:test`. Excluding
 `.agents/**` and `.claude/**` leaves the project suite at 1,734 tests across
 183 files, matching CI. The unfiltered run also failed
-`MapaOperativo > presents every point layer with a synchronized accessible
-list`; it passed in the full excluded run and in isolation, so the observed
-failure depends on suite load/order. See the
+`src/components/map/mapa-operativo.test.tsx > MapaOperativo > presents every
+point layer with a synchronized accessible list`; it passed in the full
+excluded run and in isolation. See the
 [Vitest diagnostic](../perf/vitest-copied-skills-diagnostic-2026-10-17.json).
 
+The initial focused e2e diagnostic used the same exact command three times:
+
+```powershell
+node scripts/perf/measure-loop.mjs --out "$env:TEMP\measure-loop-e2e-focused-diag-1.json" --runs 1 --steps e2e-focused
+node scripts/perf/measure-loop.mjs --out "$env:TEMP\measure-loop-e2e-focused-diag-2.json" --runs 1 --steps e2e-focused
+node scripts/perf/measure-loop.mjs --out "$env:TEMP\measure-loop-e2e-focused-diag-3.json" --runs 1 --steps e2e-focused
+```
+
+Durations and results were 39.14 s (2 passed / 27 failed), 54.40 s (26 / 3),
+and 47.49 s (27 / 2); all exited 1. The corresponding JSON logs are
+`C:\Users\nicof\AppData\Local\Temp\measure-loop-e2e-focused-diag-1.json`,
+`C:\Users\nicof\AppData\Local\Temp\measure-loop-e2e-focused-diag-2.json`,
+and `C:\Users\nicof\AppData\Local\Temp\measure-loop-e2e-focused-diag-3.json`;
+the committed summary is
+[`focused-e2e-fresh-servers-2026-10-17.json`](../perf/focused-e2e-fresh-servers-2026-10-17.json).
+The port was confirmed free after each diagnostic run, so those runs did not
+reuse a stale server.
+
+The failed `services.spec.ts` workspace test reads fixture `SVC-1043`; the
+`attaches a crew without vehicle to an already-scheduled service` test in the
+same file mutates `SVC-1043`. This is concrete shared fixture evidence for
+issue #575, not proof that this collision caused every loading failure.
+
 The deliberate failure probe is outside the normal suite. Run it locally
-when checking that the test verdict still fails on an assertion:
+when checking that Vitest still fails on an assertion:
 
 ```bash
 npm run test:failure-probe
 ```
 
-The command is expected to exit 1 and print `PERF_FAILURE_PROBE`. CI runs
-the same command and fails the job if it unexpectedly passes or the marker
-is missing.
+It is expected to exit 1 and print `PERF_FAILURE_PROBE`; CI fails if it
+unexpectedly passes or the marker is missing.

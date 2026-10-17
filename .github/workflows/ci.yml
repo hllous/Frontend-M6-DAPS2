@@ -66,6 +66,9 @@ jobs:
       - name: Unit and component tests
         run: npm test
 
+      - name: Performance measurement script tests
+        run: npm run test:perf
+
       - name: Verify the intentional Vitest failure probe
         shell: bash
         run: |

@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:perf": "node --test scripts/perf/measure-loop.node-test.mjs",
     "test:failure-probe": "vitest run --config vitest.probe.config.ts",
     "test:e2e": "playwright test"
   },

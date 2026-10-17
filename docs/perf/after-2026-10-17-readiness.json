@@ -1,0 +1,69 @@
+{
+  "meta": {
+    "commit": "54463e0ab96494adc3d14a00ddf3cdca3c421e7a",
+    "branch": "infra/571-measure-dev-loop",
+    "date": "2026-10-17T19:29:07.806Z",
+    "machine": {
+      "os": "Windows_NT 10.0.26300",
+      "cpuCores": 16,
+      "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+      "node": "v22.19.0"
+    },
+    "applicationTreeCommit": "680b11fb97b85f4b6f705944d9ee5aae75bda290",
+    "measurementToolCommit": "54463e0ab96494adc3d14a00ddf3cdca3c421e7a",
+    "portOwnershipVerified": true,
+    "serverStoppedAndPortFreedAfterEachRun": true,
+    "reporter": "Playwright JSON reporter; testResults includes failed counts and full failed spec names.",
+    "note": "Application and e2e source trees match develop 680b11f. The measurement tooling at the recorded commit verifies the listener belongs to the spawned process and confirms port 4311 is free after shutdown."
+  },
+  "results": [
+    {
+      "step": "dev-server-ready",
+      "run": 1,
+      "seconds": 4.61,
+      "commit": "54463e0ab96494adc3d14a00ddf3cdca3c421e7a",
+      "date": "2026-10-17T19:29:14.445Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "serverPid": 46544,
+      "portOwnerPid": 45768,
+      "detail": "cold .next to GET /login rendered by spawned server process"
+    },
+    {
+      "step": "dev-server-ready",
+      "run": 2,
+      "seconds": 4.22,
+      "commit": "54463e0ab96494adc3d14a00ddf3cdca3c421e7a",
+      "date": "2026-10-17T19:29:19.217Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "serverPid": 48352,
+      "portOwnerPid": 47240,
+      "detail": "cold .next to GET /login rendered by spawned server process"
+    },
+    {
+      "step": "dev-server-ready",
+      "run": 3,
+      "seconds": 4.38,
+      "commit": "54463e0ab96494adc3d14a00ddf3cdca3c421e7a",
+      "date": "2026-10-17T19:29:24.196Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "serverPid": 46892,
+      "portOwnerPid": 45516,
+      "detail": "cold .next to GET /login rendered by spawned server process"
+    }
+  ]
+}

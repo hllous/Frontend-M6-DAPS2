@@ -302,7 +302,10 @@ const stepRunners = {
   build(run) {
     rmSync(path.join(root, ".next"), { recursive: true, force: true });
     const r = timed("npm run build");
-    record("build", run, r.seconds, { exitCode: r.exitCode });
+    record("build", run, r.seconds, {
+      exitCode: r.exitCode,
+      detail: "cold Next build; .next removed before every run",
+    });
   },
 };
 

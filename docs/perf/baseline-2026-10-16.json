@@ -8,7 +8,38 @@
       "cpuCores": 16,
       "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
       "node": "v22.19.0"
-    }
+    },
+    "measurementSegments": [
+      {
+        "measurementCommit": "680b11fb97b85f4b6f705944d9ee5aae75bda290",
+        "applicationTreeCommit": "680b11fb97b85f4b6f705944d9ee5aae75bda290",
+        "steps": [
+          "worktree-setup",
+          "dev-server-ready",
+          "typecheck-cold",
+          "typecheck-warm",
+          "lint-cold",
+          "lint-warm",
+          "vitest-full",
+          "e2e-focused"
+        ],
+        "detail": "Initial three-run baseline rows captured against develop before measurement tooling was added.",
+        "readinessOwnershipVerified": false,
+        "portShutdownChecked": false
+      },
+      {
+        "measurementCommit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+        "applicationTreeCommit": "680b11fb97b85f4b6f705944d9ee5aae75bda290",
+        "steps": [
+          "e2e-full",
+          "build"
+        ],
+        "detail": "The app and e2e source trees match 680b11f; this batch used the measurement tooling commit c838ada.",
+        "serverShutdownPortChecked": false
+      }
+    ],
+    "worktreeSetupScope": "git worktree add plus npm ci with a warm npm cache; .env.local, copied skill folders, and hooks were not included.",
+    "correctedFullE2eRerun": "baseline-2026-10-17-e2e-fixed.json"
   },
   "results": [
     {
@@ -413,7 +444,8 @@
         "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
         "node": "v22.19.0"
       },
-      "exitCode": 0
+      "exitCode": 0,
+      "detail": "cold Next build; .next removed before every run"
     },
     {
       "step": "build",
@@ -427,7 +459,8 @@
         "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
         "node": "v22.19.0"
       },
-      "exitCode": 0
+      "exitCode": 0,
+      "detail": "cold Next build; .next removed before every run"
     },
     {
       "step": "build",
@@ -441,7 +474,8 @@
         "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
         "node": "v22.19.0"
       },
-      "exitCode": 0
+      "exitCode": 0,
+      "detail": "cold Next build; .next removed before every run"
     }
   ]
 }
