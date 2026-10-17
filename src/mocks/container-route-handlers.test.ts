@@ -87,3 +87,40 @@ describe("disposal site handlers delegate to the real BFF routes", () => {
     }
   });
 });
+
+describe("remaining container and disposal site routes resolve their path ids", () => {
+  it("walks a damaged container through repair and a relocation", async () => {
+    const damage = await call("POST", "/api/containers/cont-1/report-damage", crewCookie, { damageType: "STRUCTURAL", severity: "LOW" });
+    expect(damage.status).toBe(200);
+    expect(await damage.json()).toMatchObject({ id: "cont-1", status: "DAMAGED" });
+
+    expect((await call("POST", "/api/containers/cont-1/start-repair")).status).toBe(200);
+    const repaired = await call("POST", "/api/containers/cont-1/complete-repair");
+    expect(repaired.status).toBe(200);
+    expect(await repaired.json()).toMatchObject({ id: "cont-1", status: "ACTIVE" });
+
+    expect((await call("POST", "/api/containers/cont-7/relocate")).status).toBe(200);
+    const confirmed = await call("POST", "/api/containers/cont-7/confirm-relocation", undefined, { address: "Av. Paseo Colon 950", lat: -34.618, lng: -58.369 });
+    expect(confirmed.status).toBe(200);
+    expect(await confirmed.json()).toMatchObject({ id: "cont-7", status: "ACTIVE", address: "Av. Paseo Colon 950" });
+  });
+
+  it("returns the real 403 when a crew session completes a repair or confirms a relocation", async () => {
+    for (const action of ["complete-repair", "confirm-relocation"]) {
+      const response = await call("POST", `/api/containers/cont-4/${action}`, crewCookie, {});
+      expect(response.status).toBe(403);
+    }
+  });
+
+  it("creates and updates a disposal site through the route validation", async () => {
+    const created = await call("POST", "/api/disposal-sites", undefined, { code: "DS-TEST", siteType: "LANDFILL", name: "Sitio de prueba" });
+    expect(created.status).toBe(201);
+    const { id } = await created.json();
+
+    const updated = await call("PATCH", `/api/disposal-sites/${id}`, undefined, { name: "Sitio renombrado", siteType: "LANDFILL", active: true });
+    expect(updated.status).toBe(200);
+    expect(await updated.json()).toMatchObject({ id, name: "Sitio renombrado" });
+
+    expect((await call("PATCH", "/api/disposal-sites/ds-nope", undefined, { name: "x", siteType: "LANDFILL", active: true })).status).toBe(404);
+  });
+});
