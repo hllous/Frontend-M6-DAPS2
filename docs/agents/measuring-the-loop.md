@@ -40,15 +40,20 @@ Run the script regressions with:
 npm run test:perf
 ```
 
-The comparator also rejects any step with fewer than three rows in either
-input file:
+The comparator rejects any step with fewer than three rows in either input
+file. Use `--steps` to compare only selected measurements. The Oct 16 file
+keeps historical readiness and full e2e rows without listener ownership or
+port-shutdown checks, so exclude those rows and use the corrected files below:
 
 ```bash
-node scripts/perf/compare.mjs docs/perf/baseline-2026-10-16.json docs/perf/after-YYYY-MM-DD.json
+node scripts/perf/compare.mjs docs/perf/baseline-2026-10-16.json docs/perf/after-2026-10-17-vitest-exclusions.json --steps vitest-full
+node scripts/perf/compare.mjs docs/perf/baseline-2026-10-16.json docs/perf/after-2026-10-17-loop-parser.json --steps build
+node scripts/perf/compare.mjs docs/perf/baseline-2026-10-17-readiness-fixed.json docs/perf/after-2026-10-17-readiness.json --steps dev-server-ready
+node scripts/perf/compare.mjs docs/perf/baseline-2026-10-17-e2e-fixed.json docs/perf/after-2026-10-17-loop-parser.json --steps e2e-full
 ```
 
 It reports median, minimum, maximum, absolute change, and percentage change
-for steps present in both files.
+for each selected step in both files.
 
 ## Collect CI timings
 
@@ -74,19 +79,22 @@ full e2e batch did not log the listener PID or verify port release. Since the
 old launcher only called `taskkill /T /F` and did not check the port afterward,
 those rows could have reused a previous server; they remain historical data.
 
-The baseline e2e suite was rerun three times with the fixed launcher against
-the same `680b11f` app/e2e tree. The after batch used the same reporter and
-fixed server lifecycle. Both raw files record failed spec names and confirm
-that each server stopped before the next run:
-[`corrected baseline`](../perf/baseline-2026-10-17-e2e-fixed.json) and
-[`after measurements`](../perf/after-2026-10-17-loop-parser.json).
+The readiness and e2e baselines were rerun three times with the fixed launcher
+against the same `680b11f` app/e2e tree. The after batches used the same
+reporter and fixed server lifecycle. The readiness files record launcher and
+listener PIDs; the e2e files also record failed spec names. Every run confirms
+that its server stopped before the next run. See the [corrected readiness
+baseline](../perf/baseline-2026-10-17-readiness-fixed.json), [corrected e2e
+baseline](../perf/baseline-2026-10-17-e2e-fixed.json), [after e2e
+measurements](../perf/after-2026-10-17-loop-parser.json), and [after
+readiness](../perf/after-2026-10-17-readiness.json).
 
 | Step | Before median (min–max) | After median (min–max) | Change | Verdict |
 | --- | --- | --- | --- | --- |
-| Full Vitest | 81.12 s (76.46–83.84) | 50.15 s (50.13–50.89) | -30.97 s (-38.2%) | 1,734 tests / 183 files; after passes |
-| Dev server ready | 4.20 s (4.06–5.62) | 4.38 s (4.22–4.61) | +0.18 s (+4.3%) | `GET /login` rendered by the owned listener |
-| Full e2e | 243.36 s (240.63–246.82) | 232.66 s (224.28–241.49) | -10.70 s (-4.4%) | Both sets fail; counts and names vary under shared mutable fixtures |
-| Build, clean `.next` each run | 28.16 s (19.76–93.00) | 24.24 s (20.33–65.97) | -3.92 s (-13.9%) | All six builds pass; only the first run starts with cold machine caches |
+| Full Vitest ([before](../perf/baseline-2026-10-16.json), [after](../perf/after-2026-10-17-vitest-exclusions.json)) | 81.12 s (76.46–83.84) | 50.15 s (50.13–50.89) | -30.97 s (-38.2%) | 1,734 tests / 183 files; after passes |
+| Dev server ready ([before](../perf/baseline-2026-10-17-readiness-fixed.json), [after](../perf/after-2026-10-17-readiness.json)) | 4.36 s (4.24–4.39) | 4.38 s (4.22–4.61) | +0.02 s (+0.5%) | `GET /login` rendered by the owned listener |
+| Full e2e ([before](../perf/baseline-2026-10-17-e2e-fixed.json), [after](../perf/after-2026-10-17-loop-parser.json)) | 243.36 s (240.63–246.82) | 232.66 s (224.28–241.49) | -10.70 s (-4.4%) | Both sets fail; counts and names vary under shared mutable fixtures |
+| Build, clean `.next` each run ([before](../perf/baseline-2026-10-16.json), [after](../perf/after-2026-10-17-loop-parser.json)) | 28.16 s (19.76–93.00) | 24.24 s (20.33–65.97) | -3.92 s (-13.9%) | All six builds pass; only the first run starts with cold machine caches |
 
 The full e2e baseline runs failed 16, 12, and 19 tests; the after runs failed
 19, 12, and 17 tests (the first two after runs also skipped one test). The
@@ -99,6 +107,11 @@ The build table groups three runs per step. Run 1 before/after was 93.00/65.97
 seconds; runs 2–3 were 28.16/19.76 and 20.33/24.24 seconds. All six rows
 cleared `.next`, so the repeat runs are machine-warm, not warm-cache Next
 builds.
+
+The before and after Vitest rows both used `npm test` with Vitest's default
+reporter. The current measurement script uses the verbose reporter to retain
+failed test names; collect both sides with the same script and reporter for
+future comparisons.
 
 The measured worktree setup median is 199.93 s (188.86–218.07), limited to
 `git worktree add` plus `npm ci` with a warm npm cache. The full setup target

@@ -1,15 +1,27 @@
 #!/usr/bin/env node
 // Prints a before/after Markdown table (median, min, max, change) from two measure-loop JSON files.
-// Usage: node scripts/perf/compare.mjs <before.json> <after.json>
+// Usage: node scripts/perf/compare.mjs <before.json> <after.json> [--steps step-a,step-b]
 import { readFileSync } from "node:fs";
+import { readArg } from "./cli-args.mjs";
 
-const [beforeFile, afterFile] = process.argv.slice(2);
-if (!beforeFile || !afterFile) throw new Error("usage: compare.mjs <before.json> <after.json>");
+const args = process.argv.slice(2);
+const [beforeFile, afterFile] = args;
+const stepsArg = readArg(args, "steps");
+const selectedSteps = stepsArg
+  ? new Set(stepsArg.split(",").map((step) => step.trim()).filter(Boolean))
+  : null;
+if (!beforeFile || !afterFile || (args.includes("--steps") && !selectedSteps?.size)) {
+  throw new Error("usage: compare.mjs <before.json> <after.json> [--steps step-a,step-b]");
+}
 
 function stats(file) {
   const byStep = new Map();
   for (const row of JSON.parse(readFileSync(file, "utf8")).results) {
+    if (selectedSteps && !selectedSteps.has(row.step)) continue;
     byStep.set(row.step, [...(byStep.get(row.step) ?? []), row.seconds]);
+  }
+  for (const step of selectedSteps ?? []) {
+    if (!byStep.has(step)) throw new Error(`${file}: no rows for selected step ${step}`);
   }
   for (const [step, values] of byStep) {
     if (values.length < 3) throw new Error(`${file}: ${step} has ${values.length} rows; at least 3 rows are required`);

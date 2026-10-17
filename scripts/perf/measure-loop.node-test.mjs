@@ -47,6 +47,23 @@ test("compare rejects a step with fewer than three rows", () => {
   }
 });
 
+test("compare filters to requested steps before validating row counts", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "compare-test-"));
+  const before = path.join(dir, "before.json");
+  const after = path.join(dir, "after.json");
+  const rows = (step, seconds) => seconds.map((value, index) => ({ step, run: index + 1, seconds: value }));
+  writeFileSync(before, JSON.stringify({ results: [...rows("e2e-full", [8, 9]), ...rows("vitest-full", [10, 11, 12])] }));
+  writeFileSync(after, JSON.stringify({ results: [...rows("e2e-full", [7, 8]), ...rows("vitest-full", [6, 7, 8])] }));
+  try {
+    const result = run("compare.mjs", [before, after, "--steps", "vitest-full"]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /\| vitest-full \| 3\/3 \|/);
+    assert.doesNotMatch(result.stdout, /e2e-full/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("measure-loop refuses a port already serving a login page", async () => {
   const server = createServer((_, response) => response.end("<html><body>stale server</body></html>"));
   await new Promise((resolve, reject) => {

@@ -39,7 +39,9 @@
       }
     ],
     "worktreeSetupScope": "git worktree add plus npm ci with a warm npm cache; .env.local, copied skill folders, and hooks were not included.",
-    "correctedFullE2eRerun": "baseline-2026-10-17-e2e-fixed.json"
+    "correctedFullE2eRerun": "baseline-2026-10-17-e2e-fixed.json",
+    "vitestMeasurementCommand": "npm test (default reporter)",
+    "correctedReadinessRerun": "baseline-2026-10-17-readiness-fixed.json"
   },
   "results": [
     {

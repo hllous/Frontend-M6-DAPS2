@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "commit": "810ba7d37b3714a99ebda138e41b106859808114",
+    "branch": "infra/571-measure-dev-loop",
+    "date": "2026-10-17T20:13:52.158Z",
+    "machine": {
+      "os": "Windows_NT 10.0.26300",
+      "cpuCores": 16,
+      "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+      "node": "v22.19.0"
+    },
+    "applicationTreeCommit": "680b11fb97b85f4b6f705944d9ee5aae75bda290",
+    "measurementToolCommit": "810ba7d37b3714a99ebda138e41b106859808114",
+    "portOwnershipVerified": true,
+    "serverStoppedAndPortFreedAfterEachRun": true,
+    "note": "Corrected readiness baseline against the unchanged develop application/e2e tree; each run verified the listener owner and port release."
+  },
+  "results": [
+    {
+      "step": "dev-server-ready",
+      "run": 1,
+      "seconds": 4.39,
+      "commit": "810ba7d37b3714a99ebda138e41b106859808114",
+      "date": "2026-10-17T20:13:58.032Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "serverPid": 7504,
+      "portOwnerPid": 48592,
+      "detail": "cold .next to GET /login rendered by spawned server process"
+    },
+    {
+      "step": "dev-server-ready",
+      "run": 2,
+      "seconds": 4.36,
+      "commit": "810ba7d37b3714a99ebda138e41b106859808114",
+      "date": "2026-10-17T20:14:02.979Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "serverPid": 58848,
+      "portOwnerPid": 61712,
+      "detail": "cold .next to GET /login rendered by spawned server process"
+    },
+    {
+      "step": "dev-server-ready",
+      "run": 3,
+      "seconds": 4.24,
+      "commit": "810ba7d37b3714a99ebda138e41b106859808114",
+      "date": "2026-10-17T20:14:07.786Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "serverPid": 52176,
+      "portOwnerPid": 60996,
+      "detail": "cold .next to GET /login rendered by spawned server process"
+    }
+  ]
+}

@@ -11,7 +11,8 @@
     },
     "applicationTreeCommit": "680b11fb97b85f4b6f705944d9ee5aae75bda290",
     "measurementToolCommit": "0619d1e6a0ffa4e561126ac7cf32666af57fc841",
-    "note": "After measurements on the unchanged develop application tree; all runs passed 1,734 tests in 183 files. The Vitest parser added later records failed counts and names for future runs."
+    "note": "After measurements on the unchanged develop application tree; all runs passed 1,734 tests in 183 files. The Vitest parser added later records failed counts and names for future runs.",
+    "vitestMeasurementCommand": "npm test (default reporter)"
   },
   "results": [
     {
