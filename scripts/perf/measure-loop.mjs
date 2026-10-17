@@ -8,6 +8,8 @@ import os from "node:os";
 import path from "node:path";
 import { readArg } from "./cli-args.mjs";
 import { parsePlaywrightOutput, parseVitestOutput } from "./result-parsers.mjs";
+import { isDescendantOf, killPid, killTree, listeningPids, processParents } from "../dev/server-process.mjs";
+import { DEV_SERVER_ENV } from "../dev/server-config.mjs";
 
 const ALL_STEPS = [
   "worktree-setup",
@@ -91,86 +93,22 @@ function timed(command, { env = {}, cwd = root } = {}) {
   };
 }
 
+function parseCommandJson(output, label) {
+  const jsonLine = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .reverse()
+    .find((line) => line.startsWith("{") && line.endsWith("}"));
+  if (!jsonLine) throw new Error(`${label} command did not print a JSON object`);
+  return JSON.parse(jsonLine);
+}
+
 function timedCommandRunner(step, command, prepare = () => {}) {
   return (run) => {
     prepare();
     const result = timed(command);
     record(step, run, result.seconds, { exitCode: result.exitCode });
   };
-}
-
-function killTree(child) {
-  if (isWin) spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"]);
-  else process.kill(-child.pid, "SIGKILL");
-}
-
-function killPid(pid) {
-  if (isWin) spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"]);
-  else {
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch (error) {
-      if (error.code !== "ESRCH") throw error;
-    }
-  }
-}
-
-function listeningPids(port) {
-  if (isWin) {
-    const result = spawnSync("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8" });
-    if (result.status !== 0) throw new Error(`could not inspect TCP listeners for port ${port}: ${result.stderr}`);
-    return result.stdout
-      .split(/\r?\n/)
-      .flatMap((line) => {
-        const columns = line.trim().split(/\s+/);
-        const localPort = Number(/:(\d+)$/.exec(columns[1] ?? "")?.[1]);
-        return columns[0] === "TCP" && columns[3] === "LISTENING" && localPort === port
-          ? [Number(columns[4])]
-          : [];
-      });
-  }
-
-  const ss = spawnSync("ss", ["-ltnp", `sport = :${port}`], { encoding: "utf8" });
-  if (ss.status === 0) {
-    return [...new Set([...ss.stdout.matchAll(/pid=(\d+)/g)].map((match) => Number(match[1])))];
-  }
-
-  const lsof = spawnSync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"], { encoding: "utf8" });
-  if (lsof.status === 0) return lsof.stdout.trim().split(/\s+/).filter(Boolean).map(Number);
-  if (lsof.status === 1 && !lsof.error) return [];
-  throw new Error(`could not inspect TCP listeners for port ${port}; install ss or lsof`);
-}
-
-function processParents() {
-  if (isWin) {
-    const result = spawnSync(
-      "powershell.exe",
-      ["-NoProfile", "-NoLogo", "-Command", "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress"],
-      { encoding: "utf8", maxBuffer: 1 << 26 },
-    );
-    if (result.status !== 0) throw new Error(`could not inspect process ownership: ${result.stderr}`);
-    const processes = JSON.parse(result.stdout);
-    return new Map((Array.isArray(processes) ? processes : [processes]).map((process) => [
-      Number(process.ProcessId),
-      Number(process.ParentProcessId),
-    ]));
-  }
-
-  const result = spawnSync("ps", ["-eo", "pid=,ppid="], { encoding: "utf8" });
-  if (result.status !== 0) throw new Error(`could not inspect process ownership: ${result.stderr}`);
-  return new Map(result.stdout.split(/\r?\n/).flatMap((line) => {
-    const [pid, parentPid] = line.trim().split(/\s+/).map(Number);
-    return Number.isInteger(pid) && Number.isInteger(parentPid) ? [[pid, parentPid]] : [];
-  }));
-}
-
-function isDescendantOf(pid, ancestorPid, parents) {
-  const visited = new Set();
-  for (let current = pid; Number.isInteger(current) && !visited.has(current); current = parents.get(current)) {
-    if (current === ancestorPid) return true;
-    visited.add(current);
-  }
-  return false;
 }
 
 async function stopDevServer(child, portOwnerPid) {
@@ -180,7 +118,7 @@ async function stopDevServer(child, portOwnerPid) {
     ...listeningPids(port).filter((pid) => isDescendantOf(pid, child.pid, parents)),
   ].filter(Number.isInteger));
   for (const pid of owners) killPid(pid);
-  killTree(child);
+  killTree(child.pid);
 
   const deadline = Date.now() + 5_000;
   for (;;) {
@@ -201,7 +139,7 @@ async function startDevServer() {
   const child = spawn(`npx next dev --port ${port}`, {
     cwd: root,
     shell: true,
-    env: { ...process.env, ...DEV_ENV },
+    env: { ...process.env, ...DEV_SERVER_ENV },
     stdio: "ignore",
     detached: !isWin,
   });
@@ -279,13 +217,28 @@ const stepRunners = {
     spawnSync("git worktree prune", { cwd: root, shell: true });
   },
   async "dev-server-ready"(run) {
-    const { child, seconds, portOwnerPid } = await startDevServer();
-    await stopDevServer(child, portOwnerPid);
-    record("dev-server-ready", run, seconds, {
-      serverPid: child.pid,
-      portOwnerPid,
-      detail: "cold .next to GET /login rendered by spawned server process",
+    rmSync(path.join(root, ".next"), { recursive: true, force: true });
+    const start = timed(`npm run dev:server -- start --port ${port} --json`);
+    if (start.exitCode !== 0) throw new Error(`managed dev server failed to start: ${start.output}`);
+
+    const server = parseCommandJson(start.stdout, "managed dev server start");
+    const stop = timed(`npm run dev:server -- stop --port ${port} --json`);
+    let stopResult = null;
+    if (stop.exitCode === 0) stopResult = parseCommandJson(stop.stdout, "managed dev server stop");
+    record("dev-server-ready", run, server.readySeconds, {
+      exitCode: stop.exitCode === 0 && stopResult?.stopped ? 0 : 1,
+      detail: `cold .next to GET /login rendered; warmed ${server.warmedRouteCount} main page routes`,
+      serverPid: server.serverPid,
+      portOwnerPid: server.pid,
+      warmSeconds: server.warmSeconds,
+      warmFailureCount: server.warmFailureCount,
+      startCommandSeconds: start.seconds,
+      warmedRouteCount: server.warmedRouteCount,
+      portFreeAfterStop: stopResult?.stopped === true,
     });
+    if (stop.exitCode !== 0 || !stopResult?.stopped) {
+      throw new Error(`managed dev server did not stop cleanly: ${stop.output}`);
+    }
   },
   "typecheck-cold": timedCommandRunner("typecheck-cold", "npm run typecheck", () =>
     rmSync(path.join(root, "tsconfig.tsbuildinfo"), { force: true }),

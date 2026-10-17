@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:server": "node scripts/dev-server.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --cache",
@@ -14,7 +15,7 @@
     "test": "vitest run",
     "verify": "node scripts/verify.mjs",
     "verify:tests": "node scripts/verify-tests.mjs",
-    "test:perf": "node --test scripts/perf/measure-loop.node-test.mjs scripts/verify.node-test.mjs scripts/verify-tests.node-test.mjs",
+    "test:perf": "node --test scripts/perf/measure-loop.node-test.mjs scripts/verify.node-test.mjs scripts/verify-tests.node-test.mjs scripts/dev-server.node-test.mjs",
     "test:failure-probe": "vitest run --config vitest.probe.config.ts",
     "test:e2e": "playwright test"
   },
@@ -44,6 +45,8 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@next/env": "^16.3.8",
+    "@typescript-eslint/parser": "^8.69.0",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",

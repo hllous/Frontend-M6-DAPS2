@@ -20,6 +20,10 @@ Rare cases (PR checklist, branch protection reference, the `hotfix/*` exception)
 
 Running `npm run dev` yourself against a Playwright `PLAYWRIGHT_BASE_URL` (reproducing a CI e2e failure, rather than letting Playwright start and stop its own server) needs env vars `playwright.config.ts` only sets automatically for its own server, and stopping that server doesn't reliably free the port on Windows. See [`docs/agents/e2e-local-debugging.md`](docs/agents/e2e-local-debugging.md).
 
+Use `npm run dev:server -- start`, `npm run dev:server -- stop`, or
+`npm run dev:server -- restart` for a managed local server; see
+[`docs/agents/e2e-local-debugging.md`](docs/agents/e2e-local-debugging.md).
+
 ## Measured development loop
 
 Full Vitest takes a median of 50.15 s (81.12 s before #571 excluded the copied `.agents/` and `.claude/` skills; same 1,734 tests across 183 files). Local full e2e still fails 12–19 tests per run, and which ones varies; shared mutable mock fixtures are one shown cause (#575). Commands, raw data and the failure probe: [`docs/agents/measuring-the-loop.md`](docs/agents/measuring-the-loop.md).
