@@ -69,7 +69,7 @@ jobs:
   build:
     name: build
     needs: changes
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -109,7 +109,7 @@ jobs:
   test:
     name: test
     needs: changes
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -157,7 +157,7 @@ jobs:
   e2e-shard:
     name: e2e shard ${{ matrix.shard }}/3
     needs: changes
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -222,7 +222,7 @@ jobs:
     name: e2e
     runs-on: ubuntu-24.04
     needs: [changes, e2e-shard]
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     steps:
       - name: Require every Playwright shard to succeed
         env:
@@ -238,7 +238,7 @@ jobs:
   security:
     name: security
     needs: changes
-    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
