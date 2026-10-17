@@ -28,12 +28,12 @@ function padTime(text: string) {
 
 function TimePicker({ value, onChange, invalid, onBlur, ...props }: TimePickerProps) {
   const [text, setText] = useState(value);
-  const [syncedValue, setSyncedValue] = useState(value);
+  const [formValue, setFormValue] = useState(value);
   const [touched, setTouched] = useState(false);
 
   // A value changed by the form (reset, load) replaces the text; one we emitted ourselves does not.
-  if (value !== syncedValue) {
-    setSyncedValue(value);
+  if (value !== formValue) {
+    setFormValue(value);
     if (value !== (COMPLETE_TIME.test(text) ? text : "")) setText(value);
   }
 
@@ -43,7 +43,7 @@ function TimePicker({ value, onChange, invalid, onBlur, ...props }: TimePickerPr
   function commit(next: string) {
     setText(next);
     const emitted = COMPLETE_TIME.test(next) ? next : "";
-    setSyncedValue(emitted);
+    setFormValue(emitted);
     if (emitted !== value) onChange(emitted);
   }
 

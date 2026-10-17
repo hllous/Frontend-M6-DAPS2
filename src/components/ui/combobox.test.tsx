@@ -104,6 +104,6 @@ describe("Combobox", () => {
     render(<Harness />);
     const cls = screen.getByRole("combobox", { name: "Zona" }).className;
     expect(cls).toContain("h-10");
-    expect(cls).toContain("max-md:h-12");
+    expect(cls).toContain("[@media(max-width:760px)]:h-12");
   });
 });

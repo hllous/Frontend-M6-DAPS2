@@ -50,6 +50,17 @@ describe("DatePicker", () => {
     expect(screen.queryByRole("grid")).not.toBeInTheDocument();
   });
 
+  it("closes without changing the value when the selected day is clicked again", async () => {
+    const user = userEvent.setup();
+    const onValue = vi.fn();
+    render(<Harness initial="2026-03-07" onValue={onValue} />);
+    await user.click(screen.getByRole("button", { name: /fecha/i }));
+    const grid = await screen.findByRole("grid");
+    await user.click(within(grid).getByRole("button", { name: /, 7 de marzo/i }));
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /fecha/i })).toHaveTextContent("07/03/2026");
+  });
+
   it("starts weeks on Monday in Spanish", async () => {
     const user = userEvent.setup();
     render(<Harness initial="2026-03-07" />);
@@ -125,6 +136,6 @@ describe("DatePicker", () => {
     render(<Harness />);
     const cls = screen.getByRole("button", { name: /fecha/i }).className;
     expect(cls).toContain("h-10");
-    expect(cls).toContain("max-md:h-12");
+    expect(cls).toContain("[@media(max-width:760px)]:h-12");
   });
 });

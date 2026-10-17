@@ -67,7 +67,7 @@ function Combobox({
             data-slot="combobox"
             data-empty={!selected || undefined}
             className={cn(
-              "h-10 w-full justify-between px-3 font-normal data-[empty]:text-muted-foreground max-md:h-12 max-md:text-base",
+              "h-10 w-full justify-between px-3 font-normal data-[empty]:text-muted-foreground [@media(max-width:760px)]:h-12 [@media(max-width:760px)]:text-base",
               className,
             )}
             {...ariaProps}
