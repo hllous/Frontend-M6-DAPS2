@@ -15,6 +15,7 @@ import {
   sessionCookieOptions,
   type Session,
 } from "./session";
+import { createLocalMockWarmupCookie } from "./session-cookie.mjs";
 
 const now = Date.parse("2026-09-05T15:00:00.000Z");
 const secret = "test-session-secret-that-is-long-enough";
@@ -44,6 +45,28 @@ describe("owned BFF session", () => {
     expect(publicValue).not.toHaveProperty("accessToken");
     expect(publicValue.scenarioId).toBe("office-duty-queue");
     expect(AUTH_COOKIE_NAME).toBe("m6_session");
+  });
+
+  it("creates a local warm-up cookie with the runtime secret and the normal session reader", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("M6_AUTH_MODE", "mock");
+    vi.stubEnv("M6_SESSION_SECRET", secret);
+
+    const cookieHeader = createLocalMockWarmupCookie(process.env, now);
+    const cookieValue = cookieHeader.slice(`${AUTH_COOKIE_NAME}=`.length);
+
+    expect(getSessionFromCookieValue(cookieValue, secret, now)).toMatchObject({
+      mode: "mock",
+      scenarioId: "office-duty-queue",
+    });
+  });
+
+  it.each([
+    { NODE_ENV: "production", M6_AUTH_MODE: "mock" },
+    { NODE_ENV: "development", M6_AUTH_MODE: "backend-development" },
+    { NODE_ENV: "development", M6_AUTH_MODE: "real-m1" },
+  ])("refuses a warm-up cookie for unsupported $NODE_ENV/$M6_AUTH_MODE auth", (environment) => {
+    expect(() => createLocalMockWarmupCookie(environment, now)).toThrow();
   });
 
   it("bounds activity by JWT, idle, and absolute expiry", () => {

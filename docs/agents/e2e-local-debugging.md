@@ -5,6 +5,51 @@ running `npm run dev` and `npm run test:e2e` yourself, against a server you
 start manually rather than the one Playwright starts and tears down on its
 own.
 
+## Managed development server
+
+Use the managed command when a server needs to survive its starting terminal or
+when Playwright should attach to a server that was started separately:
+
+```bash
+npm run dev:server -- start
+npm run dev:server -- start --port 4314
+npm run dev:server -- stop
+npm run dev:server -- stop --port 4314
+npm run dev:server -- restart --port 4314
+```
+
+Without `--port`, `start` picks the first free port from 4311 through 4399.
+Port 4310 stays reserved for Playwright. A requested port that is occupied is
+refused before launch, and the script never kills the process already using it.
+
+The script sets `M6_AUTH_MODE=mock` and `NEXT_PUBLIC_DISABLE_MSW=true`, then
+waits for `GET /login` to return a rendered HTML page from its own listener.
+It warms `/login`, `/app`, `/app/dashboard`, and the catalog pages before
+printing the URL and listener PID. Warm-up uses page `GET` requests only;
+failures are logged and do not stop the server. Playwright's global setup uses
+the same page-only warmer before the suite starts.
+For local loopback targets, protected pages receive a mock session sealed with
+the app's session code and runtime secret; production and non-local targets skip
+all warm-up requests.
+
+The server record is stored in the OS temporary directory under a key derived
+from the worktree path. `stop` and `restart` verify the recorded process start
+identity and port ownership before stopping it by PID. They clear stale
+records without killing a reused or unrelated PID, so the next worker can
+recover after a terminal closes. The start output also includes the Next log
+path for startup errors.
+
+To run e2e against the managed server, set `PLAYWRIGHT_BASE_URL` to the printed
+origin first. In PowerShell:
+
+```powershell
+$env:PLAYWRIGHT_BASE_URL = 'http://127.0.0.1:4314'
+npm run test:e2e
+```
+
+The managed server already has the auth and MSW environment values that a
+manually started server otherwise needs below.
+
 ## Set the env vars Playwright's own webServer would have set
 
 `playwright.config.ts` only injects `M6_AUTH_MODE=mock` and

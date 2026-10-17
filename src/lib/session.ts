@@ -1,18 +1,20 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  hkdfSync,
-  randomBytes,
-} from "node:crypto";
 import { cookies } from "next/headers";
 
 import { getScenario, type Capability, type ScenarioCrew, type ScenarioId } from "./scenarios";
 import { AUTH_COOKIE_NAME } from "./session-config";
+import {
+  createMockSessionState,
+  DEFAULT_LOCAL_SESSION_SECRET,
+  openSessionValue,
+  sealSessionValue,
+  SESSION_ABSOLUTE_MS as SESSION_ABSOLUTE_DURATION_MS,
+  SESSION_IDLE_MS as SESSION_IDLE_DURATION_MS,
+} from "./session-cookie.mjs";
 
 export { AUTH_COOKIE_NAME } from "./session-config";
 
-export const SESSION_IDLE_MS = 30 * 60 * 1000;
-export const SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000;
+export const SESSION_IDLE_MS = SESSION_IDLE_DURATION_MS;
+export const SESSION_ABSOLUTE_MS = SESSION_ABSOLUTE_DURATION_MS;
 
 export type AuthMode = "mock" | "backend-development" | "real-m1";
 export type SupportedAuthMode = Exclude<AuthMode, "real-m1">;
@@ -79,10 +81,6 @@ type RuntimeEnvironment = {
   NODE_ENV?: string;
 };
 
-const localSessionSecret = "m6-local-development-session-secret";
-const sessionKeySalt = Buffer.from("m6-bff-session-key-salt-v1", "utf8");
-const sessionKeyInfo = Buffer.from("aes-256-gcm cookie encryption v1", "utf8");
-
 export function getAuthMode(environment: RuntimeEnvironment = process.env): AuthMode {
   const configuredMode = environment.M6_AUTH_MODE;
   if (configuredMode === "mock" || configuredMode === "backend-development" || configuredMode === "real-m1") {
@@ -104,14 +102,7 @@ export function createSession(
   }
 
   if (options.mode === "mock") {
-    return {
-      mode: options.mode,
-      scenarioId,
-      issuedAt: now,
-      lastActivityAt: now,
-      absoluteExpiresAt: now + SESSION_ABSOLUTE_MS,
-      jwtExpiresAt: now + SESSION_ABSOLUTE_MS,
-    };
+    return createMockSessionState(scenarioId, now);
   }
 
   const accessToken = options.devJwt;
@@ -168,16 +159,7 @@ export function requireCapability(session: Session, capability: Capability): Ses
 }
 
 export function sealSession(session: Session, secret = sessionSecret()): string {
-  const key = deriveKey(secret);
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const ciphertext = Buffer.concat([
-    cipher.update(JSON.stringify(session), "utf8"),
-    cipher.final(),
-  ]);
-  const authTag = cipher.getAuthTag();
-
-  return [iv, authTag, ciphertext].map((value) => value.toString("base64url")).join(".");
+  return sealSessionValue(session, secret);
 }
 
 export function getSessionFromCookieValue(
@@ -189,18 +171,7 @@ export function getSessionFromCookieValue(
 
   try {
     const sessionKey = secret ?? sessionSecret();
-    const [encodedIv, encodedAuthTag, encodedCiphertext] = cookieValue.split(".");
-    if (!encodedIv || !encodedAuthTag || !encodedCiphertext) return undefined;
-    const decipher = createDecipheriv(
-      "aes-256-gcm",
-      deriveKey(sessionKey),
-      Buffer.from(encodedIv, "base64url"),
-    );
-    decipher.setAuthTag(Buffer.from(encodedAuthTag, "base64url"));
-    const plaintext = Buffer.concat([
-      decipher.update(Buffer.from(encodedCiphertext, "base64url")),
-      decipher.final(),
-    ]).toString("utf8");
+    const plaintext = openSessionValue(cookieValue, sessionKey);
     const value = JSON.parse(plaintext) as Partial<Session>;
 
     if (!isSession(value) || value.mode !== getAuthMode()) return undefined;
@@ -256,17 +227,7 @@ export function sessionSecret(environment: RuntimeEnvironment = process.env): st
   if (environment.NODE_ENV === "production") {
     throw new AuthUnavailableError("M6_SESSION_SECRET es obligatorio fuera del desarrollo local.");
   }
-  return localSessionSecret;
-}
-
-function deriveKey(secret: string): Buffer {
-  return Buffer.from(hkdfSync(
-    "sha256",
-    Buffer.from(secret, "utf8"),
-    sessionKeySalt,
-    sessionKeyInfo,
-    32,
-  ));
+  return DEFAULT_LOCAL_SESSION_SECRET;
 }
 
 function readJwtExpiry(token: string): number | undefined {
