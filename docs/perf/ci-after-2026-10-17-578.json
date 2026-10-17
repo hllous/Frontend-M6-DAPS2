@@ -1,0 +1,1910 @@
+{
+  "branch": "infra/578-ci-caches",
+  "collected": "2026-10-17T21:32:53.469Z",
+  "runs": [
+    {
+      "runId": 39071091392,
+      "commit": "ba691bf1aafc11e2c8bb519e0885a6196133c38e",
+      "date": "2026-10-17T21:28:33Z",
+      "title": "chore(ci): cache CI work and skip docs-only jobs (#578)",
+      "wallSeconds": 240,
+      "jobs": [
+        {
+          "job": "docs",
+          "seconds": 9,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 1
+            },
+            {
+              "step": "Markdown lint",
+              "seconds": 4
+            },
+            {
+              "step": "Install lychee",
+              "seconds": 0
+            },
+            {
+              "step": "Link check",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "changes",
+          "seconds": 5,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Detect documentation-only pull request",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "build",
+          "seconds": 46,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 4
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 6
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Next.js build cache",
+              "seconds": 2
+            },
+            {
+              "step": "Type check",
+              "seconds": 18
+            },
+            {
+              "step": "Build",
+              "seconds": 7
+            },
+            {
+              "step": "Post Restore Next.js build cache",
+              "seconds": 3
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 1
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 2/3",
+          "seconds": 188,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 2
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 3
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 4
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 3
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 15
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 0
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 155
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 1
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 3/3",
+          "seconds": 188,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 2
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 3
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 4
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 3
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 13
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 0
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 158
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "test",
+          "seconds": 230,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 5
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 6
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Lint",
+              "seconds": 25
+            },
+            {
+              "step": "Unit and component tests",
+              "seconds": 186
+            },
+            {
+              "step": "Performance measurement script tests",
+              "seconds": 0
+            },
+            {
+              "step": "Verify the intentional Vitest failure probe",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "security",
+          "seconds": 17,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 2
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 4
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 5
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Dependency vulnerability scan",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 1
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 1/3",
+          "seconds": 184,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 2
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 4
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 3
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 3
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 15
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 0
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 152
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 1
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e",
+          "seconds": 4,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 0
+            },
+            {
+              "step": "Require every Playwright shard to succeed",
+              "seconds": 1
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "runId": 39070657642,
+      "commit": "39804faf10bc3ff6932eb715630c2c467db3a8e5",
+      "date": "2026-10-17T21:22:21Z",
+      "title": "chore(ci): cache CI work and skip docs-only jobs (#578)",
+      "wallSeconds": 263,
+      "jobs": [
+        {
+          "job": "docs",
+          "seconds": 11,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 2
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 1
+            },
+            {
+              "step": "Markdown lint",
+              "seconds": 3
+            },
+            {
+              "step": "Install lychee",
+              "seconds": 0
+            },
+            {
+              "step": "Link check",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "changes",
+          "seconds": 6,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Detect documentation-only pull request",
+              "seconds": 1
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "build",
+          "seconds": 34,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 2
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 3
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 5
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Next.js build cache",
+              "seconds": 1
+            },
+            {
+              "step": "Type check",
+              "seconds": 12
+            },
+            {
+              "step": "Build",
+              "seconds": 4
+            },
+            {
+              "step": "Post Restore Next.js build cache",
+              "seconds": 3
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 1/3",
+          "seconds": 218,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 2
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 3
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 5
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 3
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 13
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 0
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 186
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 1
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 3/3",
+          "seconds": 247,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 2
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 5
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 2
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 13
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 0
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 219
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 2/3",
+          "seconds": 182,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 2
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 3
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 3
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 3
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 16
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 0
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 149
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 1
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "test",
+          "seconds": 146,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 2
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 3
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 4
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Lint",
+              "seconds": 18
+            },
+            {
+              "step": "Unit and component tests",
+              "seconds": 113
+            },
+            {
+              "step": "Performance measurement script tests",
+              "seconds": 1
+            },
+            {
+              "step": "Verify the intentional Vitest failure probe",
+              "seconds": 0
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "security",
+          "seconds": 15,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 3
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 5
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Dependency vulnerability scan",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 1
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e",
+          "seconds": 3,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 0
+            },
+            {
+              "step": "Require every Playwright shard to succeed",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "runId": 39070339418,
+      "commit": "cb821198b2487f3210341c93491af1ec61ee74d5",
+      "date": "2026-10-17T21:17:52Z",
+      "title": "chore(ci): cache CI work and skip docs-only jobs (#578)",
+      "wallSeconds": 244,
+      "jobs": [
+        {
+          "job": "docs",
+          "seconds": 12,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 2
+            },
+            {
+              "step": "Markdown lint",
+              "seconds": 5
+            },
+            {
+              "step": "Install lychee",
+              "seconds": 0
+            },
+            {
+              "step": "Link check",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "changes",
+          "seconds": 4,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Detect documentation-only pull request",
+              "seconds": 1
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 3/3",
+          "seconds": 228,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 2
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 5
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 6
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 5
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 21
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 0
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 182
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 1
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "security",
+          "seconds": 22,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 2
+            },
+            {
+              "step": "Checkout",
+              "seconds": 3
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 5
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 4
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Dependency vulnerability scan",
+              "seconds": 4
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 1
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 1/3",
+          "seconds": 223,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 3
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 6
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 5
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 4
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 19
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 0
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 180
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 2/3",
+          "seconds": 225,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 3
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 5
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 6
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 4
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 12
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 0
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 188
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 2
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "build",
+          "seconds": 42,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 3
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 5
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Next.js build cache",
+              "seconds": 1
+            },
+            {
+              "step": "Type check",
+              "seconds": 19
+            },
+            {
+              "step": "Build",
+              "seconds": 7
+            },
+            {
+              "step": "Post Restore Next.js build cache",
+              "seconds": 3
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "test",
+          "seconds": 136,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 3
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 4
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 0
+            },
+            {
+              "step": "Lint",
+              "seconds": 16
+            },
+            {
+              "step": "Unit and component tests",
+              "seconds": 106
+            },
+            {
+              "step": "Performance measurement script tests",
+              "seconds": 0
+            },
+            {
+              "step": "Verify the intentional Vitest failure probe",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e",
+          "seconds": 4,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Require every Playwright shard to succeed",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "runId": 39069695824,
+      "commit": "2461aa1932ca7301409278581bef773ee29c5e5c",
+      "date": "2026-10-17T21:08:48Z",
+      "title": "chore(ci): cache CI work and skip docs-only jobs (#578)",
+      "wallSeconds": 280,
+      "jobs": [
+        {
+          "job": "changes",
+          "seconds": 5,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Detect documentation-only pull request",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "docs",
+          "seconds": 10,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Markdown lint",
+              "seconds": 3
+            },
+            {
+              "step": "Install lychee",
+              "seconds": 1
+            },
+            {
+              "step": "Link check",
+              "seconds": 0
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "test",
+          "seconds": 193,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 0
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 5
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 15
+            },
+            {
+              "step": "Lint",
+              "seconds": 21
+            },
+            {
+              "step": "Unit and component tests",
+              "seconds": 145
+            },
+            {
+              "step": "Performance measurement script tests",
+              "seconds": 0
+            },
+            {
+              "step": "Verify the intentional Vitest failure probe",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 2
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "security",
+          "seconds": 37,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 4
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 1
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 18
+            },
+            {
+              "step": "Dependency vulnerability scan",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 6
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "build",
+          "seconds": 90,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 5
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 18
+            },
+            {
+              "step": "Restore Next.js build cache",
+              "seconds": 0
+            },
+            {
+              "step": "Type check",
+              "seconds": 18
+            },
+            {
+              "step": "Build",
+              "seconds": 35
+            },
+            {
+              "step": "Post Restore Next.js build cache",
+              "seconds": 4
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 4
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 1/3",
+          "seconds": 230,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 2
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 18
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 11
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 9
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 178
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 3
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 3
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 2/3",
+          "seconds": 239,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 1
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 4
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 1
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 17
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 1
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 10
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 9
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 184
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 3
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 3
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e shard 3/3",
+          "seconds": 264,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 2
+            },
+            {
+              "step": "Checkout",
+              "seconds": 1
+            },
+            {
+              "step": "Setup Node.js 22",
+              "seconds": 4
+            },
+            {
+              "step": "Restore node_modules cache",
+              "seconds": 0
+            },
+            {
+              "step": "Install dependencies",
+              "seconds": 15
+            },
+            {
+              "step": "Read Playwright version",
+              "seconds": 0
+            },
+            {
+              "step": "Restore Playwright browser cache",
+              "seconds": 0
+            },
+            {
+              "step": "Install Playwright system dependencies",
+              "seconds": 13
+            },
+            {
+              "step": "Install Playwright Chromium",
+              "seconds": 8
+            },
+            {
+              "step": "Playwright smoke and accessibility suite",
+              "seconds": 212
+            },
+            {
+              "step": "Upload Playwright report",
+              "seconds": 1
+            },
+            {
+              "step": "Post Restore Playwright browser cache",
+              "seconds": 2
+            },
+            {
+              "step": "Post Restore node_modules cache",
+              "seconds": 3
+            },
+            {
+              "step": "Post Setup Node.js 22",
+              "seconds": 0
+            },
+            {
+              "step": "Post Checkout",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        },
+        {
+          "job": "e2e",
+          "seconds": 4,
+          "conclusion": "success",
+          "steps": [
+            {
+              "step": "Set up job",
+              "seconds": 0
+            },
+            {
+              "step": "Require every Playwright shard to succeed",
+              "seconds": 0
+            },
+            {
+              "step": "Complete job",
+              "seconds": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
