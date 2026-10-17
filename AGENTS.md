@@ -22,7 +22,7 @@ Running `npm run dev` yourself against a Playwright `PLAYWRIGHT_BASE_URL` (repro
 
 ## Measured development loop
 
-The #571 baseline measured full Vitest at a median of 81.12 s (76.46–83.84 s; 1,734 tests across 183 files). After excluding copied `.agents/` and `.claude/` skills, the same 1,734 project tests across 183 files pass in a median of 50.15 s (50.13–50.89 s). The corrected full e2e baseline and after runs still fail because mock fixtures are shared; each run now records failed spec names and verifies server ownership and port cleanup. The original worktree timing covers only `git worktree add` plus `npm ci`; it omits `.env.local`, copied skills, and hooks. See [the measured loop and failure notes](docs/agents/measuring-the-loop.md). Run `npm run test:perf` for measurement-script regressions. Use `npm run test:failure-probe` only to verify that Vitest still reports an intentional failure; it must exit nonzero, and CI checks that result.
+Full Vitest takes a median of 50.15 s (81.12 s before #571 excluded the copied `.agents/` and `.claude/` skills; same 1,734 tests across 183 files). Local full e2e still fails 12–19 tests per run, and which ones varies; shared mutable mock fixtures are one shown cause (#575). Commands, raw data and the failure probe: [`docs/agents/measuring-the-loop.md`](docs/agents/measuring-the-loop.md).
 
 ## Agent skills
 
