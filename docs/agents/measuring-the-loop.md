@@ -67,6 +67,11 @@ The file records each GitHub Actions run ID, commit, wall time, job time,
 and step time. Link the run IDs in the PR so the CI measurements can be
 checked against their original runs.
 
+Since #578, a pull request that only changes documentation (`docs/`, any
+`.md` file, `.markdownlint-cli2.jsonc` or `lychee.toml`) skips the
+application jobs; `docs` still runs and every required check reports. The
+classifier is `scripts/perf/docs-only.cjs`.
+
 ## #571 provenance and results
 
 The base application tree is `680b11f`. The first measurement rows (worktree
