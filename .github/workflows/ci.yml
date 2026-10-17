@@ -75,36 +75,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+          run_install: false
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Restore node_modules cache
         id: cache-node-modules
         uses: actions/cache@v6
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Restore Next.js build cache
         uses: actions/cache@v6
         with:
           path: .next/cache
-          key: next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          key: next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Type check
-        run: npm run typecheck
+        run: pnpm typecheck
 
       - name: Build
-        run: npm run build
+        run: pnpm build
 
   test:
     name: test
@@ -115,28 +121,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+          run_install: false
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Restore node_modules cache
         id: cache-node-modules
         uses: actions/cache@v6
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm lint
 
       - name: Unit and component tests
-        run: npm test
+        run: pnpm test
 
       - name: Documentation-only classifier tests
         run: node --test scripts/ci/docs-only.node-test.mjs
@@ -154,22 +166,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+          run_install: false
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Restore node_modules cache
         id: cache-node-modules
         uses: actions/cache@v6
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Read Playwright version
         id: playwright-version
@@ -185,17 +203,17 @@ jobs:
           key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright system dependencies
-        run: npx playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium
 
       - name: Install Playwright Chromium
         if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: npx playwright install chromium
+        run: pnpm exec playwright install chromium
 
       # Smoke journeys, failure journeys, and axe/WCAG checks run against deterministic
       # mock scenarios and fixture data only — no production or Tier 2 data ever enters
       # these runs, so the traces/screenshots below carry none either.
       - name: Playwright smoke and accessibility suite
-        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm exec playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -231,25 +249,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+          run_install: false
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Restore node_modules cache
         id: cache-node-modules
         uses: actions/cache@v6
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Dependency vulnerability scan
-        run: npm audit --omit=dev --audit-level=high
+        run: pnpm audit --prod --audit-level=high
 
   docs:
     name: docs
@@ -262,13 +286,20 @@ jobs:
 
       # markdownlint-cli2 0.23 exige Node 22+; todos los jobs usan Node 22.
       # Reglas y alcance en .markdownlint-cli2.jsonc.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+          run_install: false
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: pnpm
 
       - name: Markdown lint
-        run: npx --yes markdownlint-cli2@0.23.3
+        run: pnpm dlx markdownlint-cli2@0.23.3
 
       # Versión y checksum fijados: se descarga un binario, no una action de terceros.
       # Reglas y alcance en lychee.toml (offline: solo enlaces y anclas internas).

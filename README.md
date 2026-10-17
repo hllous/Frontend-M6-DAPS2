@@ -19,13 +19,13 @@ Aplicación web interna para planificar y ejecutar servicios municipales de Ambi
 ## Ejecución local
 
 ```bash
-npm ci
-npm run dev
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
 La aplicación queda en `http://localhost:3000`; el health check local es `/api/health`. La configuración se describe en [`.env.example`](.env.example). El modo local predeterminado usa escenarios y fixtures (`M6_AUTH_MODE=mock`).
 
-Si vas a usar variables locales, copiá `.env.example` a `.env.local` y ajustá los valores. Cuando el backend local usa el puerto 3000, iniciá el frontend en otro puerto, por ejemplo `npm run dev -- --port 3001`.
+Si vas a usar variables locales, copiá `.env.example` a `.env.local` y ajustá los valores. Cuando el backend local usa el puerto 3000, iniciá el frontend en otro puerto, por ejemplo `pnpm dev --port 3001`.
 
 Para conectarse al backend, configurar `M6_AUTH_MODE=backend-development`, `M6_BACKEND_ORIGIN`, `M6_DEV_JWT` y `M6_SESSION_SECRET`. Son variables del servidor: el navegador llama a los Route Handlers del BFF de Next.js y nunca recibe el JWT. La autenticación real de M1 aún no está habilitada; el modo `real-m1` falla de forma cerrada hasta que M1 publique su contrato verificable. Ver [contratos](CONTRACTS.md) y [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md).
 

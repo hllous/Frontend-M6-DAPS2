@@ -1,7 +1,7 @@
 # Local e2e debugging — detail
 
 Skeleton lives in `AGENTS.md`. This covers reproducing a CI e2e failure by
-running `npm run dev` and `npm run test:e2e` yourself, against a server you
+running `pnpm dev` and `pnpm test:e2e` yourself, against a server you
 start manually rather than the one Playwright starts and tears down on its
 own.
 
@@ -15,7 +15,7 @@ where you're pointing it at a server you started by hand. Without them,
 like a broken environment rather than a missing flag:
 
 ```bash
-M6_AUTH_MODE=mock NEXT_PUBLIC_DISABLE_MSW=true PLAYWRIGHT_BASE_URL=http://127.0.0.1:<port> npm run dev -- --port <port>
+M6_AUTH_MODE=mock NEXT_PUBLIC_DISABLE_MSW=true PLAYWRIGHT_BASE_URL=http://127.0.0.1:<port> pnpm dev --port <port>
 ```
 
 Confirm the server is actually up before trusting a test run against it:
@@ -29,7 +29,7 @@ not the code under test.
 
 ## Killing a manually-started server on Windows
 
-Stopping a backgrounded `npm run dev` does not reliably kill the
+Stopping a backgrounded `pnpm dev` does not reliably kill the
 underlying `next dev` child — the port stays bound, and a naive restart
 either fails with `EADDRINUSE` or, worse, silently reuses the stale
 process (serving whatever build and env it started with, including
@@ -53,7 +53,7 @@ order), so a spec that reuses a fixture ID another spec file already
 mutates will pass locally under parallel workers and fail in CI — grep
 `e2e/*.spec.ts` for a candidate ID before reusing it, rather than trusting
 a fixture file's on-paper status. The same accumulation happens across
-separate manual `npm run test:e2e` calls against a server you didn't
+separate manual `pnpm test:e2e` calls against a server you didn't
 restart in between: if two otherwise-identical local runs disagree,
 suspect leftover state first. Restart the server fresh, then run every
 spec file relevant to the change in a single command rather than

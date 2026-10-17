@@ -11,6 +11,7 @@ out
 .env
 *.log
 npm-debug.log*
+pnpm-debug.log*
 
 # Archivos propios de Docker
 Dockerfile
