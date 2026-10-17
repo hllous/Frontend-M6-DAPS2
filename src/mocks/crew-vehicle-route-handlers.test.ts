@@ -59,5 +59,24 @@ describe("Crew, vehicle and service frequency MSW handlers delegate to the real 
 
     const removeMember = await send("DELETE", "/api/crews/crew-1/members/user-1", fieldCookie);
     expect(removeMember.status).toBe(403);
+    expect(await removeMember.json()).toMatchObject({ statusCode: 403, error: "Forbidden" });
+  });
+
+  it("applies Office mutations through the real routes", async () => {
+    const crews = await (await send("GET", "/api/crews")).json();
+    const crew = crews.data[0];
+
+    const deactivated = await send("DELETE", `/api/crews/${crew.id}`);
+    expect(deactivated.status).toBe(200);
+    expect(await deactivated.json()).toMatchObject({ id: crew.id, active: false });
+
+    const vehicles = await (await send("GET", "/api/vehicles")).json();
+    const vehicle = vehicles.data[0];
+    const patched = await send("PATCH", `/api/vehicles/${vehicle.id}`, undefined, { active: false });
+    expect(patched.status).toBe(200);
+    expect(await patched.json()).toMatchObject({ id: vehicle.id, active: false });
+
+    const missingMembers = await send("POST", "/api/crews/nope/members", undefined, { memberUserIds: ["u1"] });
+    expect(missingMembers.status).toBe(404);
   });
 });
