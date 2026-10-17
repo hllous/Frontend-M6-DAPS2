@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+    "branch": "infra/571-measure-dev-loop",
+    "date": "2026-10-17T18:30:35.693Z",
+    "machine": {
+      "os": "Windows_NT 10.0.26300",
+      "cpuCores": 16,
+      "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+      "node": "v22.19.0"
+    },
+    "note": "Each run used measure-loop.mjs to start and stop its own Next.js server. Windows port 4311 was confirmed free after each shutdown before the next run."
+  },
+  "results": [
+    {
+      "step": "e2e-focused",
+      "run": 1,
+      "seconds": 39.14,
+      "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+      "date": "2026-10-17T18:32:19.659Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 1,
+      "detail": "2 passed, 27 failed",
+      "port": 4311,
+      "portFreeAfterShutdown": true
+    },
+    {
+      "step": "e2e-focused",
+      "run": 2,
+      "seconds": 54.4,
+      "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+      "date": "2026-10-17T18:33:20.441Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 1,
+      "detail": "26 passed, 3 failed",
+      "port": 4311,
+      "portFreeAfterShutdown": true
+    },
+    {
+      "step": "e2e-focused",
+      "run": 3,
+      "seconds": 47.49,
+      "commit": "c838ada0ec41f9d714b7b3f6a98f4f2c7b8a6b4e",
+      "date": "2026-10-17T18:34:15.175Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 1,
+      "detail": "27 passed, 2 failed",
+      "port": 4311,
+      "portFreeAfterShutdown": true
+    }
+  ]
+}

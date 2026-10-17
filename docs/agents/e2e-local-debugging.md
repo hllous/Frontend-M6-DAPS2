@@ -45,6 +45,11 @@ The double slash on `//PID //F` is required in Git Bash — a single slash
 gets rewritten as a filesystem path. Re-run the `curl` check above after
 restarting to confirm you're talking to the new process, not the old one.
 
+The `scripts/perf/measure-loop.mjs` e2e steps apply a stricter lifecycle:
+they refuse an occupied port, verify the listening PID belongs to the spawned
+server process tree, kill the listener and launcher, and wait for the port to
+be free before the next run. Use those steps when collecting loop timings.
+
 ## Run the whole relevant spec set in one invocation
 
 The mock backend keeps mutated fixture state in memory for the life of
@@ -58,3 +63,24 @@ restart in between: if two otherwise-identical local runs disagree,
 suspect leftover state first. Restart the server fresh, then run every
 spec file relevant to the change in a single command rather than
 iterating call-by-call.
+
+## Failures on a fresh server
+
+A fresh server rules out state left by an earlier server process, but it
+does not isolate tests that run in parallel against the same mutable mock
+fixtures. In the #571 focused diagnostic, three runs each started a new
+server on port 4311; the port was confirmed free after every shutdown. The
+runs reported 2 passed/27 failed, 26 passed/3 failed, and 27 passed/2 failed.
+The Services workspace sometimes stayed at `Cargando escenario`. The failing
+wide-viewport workspace test reads `SVC-1043`, which is also changed by the
+`attaches a crew without vehicle` journey in `services.spec.ts`. This is
+concrete fixture overlap for [#575](https://github.com/hllous/Frontend-M6-DAPS2/issues/575),
+not proof that the fixture caused every failure. The
+[diagnostic JSON](../perf/focused-e2e-fresh-servers-2026-10-17.json) records
+the counts and port checks.
+
+The original #571 full e2e baseline stored counts but no server PIDs or
+post-shutdown port checks, so it could have reused a stale listener. It was
+rerun three times with the process-ownership check; the exact failed spec
+names are in [`baseline-2026-10-17-e2e-fixed.json`](../perf/baseline-2026-10-17-e2e-fixed.json).
+The new after-runs are in [`after-2026-10-17-loop-parser.json`](../perf/after-2026-10-17-loop-parser.json).
