@@ -35,12 +35,16 @@ jobs:
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Detect documentation-only pull request
         id: detect
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/github-script@v9
         with:
           script: |
+            const { isDocsOnlyChange } = require("./scripts/perf/docs-only.cjs");
             const { owner, repo } = context.repo;
             const pullNumber = context.payload.pull_request.number;
             const [{ data: pull }, files] = await Promise.all([
@@ -53,19 +57,10 @@ jobs:
               }),
             ]);
 
-            const isDocumentation = (filename) =>
-              filename.startsWith("docs/") ||
-              filename.toLowerCase().endsWith(".md") ||
-              filename === ".markdownlint-cli2.jsonc" ||
-              filename === "lychee.toml";
-            const docsOnly =
-              pull.changed_files > 0 &&
-              files.length === pull.changed_files &&
-              files.every(
-                ({ filename, previous_filename }) =>
-                  isDocumentation(filename) &&
-                  (!previous_filename || isDocumentation(previous_filename)),
-              );
+            const docsOnly = isDocsOnlyChange({
+              changedFiles: pull.changed_files,
+              files,
+            });
 
             core.setOutput("docs_only", String(docsOnly));
             core.info(`Documentation-only pull request: ${docsOnly}`);
