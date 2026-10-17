@@ -16,6 +16,8 @@ const ALL_STEPS = [
   "typecheck-warm",
   "lint-cold",
   "lint-warm",
+  "verify",
+  "serial-checks",
   "vitest-full",
   "e2e-focused",
   "e2e-full",
@@ -23,6 +25,11 @@ const ALL_STEPS = [
 ];
 const FOCUSED_SPECS = ["e2e/services.spec.ts", "e2e/accessibility.spec.ts"];
 const DEV_ENV = { M6_AUTH_MODE: "mock", NEXT_PUBLIC_DISABLE_MSW: "true" };
+const SERIAL_CHECKS = [
+  { name: "typecheck", command: "npm run typecheck" },
+  { name: "lint", command: "npm run lint" },
+  { name: "vitest", command: "npm run verify:tests" },
+];
 const isWin = process.platform === "win32";
 
 const runs = Number(readArg(process.argv, "runs", "3"));
@@ -288,6 +295,42 @@ const stepRunners = {
     rmSync(path.join(root, ".eslintcache"), { force: true }),
   ),
   "lint-warm": timedCommandRunner("lint-warm", "npm run lint"),
+  verify(run) {
+    const r = timed("npm run verify");
+    const checks = [...r.output.matchAll(/^(PASS|FAIL) (typecheck|lint|test) \(([\d.]+)s\)\r?$/gm)]
+      .map(([, status, name, duration]) => ({
+        name,
+        status,
+        durationSeconds: Number(duration),
+      }));
+    const detail = checks.length
+      ? checks.map(({ name, status, durationSeconds }) => `${name} ${status} ${durationSeconds.toFixed(2)}s`).join(", ")
+      : "per-check summary missing";
+    record("verify", run, r.seconds, { exitCode: r.exitCode ?? 1, detail, checks });
+  },
+  "serial-checks"(run) {
+    const startedAt = process.hrtime.bigint();
+    const checks = SERIAL_CHECKS.map(({ name, command }) => ({ name, ...timed(command) }));
+    const vitestCheck = checks.find(({ name }) => name === "vitest");
+    let testResults;
+    let testSummaryError;
+    try {
+      testResults = parseVitestOutput(vitestCheck.output);
+    } catch (error) {
+      testSummaryError = error.message;
+    }
+    const failedCheck = checks.find(({ exitCode }) => exitCode !== 0);
+    const exitCode = failedCheck ? (failedCheck.exitCode ?? 1) : 0;
+    const detail = checks
+      .map(({ name, seconds, exitCode }) => `${name} ${exitCode === 0 ? "PASS" : "FAIL"} ${seconds.toFixed(2)}s`)
+      .join(", ");
+    record("serial-checks", run, Number(process.hrtime.bigint() - startedAt) / 1e9, {
+      exitCode,
+      detail,
+      checks: checks.map(({ name, seconds, exitCode }) => ({ name, seconds, exitCode: exitCode ?? 1 })),
+      ...(testResults ? { testResults } : { testSummaryError }),
+    });
+  },
   "vitest-full"(run) {
     const r = timed("npm test -- --reporter=verbose");
     const testResults = parseVitestOutput(r.output);

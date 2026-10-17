@@ -41,14 +41,24 @@ import path from "node:path";
 const name = process.argv[2];
 const markerDirectory = process.env.VERIFY_MARKER_DIRECTORY;
 writeFileSync(path.join(markerDirectory, name), "started");
-const deadline = Date.now() + 5000;
-while (!["typecheck", "lint", "test"].every((check) => existsSync(path.join(markerDirectory, check)))) {
-  if (Date.now() >= deadline) {
-    console.error("CHECKS_DID_NOT_START_TOGETHER");
-    process.exit(2);
+const staticChecks = ["typecheck", "lint"];
+
+if (staticChecks.includes(name)) {
+  const deadline = Date.now() + 5000;
+  while (!staticChecks.every((check) => existsSync(path.join(markerDirectory, check)))) {
+    if (Date.now() >= deadline) {
+      console.error("STATIC_CHECKS_DID_NOT_START_TOGETHER");
+      process.exit(2);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+} else if (!staticChecks.every((check) => existsSync(path.join(markerDirectory, check + ".done")))) {
+  console.error("TEST_STARTED_BEFORE_STATIC_CHECKS_FINISHED");
+  process.exit(2);
 }
+
+writeFileSync(path.join(markerDirectory, name + ".done"), "finished");
 if (process.env.VERIFY_FAIL_CHECK === name) {
   console.error("INJECTED_FAILURE:" + name);
   process.exit(1);
@@ -75,7 +85,7 @@ console.log("CHECK_OK:" + name);
 
 }
 
-test("verify runs all checks together and prints a per-check summary", () => {
+test("verify runs typecheck and lint together before Vitest and prints a per-check summary", () => {
   const result = runVerify();
   const output = `${result.stdout}\n${result.stderr}`;
 
@@ -86,14 +96,17 @@ test("verify runs all checks together and prints a per-check summary", () => {
   assert.match(output, /3\/3 checks passed/);
 });
 
-test("verify reports a failed check and exits non-zero while running the others", () => {
-  const result = runVerify("lint");
-  const output = `${result.stdout}\n${result.stderr}`;
+for (const failingCheck of checkNames) {
+  test(`verify reports a failed ${failingCheck} check and exits non-zero while running the others`, () => {
+    const result = runVerify(failingCheck);
+    const output = `${result.stdout}\n${result.stderr}`;
 
-  assert.equal(result.status, 1, output);
-  assert.match(output, /PASS typecheck\b/);
-  assert.match(output, /FAIL lint\b/);
-  assert.match(output, /PASS test\b/);
-  assert.match(output, /INJECTED_FAILURE:lint/);
-  assert.match(output, /2\/3 checks passed/);
-});
+    assert.equal(result.status, 1, output);
+    for (const checkName of checkNames) {
+      const status = checkName === failingCheck ? "FAIL" : "PASS";
+      assert.match(output, new RegExp(`${status} ${checkName}\\b`));
+    }
+    assert.match(output, new RegExp(`INJECTED_FAILURE:${failingCheck}`));
+    assert.match(output, /2\/3 checks passed/);
+  });
+}

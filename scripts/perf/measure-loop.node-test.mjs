@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -96,6 +96,89 @@ test("compare filters to requested steps before validating row counts", () => {
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /\| vitest-full \| 3\/3 \|/);
     assert.doesNotMatch(result.stdout, /e2e-full/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("measure-loop measures verify and its checks in a serial sequence", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "measure-loop-verify-test-"));
+  const bin = path.join(dir, "bin");
+  const fakeNpmScript = path.join(dir, "fake-npm.mjs");
+  const fakeNpm = path.join(bin, process.platform === "win32" ? "npm.cmd" : "npm");
+  const logFile = path.join(dir, "commands.jsonl");
+  const outFile = path.join(dir, "measurements.json");
+  const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+
+  mkdirSync(bin);
+  writeFileSync(
+    fakeNpmScript,
+    `import { appendFileSync } from "node:fs";
+const [action, name, ...args] = process.argv.slice(2);
+appendFileSync(process.env.PERF_FAKE_NPM_LOG, JSON.stringify([action, name, ...args]) + "\\n");
+if (name === "verify") {
+  console.log("PASS typecheck (0.01s)\\nPASS lint (0.01s)\\nPASS test (0.01s)\\n3/3 checks passed in 0.02s");
+} else if (name === "verify:tests") {
+  console.log(" Test Files 1 passed (1)\\n      Tests 1 passed (1)");
+}
+`,
+  );
+
+  if (process.platform === "win32") {
+    writeFileSync(fakeNpm, '@echo off\r\n"%NODE_EXE%" "%PERF_FAKE_NPM_SCRIPT%" %*\r\nexit /b %ERRORLEVEL%\r\n');
+  } else {
+    writeFileSync(fakeNpm, '#!/bin/sh\nexec "$NODE_EXE" "$PERF_FAKE_NPM_SCRIPT" "$@"\n');
+    chmodSync(fakeNpm, 0o755);
+  }
+
+  try {
+    const result = spawnSync(process.execPath, [path.join(scripts, "measure-loop.mjs"),
+      "--out", outFile,
+      "--runs", "3",
+      "--steps", "verify,serial-checks",
+    ], {
+      cwd: root,
+      env: {
+        ...process.env,
+        [pathKey]: `${bin}${path.delimiter}${process.env[pathKey] ?? ""}`,
+        NODE_EXE: process.execPath,
+        PERF_FAKE_NPM_SCRIPT: fakeNpmScript,
+        PERF_FAKE_NPM_LOG: logFile,
+      },
+      encoding: "utf8",
+      timeout: 15_000,
+    });
+    const output = `${result.stdout}\n${result.stderr}`;
+
+    assert.equal(result.status, 0, output);
+    const measurements = JSON.parse(readFileSync(outFile, "utf8"));
+    assert.deepEqual(measurements.results.map(({ step }) => step), [
+      "verify", "verify", "verify", "serial-checks", "serial-checks", "serial-checks",
+    ]);
+    assert.ok(measurements.results.every(({ exitCode }) => exitCode === 0));
+    assert.deepEqual(measurements.results[0].checks, [
+      { name: "typecheck", status: "PASS", durationSeconds: 0.01 },
+      { name: "lint", status: "PASS", durationSeconds: 0.01 },
+      { name: "test", status: "PASS", durationSeconds: 0.01 },
+    ]);
+    assert.deepEqual(measurements.results[3].checks.map(({ name }) => name), ["typecheck", "lint", "vitest"]);
+    assert.equal(measurements.results[3].testResults.total, 1);
+
+    const commands = readFileSync(logFile, "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
+    assert.deepEqual(commands, [
+      ["run", "verify"],
+      ["run", "verify"],
+      ["run", "verify"],
+      ["run", "typecheck"],
+      ["run", "lint"],
+      ["run", "verify:tests"],
+      ["run", "typecheck"],
+      ["run", "lint"],
+      ["run", "verify:tests"],
+      ["run", "typecheck"],
+      ["run", "lint"],
+      ["run", "verify:tests"],
+    ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

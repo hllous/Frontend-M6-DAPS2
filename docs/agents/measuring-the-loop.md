@@ -16,14 +16,23 @@ node scripts/perf/measure-loop.mjs --out docs/perf/after-YYYY-MM-DD-e2e.json --r
 ```
 
 The available steps are `worktree-setup`, `dev-server-ready`,
-`typecheck-cold`, `typecheck-warm`, `lint-cold`, `lint-warm`, `vitest-full`,
-`e2e-focused`, `e2e-full`, and `build`. The e2e steps start and stop a
-separate `next dev` process for every run. They fail before launch when the
-port is already in use, verify that the listener belongs to the spawned
-process tree, stop the listener and launcher, and wait for the port to become
-free before recording a passing setup. The JSON records test counts and
-failed test names for Vitest and Playwright, plus the launcher and listener
-PIDs for the readiness step.
+`typecheck-cold`, `typecheck-warm`, `lint-cold`, `lint-warm`, `verify`,
+`serial-checks`, `vitest-full`, `e2e-focused`, `e2e-full`, and `build`. The
+`verify` step records the combined command's per-check statuses and durations;
+`serial-checks` runs typecheck, lint, and `verify:tests` one after another and
+records each duration. The e2e steps start and stop a separate `next dev`
+process for every run. They fail before launch when the port is already in
+use, verify that the listener belongs to the spawned process tree, stop the
+listener and launcher, and wait for the port to become free before recording
+a passing setup. The JSON records test counts and failed test names for
+Vitest and Playwright, plus the launcher and listener PIDs for the readiness
+step.
+
+Compare the staged verifier with the same checks run serially using:
+
+```bash
+node scripts/perf/measure-loop.mjs --out docs/perf/verify-schedule-YYYY-MM-DD.json --runs 3 --steps verify,serial-checks
+```
 
 `worktree-setup` currently measures only `git worktree add` plus `npm ci`
 with a warm npm cache. It does not include `.env.local`, copied skill folders,
@@ -169,11 +178,11 @@ npm run test:failure-probe
 It is expected to exit 1 and print `PERF_FAILURE_PROBE`; CI fails if it
 unexpectedly passes or the marker is missing.
 
-## Parallel verification and cache results (#573)
+## Verification schedule and cache results (#573)
 
-The new `npm run verify` runs typecheck, lint, and the full Vitest suite in
-parallel. Its test check defaults to two workers; set `VERIFY_MAX_WORKERS` to
-override that default. The timings below use the same #571 measurement script,
+The `npm run verify` command runs typecheck and lint in parallel, then the full
+Vitest suite. Vitest uses its default worker count unless `VERIFY_MAX_WORKERS`
+is set to cap it. The timings below use the same #571 measurement script,
 steps, machine, and three-run batch on `develop` and the #573 code commit.
 
 Both batches timed `npm run lint` with the same repository file scope. On
@@ -199,3 +208,21 @@ typecheck already met it on `develop`, while warm lint did not. The unified
 
 Raw results: [develop baseline](../perf/baseline-2026-10-17-573-verify.json)
 and [#573 after](../perf/after-2026-10-17-573-verify.json).
+
+The first all-parallel implementation ran typecheck, lint, and Vitest together;
+one local run took 353.47 s and failed with a Vitest fork timeout. The staged
+schedule keeps typecheck and lint parallel, then starts Vitest after both exit.
+Against the same checks run serially, the staged `verify` median was 1.45 s
+(1.9%) faster. All six measured runs passed; each serial Vitest run reported
+1,734 tests across 183 files. The prior all-parallel attempt is recorded under
+`observations` in the batch JSON. The coordinator reported 100 s for typecheck
+and 111 s for lint under contention; exact per-check output, commit, and
+timestamp were not captured, so it is excluded from the schedule medians.
+
+| Schedule | Runs | Median (min–max) s | Change s | Change % |
+| --- | --- | --- | --- | --- |
+| Serial checks | 3/3 | 78.15 (76.71–85.49) | baseline | baseline |
+| Staged `verify` | 3/3 | 76.70 (75.45–95.69) | -1.45 | -1.9% |
+
+The schedule comparison's raw results are in
+[the #573 batch](../perf/verify-schedule-2026-10-17.json).

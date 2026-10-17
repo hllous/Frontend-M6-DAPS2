@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -43,22 +43,24 @@ appendFileSync(process.env.VERIFY_TESTS_LOG, JSON.stringify({ name, args }) + "\
       encoding: "utf8",
       timeout: 15000,
     });
-    const commands = readFileSync(logFile, "utf8")
-      .trim()
-      .split(/\r?\n/)
-      .map((line) => JSON.parse(line));
+    const commands = existsSync(logFile)
+      ? readFileSync(logFile, "utf8")
+        .trim()
+        .split(/\r?\n/)
+        .map((line) => JSON.parse(line))
+      : [];
     return { result, commands };
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
 }
 
-test("verify test suite defaults to two workers and runs CLI regression tests", () => {
+test("verify test suite uses Vitest defaults and runs CLI regression tests", () => {
   const { result, commands } = runVerifyTests(undefined);
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.deepEqual(commands, [
-    { name: "test", args: ["--maxWorkers=2"] },
+    { name: "test", args: [] },
     { name: "perf", args: [] },
   ]);
 });
@@ -71,4 +73,12 @@ test("verify test suite accepts a worker count override", () => {
     { name: "test", args: ["--maxWorkers=6"] },
     { name: "perf", args: [] },
   ]);
+});
+
+test("verify test suite rejects an invalid worker count before starting checks", () => {
+  const { result, commands } = runVerifyTests("0");
+
+  assert.equal(result.status, 2, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, /VERIFY_MAX_WORKERS must be a positive safe integer/);
+  assert.deepEqual(commands, []);
 });

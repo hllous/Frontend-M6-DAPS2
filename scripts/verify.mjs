@@ -6,6 +6,8 @@ const checks = [
   { name: "lint", npmArgs: ["run", "lint"] },
   { name: "test", npmArgs: ["run", "verify:tests"] },
 ];
+const staticChecks = checks.filter(({ name }) => name !== "test");
+const testCheck = checks.find(({ name }) => name === "test");
 
 function runCheck({ name, npmArgs }) {
   const startedAt = process.hrtime.bigint();
@@ -57,7 +59,8 @@ function printFailureOutput(output) {
 
 async function main() {
   const startedAt = process.hrtime.bigint();
-  const results = await Promise.all(checks.map(runCheck));
+  const results = await Promise.all(staticChecks.map(runCheck));
+  results.push(await runCheck(testCheck));
 
   for (const result of results) {
     const passed = result.exitCode === 0;

@@ -2,9 +2,9 @@ import { spawnSync } from "node:child_process";
 
 const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
-const workerCount = process.env.VERIFY_MAX_WORKERS ?? "2";
+const workerCount = process.env.VERIFY_MAX_WORKERS;
 
-if (!/^[1-9]\d*$/.test(workerCount) || !Number.isSafeInteger(Number(workerCount))) {
+if (workerCount !== undefined && (!/^[1-9]\d*$/.test(workerCount) || !Number.isSafeInteger(Number(workerCount)))) {
   console.error("VERIFY_MAX_WORKERS must be a positive safe integer");
   process.exitCode = 2;
 } else {
@@ -24,7 +24,10 @@ if (!/^[1-9]\d*$/.test(workerCount) || !Number.isSafeInteger(Number(workerCount)
     return result.status ?? 1;
   }
 
-  const testExitCode = runNpm(["run", "test", "--", `--maxWorkers=${workerCount}`]);
+  const testArgs = ["run", "test"];
+  if (workerCount !== undefined) testArgs.push("--", `--maxWorkers=${workerCount}`);
+
+  const testExitCode = runNpm(testArgs);
   if (testExitCode !== 0) {
     process.exitCode = testExitCode;
   } else {
