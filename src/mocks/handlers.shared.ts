@@ -252,16 +252,6 @@ function containerQueryFromUrl(url: string): ContainerQuery {
   };
 }
 
-function streetClosureRequestQueryFromUrl(url: string) {
-  const params = new URL(url).searchParams;
-  return streetClosureRequestQuerySchema.parse({
-    status: params.get("status") ?? undefined,
-    sourceId: params.get("sourceId") ?? undefined,
-    page: params.has("page") ? Number(params.get("page")) : undefined,
-    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
-  });
-}
-
 export const handlers = [
   http.get("*/api/mock/scenarios", () => HttpResponse.json(Object.values(scenarios))),
   http.get("*/api/mock/scenarios/:scenarioId", ({ params }) => {

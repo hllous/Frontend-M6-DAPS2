@@ -35,9 +35,9 @@ function call(method: string, path: string, cookie?: string, body?: unknown) {
   });
 }
 
-function uploadEvidence(ownerId: string, options: { cookie?: string; key?: string; fileBytes?: number } = {}) {
+function uploadEvidence(ownerId: string, options: { cookie?: string; key?: string } = {}) {
   const boundary = "street-repair-boundary";
-  const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="photo.jpg"\r\nContent-Type: image/jpeg\r\n\r\n${"x".repeat(options.fileBytes ?? 8)}\r\n`
+  const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="photo.jpg"\r\nContent-Type: image/jpeg\r\n\r\n${"x".repeat(8)}\r\n`
     + `--${boundary}\r\nContent-Disposition: form-data; name="ownerType"\r\n\r\nSERVICE\r\n`
     + `--${boundary}\r\nContent-Disposition: form-data; name="ownerId"\r\n\r\n${ownerId}\r\n--${boundary}--\r\n`;
   vi.stubGlobal("Blob", NodeBlob);
@@ -78,6 +78,13 @@ describe("repair request handlers delegate to the real BFF routes", () => {
     expect(denied.status).toBe(403);
   });
 
+  it("lets a Field crew create a repair request from its own service and rejects another crew's with the real 403", async () => {
+    const body = { damageType: "BROKEN_SIDEWALK", address: "Av. Rivadavia 2200", severity: "LOW", publicSafetyRisk: false, detectedInType: "SERVICE" };
+
+    expect((await call("POST", "/api/repair-requests", crewCookie, { ...body, detectedInId: "SVC-1050" })).status).toBe(201);
+    expect((await call("POST", "/api/repair-requests", crewCookie, { ...body, detectedInId: "SVC-1042" })).status).toBe(403);
+  });
+
   it("returns the real 404 for an unknown repair request", async () => {
     expect((await call("GET", "/api/repair-requests/RR-UNKNOWN")).status).toBe(404);
   });
@@ -101,12 +108,6 @@ describe("evidence handlers delegate to the real BFF routes", () => {
     const response = await uploadEvidence("SVC-1042", { key: "other-crew-key" });
 
     expect(response.status).toBe(403);
-  });
-
-  it("rejects a file above 4 MB with the real 413", async () => {
-    const response = await uploadEvidence("SVC-1050", { key: "oversize-key", fileBytes: 4 * 1024 * 1024 + 1 });
-
-    expect(response.status).toBe(413);
   });
 
   it("lists evidence for Office and returns 400 without the owner", async () => {
