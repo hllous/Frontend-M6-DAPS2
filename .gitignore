@@ -8,6 +8,7 @@
 
 # testing
 /coverage
+/.eslintcache
 /test-results/
 /playwright-report/
 /blob-report/

@@ -48,6 +48,14 @@ Single-context layout (GLOSSARY.md + docs/adr/ at repo root). See `docs/agents/d
 
 Changing a `.md` file: run `npx --yes markdownlint-cli2@0.23.3` (Node 22+) and `lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'`; CI runs both in the `docs` job. Details: [`docs/README.md`](docs/README.md).
 
+## Verification checklist
+
+- While iterating, run the related Vitest tests with `npx vitest run <test-file>`.
+- Before committing, run `npm run verify`, which runs typecheck, lint, and the
+  full Vitest suite in parallel.
+- Before marking work done, rerun `npm run verify` and run the Playwright specs
+  for each touched screen or component with `npm run test:e2e -- <spec>`.
+
 ## UI components: shadcn as the base
 
 ### Rule
