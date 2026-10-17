@@ -1,7 +1,12 @@
 import nextConfig from "eslint-config-next";
+import tsParser from "@typescript-eslint/parser";
 
 const eslintConfig = [
   ...nextConfig,
+  {
+    files: ["src/**/*.d.cts"],
+    languageOptions: { parser: tsParser },
+  },
   {
     files: ["src/**/*.{js,jsx,ts,tsx}"],
     ignores: [
