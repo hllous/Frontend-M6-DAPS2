@@ -168,3 +168,34 @@ npm run test:failure-probe
 
 It is expected to exit 1 and print `PERF_FAILURE_PROBE`; CI fails if it
 unexpectedly passes or the marker is missing.
+
+## Parallel verification and cache results (#573)
+
+The new `npm run verify` runs typecheck, lint, and the full Vitest suite in
+parallel. Its test check defaults to two workers; set `VERIFY_MAX_WORKERS` to
+override that default. The timings below use the same #571 measurement script,
+steps, machine, and three-run batch on `develop` and the #573 code commit.
+
+Both batches timed `npm run lint` with the same repository file scope. On
+`develop`, that script runs `eslint .`; #573 adds `--cache` while keeping the
+same file input and ESLint configuration. The measurement script clears
+`.eslintcache` before each cold run; the warm run follows and can reuse the
+cache. The first baseline cold lint sample was 59.08 s, followed by 13.80 s and
+13.71 s. It remains in the raw data and the table's min–max; the three-run
+median is 13.80 s. No other worker's heavy command overlapped the batch.
+
+| Step | Runs | Before median (min–max) s | After median (min–max) s | Change s | Change % |
+| --- | --- | --- | --- | --- | --- |
+| Typecheck cold | 3/3 | 11.45 (11.15–35.37) | 10.74 (10.70–10.95) | -0.71 | -6.2% |
+| Typecheck warm | 3/3 | 4.21 (4.14–4.35) | 4.20 (4.16–4.21) | -0.01 | -0.2% |
+| Lint cold | 3/3 | 13.80 (13.71–59.08) | 13.79 (13.39–14.30) | -0.01 | -0.1% |
+| Lint warm | 3/3 | 13.95 (13.63–15.16) | 3.33 (3.24–3.36) | -10.62 | -76.1% |
+
+After the change, warm typecheck is 39.1% of cold, and warm lint is 24.1% of
+cold. Both meet #541's warm-cache target of half the cold median or less;
+typecheck already met it on `develop`, while warm lint did not. The unified
+`verify` command has no before measurement because it did not exist on
+`develop`.
+
+Raw results: [develop baseline](../perf/baseline-2026-10-17-573-verify.json)
+and [#573 after](../perf/after-2026-10-17-573-verify.json).
