@@ -1,0 +1,263 @@
+{
+  "meta": {
+    "commit": "09a1801c0f125d262adfaee993fb5e5da7d28f17",
+    "branch": "infra/573-verify-command",
+    "date": "2026-10-17T21:53:58.725Z",
+    "machine": {
+      "os": "Windows_NT 10.0.26300",
+      "cpuCores": 16,
+      "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+      "node": "v22.19.0"
+    }
+  },
+  "results": [
+    {
+      "step": "verify",
+      "run": 1,
+      "seconds": 95.69,
+      "commit": "09a1801c0f125d262adfaee993fb5e5da7d28f17",
+      "date": "2026-10-17T21:55:34.421Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "typecheck PASS 14.68s, lint PASS 18.88s, test PASS 76.48s",
+      "checks": [
+        {
+          "name": "typecheck",
+          "status": "PASS",
+          "durationSeconds": 14.68
+        },
+        {
+          "name": "lint",
+          "status": "PASS",
+          "durationSeconds": 18.88
+        },
+        {
+          "name": "test",
+          "status": "PASS",
+          "durationSeconds": 76.48
+        }
+      ]
+    },
+    {
+      "step": "verify",
+      "run": 2,
+      "seconds": 75.45,
+      "commit": "09a1801c0f125d262adfaee993fb5e5da7d28f17",
+      "date": "2026-10-17T21:56:49.874Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "typecheck PASS 4.24s, lint PASS 3.31s, test PASS 70.90s",
+      "checks": [
+        {
+          "name": "typecheck",
+          "status": "PASS",
+          "durationSeconds": 4.24
+        },
+        {
+          "name": "lint",
+          "status": "PASS",
+          "durationSeconds": 3.31
+        },
+        {
+          "name": "test",
+          "status": "PASS",
+          "durationSeconds": 70.9
+        }
+      ]
+    },
+    {
+      "step": "verify",
+      "run": 3,
+      "seconds": 76.7,
+      "commit": "09a1801c0f125d262adfaee993fb5e5da7d28f17",
+      "date": "2026-10-17T21:58:06.572Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "typecheck PASS 4.09s, lint PASS 3.18s, test PASS 72.28s",
+      "checks": [
+        {
+          "name": "typecheck",
+          "status": "PASS",
+          "durationSeconds": 4.09
+        },
+        {
+          "name": "lint",
+          "status": "PASS",
+          "durationSeconds": 3.18
+        },
+        {
+          "name": "test",
+          "status": "PASS",
+          "durationSeconds": 72.28
+        }
+      ]
+    },
+    {
+      "step": "serial-checks",
+      "run": 1,
+      "seconds": 78.15,
+      "commit": "09a1801c0f125d262adfaee993fb5e5da7d28f17",
+      "date": "2026-10-17T21:59:24.723Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "typecheck PASS 4.05s, lint PASS 3.12s, vitest PASS 70.98s",
+      "checks": [
+        {
+          "name": "typecheck",
+          "seconds": 4.0537563,
+          "exitCode": 0
+        },
+        {
+          "name": "lint",
+          "seconds": 3.1181845,
+          "exitCode": 0
+        },
+        {
+          "name": "vitest",
+          "seconds": 70.9792104,
+          "exitCode": 0
+        }
+      ],
+      "testResults": {
+        "passed": 1734,
+        "failed": 0,
+        "total": 1734,
+        "flaky": 0,
+        "skipped": 0,
+        "failedTests": [],
+        "failedFiles": [],
+        "files": {
+          "passed": 183,
+          "failed": 0,
+          "total": 183
+        }
+      }
+    },
+    {
+      "step": "serial-checks",
+      "run": 2,
+      "seconds": 76.71,
+      "commit": "09a1801c0f125d262adfaee993fb5e5da7d28f17",
+      "date": "2026-10-17T22:00:41.436Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "typecheck PASS 4.01s, lint PASS 3.03s, vitest PASS 69.67s",
+      "checks": [
+        {
+          "name": "typecheck",
+          "seconds": 4.0121764,
+          "exitCode": 0
+        },
+        {
+          "name": "lint",
+          "seconds": 3.0327731,
+          "exitCode": 0
+        },
+        {
+          "name": "vitest",
+          "seconds": 69.6669588,
+          "exitCode": 0
+        }
+      ],
+      "testResults": {
+        "passed": 1734,
+        "failed": 0,
+        "total": 1734,
+        "flaky": 0,
+        "skipped": 0,
+        "failedTests": [],
+        "failedFiles": [],
+        "files": {
+          "passed": 183,
+          "failed": 0,
+          "total": 183
+        }
+      }
+    },
+    {
+      "step": "serial-checks",
+      "run": 3,
+      "seconds": 85.49,
+      "commit": "09a1801c0f125d262adfaee993fb5e5da7d28f17",
+      "date": "2026-10-17T22:02:06.927Z",
+      "machine": {
+        "os": "Windows_NT 10.0.26300",
+        "cpuCores": 16,
+        "cpuModel": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+        "node": "v22.19.0"
+      },
+      "exitCode": 0,
+      "detail": "typecheck PASS 4.33s, lint PASS 3.31s, vitest PASS 77.85s",
+      "checks": [
+        {
+          "name": "typecheck",
+          "seconds": 4.3285846,
+          "exitCode": 0
+        },
+        {
+          "name": "lint",
+          "seconds": 3.310372,
+          "exitCode": 0
+        },
+        {
+          "name": "vitest",
+          "seconds": 77.8516537,
+          "exitCode": 0
+        }
+      ],
+      "testResults": {
+        "passed": 1734,
+        "failed": 0,
+        "total": 1734,
+        "flaky": 0,
+        "skipped": 0,
+        "failedTests": [],
+        "failedFiles": [],
+        "files": {
+          "passed": 183,
+          "failed": 0,
+          "total": 183
+        }
+      }
+    }
+  ],
+  "observations": [
+    {
+      "command": "npm run verify (all three checks started in parallel)",
+      "durationSeconds": 353.47,
+      "exitCode": 1,
+      "failure": "Vitest fork timeout",
+      "reportedCheckDurationsSeconds": {
+        "typecheck": 100,
+        "lint": 111
+      },
+      "source": "https://github.com/hllous/Frontend-M6-DAPS2/issues/573#issuecomment-6241900314",
+      "details": "Prior local attempt before the staged schedule. Exact per-check output, commit, and timestamp were not captured, so this observation is excluded from the schedule medians."
+    }
+  ]
+}

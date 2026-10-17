@@ -16,14 +16,23 @@ node scripts/perf/measure-loop.mjs --out docs/perf/after-YYYY-MM-DD-e2e.json --r
 ```
 
 The available steps are `worktree-setup`, `dev-server-ready`,
-`typecheck-cold`, `typecheck-warm`, `lint-cold`, `lint-warm`, `vitest-full`,
-`e2e-focused`, `e2e-full`, and `build`. The e2e steps start and stop a
-separate `next dev` process for every run. They fail before launch when the
-port is already in use, verify that the listener belongs to the spawned
-process tree, stop the listener and launcher, and wait for the port to become
-free before recording a passing setup. The JSON records test counts and
-failed test names for Vitest and Playwright, plus the launcher and listener
-PIDs for the readiness step.
+`typecheck-cold`, `typecheck-warm`, `lint-cold`, `lint-warm`, `verify`,
+`serial-checks`, `vitest-full`, `e2e-focused`, `e2e-full`, and `build`. The
+`verify` step records the combined command's per-check statuses and durations;
+`serial-checks` runs typecheck, lint, and `verify:tests` one after another and
+records each duration. The e2e steps start and stop a separate `next dev`
+process for every run. They fail before launch when the port is already in
+use, verify that the listener belongs to the spawned process tree, stop the
+listener and launcher, and wait for the port to become free before recording
+a passing setup. The JSON records test counts and failed test names for
+Vitest and Playwright, plus the launcher and listener PIDs for the readiness
+step.
+
+Compare the staged verifier with the same checks run serially using:
+
+```bash
+node scripts/perf/measure-loop.mjs --out docs/perf/verify-schedule-YYYY-MM-DD.json --runs 3 --steps verify,serial-checks
+```
 
 `worktree-setup` currently measures only `git worktree add` plus `npm ci`
 with a warm npm cache. It does not include `.env.local`, copied skill folders,
@@ -168,3 +177,52 @@ npm run test:failure-probe
 
 It is expected to exit 1 and print `PERF_FAILURE_PROBE`; CI fails if it
 unexpectedly passes or the marker is missing.
+
+## Verification schedule and cache results (#573)
+
+The `npm run verify` command runs typecheck and lint in parallel, then the full
+Vitest suite. Vitest uses its default worker count unless `VERIFY_MAX_WORKERS`
+is set to cap it. The timings below use the same #571 measurement script,
+steps, machine, and three-run batch on `develop` and the #573 code commit.
+
+Both batches timed `npm run lint` with the same repository file scope. On
+`develop`, that script runs `eslint .`; #573 adds `--cache` while keeping the
+same file input and ESLint configuration. The measurement script clears
+`.eslintcache` before each cold run; the warm run follows and can reuse the
+cache. The first baseline cold lint sample was 59.08 s, followed by 13.80 s and
+13.71 s. It remains in the raw data and the table's min–max; the three-run
+median is 13.80 s. No other worker's heavy command overlapped the batch.
+
+| Step | Runs | Before median (min–max) s | After median (min–max) s | Change s | Change % |
+| --- | --- | --- | --- | --- | --- |
+| Typecheck cold | 3/3 | 11.45 (11.15–35.37) | 10.74 (10.70–10.95) | -0.71 | -6.2% |
+| Typecheck warm | 3/3 | 4.21 (4.14–4.35) | 4.20 (4.16–4.21) | -0.01 | -0.2% |
+| Lint cold | 3/3 | 13.80 (13.71–59.08) | 13.79 (13.39–14.30) | -0.01 | -0.1% |
+| Lint warm | 3/3 | 13.95 (13.63–15.16) | 3.33 (3.24–3.36) | -10.62 | -76.1% |
+
+After the change, warm typecheck is 39.1% of cold, and warm lint is 24.1% of
+cold. Both meet #541's warm-cache target of half the cold median or less;
+typecheck already met it on `develop`, while warm lint did not. The unified
+`verify` command has no before measurement because it did not exist on
+`develop`.
+
+Raw results: [develop baseline](../perf/baseline-2026-10-17-573-verify.json)
+and [#573 after](../perf/after-2026-10-17-573-verify.json).
+
+The first all-parallel implementation ran typecheck, lint, and Vitest together;
+one local run took 353.47 s and failed with a Vitest fork timeout. The staged
+schedule keeps typecheck and lint parallel, then starts Vitest after both exit.
+Against the same checks run serially, the staged `verify` median was 1.45 s
+(1.9%) faster. All six measured runs passed; each serial Vitest run reported
+1,734 tests across 183 files. The prior all-parallel attempt is recorded under
+`observations` in the batch JSON. The coordinator reported 100 s for typecheck
+and 111 s for lint under contention; exact per-check output, commit, and
+timestamp were not captured, so it is excluded from the schedule medians.
+
+| Schedule | Runs | Median (min–max) s | Change s | Change % |
+| --- | --- | --- | --- | --- |
+| Serial checks | 3/3 | 78.15 (76.71–85.49) | baseline | baseline |
+| Staged `verify` | 3/3 | 76.70 (75.45–95.69) | -1.45 | -1.9% |
+
+The schedule comparison's raw results are in
+[the #573 batch](../perf/verify-schedule-2026-10-17.json).
