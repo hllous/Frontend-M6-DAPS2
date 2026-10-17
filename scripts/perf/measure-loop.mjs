@@ -97,6 +97,17 @@ function killTree(child) {
   else process.kill(-child.pid, "SIGKILL");
 }
 
+function killPid(pid) {
+  if (isWin) spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"]);
+  else {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
+  }
+}
+
 function listeningPids(port) {
   if (isWin) {
     const result = spawnSync("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8" });
@@ -155,6 +166,26 @@ function isDescendantOf(pid, ancestorPid, parents) {
   return false;
 }
 
+async function stopDevServer(child, portOwnerPid) {
+  const parents = processParents();
+  const owners = new Set([
+    portOwnerPid,
+    ...listeningPids(port).filter((pid) => isDescendantOf(pid, child.pid, parents)),
+  ].filter(Number.isInteger));
+  for (const pid of owners) killPid(pid);
+  killTree(child);
+
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    const remaining = listeningPids(port);
+    if (!remaining.length) return;
+    if (Date.now() > deadline) {
+      throw new Error(`port ${port} is still in use after stopping spawned server; pid(s): ${remaining.join(", ")}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
 async function startDevServer() {
   const existingPids = listeningPids(port);
   if (existingPids.length) throw new Error(`port ${port} is already in use by pid(s) ${existingPids.join(", ")}`);
@@ -194,13 +225,17 @@ async function startDevServer() {
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   } catch (error) {
-    if (child.exitCode === null) killTree(child);
+    try {
+      await stopDevServer(child);
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], "dev server startup and cleanup failed");
+    }
     throw error;
   }
 }
 
 async function playwrightStep(step, run, args) {
-  const { child } = await startDevServer();
+  const { child, portOwnerPid } = await startDevServer();
   try {
     const r = timed(`npx playwright test ${args} --reporter=json`, {
       env: { PLAYWRIGHT_BASE_URL: `http://127.0.0.1:${port}` },
@@ -214,7 +249,7 @@ async function playwrightStep(step, run, args) {
     ].filter(Boolean).join(", ");
     record(step, run, r.seconds, { exitCode: r.exitCode, detail, testResults });
   } finally {
-    killTree(child);
+    await stopDevServer(child, portOwnerPid);
   }
 }
 
@@ -238,7 +273,7 @@ const stepRunners = {
   },
   async "dev-server-ready"(run) {
     const { child, seconds, portOwnerPid } = await startDevServer();
-    killTree(child);
+    await stopDevServer(child, portOwnerPid);
     record("dev-server-ready", run, seconds, {
       serverPid: child.pid,
       portOwnerPid,
