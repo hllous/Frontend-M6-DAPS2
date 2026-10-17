@@ -4,6 +4,7 @@ import { containerRouteHandlers } from "./container-route-handlers";
 import { envControlRouteHandlers } from "./env-control-route-handlers";
 import { handlers as sharedHandlers } from "./handlers.shared";
 import { serviceTypeRouteHandlers } from "./service-type-route-handlers";
+import { treeRouteHandlers } from "./tree-route-handlers";
 import { crewVehicleRouteHandlers } from "./crew-vehicle-route-handlers";
 import { zoneRouteHandlers } from "./zone-route-handlers";
 import { serviceRouteHandlers } from "./service-route-handlers";
@@ -17,6 +18,7 @@ export const handlers = [
   ...zoneRouteHandlers(officeSessionCookie),
   ...envControlRouteHandlers(officeSessionCookie, fieldCrewSessionCookie),
   ...serviceRouteHandlers(officeSessionCookie),
+  ...treeRouteHandlers(officeSessionCookie, fieldCrewSessionCookie),
   ...containerRouteHandlers(officeSessionCookie, fieldCrewSessionCookie),
   ...crewVehicleRouteHandlers(officeSessionCookie),
 ];

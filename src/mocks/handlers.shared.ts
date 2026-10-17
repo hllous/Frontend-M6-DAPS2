@@ -54,19 +54,13 @@ import {
   greenSpaceFixtures,
   paginateGreenSpaceFixtures,
 } from "@/lib/green-space-fixtures";
-import {
-  createGreenSpaceInputSchema,
-  greenSpaceTypeSchema,
-  updateGreenSpaceInputSchema,
-  type GreenSpaceQuery,
-} from "@/lib/green-spaces";
+import { greenSpaceTypeSchema, type GreenSpaceQuery } from "@/lib/green-spaces";
 import { addGreenPointFixture, filterGreenPointFixtures, greenPointFixtures, paginateGreenPointFixtures, updateGreenPointFixture } from "@/lib/green-point-fixtures";
-import { greenPointCreateInputSchema, greenPointUpdateInputSchema, wasteTypeSchema, type GreenPointQuery } from "@/lib/green-points";
+import { wasteTypeSchema, type GreenPointQuery } from "@/lib/green-points";
 import { addTreeFixture, filterTreeFixtures, paginateTreeFixtures, treeFixtures, updateTreeFixture } from "@/lib/tree-fixtures";
-import { treeCreateInputSchema, treeUpdateInputSchema, type TreeQuery } from "@/lib/trees";
 import { addTreeSurveyFixture, createTreeSurveyFixture, filterTreeSurveyFixtures, getTreeSurveyFixture, paginateTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { treeHealthStatusSchema, treeSurveyCreateInputSchema, riskLevelSchema } from "@/lib/tree-surveys";
-import { addTreeInterventionFixture, createTreeInterventionFixture, filterTreeInterventionFixtures, getTreeInterventionFixture, paginateTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
+import { getTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 import { treeInterventionAssignServiceInputSchema, treeInterventionAuthorizeInputSchema, treeInterventionCreateInputSchema, treeInterventionStatusSchema, treeInterventionTypeSchema } from "@/lib/tree-interventions";
 import {
   addRepairRequestFixture,
@@ -197,43 +191,6 @@ function serviceFrequencyQueryFromUrl(url: string): ServiceFrequencyQuery {
   };
 }
 
-function greenSpaceQueryFromUrl(url: string): GreenSpaceQuery {
-  const params = new URL(url).searchParams;
-  return {
-    active: params.has("active") ? params.get("active") === "true" : undefined,
-    spaceType: greenSpaceTypeSchema.safeParse(params.get("spaceType")).success
-      ? (params.get("spaceType") as GreenSpaceQuery["spaceType"])
-      : undefined,
-    zoneId: params.get("zoneId") ?? undefined,
-    page: params.has("page") ? Number(params.get("page")) : undefined,
-    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
-  };
-}
-
-function greenPointQueryFromUrl(url: string): GreenPointQuery {
-  const params = new URL(url).searchParams;
-  const wasteType = wasteTypeSchema.safeParse(params.get("wasteType"));
-  return {
-    active: params.has("active") ? params.get("active") === "true" : undefined,
-    zoneId: params.get("zoneId") ?? undefined,
-    wasteType: wasteType.success ? wasteType.data : undefined,
-    search: params.get("search") ?? undefined,
-    page: params.has("page") ? Number(params.get("page")) : undefined,
-    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
-  };
-}
-
-function treeQueryFromUrl(url: string): TreeQuery {
-  const params = new URL(url).searchParams;
-  return {
-    active: params.has("active") ? params.get("active") === "true" : undefined,
-    zoneId: params.get("zoneId") ?? undefined,
-    search: params.get("search") ?? undefined,
-    page: params.has("page") ? Number(params.get("page")) : undefined,
-    pageSize: params.has("pageSize") ? Number(params.get("pageSize")) : undefined,
-  };
-}
-
 function containerQueryFromUrl(url: string): ContainerQuery {
   const params = new URL(url).searchParams;
   const rawStatus = params.get("status");
@@ -266,11 +223,9 @@ export const handlers = [
   http.get("*/api/mock/scenarios", () => HttpResponse.json(Object.values(scenarios))),
   http.get("*/api/mock/scenarios/:scenarioId", ({ params }) => {
     const scenarioId = params.scenarioId;
-
     if (typeof scenarioId !== "string" || !scenarioIds.has(scenarioId as ScenarioId)) {
       return HttpResponse.json({ message: "Escenario no encontrado." }, { status: 404 });
     }
-
     return HttpResponse.json(getScenario(scenarioId as ScenarioId));
   }),
   // StreetClosureRequest adapter contract and deterministic scenario handlers.
@@ -362,229 +317,10 @@ export const handlers = [
     if (!item) return HttpResponse.json({ statusCode: 404, message: "Solicitud no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/street-closure-requests/${params.requestId}/end` }, { status: 404 });
     return HttpResponse.json(updateStreetClosureRequestFixture(item.id, { status: "ENDED", updatedAt: new Date().toISOString() }));
   }),
-  http.get("*/api/green-spaces", ({ request }) => {
-    const query = greenSpaceQueryFromUrl(request.url);
-    return HttpResponse.json(paginateGreenSpaceFixtures(filterGreenSpaceFixtures(query), query.page, query.pageSize));
-  }),
-  http.get("*/api/green-spaces/:greenSpaceId", ({ params }) => {
-    const greenSpace = greenSpaceFixtures.find((item) => item.id === params.greenSpaceId);
-    return greenSpace
-      ? HttpResponse.json(greenSpace)
-      : HttpResponse.json(
-          {
-            statusCode: 404,
-            message: "Espacio verde no encontrado.",
-            error: "Not Found",
-            timestamp: new Date().toISOString(),
-            path: `/api/green-spaces/${params.greenSpaceId}`,
-          },
-          { status: 404 },
-        );
-  }),
-  http.post("*/api/green-spaces", async ({ request }) => {
-    const parsed = createGreenSpaceInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) {
-      return HttpResponse.json(
-        {
-          statusCode: 400,
-          message: "Datos de espacio verde inválidos.",
-          error: "Bad Request",
-          timestamp: new Date().toISOString(),
-          path: "/api/green-spaces",
-        },
-        { status: 400 },
-      );
-    }
-    const greenSpace = {
-      id: `green-space-108-${greenSpaceFixtures.length + 1}`,
-      ...parsed.data,
-      lat: parsed.data.lat ?? null,
-      lng: parsed.data.lng ?? null,
-      active: true,
-    };
-    addGreenSpaceFixture(greenSpace);
-    return HttpResponse.json(greenSpace, { status: 201 });
-  }),
-  http.patch("*/api/green-spaces/:greenSpaceId", async ({ params, request }) => {
-    const greenSpace = greenSpaceFixtures.find((item) => item.id === params.greenSpaceId);
-    const parsed = updateGreenSpaceInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!greenSpace) {
-      return HttpResponse.json(
-        {
-          statusCode: 404,
-          message: "Espacio verde no encontrado.",
-          error: "Not Found",
-          timestamp: new Date().toISOString(),
-          path: `/api/green-spaces/${params.greenSpaceId}`,
-        },
-        { status: 404 },
-      );
-    }
-    if (!parsed.success) {
-      return HttpResponse.json(
-        {
-          statusCode: 400,
-          message: "Datos de espacio verde inválidos.",
-          error: "Bad Request",
-          timestamp: new Date().toISOString(),
-          path: `/api/green-spaces/${params.greenSpaceId}`,
-        },
-        { status: 400 },
-      );
-    }
-    Object.assign(greenSpace, parsed.data);
-    return HttpResponse.json(greenSpace);
-  }),
-  http.delete("*/api/green-spaces/:greenSpaceId", ({ params }) => {
-    const greenSpace = greenSpaceFixtures.find((item) => item.id === params.greenSpaceId);
-    if (!greenSpace) {
-      return HttpResponse.json(
-        {
-          statusCode: 404,
-          message: "Espacio verde no encontrado.",
-          error: "Not Found",
-          timestamp: new Date().toISOString(),
-          path: `/api/green-spaces/${params.greenSpaceId}`,
-        },
-        { status: 404 },
-      );
-    }
-    greenSpace.active = false;
-    return HttpResponse.json(greenSpace);
-  }),
   // --- Green Point catalog (#124) ---
-  http.get("*/api/green-points", ({ request }) => { const query = greenPointQueryFromUrl(request.url); return HttpResponse.json(paginateGreenPointFixtures(filterGreenPointFixtures(query), query.page, query.pageSize)); }),
-  http.get("*/api/green-points/:greenPointId", ({ params }) => {
-    const point = greenPointFixtures.find((item) => item.id === params.greenPointId);
-    return point ? HttpResponse.json(point) : HttpResponse.json({ statusCode: 404, message: "Punto verde no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/green-points/${params.greenPointId}` }, { status: 404 });
-  }),
-  http.post("*/api/green-points", async ({ request }) => {
-    const parsed = greenPointCreateInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de punto verde inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/green-points" }, { status: 400 });
-    const created = { id: `green-point-${Date.now()}`, ...parsed.data, address: parsed.data.address ?? null, lat: parsed.data.lat ?? null, lng: parsed.data.lng ?? null, active: parsed.data.active ?? true };
-    addGreenPointFixture(created);
-    return HttpResponse.json(created, { status: 201 });
-  }),
-  http.patch("*/api/green-points/:greenPointId", async ({ params, request }) => {
-    const parsed = greenPointUpdateInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos editables de punto verde inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/green-points" }, { status: 400 });
-    const updated = updateGreenPointFixture(params.greenPointId as string, parsed.data);
-    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "Punto verde no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/green-points" }, { status: 404 });
-  }),
-  http.delete("*/api/green-points/:greenPointId", ({ params }) => {
-    const updated = updateGreenPointFixture(params.greenPointId as string, { active: false });
-    return updated ? new HttpResponse(null, { status: 204 }) : HttpResponse.json({ statusCode: 404, message: "Punto verde no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/green-points" }, { status: 404 });
-  }),
   // --- Tree catalog (#126) ---
-  http.get("*/api/trees", ({ request }) => { const query = treeQueryFromUrl(request.url); return HttpResponse.json(paginateTreeFixtures(filterTreeFixtures(query), query.page, query.pageSize)); }),
-  http.get("*/api/trees/:treeId", ({ params }) => {
-    const tree = treeFixtures.find((item) => item.id === params.treeId);
-    return tree ? HttpResponse.json(tree) : HttpResponse.json({ statusCode: 404, message: "Árbol no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/trees/${params.treeId}` }, { status: 404 });
-  }),
-  http.post("*/api/trees", async ({ request }) => {
-    const parsed = treeCreateInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos de árbol inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 400 });
-    if (treeFixtures.some((item) => item.surveyCode.toLowerCase() === parsed.data.surveyCode.toLowerCase())) return HttpResponse.json({ statusCode: 409, message: "Ya existe un árbol con ese código de relevamiento.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 409 });
-    const created = { id: `tree-${Date.now()}`, ...parsed.data, address: parsed.data.address ?? null, lat: parsed.data.lat ?? null, lng: parsed.data.lng ?? null, active: parsed.data.active ?? true, lastSurvey: null };
-    addTreeFixture(created);
-    return HttpResponse.json(created, { status: 201 });
-  }),
-  http.patch("*/api/trees/:treeId", async ({ params, request }) => {
-    const parsed = treeUpdateInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: "Datos editables de árbol inválidos.", error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 400 });
-    const updated = updateTreeFixture(params.treeId as string, parsed.data);
-    return updated ? HttpResponse.json(updated) : HttpResponse.json({ statusCode: 404, message: "Árbol no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 404 });
-  }),
-  http.delete("*/api/trees/:treeId", ({ params }) => {
-    const updated = updateTreeFixture(params.treeId as string, { active: false });
-    return updated ? new HttpResponse(null, { status: 204 }) : HttpResponse.json({ statusCode: 404, message: "Árbol no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: "/api/trees" }, { status: 404 });
-  }),
   // --- Tree surveys (#127) ---
-  http.get("*/api/trees/:treeId/surveys", ({ request, params }) => {
-    const url = new URL(request.url);
-    const query = { healthStatus: treeHealthStatusSchema.safeParse(url.searchParams.get("healthStatus")).data, riskLevel: riskLevelSchema.safeParse(url.searchParams.get("riskLevel")).data, page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined, pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined };
-    return HttpResponse.json(paginateTreeSurveyFixtures(filterTreeSurveyFixtures(params.treeId as string, query), query.page, query.pageSize));
-  }),
-  http.get("*/api/trees/:treeId/surveys/:surveyId", ({ params }) => {
-    const survey = getTreeSurveyFixture(params.treeId as string, params.surveyId as string);
-    return survey ? HttpResponse.json(survey) : HttpResponse.json({ statusCode: 404, message: "Relevamiento no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/trees/${params.treeId}/surveys/${params.surveyId}` }, { status: 404 });
-  }),
-  http.post("*/api/trees/:treeId/surveys", async ({ request, params }) => {
-    const parsed = treeSurveyCreateInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/trees/${params.treeId}/surveys` }, { status: 400 });
-    const created = createTreeSurveyFixture(params.treeId as string, parsed.data, "field-user-1");
-    addTreeSurveyFixture(created);
-    updateTreeFixture(params.treeId as string, {
-      lastSurvey: {
-        surveyedAt: created.surveyedAt,
-        healthStatus: created.healthStatus,
-        riskLevel: created.riskLevel,
-        riskType: created.riskType,
-        suggestedIntervention: created.suggestedIntervention,
-      },
-    });
-    return HttpResponse.json(created, { status: 201 });
-  }),
   // --- Tree interventions (#128) ---
-  http.get("*/api/tree-interventions", ({ request }) => {
-    const url = new URL(request.url);
-    const query = {
-      interventionType: treeInterventionTypeSchema.safeParse(url.searchParams.get("interventionType")).data,
-      status: treeInterventionStatusSchema.safeParse(url.searchParams.get("status")).data,
-      page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-      pageSize: url.searchParams.has("pageSize") ? Number(url.searchParams.get("pageSize")) : undefined,
-    };
-    return HttpResponse.json(paginateTreeInterventionFixtures(filterTreeInterventionFixtures(query), query.page, query.pageSize));
-  }),
-  http.get("*/api/tree-interventions/:interventionId", ({ params }) => {
-    const intervention = getTreeInterventionFixture(params.interventionId as string);
-    return intervention ? HttpResponse.json(intervention) : HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}` }, { status: 404 });
-  }),
-  http.post("*/api/tree-interventions", async ({ request }) => {
-    const parsed = treeInterventionCreateInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: "/api/tree-interventions" }, { status: 400 });
-    const created = createTreeInterventionFixture(parsed.data);
-    addTreeInterventionFixture(created);
-    return HttpResponse.json(created, { status: 201 });
-  }),
-  http.post("*/api/tree-interventions/:interventionId/submit-for-authorization", ({ params }) => {
-    const intervention = getTreeInterventionFixture(params.interventionId as string);
-    if (!intervention) return HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/submit-for-authorization` }, { status: 404 });
-    if (intervention.interventionType !== "REMOVAL") return HttpResponse.json({ statusCode: 400, message: "Solo las extracciones requieren el envío a autorización.", error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/submit-for-authorization` }, { status: 400 });
-    if (intervention.status !== "REQUESTED") return HttpResponse.json({ statusCode: 409, message: "Solo se puede enviar a autorización una extracción solicitada.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/submit-for-authorization` }, { status: 409 });
-    return HttpResponse.json(updateTreeInterventionFixture(params.interventionId as string, { status: "PENDING_AUTHORIZATION" }));
-  }),
-  http.post("*/api/tree-interventions/:interventionId/authorize", async ({ params, request }) => {
-    const parsed = treeInterventionAuthorizeInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/authorize` }, { status: 400 });
-    const intervention = getTreeInterventionFixture(params.interventionId as string);
-    if (!intervention) return HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/authorize` }, { status: 404 });
-    const validStatus = intervention.interventionType === "REMOVAL" ? intervention.status === "PENDING_AUTHORIZATION" : intervention.status === "REQUESTED";
-    if (!validStatus) return HttpResponse.json({ statusCode: 409, message: "La intervención no se encuentra en un estado autorizable.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/authorize` }, { status: 409 });
-    return HttpResponse.json(updateTreeInterventionFixture(params.interventionId as string, { status: "AUTHORIZED", authorizedByUserId: parsed.data.authorizedByUserId, authorizedAt: new Date().toISOString() }));
-  }),
-  http.post("*/api/tree-interventions/:interventionId/reject", ({ params }) => {
-    const intervention = getTreeInterventionFixture(params.interventionId as string);
-    if (!intervention) return HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/reject` }, { status: 404 });
-    if (intervention.interventionType !== "REMOVAL" || intervention.status !== "PENDING_AUTHORIZATION") return HttpResponse.json({ statusCode: 409, message: "Solo se puede rechazar una extracción pendiente de autorización.", error: "Conflict", timestamp: new Date().toISOString(), path: `/api/tree-interventions/${params.interventionId}/reject` }, { status: 409 });
-    return HttpResponse.json(updateTreeInterventionFixture(params.interventionId as string, { status: "REJECTED" }));
-  }),
-  http.post("*/api/tree-interventions/:interventionId/assign-service", async ({ params, request }) => {
-    const interventionId = params.interventionId as string;
-    const path = `/api/tree-interventions/${interventionId}/assign-service`;
-    const parsed = treeInterventionAssignServiceInputSchema.safeParse(await request.json().catch(() => undefined));
-    if (!parsed.success) return HttpResponse.json({ statusCode: 400, message: parsed.error.issues.map((issue) => issue.message).join(" "), error: "Bad Request", timestamp: new Date().toISOString(), path }, { status: 400 });
-
-    const intervention = getTreeInterventionFixture(interventionId);
-    if (!intervention) return HttpResponse.json({ statusCode: 404, message: "Intervención de arbolado no encontrada.", error: "Not Found", timestamp: new Date().toISOString(), path }, { status: 404 });
-    if (intervention.status !== "AUTHORIZED") return HttpResponse.json({ statusCode: 409, message: "Solo se puede asociar un servicio a una intervención autorizada.", error: "Conflict", timestamp: new Date().toISOString(), path }, { status: 409 });
-    if (intervention.serviceId) return HttpResponse.json({ statusCode: 409, message: "La intervención ya tiene un servicio asociado.", error: "Conflict", timestamp: new Date().toISOString(), path }, { status: 409 });
-
-    const service = serviceFixtures.find((candidate) => candidate.id === parsed.data.serviceId);
-    if (!service) return HttpResponse.json({ statusCode: 404, message: "Servicio no encontrado.", error: "Not Found", timestamp: new Date().toISOString(), path }, { status: 404 });
-    if (service.mode !== "POINT") return HttpResponse.json({ statusCode: 400, message: "El servicio de una intervención de arbolado debe ser de modo POINT.", error: "Bad Request", timestamp: new Date().toISOString(), path }, { status: 400 });
-    return HttpResponse.json(updateTreeInterventionFixture(interventionId, { serviceId: service.id }));
-  }),
   http.post("*/api/evidence", async ({ request }) => {
     const idempotencyKey = request.headers.get("Idempotency-Key") || request.headers.get("idempotency-key");
     if (!idempotencyKey || !idempotencyKey.trim()) {
@@ -599,7 +335,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     let formData: FormData;
     try {
       formData = await request.formData();
@@ -615,11 +350,9 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     const file = formData.get("file");
     const rawOwnerType = formData.get("ownerType");
     const ownerId = formData.get("ownerId");
-
     if (!file || typeof file === "string" || !(file instanceof Blob)) {
       return HttpResponse.json(
         {
@@ -632,7 +365,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     if (!rawOwnerType || typeof rawOwnerType !== "string") {
       return HttpResponse.json(
         {
@@ -645,7 +377,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     const parsedOwnerType = evidenceOwnerTypeSchema.safeParse(rawOwnerType);
     if (!parsedOwnerType.success) {
       return HttpResponse.json(
@@ -659,7 +390,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     if (!ownerId || typeof ownerId !== "string" || !ownerId.trim()) {
       return HttpResponse.json(
         {
@@ -672,7 +402,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     if (file.size > MAX_EVIDENCE_FILE_SIZE_BYTES) {
       return HttpResponse.json(
         {
@@ -685,7 +414,6 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     const allowedMime = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
     const mimeType = file.type || "application/octet-stream";
     if (!allowedMime.has(mimeType)) {
@@ -700,12 +428,10 @@ export const handlers = [
         { status: 400 },
       );
     }
-
     const cacheKey = `${parsedOwnerType.data}:${ownerId}:${idempotencyKey}`;
     if (evidenceCache.has(cacheKey)) {
       return HttpResponse.json(evidenceCache.get(cacheKey)!, { status: 200 });
     }
-
     if (parsedOwnerType.data === "ZONE_RESULT") {
       const zoneResult = zoneResultFixtures.find((zr) => zr.id === ownerId);
       if (!zoneResult) {
@@ -742,7 +468,6 @@ export const handlers = [
         return HttpResponse.json({ statusCode: 404, message: `La inspección ${ownerId} no existe.`, error: "Not Found", timestamp: new Date().toISOString(), path: "/api/evidence" }, { status: 404 });
       }
     }
-
     const rawNameFromForm = formData.get("fileName");
     const fileObjName = (file as { name?: string }).name;
     const fileName =
@@ -750,7 +475,6 @@ export const handlers = [
       (fileObjName && fileObjName !== "blob" ? fileObjName : null) ||
       "archivo";
     const sanitizedFilename = sanitizeFilename(fileName, mimeType);
-
     const attachment: Attachment = {
       id: `att-${Math.floor(1000 + Math.random() * 9000)}`,
       url: `/mock/evidence/${sanitizedFilename}`,
@@ -758,7 +482,6 @@ export const handlers = [
       contentType: mimeType,
       uploadedAt: new Date().toISOString(),
     };
-
     if (parsedOwnerType.data === "ZONE_RESULT") {
       addAttachmentToZoneResult(ownerId, attachment);
     }
@@ -771,9 +494,7 @@ export const handlers = [
     if (parsedOwnerType.data === "INSPECTION") {
       addAttachmentToInspection(ownerId, attachment);
     }
-
     evidenceCache.set(cacheKey, attachment);
-
     return HttpResponse.json(attachment, { status: 201 });
   }),
   // ── RepairRequest / M3 (issue #113) ─────────────────────────────────────
