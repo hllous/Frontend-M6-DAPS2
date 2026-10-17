@@ -66,6 +66,19 @@ jobs:
       - name: Unit and component tests
         run: npm test
 
+      - name: Verify the intentional Vitest failure probe
+        shell: bash
+        run: |
+          set +e
+          output=$(npm run test:failure-probe 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ] || ! grep -Fq "PERF_FAILURE_PROBE" <<<"$output"; then
+            echo "Expected the dedicated failure probe to fail on its intentional assertion"
+            exit 1
+          fi
+
   e2e-shard:
     name: e2e shard ${{ matrix.shard }}/3
     runs-on: ubuntu-24.04

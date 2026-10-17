@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:failure-probe": "vitest run --config vitest.probe.config.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
