@@ -3,6 +3,7 @@ import { createSessionCookie } from "@/test/session";
 import { envControlRouteHandlers } from "./env-control-route-handlers";
 import { handlers as sharedHandlers } from "./handlers.shared";
 import { serviceTypeRouteHandlers } from "./service-type-route-handlers";
+import { crewVehicleRouteHandlers } from "./crew-vehicle-route-handlers";
 import { zoneRouteHandlers } from "./zone-route-handlers";
 import { serviceRouteHandlers } from "./service-route-handlers";
 
@@ -15,4 +16,5 @@ export const handlers = [
   ...zoneRouteHandlers(officeSessionCookie),
   ...envControlRouteHandlers(officeSessionCookie, fieldCrewSessionCookie),
   ...serviceRouteHandlers(officeSessionCookie),
+  ...crewVehicleRouteHandlers(officeSessionCookie),
 ];
