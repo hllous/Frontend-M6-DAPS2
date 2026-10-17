@@ -53,6 +53,7 @@ Changing a `.md` file: run `npx --yes markdownlint-cli2@0.23.3` (Node 22+) and `
 - While iterating, run the related Vitest tests with `npx vitest run <test-file>`.
 - Before committing, run `npm run verify`, which runs typecheck, lint, and the
   full Vitest suite in parallel.
+- Set `VERIFY_MAX_WORKERS` to adjust the full test check from its default of 2.
 - Before marking work done, rerun `npm run verify` and run the Playwright specs
   for each touched screen or component with `npm run test:e2e -- <spec>`.
 
