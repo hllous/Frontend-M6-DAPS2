@@ -27,8 +27,10 @@ Orca runs the repo's setup script with `cmd.exe` on Windows, one line at a time,
 ```bat
 pnpm install --frozen-lockfile
 git checkout -- public/mockServiceWorker.js
-copy /Y "<main clone>\.env.local" .env.local
+copy /Y "%ORCA_ROOT_PATH%\.env.local" .env.local
 ```
+
+Orca sets `ORCA_ROOT_PATH` (the main clone) and `ORCA_WORKTREE_PATH` while the setup script runs, so the script has no machine-specific path.
 
 The install takes about 4 minutes per worktree on Windows, even when every package comes from pnpm's store.
 
