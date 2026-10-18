@@ -27,10 +27,10 @@ Orca runs the repo's setup script with `cmd.exe` on Windows, one line at a time,
 ```bat
 pnpm install --frozen-lockfile
 git checkout -- public/mockServiceWorker.js
-node -e "const p=require('path'),g=require('child_process').execSync('git rev-parse --path-format=absolute --git-common-dir').toString().trim();require('fs').copyFileSync(p.join(g,'..','.env.local'),'.env.local')"
+copy /Y "%ORCA_ROOT_PATH%\.env.local" .env.local
 ```
 
-The last line finds the main clone through git (the parent of the shared `.git` directory), so the script has no machine-specific path. It uses Node because Orca prefixes each line with `call`, which can't run a cmd `for` loop.
+Orca sets `ORCA_ROOT_PATH` (the main clone) and `ORCA_WORKTREE_PATH` while the setup script runs, so the script has no machine-specific path.
 
 The install takes about 4 minutes per worktree on Windows, even when every package comes from pnpm's store.
 
