@@ -8,7 +8,7 @@ Los documentos centrales están en la raíz. En particular, el dominio sigue la 
 
 - [README](../README.md): stack, ejecución local y estructura del repositorio.
 - [PRODUCT](../PRODUCT.md): propósito, usuarios, principios y evidencia de producto.
-- [CONTEXT](../GLOSSARY.md): vocabulario y conceptos del dominio M6.
+- [GLOSSARY](../GLOSSARY.md): vocabulario y conceptos del dominio M6.
 - [CONTRACTS](../CONTRACTS.md): contratos frontend/backend, hipótesis y criterios de aceptación.
 - [DESIGN](../DESIGN.md): estándar visual y de interacción.
 - [ROADMAP](../ROADMAP.md): fases, dependencias y preparación de entregas.
@@ -46,5 +46,7 @@ Para correrlos en local:
 pnpm dlx markdownlint-cli2@0.23.3
 lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'
 ```
+
+Un PR que solo toca `docs/`, archivos `.md`, `.markdownlint-cli2.jsonc` o `lychee.toml` omite los jobs de la app (`scripts/ci/docs-only.cjs`).
 
 `markdownlint-cli2` necesita Node 22 o superior. `lychee` se instala aparte ([instrucciones](https://lychee.cli.rs/installation/)); en CI se usa la versión fijada en `.github/workflows/ci.yml`.
