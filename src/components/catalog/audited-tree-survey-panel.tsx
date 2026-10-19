@@ -147,16 +147,16 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
         <FieldGroup className="grid gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="survey-health-filter">Estado sanitario</FieldLabel>
-            <Select items={HEALTH_LABELS} value={healthStatus || null} onValueChange={(value) => { setHealthStatus(String(value ?? "") as TreeHealthStatus | ""); setPage(1); }}>
-              <SelectTrigger id="survey-health-filter" aria-label="Filtrar por estado sanitario"><SelectValue placeholder="Todos" /></SelectTrigger>
-              <SelectContent><SelectGroup>{Object.entries(HEALTH_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+            <Select items={{ __all__: "Todos", ...HEALTH_LABELS }} value={healthStatus || "__all__"} onValueChange={(value) => { setHealthStatus(value === "__all__" ? "" : String(value) as TreeHealthStatus); setPage(1); }}>
+              <SelectTrigger id="survey-health-filter" aria-label="Filtrar por estado sanitario"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup><SelectItem value="__all__">Todos</SelectItem>{Object.entries(HEALTH_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
             </Select>
           </Field>
           <Field>
             <FieldLabel htmlFor="survey-risk-filter">Nivel de riesgo</FieldLabel>
-            <Select items={RISK_LEVEL_LABELS} value={riskLevel || null} onValueChange={(value) => { setRiskLevel(String(value ?? "") as RiskLevel | ""); setPage(1); }}>
-              <SelectTrigger id="survey-risk-filter" aria-label="Filtrar por nivel de riesgo"><SelectValue placeholder="Todos" /></SelectTrigger>
-              <SelectContent><SelectGroup>{Object.entries(RISK_LEVEL_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+            <Select items={{ __all__: "Todos", ...RISK_LEVEL_LABELS }} value={riskLevel || "__all__"} onValueChange={(value) => { setRiskLevel(value === "__all__" ? "" : String(value) as RiskLevel); setPage(1); }}>
+              <SelectTrigger id="survey-risk-filter" aria-label="Filtrar por nivel de riesgo"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup><SelectItem value="__all__">Todos</SelectItem>{Object.entries(RISK_LEVEL_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
             </Select>
           </Field>
         </FieldGroup>
@@ -199,18 +199,18 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
             </Field>
             <Field data-invalid={fieldHasError("riskType")}>
               <FieldLabel htmlFor="risk-type">Tipo de riesgo</FieldLabel>
-              <Select items={RISK_TYPE_LABELS} value={form.riskType || null} onValueChange={(value) => setForm({ ...form, riskType: String(value ?? "") })}>
+              <Select items={{ __none__: "Sin tipo", ...RISK_TYPE_LABELS }} value={form.riskType || null} onValueChange={(value) => setForm({ ...form, riskType: value === "__none__" ? "" : String(value ?? "") })}>
                 <SelectTrigger id="risk-type" aria-label="Tipo de riesgo" aria-required={form.riskLevel === "HIGH" || form.riskLevel === "CRITICAL"} aria-invalid={fieldHasError("riskType")} aria-describedby={fieldHasError("riskType") ? "risk-type-help risk-type-error" : "risk-type-help"}><SelectValue placeholder="Seleccione un tipo" /></SelectTrigger>
-                <SelectContent><SelectGroup>{Object.entries(RISK_TYPE_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+                <SelectContent><SelectGroup><SelectItem value="__none__">Sin tipo</SelectItem>{Object.entries(RISK_TYPE_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
               <FieldDescription className="text-xs leading-4" id="risk-type-help">Obligatorio para niveles de riesgo alto o crítico.</FieldDescription>
               {fieldHasError("riskType") ? <FieldError id="risk-type-error">{formError}</FieldError> : null}
             </Field>
             <Field data-invalid={fieldHasError("suggestedIntervention")}>
               <FieldLabel htmlFor="suggested-intervention">Intervención sugerida</FieldLabel>
-              <Select items={INTERVENTION_LABELS} value={form.suggestedIntervention || null} onValueChange={(value) => setForm({ ...form, suggestedIntervention: String(value ?? "") })}>
+              <Select items={{ __none__: "Sin sugerencia", ...INTERVENTION_LABELS }} value={form.suggestedIntervention || null} onValueChange={(value) => setForm({ ...form, suggestedIntervention: value === "__none__" ? "" : String(value ?? "") })}>
                 <SelectTrigger id="suggested-intervention" aria-label="Intervención sugerida" aria-invalid={fieldHasError("suggestedIntervention")} aria-describedby={fieldHasError("suggestedIntervention") ? "suggested-intervention-help suggested-intervention-error" : "suggested-intervention-help"}><SelectValue placeholder="Sin sugerencia" /></SelectTrigger>
-                <SelectContent><SelectGroup>{Object.entries(INTERVENTION_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+                <SelectContent><SelectGroup><SelectItem value="__none__">Sin sugerencia</SelectItem>{Object.entries(INTERVENTION_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
               <FieldDescription className="text-xs leading-4" id="suggested-intervention-help">Registre la acción recomendada, si corresponde.</FieldDescription>
               {fieldHasError("suggestedIntervention") ? <FieldError id="suggested-intervention-error">{formError}</FieldError> : null}

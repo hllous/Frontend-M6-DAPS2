@@ -39,7 +39,7 @@ test.describe("Tree catalog management #126", () => {
     const row = page.locator("tbody tr").filter({ hasText: "ARB-E2E-" }).last();
     await row.getByRole("button", { name: "Ver detalle" }).click();
     const detail = page.getByRole("dialog", { name: /Detalle del árbol/ });
-    await expect(detail).toContainText("Ceibo", { timeout: 15_000 });
+    await expect(detail).toContainText("Ceibo");
     await expect(page).toHaveURL(/[?&]detail=/);
     await expect(detail.getByText("Sin relevamientos registrados.")).toBeVisible();
     await expect(detail.getByRole("link", { name: "Ver en el mapa" })).toBeVisible();

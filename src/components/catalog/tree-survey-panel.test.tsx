@@ -29,6 +29,34 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("TreeSurveyPanel", () => {
+  it("lets users clear survey filters and optional survey selections", async () => {
+    const user = userEvent.setup();
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    await screen.findByRole("heading", { name: /Historial de relevamientos/ });
+
+    const healthFilter = screen.getByRole("combobox", { name: "Filtrar por estado sanitario" });
+    await chooseSelectOption(user, healthFilter, "Debilitado");
+    await chooseSelectOption(user, healthFilter, "Todos");
+    expect(healthFilter).toHaveTextContent("Todos");
+
+    const riskFilter = screen.getByRole("combobox", { name: "Filtrar por nivel de riesgo" });
+    await chooseSelectOption(user, riskFilter, "Alto");
+    await chooseSelectOption(user, riskFilter, "Todos");
+    expect(riskFilter).toHaveTextContent("Todos");
+
+    await user.click(screen.getByRole("button", { name: "Registrar relevamiento" }));
+    const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
+    const riskType = within(dialog).getByRole("combobox", { name: "Tipo de riesgo" });
+    await chooseSelectOption(user, riskType, "Caída de ramas");
+    await chooseSelectOption(user, riskType, "Sin tipo");
+    expect(riskType).toHaveTextContent("Seleccione un tipo");
+
+    const suggestedIntervention = within(dialog).getByRole("combobox", { name: "Intervención sugerida" });
+    await chooseSelectOption(user, suggestedIntervention, "Poda de formación");
+    await chooseSelectOption(user, suggestedIntervention, "Sin sugerencia");
+    expect(suggestedIntervention).toHaveTextContent("Sin sugerencia");
+  });
+
   it("lets Field review newest-first history and inspect an immutable detail", async () => {
     render(<TreeSurveyPanel tree={tree} scenario={scenarios.fieldCrewLeader} onClose={vi.fn()} />);
     expect(await screen.findByRole("heading", { name: /Historial de relevamientos/ })).toBeVisible();

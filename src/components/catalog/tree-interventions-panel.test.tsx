@@ -53,6 +53,15 @@ describe("TreeInterventionsPanel", () => {
     await chooseSelectOption(user, screen.getByRole("combobox", { name: "Filtrar por estado" }), "Autorizada");
     expect(await screen.findByRole("article", { name: /intervention-2|Tratamiento/i })).toBeVisible();
     expect(screen.queryByRole("article", { name: /intervention-1|Poda de seguridad/i })).not.toBeInTheDocument();
+    const statusFilter = screen.getByRole("combobox", { name: "Filtrar por estado" });
+    await chooseSelectOption(user, statusFilter, "Todos");
+    expect(await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i })).toBeVisible();
+
+    const typeFilter = screen.getByRole("combobox", { name: "Filtrar por tipo de intervención" });
+    await chooseSelectOption(user, typeFilter, "Tratamiento");
+    expect(screen.queryByRole("article", { name: /intervention-1|Poda de seguridad/i })).not.toBeInTheDocument();
+    await chooseSelectOption(user, typeFilter, "Todos");
+    expect(await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i })).toBeVisible();
   });
 
   it("names each card by its trees, never by the request id, and falls back to the tree address", async () => {

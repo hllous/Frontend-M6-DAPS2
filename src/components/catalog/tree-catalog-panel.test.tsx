@@ -22,6 +22,22 @@ afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
 describe("TreeCatalogPanel", () => {
+  it("marks the required zone and associates its validation error with the field", async () => {
+    const user = userEvent.setup();
+    render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Árboles" });
+    await user.click(screen.getByRole("button", { name: "Registrar árbol" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Registrar árbol" });
+    const zone = within(dialog).getByRole("combobox", { name: "Zona operativa" });
+    expect(zone).toHaveAttribute("aria-required", "true");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar árbol" }));
+
+    expect(await within(dialog).findByText("La zona operativa es obligatoria.")).toBeVisible();
+    expect(zone).toHaveAttribute("aria-invalid", "true");
+    expect(zone).toHaveAttribute("aria-describedby", "tree-zone-help tree-zone-error");
+  });
+
   it("lists trees for any authenticated actor and opens detail without management actions", async () => {
     render(<TreeCatalogPanel scenario={scenarios.fieldCrewLeader} />);
     expect(await screen.findByRole("heading", { name: "Árboles" })).toBeVisible();

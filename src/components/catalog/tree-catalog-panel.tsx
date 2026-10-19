@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemGroup } from "@/components/ui/item";
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -138,6 +138,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const [editingTree, setEditingTree] = useState<Tree | null>(null);
   const [form, setForm] = useState<TreeForm>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
+  const [zoneError, setZoneError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadedDetail, setLoadedDetail] = useState<DetailState | null>(null);
   const [surveyTree, setSurveyTree] = useState<Tree | null>(null);
@@ -185,6 +186,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
     setEditingTree(null);
     setForm(emptyForm);
     setFormError(null);
+    setZoneError(null);
     setFormOpen(true);
   };
 
@@ -192,6 +194,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
     setEditingTree(tree);
     setForm({ surveyCode: tree.surveyCode, zoneId: tree.zoneId, species: tree.species ?? "", address: tree.address ?? "", lat: tree.lat === null ? "" : String(tree.lat), lng: tree.lng === null ? "" : String(tree.lng), heightM: tree.heightM === null ? "" : String(tree.heightM), diameterCm: tree.diameterCm === null ? "" : String(tree.diameterCm), active: tree.active });
     setFormError(null);
+    setZoneError(null);
     setFormOpen(true);
   };
 
@@ -241,6 +244,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
       : treeCreateInputSchema.safeParse({ surveyCode: form.surveyCode, ...payload });
     if (!parsed.success) {
       setFormError(parsed.error.issues[0]?.message ?? "Revise los datos del formulario.");
+      setZoneError(parsed.error.issues.find((issue) => issue.path.includes("zoneId"))?.message ?? null);
       return;
     }
 
@@ -368,6 +372,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
         consequence="El árbol quedará inactivo y se conservará su referencia histórica."
         confirmAction={`Dar de baja el árbol ${deactivateTarget?.surveyCode ?? ""}`.trim()}
         safeAlternative={`Conservar árbol ${deactivateTarget?.surveyCode ?? ""}`.trim()}
+        footerClassName="flex-col items-stretch sm:flex-row"
         isSubmitting={isSubmittingDeactivate}
         onConfirm={() => deactivateTarget && void deactivate(deactivateTarget)}
       >
@@ -382,12 +387,14 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <FieldGroup className="gap-4">
               <Field><FieldLabel htmlFor="tree-survey-code">Código de relevamiento</FieldLabel><Input id="tree-survey-code" value={form.surveyCode} disabled={Boolean(editingTree)} onChange={(event) => setForm({ ...form, surveyCode: event.target.value })} required={!editingTree} aria-describedby={editingTree ? "tree-survey-code-help" : undefined} /><FieldDescription className="text-xs leading-4" id="tree-survey-code-help">Identifica el ejemplar en el censo y no se puede cambiar.</FieldDescription></Field>
               <Field><FieldLabel htmlFor="tree-species">Especie</FieldLabel><Input id="tree-species" value={form.species} onChange={(event) => setForm({ ...form, species: event.target.value })} required /></Field>
-              <Field>
-                <FieldLabel htmlFor="tree-zone">Zona operativa</FieldLabel>
-                <Select items={Object.fromEntries(zones.map((zone) => [zone.id, `${zone.code} · ${zone.name}`]))} value={form.zoneId || null} onValueChange={(value) => setForm({ ...form, zoneId: String(value ?? "") })}>
-                  <SelectTrigger id="tree-zone" aria-label="Zona operativa"><SelectValue placeholder="Seleccione una zona" /></SelectTrigger>
+              <Field data-invalid={Boolean(zoneError)}>
+                <FieldLabel htmlFor="tree-zone">Zona operativa <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+                <Select items={Object.fromEntries(zones.map((zone) => [zone.id, `${zone.code} · ${zone.name}`]))} value={form.zoneId || null} onValueChange={(value) => { setForm({ ...form, zoneId: String(value ?? "") }); setZoneError(null); }}>
+                  <SelectTrigger id="tree-zone" aria-label="Zona operativa" aria-required="true" aria-invalid={Boolean(zoneError)} aria-describedby={zoneError ? "tree-zone-help tree-zone-error" : "tree-zone-help"}><SelectValue placeholder="Seleccione una zona" /></SelectTrigger>
                   <SelectContent><SelectGroup>{zones.map((zone) => <SelectItem key={zone.id} value={zone.id}>{zone.code} · {zone.name}</SelectItem>)}</SelectGroup></SelectContent>
                 </Select>
+                <FieldDescription id="tree-zone-help">Seleccione la zona que corresponde al árbol.</FieldDescription>
+                {zoneError ? <FieldError id="tree-zone-error">{zoneError}</FieldError> : null}
               </Field>
               <Field><FieldLabel htmlFor="tree-address">Dirección</FieldLabel><Input id="tree-address" value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /><FieldDescription className="text-xs leading-4">Opcional. Se utiliza junto con la especie en la búsqueda.</FieldDescription></Field>
               <div className="grid grid-cols-2 gap-3">

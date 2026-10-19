@@ -485,16 +485,16 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="intervention-type-filter">Tipo de intervención</FieldLabel>
-          <Select items={TREE_INTERVENTION_LABELS} value={interventionType || null} onValueChange={(value) => { setInterventionType(String(value ?? "") as TreeInterventionType | ""); setPage(1); }}>
-            <SelectTrigger id="intervention-type-filter" aria-label="Filtrar por tipo de intervención"><SelectValue placeholder="Todos" /></SelectTrigger>
-            <SelectContent><SelectGroup>{Object.entries(TREE_INTERVENTION_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+          <Select items={{ __all__: "Todos", ...TREE_INTERVENTION_LABELS }} value={interventionType || "__all__"} onValueChange={(value) => { setInterventionType(value === "__all__" ? "" : String(value) as TreeInterventionType); setPage(1); }}>
+            <SelectTrigger id="intervention-type-filter" aria-label="Filtrar por tipo de intervención"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectGroup><SelectItem value="__all__">Todos</SelectItem>{Object.entries(TREE_INTERVENTION_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
           </Select>
         </Field>
         <Field>
           <FieldLabel htmlFor="intervention-status-filter">Estado de la solicitud</FieldLabel>
-          <Select items={TREE_INTERVENTION_STATUS_LABELS} value={status || null} onValueChange={(value) => { setStatus(String(value ?? "") as TreeInterventionStatus | ""); setPage(1); }}>
-            <SelectTrigger id="intervention-status-filter" aria-label="Filtrar por estado"><SelectValue placeholder="Todos" /></SelectTrigger>
-            <SelectContent><SelectGroup>{Object.entries(TREE_INTERVENTION_STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+          <Select items={{ __all__: "Todos", ...TREE_INTERVENTION_STATUS_LABELS }} value={status || "__all__"} onValueChange={(value) => { setStatus(value === "__all__" ? "" : String(value) as TreeInterventionStatus); setPage(1); }}>
+            <SelectTrigger id="intervention-status-filter" aria-label="Filtrar por estado"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectGroup><SelectItem value="__all__">Todos</SelectItem>{Object.entries(TREE_INTERVENTION_STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
           </Select>
         </Field>
       </FieldGroup>
