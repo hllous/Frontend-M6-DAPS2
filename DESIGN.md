@@ -182,7 +182,7 @@ Use the approved **Campos explícitos** anatomy as the default for forms and tas
 - Support empty, hover, active, focus, invalid, disabled, read-only, loading, success, and destructive-confirmation states without relying on color alone.
 - Task sections may organize genuinely multi-stage workflows, but they do not replace the approved field anatomy or become a decorative container around routine forms.
 
-In production, align this anatomy with the project-owned shadcn/Base UI compositions (`FieldGroup`, `Field`, `Button`, `Spinner`, toast, and `AlertDialog`) rather than creating parallel primitives, as required by the [shadcn-as-the-base rule in AGENTS.md](AGENTS.md#ui-components-shadcn-first).
+In production, align this anatomy with the project-owned shadcn/Base UI compositions (`FieldGroup`, `Field`, `Button`, `Spinner`, toast, and `AlertDialog`) rather than creating parallel primitives, as required by the [shadcn-first rule in AGENTS.md](AGENTS.md#ui-components-shadcn-first).
 
 ### Motion and reduced motion
 
@@ -285,7 +285,7 @@ Choose chart forms according to the operational question rather than applying on
 - Keep chart color subordinate to data meaning: institutional blue carries the primary series; semantic colors retain their approved status meanings; coral marks exceptional thresholds or selections rather than ordinary decoration.
 - Show units, date range, data freshness, and relevant targets in text. Tooltips supplement persistent labels and cannot be the only way to retrieve a value.
 - Preserve the current filters and selected datum when switching between visualization and table. On narrow screens, prefer readable transformation or the table companion over horizontal chart scrolling.
-- Production charts should compose the project-owned shadcn Chart wrapper and Recharts foundation, using M6 semantic tokens and component rules rather than copying gallery examples verbatim, as required by the [shadcn-as-the-base rule in AGENTS.md](AGENTS.md#ui-components-shadcn-first).
+- Production charts should compose the project-owned shadcn Chart wrapper and Recharts foundation, using M6 semantic tokens and component rules rather than copying gallery examples verbatim, as required by the [shadcn-first rule in AGENTS.md](AGENTS.md#ui-components-shadcn-first).
 
 ### Accessibility
 
@@ -342,7 +342,7 @@ Use the approved **Par canónico y lista de verificación** format to make the r
 - Name the governing rule on every pair and state why the incorrect version fails. A pair without a stated reason is decoration.
 - Give each area a review checklist. Checklists are text tied to rules, so they cover the rules that have no rendered pair and stay accurate when a component changes.
 - Keep the rule prose normative. The pair and the checklist are aids for applying a rule, not separate rules; when they disagree with the section above, the section wins and the example is corrected.
-- Do not grow this into a component catalog; component documentation lives with the shadcn compositions in `src/components/ui/`, as required by the [shadcn-as-the-base rule in AGENTS.md](AGENTS.md#ui-components-shadcn-first).
+- Do not grow this into a component catalog; component documentation lives with the shadcn compositions in `src/components/ui/`, as required by the [shadcn-first rule in AGENTS.md](AGENTS.md#ui-components-shadcn-first).
 
 The canonical pairs live at [`docs/design/examples/index.html`](docs/design/examples/index.html). Open that file directly in a browser; it is self-contained, needs no build step, and carries all seven pairs and all seven checklists on one page. It is versioned with this document, so a change to a rule and a change to its example arrive in the same commit.
 

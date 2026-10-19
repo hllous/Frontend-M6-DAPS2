@@ -12,6 +12,7 @@
 /test-results/
 /playwright-report/
 /blob-report/
+/.playwright-cli/
 
 # next.js
 /.next/
