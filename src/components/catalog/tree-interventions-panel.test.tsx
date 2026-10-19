@@ -75,6 +75,33 @@ describe("TreeInterventionsPanel", () => {
     expect(within(removal).getByText("Av. Las Heras 2100")).toBeVisible();
   });
 
+  it("shows each intervention priority as a text-labeled semantic badge", async () => {
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+
+    const cases = [
+      { name: /intervention-1|Poda de seguridad/i, label: "Alta", variant: "warning" },
+      { name: /intervention-2|Tratamiento/i, label: "Media", variant: "info" },
+      { name: /intervention-3|Extracción/i, label: "Crítica", variant: "danger" },
+    ] as const;
+
+    for (const { name, label, variant } of cases) {
+      const request = await screen.findByRole("article", { name });
+      const priority = within(request).getByText(label);
+
+      expect(priority).toHaveAttribute("data-variant", variant);
+    }
+  });
+
+  it("shows an unrecorded intervention priority as neutral text", async () => {
+    updateTreeInterventionFixture("intervention-1", { priority: "LOW" });
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+
+    const request = await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i });
+    const priority = within(request).getByText("Baja");
+
+    expect(priority).toHaveAttribute("data-variant", "secondary");
+  });
+
   it("offers a street closure request only from an authorized intervention", async () => {
     const user = userEvent.setup();
     render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);

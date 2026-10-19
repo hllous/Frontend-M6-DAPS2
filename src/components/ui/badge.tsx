@@ -11,6 +11,7 @@ const badgeVariants = cva(
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
+        info: "bg-[var(--color-info-fill)] text-[var(--color-info)]",
         success: "bg-[var(--color-success-fill)] text-[var(--color-success)]",
         warning: "bg-[var(--color-warning-fill)] text-[var(--color-warning)]",
         danger: "bg-[var(--color-danger-fill)] text-[var(--color-danger)]",

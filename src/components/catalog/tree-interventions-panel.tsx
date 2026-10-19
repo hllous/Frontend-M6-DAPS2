@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -47,6 +48,7 @@ export const TREE_INTERVENTION_STATUS_LABELS: Record<TreeInterventionStatus, str
 };
 
 const PRIORITY_LABELS = { LOW: "Baja", MEDIUM: "Media", HIGH: "Alta", CRITICAL: "Crítica" } as const;
+const PRIORITY_BADGE_VARIANTS = { LOW: "secondary", MEDIUM: "info", HIGH: "warning", CRITICAL: "danger" } as const;
 const STATUS_TONES: Record<TreeInterventionStatus, string> = {
   REQUESTED: "bg-[var(--color-info-fill)] text-[var(--color-info)]",
   PENDING_AUTHORIZATION: "bg-[var(--color-warning-fill)] text-[var(--color-warning)]",
@@ -507,16 +509,49 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           {state.page.interventions.map((intervention) => {
             // La solicitud no tiene código propio: se la identifica por los árboles que toca.
             const linked = intervention.treeIds.map(treeById).filter((tree): tree is Tree => Boolean(tree));
-            const reference = linked.length ? linked.map((tree) => tree.surveyCode).join(", ") : intervention.createdAt ? `Solicitada el ${dateTimeLabel(intervention.createdAt)}` : null;
+            const reference = linked.length ? linked.map((tree) => tree.surveyCode).join(", ") : intervention.createdAt ? "Solicitada el " + dateTimeLabel(intervention.createdAt) : null;
             const address = intervention.address ?? linked[0]?.address ?? "Sin dirección registrada";
-            return <article key={intervention.id} aria-label={[TREE_INTERVENTION_LABELS[intervention.interventionType], reference].filter(Boolean).join(" · ")} className="rounded-2xl border border-border bg-card p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>{reference ? <p className="text-xs text-muted-foreground">{reference}</p> : null}<h2 className="mt-1 text-base font-semibold">{TREE_INTERVENTION_LABELS[intervention.interventionType]}</h2></div>
-              <InterventionStatusBadge status={intervention.status} />
-            </div>
-            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles</dt><dd className="mt-0.5">{intervention.treeIds.length} {intervention.treeIds.length === 1 ? "ejemplar" : "ejemplares"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{intervention.priority === null ? "—" : PRIORITY_LABELS[intervention.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{address}</dd></div></dl>
-            <div className="mt-4 flex justify-end"><Button type="button" size="sm" variant="outline" className="h-10 max-[760px]:h-12" onClick={() => void openDetail(intervention)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button></div>
-          </article>;
+            const treeCount = intervention.treeIds.length + " " + (intervention.treeIds.length === 1 ? "ejemplar" : "ejemplares");
+            const priorityLabel = intervention.priority === null ? "No indicada" : PRIORITY_LABELS[intervention.priority];
+            const priorityVariant = intervention.priority === null ? "secondary" : PRIORITY_BADGE_VARIANTS[intervention.priority];
+
+            return (
+              <Card
+                key={intervention.id}
+                role="article"
+                aria-label={[TREE_INTERVENTION_LABELS[intervention.interventionType], reference].filter(Boolean).join(" · ")}
+                size="sm"
+                className="gap-2 py-2"
+              >
+                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    {reference ? <CardDescription className="text-xs">{reference}</CardDescription> : null}
+                    <CardTitle className="text-sm leading-5 font-semibold">{TREE_INTERVENTION_LABELS[intervention.interventionType]}</CardTitle>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">Estado</span>
+                    <InterventionStatusBadge status={intervention.status} />
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <dl className="grid min-w-[17rem] flex-1 grid-cols-2 gap-x-3 gap-y-1.5 text-sm sm:grid-cols-[minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(11rem,1.5fr)]">
+                    <div className="flex min-w-0 items-baseline gap-1.5 sm:flex-col sm:items-start sm:gap-0">
+                      <dt className="shrink-0 text-xs font-medium text-muted-foreground">Árboles</dt>
+                      <dd className="font-medium">{treeCount}</dd>
+                    </div>
+                    <div className="flex min-w-0 items-baseline gap-1.5 sm:flex-col sm:items-start sm:gap-0">
+                      <dt className="shrink-0 text-xs font-medium text-muted-foreground">Prioridad</dt>
+                      <dd><Badge variant={priorityVariant}>{priorityLabel}</Badge></dd>
+                    </div>
+                    <div className="col-span-2 flex min-w-0 items-baseline gap-1.5 sm:col-span-1 sm:flex-col sm:items-start sm:gap-0">
+                      <dt className="shrink-0 text-xs font-medium text-muted-foreground">Dirección</dt>
+                      <dd className="min-w-0 break-words font-medium">{address}</dd>
+                    </div>
+                  </dl>
+                  <Button type="button" size="sm" variant="outline" className="ml-auto h-10 max-[760px]:h-12" onClick={() => void openDetail(intervention)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button>
+                </CardContent>
+              </Card>
+            );
           })}
         </div>
         <div className="flex items-center justify-between gap-3" aria-label="Paginación de intervenciones"><span className="text-sm text-muted-foreground">Página {state.page.page} de {state.page.totalPages}</span><div className="flex gap-2"><Button type="button" variant="outline" size="sm" aria-label="Página anterior" disabled={state.page.page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft data-icon="inline-start" aria-hidden />Anterior</Button><Button type="button" variant="outline" size="sm" aria-label="Página siguiente" disabled={state.page.page >= state.page.totalPages} onClick={() => setPage((current) => current + 1)}>Siguiente<ChevronRight data-icon="inline-end" aria-hidden /></Button></div></div>
@@ -634,7 +669,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                   </form>
                 ) : null}
                 {detail.interventionType === "REMOVAL" && detail.status === "REQUESTED" && canRequest ? <Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "submit"} onClick={() => void runAction("submit")}><Send data-icon="inline-start" aria-hidden />{activeAction === "submit" ? "Enviando a autorización…" : "Enviar a autorización"}</Button> : null}
-                {canAuthorize && ((detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <div className="flex flex-wrap gap-2"><Button type="button" disabled={activeAction !== null} aria-busy={activeAction === "authorize"} onClick={() => void runAction("authorize")}><CheckCircle2 data-icon="inline-start" aria-hidden />{activeAction === "authorize" ? "Autorizando intervención…" : "Autorizar intervención"}</Button>{detail.interventionType === "REMOVAL" ? <Button type="button" variant="destructive" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(true)}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button> : null}</div> : null}
+              {canAuthorize && ((detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <div className="flex flex-wrap justify-center gap-2"><Button type="button" disabled={activeAction !== null} aria-busy={activeAction === "authorize"} onClick={() => void runAction("authorize")}><CheckCircle2 data-icon="inline-start" aria-hidden />{activeAction === "authorize" ? "Autorizando intervención…" : "Autorizar intervención"}</Button>{detail.interventionType === "REMOVAL" ? <Button type="button" variant="destructive" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(true)}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button> : null}</div> : null}
                 {detail.status === "REJECTED" && canRequest ? <div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">Esta decisión es terminal. Puede registrar una nueva solicitud con los datos de esta extracción.</p><Button type="button" variant="outline" onClick={() => { setDetail(null); openRequest({ initialTreeIds: detail.treeIds, initialType: detail.interventionType, initialAddress: detail.address ?? undefined, initialRequiresStreetClosure: detail.requiresStreetClosure, initialPriority: detail.priority ?? undefined, initialJustification: detail.justification ?? "" }); }}>Crear nueva solicitud</Button></div> : null}
               </div>
             </>
