@@ -192,15 +192,25 @@ describe("ServicesWorkspace component", () => {
 
       const map = await screen.findByRole("region", { name: "Mapa territorial de Servicios" });
       const drawer = await screen.findByRole("complementary", { name: "Lista de servicios" });
-      const toggle = screen.getByRole("button", { name: "Expandir lista a pantalla completa" });
       expect(map).toBeVisible();
+      expect(document.querySelector("[data-slot='drawer-popup']")).toBeInTheDocument();
       const marker = await within(map).findByRole("button", { name: /Poda de árbol — Av\. Rivadavia 2200/ });
       await user.click(marker);
 
-      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      const suspendedDrawer = document.querySelector("[data-slot='drawer-popup']");
+      expect(suspendedDrawer).toBeInTheDocument();
+      await waitFor(() => expect(suspendedDrawer).toHaveAttribute("hidden"));
+      expect(suspendedDrawer).not.toBeVisible();
       const preview = await screen.findByRole("complementary", { name: "Poda de árbol — Av. Rivadavia 2200" });
       expect(preview).toHaveTextContent("Poda de árbol — Av. Rivadavia 2200");
-      expect(within(preview).getByRole("button", { name: "Cerrar vista previa" })).toHaveFocus();
+      const closePreview = within(preview).getByRole("button", { name: "Cerrar vista previa" });
+      expect(closePreview).toHaveFocus();
+      await user.click(closePreview);
+      await waitFor(() => expect(document.querySelector("[data-slot='drawer-popup']")).toBeInTheDocument());
+      expect(screen.getByRole("button", { name: "Expandir lista a pantalla completa" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
       fireEvent(window, new Event("resize"));

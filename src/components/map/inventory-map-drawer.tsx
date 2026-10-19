@@ -24,6 +24,7 @@ type InventoryMapDrawerProps = {
   expandToViewport?: boolean;
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
+  suspended?: boolean;
   snapState?: InventoryMapDrawerSnapState;
   onSnapStateChange?: (snapState: InventoryMapDrawerSnapState) => void;
   summary: string;
@@ -45,11 +46,13 @@ export function InventoryMapDrawer({
   expandToViewport = false,
   expanded: controlledExpanded,
   onExpandedChange,
+  suspended = false,
   snapState: controlledSnapState,
   onSnapStateChange,
   summary,
 }: InventoryMapDrawerProps) {
   const mobileRootRef = useRef<HTMLElement>(null);
+  const drawerFocusRef = useRef<HTMLButtonElement>(null);
   const [isCompact, setIsCompact] = useState(false);
   const [localExpanded, setLocalExpanded] = useState(false);
   const [localSnapState, setLocalSnapState] = useState<InventoryMapDrawerSnapState>("peek");
@@ -75,11 +78,18 @@ export function InventoryMapDrawer({
       const shellHeaderBottom = expandToViewport
         ? document.querySelector<HTMLElement>('header[class*="topbar"]')?.getBoundingClientRect().bottom
         : undefined;
-      const mobileNavTop = expandToViewport
-        ? document.querySelector<HTMLElement>('nav[aria-label="Navegación móvil"]')?.getBoundingClientRect().top
-        : undefined;
+      const mobileNavTop = document.querySelector<HTMLElement>('nav[aria-label="Navegación móvil"]')?.getBoundingClientRect().top;
       const top = Math.max(0, Math.round(shellHeaderBottom ?? bounds.top));
-      const bottom = Math.max(0, Math.round(viewportHeight - (mobileNavTop ?? bounds.bottom)));
+      const reservedBottom = Math.max(0, Math.round(viewportHeight - (mobileNavTop ?? bounds.bottom)));
+      const availableHeight = Math.max(0, viewportHeight - top - reservedBottom);
+      const snapHeight = hasSnapPoints && snapState !== "peek"
+        ? Math.min(availableHeight, SNAP_POINT_BY_STATE[snapState] * viewportHeight)
+        : availableHeight;
+      // Base UI measures snap fractions against the viewport, so reserve half of the size delta as translation space.
+      const snapOffset = hasSnapPoints && snapState !== "peek"
+        ? Math.max(0, (availableHeight - snapHeight) / 2)
+        : 0;
+      const bottom = Math.max(0, Math.round(reservedBottom + snapOffset));
       const height = Math.max(0, viewportHeight - top - bottom);
       setPopupStyle({ top, bottom, height, maxHeight: height } as CSSProperties);
     };
@@ -95,7 +105,7 @@ export function InventoryMapDrawer({
       window.removeEventListener("resize", updateBounds);
       resizeObserver?.disconnect();
     };
-  }, [expandToViewport, isCompact]);
+  }, [expandToViewport, hasSnapPoints, isCompact, snapState]);
 
   function updateExpanded(nextExpanded: boolean) {
     if (controlledExpanded === undefined) setLocalExpanded(nextExpanded);
@@ -121,7 +131,7 @@ export function InventoryMapDrawer({
     return (
       <aside ref={mobileRootRef} className={styles.mobileRoot} aria-label={ariaLabel} data-snap={snapState}>
         <Drawer
-          open={snapState !== "peek"}
+          open={!suspended && snapState !== "peek"}
           onOpenChange={(open) => updateSnapState(open ? "half" : "peek")}
           modal={false}
           disablePointerDismissal
@@ -142,16 +152,20 @@ export function InventoryMapDrawer({
           >
             {summary}
           </DrawerTrigger>
-          <DrawerContent className={cn(styles.popup, expandToViewport && styles.viewportPopup)} initialFocus={false} style={popupStyle}>
+          <DrawerContent
+            className={styles.popup}
+            initialFocus={(openType) => openType ? drawerFocusRef.current : false}
+            style={popupStyle}
+          >
             <DrawerHeader className={styles.header}>
               <DrawerTitle>{summary}</DrawerTitle>
               <div className="flex items-center gap-2">
                 {snapState === "half" ? (
-                  <Button variant="outline" aria-label="Expandir lista a pantalla completa" aria-expanded onClick={() => updateSnapState("full")}>
+                  <Button ref={drawerFocusRef} variant="outline" aria-label="Expandir lista a pantalla completa" aria-expanded onClick={() => updateSnapState("full")}>
                     Expandir
                   </Button>
                 ) : (
-                  <DrawerClose render={<Button variant="outline" aria-label="Reducir lista y mostrar mapa" aria-expanded>Ver mapa</Button>} />
+                  <DrawerClose render={<Button ref={drawerFocusRef} variant="outline" aria-label="Reducir lista y mostrar mapa" aria-expanded>Ver mapa</Button>} />
                 )}
                 <DrawerClose render={<Button variant="ghost" size="icon-sm" aria-label="Cerrar lista"><X aria-hidden /></Button>} />
               </div>
@@ -174,10 +188,14 @@ export function InventoryMapDrawer({
           <span className={styles.grabber} aria-hidden="true" />
           <span>{summary}</span>
         </DrawerTrigger>
-        <DrawerContent className={cn(styles.popup, expandToViewport && styles.viewportPopup)} initialFocus={false} style={popupStyle}>
+        <DrawerContent
+          className={styles.popup}
+          initialFocus={(openType) => openType ? drawerFocusRef.current : false}
+          style={popupStyle}
+        >
           <DrawerHeader className={styles.header}>
             <DrawerTitle>{summary}</DrawerTitle>
-              <DrawerClose render={<Button variant="ghost" size="icon-sm" aria-label="Cerrar lista"><X aria-hidden /></Button>} />
+              <DrawerClose render={<Button ref={drawerFocusRef} variant="ghost" size="icon-sm" aria-label="Cerrar lista"><X aria-hidden /></Button>} />
           </DrawerHeader>
           <div className={styles.content}>{children}</div>
         </DrawerContent>

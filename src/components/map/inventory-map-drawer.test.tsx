@@ -5,6 +5,43 @@ import { describe, expect, it, vi } from "vitest";
 import { InventoryMapDrawer } from "./inventory-map-drawer";
 
 describe("InventoryMapDrawer", () => {
+  it("moves keyboard focus into the drawer and preserves list scroll when it closes", async () => {
+    const originalWidth = window.innerWidth;
+    const user = userEvent.setup();
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+
+    try {
+      render(
+        <InventoryMapDrawer ariaLabel="Inventario visible" summary="Elementos">
+          <div data-testid="list-scroll-region" style={{ height: 80, overflow: "auto" }}>
+            <div style={{ height: 400 }}>Contenido desplazable</div>
+          </div>
+        </InventoryMapDrawer>,
+      );
+
+      const trigger = await screen.findByRole("button", { name: "Mostrar lista" });
+      trigger.focus();
+      await user.keyboard("{Enter}");
+
+      const drawer = await screen.findByRole("dialog", { name: "Elementos" });
+      const closeButton = within(drawer).getByRole("button", { name: "Cerrar lista" });
+      expect(closeButton).toHaveFocus();
+
+      const scrollRegion = within(drawer).getByTestId("list-scroll-region");
+      scrollRegion.scrollTop = 120;
+      await user.click(closeButton);
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Elementos" })).not.toBeInTheDocument());
+      await user.click(trigger);
+
+      const reopenedDrawer = await screen.findByRole("dialog", { name: "Elementos" });
+      const reopenedScrollRegion = within(reopenedDrawer).getByTestId("list-scroll-region");
+      expect(reopenedScrollRegion).toBe(scrollRegion);
+      expect(reopenedScrollRegion.scrollTop).toBe(120);
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
+  });
+
   it("opens the mobile item panel as a keyboard-operable non-modal drawer", async () => {
     const originalWidth = window.innerWidth;
     const user = userEvent.setup();

@@ -61,6 +61,8 @@ describe("ReferralsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de SCR-1001" });
     expect(within(detail).getByRole("status", { name: "Estado: Solicitada" })).toBeVisible();
+    expect(within(detail).getByText("05/09/2026 08:00")).toBeVisible();
+    expect(within(detail).getByText("05/09/2026 12:00")).toBeVisible();
     expect(within(detail).getByRole("link", { name: /Ver Servicio de origen/ })).toHaveAttribute(
       "href",
       "/app?destination=services&detail=SVC-1050",

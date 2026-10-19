@@ -52,6 +52,8 @@ const itemVariants = cva(
         default: "border-transparent",
         outline: "border-border",
         muted: "border-transparent bg-muted/50",
+        interactive:
+          "rounded-2xl border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-subtle)]",
       },
       size: {
         default: "gap-2.5 px-3 py-2.5",

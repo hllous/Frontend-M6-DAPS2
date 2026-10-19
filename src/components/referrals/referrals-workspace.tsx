@@ -521,8 +521,8 @@ function ReferralRow({
 }) {
   return (
     <Item
-      variant="outline"
-      className="min-h-12 w-full items-start gap-3 rounded-2xl border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-subtle)] sm:items-center"
+      variant="interactive"
+      className="min-h-12 w-full items-start gap-3 p-4 text-left sm:items-center"
       render={(
         <Button
           type="button"
@@ -548,7 +548,7 @@ function ReferralRow({
           <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {referral.sourceId} · {referral.sourceLabel}</span>
         </span>
         <ItemActions className="w-full basis-full justify-end sm:ml-auto sm:w-auto sm:basis-auto">
-          <Badge variant="outline" className="h-auto min-h-7 shrink-0 gap-1.5 rounded-full border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text)]" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
+          <Badge variant="status" className="min-h-7 shrink-0 gap-1.5 px-2.5 py-1 text-xs font-semibold" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
             <ReferralStatusIcon referral={referral} className="h-3.5 w-3.5" />
             {statusLabel(referral)}
           </Badge>
@@ -1000,20 +1000,20 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
       <dl className="mt-4 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
         <DataField label="Tipo de corte" value={request.closureType === "TOTAL" ? "Total" : "Parcial"} />
         <DataField label="Motivo" value={request.reason} />
-        <DataField label="Inicio solicitado" value={formatDate(request.requestedFrom)} />
-        <DataField label="Fin solicitado" value={formatDate(request.requestedTo)} />
+        <DataField label="Inicio solicitado" value={formatDateTime(request.requestedFrom)} />
+        <DataField label="Fin solicitado" value={formatDateTime(request.requestedTo)} />
         <DataField label="Identificador externo de M7" value={request.closureId ?? "M7 todavía no informó un identificador"} />
       </dl>
       <div className="mt-5 border-t border-[var(--color-border)] pt-4">
         <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Tramos afectados</h3>
-        <ul className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+        <ItemGroup className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
           {request.affectedSections.map((section, index) => (
-            <li key={`${section.streetName}-${index}`} className="rounded-xl bg-[var(--color-surface-subtle)] p-3 text-[var(--color-text)]">
+            <Item key={`${section.streetName}-${index}`} variant="muted" className="block rounded-xl p-3 text-[var(--color-text)]">
               <span className="font-semibold">{section.streetName}</span>
               <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">Entre {section.fromCross} y {section.toCross}</span>
-            </li>
+            </Item>
           ))}
-        </ul>
+        </ItemGroup>
       </div>
     </section>
   );
@@ -1021,7 +1021,7 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
 
 function StatusBadge({ referral }: { referral: Referral }) {
   return (
-    <Badge variant="outline" className="h-auto min-h-8 gap-2 rounded-full border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text)]" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
+    <Badge variant="status" className="min-h-8 gap-2 px-3 py-1.5 text-sm font-semibold" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
       <ReferralStatusIcon referral={referral} className="h-4 w-4" />
       {statusLabel(referral)}
     </Badge>

@@ -30,13 +30,10 @@
 }
 
 .popup {
+  --drawer-bleed-background: transparent;
   bottom: calc(4.5rem + env(safe-area-inset-bottom));
   width: 100%;
   max-height: calc(100dvh - 9rem - env(safe-area-inset-bottom));
-}
-
-.viewportPopup {
-  --drawer-bleed-background: transparent;
 }
 
 .header {
