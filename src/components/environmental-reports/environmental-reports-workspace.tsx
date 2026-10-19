@@ -38,7 +38,6 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
-import { formatArgentinaDateTime, formatCalendarDay } from "@/lib/argentina-date";
 import {
   ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS,
   ENVIRONMENTAL_SEVERITY_LABELS as severityLabels,
@@ -145,8 +144,24 @@ function visibleToScenario(report: EnvironmentalReport, scenario: OperationalSce
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "No informado";
+  return formatDateTime(value);
+}
+
+const calendarDateFormatter = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
+const argentinaDateTimeFormatter = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Argentina/Buenos_Aires" });
+
+function formatCalendarDate(value: string) {
+  const day = value.slice(0, 10);
+  const date = new Date(`${day}T00:00:00.000Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === day
+    ? calendarDateFormatter.format(date)
+    : value;
+}
+
+function formatDateTime(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return formatCalendarDate(value);
   const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return Number.isNaN(date.valueOf()) ? value : argentinaDateTimeFormatter.format(date);
 }
 
 type SchedulingMode = "schedule" | "reinspection" | "service";
@@ -169,7 +184,7 @@ type InspectionServiceDraft = {
  */
 function inspectionAgenda(inspection: EnvironmentalInspection, service: Service | null | undefined) {
   const day = service?.scheduledDate ?? inspection.scheduledDate;
-  const date = day ? formatCalendarDay(day) : inspection.inspectedAt ? formatArgentinaDateTime(inspection.inspectedAt) : "—";
+  const date = day ? formatCalendarDate(day) : inspection.inspectedAt ? formatDateTime(inspection.inspectedAt) : "—";
   const window = service?.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : inspection.timeWindow ? `${inspection.timeWindow.start}–${inspection.timeWindow.end}` : "—";
   return `${date} · ${window}`;
 }
@@ -875,14 +890,14 @@ function InspectionSchedulingDialog({ open, mode, initial, onOpenChange, onSubmi
       {error && <Alert variant="destructive">{error}</Alert>}
       <form id="inspection-scheduling-form" onSubmit={submit}>
         <FieldGroup>
-          <Field><FieldLabel htmlFor="inspection-scheduled-date">Fecha de inspección</FieldLabel><DatePicker id="inspection-scheduled-date" value={date} onChange={setDate} disabled={submitting} aria-required="true" /></Field>
+          <Field><FieldLabel htmlFor="inspection-scheduled-date">Fecha de inspección <span aria-hidden="true">*</span></FieldLabel><DatePicker id="inspection-scheduled-date" value={date} onChange={setDate} disabled={submitting} aria-required="true" /></Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field><FieldLabel id="inspection-time-start-label" htmlFor="inspection-time-start">Inicio</FieldLabel><TimePicker id="inspection-time-start" aria-labelledby="inspection-time-start-label" value={start} onChange={setStart} disabled={submitting} /></Field>
             <Field><FieldLabel id="inspection-time-end-label" htmlFor="inspection-time-end">Fin</FieldLabel><TimePicker id="inspection-time-end" aria-labelledby="inspection-time-end-label" value={end} onChange={setEnd} disabled={submitting} /></Field>
           </div>
-          <Field><FieldLabel htmlFor="inspection-zone">Zona operativa</FieldLabel><Combobox id="inspection-zone" value={zoneId} onChange={setZoneId} disabled={submitting} aria-required="true" placeholder="Seleccione una zona" searchPlaceholder="Buscar zonas" emptyText="No se encontraron zonas." options={[{ value: "", label: "Seleccione una zona" }, ...zones.map((zone) => ({ value: zone.id, label: `${zone.code} — ${zone.name}` }))]} /></Field>
-          <Field><FieldLabel htmlFor="inspection-crew">Cuadrilla</FieldLabel><Combobox id="inspection-crew" value={crewId} onChange={setCrewId} disabled={submitting} aria-required="true" placeholder="Seleccione una cuadrilla" searchPlaceholder="Buscar cuadrillas" emptyText="No se encontraron cuadrillas." options={[{ value: "", label: "Seleccione una cuadrilla" }, ...crews.map((crew) => ({ value: crew.id, label: crew.name }))]} /></Field>
-          {conflict && <Field><FieldLabel htmlFor="inspection-override-note">Justificación del solapamiento</FieldLabel><Textarea id="inspection-override-note" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} disabled={submitting} rows={3} maxLength={OVERRIDE_NOTE_MAX} aria-required="true" aria-describedby="inspection-override-note-help" className="resize-y" /><FieldDescription id="inspection-override-note-help">{conflict} Elija otra cuadrilla o justifique la asignación (mínimo {OVERRIDE_NOTE_MIN} caracteres).</FieldDescription></Field>}
+          <Field><FieldLabel htmlFor="inspection-zone">Zona operativa <span aria-hidden="true">*</span></FieldLabel><Combobox id="inspection-zone" value={zoneId} onChange={setZoneId} disabled={submitting} aria-required="true" placeholder="Seleccione una zona" searchPlaceholder="Buscar zonas" emptyText="No se encontraron zonas." options={[{ value: "", label: "Seleccione una zona" }, ...zones.map((zone) => ({ value: zone.id, label: `${zone.code} — ${zone.name}` }))]} /></Field>
+          <Field><FieldLabel htmlFor="inspection-crew">Cuadrilla <span aria-hidden="true">*</span></FieldLabel><Combobox id="inspection-crew" value={crewId} onChange={setCrewId} disabled={submitting} aria-required="true" placeholder="Seleccione una cuadrilla" searchPlaceholder="Buscar cuadrillas" emptyText="No se encontraron cuadrillas." options={[{ value: "", label: "Seleccione una cuadrilla" }, ...crews.map((crew) => ({ value: crew.id, label: crew.name }))]} /></Field>
+          {conflict && <Field><FieldLabel htmlFor="inspection-override-note">Justificación del solapamiento <span aria-hidden="true">*</span></FieldLabel><Textarea id="inspection-override-note" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} disabled={submitting} rows={3} maxLength={OVERRIDE_NOTE_MAX} aria-required="true" aria-describedby="inspection-override-note-help" className="resize-y" /><FieldDescription id="inspection-override-note-help">{conflict} Elija otra cuadrilla o justifique la asignación (mínimo {OVERRIDE_NOTE_MIN} caracteres).</FieldDescription></Field>}
         </FieldGroup>
       </form>
       <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button><Button type="submit" form="inspection-scheduling-form" disabled={submitting} className="gap-2">{submitting && <Spinner data-icon="inline-start" aria-hidden />}{submitting ? "Guardando programación…" : title}</Button></DialogFooter>

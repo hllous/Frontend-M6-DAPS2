@@ -275,6 +275,15 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(detail).getByRole("button", { name: "Programar inspección" }));
 
     const dialog = screen.getByRole("dialog");
+    const scheduledDate = within(dialog).getByRole("button", { name: "Fecha de inspección" });
+    const zone = within(dialog).getByRole("combobox", { name: "Zona operativa" });
+    const crew = within(dialog).getByRole("combobox", { name: "Cuadrilla" });
+    expect(scheduledDate).toHaveAttribute("aria-required", "true");
+    expect(scheduledDate.parentElement).toHaveTextContent("Fecha de inspección *");
+    expect(zone).toHaveAttribute("aria-required", "true");
+    expect(zone.parentElement).toHaveTextContent("Zona operativa *");
+    expect(crew).toHaveAttribute("aria-required", "true");
+    expect(crew.parentElement).toHaveTextContent("Cuadrilla *");
     await chooseDate(user, within(dialog), "Fecha de inspección", "2026-09-10");
     await chooseTime(user, within(dialog), "Inicio", "09:30");
     await chooseTime(user, within(dialog), "Fin", "10:30");
@@ -351,7 +360,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     await chooseOption(user, within(dialog), "Cuadrilla", /Cuadrilla A/);
     await user.click(within(dialog).getByRole("button", { name: "Programar servicio" }));
 
-    const note = await within(dialog).findByLabelText("Justificación del solapamiento");
+    const note = await within(dialog).findByRole("textbox", { name: /Justificación del solapamiento/ });
+    expect(note).toHaveAttribute("aria-required", "true");
+    expect(note.parentElement).toHaveTextContent("Justificación del solapamiento *");
     expect(within(dialog).getByText(/La cuadrilla ya está tomada en esa franja/)).toBeVisible();
     await user.type(note, "La otra parada termina antes.");
     await user.click(within(dialog).getByRole("button", { name: "Programar servicio" }));
@@ -399,7 +410,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     const item = (await within(detail).findByText("INS-1005")).closest<HTMLElement>('[role="listitem"]')!;
     expect(within(item).getByText("Resultado: Infracción constatada")).toBeVisible();
     // #321: fecha legible, sin el ISO del backend ni una versión de checklist que no existe.
-    expect(await within(item).findByText(/^5 sept 2026 · 13:00–16:00$/)).toBeVisible();
+    expect(await within(item).findByText(/^05\/09\/2026 · 13:00–16:00$/)).toBeVisible();
     expect(item).not.toHaveTextContent("ambiental-v");
     expect(within(item).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
     expect(item).not.toHaveTextContent("crew-c");

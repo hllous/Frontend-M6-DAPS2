@@ -44,10 +44,7 @@
 .table th { background: var(--color-surface-subtle); color: var(--color-text-secondary); font-size: 12px; font-weight: 600; }
 .table th:last-child, .table td:last-child { text-align: right; }
 .table tr:last-child td { border-bottom: 0; }
-.rowButton { display: flex; min-height: 32px; align-items: center; gap: var(--space-8); padding: 0; border: 0; background: transparent; color: var(--color-text); font: inherit; font-weight: 600; text-align: left; }
-.rowButton::before { width: 8px; height: 8px; border-radius: 50%; background: var(--color-action); content: ""; }
-.rowButton[data-selected="true"] { color: var(--color-action); }
-.rowButton[data-selected="true"]::before { background: var(--color-accent); }
+.rowButton { justify-content: flex-start; gap: var(--space-8); text-align: left; white-space: normal; }
 .note { display: block; margin-top: var(--space-4); color: var(--color-text-secondary); font-size: 12px; font-weight: 400; }
 .value { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .records { display: flex; flex-direction: column; gap: var(--space-12); padding: var(--space-14); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }

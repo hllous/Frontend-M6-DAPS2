@@ -91,7 +91,7 @@
   },
   "src/components/indicators/indicators-dashboard.tsx": {
     "no-restricted-syntax": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/map/mapa-operativo.tsx": {

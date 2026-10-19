@@ -18,7 +18,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { formatCalendarDay } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
 import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
 import { serviceSourceHref } from "@/lib/referrals";
@@ -125,7 +124,7 @@ function serviceToTraceRecord(service: Service): TraceRecord {
     id: service.id,
     href: serviceSourceHref(service.id),
     title: service.title,
-    detail: `${formatCalendarDay(service.scheduledDate)}${service.windowFrom ? ` · ${service.windowFrom}–${service.windowTo ?? ""}` : ""}`,
+    detail: `${formatCalendarDate(service.scheduledDate)}${service.windowFrom ? ` · ${service.windowFrom}–${service.windowTo ?? ""}` : ""}`,
     zone: service.zoneNames.length > 0 ? service.zoneNames.join(" · ") : "Sin zona informada",
     status: STATUS_LABEL[service.status],
   };
@@ -147,11 +146,23 @@ function formatNumber(value: number, unit: string) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" }).format(new Date(`${value}T12:00:00`));
+  return formatCalendarDate(value);
+}
+
+const calendarDateFormatter = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
+const argentinaDateTimeFormatter = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Argentina/Buenos_Aires" });
+
+function formatCalendarDate(value: string) {
+  const day = value.slice(0, 10);
+  const date = new Date(`${day}T00:00:00.000Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === day
+    ? calendarDateFormatter.format(date)
+    : value;
 }
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? value : argentinaDateTimeFormatter.format(date);
 }
 
 function familySummary(data: IndicatorData) {
@@ -630,7 +641,10 @@ function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoi
 function TableView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
   const detailLabels = [...new Set(points.flatMap((point) => point.details?.map((detail) => detail.label) ?? []))];
   const valueHeading = tableValueHeading(points[0]?.unit);
-  return <div className={styles.tableWrap}><table className={styles.table}><caption>Valores exactos de {title.toLowerCase()}</caption><thead><tr><th scope="col">Categoría</th>{detailLabels.map((label) => <th key={label} scope="col">{label}</th>)}<th scope="col">{valueHeading}</th></tr></thead><tbody>{points.map((point) => <tr key={point.id}><td><button type="button" className={styles.rowButton} data-selected={selectedId === point.id} aria-pressed={selectedId === point.id} onClick={() => onSelect(point.id)}>{point.label}{point.note ? <span className={styles.note}>{point.note}</span> : null}</button></td>{detailLabels.map((label) => { const detail = point.details?.find((item) => item.label === label); return <td key={label} className={styles.value}>{detail ? metricText(detail) : ""}</td>; })}<td className={styles.value}>{metricText(point)}</td></tr>)}</tbody></table></div>;
+  return <div className={styles.tableWrap}><table className={styles.table}><caption>Valores exactos de {title.toLowerCase()}</caption><thead><tr><th scope="col">Categoría</th>{detailLabels.map((label) => <th key={label} scope="col">{label}</th>)}<th scope="col">{valueHeading}</th></tr></thead><tbody>{points.map((point) => {
+    const isSelected = selectedId === point.id;
+    return <tr key={point.id}><td><Button type="button" variant={isSelected ? "secondary" : "ghost"} size="sm" className={styles.rowButton} aria-pressed={isSelected} onClick={() => onSelect(point.id)}>{point.label}{point.note ? <span className={styles.note}>{point.note}</span> : null}</Button></td>{detailLabels.map((label) => { const detail = point.details?.find((item) => item.label === label); return <td key={label} className={styles.value}>{detail ? metricText(detail) : ""}</td>; })}<td className={styles.value}>{metricText(point)}</td></tr>;
+  })}</tbody></table></div>;
 }
 
 function tableValueHeading(unit?: string) {

@@ -168,6 +168,8 @@ describe("IndicatorsDashboard", () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByRole("heading", { name: "Cobertura" })).toBeVisible();
+    expect(await screen.findByText(/^\d{2}\/\d{2}\/\d{4} – \d{2}\/\d{2}\/\d{4}$/)).toBeVisible();
+    expect(screen.getByText(/Actualizado \d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}/)).toBeVisible();
     expect(screen.getByText(/Unidad de análisis:/).closest("p")).toHaveTextContent("Unidad de análisis: servicio + zona");
     expect(screen.getByText("Atendidos")).toBeVisible();
     expect(screen.getByText("Programados")).toBeVisible();
@@ -267,6 +269,9 @@ describe("IndicatorsDashboard", () => {
     const costera = within(zonesTable).getByRole("row", { name: /Costera/ });
     expect(within(costera).getByRole("cell", { name: "5 objetivos" })).toBeVisible();
     expect(within(costera).getByRole("cell", { name: "3 objetivos" })).toBeVisible();
+    const costeraButton = within(costera).getByRole("button", { name: /Costera/ });
+    await user.click(costeraButton);
+    expect(costeraButton).toHaveAttribute("aria-pressed", "true");
     const norte = within(zonesTable).getByRole("row", { name: /Norte/ });
     expect(within(norte).getByRole("cell", { name: "7 objetivos" })).toBeVisible();
     expect(within(norte).getByRole("cell", { name: "5 objetivos" })).toBeVisible();
