@@ -31,6 +31,7 @@ import {
   Field,
   FieldContent,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
@@ -70,6 +71,16 @@ type LoadState =
   | { status: "ready"; items: Zone[] }
   | { status: "error"; message: string };
 
+type FormErrors = { code?: string; name?: string; form?: string };
+
+function mapFormError(message: string): FormErrors {
+  const errors: FormErrors = {};
+  if (/\bc[oó]digo\b/i.test(message)) errors.code = message;
+  if (/\bnombre\b/i.test(message)) errors.name = message;
+  if (!errors.code && !errors.name) errors.form = message;
+  return errors;
+}
+
 export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }) {
   const canManage =
     scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("zone:manage");
@@ -84,7 +95,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   // Create state
   const [showCreate, setShowCreate] = useState(false);
   const [createDraft, setCreateDraft] = useState<CreateZoneInput>({ code: "", name: "" });
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [createErrors, setCreateErrors] = useState<FormErrors>({});
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
 
   // Edit state
@@ -93,7 +104,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     name: "",
     active: true,
   });
-  const [editError, setEditError] = useState<string | null>(null);
+  const [editErrors, setEditErrors] = useState<FormErrors>({});
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Deactivate confirmation state
@@ -149,19 +160,28 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   // Submit create
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCreateError(null);
+    setCreateErrors({});
+    const validationErrors: FormErrors = {};
+    if (!createDraft.code.trim()) validationErrors.code = "El código es obligatorio.";
+    if (!createDraft.name.trim()) validationErrors.name = "El nombre es obligatorio.";
+    if (Object.keys(validationErrors).length > 0) {
+      setCreateErrors(validationErrors);
+      return;
+    }
+
     setIsSubmittingCreate(true);
     try {
       await zonesAdapter.create(createDraft);
       setShowCreate(false);
       setCreateDraft({ code: "", name: "" });
       setRequestVersion((v) => v + 1);
+      setCreateErrors({});
       notifySuccess("Zona creada.");
     } catch (caught) {
       if (caught instanceof ZoneRequestError) {
-        setCreateError(caught.message);
+        setCreateErrors(mapFormError(caught.message));
       } else {
-        setCreateError("Error inesperado al crear la zona operativa.");
+        setCreateErrors({ form: "Error inesperado al crear la zona operativa." });
       }
     } finally {
       setIsSubmittingCreate(false);
@@ -172,25 +192,31 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const handleStartEdit = (zone: Zone) => {
     setEditingZone(zone);
     setEditDraft({ name: zone.name, active: zone.active });
-    setEditError(null);
+    setEditErrors({});
   };
 
   // Submit edit
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingZone) return;
-    setEditError(null);
+    setEditErrors({});
+    if (!editDraft.name.trim()) {
+      setEditErrors({ name: "El nombre es obligatorio." });
+      return;
+    }
+
     setIsSubmittingEdit(true);
     try {
       await zonesAdapter.update(editingZone.id, editDraft);
       setEditingZone(null);
       setRequestVersion((v) => v + 1);
+      setEditErrors({});
       notifySuccess("Cambios guardados.");
     } catch (caught) {
       if (caught instanceof ZoneRequestError) {
-        setEditError(caught.message);
+        setEditErrors(mapFormError(caught.message));
       } else {
-        setEditError("Error al actualizar la zona operativa.");
+        setEditErrors({ form: "Error al actualizar la zona operativa." });
       }
     } finally {
       setIsSubmittingEdit(false);
@@ -338,7 +364,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             type="button"
             onClick={() => {
               setShowCreate(true);
-              setCreateError(null);
+              setCreateErrors({});
             }}
             className="gap-1.5"
           >
@@ -412,9 +438,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             </Button>
           </div>
 
-          {createError && (
+          {createErrors.form && (
             <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{createError}</AlertDescription>
+              <AlertDescription>{createErrors.form}</AlertDescription>
             </Alert>
           )}
 
@@ -426,8 +452,22 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 required
                 placeholder="Ej. Z-04"
                 value={createDraft.code}
-                onChange={(e) => setCreateDraft({ ...createDraft, code: e.target.value })}
+                onInvalid={(event) => {
+                  event.preventDefault();
+                  setCreateErrors((errors) => ({ ...errors, code: "El código es obligatorio.", form: undefined }));
+                }}
+                onChange={(e) => {
+                  setCreateDraft({ ...createDraft, code: e.target.value });
+                  setCreateErrors((errors) =>
+                    errors.code || errors.form ? { ...errors, code: undefined, form: undefined } : errors,
+                  );
+                }}
+                aria-invalid={createErrors.code ? true : undefined}
+                aria-describedby={createErrors.code ? "create-zone-code-error" : undefined}
               />
+              {createErrors.code && (
+                <FieldError id="create-zone-code-error">{createErrors.code}</FieldError>
+              )}
             </Field>
 
             <Field>
@@ -437,8 +477,22 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 required
                 placeholder="Ej. Zona Centro Este"
                 value={createDraft.name}
-                onChange={(e) => setCreateDraft({ ...createDraft, name: e.target.value })}
+                onInvalid={(event) => {
+                  event.preventDefault();
+                  setCreateErrors((errors) => ({ ...errors, name: "El nombre es obligatorio.", form: undefined }));
+                }}
+                onChange={(e) => {
+                  setCreateDraft({ ...createDraft, name: e.target.value });
+                  setCreateErrors((errors) =>
+                    errors.name || errors.form ? { ...errors, name: undefined, form: undefined } : errors,
+                  );
+                }}
+                aria-invalid={createErrors.name ? true : undefined}
+                aria-describedby={createErrors.name ? "create-zone-name-error" : undefined}
               />
+              {createErrors.name && (
+                <FieldError id="create-zone-name-error">{createErrors.name}</FieldError>
+              )}
             </Field>
           </FieldGroup>
 
@@ -484,9 +538,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             </Button>
           </div>
 
-          {editError && (
+          {editErrors.form && (
             <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{editError}</AlertDescription>
+              <AlertDescription>{editErrors.form}</AlertDescription>
             </Alert>
           )}
 
@@ -508,8 +562,22 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 id="edit-zone-name"
                 required
                 value={editDraft.name}
-                onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
+                onInvalid={(event) => {
+                  event.preventDefault();
+                  setEditErrors((errors) => ({ ...errors, name: "El nombre es obligatorio.", form: undefined }));
+                }}
+                onChange={(e) => {
+                  setEditDraft({ ...editDraft, name: e.target.value });
+                  setEditErrors((errors) =>
+                    errors.name || errors.form ? { ...errors, name: undefined, form: undefined } : errors,
+                  );
+                }}
+                aria-invalid={editErrors.name ? true : undefined}
+                aria-describedby={editErrors.name ? "edit-zone-name-error" : undefined}
               />
+              {editErrors.name && (
+                <FieldError id="edit-zone-name-error">{editErrors.name}</FieldError>
+              )}
             </Field>
 
             <Field orientation="horizontal" className="pt-2 sm:col-span-2">

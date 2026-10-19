@@ -146,6 +146,13 @@ describe("ZoneCatalogPanel component", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("Ya existe una zona operativa con el código Z-BEL");
     });
+
+    expect(codeInput).toHaveAttribute("aria-invalid", "true");
+    const errorId = codeInput.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    expect(errorId ? document.getElementById(errorId) : null).toHaveTextContent(
+      "Ya existe una zona operativa con el código Z-BEL",
+    );
   });
 
   it("allows Office to edit a zone and enforces that code is read-only / immutable", async () => {
@@ -170,6 +177,13 @@ describe("ZoneCatalogPanel component", () => {
 
     const nameInput = screen.getByLabelText("Nombre");
     await user.clear(nameInput);
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(nameInput).toHaveAttribute("aria-invalid", "true"));
+    const errorId = nameInput.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    expect(errorId ? document.getElementById(errorId) : null).toHaveTextContent("El nombre es obligatorio.");
+
     await user.type(nameInput, "Zona Norte Modificada");
 
     await user.click(screen.getByRole("button", { name: "Guardar cambios" }));

@@ -33,7 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import {
@@ -64,6 +64,16 @@ type LoadState =
   | { status: "loading" }
   | { status: "ready"; items: Route[] }
   | { status: "error"; message: string };
+
+type FormErrors = { code?: string; name?: string; form?: string };
+
+function mapFormError(message: string): FormErrors {
+  const errors: FormErrors = {};
+  if (/\bc[oó]digo\b/i.test(message)) errors.code = message;
+  if (/\bnombre\b/i.test(message)) errors.name = message;
+  if (!errors.code && !errors.name) errors.form = message;
+  return errors;
+}
 
 type StalenessWarningReason = "changed" | "unavailable" | null;
 
@@ -101,7 +111,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   // Create state
   const [showCreate, setShowCreate] = useState(false);
   const [createDraft, setCreateDraft] = useState<CreateRouteInput>({ code: "", name: "" });
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [createErrors, setCreateErrors] = useState<FormErrors>({});
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
 
   // Edit state
@@ -110,7 +120,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     name: "",
     active: true,
   });
-  const [editError, setEditError] = useState<string | null>(null);
+  const [editErrors, setEditErrors] = useState<FormErrors>({});
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Deactivate confirmation state
@@ -202,9 +212,12 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
   async function handleCreateSubmit(event: React.FormEvent) {
     event.preventDefault();
-    setCreateError(null);
-    if (!createDraft.code.trim() || !createDraft.name.trim()) {
-      setCreateError("El código y el nombre son obligatorios.");
+    setCreateErrors({});
+    const validationErrors: FormErrors = {};
+    if (!createDraft.code.trim()) validationErrors.code = "El código es obligatorio.";
+    if (!createDraft.name.trim()) validationErrors.name = "El nombre es obligatorio.";
+    if (Object.keys(validationErrors).length > 0) {
+      setCreateErrors(validationErrors);
       return;
     }
 
@@ -221,13 +234,14 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       // with an empty stops section and an obvious call-to-action, not an auto-redirect into stop-editing mode."
       setSelectedRoute(created);
       setRequestVersion((v) => v + 1);
+      setCreateErrors({});
       notifySuccess("Recorrido creado.");
     } catch (caught) {
       const message =
         caught instanceof RouteRequestError
           ? caught.message
           : "No se pudo crear el recorrido. Intente nuevamente.";
-      setCreateError(message);
+      setCreateErrors(mapFormError(message));
     } finally {
       setIsSubmittingCreate(false);
     }
@@ -236,15 +250,15 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   function handleOpenEdit(route: Route) {
     setEditingRoute(route);
     setEditDraft({ name: route.name, active: route.active });
-    setEditError(null);
+    setEditErrors({});
   }
 
   async function handleEditSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!editingRoute) return;
-    setEditError(null);
+    setEditErrors({});
     if (!editDraft.name.trim()) {
-      setEditError("El nombre es obligatorio.");
+      setEditErrors({ name: "El nombre es obligatorio." });
       return;
     }
 
@@ -259,13 +273,14 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         setSelectedRoute(updated);
       }
       setRequestVersion((v) => v + 1);
+      setEditErrors({});
       notifySuccess("Cambios guardados.");
     } catch (caught) {
       const message =
         caught instanceof RouteRequestError
           ? caught.message
           : "No se pudo actualizar el recorrido. Intente nuevamente.";
-      setEditError(message);
+      setEditErrors(mapFormError(message));
     } finally {
       setIsSubmittingEdit(false);
     }
@@ -1146,7 +1161,13 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       </div>
 
       {/* Modal: Crear Recorrido */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog
+        open={showCreate}
+        onOpenChange={(open) => {
+          setShowCreate(open);
+          if (!open) setCreateErrors({});
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <form onSubmit={handleCreateSubmit} className="space-y-4">
             <DialogHeader>
@@ -1156,9 +1177,9 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               </DialogDescription>
             </DialogHeader>
 
-            {createError && (
+            {createErrors.form && (
               <Alert variant="destructive" data-testid="create-route-error">
-                <AlertDescription>{createError}</AlertDescription>
+                <AlertDescription>{createErrors.form}</AlertDescription>
               </Alert>
             )}
 
@@ -1170,12 +1191,21 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   type="text"
                   placeholder="Ej: REC-004"
                   value={createDraft.code}
-                  onChange={(e) => setCreateDraft((d) => ({ ...d, code: e.target.value }))}
+                  onChange={(e) => {
+                    setCreateDraft((d) => ({ ...d, code: e.target.value }));
+                    setCreateErrors((errors) => ({ ...errors, code: undefined, form: undefined }));
+                  }}
                   disabled={isSubmittingCreate}
                   data-testid="create-route-code-input"
-                  aria-invalid={Boolean(createError)}
+                  aria-invalid={createErrors.code ? true : undefined}
+                  aria-describedby={`create-route-code-help${createErrors.code ? " create-route-code-error" : ""}`}
                 />
-                <FieldDescription>
+                {createErrors.code && (
+                  <FieldError id="create-route-code-error" data-testid="create-route-error">
+                    {createErrors.code}
+                  </FieldError>
+                )}
+                <FieldDescription id="create-route-code-help">
                   Identificador único (inmutable tras la creación).
                 </FieldDescription>
               </Field>
@@ -1187,10 +1217,18 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   type="text"
                   placeholder="Ej: Recorrido Nocturno San Telmo"
                   value={createDraft.name}
-                  onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))}
+                  onChange={(e) => {
+                    setCreateDraft((d) => ({ ...d, name: e.target.value }));
+                    setCreateErrors((errors) => ({ ...errors, name: undefined, form: undefined }));
+                  }}
                   disabled={isSubmittingCreate}
                   data-testid="create-route-name-input"
+                  aria-invalid={createErrors.name ? true : undefined}
+                  aria-describedby={createErrors.name ? "create-route-name-error" : undefined}
                 />
+                {createErrors.name && (
+                  <FieldError id="create-route-name-error">{createErrors.name}</FieldError>
+                )}
               </Field>
             </FieldGroup>
 
@@ -1198,7 +1236,10 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowCreate(false)}
+                onClick={() => {
+                  setShowCreate(false);
+                  setCreateErrors({});
+                }}
                 disabled={isSubmittingCreate}
               >
                 Cancelar
@@ -1230,9 +1271,9 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               </DialogDescription>
             </DialogHeader>
 
-            {editError && (
+            {editErrors.form && (
               <Alert variant="destructive" data-testid="edit-route-error">
-                <AlertDescription>{editError}</AlertDescription>
+                <AlertDescription>{editErrors.form}</AlertDescription>
               </Alert>
             )}
 
@@ -1246,10 +1287,11 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   readOnly
                   disabled
                   aria-readonly="true"
+                  aria-describedby="edit-route-code-help"
                   className="bg-muted/50 font-mono"
                   data-testid="edit-route-code-readonly"
                 />
-                <FieldDescription>
+                <FieldDescription id="edit-route-code-help">
                   El código es inmutable tras la creación.
                 </FieldDescription>
               </Field>
@@ -1260,11 +1302,18 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   id="edit-route-name"
                   type="text"
                   value={editDraft.name}
-                  onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+                  onChange={(e) => {
+                    setEditDraft((d) => ({ ...d, name: e.target.value }));
+                    setEditErrors((errors) => ({ ...errors, name: undefined, form: undefined }));
+                  }}
                   disabled={isSubmittingEdit}
                   data-testid="edit-route-name-input"
-                  aria-invalid={Boolean(editError)}
+                  aria-invalid={editErrors.name ? true : undefined}
+                  aria-describedby={editErrors.name ? "edit-route-name-error" : undefined}
                 />
+                {editErrors.name && (
+                  <FieldError id="edit-route-name-error">{editErrors.name}</FieldError>
+                )}
               </Field>
 
               <Field orientation="horizontal" className="pt-1">

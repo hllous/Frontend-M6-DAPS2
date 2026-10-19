@@ -263,6 +263,15 @@ describe("RouteCatalogPanel component", () => {
         "Ya existe un recorrido con el código REC-001.",
       );
     });
+
+    const codeInput = screen.getByTestId("create-route-code-input");
+    expect(codeInput).toHaveAttribute("aria-invalid", "true");
+    const errorId = codeInput.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    const fieldErrorId = errorId?.split(/\s+/).at(-1);
+    expect(fieldErrorId ? document.getElementById(fieldErrorId) : null).toHaveTextContent(
+      "Ya existe un recorrido con el código REC-001.",
+    );
   });
 
   it("allows Office to edit a route and enforces that code is read-only / immutable", async () => {
@@ -284,6 +293,14 @@ describe("RouteCatalogPanel component", () => {
     expect(codeInput).toBeDisabled();
 
     const nameInput = screen.getByTestId("edit-route-name-input");
+    await user.clear(nameInput);
+    await user.click(screen.getByTestId("submit-edit-route"));
+
+    await waitFor(() => expect(nameInput).toHaveAttribute("aria-invalid", "true"));
+    const errorId = nameInput.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    expect(errorId ? document.getElementById(errorId) : null).toHaveTextContent("El nombre es obligatorio.");
+
     await user.clear(nameInput);
     await user.type(nameInput, "Recorrido Casco Histórico Modificado");
 
