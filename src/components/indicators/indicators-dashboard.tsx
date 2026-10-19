@@ -6,11 +6,18 @@ import { Activity, CheckCheck, Database, RefreshCw, Recycle, TriangleAlert } fro
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Item, ItemGroup } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatCalendarDay } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
 import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
@@ -194,24 +201,26 @@ function useNarrowDashboard() {
 }
 
 function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { states: Record<FamilyKey, FamilyState>; selectedFamily: FamilyKey; onSelect: (family: FamilyKey) => void; onRetry: (family: FamilyKey) => void }) {
-  return <section className={styles.summaryBand} aria-label="Familias de indicadores" role="region" aria-busy={familyOrder.some((family) => states[family].status === "loading")}>
-    {familyOrder.map((family) => {
-      const state = states[family];
-      const item = state.data;
-      const meta = familyMeta[family];
-      const Icon = meta.icon;
-      return <article className={styles.summaryCard} data-state={state.status} key={family}>
-        <button type="button" className={styles.summaryCardSelect} aria-pressed={selectedFamily === family} aria-label={`${meta.label}: seleccionar familia`} onClick={() => onSelect(family)}>
-          <span className={styles.summaryCardHeader}><span>{meta.label}</span><span className={styles.summaryIcon}><Icon size={17} aria-hidden /></span></span>
-          <span className={styles.summaryValue}>{item && state.status === "ready" ? familySummary(item) : "—"}</span>
-          <span className={styles.summaryLabel}>{item?.primary.label ?? meta.description}</span>
-          <span className={styles.summaryHint}>{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
-        </button>
-        {state.status === "loading" ? <Skeleton className={styles.summarySkeleton} role="status" aria-label={`Cargando ${meta.label}`} /> : null}
-        {state.status === "empty" ? <p className={styles.summaryState} role="status">Sin datos</p> : null}
-        {state.status === "error" ? <div className={styles.summaryState} role="alert"><span>No se pudo cargar {meta.label}</span><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></div> : null}
-      </article>;
-    })}
+  return <section aria-label="Familias de indicadores" role="region" aria-busy={familyOrder.some((family) => states[family].status === "loading")}>
+    <ToggleGroup value={[selectedFamily]} onValueChange={(values) => { const family = values[0]; if (family) onSelect(family as FamilyKey); }} aria-label="Familias de indicadores" className={styles.summaryBand}>
+      {familyOrder.map((family) => {
+        const state = states[family];
+        const item = state.data;
+        const meta = familyMeta[family];
+        const Icon = meta.icon;
+        return <Card className={styles.summaryCard} data-state={state.status} key={family} size="sm">
+          <ToggleGroupItem variant="card" className={styles.summaryCardSelect} value={family} aria-label={`${meta.label}: seleccionar familia`}>
+            <span className={styles.summaryCardHeader}><span className="text-sm font-semibold text-muted-foreground">{meta.label}</span><span className={`${styles.summaryIcon} size-8 rounded-lg bg-muted text-primary`}><Icon size={17} aria-hidden /></span></span>
+            <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item && state.status === "ready" ? familySummary(item) : "—"}</span>
+            <span className="text-xs leading-snug text-muted-foreground">{item?.primary.label ?? meta.description}</span>
+            <span className="text-xs font-semibold text-primary">{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
+          </ToggleGroupItem>
+          {state.status === "loading" ? <Skeleton className={styles.summarySkeleton} role="status" aria-label={`Cargando ${meta.label}`} /> : null}
+          {state.status === "empty" ? <Alert role="status" className={styles.summaryState}>Sin datos</Alert> : null}
+          {state.status === "error" ? <Alert variant="destructive" className={styles.summaryState}><AlertTitle>No se pudo cargar {meta.label}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></Alert> : null}
+        </Card>;
+      })}
+    </ToggleGroup>
   </section>;
 }
 
@@ -219,7 +228,7 @@ function ModuleState({ label, status, onRetry, children }: { label: string; stat
   const titleId = `indicator-${label.toLowerCase().replaceAll(" ", "-")}-title`;
   const emptyLabel = label === "Detalle territorial" ? "territoriales" : label.toLowerCase();
   if (status === "ready") return <section className={styles.module} aria-label={label} role="region"><h2 id={titleId}>{label}</h2>{children}</section>;
-  if (status === "loading") return <section className={styles.moduleState} aria-label={label} role="region"><h2 id={titleId}>{label}</h2><Skeleton className={styles.moduleSkeleton} aria-hidden /><p role="status">Cargando {label.toLowerCase()}…</p></section>;
+  if (status === "loading") return <section className={styles.moduleState} aria-label={label} role="region"><h2 id={titleId}>{label}</h2><Skeleton className={styles.moduleSkeleton} aria-hidden /><Alert role="status">Cargando {label.toLowerCase()}…</Alert></section>;
   if (status === "empty") return <section className={styles.moduleState} aria-label={label} role="region"><Empty><EmptyHeader><EmptyTitle id={titleId}>Sin resultados {emptyLabel}</EmptyTitle><EmptyDescription>No hay datos para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty></section>;
   return <section className={styles.moduleState} aria-label={label} role="region"><Alert variant="destructive"><AlertTitle id={titleId}>No se pudo cargar {label}</AlertTitle><AlertDescription>Verifique la conexión y vuelva a intentarlo. El período y la familia seleccionada se conservarán.</AlertDescription><Button type="button" variant="outline" onClick={onRetry}>Reintentar {label}</Button></Alert></section>;
 }
@@ -397,22 +406,28 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       </div>
 
       <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); pendingSignal.current = undefined; const validation = indicatorQuerySchema.safeParse(query); if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; } setFilterError(null); setSelectedSignal(null); setRecordPlan(null); setRecordsStatus("idle"); setFamilyStates(emptyFamilyState()); setAppliedQuery({ ...query }); }}>
-        <div className={styles.field}><label htmlFor="indicator-from">Desde</label><input id="indicator-from" type="date" value={query.from ?? ""} onChange={(event) => { setFilterError(null); setQuery((current) => ({ ...current, from: event.target.value || undefined })); }} /></div>
-        <div className={styles.field}><label htmlFor="indicator-to">Hasta</label><input id="indicator-to" type="date" value={query.to ?? ""} aria-invalid={filterError ? true : undefined} aria-describedby={filterError ? "indicator-to-error" : undefined} onChange={(event) => { setFilterError(null); setQuery((current) => ({ ...current, to: event.target.value || undefined })); }} /></div>
-        <div className={styles.field}><label htmlFor="indicator-family">Familia</label><select id="indicator-family" value={selectedFamily} onChange={(event) => selectFamily(event.target.value as FamilyKey)}>{familyOrder.map((family) => <option key={family} value={family}>{familyMeta[family].label}</option>)}</select></div>
+        <Field className={styles.field}><FieldLabel htmlFor="indicator-from">Desde</FieldLabel><DatePicker id="indicator-from" value={query.from ?? ""} onChange={(from) => { setFilterError(null); setQuery((current) => ({ ...current, from: from || undefined })); }} /></Field>
+        <Field className={styles.field}><FieldLabel htmlFor="indicator-to">Hasta</FieldLabel><DatePicker id="indicator-to" value={query.to ?? ""} invalid={Boolean(filterError)} aria-describedby={filterError ? "indicator-to-error" : undefined} onChange={(to) => { setFilterError(null); setQuery((current) => ({ ...current, to: to || undefined })); }} /></Field>
+        <Field className={styles.field}>
+          <FieldLabel htmlFor="indicator-family">Familia</FieldLabel>
+          <Select value={selectedFamily} onValueChange={(family) => selectFamily(String(family) as FamilyKey)}>
+            <SelectTrigger id="indicator-family"><SelectValue>{familyMeta[selectedFamily].label}</SelectValue></SelectTrigger>
+            <SelectContent><SelectGroup>{familyOrder.map((family) => <SelectItem key={family} value={family}>{familyMeta[family].label}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+        </Field>
         <CatalogFilter id="indicator-zone" label="Zona operativa" allLabel="Todas las zonas" noun="zonas" options={filterCatalog?.zones} value={query.zoneId} onChange={(zoneId) => setQuery((current) => ({ ...current, zoneId }))} />
         <CatalogFilter id="indicator-service-type" label="Tipo de servicio" allLabel="Todos los tipos" noun="tipos de servicio" options={filterCatalog?.serviceTypes} value={query.serviceTypeId} onChange={(serviceTypeId) => setQuery((current) => ({ ...current, serviceTypeId }))} />
         <Button className={styles.filterAction} type="submit" disabled={dashboardStatus === "loading"}><RefreshCw data-icon="inline-start" aria-hidden />{dashboardStatus === "loading" ? "Actualizando…" : "Actualizar"}</Button>
-        {ignoredFilters ? <p role="status" className={styles.note}>Filtros sin efecto en {familyMeta[selectedFamily].label}: {ignoredFilters}. Esta familia sólo se filtra por período, así que se muestra sin filtrar.</p> : null}
-        {filterError ? <p id="indicator-to-error" role="alert" className={styles.fieldError}>{filterError}</p> : null}
+        {ignoredFilters ? <Alert role="status" className={styles.note}>Filtros sin efecto en {familyMeta[selectedFamily].label}: {ignoredFilters}. Esta familia sólo se filtra por período, así que se muestra sin filtrar.</Alert> : null}
+        {filterError ? <FieldError id="indicator-to-error" className={styles.fieldError}>{filterError}</FieldError> : null}
       </form>
 
       <div className={styles.summaryHeading}><h2>Resumen del período</h2><span>{appliedQuery.from && appliedQuery.to ? `${formatDate(appliedQuery.from)} – ${formatDate(appliedQuery.to)}` : "Últimos 30 días"}</span></div>
       <FamilySelectorBand states={familyStates} selectedFamily={selectedFamily} onSelect={selectFamily} onRetry={retryFamily} />
-      {isNarrow ? <div className={styles.mobileViewToggle} role="group" aria-label="Visualización de indicadores">
-        <Button type="button" variant={viewMode === "bars" ? "default" : "outline"} aria-pressed={viewMode === "bars"} onClick={() => setViewMode("bars")}>Barras</Button>
-        <Button type="button" variant={viewMode === "table" ? "default" : "outline"} aria-pressed={viewMode === "table"} onClick={() => setViewMode("table")}>Tabla</Button>
-      </div> : null}
+      {isNarrow ? <ToggleGroup value={[viewMode]} onValueChange={(values) => { const value = values[0]; if (value) setViewMode(value as ViewMode); }} variant="outline" className={styles.mobileViewToggle} aria-label="Visualización de indicadores">
+        <ToggleGroupItem value="bars" size="lg">Barras</ToggleGroupItem>
+        <ToggleGroupItem value="table" size="lg">Tabla</ToggleGroupItem>
+      </ToggleGroup> : null}
       {isNarrow ? <Tabs defaultValue="summary" className={styles.mobileTabs}>
         <TabsList aria-label="Secciones del tablero" className={styles.tabList}>
           <TabsTrigger value="summary">Resumen</TabsTrigger>
@@ -438,11 +453,22 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
 function CatalogFilter({ id, label, allLabel, noun, options, value, onChange }: { id: string; label: string; allLabel: string; noun: string; options?: FilterOption[]; value?: string; onChange: (value: string | undefined) => void }) {
   const hint = !options ? `Cargando ${noun}…` : options.length === 0 ? `No se pudieron cargar las ${noun}; el filtro no está disponible.` : null;
-  return <div className={styles.field}>
-    <label htmlFor={id}>{label}</label>
-    <select id={id} value={value ?? ""} disabled={!options?.length} aria-describedby={hint ? `${id}-hint` : undefined} onChange={(event) => onChange(event.target.value || undefined)}><option value="">{allLabel}</option>{options?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>
-    {hint ? <p id={`${id}-hint`} className={styles.note} role="status">{hint}</p> : null}
-  </div>;
+  return <Field className={`${styles.field} min-w-0`}>
+    <FieldLabel htmlFor={id}>{label}</FieldLabel>
+    <Combobox
+      id={id}
+      value={value ?? ""}
+      options={[{ value: "", label: allLabel }, ...(options ?? []).map((option) => ({ value: option.id, label: option.label }))]}
+      onChange={(next) => onChange(next || undefined)}
+      disabled={!options?.length}
+      busy={!options}
+      aria-describedby={hint ? `${id}-hint` : undefined}
+      placeholder={allLabel}
+      searchPlaceholder={`Buscar ${noun}`}
+      emptyText={`No se encontraron ${noun}.`}
+    />
+    {hint ? <FieldDescription id={`${id}-hint`} className={styles.note} role="status">{hint}</FieldDescription> : null}
+  </Field>;
 }
 
 function metricText(metric: { value: number | null; unit: string }) {
@@ -485,7 +511,10 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
     <div className={styles.detailHeader}>
       <div><h2 id="indicator-detail-title">{meta.label}</h2><p>{formatDate(data.period.from)} – {formatDate(data.period.to)} · {data.primary.label}: <strong>{metricText(data.primary)}</strong></p></div>
       <div className={styles.viewActions}>
-        <div className={styles.viewToggle} aria-label="Vista del detalle"><button type="button" aria-pressed={requestedViewMode === "bars"} onClick={() => onViewModeChange("bars")}>Barras</button><button type="button" aria-pressed={requestedViewMode === "table"} onClick={() => onViewModeChange("table")}>Tabla</button></div>
+        <ToggleGroup value={[requestedViewMode]} onValueChange={(values) => { const value = values[0]; if (value) onViewModeChange(value as ViewMode); }} variant="outline" size="sm" className={styles.viewToggle} aria-label="Vista del detalle">
+          <ToggleGroupItem value="bars">Barras</ToggleGroupItem>
+          <ToggleGroupItem value="table">Tabla</ToggleGroupItem>
+        </ToggleGroup>
       </div>
     </div>
     {hasSummaryMetrics ? <div className={styles.summaryMetrics} aria-label={`Resumen exacto de ${meta.label}`}>{data.summaryMetrics.map((metric) => <div className={styles.summaryMetric} key={metric.label}><strong>{metricText(metric)}</strong><span>{metric.label}</span></div>)}</div> : null}
@@ -501,17 +530,17 @@ function AccessibleRecords({ family, plan, selection, breakdown, point, records,
   const meta = familyMeta[family];
   const hasSelection = Boolean(selection && breakdown && point);
   return <section className={styles.records} aria-labelledby="indicator-records-title">
-    {familyStatus === "loading" && !plan ? <p className={styles.recordsMessage} role="status">Cargando registros relacionados…</p> : null}
-    {familyStatus === "error" && !plan ? <p className={styles.recordsMessage} role="alert">No se pudieron cargar los registros relacionados porque la familia seleccionada no está disponible.</p> : null}
+    {familyStatus === "loading" && !plan ? <Alert role="status" className={styles.recordsMessage}>Cargando registros relacionados…</Alert> : null}
+    {familyStatus === "error" && !plan ? <Alert variant="destructive" className={styles.recordsMessage}>No se pudieron cargar los registros relacionados porque la familia seleccionada no está disponible.</Alert> : null}
     <div className={styles.recordsHeader}>
       <div><h2 id="indicator-records-title">Registros accesibles</h2><p>Consulte los registros que explican la señal sin habilitar su gestión desde el tablero.</p></div>
       {plan?.resource ? <Link className={styles.recordsLink} href={plan.href}>{plan.linkLabel}</Link> : null}
     </div>
-    <div className={styles.recordsContext} aria-live="polite">
-      {plan?.resource === null && hasSelection ? <p>{plan.reason}</p> : hasSelection ? <p><strong>Filtro activo:</strong> {meta.label} · {breakdown?.title} · {point?.label} · {pointText(point!)}</p> : plan?.resource ? <p><strong>Sin filtro de señal.</strong> Se muestran todos los {plan.title.toLowerCase()} accesibles en el período.</p> : <p>Seleccione una señal compatible para consultar sus registros accesibles.</p>}
+    <Alert role="status" variant="info" className={styles.recordsContext}>
+      {plan?.resource === null && hasSelection ? <AlertDescription>{plan.reason}</AlertDescription> : hasSelection ? <AlertDescription><strong>Filtro activo:</strong> {meta.label} · {breakdown?.title} · {point?.label} · {pointText(point!)}</AlertDescription> : plan?.resource ? <AlertDescription><strong>Sin filtro de señal.</strong> Se muestran todos los {plan.title.toLowerCase()} accesibles en el período.</AlertDescription> : <AlertDescription>Seleccione una señal compatible para consultar sus registros accesibles.</AlertDescription>}
       {hasSelection ? <Button type="button" variant="outline" size="sm" onClick={onClear}>Quitar filtro de señal</Button> : null}
-    </div>
-    {plan?.resource ? status === "loading" ? <p className={styles.recordsMessage} role="status">Cargando registros accesibles…</p> : status === "error" ? <p className={styles.recordsMessage} role="alert">No se pudieron cargar los registros accesibles.</p> : <TraceRecordsTable plan={plan} records={records} /> : <p className={styles.recordsMessage} role="status">{hasSelection ? "No hay una relación de registros disponible para esta señal." : "Esta familia no tiene una vista de registros accesibles para la selección actual."}</p>}
+    </Alert>
+    {plan?.resource ? status === "loading" ? <Alert role="status" className={styles.recordsMessage}>Cargando registros accesibles…</Alert> : status === "error" ? <Alert variant="destructive" className={styles.recordsMessage}>No se pudieron cargar los registros accesibles.</Alert> : <TraceRecordsTable plan={plan} records={records} /> : <Alert role="status" className={styles.recordsMessage}>{hasSelection ? "No hay una relación de registros disponible para esta señal." : "Esta familia no tiene una vista de registros accesibles para la selección actual."}</Alert>}
   </section>;
 }
 
@@ -524,7 +553,7 @@ function BreakdownView({ breakdown, viewMode, selectedId: controlledSelectedId, 
   const selectedId = controlledSelectedId ?? localSelectedId;
   const selected = controlledSelectedId ? breakdown.points.find((point) => point.id === selectedId) : undefined;
   const setSelectedId = (pointId: string) => { setLocalSelectedId(pointId); onSelect(pointId); };
-  return <div className={styles.breakdown}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <p aria-live="polite"><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</p> : null}</div>{viewMode === "bars" ? <BarView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />}</div>;
+  return <div className={styles.breakdown}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{viewMode === "bars" ? <BarView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />}</div>;
 }
 
 function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
@@ -576,10 +605,25 @@ function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoi
 
   return <div className={styles.chartView} ref={rootRef}>
     <ChartContainer className={styles.chart} config={chartConfig} initialDimension={{ width: 480, height: Math.max(220, points.length * 56 + 40) }}><BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 8, right: 24, top: 12, bottom: 8 }} onMouseMove={previewPoint} onMouseLeave={() => { if (!pinnedId) setHoveredId(undefined); }} onClick={(entry) => { const point = pointFromEntry(entry); if (point?.id) pinPoint(point.id); }}><CartesianGrid horizontal={false} stroke="var(--color-border)" /><XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => formatNumber(Number(value), points[0]?.unit ?? "")} /><YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={104} /><ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => <span>{formatNumber(Number(value), points[0]?.unit ?? "")} {points[0]?.unit}</span>} />} /><Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--color-action)" isAnimationActive={false}>{points.map((point) => <Cell key={point.id} fill={indicatorToneColors[point.tone ?? "primary"]} />)}</Bar></BarChart></ChartContainer>
-    <div className={styles.chartDetails} role="list" aria-label={`Valores exactos de ${title.toLowerCase()}`}>
-      {points.map((point) => <div key={point.id} role="listitem"><button ref={(element) => { triggerRefs.current[point.id] = element; }} className={styles.chartDetailButton} type="button" aria-pressed={selectedId === point.id} onFocus={() => { if (!pinnedId) setHoveredId(point.id); }} onMouseEnter={() => { if (!pinnedId) setHoveredId(point.id); }} onMouseLeave={() => { if (!pinnedId) setHoveredId(undefined); }} onClick={() => pinPoint(point.id)}><span>{point.label}</span><span>{pointText(point)}</span></button></div>)}
-    </div>
-    {activePoint ? <div className={styles.chartPinnedDetail} role="status" aria-label={`${pinnedId ? "Detalle fijado" : "Detalle"} de ${activePoint.label}`}><strong>{activePoint.label}</strong><span>{pointText(activePoint)}{activePoint.note ? ` · ${activePoint.note}` : ""}</span>{pinnedId ? <button type="button" onClick={dismissDetail}>Cerrar detalle</button> : null}</div> : null}
+    <ItemGroup className={styles.chartDetails} aria-label={`Valores exactos de ${title.toLowerCase()}`}>
+      {points.map((point) => <Item
+        key={point.id}
+        className={styles.chartDetailButton}
+        render={<Button
+          ref={(element) => { triggerRefs.current[point.id] = element; }}
+          type="button"
+          variant={selectedId === point.id ? "secondary" : "outline"}
+          aria-pressed={selectedId === point.id}
+          onFocus={() => { if (!pinnedId) setHoveredId(point.id); }}
+          onMouseEnter={() => { if (!pinnedId) setHoveredId(point.id); }}
+          onMouseLeave={() => { if (!pinnedId) setHoveredId(undefined); }}
+          onClick={() => pinPoint(point.id)}
+        />}
+      >
+        <span>{point.label}</span><span className="text-muted-foreground tabular-nums text-right">{pointText(point)}</span>
+      </Item>)}
+    </ItemGroup>
+    {activePoint ? <Alert role="status" variant="info" className={styles.chartPinnedDetail} aria-label={`${pinnedId ? "Detalle fijado" : "Detalle"} de ${activePoint.label}`}><strong>{activePoint.label}</strong><span>{pointText(activePoint)}{activePoint.note ? ` · ${activePoint.note}` : ""}</span>{pinnedId ? <Button type="button" variant="link" size="sm" className="ms-auto" onClick={dismissDetail}>Cerrar detalle</Button> : null}</Alert> : null}
   </div>;
 }
 

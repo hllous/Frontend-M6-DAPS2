@@ -1,11 +1,14 @@
 "use client";
 
 import { useId, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/legacy-field";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { MAX_REASON_LENGTH } from "@/lib/input-limits";
 
 export type ReportDecision = "forward" | "dismiss";
@@ -76,14 +79,14 @@ function ReportDecisionForm({ decision, reportId, onOpenChange, onConfirm }: { d
       </DialogHeader>
       <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4 py-2">
         {errorMessage && (
-          <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">
+          <Alert variant="destructive" className="flex items-start gap-2.5">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span id={reasonInvalid ? `${formId}-reason-error` : undefined}>{errorMessage}</span>
-          </div>
+          </Alert>
         )}
         <Field>
           <FieldLabel htmlFor={`${formId}-reason`}>Motivo <span aria-hidden="true">*</span></FieldLabel>
-          <textarea
+          <Textarea
             id={`${formId}-reason`}
             rows={3}
             maxLength={MAX_REASON_LENGTH}
@@ -92,7 +95,7 @@ function ReportDecisionForm({ decision, reportId, onOpenChange, onConfirm }: { d
             onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); setErrorMessage(null); }}
             aria-invalid={reasonInvalid}
             aria-describedby={reasonInvalid ? `${formId}-reason-error` : `${formId}-reason-help`}
-            className="w-full resize-y rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-3 text-base text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"
+            className="resize-y"
           />
           <FieldDescription id={`${formId}-reason-help`}>Obligatorio. Hasta {MAX_REASON_LENGTH} caracteres.</FieldDescription>
         </Field>
@@ -100,7 +103,7 @@ function ReportDecisionForm({ decision, reportId, onOpenChange, onConfirm }: { d
       <DialogFooter>
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Volver al expediente</Button>
         <Button type="submit" form={formId} disabled={submitting} className="gap-2">
-          {submitting && <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden />}
+          {submitting && <Spinner data-icon="inline-start" aria-hidden />}
           {submitting ? copy.submitting : copy.submit}
         </Button>
       </DialogFooter>

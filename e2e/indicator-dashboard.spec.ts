@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseOption } from "./support/reports-indicators";
 
 test.describe("operational indicator dashboard #138", () => {
   test("Field can open the semantic indicator table on a narrow screen", async ({ page }) => {
@@ -29,7 +30,7 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(page.getByText("Actualizado")).toBeVisible();
 
     const detail = page.locator("section[aria-labelledby='indicator-detail-title']");
-    await page.getByLabel("Zona operativa").selectOption("zone-2");
+    await chooseOption(page, "Zona operativa", "Palermo");
     await page.getByRole("button", { name: "Actualizar" }).click();
     await expect(detail.getByText("Costera").first()).toBeVisible();
 

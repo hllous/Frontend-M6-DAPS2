@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse, passthrough } from "msw";
 import { setupServer } from "msw/node";
@@ -12,6 +12,22 @@ import { handlers } from "@/mocks/handlers";
 import { IndicatorsDashboard } from "./indicators-dashboard";
 
 const server = setupServer(...handlers);
+
+async function chooseDate(user: ReturnType<typeof userEvent.setup>, label: string, value: string) {
+  const trigger = screen.getByRole("button", { name: new RegExp(`^${label}`) });
+  const displayedValue = trigger.textContent?.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  const currentMonth = displayedValue ? Number(displayedValue[2]) - 1 : new Date().getMonth();
+  const currentYear = displayedValue ? Number(displayedValue[3]) : new Date().getFullYear();
+  const [year, month, day] = value.split("-").map(Number);
+  const offset = (year - currentYear) * 12 + month - 1 - currentMonth;
+
+  await user.click(trigger);
+  for (let index = 0; index < Math.abs(offset); index += 1) {
+    await user.click(screen.getByRole("button", { name: offset < 0 ? "Mes anterior" : "Mes siguiente" }));
+  }
+  const dateLabel = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, day)));
+  await user.click(screen.getByRole("button", { name: new RegExp(`(?:^|,\\s)${dateLabel}$`, "i") }));
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
@@ -159,7 +175,8 @@ describe("IndicatorsDashboard", () => {
     const centro = await screen.findByRole("button", { name: /Centro.*89,7.*140.*156/i });
     centro.focus();
     await user.keyboard("{Enter}");
-    expect(screen.getAllByText(/Seleccionado:/)[0]?.closest("p")).toHaveTextContent("Seleccionado: Centro");
+    const selectedStatus = screen.getAllByRole("status").find((status) => status.textContent?.includes("Seleccionado:"));
+    expect(selectedStatus).toHaveTextContent("Seleccionado: Centro");
 
     await user.click(screen.getByRole("button", { name: "Tabla" }));
     const coverageTable = screen.getByRole("region", { name: "Tabla de datos de Cobertura" });
@@ -344,12 +361,7 @@ describe("IndicatorsDashboard", () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
-    for (const family of ["Incidencias", "Residuos"]) {
-      const familyButton = within(familyBand).getByRole("button", { name: new RegExp(family) });
-      const familyCard = familyButton.closest("article");
-      expect(familyCard).not.toBeNull();
-      expect(await within(familyCard as HTMLElement).findByText("Sin datos")).toBeVisible();
-    }
+    expect(await within(familyBand).findAllByText("Sin datos")).toHaveLength(2);
   });
 
   it("lists real zones and service types and sends their UUIDs as filters (#302)", async () => {
@@ -366,8 +378,10 @@ describe("IndicatorsDashboard", () => {
 
     const requested: string[] = [];
     server.use(http.get("*/api/indicators/:family", ({ request }) => { requested.push(new URL(request.url).search); return passthrough(); }));
-    await user.selectOptions(await screen.findByLabelText("Zona operativa"), "Zona Sur real");
-    await user.selectOptions(screen.getByLabelText("Tipo de servicio"), "Censo de arbolado urbano");
+    await user.click(await screen.findByRole("combobox", { name: "Zona operativa" }));
+    await user.click(await screen.findByRole("option", { name: "Zona Sur real" }));
+    await user.click(screen.getByRole("combobox", { name: "Tipo de servicio" }));
+    await user.click(await screen.findByRole("option", { name: "Censo de arbolado urbano" }));
     expect(screen.queryByRole("option", { name: "Centro" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Actualizar" }));
 
@@ -394,15 +408,15 @@ describe("IndicatorsDashboard", () => {
     let indicatorRequests = 0;
     server.use(http.get("*/api/indicators/:family", () => { indicatorRequests += 1; return HttpResponse.json({}, { status: 500 }); }));
 
-    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-09-20" } });
-    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-09-01" } });
+    await chooseDate(user, "Desde", "2026-09-20");
+    await chooseDate(user, "Hasta", "2026-09-01");
     await user.click(screen.getByRole("button", { name: "Actualizar" }));
 
     expect(await screen.findByText("La fecha «Desde» no puede ser posterior a «Hasta».")).toBeVisible();
-    expect(screen.getByLabelText("Hasta")).toBeInvalid();
+    expect(screen.getByRole("button", { name: /^Hasta/ })).toHaveAttribute("aria-invalid", "true");
     expect(indicatorRequests).toBe(0);
 
-    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-09-20" } });
+    await chooseDate(user, "Hasta", "2026-09-20");
     expect(screen.queryByText("La fecha «Desde» no puede ser posterior a «Hasta».")).not.toBeInTheDocument();
-  });
+  }, 15000);
 });

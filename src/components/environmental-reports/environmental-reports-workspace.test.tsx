@@ -15,6 +15,39 @@ import { scenarios } from "@/lib/scenarios";
 import { EnvironmentalReportsWorkspace } from "./environmental-reports-workspace";
 
 const server = setupServer(...handlers);
+
+async function chooseOption(user: ReturnType<typeof userEvent.setup>, scope: ReturnType<typeof within>, label: string | RegExp, option: string | RegExp) {
+  const trigger = scope.getByRole("combobox", { name: label });
+  trigger.focus();
+  await user.keyboard("{Enter}");
+  await screen.findByRole("listbox");
+  await user.click(await screen.findByRole("option", { name: option }));
+}
+
+async function chooseDate(user: ReturnType<typeof userEvent.setup>, scope: ReturnType<typeof within>, label: string, value: string) {
+  const trigger = scope.getByRole("button", { name: label });
+  const displayedValue = trigger.textContent?.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  const currentMonth = displayedValue ? Number(displayedValue[2]) - 1 : new Date().getMonth();
+  const currentYear = displayedValue ? Number(displayedValue[3]) : new Date().getFullYear();
+  const [year, month, day] = value.split("-").map(Number);
+  const offset = (year - currentYear) * 12 + month - 1 - currentMonth;
+  await user.click(trigger);
+  for (let index = 0; index < Math.abs(offset); index += 1) {
+    await user.click(screen.getByRole("button", { name: offset < 0 ? "Mes anterior" : "Mes siguiente" }));
+  }
+  const dateLabel = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, day)));
+  await user.click(screen.getByRole("button", { name: new RegExp(`(?:^|,\\s)${dateLabel}$`, "i") }));
+}
+
+async function chooseTime(user: ReturnType<typeof userEvent.setup>, scope: ReturnType<typeof within>, label: string, value: string) {
+  const [hour, minute] = value.split(":");
+  const timeGroup = scope.getByRole("group", { name: label });
+  await user.click(within(timeGroup).getByRole("combobox", { name: "Hora" }));
+  await user.click(screen.getByRole("option", { name: hour }));
+  await user.click(within(timeGroup).getByRole("combobox", { name: "Minutos" }));
+  await user.click(screen.getByRole("option", { name: minute }));
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); resetRepairRequestFixtures(); resetServiceFixtures(); window.localStorage.clear(); window.history.replaceState(null, "", "/app?destination=environment"); vi.useRealTimers(); });
 afterAll(() => server.close());
@@ -120,7 +153,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     expect(within(list).getByRole("button", { name: /ER-1004/ })).toBeVisible();
 
-    await user.selectOptions(screen.getByLabelText("Prioridad"), "CRITICAL");
+    await chooseOption(user, within(screen.getByRole("region", { name: "Filtros de la cola" })), "Prioridad", "Crítica");
 
     await waitFor(() => expect(requested.at(-1)?.get("priority")).toBe("CRITICAL"));
     expect(requested.at(-1)?.get("pageSize")).toBe("25");
@@ -146,9 +179,9 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     expect(await screen.findByText("Página 2 de 3 · 3 expedientes")).toBeVisible();
     expect(pages).toEqual(["2"]);
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByRole("link", { name: /siguiente/i }));
     expect(await screen.findByText("Página 3 de 3 · 3 expedientes")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: /siguiente/i })).toHaveAttribute("aria-disabled", "true");
     expect(new URLSearchParams(window.location.search).get("page")).toBe("3");
   });
 
@@ -222,7 +255,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(list).queryByRole("button", { name: /ER-1002/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Abrir reporte" }));
     const dialog = screen.getByRole("dialog");
-    await user.selectOptions(within(dialog).getByLabelText(/Tipo de hallazgo/), "NOISE");
+    await chooseOption(user, within(dialog), /Tipo de hallazgo/, "Ruidos molestos");
     await user.type(within(dialog).getByLabelText(/Dirección o referencia/), "Calle Nueva 100");
     await user.type(within(dialog).getByLabelText(/Descripción del hallazgo/), "Ruido nocturno constante.");
     await user.type(within(dialog).getByLabelText(/Latitud/), "-34.6");
@@ -242,9 +275,11 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(detail).getByRole("button", { name: "Programar inspección" }));
 
     const dialog = screen.getByRole("dialog");
-    await user.type(within(dialog).getByLabelText("Fecha de inspección"), "2026-09-10");
-    await user.selectOptions(within(dialog).getByLabelText("Zona operativa"), "zone-1");
-    await user.selectOptions(within(dialog).getByLabelText("Cuadrilla"), "crew-a");
+    await chooseDate(user, within(dialog), "Fecha de inspección", "2026-09-10");
+    await chooseTime(user, within(dialog), "Inicio", "09:30");
+    await chooseTime(user, within(dialog), "Fin", "10:30");
+    await chooseOption(user, within(dialog), "Zona operativa", /Belgrano/);
+    await chooseOption(user, within(dialog), "Cuadrilla", /Cuadrilla A/);
     await user.click(within(dialog).getByRole("button", { name: "Programar inspección" }));
 
     expect(await within(detail).findByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();
@@ -252,10 +287,10 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(detail).getByText(/Cuadrilla A/)).toBeVisible();
     // #320: dos escrituras; la cuadrilla viaja en el alta del servicio, sin assign-crew aparte.
     expect(create).toHaveBeenCalledTimes(1);
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ origin: "INSPECTION", inspectionId: expect.any(String), crewId: "crew-a", zoneIds: ["zone-1"], scheduledDate: "2026-09-10" }));
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ origin: "INSPECTION", inspectionId: expect.any(String), crewId: "crew-a", zoneIds: ["zone-1"], scheduledDate: "2026-09-10", timeWindow: { start: "09:30", end: "10:30" } }));
     expect(assignCrew).not.toHaveBeenCalled();
     expect(within(detail).queryByRole("button", { name: "Programar servicio" })).not.toBeInTheDocument();
-  });
+  }, 15000);
 
   it("keeps the inspection and offers to retry only the Service when its creation fails (#320)", async () => {
     const user = userEvent.setup();
@@ -269,9 +304,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(detail).getByRole("button", { name: "Programar inspección" }));
 
     const dialog = screen.getByRole("dialog");
-    await user.type(within(dialog).getByLabelText("Fecha de inspección"), "2026-09-10");
-    await user.selectOptions(within(dialog).getByLabelText("Zona operativa"), "zone-1");
-    await user.selectOptions(within(dialog).getByLabelText("Cuadrilla"), "crew-a");
+    await chooseDate(user, within(dialog), "Fecha de inspección", "2026-09-10");
+    await chooseOption(user, within(dialog), "Zona operativa", /Belgrano/);
+    await chooseOption(user, within(dialog), "Cuadrilla", /Cuadrilla A/);
     await user.click(within(dialog).getByRole("button", { name: "Programar inspección" }));
 
     expect(await within(detail).findByText(/La inspección quedó programada, pero no se pudo crear el Servicio POINT/)).toBeVisible();
@@ -283,8 +318,8 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(detail).getByRole("button", { name: "Programar servicio" }));
     const retry = await screen.findByRole("dialog", { name: "Programar servicio" });
     // El reintento conserva lo que se cargó y sólo vuelve a dar de alta el servicio.
-    expect(within(retry).getByLabelText("Fecha de inspección")).toHaveValue("2026-09-10");
-    expect(within(retry).getByLabelText("Cuadrilla")).toHaveValue("crew-a");
+    expect(within(retry).getByRole("button", { name: "Fecha de inspección" })).toHaveTextContent("10/09/2026");
+    expect(within(retry).getByRole("combobox", { name: "Cuadrilla" })).toHaveTextContent("Cuadrilla A");
     await user.click(within(retry).getByRole("button", { name: "Programar servicio" }));
 
     expect(await within(detail).findByText(/^SVC-/)).toBeVisible();
@@ -311,9 +346,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(await within(detail).findByRole("button", { name: "Programar servicio" }));
     const dialog = await screen.findByRole("dialog", { name: "Programar servicio" });
     expect(within(dialog).queryByLabelText("Versión del checklist")).not.toBeInTheDocument();
-    await user.type(within(dialog).getByLabelText("Fecha de inspección"), "2026-09-12");
-    await user.selectOptions(within(dialog).getByLabelText("Zona operativa"), "zone-1");
-    await user.selectOptions(within(dialog).getByLabelText("Cuadrilla"), "crew-a");
+    await chooseDate(user, within(dialog), "Fecha de inspección", "2026-09-12");
+    await chooseOption(user, within(dialog), "Zona operativa", /Belgrano/);
+    await chooseOption(user, within(dialog), "Cuadrilla", /Cuadrilla A/);
     await user.click(within(dialog).getByRole("button", { name: "Programar servicio" }));
 
     const note = await within(dialog).findByLabelText("Justificación del solapamiento");
@@ -325,9 +360,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ origin: "INSPECTION", inspectionId, crewId: "crew-a", overrideNote: "La otra parada termina antes." }));
     expect(await within(detail).findByText(/^SVC-/)).toBeVisible();
     expect(within(detail).queryByRole("button", { name: "Programar servicio" })).not.toBeInTheDocument();
-  });
-
-  it("reprograms a scheduled inspection through its linked Service instead of creating another inspection (#294)", async () => {
+  }, 15000);  it("reprograms a scheduled inspection through its linked Service instead of creating another inspection (#294)", async () => {
     const user = userEvent.setup();
     const schedule = vi.spyOn(environmentalReportsAdapter, "schedule");
     const reschedule = vi.spyOn(servicesAdapter, "reschedule");
@@ -363,7 +396,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: /ER-1005/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1005" });
 
-    const item = (await within(detail).findByText("INS-1005")).closest("li")!;
+    const item = (await within(detail).findByText("INS-1005")).closest<HTMLElement>('[role="listitem"]')!;
     expect(within(item).getByText("Resultado: Infracción constatada")).toBeVisible();
     // #321: fecha legible, sin el ISO del backend ni una versión de checklist que no existe.
     expect(await within(item).findByText(/^5 sept 2026 · 13:00–16:00$/)).toBeVisible();

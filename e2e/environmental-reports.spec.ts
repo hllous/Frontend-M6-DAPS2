@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseDate, chooseOption, chooseTime } from "./support/reports-indicators";
 
 test.describe("EnvironmentalReport case file", () => {
   test("Office returns focus to the report after forwarding and issuing a notice", async ({ page }) => {
@@ -55,9 +56,11 @@ test.describe("EnvironmentalReport case file", () => {
     const detail = page.getByRole("region", { name: "Detalle de ER-1002" });
     await detail.getByRole("button", { name: "Programar inspección" }).click();
     const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Fecha de inspección").fill("2026-09-10");
-    await dialog.getByLabel("Zona operativa").selectOption("zone-1");
-    await dialog.getByLabel("Cuadrilla").selectOption("crew-a");
+    await chooseDate(dialog, "Fecha de inspección", "2026-09-10");
+    await chooseTime(dialog, "Inicio", "09:00");
+    await chooseTime(dialog, "Fin", "10:30");
+    await chooseOption(dialog, "Zona operativa", /Belgrano/);
+    await chooseOption(dialog, "Cuadrilla", /Cuadrilla A/);
     await dialog.getByRole("button", { name: "Programar inspección" }).click();
     await expect(detail.getByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();
     await expect(detail.getByText(/^SVC-/)).toBeVisible();
@@ -71,7 +74,7 @@ test.describe("EnvironmentalReport case file", () => {
     await expect(page.getByRole("region", { name: "Reportes ambientales asignados" })).toBeVisible();
     await page.getByRole("button", { name: "Abrir reporte" }).click();
     const dialog = page.getByRole("dialog");
-    await dialog.getByLabel(/Tipo de hallazgo/).selectOption("NOISE");
+    await chooseOption(dialog, /Tipo de hallazgo/, "Ruidos molestos");
     await dialog.getByLabel(/Dirección o referencia/).fill("Calle Nueva 100");
     await dialog.getByLabel(/Descripción del hallazgo/).fill("Ruido nocturno constante.");
     await dialog.getByLabel(/Latitud/).fill("-34.6");

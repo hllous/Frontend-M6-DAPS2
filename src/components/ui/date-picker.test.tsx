@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DatePicker } from "./date-picker";
 import { Field, FieldError, FieldLabel } from "./field";
 
-function Harness({ initial = "", onValue, invalid = false, min }: { initial?: string; onValue?: (v: string) => void; invalid?: boolean; min?: string }) {
+function Harness({ initial = "", onValue, invalid = false, min, required = false }: { initial?: string; onValue?: (v: string) => void; invalid?: boolean; min?: string; required?: boolean }) {
   const [value, setValue] = useState(initial);
   return (
     <Field data-invalid={invalid || undefined}>
@@ -17,6 +17,7 @@ function Harness({ initial = "", onValue, invalid = false, min }: { initial?: st
         min={min}
         invalid={invalid}
         aria-describedby={invalid ? "fecha-error" : undefined}
+        aria-required={required || undefined}
         onChange={(v) => {
           setValue(v);
           onValue?.(v);
@@ -28,6 +29,11 @@ function Harness({ initial = "", onValue, invalid = false, min }: { initial?: st
 }
 
 describe("DatePicker", () => {
+  it("preserves required semantics on the trigger", () => {
+    render(<Harness required />);
+    expect(screen.getByRole("button", { name: /fecha/i })).toHaveAttribute("aria-required", "true");
+  });
+
   it("is labelled by its field label and shows the placeholder dd/mm/aaaa when empty", () => {
     render(<Harness />);
     expect(screen.getByRole("button", { name: /fecha/i })).toHaveTextContent("dd/mm/aaaa");
