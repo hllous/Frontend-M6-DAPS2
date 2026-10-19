@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldLabel } from "@/components/ui/field";
 import {
   Empty,
   EmptyDescription,
@@ -18,8 +19,10 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatArgentinaDateTime, todayInArgentina } from "@/lib/argentina-date";
+import { todayInArgentina } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS } from "@/lib/containers";
 import { indicatorsAdapter, type CoverageIndicator } from "@/lib/indicators";
 import {
@@ -223,11 +226,32 @@ function toListItems(data: OperationalMapData): MapListItem[] {
 }
 
 function formatTodayDate(date: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "numeric",
-    month: "long",
+  return formatCalendarDate(date);
+}
+
+function formatCalendarDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match || new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value) return value;
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+function formatMapDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return value;
+  const timeZone = "America/Argentina/Buenos_Aires";
+  const dateLabel = new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
     year: "numeric",
-  }).format(new Date(`${date}T12:00:00`));
+    timeZone,
+  }).format(date);
+  const timeLabel = new Intl.DateTimeFormat("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).format(date);
+  return `${dateLabel} ${timeLabel}`;
 }
 
 function activeZoneRecords(zones: OperationalZone[]) {
@@ -591,7 +615,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                 <div className={styles.mapToolbar}>
                   <strong>{currentView.title}</strong>
                   <span>{mapToolbarSummary(view, locatedItems.length, zones, routeStops.length, todayServices.length, coverageZoneOverlays)}</span>
-                  {lastConsultedAt ? <span>Consultado {formatArgentinaDateTime(lastConsultedAt)}</span> : null}
+                  {lastConsultedAt ? <span>Consultado {formatMapDateTime(lastConsultedAt)}</span> : null}
                 </div>
                 <OperationalMapCanvas
                   view={view}
@@ -613,6 +637,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                 <InventoryMapDrawer
                   ariaLabel={`Controles de la vista ${currentView.label}`}
                   className={styles.sidePanel}
+                  expandToViewport
                   summary="Elementos"
                 >
                   <InventoryPanel
@@ -709,16 +734,17 @@ function InventoryPanel({
         {(Object.keys(layerLabels) as LayerId[]).map((layer) => {
           const count = items.filter((item) => item.layer === layer && item.lat !== null && item.lng !== null).length;
           return (
-            <label className={styles.layerControl} key={layer}>
+            <Field className={styles.layerControl} key={layer}>
               <Checkbox
+                id={`map-layer-${layer}`}
                 checked={enabledLayers[layer]}
                 onCheckedChange={(checked) => onLayerChange(layer, checked === true)}
                 aria-label={`${layerLabels[layer]}, ${count} ubicados`}
               />
               <span className={`${styles.layerSwatch} ${styles[layer]}`} aria-hidden />
-              <span>{layerLabels[layer]}</span>
+              <FieldLabel htmlFor={`map-layer-${layer}`} className="text-sm font-normal">{layerLabels[layer]}</FieldLabel>
               <small>{count}</small>
-            </label>
+            </Field>
           );
         })}
       </fieldset>
@@ -739,15 +765,15 @@ function InventoryPanel({
                 <li key={`${item.layer}-${item.id}`} className={isSelected ? styles.selected : undefined}>
                   <span className={`${styles.listMarker} ${styles[item.markerTone]}`} aria-hidden />
                   <span>
-                    <button
+                    <Toggle
                       type="button"
-                      className={styles.itemButton}
-                      aria-pressed={isSelected}
-                      onClick={() => onSelectItem(item)}
+                      className={cn(styles.itemButton, "h-auto w-full items-start justify-start whitespace-normal text-left")}
+                      pressed={isSelected}
+                      onPressedChange={() => onSelectItem(item)}
                     >
                       <strong>{item.title}</strong>
                       <small>{item.description}</small>
-                    </button>
+                    </Toggle>
                     {isSelected && item.layer === "trees" ? <Link className={styles.itemLink} href={treeCatalogHref(item.id)}>Ver ficha del árbol {item.title}</Link> : null}
                   </span>
                 </li>
@@ -789,18 +815,19 @@ function ZonesMapPanel({
       <ul className={styles.zoneList}>
         {zones.map((zone) => (
           <li key={zone.code}>
-            <button
+            <Toggle
               type="button"
-              className={`${styles.zoneButton} ${selectedZoneCode === zone.code ? styles.selected : ""}`}
-              aria-pressed={selectedZoneCode === zone.code}
-              onClick={() => onSelectZone(selectedZoneCode === zone.code ? "" : zone.code)}
+              className={cn(styles.zoneButton, "h-auto min-w-0 justify-start whitespace-normal text-left", selectedZoneCode === zone.code && styles.selected)}
+              variant="outline"
+              pressed={selectedZoneCode === zone.code}
+              onPressedChange={(pressed) => onSelectZone(pressed ? zone.code : "")}
             >
               <span className={`${styles.zoneSwatch} ${styles[zone.code.toLowerCase().replace("-", "")]}`} aria-hidden />
               <span>
                 <strong>{zone.code}</strong>
                 <small>{zone.name}</small>
               </span>
-            </button>
+            </Toggle>
           </li>
         ))}
       </ul>
@@ -853,11 +880,12 @@ function CoverageMapPanel({
       <ul className={styles.coverageZoneList}>
         {zones.map((zone) => (
           <li key={zone.zoneCode}>
-            <button
+            <Toggle
               type="button"
-              className={`${styles.coverageZoneButton} ${selectedZoneCode === zone.zoneCode ? styles.selected : ""}`}
-              aria-pressed={selectedZoneCode === zone.zoneCode}
-              onClick={() => onSelectZone(selectedZoneCode === zone.zoneCode ? "" : zone.zoneCode)}
+              className={cn(styles.coverageZoneButton, "h-auto min-w-0 justify-start whitespace-normal text-left", selectedZoneCode === zone.zoneCode && styles.selected)}
+              variant="outline"
+              pressed={selectedZoneCode === zone.zoneCode}
+              onPressedChange={(pressed) => onSelectZone(pressed ? zone.zoneCode : "")}
             >
               <span className={`${styles.coverageLegendSwatch} ${styles[coverageBandSwatchClass[zone.band]]}`} aria-hidden />
               <span className={styles.coverageZoneCopy}>
@@ -867,7 +895,7 @@ function CoverageMapPanel({
               <span className={COVERAGE_BAND_CLASSES[zone.band]}>
                 {COVERAGE_BAND_LABELS[zone.band]} · {formatCoverageRate(zone.rate)}
               </span>
-            </button>
+            </Toggle>
           </li>
         ))}
       </ul>
@@ -908,18 +936,17 @@ function RouteMapPanel({
         </div>
         <p>Las paradas se leen en orden y cada zona queda resaltada en el mapa.</p>
       </div>
-      <div className={styles.fieldGroup}>
-        <label htmlFor="map-route-select">Recorrido a visualizar</label>
-        <select
+      <Field className={styles.fieldGroup}>
+        <FieldLabel htmlFor="map-route-select">Recorrido a visualizar</FieldLabel>
+        <NativeSelect
           id="map-route-select"
           value={selectedRouteId}
           onChange={(event) => onRouteChange(event.target.value)}
-          className={styles.routeSelect}
         >
-          {routes.length === 0 ? <option value="">No hay recorridos activos</option> : null}
-          {routes.map((route) => <option key={route.id} value={route.id}>{route.code} · {route.name}</option>)}
-        </select>
-      </div>
+          {routes.length === 0 ? <NativeSelectOption value="">No hay recorridos activos</NativeSelectOption> : null}
+          {routes.map((route) => <NativeSelectOption key={route.id} value={route.id}>{route.code} · {route.name}</NativeSelectOption>)}
+        </NativeSelect>
+      </Field>
       {selectedRoute ? (
         <>
           <div className={styles.routeSummary}>
@@ -929,11 +956,12 @@ function RouteMapPanel({
           <ol className={styles.routeStopList}>
             {routeStops.map((stop) => (
               <li key={stop.id}>
-                <button
+                <Toggle
                   type="button"
-                  className={`${styles.routeStopButton} ${selectedStopSequence === stop.sequence ? styles.selected : ""}`}
-                  aria-pressed={selectedStopSequence === stop.sequence}
-                  onClick={() => onSelectStop(selectedStopSequence === stop.sequence ? 0 : stop.sequence)}
+                  className={cn(styles.routeStopButton, "h-auto min-w-0 justify-start whitespace-normal text-left", selectedStopSequence === stop.sequence && styles.selected)}
+                  variant="outline"
+                  pressed={selectedStopSequence === stop.sequence}
+                  onPressedChange={(pressed) => onSelectStop(pressed ? stop.sequence : 0)}
                 >
                   <span className={styles.sequenceBadge} aria-hidden>{stop.sequence}</span>
                   <span className={styles.routeStopCopy}>
@@ -941,7 +969,7 @@ function RouteMapPanel({
                     <small>{stop.zoneCode} · {stop.zoneName}</small>
                   </span>
                   <small className={styles.duration}>{stop.estimatedDurationMin !== null ? `${stop.estimatedDurationMin} min estimados` : "Sin duración"}</small>
-                </button>
+                </Toggle>
               </li>
             ))}
           </ol>
@@ -1039,12 +1067,11 @@ function formatCoverageRate(rate: number | null) {
 }
 
 function formatCoveragePeriod(period: CoverageIndicator["period"]) {
-  const format = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short", year: "numeric" });
-  return `${format.format(new Date(`${period.from}T12:00:00`))} – ${format.format(new Date(`${period.to}T12:00:00`))}`;
+  return `${formatCalendarDate(period.from)} – ${formatCalendarDate(period.to)}`;
 }
 
 function formatCoverageFreshness(updatedAt: string) {
-  return new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(updatedAt));
+  return formatMapDateTime(updatedAt);
 }
 
 function MapSideLoading({ label }: { label: string }) {

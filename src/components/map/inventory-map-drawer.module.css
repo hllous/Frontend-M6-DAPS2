@@ -1,16 +1,47 @@
-.drawer {
+.desktopPanel {
   display: flex;
   min-height: 0;
-  flex: 1;
   flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  background: var(--color-surface);
+}
+
+.mobileRoot {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
 }
 
 .handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  min-height: 52px;
+  justify-content: center;
+  border-radius: 12px 12px 0 0;
+  padding: 6px 16px;
+  pointer-events: auto;
+}
+
+.hiddenHandle {
   display: none;
+}
+
+.popup {
+  bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  width: 100%;
+  max-height: calc(100dvh - 9rem - env(safe-area-inset-bottom));
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 8px;
+  text-align: left;
 }
 
 .content {
@@ -18,113 +49,5 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  overflow: hidden;
-}
-
-.drawer[data-compact="true"][data-snap-points="true"] {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  height: 100%;
-  flex: initial;
-  border-color: var(--color-border-strong);
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
-  box-shadow: 0 -8px 24px color-mix(in oklab, var(--color-text) 16%, transparent);
-  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.drawer[data-compact="true"][data-snap-points="true"][data-snap="peek"] {
-  transform: translateY(calc(100% - var(--drawer-handle-height, 52px) + var(--drawer-drag-offset, 0px)));
-}
-
-.drawer[data-compact="true"][data-snap-points="true"][data-snap="half"] {
-  transform: translateY(calc(50% + var(--drawer-drag-offset, 0px)));
-}
-
-.drawer[data-compact="true"][data-snap-points="true"][data-snap="full"] {
-  transform: translateY(var(--drawer-drag-offset, 0px));
-}
-
-.drawer[data-compact="true"][data-snap-points="false"] {
-  position: absolute;
-  z-index: 2;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: min(76%, 580px);
-  flex: initial;
-  border-color: var(--color-border-strong);
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
-  box-shadow: 0 -8px 24px color-mix(in oklab, var(--color-text) 16%, transparent);
-  transition: transform 220ms ease-out;
-}
-
-.drawer[data-compact="true"][data-snap-points="false"][data-expanded="false"] {
-  transform: translateY(calc(100% - var(--drawer-handle-height, 80px) + var(--drawer-drag-offset, 0px)));
-}
-
-.drawer[data-compact="true"][data-snap-points="false"][data-expanded="true"] {
-  transform: translateY(var(--drawer-drag-offset, 0px));
-}
-
-.drawer[data-compact="true"][data-dragging="true"] {
-  transition: none;
-}
-
-.drawer[data-compact="true"] .handle {
-  display: flex;
-  width: 100%;
-  min-height: var(--drawer-handle-height, 80px);
-  height: var(--drawer-handle-height, 80px);
-  flex-direction: column;
-  gap: 8px;
-  border: 0;
-  border-radius: 0;
-  padding: 8px 16px;
-  touch-action: none;
-  cursor: grab;
-}
-
-.drawer[data-compact="true"][data-snap-points="true"] .handle {
-  gap: 4px;
-  padding-block: 4px;
-}
-
-.drawer[data-compact="true"] .handle:active {
-  cursor: grabbing;
-}
-
-.drawer[data-compact="true"] .handle:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: -3px;
-}
-
-.drawer[data-compact="true"] .grabber {
-  width: 40px;
-  height: 4px;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: var(--color-border-strong);
-}
-
-.drawer[data-compact="true"] .summary {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--color-text);
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.drawer[data-compact="true"] .content {
-  min-height: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .drawer[data-compact="true"] {
-    transition-duration: 1ms;
-  }
+  overflow: auto;
 }

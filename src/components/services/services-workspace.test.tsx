@@ -192,7 +192,7 @@ describe("ServicesWorkspace component", () => {
 
       const map = await screen.findByRole("region", { name: "Mapa territorial de Servicios" });
       const drawer = await screen.findByRole("complementary", { name: "Lista de servicios" });
-      const toggle = within(drawer).getByRole("button", { name: "Expandir lista a pantalla completa" });
+      const toggle = screen.getByRole("button", { name: "Expandir lista a pantalla completa" });
       expect(map).toBeVisible();
       const marker = await within(map).findByRole("button", { name: /Poda de árbol — Av\. Rivadavia 2200/ });
       await user.click(marker);

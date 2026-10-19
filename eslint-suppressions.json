@@ -104,16 +104,6 @@
       "count": 18
     }
   },
-  "src/components/map/mapa-operativo.tsx": {
-    "no-restricted-syntax": {
-      "count": 7
-    }
-  },
-  "src/components/referrals/referrals-workspace.tsx": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
   "src/components/services/assign-crew-dialog.tsx": {
     "no-restricted-syntax": {
       "count": 2

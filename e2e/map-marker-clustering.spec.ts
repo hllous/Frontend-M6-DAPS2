@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
 
@@ -38,45 +38,30 @@ test("selecting an inventory list item highlights its map marker #424", async ({
   await expect(page.locator('[class*="markerSelected"]').first()).toBeVisible();
 });
 
-test("keeps the mobile map visible with a keyboard and drag accessible inventory drawer #423", async ({ page }) => {
+test("keeps the mobile map visible with a keyboard accessible inventory drawer #423", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
 
   const drawer = page.getByRole("complementary", { name: "Controles de la vista Inventario" });
   const map = page.locator(".leaflet-container");
-  const handle = drawer.locator('[data-inventory-map-drawer-handle="true"]');
-  const contentId = await handle.getAttribute("aria-controls");
-  if (!contentId) throw new Error("Expected the inventory drawer handle to identify its content.");
-  const content = drawer.locator(`#${contentId}`);
+  const trigger = drawer.getByRole("button", { name: "Mostrar lista" });
 
   await expect(map).toBeVisible();
-  await expect(handle).toBeInViewport({ ratio: 0.95 });
-  await expect(handle).toHaveAccessibleName("Mostrar lista");
-  await expect(handle).toHaveAttribute("aria-expanded", "false");
-  await expect(handle).toHaveCSS("min-height", "80px");
-  await expect(handle.getByText("Elementos")).toBeVisible();
+  await expect(trigger).toBeInViewport({ ratio: 0.95 });
+  await trigger.focus();
+  await page.keyboard.press("Enter");
 
-  await handle.focus();
-  await page.keyboard.press("Tab");
-  await expect(content.locator(":focus")).toBeFocused();
-  await expect(handle).toHaveAttribute("aria-expanded", "true");
-  await expect(handle).toHaveAccessibleName("Ocultar lista");
-  const firstItem = drawer.getByRole("button", { name: /CONT-002/ });
-  await firstItem.focus();
-  await expect(firstItem).toBeFocused();
-  await expect(firstItem).toBeInViewport();
+  const content = page.getByRole("dialog", { name: "Elementos" });
+  await expect(content).toBeVisible();
+  await expect(content).not.toHaveAttribute("aria-modal", "true");
+  const firstItem = content.getByRole("button", { name: /CONT-002/ });
+  await expect(firstItem).toBeVisible();
+  await expect(map).toBeVisible();
 
-  const expandedHandle = handle;
-  const expandedBox = await expandedHandle.boundingBox();
-  if (!expandedBox) throw new Error("Expected the expanded drawer handle to be visible.");
-  const x = expandedBox.x + expandedBox.width / 2;
-  const startY = expandedBox.y + expandedBox.height / 2;
-  await page.mouse.move(x, startY);
-  await page.mouse.down();
-  await page.mouse.move(x, startY + 220, { steps: 5 });
-  await page.mouse.up();
-  await expect(drawer.getByRole("button", { name: "Mostrar lista" })).toHaveAttribute("aria-expanded", "false");
+  await content.getByRole("button", { name: "Cerrar lista" }).click();
+  await expect(content).not.toBeVisible();
+  await expect(trigger).toBeFocused();
 
   await expect(map).toBeVisible();
 });
@@ -120,13 +105,23 @@ test("keeps the map box height constant across tabs on desktop and mobile #423",
       const tab = page.getByRole("tab", { name: label });
       await tab.click();
       await expect(tab).toHaveAttribute("aria-selected", "true");
-      const listArea = label === "Inventario"
-        ? page.locator("section[class*='visibleList'] ul")
-        : page.locator("section[class*='viewPanel']");
+      let listArea: Locator;
+      let inventoryDialog: Locator | undefined;
+      if (label === "Inventario" && viewport.width <= 760) {
+        await page.getByRole("button", { name: "Mostrar lista" }).click();
+        inventoryDialog = page.getByRole("dialog", { name: "Elementos" });
+        await expect(inventoryDialog).toBeVisible();
+        listArea = inventoryDialog.locator("section[class*='visibleList'] ul");
+      } else {
+        listArea = label === "Inventario"
+          ? page.locator("section[class*='visibleList'] ul")
+          : page.locator("section[class*='viewPanel']");
+      }
       await expect.poll(() => listArea.evaluate((element) => getComputedStyle(element).overflowY)).toBe("auto");
       const box = await mapPanel.boundingBox();
       if (!box) throw new Error(`Expected the map panel to be visible for ${label}.`);
       heights.push(box.height);
+      if (inventoryDialog) await inventoryDialog.getByRole("button", { name: "Cerrar lista" }).click();
     }
 
     expect(
