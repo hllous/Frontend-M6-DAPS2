@@ -7,15 +7,18 @@ import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Eye, HeartPulse, In
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
-import { formControlClass } from "@/components/ui/form-control";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import type { OperationalScenario } from "@/lib/scenarios";
 import type { Tree } from "@/lib/trees";
 import { todayInArgentina } from "@/lib/argentina-date";
-import { cn } from "@/lib/utils";
 import { RISK_LEVEL_LABELS, treeSurveyCreateInputSchema, treeSurveysAdapter, type RiskLevel, type TreeHealthStatus, type TreeSurvey, type TreeSurveyCreateInput, type TreeSurveyQuery } from "@/lib/tree-surveys";
 import { TreeInterventionRequestDialog } from "./tree-interventions-panel";
 
@@ -28,19 +31,19 @@ const RISK_TYPE_LABELS = { FALLING_BRANCH: "Caída de ramas", TRUNK_INSTABILITY:
 const INTERVENTION_LABELS = { FORMATION_PRUNING: "Poda de formación", SAFETY_PRUNING: "Poda de seguridad", REMOVAL: "Extracción", PLANTING: "Plantación", TREATMENT: "Tratamiento" } as const;
 const newForm = (surveyedAt: string): FormState => ({ surveyedAt, healthStatus: "", riskLevel: "", riskType: "", suggestedIntervention: "", requiresStreetClosure: false, requiresPublicWorks: false, notes: "" });
 
-const HEALTH_TONES: Record<TreeHealthStatus, string> = {
-  HEALTHY: "bg-[var(--color-success-fill)] text-[var(--color-success)]",
-  WEAKENED: "bg-[var(--color-warning-fill)] text-[var(--color-warning)]",
-  DISEASED: "bg-[var(--color-warning-fill)] text-[var(--color-warning)]",
-  DEAD: "bg-[var(--color-danger-fill)] text-[var(--color-danger)]",
+const HEALTH_TONES: Record<TreeHealthStatus, "success" | "warning" | "danger"> = {
+  HEALTHY: "success",
+  WEAKENED: "warning",
+  DISEASED: "warning",
+  DEAD: "danger",
 };
 const HEALTH_ICONS = { HEALTHY: CheckCircle2, WEAKENED: TriangleAlert, DISEASED: HeartPulse, DEAD: Skull } as const;
-const RISK_TONES: Record<RiskLevel, string> = {
-  NONE: "bg-[var(--color-success-fill)] text-[var(--color-success)]",
-  LOW: "bg-[var(--color-success-fill)] text-[var(--color-success)]",
-  MEDIUM: "bg-[var(--color-warning-fill)] text-[var(--color-warning)]",
-  HIGH: "bg-[var(--color-warning-fill)] text-[var(--color-warning)]",
-  CRITICAL: "bg-[var(--color-danger-fill)] text-[var(--color-danger)]",
+const RISK_TONES: Record<RiskLevel, "success" | "warning" | "danger"> = {
+  NONE: "success",
+  LOW: "success",
+  MEDIUM: "warning",
+  HIGH: "warning",
+  CRITICAL: "danger",
 };
 
 function dateLabel(value: string) {
@@ -49,16 +52,24 @@ function dateLabel(value: string) {
 }
 
 function dateTimeLabel(value: string) {
-  return new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date(value));
 }
 
 function HealthBadge({ status }: { status: TreeHealthStatus }) {
   const Icon = HEALTH_ICONS[status];
-  return <Badge variant="outline" className={cn("border-transparent", HEALTH_TONES[status])}><Icon data-icon="inline-start" aria-hidden />{HEALTH_LABELS[status]}</Badge>;
+  return <Badge variant={HEALTH_TONES[status]}><Icon data-icon="inline-start" aria-hidden />{HEALTH_LABELS[status]}</Badge>;
 }
 
 function RiskBadge({ level }: { level: RiskLevel }) {
-  return <Badge variant="outline" className={cn("border-transparent", RISK_TONES[level])}><ShieldAlert data-icon="inline-start" aria-hidden />Riesgo {RISK_LEVEL_LABELS[level]}</Badge>;
+  return <Badge variant={RISK_TONES[level]}><ShieldAlert data-icon="inline-start" aria-hidden />Riesgo {RISK_LEVEL_LABELS[level]}</Badge>;
 }
 
 export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree; scenario: OperationalScenario; onClose: () => void }) {
@@ -130,64 +141,96 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
       {canSurvey ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar relevamiento</Button> : null}
     </div>
     {!canSurvey ? <Alert><AlertDescription>Esta sesión puede consultar el historial, pero no registrar relevamientos.</AlertDescription></Alert> : null}
-    {notice ? <p role="status" className="rounded-lg border border-[var(--color-success-line)] bg-[var(--color-success-fill)] px-3 py-2 text-sm text-[var(--color-success)]">{notice}</p> : null}
-    <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
-      <Field>
-        <FieldLabel htmlFor="survey-health-filter">Estado sanitario</FieldLabel>
-        <select id="survey-health-filter" aria-label="Filtrar por estado sanitario" className={formControlClass} value={healthStatus} onChange={(event) => { setHealthStatus(event.target.value as TreeHealthStatus | ""); setPage(1); }}><option value="">Todos</option>{Object.entries(HEALTH_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="survey-risk-filter">Nivel de riesgo</FieldLabel>
-        <select id="survey-risk-filter" aria-label="Filtrar por nivel de riesgo" className={formControlClass} value={riskLevel} onChange={(event) => { setRiskLevel(event.target.value as RiskLevel | ""); setPage(1); }}><option value="">Todos</option>{Object.entries(RISK_LEVEL_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-      </Field>
-    </FieldGroup>
+    {notice ? <Alert role="status"><AlertDescription>{notice}</AlertDescription></Alert> : null}
+    <Card className="py-0">
+      <CardContent className="p-4">
+        <FieldGroup className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="survey-health-filter">Estado sanitario</FieldLabel>
+            <Select items={HEALTH_LABELS} value={healthStatus || null} onValueChange={(value) => { setHealthStatus(String(value ?? "") as TreeHealthStatus | ""); setPage(1); }}>
+              <SelectTrigger id="survey-health-filter" aria-label="Filtrar por estado sanitario"><SelectValue placeholder="Todos" /></SelectTrigger>
+              <SelectContent><SelectGroup>{Object.entries(HEALTH_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="survey-risk-filter">Nivel de riesgo</FieldLabel>
+            <Select items={RISK_LEVEL_LABELS} value={riskLevel || null} onValueChange={(value) => { setRiskLevel(String(value ?? "") as RiskLevel | ""); setPage(1); }}>
+              <SelectTrigger id="survey-risk-filter" aria-label="Filtrar por nivel de riesgo"><SelectValue placeholder="Todos" /></SelectTrigger>
+              <SelectContent><SelectGroup>{Object.entries(RISK_LEVEL_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+            </Select>
+          </Field>
+        </FieldGroup>
+      </CardContent>
+    </Card>
     {state.status === "loading" ? <div role="status" aria-label="Cargando relevamientos" className="flex flex-col gap-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div> : null}
     {state.status === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{state.message}</span><Button type="button" variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></AlertDescription></Alert> : null}
     {state.status === "ready" && state.page.surveys.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin relevamientos</EmptyTitle><EmptyDescription>No hay registros para los filtros seleccionados. Quite uno o más filtros para consultar el historial completo.</EmptyDescription></EmptyHeader></Empty> : null}
     {state.status === "ready" && state.page.surveys.length > 0 ? <><p className="text-sm text-muted-foreground" aria-live="polite">{state.page.total} {state.page.total === 1 ? "relevamiento" : "relevamientos"}</p><div className="grid gap-3">{state.page.surveys.map((survey) => <article key={survey.id} aria-label={`${dateLabel(survey.surveyedAt)} · ${RISK_LEVEL_LABELS[survey.riskLevel]}`} className="rounded-xl border border-border bg-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold">{dateLabel(survey.surveyedAt)}</p><div className="mt-2 flex flex-wrap gap-2"><HealthBadge status={survey.healthStatus} /><RiskBadge level={survey.riskLevel} /></div></div><Button type="button" size="sm" variant="outline" onClick={() => void openDetail(survey)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button></div><dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de riesgo</dt><dd className="mt-0.5">{survey.riskType ? RISK_TYPE_LABELS[survey.riskType] : "No informado"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Intervención sugerida</dt><dd className="mt-0.5">{survey.suggestedIntervention ? INTERVENTION_LABELS[survey.suggestedIntervention] : "No sugerida"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dependencias</dt><dd className="mt-0.5">{[survey.requiresStreetClosure && "Corte de calle", survey.requiresPublicWorks && "Obras públicas"].filter(Boolean).join(" · ") || "Ninguna"}</dd></div></dl></article>)}</div><div className="flex items-center justify-between gap-3" aria-label="Paginación de relevamientos"><span className="text-sm text-muted-foreground">Página {state.page.page} de {state.page.totalPages}</span><div className="flex gap-2"><Button type="button" variant="outline" size="sm" aria-label="Página anterior" disabled={state.page.page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft data-icon="inline-start" aria-hidden />Anterior</Button><Button type="button" variant="outline" size="sm" aria-label="Página siguiente" disabled={state.page.page >= state.page.totalPages} onClick={() => setPage((current) => current + 1)}>Siguiente<ChevronRight data-icon="inline-end" aria-hidden /></Button></div></div></> : null}
 
-    <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent><DialogHeader><DialogTitle>Registrar relevamiento</DialogTitle><DialogDescription>Observación ambiental del árbol. El registro quedará guardado como parte del historial inmutable.</DialogDescription></DialogHeader>{formError && fieldHasError("form") ? <Alert variant="destructive"><AlertDescription>{formError}</AlertDescription></Alert> : null}<form id="tree-survey-form" onSubmit={(event) => void submit(event)} noValidate><FieldGroup>
-      <Field data-invalid={fieldHasError("surveyedAt")}>
-        <FieldLabel htmlFor="surveyed-at">Fecha del relevamiento <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-        <input id="surveyed-at" aria-label="Fecha del relevamiento" aria-invalid={fieldHasError("surveyedAt")} aria-describedby={fieldHasError("surveyedAt") ? "surveyed-at-help surveyed-at-error" : "surveyed-at-help"} type="date" max={today} className={formControlClass} value={form.surveyedAt} onChange={(event) => setForm({ ...form, surveyedAt: event.target.value })} required />
-        <FieldDescription id="surveyed-at-help">Indique la fecha en que se realizó la observación.</FieldDescription>
-        {fieldHasError("surveyedAt") ? <FieldError id="surveyed-at-error">{formError}</FieldError> : null}
-      </Field>
-      <Field data-invalid={fieldHasError("healthStatus")}>
-        <FieldLabel htmlFor="health-status">Estado sanitario <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-        <select id="health-status" aria-label="Estado sanitario" aria-invalid={fieldHasError("healthStatus")} aria-describedby={fieldHasError("healthStatus") ? "health-status-help health-status-error" : "health-status-help"} className={formControlClass} value={form.healthStatus} onChange={(event) => setForm({ ...form, healthStatus: event.target.value as FormState["healthStatus"] })} required><option value="">Seleccione un estado</option>{Object.entries(HEALTH_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <FieldDescription id="health-status-help">Seleccione el estado observado durante el relevamiento.</FieldDescription>
-        {fieldHasError("healthStatus") ? <FieldError id="health-status-error">{formError}</FieldError> : null}
-      </Field>
-      <Field data-invalid={fieldHasError("riskLevel")}>
-        <FieldLabel htmlFor="risk-level">Nivel de riesgo <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-        <select id="risk-level" aria-label="Nivel de riesgo" aria-invalid={fieldHasError("riskLevel")} aria-describedby={fieldHasError("riskLevel") ? "risk-level-help risk-level-error" : "risk-level-help"} className={formControlClass} value={form.riskLevel} onChange={(event) => setForm({ ...form, riskLevel: event.target.value as FormState["riskLevel"] })} required><option value="">Seleccione un nivel</option>{Object.entries(RISK_LEVEL_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <FieldDescription id="risk-level-help">Use el nivel que corresponda a la exposición observada.</FieldDescription>
-        {fieldHasError("riskLevel") ? <FieldError id="risk-level-error">{formError}</FieldError> : null}
-      </Field>
-      <Field data-invalid={fieldHasError("riskType")}>
-        <FieldLabel htmlFor="risk-type">Tipo de riesgo</FieldLabel>
-        <select id="risk-type" aria-label="Tipo de riesgo" aria-invalid={fieldHasError("riskType")} aria-describedby={fieldHasError("riskType") ? "risk-type-help risk-type-error" : "risk-type-help"} className={formControlClass} value={form.riskType} onChange={(event) => setForm({ ...form, riskType: event.target.value })}><option value="">Seleccione un tipo</option>{Object.entries(RISK_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <FieldDescription id="risk-type-help">Obligatorio para niveles de riesgo alto o crítico.</FieldDescription>
-        {fieldHasError("riskType") ? <FieldError id="risk-type-error">{formError}</FieldError> : null}
-      </Field>
-      <Field data-invalid={fieldHasError("suggestedIntervention")}>
-        <FieldLabel htmlFor="suggested-intervention">Intervención sugerida</FieldLabel>
-        <select id="suggested-intervention" aria-label="Intervención sugerida" aria-invalid={fieldHasError("suggestedIntervention")} aria-describedby={fieldHasError("suggestedIntervention") ? "suggested-intervention-help suggested-intervention-error" : "suggested-intervention-help"} className={formControlClass} value={form.suggestedIntervention} onChange={(event) => setForm({ ...form, suggestedIntervention: event.target.value })}><option value="">Sin sugerencia</option>{Object.entries(INTERVENTION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <FieldDescription id="suggested-intervention-help">Registre la acción recomendada, si corresponde.</FieldDescription>
-        {fieldHasError("suggestedIntervention") ? <FieldError id="suggested-intervention-error">{formError}</FieldError> : null}
-      </Field>
-      <FieldGroup className="gap-3">
-        <Field className="flex-row items-start gap-2"><input id="street-closure" type="checkbox" className="mt-1 size-4 border border-[var(--color-border-strong)] accent-[var(--color-action)]" checked={form.requiresStreetClosure} onChange={(event) => setForm({ ...form, requiresStreetClosure: event.target.checked })} /><FieldLabel htmlFor="street-closure" className="font-normal">Requiere corte de calle</FieldLabel></Field>
-        <Field className="flex-row items-start gap-2"><input id="public-works" type="checkbox" className="mt-1 size-4 border border-[var(--color-border-strong)] accent-[var(--color-action)]" checked={form.requiresPublicWorks} onChange={(event) => setForm({ ...form, requiresPublicWorks: event.target.checked })} /><FieldLabel htmlFor="public-works" className="font-normal">Requiere obras públicas</FieldLabel></Field>
-      </FieldGroup>
-      <Field data-invalid={fieldHasError("notes")}>
-        <FieldLabel htmlFor="survey-notes">Observaciones</FieldLabel>
-        <textarea id="survey-notes" aria-label="Observaciones" aria-invalid={fieldHasError("notes")} aria-describedby={fieldHasError("notes") ? "survey-notes-help survey-notes-error" : "survey-notes-help"} className={`${formControlClass} min-h-24`} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-        <FieldDescription id="survey-notes-help">Describa hallazgos relevantes para el seguimiento operativo.</FieldDescription>
-        {fieldHasError("notes") ? <FieldError id="survey-notes-error">{formError}</FieldError> : null}
-      </Field>
-    </FieldGroup></form><DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={isSubmitting}>Cancelar</Button><Button type="submit" form="tree-survey-form" disabled={isSubmitting}>{isSubmitting ? "Guardando…" : "Guardar relevamiento"}</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={Boolean(detail)} onOpenChange={(open) => !open && setDetail(null)}><DialogContent><DialogHeader><DialogTitle>Detalle del relevamiento</DialogTitle><DialogDescription>Registro de lectura. Los relevamientos existentes no se pueden modificar ni eliminar.</DialogDescription></DialogHeader>{detailLoading ? <p role="status">Cargando detalle…</p> : null}{detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}{detail && !detailError ? <dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha</dt><dd className="mt-0.5">{dateTimeLabel(detail.surveyedAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estado sanitario</dt><dd className="mt-1"><HealthBadge status={detail.healthStatus} /></dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nivel de riesgo</dt><dd className="mt-1"><RiskBadge level={detail.riskLevel} /></dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de riesgo</dt><dd className="mt-0.5">{detail.riskType ? RISK_TYPE_LABELS[detail.riskType] : "No informado"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Intervención sugerida</dt><dd className="mt-0.5">{detail.suggestedIntervention ? INTERVENTION_LABELS[detail.suggestedIntervention] : "No sugerida"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Requiere corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Requiere obras públicas</dt><dd className="mt-0.5">{detail.requiresPublicWorks ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Observaciones</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.notes ?? "Sin observaciones registradas."}</dd></div></dl> : null}<DialogFooter><Button type="button" variant="outline" onClick={() => setDetail(null)}>Cerrar detalle</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={formOpen} onOpenChange={setFormOpen}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Registrar relevamiento</DialogTitle><DialogDescription>Observación ambiental del árbol. El registro quedará guardado como parte del historial inmutable.</DialogDescription></DialogHeader>
+        {formError && fieldHasError("form") ? <Alert variant="destructive"><AlertDescription>{formError}</AlertDescription></Alert> : null}
+        <form id="tree-survey-form" className="flex min-h-0 flex-1 flex-col" onSubmit={(event) => void submit(event)} noValidate>
+          <FieldGroup className="gap-4">
+            <Field data-invalid={fieldHasError("surveyedAt")}>
+              <FieldLabel htmlFor="surveyed-at">Fecha del relevamiento <span>(obligatorio)</span></FieldLabel>
+              <DatePicker id="surveyed-at" aria-describedby={fieldHasError("surveyedAt") ? "surveyed-at-help surveyed-at-error" : "surveyed-at-help"} invalid={fieldHasError("surveyedAt")} max={today} value={form.surveyedAt} onChange={(surveyedAt) => setForm({ ...form, surveyedAt })} />
+              <FieldDescription className="text-xs leading-4" id="surveyed-at-help">Indique la fecha en que se realizó la observación.</FieldDescription>
+              {fieldHasError("surveyedAt") ? <FieldError id="surveyed-at-error">{formError}</FieldError> : null}
+            </Field>
+            <Field data-invalid={fieldHasError("healthStatus")}>
+              <FieldLabel htmlFor="health-status">Estado sanitario <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+              <Select items={HEALTH_LABELS} value={form.healthStatus || null} onValueChange={(value) => setForm({ ...form, healthStatus: String(value ?? "") as FormState["healthStatus"] })}>
+                <SelectTrigger id="health-status" aria-label="Estado sanitario" aria-required="true" aria-invalid={fieldHasError("healthStatus")} aria-describedby={fieldHasError("healthStatus") ? "health-status-help health-status-error" : "health-status-help"}><SelectValue placeholder="Seleccione un estado" /></SelectTrigger>
+                <SelectContent><SelectGroup>{Object.entries(HEALTH_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+              <FieldDescription className="text-xs leading-4" id="health-status-help">Seleccione el estado observado durante el relevamiento.</FieldDescription>
+              {fieldHasError("healthStatus") ? <FieldError id="health-status-error">{formError}</FieldError> : null}
+            </Field>
+            <Field data-invalid={fieldHasError("riskLevel")}>
+              <FieldLabel htmlFor="risk-level">Nivel de riesgo <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+              <Select items={RISK_LEVEL_LABELS} value={form.riskLevel || null} onValueChange={(value) => setForm({ ...form, riskLevel: String(value ?? "") as FormState["riskLevel"] })}>
+                <SelectTrigger id="risk-level" aria-label="Nivel de riesgo" aria-required="true" aria-invalid={fieldHasError("riskLevel")} aria-describedby={fieldHasError("riskLevel") ? "risk-level-help risk-level-error" : "risk-level-help"}><SelectValue placeholder="Seleccione un nivel" /></SelectTrigger>
+                <SelectContent><SelectGroup>{Object.entries(RISK_LEVEL_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+              <FieldDescription className="text-xs leading-4" id="risk-level-help">Use el nivel que corresponda a la exposición observada.</FieldDescription>
+              {fieldHasError("riskLevel") ? <FieldError id="risk-level-error">{formError}</FieldError> : null}
+            </Field>
+            <Field data-invalid={fieldHasError("riskType")}>
+              <FieldLabel htmlFor="risk-type">Tipo de riesgo</FieldLabel>
+              <Select items={RISK_TYPE_LABELS} value={form.riskType || null} onValueChange={(value) => setForm({ ...form, riskType: String(value ?? "") })}>
+                <SelectTrigger id="risk-type" aria-label="Tipo de riesgo" aria-required={form.riskLevel === "HIGH" || form.riskLevel === "CRITICAL"} aria-invalid={fieldHasError("riskType")} aria-describedby={fieldHasError("riskType") ? "risk-type-help risk-type-error" : "risk-type-help"}><SelectValue placeholder="Seleccione un tipo" /></SelectTrigger>
+                <SelectContent><SelectGroup>{Object.entries(RISK_TYPE_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+              <FieldDescription className="text-xs leading-4" id="risk-type-help">Obligatorio para niveles de riesgo alto o crítico.</FieldDescription>
+              {fieldHasError("riskType") ? <FieldError id="risk-type-error">{formError}</FieldError> : null}
+            </Field>
+            <Field data-invalid={fieldHasError("suggestedIntervention")}>
+              <FieldLabel htmlFor="suggested-intervention">Intervención sugerida</FieldLabel>
+              <Select items={INTERVENTION_LABELS} value={form.suggestedIntervention || null} onValueChange={(value) => setForm({ ...form, suggestedIntervention: String(value ?? "") })}>
+                <SelectTrigger id="suggested-intervention" aria-label="Intervención sugerida" aria-invalid={fieldHasError("suggestedIntervention")} aria-describedby={fieldHasError("suggestedIntervention") ? "suggested-intervention-help suggested-intervention-error" : "suggested-intervention-help"}><SelectValue placeholder="Sin sugerencia" /></SelectTrigger>
+                <SelectContent><SelectGroup>{Object.entries(INTERVENTION_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+              <FieldDescription className="text-xs leading-4" id="suggested-intervention-help">Registre la acción recomendada, si corresponde.</FieldDescription>
+              {fieldHasError("suggestedIntervention") ? <FieldError id="suggested-intervention-error">{formError}</FieldError> : null}
+            </Field>
+            <FieldSet className="gap-3">
+              <FieldLegend variant="label">Condiciones asociadas</FieldLegend>
+              <Field orientation="horizontal" className="items-center"><Checkbox id="street-closure" checked={form.requiresStreetClosure} onCheckedChange={(checked) => setForm({ ...form, requiresStreetClosure: Boolean(checked) })} /><FieldLabel htmlFor="street-closure" className="font-normal">Requiere corte de calle</FieldLabel></Field>
+              <Field orientation="horizontal" className="items-center"><Checkbox id="public-works" checked={form.requiresPublicWorks} onCheckedChange={(checked) => setForm({ ...form, requiresPublicWorks: Boolean(checked) })} /><FieldLabel htmlFor="public-works" className="font-normal">Requiere obras públicas</FieldLabel></Field>
+            </FieldSet>
+            <Field data-invalid={fieldHasError("notes")}>
+              <FieldLabel htmlFor="survey-notes">Observaciones</FieldLabel>
+              <Textarea id="survey-notes" aria-label="Observaciones" aria-invalid={fieldHasError("notes")} aria-describedby={fieldHasError("notes") ? "survey-notes-help survey-notes-error" : "survey-notes-help"} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+              <FieldDescription className="text-xs leading-4" id="survey-notes-help">Describa hallazgos relevantes para el seguimiento operativo.</FieldDescription>
+              {fieldHasError("notes") ? <FieldError id="survey-notes-error">{formError}</FieldError> : null}
+            </Field>
+          </FieldGroup>
+          <DialogFooter className="flex-col items-stretch sm:flex-row sm:items-center"><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={isSubmitting}>Cancelar</Button><Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Guardando…" : "Guardar relevamiento"}</Button></DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={Boolean(detail)} onOpenChange={(open) => !open && setDetail(null)}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Detalle del relevamiento</DialogTitle><DialogDescription>Registro de lectura. Los relevamientos existentes no se pueden modificar ni eliminar.</DialogDescription></DialogHeader>{detailLoading ? <Alert role="status"><AlertDescription>Cargando detalle…</AlertDescription></Alert> : null}{detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}{detail && !detailError ? <dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha</dt><dd className="mt-0.5">{dateTimeLabel(detail.surveyedAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estado sanitario</dt><dd className="mt-1"><HealthBadge status={detail.healthStatus} /></dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nivel de riesgo</dt><dd className="mt-1"><RiskBadge level={detail.riskLevel} /></dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de riesgo</dt><dd className="mt-0.5">{detail.riskType ? RISK_TYPE_LABELS[detail.riskType] : "No informado"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Intervención sugerida</dt><dd className="mt-0.5">{detail.suggestedIntervention ? INTERVENTION_LABELS[detail.suggestedIntervention] : "No sugerida"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Requiere corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Requiere obras públicas</dt><dd className="mt-0.5">{detail.requiresPublicWorks ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Observaciones</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.notes ?? "Sin observaciones registradas."}</dd></div></dl> : null}<DialogFooter><Button type="button" variant="outline" onClick={() => setDetail(null)}>Cerrar detalle</Button></DialogFooter></DialogContent></Dialog>
   </section>;
 }

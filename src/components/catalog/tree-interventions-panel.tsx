@@ -8,11 +8,17 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
-import { formControlClass } from "@/components/ui/form-control";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Item, ItemGroup } from "@/components/ui/item";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { TimePicker } from "@/components/ui/time-picker";
 import { CreateStreetClosureRequestDialog } from "@/components/services/create-street-closure-request-dialog";
 import Link from "next/link";
 import { servicesAdapter, type CreateServiceInput, type Service } from "@/lib/services";
@@ -103,10 +109,25 @@ function treeName(tree: Tree) {
 }
 
 function dateTimeLabel(value?: string | null) {
-  return value ? new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "No registrada";
+  return value ? new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date(value)) : "No registrada";
 }
 
 const emptySchedule = () => ({ scheduledDate: todayInArgentina(), windowFrom: "08:00", windowTo: "12:00", crewId: "", vehicleId: "" });
+type ScheduleField = "scheduledDate" | "windowFrom" | "windowTo";
+const SCHEDULE_REQUIRED_ERROR = "Seleccione una fecha y complete ambas horas para programar el servicio.";
+const SCHEDULE_FIELD_ERRORS: Record<ScheduleField, string> = {
+  scheduledDate: "Seleccione una fecha programada.",
+  windowFrom: "Seleccione una hora de inicio.",
+  windowTo: "Seleccione una hora de finalización.",
+};
 const SERVICE_LOOKUP_FAILURE = "No se pudo verificar si ya existe un servicio para esta intervención. Reintente.";
 const SERVICE_LOOKUP_PAGE_LIMIT = 20;
 
@@ -163,55 +184,70 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
   const fieldHasError = (field: string) => formErrorField === field;
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Solicitar intervención</DialogTitle>
           <DialogDescription>Registre qué intervención requiere uno o más árboles. La solicitud comenzará en estado solicitada.</DialogDescription>
         </DialogHeader>
         {formError && fieldHasError("form") ? <Alert variant="destructive"><AlertDescription>{formError}</AlertDescription></Alert> : null}
-        <form id="tree-intervention-form" onSubmit={(event) => void submit(event)} noValidate>
-          <FieldGroup>
+        <form id="tree-intervention-form" className="flex min-h-0 flex-1 flex-col" onSubmit={(event) => void submit(event)} noValidate>
+          <FieldGroup className="gap-4">
             <Field data-invalid={fieldHasError("interventionType")}>
               <FieldLabel htmlFor="intervention-type">Tipo de intervención <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-              <select id="intervention-type" className={formControlClass} value={form.interventionType} aria-invalid={fieldHasError("interventionType")} aria-describedby={fieldHasError("interventionType") ? "intervention-type-error" : undefined} onChange={(event) => setForm({ ...form, interventionType: event.target.value as RequestForm["interventionType"] })} required>
-                <option value="">Seleccione un tipo</option>
-                {Object.entries(TREE_INTERVENTION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
+              <Select items={TREE_INTERVENTION_LABELS} value={form.interventionType || null} onValueChange={(value) => setForm({ ...form, interventionType: String(value ?? "") as RequestForm["interventionType"] })}>
+              <SelectTrigger id="intervention-type" aria-label="Tipo de intervención" aria-required="true" aria-invalid={fieldHasError("interventionType")} aria-describedby={fieldHasError("interventionType") ? "intervention-type-error" : undefined}><SelectValue placeholder="Seleccione un tipo" /></SelectTrigger>
+                <SelectContent><SelectGroup>{Object.entries(TREE_INTERVENTION_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
               {fieldHasError("interventionType") ? <FieldError id="intervention-type-error">{formError}</FieldError> : null}
             </Field>
             <Field data-invalid={fieldHasError("treeIds")}>
               <FieldLabel htmlFor="intervention-trees">Árboles a intervenir <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-              <select id="intervention-trees" multiple size={Math.min(6, Math.max(3, props.trees.length))} className={`${formControlClass} h-auto py-2`} value={form.treeIds} aria-invalid={fieldHasError("treeIds")} aria-describedby={fieldHasError("treeIds") ? "intervention-trees-help intervention-trees-error" : "intervention-trees-help"} onChange={(event) => setForm({ ...form, treeIds: Array.from(event.target.selectedOptions, (option) => option.value), address: form.address || props.trees.find((tree) => tree.id === event.target.value)?.address || "" })}>
-                {props.trees.map((tree) => <option key={tree.id} value={tree.id}>{treeName(tree)} · {tree.address ?? "Sin dirección"}</option>)}
-              </select>
-              <FieldDescription id="intervention-trees-help">Mantenga presionada la tecla Ctrl o ⌘ para seleccionar más de un árbol.</FieldDescription>
+              <Select
+                items={Object.fromEntries(props.trees.map((tree) => [tree.id, `${treeName(tree)} · ${tree.address ?? "Sin dirección"}`]))}
+                multiple
+                value={form.treeIds}
+                onValueChange={(value) => {
+                  const treeIds = Array.isArray(value) ? value.map(String) : [];
+                  const firstSelectedTreeId = treeIds[0];
+                  setForm((current) => ({ ...current, treeIds, address: current.address || props.trees.find((tree) => tree.id === firstSelectedTreeId)?.address || "" }));
+                }}
+              >
+                <SelectTrigger id="intervention-trees" aria-label="Árboles a intervenir" aria-required="true" aria-invalid={fieldHasError("treeIds")} aria-describedby={fieldHasError("treeIds") ? "intervention-trees-help intervention-trees-error" : "intervention-trees-help"}>
+                  <SelectValue placeholder="Seleccione uno o más árboles" />
+                </SelectTrigger>
+                <SelectContent><SelectGroup>{props.trees.map((tree) => <SelectItem key={tree.id} value={tree.id}>{treeName(tree)} · {tree.address ?? "Sin dirección"}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+              <FieldDescription className="text-xs leading-4" id="intervention-trees-help">Seleccione uno o más ejemplares; puede elegir varios árboles.</FieldDescription>
               {fieldHasError("treeIds") ? <FieldError id="intervention-trees-error">{formError}</FieldError> : null}
             </Field>
             <Field data-invalid={fieldHasError("address")}>
               <FieldLabel htmlFor="intervention-address">Dirección <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-              <input id="intervention-address" className={formControlClass} value={form.address} aria-invalid={fieldHasError("address")} aria-describedby={fieldHasError("address") ? "intervention-address-error" : undefined} onChange={(event) => setForm({ ...form, address: event.target.value })} required />
+              <Input id="intervention-address" value={form.address} aria-invalid={fieldHasError("address")} aria-describedby={fieldHasError("address") ? "intervention-address-error" : undefined} onChange={(event) => setForm({ ...form, address: event.target.value })} required />
               {fieldHasError("address") ? <FieldError id="intervention-address-error">{formError}</FieldError> : null}
             </Field>
             <Field>
               <FieldLabel htmlFor="intervention-priority">Prioridad <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-              <select id="intervention-priority" className={formControlClass} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as RequestForm["priority"] })}>{Object.entries(PRIORITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+              <Select items={PRIORITY_LABELS} value={form.priority} onValueChange={(value) => setForm({ ...form, priority: String(value) as RequestForm["priority"] })}>
+                <SelectTrigger id="intervention-priority" aria-label="Prioridad" aria-required="true"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectGroup>{Object.entries(PRIORITY_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
             </Field>
-            <Field className="flex-row items-start gap-2">
-              <input id="intervention-street-closure" type="checkbox" className="mt-1 size-4 border border-[var(--color-border-strong)] accent-[var(--color-action)]" checked={form.requiresStreetClosure} onChange={(event) => setForm({ ...form, requiresStreetClosure: event.target.checked })} />
+            <Field orientation="horizontal" className="items-center">
+              <Checkbox id="intervention-street-closure" checked={form.requiresStreetClosure} onCheckedChange={(checked) => setForm({ ...form, requiresStreetClosure: Boolean(checked) })} />
               <FieldLabel htmlFor="intervention-street-closure" className="font-normal">Requiere corte de calle</FieldLabel>
             </Field>
             <Field data-invalid={fieldHasError("justification")}>
-              <FieldLabel htmlFor="intervention-justification">Justificación{form.interventionType === "REMOVAL" ? <span aria-hidden="true"> (obligatorio para extracción)</span> : null}</FieldLabel>
-              <textarea id="intervention-justification" className={`${formControlClass} min-h-24`} value={form.justification} aria-invalid={fieldHasError("justification")} aria-describedby={fieldHasError("justification") ? "intervention-justification-help intervention-justification-error" : "intervention-justification-help"} onChange={(event) => setForm({ ...form, justification: event.target.value })} />
-              <FieldDescription id="intervention-justification-help">Es obligatoria para solicitar una extracción. No se adjuntan evidencias en esta etapa.</FieldDescription>
+              <FieldLabel htmlFor="intervention-justification">Justificación{form.interventionType === "REMOVAL" ? <span> (obligatorio para extracción)</span> : null}</FieldLabel>
+              <Textarea id="intervention-justification" value={form.justification} required={form.interventionType === "REMOVAL"} aria-invalid={fieldHasError("justification")} aria-describedby={fieldHasError("justification") ? "intervention-justification-help intervention-justification-error" : "intervention-justification-help"} onChange={(event) => setForm({ ...form, justification: event.target.value })} />
+              <FieldDescription className="text-xs leading-4" id="intervention-justification-help">Es obligatoria para solicitar una extracción. No se adjuntan evidencias en esta etapa.</FieldDescription>
               {fieldHasError("justification") ? <FieldError id="intervention-justification-error">{formError}</FieldError> : null}
             </Field>
           </FieldGroup>
-        </form>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => props.onOpenChange(false)} disabled={isSubmitting}>Cerrar formulario</Button>
-          <Button type="submit" form="tree-intervention-form" disabled={isSubmitting} aria-busy={isSubmitting}>{isSubmitting ? "Creando solicitud…" : "Crear solicitud de intervención"}</Button>
+        <DialogFooter className="flex-col items-stretch sm:flex-row sm:items-center">
+          <Button type="button" variant="outline" className="w-full min-w-0 whitespace-normal sm:w-auto" onClick={() => props.onOpenChange(false)} disabled={isSubmitting}>Cerrar formulario</Button>
+          <Button type="submit" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={isSubmitting} aria-busy={isSubmitting}>{isSubmitting ? "Creando solicitud…" : "Crear solicitud de intervención"}</Button>
         </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -237,6 +273,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState(emptySchedule);
+  const [scheduleFieldErrors, setScheduleFieldErrors] = useState<ScheduleField[]>([]);
   const [resources, setResources] = useState<{ crews: Crew[]; vehicles: Vehicle[] } | "error" | null>(null);
   const [unsyncedService, setUnsyncedService] = useState<PendingServiceLink | null>(null);
   const [serviceLookupStatus, setServiceLookupStatus] = useState<ServiceLookupStatus>("idle");
@@ -448,11 +485,17 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="intervention-type-filter">Tipo de intervención</FieldLabel>
-          <select id="intervention-type-filter" className={formControlClass} aria-label="Filtrar por tipo de intervención" value={interventionType} onChange={(event) => { setInterventionType(event.target.value as TreeInterventionType | ""); setPage(1); }}><option value="">Todos</option>{Object.entries(TREE_INTERVENTION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <Select items={TREE_INTERVENTION_LABELS} value={interventionType || null} onValueChange={(value) => { setInterventionType(String(value ?? "") as TreeInterventionType | ""); setPage(1); }}>
+            <SelectTrigger id="intervention-type-filter" aria-label="Filtrar por tipo de intervención"><SelectValue placeholder="Todos" /></SelectTrigger>
+            <SelectContent><SelectGroup>{Object.entries(TREE_INTERVENTION_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
         </Field>
         <Field>
           <FieldLabel htmlFor="intervention-status-filter">Estado de la solicitud</FieldLabel>
-          <select id="intervention-status-filter" className={formControlClass} aria-label="Filtrar por estado" value={status} onChange={(event) => { setStatus(event.target.value as TreeInterventionStatus | ""); setPage(1); }}><option value="">Todos</option>{Object.entries(TREE_INTERVENTION_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <Select items={TREE_INTERVENTION_STATUS_LABELS} value={status || null} onValueChange={(value) => { setStatus(String(value ?? "") as TreeInterventionStatus | ""); setPage(1); }}>
+            <SelectTrigger id="intervention-status-filter" aria-label="Filtrar por estado"><SelectValue placeholder="Todos" /></SelectTrigger>
+            <SelectContent><SelectGroup>{Object.entries(TREE_INTERVENTION_STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
         </Field>
       </FieldGroup>
       {state.status === "loading" ? <div role="status" aria-label="Cargando intervenciones" className="flex flex-col gap-3"><Skeleton className="h-28 w-full" /><Skeleton className="h-28 w-full" /></div> : null}
@@ -497,16 +540,16 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         />
       ) : null}
       <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { serviceLookupRequest.current += 1; setDetail(null); setUnsyncedService(null); setServiceLookupStatus("idle"); setRejectConfirmOpen(false); } }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle><DialogDescription>Consulte los datos de la solicitud y, según su estado y permisos, registre una decisión de autorización.</DialogDescription></DialogHeader>
-          {detailLoading ? <p role="status">Cargando detalle…</p> : null}
+          {detailLoading ? <Alert role="status"><AlertDescription>Cargando detalle…</AlertDescription></Alert> : null}
           {detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}
-          {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : PRIORITY_LABELS[detail.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ul className="flex flex-col gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <li key={tree?.id ?? detail.treeIds[index]} className="rounded-xl border border-border bg-muted px-3 py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</li>)}</ul></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
+          {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : PRIORITY_LABELS[detail.priority]}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <Item key={tree?.id ?? detail.treeIds[index]} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</Item>)}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
           {detail && !detailLoading && !detailError ? (
             <>
               {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
               {unsyncedService ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>El Servicio {unsyncedService.id}{unsyncedService.title ? ` — ${unsyncedService.title}` : ""} fue creado, pero quedó sin vincular. La vinculación quedó pendiente. Complétela antes de salir de esta página.</span><Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "retry-link"} onClick={() => void retryServiceLink()}><RefreshCw data-icon="inline-start" aria-hidden />{activeAction === "retry-link" ? "Reintentando vinculación…" : "Reintentar vinculación"}</Button></AlertDescription></Alert> : null}
-              {canSchedule && detail.status === "AUTHORIZED" && serviceLookupStatus === "loading" ? <p role="status" className="text-sm text-muted-foreground">Verificando si ya existe un servicio para esta intervención…</p> : null}
+              {canSchedule && detail.status === "AUTHORIZED" && serviceLookupStatus === "loading" ? <Alert role="status"><AlertDescription>Verificando si ya existe un servicio para esta intervención…</AlertDescription></Alert> : null}
               {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && serviceLookupStatus === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{SERVICE_LOOKUP_FAILURE}</span><Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => void verifyExistingService(detail)}>Reintentar</Button></AlertDescription></Alert> : null}
               <div className="flex flex-col gap-3 border-t border-[var(--color-border)] pt-4">
                 {detail.status === "AUTHORIZED" ? (
@@ -528,46 +571,59 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                   </Button>
                 ) : null}
                 {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className="font-mono font-semibold underline" href={serviceSourceHref(detail.serviceId)}>{detail.serviceId}</Link>.</AlertDescription></Alert> : null}
-                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && !scheduleOpen ? <Button type="button" variant="default" disabled={activeAction !== null} onClick={() => { setScheduleForm(emptySchedule()); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
+                {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && !scheduleOpen ? <Button type="button" variant="default" disabled={activeAction !== null} onClick={() => { setScheduleForm(emptySchedule()); setScheduleFieldErrors([]); setActionError(null); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
                 {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && scheduleOpen ? (
                   <form
                     aria-label="Programar servicio para la intervención"
                     className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3"
                     onSubmit={(event) => {
                       event.preventDefault();
+                      const missing: ScheduleField[] = [];
+                      if (!scheduleForm.scheduledDate) missing.push("scheduledDate");
+                      if (!scheduleForm.windowFrom) missing.push("windowFrom");
+                      if (!scheduleForm.windowTo) missing.push("windowTo");
+                      setScheduleFieldErrors(missing);
+                      if (missing.length > 0) {
+                        setActionError(SCHEDULE_REQUIRED_ERROR);
+                        return;
+                      }
+                      setActionError(null);
                       void runAction("schedule", scheduleForm);
                     }}
                   >
                     <p className="text-sm font-semibold">Servicio puntual de ejecución</p>
                     <FieldGroup className="grid gap-3 sm:grid-cols-3">
-                      <Field>
-                        <FieldLabel htmlFor="tree-service-date">Fecha programada</FieldLabel>
-                        <input id="tree-service-date" type="date" required className={formControlClass} value={scheduleForm.scheduledDate} onChange={(event) => setScheduleForm({ ...scheduleForm, scheduledDate: event.target.value })} />
+                      <Field data-invalid={scheduleFieldErrors.includes("scheduledDate")}>
+                        <FieldLabel htmlFor="tree-service-date">Fecha programada <span>(obligatorio)</span></FieldLabel>
+                        <DatePicker id="tree-service-date" value={scheduleForm.scheduledDate} invalid={scheduleFieldErrors.includes("scheduledDate")} aria-describedby={scheduleFieldErrors.includes("scheduledDate") ? "tree-service-date-error" : undefined} onChange={(scheduledDate) => { setScheduleForm({ ...scheduleForm, scheduledDate }); setScheduleFieldErrors((errors) => errors.filter((field) => field !== "scheduledDate")); setActionError((error) => error === SCHEDULE_REQUIRED_ERROR ? null : error); }} />
+                        {scheduleFieldErrors.includes("scheduledDate") ? <FieldError id="tree-service-date-error">{SCHEDULE_FIELD_ERRORS.scheduledDate}</FieldError> : null}
                       </Field>
-                      <Field>
-                        <FieldLabel htmlFor="tree-service-from">Desde</FieldLabel>
-                        <input id="tree-service-from" type="time" required className={formControlClass} value={scheduleForm.windowFrom} onChange={(event) => setScheduleForm({ ...scheduleForm, windowFrom: event.target.value })} />
+                      <Field data-invalid={scheduleFieldErrors.includes("windowFrom")}>
+                        <FieldLabel id="tree-service-from-label" htmlFor="tree-service-from">Desde <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+                        <TimePicker id="tree-service-from" aria-labelledby="tree-service-from-label" aria-label="Desde" required invalid={scheduleFieldErrors.includes("windowFrom")} aria-describedby={scheduleFieldErrors.includes("windowFrom") ? "tree-service-from-error" : undefined} value={scheduleForm.windowFrom} onChange={(windowFrom) => { setScheduleForm({ ...scheduleForm, windowFrom }); setScheduleFieldErrors((errors) => errors.filter((field) => field !== "windowFrom")); setActionError((error) => error === SCHEDULE_REQUIRED_ERROR ? null : error); }} />
+                        {scheduleFieldErrors.includes("windowFrom") ? <FieldError id="tree-service-from-error">{SCHEDULE_FIELD_ERRORS.windowFrom}</FieldError> : null}
                       </Field>
-                      <Field>
-                        <FieldLabel htmlFor="tree-service-to">Hasta</FieldLabel>
-                        <input id="tree-service-to" type="time" required className={formControlClass} value={scheduleForm.windowTo} onChange={(event) => setScheduleForm({ ...scheduleForm, windowTo: event.target.value })} />
+                      <Field data-invalid={scheduleFieldErrors.includes("windowTo")}>
+                        <FieldLabel id="tree-service-to-label" htmlFor="tree-service-to">Hasta <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+                        <TimePicker id="tree-service-to" aria-labelledby="tree-service-to-label" aria-label="Hasta" required invalid={scheduleFieldErrors.includes("windowTo")} aria-describedby={scheduleFieldErrors.includes("windowTo") ? "tree-service-to-error" : undefined} value={scheduleForm.windowTo} onChange={(windowTo) => { setScheduleForm({ ...scheduleForm, windowTo }); setScheduleFieldErrors((errors) => errors.filter((field) => field !== "windowTo")); setActionError((error) => error === SCHEDULE_REQUIRED_ERROR ? null : error); }} />
+                        {scheduleFieldErrors.includes("windowTo") ? <FieldError id="tree-service-to-error">{SCHEDULE_FIELD_ERRORS.windowTo}</FieldError> : null}
                       </Field>
                     </FieldGroup>
                     <FieldGroup className="grid gap-3 sm:grid-cols-2">
                       <Field>
                         <FieldLabel htmlFor="tree-service-crew">Cuadrilla (opcional)</FieldLabel>
-                        <select id="tree-service-crew" className={formControlClass} value={scheduleForm.crewId} disabled={!resources || resources === "error"} onChange={(event) => setScheduleForm({ ...scheduleForm, crewId: event.target.value })}>
-                          <option value="">Sin asignar</option>
-                          {resources && resources !== "error" ? resources.crews.map((crew) => <option key={crew.id} value={crew.id}>{crew.name}</option>) : null}
-                        </select>
+                        <Select items={{ __none__: "Sin asignar", ...Object.fromEntries(resources && resources !== "error" ? resources.crews.map((crew) => [crew.id, crew.name]) : []) }} value={scheduleForm.crewId || "__none__"} disabled={!resources || resources === "error"} onValueChange={(value) => setScheduleForm({ ...scheduleForm, crewId: value === "__none__" ? "" : String(value ?? "") })}>
+                          <SelectTrigger id="tree-service-crew" aria-label="Cuadrilla (opcional)"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectGroup><SelectItem value="__none__">Sin asignar</SelectItem>{resources && resources !== "error" ? resources.crews.map((crew) => <SelectItem key={crew.id} value={crew.id}>{crew.name}</SelectItem>) : null}</SelectGroup></SelectContent>
+                        </Select>
                       </Field>
                       <Field>
                         <FieldLabel htmlFor="tree-service-vehicle">Vehículo (opcional)</FieldLabel>
-                        <select id="tree-service-vehicle" className={formControlClass} value={scheduleForm.vehicleId} disabled={!resources || resources === "error"} onChange={(event) => setScheduleForm({ ...scheduleForm, vehicleId: event.target.value })}>
-                          <option value="">Sin asignar</option>
-                          {resources && resources !== "error" ? resources.vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.plate}</option>) : null}
-                        </select>
-                        {resources === "error" ? <FieldDescription>No se pudieron cargar cuadrillas y vehículos; puede asignarlos después desde Servicios.</FieldDescription> : null}
+                        <Select items={{ __none__: "Sin asignar", ...Object.fromEntries(resources && resources !== "error" ? resources.vehicles.map((vehicle) => [vehicle.id, vehicle.plate]) : []) }} value={scheduleForm.vehicleId || "__none__"} disabled={!resources || resources === "error"} onValueChange={(value) => setScheduleForm({ ...scheduleForm, vehicleId: value === "__none__" ? "" : String(value ?? "") })}>
+                          <SelectTrigger id="tree-service-vehicle" aria-label="Vehículo (opcional)"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectGroup><SelectItem value="__none__">Sin asignar</SelectItem>{resources && resources !== "error" ? resources.vehicles.map((vehicle) => <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.plate}</SelectItem>) : null}</SelectGroup></SelectContent>
+                        </Select>
+                        {resources === "error" ? <FieldDescription className="text-xs leading-4">No se pudieron cargar cuadrillas y vehículos; puede asignarlos después desde Servicios.</FieldDescription> : null}
                       </Field>
                     </FieldGroup>
                     <p className="text-xs text-muted-foreground">{"Se crear\u00e1 un servicio de punto, con el primer \u00e1rbol como objetivo t\u00e9cnico y el listado completo de \u00e1rboles como contexto relacionado."}</p>

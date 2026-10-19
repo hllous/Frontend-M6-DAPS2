@@ -4,11 +4,6 @@
       "count": 1
     }
   },
-  "src/components/catalog/audited-tree-survey-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 11
-    }
-  },
   "src/components/catalog/catalog-deactivation-dialog.tsx": {
     "no-restricted-syntax": {
       "count": 1
@@ -71,12 +66,7 @@
   },
   "src/components/catalog/tree-catalog-panel.tsx": {
     "no-restricted-syntax": {
-      "count": 19
-    }
-  },
-  "src/components/catalog/tree-interventions-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 16
+      "count": 1
     }
   },
   "src/components/catalog/vehicle-catalog-panel.tsx": {
