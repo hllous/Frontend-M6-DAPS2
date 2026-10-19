@@ -142,7 +142,7 @@ export function InventoryMapDrawer({
           >
             {summary}
           </DrawerTrigger>
-          <DrawerContent className={styles.popup} initialFocus={false} style={popupStyle}>
+          <DrawerContent className={cn(styles.popup, expandToViewport && styles.viewportPopup)} initialFocus={false} style={popupStyle}>
             <DrawerHeader className={styles.header}>
               <DrawerTitle>{summary}</DrawerTitle>
               <div className="flex items-center gap-2">
@@ -174,7 +174,7 @@ export function InventoryMapDrawer({
           <span className={styles.grabber} aria-hidden="true" />
           <span>{summary}</span>
         </DrawerTrigger>
-        <DrawerContent className={styles.popup} initialFocus={false} style={popupStyle}>
+        <DrawerContent className={cn(styles.popup, expandToViewport && styles.viewportPopup)} initialFocus={false} style={popupStyle}>
           <DrawerHeader className={styles.header}>
             <DrawerTitle>{summary}</DrawerTitle>
               <DrawerClose render={<Button variant="ghost" size="icon-sm" aria-label="Cerrar lista"><X aria-hidden /></Button>} />

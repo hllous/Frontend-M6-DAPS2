@@ -111,10 +111,10 @@ test("keeps the map box height constant across tabs on desktop and mobile #423",
         await page.getByRole("button", { name: "Mostrar lista" }).click();
         inventoryDialog = page.getByRole("dialog", { name: "Elementos" });
         await expect(inventoryDialog).toBeVisible();
-        listArea = inventoryDialog.locator("section[class*='visibleList'] ul");
+        listArea = inventoryDialog.getByRole("list", { name: "Elementos visibles" });
       } else {
         listArea = label === "Inventario"
-          ? page.locator("section[class*='visibleList'] ul")
+          ? page.getByRole("list", { name: "Elementos visibles" })
           : page.locator("section[class*='viewPanel']");
       }
       await expect.poll(() => listArea.evaluate((element) => getComputedStyle(element).overflowY)).toBe("auto");
@@ -153,4 +153,25 @@ test("keeps the mobile refresh action compact and keyboard accessible #423", asy
   const tooltip = page.getByRole("tooltip");
   await expect(tooltip).toBeVisible();
   await expect(tooltip).toHaveText("Actualizar datos");
+});
+
+test("keeps mobile navigation usable while the inventory drawer is open", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginViaApi(page, "office-duty-queue");
+  await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
+
+  const drawer = page.getByRole("complementary", { name: "Controles de la vista Inventario" });
+  await drawer.getByRole("button", { name: "Mostrar lista" }).click();
+  const panel = page.getByRole("dialog", { name: "Elementos" });
+  await expect(panel).toBeVisible();
+
+  const mobileNavigation = page.getByRole("navigation", { name: "Navegación móvil" });
+  await expect.poll(async () => panel.evaluate((element) => {
+    const navigation = document.querySelector<HTMLElement>('nav[aria-label="Navegación móvil"]');
+    return navigation !== null && element.getBoundingClientRect().bottom <= navigation.getBoundingClientRect().top + 1;
+  })).toBe(true);
+  await expect.poll(() => panel.evaluate((element) => getComputedStyle(element, "::after").backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+  await mobileNavigation.getByRole("link", { name: "Servicios", exact: true }).click();
+
+  await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
 });

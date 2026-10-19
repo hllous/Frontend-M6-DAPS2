@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
@@ -17,6 +17,15 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -758,28 +767,34 @@ function InventoryPanel({
           <p className={styles.locationNotice}>{unlocatedCount} sin coordenadas no se muestran en el mapa.</p>
         ) : null}
         {locatedItems.length > 0 ? (
-          <ul>
+          <ItemGroup className={styles.visibleItemGroup} aria-label="Elementos visibles">
             {locatedItems.map((item) => {
               const isSelected = `${item.layer}-${item.id}` === selectedMapItemKey;
               return (
-                <li key={`${item.layer}-${item.id}`} className={isSelected ? styles.selected : undefined}>
-                  <span className={`${styles.listMarker} ${styles[item.markerTone]}`} aria-hidden />
-                  <span>
+                <Item key={`${item.layer}-${item.id}`} variant={isSelected ? "muted" : "default"} size="xs" className={styles.visibleItem}>
+                  <ItemMedia>
+                    <span className={`${styles.listMarker} ${styles[item.markerTone]}`} aria-hidden />
+                  </ItemMedia>
+                  <ItemContent className={styles.visibleItemContent}>
                     <Toggle
                       type="button"
                       className={cn(styles.itemButton, "h-auto w-full items-start justify-start whitespace-normal text-left")}
                       pressed={isSelected}
                       onPressedChange={() => onSelectItem(item)}
                     >
-                      <strong>{item.title}</strong>
-                      <small>{item.description}</small>
+                      <ItemTitle className="w-full min-w-0">{item.title}</ItemTitle>
+                      <ItemDescription>{item.description}</ItemDescription>
                     </Toggle>
-                    {isSelected && item.layer === "trees" ? <Link className={styles.itemLink} href={treeCatalogHref(item.id)}>Ver ficha del árbol {item.title}</Link> : null}
-                  </span>
-                </li>
+                    {isSelected && item.layer === "trees" ? (
+                      <Link className={buttonVariants({ variant: "link", size: "sm" })} href={treeCatalogHref(item.id)}>
+                        Ver ficha del árbol {item.title}
+                      </Link>
+                    ) : null}
+                  </ItemContent>
+                </Item>
               );
             })}
-          </ul>
+          </ItemGroup>
         ) : (
           <Empty className={styles.emptyState}>
             <EmptyHeader>
@@ -812,25 +827,30 @@ function ZonesMapPanel({
         </div>
         <p>Cuatro polígonos oficiales unidos al catálogo por el código estable de zona.</p>
       </div>
-      <ul className={styles.zoneList}>
+      <ItemGroup className={styles.zoneList} aria-labelledby="zones-view-title">
         {zones.map((zone) => (
-          <li key={zone.code}>
-            <Toggle
+          <Item
+            key={zone.code}
+            variant={selectedZoneCode === zone.code ? "muted" : "default"}
+            size="xs"
+            render={<Toggle
               type="button"
-              className={cn(styles.zoneButton, "h-auto min-w-0 justify-start whitespace-normal text-left", selectedZoneCode === zone.code && styles.selected)}
-              variant="outline"
+              className={cn(styles.zoneButton, "h-auto min-w-0 justify-start whitespace-normal text-left")}
+              variant="default"
               pressed={selectedZoneCode === zone.code}
               onPressedChange={(pressed) => onSelectZone(pressed ? zone.code : "")}
-            >
+            />}
+          >
+            <ItemMedia>
               <span className={`${styles.zoneSwatch} ${styles[zone.code.toLowerCase().replace("-", "")]}`} aria-hidden />
-              <span>
-                <strong>{zone.code}</strong>
-                <small>{zone.name}</small>
-              </span>
-            </Toggle>
-          </li>
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>{zone.code}</ItemTitle>
+              <ItemDescription>{zone.name}</ItemDescription>
+            </ItemContent>
+          </Item>
         ))}
-      </ul>
+      </ItemGroup>
       <p className={styles.mapHint}>Seleccione una zona para destacarla en el mapa. El color no es el único indicador: cada zona conserva su código y nombre.</p>
     </section>
   );
@@ -877,28 +897,33 @@ function CoverageMapPanel({
         {zonesWithData} de {zones.length} zonas con datos
         {coverage ? ` · Actualizado ${formatCoverageFreshness(coverage.freshness.updatedAt)}` : ""}
       </p>
-      <ul className={styles.coverageZoneList}>
+      <ItemGroup className={styles.coverageZoneList} aria-labelledby="coverage-view-title">
         {zones.map((zone) => (
-          <li key={zone.zoneCode}>
-            <Toggle
+          <Item
+            key={zone.zoneCode}
+            variant={selectedZoneCode === zone.zoneCode ? "muted" : "default"}
+            size="xs"
+            render={<Toggle
               type="button"
-              className={cn(styles.coverageZoneButton, "h-auto min-w-0 justify-start whitespace-normal text-left", selectedZoneCode === zone.zoneCode && styles.selected)}
-              variant="outline"
+              className={cn(styles.coverageZoneButton, "h-auto min-w-0 justify-start whitespace-normal text-left")}
+              variant="default"
               pressed={selectedZoneCode === zone.zoneCode}
               onPressedChange={(pressed) => onSelectZone(pressed ? zone.zoneCode : "")}
-            >
+            />}
+          >
+            <ItemMedia>
               <span className={`${styles.coverageLegendSwatch} ${styles[coverageBandSwatchClass[zone.band]]}`} aria-hidden />
-              <span className={styles.coverageZoneCopy}>
-                <strong>{zone.zoneName}</strong>
-                <small>{zone.zoneCode} · {zone.note}</small>
-              </span>
-              <span className={COVERAGE_BAND_CLASSES[zone.band]}>
-                {COVERAGE_BAND_LABELS[zone.band]} · {formatCoverageRate(zone.rate)}
-              </span>
-            </Toggle>
-          </li>
+            </ItemMedia>
+            <ItemContent className={styles.coverageZoneCopy}>
+              <ItemTitle>{zone.zoneName}</ItemTitle>
+              <ItemDescription>{zone.zoneCode} · {zone.note}</ItemDescription>
+            </ItemContent>
+            <span className={COVERAGE_BAND_CLASSES[zone.band]}>
+              {COVERAGE_BAND_LABELS[zone.band]} · {formatCoverageRate(zone.rate)}
+            </span>
+          </Item>
         ))}
-      </ul>
+      </ItemGroup>
       <p className={styles.mapHint}>
         Seleccione una zona para destacarla. El color se acompaña con la tasa, el código y el detalle atendido/programado.
       </p>
@@ -953,26 +978,31 @@ function RouteMapPanel({
             <strong>{selectedRoute.name}</strong>
             <span>{routeStops.length} paradas · {totalRouteDuration(routeStops)} min estimados</span>
           </div>
-          <ol className={styles.routeStopList}>
+          <ItemGroup className={styles.routeStopList} aria-label="Paradas del recorrido">
             {routeStops.map((stop) => (
-              <li key={stop.id}>
-                <Toggle
+              <Item
+                key={stop.id}
+                variant={selectedStopSequence === stop.sequence ? "muted" : "default"}
+                size="xs"
+                render={<Toggle
                   type="button"
-                  className={cn(styles.routeStopButton, "h-auto min-w-0 justify-start whitespace-normal text-left", selectedStopSequence === stop.sequence && styles.selected)}
-                  variant="outline"
+                  className={cn(styles.routeStopButton, "h-auto min-w-0 justify-start whitespace-normal text-left")}
+                  variant="default"
                   pressed={selectedStopSequence === stop.sequence}
                   onPressedChange={(pressed) => onSelectStop(pressed ? stop.sequence : 0)}
-                >
-                  <span className={styles.sequenceBadge} aria-hidden>{stop.sequence}</span>
-                  <span className={styles.routeStopCopy}>
-                    <strong>Parada {stop.sequence}</strong>
-                    <small>{stop.zoneCode} · {stop.zoneName}</small>
-                  </span>
-                  <small className={styles.duration}>{stop.estimatedDurationMin !== null ? `${stop.estimatedDurationMin} min estimados` : "Sin duración"}</small>
-                </Toggle>
-              </li>
+                />}
+              >
+                <ItemMedia className={styles.sequenceBadge} aria-hidden>{stop.sequence}</ItemMedia>
+                <ItemContent className={styles.routeStopCopy}>
+                  <ItemTitle>Parada {stop.sequence}</ItemTitle>
+                  <ItemDescription>{stop.zoneCode} · {stop.zoneName}</ItemDescription>
+                </ItemContent>
+                <ItemActions className={styles.duration}>
+                  <ItemDescription>{stop.estimatedDurationMin !== null ? `${stop.estimatedDurationMin} min estimados` : "Sin duración"}</ItemDescription>
+                </ItemActions>
+              </Item>
             ))}
-          </ol>
+          </ItemGroup>
         </>
       ) : (
         <Empty className={styles.emptyState}>
@@ -1011,20 +1041,22 @@ function TodayMapPanel({
         {services.length} servicio{services.length === 1 ? "" : "s"} programado{services.length === 1 ? "" : "s"} hoy
       </p>
       {zones.length > 0 ? (
-        <ul className={styles.todayZoneList}>
+        <ItemGroup className={styles.todayZoneList} aria-labelledby="today-view-title">
           {zones.map((zone) => (
-            <li key={zone.zoneId}>
-              <span className={`${styles.todayStatus} ${styles[zone.status.toLowerCase()]}`} aria-hidden />
-              <span>
-                <strong>{zone.zoneName}</strong>
-                <small>{zone.zoneCode} · {zone.resultCount}/{zone.serviceCount} resultados registrados</small>
-              </span>
+            <Item key={zone.zoneId} variant="outline" size="xs" className={styles.todayZoneItem}>
+              <ItemMedia>
+                <span className={`${styles.todayStatus} ${styles[zone.status.toLowerCase()]}`} aria-hidden />
+              </ItemMedia>
+              <ItemContent>
+                <ItemTitle>{zone.zoneName}</ItemTitle>
+                <ItemDescription>{zone.zoneCode} · {zone.resultCount}/{zone.serviceCount} resultados registrados</ItemDescription>
+              </ItemContent>
               <span className={`${styles.statusLabel} ${styles[zone.status.toLowerCase()]}`}>
                 {todayStatusLabels[zone.status]}
               </span>
-            </li>
+            </Item>
           ))}
-        </ul>
+        </ItemGroup>
       ) : (
         <Empty className={styles.emptyState}>
           <EmptyHeader>
@@ -1036,19 +1068,22 @@ function TodayMapPanel({
       )}
       {services.length > 0 ? (
         <div className={styles.todayServiceList}>
-          <h3>Servicios incluidos</h3>
-          <ul>
+          <h3 id="today-service-list-title">Servicios incluidos</h3>
+          <ItemGroup className={styles.todayServiceItems} aria-labelledby="today-service-list-title">
             {services.map(({ service, zoneResults }) => (
-              <li key={service.id}>
-                <strong>{service.title}</strong>
-                <small>{service.id} · {service.windowFrom ?? "Horario no informado"}–{service.windowTo ?? ""}</small>
-                <span>{service.zoneIds.map((zoneId) => {
-                  const result = zoneResults.find((candidate) => candidate.zoneId === zoneId);
-                  return `${service.zoneNames[service.zoneIds.indexOf(zoneId)] ?? zoneId}: ${result ? ZONE_RESULT_STATUS_LABEL[result.status] : "Pendiente"}`;
-                }).join(" · ")}</span>
-              </li>
+              <Item key={service.id} variant="outline" size="xs">
+                <ItemContent>
+                  <ItemTitle>{service.title}</ItemTitle>
+                  <ItemDescription>{service.id} · {service.windowFrom ?? "Horario no informado"}–{service.windowTo ?? ""}</ItemDescription>
+                  <ItemDescription>{service.zoneIds.map((zoneId) => {
+                    const result = zoneResults.find((candidate) => candidate.zoneId === zoneId);
+                    return `${service.zoneNames[service.zoneIds.indexOf(zoneId)] ?? zoneId}: ${result ? ZONE_RESULT_STATUS_LABEL[result.status] : "Pendiente"}`;
+                  }).join(" · ")}
+                  </ItemDescription>
+                </ItemContent>
+              </Item>
             ))}
-          </ul>
+          </ItemGroup>
         </div>
       ) : null}
       <p className={styles.mapHint}>La vista consulta el detalle de cada servicio del día para no confundir una zona asignada con una zona efectivamente atendida.</p>

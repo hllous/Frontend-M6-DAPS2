@@ -64,6 +64,8 @@ describe("MapaOperativo", () => {
 
     expect(screen.getByRole("status", { name: "Cargando mapa operativo" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Elementos" })).toBeInTheDocument();
+    const inventoryList = screen.getByRole("list", { name: "Elementos visibles" });
+    expect(within(inventoryList).getAllByRole("listitem").length).toBeGreaterThan(0);
     expect(screen.getByText("CONT-002")).toBeInTheDocument();
     expect(screen.getByText("Punto verde Plaza Mitre")).toBeInTheDocument();
     expect(screen.getByText("Parque del Bicentenario")).toBeInTheDocument();
@@ -158,6 +160,7 @@ describe("MapaOperativo", () => {
     await user.click(await screen.findByRole("tab", { name: "Zonas" }));
 
     expect(await screen.findByRole("heading", { name: "Zonas operativas" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "Zonas operativas" })).toBeVisible();
     expect(screen.getByText("Z-BEL")).toBeVisible();
     expect(screen.getByText("Belgrano")).toBeVisible();
     expect(screen.getByText("Z-PAL")).toBeVisible();
@@ -194,6 +197,7 @@ describe("MapaOperativo", () => {
     await user.click(await screen.findByRole("tab", { name: "Cobertura" }));
 
     expect(await screen.findByRole("heading", { name: "Cobertura por zona" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "Cobertura por zona" })).toBeVisible();
     expect(screen.getByText(/92,5/)).toBeVisible();
     expect(screen.getByText(/148 de 160 objetivos/)).toBeVisible();
     expect(screen.getByText("Cobertura alta")).toBeVisible();
@@ -253,6 +257,7 @@ describe("MapaOperativo", () => {
     await user.click(await screen.findByRole("tab", { name: "Recorrido" }));
 
     expect(await screen.findByRole("heading", { name: "Recorrido Norte" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "Paradas del recorrido" })).toBeVisible();
     expect(screen.getByText("Parada 1")).toBeVisible();
     expect(screen.getByText("Parada 2")).toBeVisible();
     expect(screen.getByText("Parada 3")).toBeVisible();
@@ -354,6 +359,9 @@ describe("MapaOperativo", () => {
     await user.click(await screen.findByRole("tab", { name: "Atención hoy" }));
 
     expect(await screen.findByRole("heading", { name: "Zonas atendidas hoy" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "Zonas atendidas hoy" })).toBeVisible();
+    const serviceList = screen.getByRole("list", { name: "Servicios incluidos" });
+    expect(within(serviceList).getByRole("listitem")).toBeVisible();
     expect(screen.getByText("Belgrano")).toBeVisible();
     expect(screen.getByText("Atendida")).toBeVisible();
     expect(screen.getByText("Palermo")).toBeVisible();

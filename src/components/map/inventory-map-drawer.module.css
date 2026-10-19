@@ -35,6 +35,10 @@
   max-height: calc(100dvh - 9rem - env(safe-area-inset-bottom));
 }
 
+.viewportPopup {
+  --drawer-bleed-background: transparent;
+}
+
 .header {
   display: flex;
   flex-direction: row;
