@@ -32,7 +32,7 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Item, ItemGroup } from "@/components/ui/item";
+import { Item, ItemActions, ItemGroup } from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
 import { referralsAdapter, referralFromRepairRequest, referralFromStreetClosureRequest, type Referral } from "@/lib/referrals";
 import { getReferralAnomalies, type ReferralAnomaly } from "@/lib/referral-anomalies";
@@ -547,11 +547,13 @@ function ReferralRow({
           <span className="mt-1 block truncate text-sm text-[var(--color-text)]">{referralKindDescriptionFor(referral)}</span>
           <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {referral.sourceId} · {referral.sourceLabel}</span>
         </span>
-        <Badge variant="outline" className="h-auto min-h-7 shrink-0 gap-1.5 rounded-full border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text)]" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
-          <ReferralStatusIcon referral={referral} className="h-3.5 w-3.5" />
-          {statusLabel(referral)}
-        </Badge>
-        <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-secondary)] sm:mt-0" aria-hidden />
+        <ItemActions className="ml-auto w-full basis-full justify-end sm:w-auto sm:basis-auto">
+          <Badge variant="outline" className="h-auto min-h-7 shrink-0 gap-1.5 rounded-full border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text)]" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
+            <ReferralStatusIcon referral={referral} className="h-3.5 w-3.5" />
+            {statusLabel(referral)}
+          </Badge>
+          <ArrowUpRight className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" aria-hidden />
+        </ItemActions>
     </Item>
   );
 }
