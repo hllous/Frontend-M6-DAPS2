@@ -398,7 +398,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
             <p id="referrals-scope-note" className="sr-only">
               Seleccione una derivación para consultar su detalle. La fuente canónica se consulta mediante el enlace a su módulo de origen.
             </p>
-            <ItemGroup className="grid gap-3" aria-label="Derivaciones">
+            <ItemGroup className="grid min-w-0 grid-cols-1 gap-3" aria-label="Derivaciones">
               {loadState.referrals.map((referral) => (
                 <ReferralRow
                   key={`${referral.kind}-${referral.id}`}
@@ -547,7 +547,7 @@ function ReferralRow({
           <span className="mt-1 block truncate text-sm text-[var(--color-text)]">{referralKindDescriptionFor(referral)}</span>
           <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {referral.sourceId} · {referral.sourceLabel}</span>
         </span>
-        <ItemActions className="ml-auto w-full basis-full justify-end sm:w-auto sm:basis-auto">
+        <ItemActions className="w-full basis-full justify-end sm:ml-auto sm:w-auto sm:basis-auto">
           <Badge variant="outline" className="h-auto min-h-7 shrink-0 gap-1.5 rounded-full border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text)]" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
             <ReferralStatusIcon referral={referral} className="h-3.5 w-3.5" />
             {statusLabel(referral)}
