@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseCatalogOption } from "./support/catalog-611-controls";
 
 async function openZonesCatalog(page: import("@playwright/test").Page) {
   await loginViaApi(page, "office-duty-queue");
@@ -15,6 +16,11 @@ test.describe("Zone catalog management #106", () => {
     await expect(page.getByText("Z-BEL")).toBeVisible();
     await expect(page.getByText("Belgrano")).toBeVisible();
     await expect(page.getByText("Z-PAL")).toBeVisible();
+
+    await chooseCatalogOption(page, "Filtrar por estado", "Activas");
+    await expect(page.getByText("Z-PAL")).toBeVisible();
+
+    await chooseCatalogOption(page, "Filtrar por estado", "Todos");
 
     // Filter by search
     const searchInput = page.getByLabel("Buscar zonas operativas");
@@ -97,13 +103,13 @@ test.describe("Zone catalog management #106", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: "Gestionar barrios" })).toBeVisible();
     await dialog.getByLabel("Buscar barrios").fill("Industrial");
-    await dialog.getByLabel("Barrio Industrial").check();
+    await dialog.getByRole("checkbox", { name: /Barrio Industrial/ }).click();
     await dialog.getByRole("button", { name: "Asignar seleccionados" }).click();
 
-    await expect(dialog.getByText("Barrios asignados correctamente.")).toBeVisible();
+    await expect(page.getByText("Barrios asignados correctamente.")).toBeVisible();
     await expect(dialog.getByRole("list", { name: "Barrios asignados" }).getByText("Barrio Industrial")).toBeVisible();
 
     await dialog.getByRole("button", { name: "Quitar Barrio Industrial" }).click();
-    await expect(dialog.getByText("Barrio quitado de la zona.")).toBeVisible();
+    await expect(page.getByText("Barrio quitado de la zona.")).toBeVisible();
   });
 });

@@ -9,8 +9,6 @@ import {
   CheckCircle2,
   Clock,
   Eye,
-  Info,
-  Loader2,
   MapPin,
   Pencil,
   Plus,
@@ -24,6 +22,7 @@ import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -34,9 +33,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
-import { formControlClass } from "@/components/ui/form-control";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { notifySuccess } from "@/components/ui/feedback";
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   type CreateRouteInput,
@@ -210,6 +221,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       // with an empty stops section and an obvious call-to-action, not an auto-redirect into stop-editing mode."
       setSelectedRoute(created);
       setRequestVersion((v) => v + 1);
+      notifySuccess("Recorrido creado.");
     } catch (caught) {
       const message =
         caught instanceof RouteRequestError
@@ -247,6 +259,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         setSelectedRoute(updated);
       }
       setRequestVersion((v) => v + 1);
+      notifySuccess("Cambios guardados.");
     } catch (caught) {
       const message =
         caught instanceof RouteRequestError
@@ -286,6 +299,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         setSelectedRoute(updated);
       }
       setRequestVersion((v) => v + 1);
+      notifySuccess("Recorrido dado de baja.");
     } catch (caught) {
       setDeactivateError(caught instanceof RouteRequestError ? caught.message : "No se pudo dar de baja el recorrido.");
     } finally {
@@ -443,6 +457,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       setSelectedRoute(updated);
       setIsEditingStops(false);
       setRequestVersion((v) => v + 1);
+      notifySuccess("Secuencia de paradas guardada.");
     } catch (caught) {
       const message =
         caught instanceof RouteRequestError
@@ -489,15 +504,9 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 <span className="inline-flex items-center rounded-md bg-secondary px-2.5 py-0.5 text-xs font-mono font-medium text-secondary-foreground">
                   {selectedRoute.code}
                 </span>
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    selectedRoute.active
-                      ? "bg-[var(--color-success-fill)] text-[var(--color-success)]"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
+                <Badge variant={selectedRoute.active ? "success" : "secondary"}>
                   {selectedRoute.active ? "Activo" : "Inactivo"}
-                </span>
+                </Badge>
               </div>
               <h2 className="text-xl font-semibold text-foreground">
                 {selectedRoute.name}
@@ -706,65 +715,77 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <div className="flex flex-wrap items-center justify-between gap-2 self-stretch sm:flex-nowrap sm:self-auto">
                             <div className="flex items-center gap-1.5">
-                              <label
+                              <FieldLabel
                                 htmlFor={`duration-${idx}`}
                                 className="text-xs text-muted-foreground whitespace-nowrap"
                               >
                                 Duración:
-                              </label>
-                              <input
+                              </FieldLabel>
+                              <Input
                                 id={`duration-${idx}`}
                                 type="number"
                                 min={1}
                                 max={1440}
                                 value={stop.estimatedDurationMin}
                                 onChange={(e) => handleDurationChange(idx, Number(e.target.value))}
-                                className="h-10 w-20 rounded-md border border-input bg-transparent px-2 text-xs text-right max-[760px]:h-12"
+                                className="h-10 w-20 px-2 text-right text-xs"
                                 data-testid={`stop-duration-input-${idx}`}
                               />
                               <span className="text-xs text-muted-foreground">min</span>
                             </div>
-                            <div className="flex items-center gap-1 ml-2">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleMoveStop(idx, "up")}
-                                disabled={idx === 0}
-                                className="h-10 w-10 p-0 max-[760px]:h-12 max-[760px]:w-12"
-                                title="Mover arriba"
-                                aria-label="Mover arriba"
-                                data-testid={`stop-move-up-${idx}`}
-                              >
-                                <ArrowUp className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleMoveStop(idx, "down")}
-                                disabled={idx === draftStops.length - 1}
-                                className="h-10 w-10 p-0 max-[760px]:h-12 max-[760px]:w-12"
-                                title="Mover abajo"
-                                aria-label="Mover abajo"
-                                data-testid={`stop-move-down-${idx}`}
-                              >
-                                <ArrowDown className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveStop(idx)}
-                                className="h-10 w-10 p-0 text-destructive hover:bg-destructive/10 max-[760px]:h-12 max-[760px]:w-12"
-                                title="Quitar parada"
-                                aria-label="Quitar parada"
-                                data-testid={`stop-remove-${idx}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                            <div className="flex items-center gap-1 sm:ml-2">
+                              <Tooltip>
+                                <TooltipTrigger render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleMoveStop(idx, "up")}
+                                    disabled={idx === 0}
+                                    className="h-10 w-10 p-0 max-[760px]:h-12 max-[760px]:w-12"
+                                    aria-label="Mover arriba"
+                                    data-testid={`stop-move-up-${idx}`}
+                                  >
+                                    <ArrowUp className="h-3.5 w-3.5" />
+                                  </Button>
+                                } />
+                                <TooltipContent>Mover arriba</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleMoveStop(idx, "down")}
+                                    disabled={idx === draftStops.length - 1}
+                                    className="h-10 w-10 p-0 max-[760px]:h-12 max-[760px]:w-12"
+                                    aria-label="Mover abajo"
+                                    data-testid={`stop-move-down-${idx}`}
+                                  >
+                                    <ArrowDown className="h-3.5 w-3.5" />
+                                  </Button>
+                                } />
+                                <TooltipContent>Mover abajo</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveStop(idx)}
+                                    className="h-10 w-10 p-0 text-destructive hover:bg-destructive/10 max-[760px]:h-12 max-[760px]:w-12"
+                                    aria-label="Quitar parada"
+                                    data-testid={`stop-remove-${idx}`}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                } />
+                                <TooltipContent>Quitar parada</TooltipContent>
+                              </Tooltip>
                             </div>
                           </div>
                         </div>
@@ -779,45 +800,56 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                     Agregar parada operativa al recorrido
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <div className="flex-1">
-                      <label htmlFor="stop-zone-select" className="mb-1 block text-xs font-medium text-foreground">
+                    <Field className="flex-1">
+                      <FieldLabel htmlFor="stop-zone-select" className="mb-1 text-xs font-medium text-foreground">
                         Zona operativa
-                      </label>
-                      <select
-                        id="stop-zone-select"
-                        value={newStopZoneId}
-                        onChange={(e) => setNewStopZoneId(e.target.value)}
-                        className={`${formControlClass} w-full text-xs`}
-                        data-testid="stop-zone-select"
+                      </FieldLabel>
+                      <Select
+                        value={newStopZoneId || null}
+                        items={Object.fromEntries(
+                          availableZones
+                            .filter((zone) => zone.active)
+                            .map((zone) => [
+                              zone.id,
+                              `${zone.code} — ${zone.name}${draftStops.some((stop) => stop.zoneId === zone.id) ? " (Ya en recorrido)" : ""}`,
+                            ]),
+                        )}
+                        onValueChange={(value) => setNewStopZoneId(value ?? "")}
                       >
-                        <option value="">Seleccione una zona operativa activa...</option>
-                        {availableZones
-                          .filter((z) => z.active)
-                          .map((z) => {
-                            const isAlreadyAdded = draftStops.some((s) => s.zoneId === z.id);
-                            return (
-                              <option key={z.id} value={z.id}>
-                                {z.code} — {z.name} {isAlreadyAdded ? "(Ya en recorrido)" : ""}
-                              </option>
-                            );
-                          })}
-                      </select>
-                    </div>
+                        <SelectTrigger id="stop-zone-select" aria-label="Zona operativa" data-testid="stop-zone-select" className="text-xs">
+                          <SelectValue placeholder="Seleccione una zona operativa activa..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {availableZones
+                              .filter((z) => z.active)
+                              .map((z) => {
+                                const isAlreadyAdded = draftStops.some((s) => s.zoneId === z.id);
+                                return (
+                                  <SelectItem key={z.id} value={z.id}>
+                                    {z.code} — {z.name}{isAlreadyAdded ? " (Ya en recorrido)" : ""}
+                                  </SelectItem>
+                                );
+                              })}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
                     <div className="flex items-center gap-1.5">
-                      <label
+                      <FieldLabel
                         htmlFor="new-stop-duration"
                         className="text-xs text-muted-foreground whitespace-nowrap"
                       >
                         Duración est.:
-                      </label>
-                      <input
+                      </FieldLabel>
+                      <Input
                         id="new-stop-duration"
                         type="number"
                         min={1}
                         max={1440}
                         value={newStopDuration}
                         onChange={(e) => setNewStopDuration(Number(e.target.value))}
-                        className="h-10 max-[760px]:h-12 w-20 rounded-md border border-input bg-transparent px-2 text-xs text-right"
+                        className="h-10 w-20 px-2 text-right text-xs"
                         data-testid="stop-duration-input"
                       />
                       <span className="text-xs text-muted-foreground">min</span>
@@ -863,7 +895,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                       className="inline-flex items-center gap-1.5"
                       data-testid="save-sequence-button"
                     >
-                      {isSavingStops && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {isSavingStops && <Spinner aria-hidden="true" className="size-3.5" />}
                       Guardar secuencia
                     </Button>
                   </div>
@@ -878,60 +910,75 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border bg-card p-4">
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           {/* Search */}
-          <div className="relative flex-1 max-w-sm">
-            <label htmlFor="search-routes-input" className="mb-1 block text-xs font-medium text-foreground">
+          <div className="relative min-w-0 max-w-sm flex-1">
+            <FieldLabel htmlFor="search-routes-input" className="mb-1 text-xs font-medium text-foreground">
               Buscar recorridos
-            </label>
-            <Search className="absolute left-2.5 top-8 h-4 w-4 text-muted-foreground max-[760px]:top-9" />
-            <input
-              id="search-routes-input"
-              type="text"
-              placeholder="Buscar por código o nombre..."
-              value={search}
-              maxLength={MAX_SEARCH_LENGTH}
-              onChange={(e) => setSearch(e.target.value)}
-              className={`${formControlClass} pl-9 w-full`}
-              data-testid="search-routes-input"
-            />
+            </FieldLabel>
+            <div className="relative flex w-full items-center">
+              <Search aria-hidden="true" className="absolute left-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="search-routes-input"
+                type="text"
+                placeholder="Buscar por código o nombre..."
+                value={search}
+                maxLength={MAX_SEARCH_LENGTH}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+                data-testid="search-routes-input"
+              />
+            </div>
           </div>
 
           {/* Active status filter */}
           <div className="flex items-center gap-2">
-            <label htmlFor="route-active-filter" className="text-xs text-muted-foreground whitespace-nowrap">
+            <FieldLabel htmlFor="route-active-filter" className="text-xs text-muted-foreground whitespace-nowrap">
               Estado:
-            </label>
-            <select
-              id="route-active-filter"
+            </FieldLabel>
+            <Select
               value={activeFilter}
-              onChange={(e) => setActiveFilter(e.target.value as "all" | "true" | "false")}
-              className={formControlClass}
-              data-testid="active-filter-select"
+              items={{ all: "Todos", true: "Solo activos", false: "Solo inactivos" }}
+              onValueChange={(value) => setActiveFilter(value as "all" | "true" | "false")}
             >
-              <option value="all">Todos</option>
-              <option value="true">Solo activos</option>
-              <option value="false">Solo inactivos</option>
-            </select>
+              <SelectTrigger id="route-active-filter" aria-label="Estado:" data-testid="active-filter-select" className="sm:w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="true">Solo activos</SelectItem>
+                  <SelectItem value="false">Solo inactivos</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Zone filter */}
           <div className="flex items-center gap-2">
-            <label htmlFor="route-zone-filter" className="text-xs text-muted-foreground whitespace-nowrap">
+            <FieldLabel htmlFor="route-zone-filter" className="text-xs text-muted-foreground whitespace-nowrap">
               Zona:
-            </label>
-            <select
-              id="route-zone-filter"
+            </FieldLabel>
+            <Select
               value={zoneFilter}
-              onChange={(e) => setZoneFilter(e.target.value)}
-              className={formControlClass}
-              data-testid="zone-filter-select"
+              items={Object.fromEntries([
+                ["all", "Todas las zonas"],
+                ...availableZones.map((zone) => [zone.id, `${zone.name} (${zone.code})`]),
+              ])}
+              onValueChange={(value) => setZoneFilter(value ?? "all")}
             >
-              <option value="all">Todas las zonas</option>
-              {availableZones.map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.name} ({z.code})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="route-zone-filter" aria-label="Zona:" data-testid="zone-filter-select" className="sm:w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">Todas las zonas</SelectItem>
+                  {availableZones.map((z) => (
+                    <SelectItem key={z.id} value={z.id}>
+                      {z.name} ({z.code})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -940,7 +987,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
           size="sm"
           onClick={() => setRequestVersion((v) => v + 1)}
           className="inline-flex items-center gap-1.5 self-start sm:self-auto"
-          title="Actualizar listado"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Actualizar
@@ -1037,15 +1083,9 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          route.active
-                            ? "bg-[var(--color-success-fill)] text-[var(--color-success)]"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
+                      <Badge variant={route.active ? "success" : "secondary"}>
                         {route.active ? "Activo" : "Inactivo"}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center justify-end gap-1">
@@ -1054,7 +1094,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                           size="sm"
                           onClick={() => setSelectedRoute(route)}
                           className="h-8 px-2 text-xs"
-                          title="Ver detalle"
                           data-testid={`view-route-${route.id}`}
                         >
                           <Eye className="h-3.5 w-3.5 mr-1" />
@@ -1062,29 +1101,37 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                         </Button>
                         {canManage && (
                           <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenEdit(route)}
-                              className="h-8 px-2 text-xs"
-                              title="Editar recorrido"
-                              data-testid={`edit-route-${route.id}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                              <span className="sr-only">Editar</span>
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger render={
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenEdit(route)}
+                                  className="h-8 px-2 text-xs"
+                                  aria-label="Editar recorrido"
+                                  data-testid={`edit-route-${route.id}`}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              } />
+                              <TooltipContent>Editar recorrido</TooltipContent>
+                            </Tooltip>
                             {route.active && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleOpenDeactivate(route)}
-                                className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
-                                title="Desactivar recorrido"
-                                data-testid={`deactivate-route-${route.id}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                <span className="sr-only">Desactivar</span>
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger render={
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleOpenDeactivate(route)}
+                                    className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
+                                    aria-label="Desactivar recorrido"
+                                    data-testid={`deactivate-route-${route.id}`}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                } />
+                                <TooltipContent>Desactivar recorrido</TooltipContent>
+                              </Tooltip>
                             )}
                           </>
                         )}
@@ -1110,30 +1157,24 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
             </DialogHeader>
 
             {createError && (
-              <div
-                className="rounded-md bg-destructive/15 p-3 text-xs text-destructive font-medium"
-                data-testid="create-route-error"
-              >
-                {createError}
-              </div>
+              <Alert variant="destructive" data-testid="create-route-error">
+                <AlertDescription>{createError}</AlertDescription>
+              </Alert>
             )}
 
             <FieldGroup className="space-y-3">
               <Field>
                 <FieldLabel htmlFor="create-route-code">Código del recorrido</FieldLabel>
-                <input
+                <Input
                   id="create-route-code"
                   type="text"
                   placeholder="Ej: REC-004"
                   value={createDraft.code}
                   onChange={(e) => setCreateDraft((d) => ({ ...d, code: e.target.value }))}
-                  className={`${formControlClass} w-full`}
                   disabled={isSubmittingCreate}
                   data-testid="create-route-code-input"
                   aria-invalid={Boolean(createError)}
-                  aria-describedby={createError ? "create-route-code-error" : undefined}
                 />
-                <FieldError id="create-route-code-error">{createError}</FieldError>
                 <FieldDescription>
                   Identificador único (inmutable tras la creación).
                 </FieldDescription>
@@ -1141,13 +1182,12 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
               <Field>
                 <FieldLabel htmlFor="create-route-name">Nombre descriptivo</FieldLabel>
-                <input
+                <Input
                   id="create-route-name"
                   type="text"
                   placeholder="Ej: Recorrido Nocturno San Telmo"
                   value={createDraft.name}
                   onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))}
-                  className={`${formControlClass} w-full`}
                   disabled={isSubmittingCreate}
                   data-testid="create-route-name-input"
                 />
@@ -1168,7 +1208,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 disabled={isSubmittingCreate}
                 data-testid="submit-create-route"
               >
-                {isSubmittingCreate && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                {isSubmittingCreate && <Spinner aria-hidden="true" className="mr-1.5 size-3.5" />}
                 Crear recorrido
               </Button>
             </DialogFooter>
@@ -1191,24 +1231,22 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
             </DialogHeader>
 
             {editError && (
-              <div
-                className="rounded-md bg-destructive/15 p-3 text-xs text-destructive font-medium"
-                data-testid="edit-route-error"
-              >
-                {editError}
-              </div>
+              <Alert variant="destructive" data-testid="edit-route-error">
+                <AlertDescription>{editError}</AlertDescription>
+              </Alert>
             )}
 
             <FieldGroup className="space-y-3">
               <Field>
                 <FieldLabel htmlFor="edit-route-code">Código</FieldLabel>
-                <input
+                <Input
                   id="edit-route-code"
                   type="text"
                   value={editingRoute?.code ?? ""}
                   readOnly
                   disabled
-                  className={`${formControlClass} w-full bg-muted font-mono cursor-not-allowed`}
+                  aria-readonly="true"
+                  className="bg-muted/50 font-mono"
                   data-testid="edit-route-code-readonly"
                 />
                 <FieldDescription>
@@ -1218,34 +1256,29 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
               <Field>
                 <FieldLabel htmlFor="edit-route-name">Nombre descriptivo</FieldLabel>
-                <input
+                <Input
                   id="edit-route-name"
                   type="text"
                   value={editDraft.name}
                   onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
-                  className={`${formControlClass} w-full`}
                   disabled={isSubmittingEdit}
                   data-testid="edit-route-name-input"
                   aria-invalid={Boolean(editError)}
-                  aria-describedby={editError ? "edit-route-name-error" : undefined}
                 />
-                <FieldError id="edit-route-name-error">{editError}</FieldError>
               </Field>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
+              <Field orientation="horizontal" className="pt-1">
+                <Checkbox
                   id="edit-route-active"
                   checked={editDraft.active}
-                  onChange={(e) => setEditDraft((d) => ({ ...d, active: e.target.checked }))}
+                  onCheckedChange={(checked) => setEditDraft((d) => ({ ...d, active: checked === true }))}
                   disabled={isSubmittingEdit}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                   data-testid="edit-route-active-checkbox"
                 />
-                <label htmlFor="edit-route-active" className="text-sm font-medium text-foreground">
+                <FieldLabel htmlFor="edit-route-active" className="text-sm font-medium text-foreground">
                   Recorrido activo
-                </label>
-              </div>
+                </FieldLabel>
+              </Field>
             </FieldGroup>
 
             <DialogFooter>
@@ -1262,7 +1295,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 disabled={isSubmittingEdit}
                 data-testid="submit-edit-route"
               >
-                {isSubmittingEdit && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                {isSubmittingEdit && <Spinner aria-hidden="true" className="mr-1.5 size-3.5" />}
                 Guardar cambios
               </Button>
             </DialogFooter>
@@ -1289,17 +1322,21 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         contentClassName="sm:max-w-md"
         confirmDataTestId="confirm-deactivate-button"
       >
-        {deactivateError ? <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{deactivateError}</p> : null}
+        {deactivateError ? (
+          <Alert variant="destructive">
+            <AlertDescription>{deactivateError}</AlertDescription>
+          </Alert>
+        ) : null}
         {isLoadingReferences ? (
           <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            <Spinner aria-hidden="true" />
             Verificando referencias a frecuencias de servicio...
           </div>
         ) : referencesUnavailable ? (
           <div className="flex flex-col gap-3">
-            <Alert className="border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
+            <Alert variant="warning">
               <AlertTriangle aria-hidden="true" />
-              <AlertDescription className="text-[var(--color-warning)]">
+              <AlertDescription>
                 No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
               </AlertDescription>
             </Alert>
@@ -1321,9 +1358,17 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 <p>El backend no realiza control referencial automático. Desactivar este recorrido mantendrá las frecuencias existentes pero podría impactar en la programación operativa futura.</p>
                 <div className="mt-1 space-y-1 rounded border bg-background/50 p-2">
                   <div className="text-xs font-medium">Frecuencias activas ({referencesReport.activeServiceFrequencies.length}):</div>
-                  <ul className="list-disc space-y-0.5 pl-4">
-                    {referencesReport.activeServiceFrequencies.map((frequency) => <li key={frequency.id}><strong>{frequency.serviceTypeName}</strong> — Turno {frequency.shift} ({frequency.weekdays.join(", ")})</li>)}
-                  </ul>
+                  <ItemGroup className="gap-1">
+                    {referencesReport.activeServiceFrequencies.map((frequency) => (
+                      <Item key={frequency.id} variant="outline" size="xs" className="border-0 bg-background/50">
+                        <ItemContent>
+                          <ItemTitle>
+                            <strong>{frequency.serviceTypeName}</strong> — Turno {frequency.shift} ({frequency.weekdays.join(", ")})
+                          </ItemTitle>
+                        </ItemContent>
+                      </Item>
+                    ))}
+                  </ItemGroup>
                 </div>
               </div>
             </div>
@@ -1381,7 +1426,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               disabled={isSavingStops}
               data-testid="confirm-staleness-save-button"
             >
-              {isSavingStops && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              {isSavingStops && <Spinner aria-hidden="true" className="mr-1.5 size-3.5" />}
               Continuar y guardar
             </Button>
           </DialogFooter>

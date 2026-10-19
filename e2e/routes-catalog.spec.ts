@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseCatalogOption } from "./support/catalog-611-controls";
 
 async function openRoutesCatalog(page: import("@playwright/test").Page) {
   await loginViaApi(page, "office-duty-queue");
@@ -16,8 +17,13 @@ test.describe("Route catalog management #107", () => {
     await expect(page.getByText("Recorrido Casco Histórico")).toBeVisible();
     await expect(page.getByText("REC-002")).toBeVisible();
 
+    await chooseCatalogOption(page, "Estado:", "Solo activos");
+    await expect(page.getByText("REC-003")).not.toBeVisible();
+    await chooseCatalogOption(page, "Estado:", "Todos");
+    await expect(page.getByText("REC-003")).toBeVisible();
+
     // Filter by search
-    const searchInput = page.getByTestId("search-routes-input");
+    const searchInput = page.getByRole("textbox", { name: "Buscar recorridos" });
     await searchInput.fill("Costanera");
     await expect(page.getByText("REC-002")).toBeVisible();
     await expect(page.getByText("Recorrido Casco Histórico")).not.toBeVisible();
@@ -27,8 +33,7 @@ test.describe("Route catalog management #107", () => {
     await expect(page.getByText("Recorrido Casco Histórico")).toBeVisible();
 
     // Filter by zone
-    const zoneSelect = page.getByTestId("zone-filter-select");
-    await zoneSelect.selectOption("zone-1");
+    await chooseCatalogOption(page, "Zona:", "Belgrano (Z-BEL)");
     await expect(page.getByText("REC-001")).toBeVisible();
     await expect(page.getByText("REC-002")).not.toBeVisible();
   });
@@ -36,13 +41,13 @@ test.describe("Route catalog management #107", () => {
   test("Office actor creates a new route and lands on detail view with empty stops and obvious CTA", async ({ page }) => {
     await openRoutesCatalog(page);
 
-    await page.getByTestId("create-route-button").click();
+    await page.getByRole("button", { name: "Nuevo recorrido" }).click();
     await expect(page.getByRole("heading", { name: "Nuevo recorrido" })).toBeVisible();
 
-    await page.getByTestId("create-route-code-input").fill("REC-050");
-    await page.getByTestId("create-route-name-input").fill("Recorrido Circunvalación");
+    await page.getByRole("textbox", { name: "Código del recorrido" }).fill("REC-050");
+    await page.getByRole("textbox", { name: "Nombre descriptivo" }).fill("Recorrido Circunvalación");
 
-    await page.getByTestId("submit-create-route").click();
+    await page.getByRole("button", { name: "Crear recorrido" }).click();
 
     // Verify it lands on its detail view
     const detailView = page.getByTestId("route-detail-view");
@@ -74,7 +79,7 @@ test.describe("Route catalog management #107", () => {
     await expect(codeInput).toHaveValue("REC-002");
 
     // Edit name
-    const nameInput = page.getByTestId("edit-route-name-input");
+    const nameInput = page.getByRole("textbox", { name: "Nombre descriptivo" });
     await nameInput.fill("Recorrido Costanera Modificado");
 
     await page.getByTestId("submit-edit-route").click();

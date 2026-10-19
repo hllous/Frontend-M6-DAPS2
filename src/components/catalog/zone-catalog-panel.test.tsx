@@ -12,6 +12,15 @@ import { ZoneCatalogPanel } from "./zone-catalog-panel";
 
 const server = setupServer(...handlers);
 
+async function chooseSelectOption(
+  user: ReturnType<typeof userEvent.setup>,
+  accessibleName: string,
+  optionName: string,
+) {
+  await user.click(screen.getByRole("combobox", { name: accessibleName }));
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
@@ -78,8 +87,7 @@ describe("ZoneCatalogPanel component", () => {
       expect(screen.getByText("Recoleta")).toBeInTheDocument();
     });
 
-    const statusFilter = screen.getByLabelText("Filtrar por estado");
-    await user.selectOptions(statusFilter, "true");
+    await chooseSelectOption(user, "Filtrar por estado", "Activas");
 
     await waitFor(() => {
       expect(screen.getByText("Belgrano")).toBeInTheDocument();
@@ -224,7 +232,8 @@ describe("ZoneCatalogPanel component", () => {
     const confirm = within(dialog).getByRole("button", { name: "Dar de baja la zona Z-BEL" });
     await waitFor(() => expect(confirm).toBeEnabled());
     await user.click(confirm);
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("No se pudo dar de baja la zona.");
+    const errorMessage = await within(dialog).findByText("No se pudo dar de baja la zona.");
+    expect(errorMessage.closest('[role="alert"]')).toHaveTextContent("No se pudo dar de baja la zona.");
     expect(dialog).toBeVisible();
   });
 
@@ -245,18 +254,17 @@ describe("ZoneCatalogPanel component", () => {
 
     const searchInput = within(dialog).getByLabelText("Buscar barrios");
     await user.type(searchInput, "Industrial");
-    const industrialOption = within(dialog).getByLabelText(/Barrio Industrial/i);
+    const industrialOption = within(dialog).getByRole("checkbox", { name: /Barrio Industrial/i });
     await user.click(industrialOption);
     await user.click(within(dialog).getByRole("button", { name: "Asignar seleccionados" }));
 
     await waitFor(() => {
-      expect(within(dialog).getByText("Barrios asignados correctamente.")).toBeInTheDocument();
       expect(within(dialog).getByRole("list", { name: "Barrios asignados" })).toHaveTextContent("Barrio Industrial");
     });
 
     await user.click(within(dialog).getByRole("button", { name: "Quitar Barrio Industrial" }));
     await waitFor(() => {
-      expect(within(dialog).getByText("Barrio quitado de la zona.")).toBeInTheDocument();
+      expect(within(dialog).getByRole("list", { name: "Barrios asignados" })).not.toHaveTextContent("Barrio Industrial");
     });
   });
 

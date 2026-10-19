@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
-  Check,
-  Loader2,
   MapPin,
   Pencil,
   Plus,
@@ -16,8 +14,9 @@ import {
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -28,9 +27,32 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
-import { formControlClass } from "@/components/ui/form-control";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from "@/components/ui/item";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { notifySuccess } from "@/components/ui/feedback";
 import { neighborhoodsAdapter, type Neighborhood } from "@/lib/neighborhoods";
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
@@ -90,7 +112,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const [assignedNeighborhoods, setAssignedNeighborhoods] = useState<Neighborhood[]>([]);
   const [selectedNeighborhoodIds, setSelectedNeighborhoodIds] = useState<string[]>([]);
   const [neighborhoodError, setNeighborhoodError] = useState<string | null>(null);
-  const [neighborhoodNotice, setNeighborhoodNotice] = useState<string | null>(null);
   const [isLoadingNeighborhoods, setIsLoadingNeighborhoods] = useState(false);
   const [isSubmittingNeighborhoods, setIsSubmittingNeighborhoods] = useState(false);
   const [removingNeighborhoodId, setRemovingNeighborhoodId] = useState<string | null>(null);
@@ -135,6 +156,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       setShowCreate(false);
       setCreateDraft({ code: "", name: "" });
       setRequestVersion((v) => v + 1);
+      notifySuccess("Zona creada.");
     } catch (caught) {
       if (caught instanceof ZoneRequestError) {
         setCreateError(caught.message);
@@ -163,6 +185,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       await zonesAdapter.update(editingZone.id, editDraft);
       setEditingZone(null);
       setRequestVersion((v) => v + 1);
+      notifySuccess("Cambios guardados.");
     } catch (caught) {
       if (caught instanceof ZoneRequestError) {
         setEditError(caught.message);
@@ -201,6 +224,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       setDeactivatingZone(null);
       setReferencesReport(null);
       setRequestVersion((v) => v + 1);
+      notifySuccess("Zona dada de baja.");
     } catch (caught) {
       setDeactivateError(caught instanceof ZoneRequestError ? caught.message : "No se pudo dar de baja la zona operativa.");
     } finally {
@@ -221,7 +245,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     setNeighborhoodSearch("");
     setSelectedNeighborhoodIds([]);
     setNeighborhoodError(null);
-    setNeighborhoodNotice(null);
     setIsLoadingNeighborhoods(true);
 
     try {
@@ -258,7 +281,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const handleAssignNeighborhoods = async () => {
     if (!neighborhoodZone || selectedNeighborhoodIds.length === 0) return;
     setNeighborhoodError(null);
-    setNeighborhoodNotice(null);
     setIsSubmittingNeighborhoods(true);
 
     try {
@@ -269,7 +291,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       setNeighborhoodZone(updated);
       setAssignedNeighborhoods(await neighborhoodsAdapter.resolveIds(updated.neighborhoodIds ?? []));
       setSelectedNeighborhoodIds([]);
-      setNeighborhoodNotice("Barrios asignados correctamente.");
+      notifySuccess("Barrios asignados correctamente.");
     } catch (caught) {
       setNeighborhoodError(
         caught instanceof ZoneRequestError ? caught.message : "No se pudieron asignar los barrios.",
@@ -282,7 +304,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const handleRemoveNeighborhood = async (neighborhoodId: string) => {
     if (!neighborhoodZone) return;
     setNeighborhoodError(null);
-    setNeighborhoodNotice(null);
     setRemovingNeighborhoodId(neighborhoodId);
 
     try {
@@ -290,7 +311,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       updateZoneInState(updated);
       setNeighborhoodZone(updated);
       setAssignedNeighborhoods(await neighborhoodsAdapter.resolveIds(updated.neighborhoodIds ?? []));
-      setNeighborhoodNotice("Barrio quitado de la zona.");
+      notifySuccess("Barrio quitado de la zona.");
     } catch (caught) {
       setNeighborhoodError(
         caught instanceof ZoneRequestError ? caught.message : "No se pudo quitar el barrio de la zona.",
@@ -303,7 +324,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const closeNeighborhoodDialog = () => {
     setNeighborhoodZone(null);
     setNeighborhoodError(null);
-    setNeighborhoodNotice(null);
     setSelectedNeighborhoodIds([]);
   };
 
@@ -330,34 +350,41 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
       {/* Filter and search bar */}
       <div className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_200px]">
-        <label className="flex flex-col gap-1 text-sm font-semibold">
-          Buscar
+        <Field>
+          <FieldLabel htmlFor="zone-search">Buscar</FieldLabel>
           <div className="relative flex items-center">
             <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <input
+            <Input
+              id="zone-search"
               aria-label="Buscar zonas operativas"
-              className={`${formControlClass} w-full pl-9`}
+              className="pl-9"
               placeholder="Buscar por código o nombre..."
               value={search}
               maxLength={MAX_SEARCH_LENGTH}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-        </label>
+        </Field>
 
-        <label className="flex flex-col gap-1 text-sm font-semibold">
-          Estado
-          <select
-            aria-label="Filtrar por estado"
-            className={formControlClass}
+        <Field>
+          <FieldLabel htmlFor="zone-active-filter">Estado</FieldLabel>
+          <Select
             value={activeFilter}
-            onChange={(e) => setActiveFilter(e.target.value as "all" | "true" | "false")}
+            items={{ all: "Todos", true: "Activas", false: "Inactivas" }}
+            onValueChange={(value) => setActiveFilter(value as "all" | "true" | "false")}
           >
-            <option value="all">Todos</option>
-            <option value="true">Activas</option>
-            <option value="false">Inactivas</option>
-          </select>
-        </label>
+            <SelectTrigger id="zone-active-filter" aria-label="Filtrar por estado">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="true">Activas</SelectItem>
+                <SelectItem value="false">Inactivas</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
       </div>
 
       {/* Create form section (if expanded) */}
@@ -386,33 +413,28 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           </div>
 
           {createError && (
-            <div role="alert" className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-              {createError}
-            </div>
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{createError}</AlertDescription>
+            </Alert>
           )}
 
           <FieldGroup className="grid gap-4 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="create-zone-code">Código</FieldLabel>
-              <input
+              <Input
                 id="create-zone-code"
                 required
-                className={formControlClass}
                 placeholder="Ej. Z-04"
                 value={createDraft.code}
-                aria-invalid={Boolean(createError)}
-                aria-describedby={createError ? "create-zone-code-error" : undefined}
                 onChange={(e) => setCreateDraft({ ...createDraft, code: e.target.value })}
               />
-              <FieldError id="create-zone-code-error" role="none">{createError}</FieldError>
             </Field>
 
             <Field>
               <FieldLabel htmlFor="create-zone-name">Nombre</FieldLabel>
-              <input
+              <Input
                 id="create-zone-name"
                 required
-                className={formControlClass}
                 placeholder="Ej. Zona Centro Este"
                 value={createDraft.name}
                 onChange={(e) => setCreateDraft({ ...createDraft, name: e.target.value })}
@@ -430,6 +452,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmittingCreate}>
+              {isSubmittingCreate && <Spinner aria-hidden="true" />}
               {isSubmittingCreate ? "Creando..." : "Crear zona"}
             </Button>
           </div>
@@ -462,49 +485,41 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           </div>
 
           {editError && (
-            <div role="alert" className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-              {editError}
-            </div>
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{editError}</AlertDescription>
+            </Alert>
           )}
 
           <FieldGroup className="grid gap-4 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="edit-zone-code">Código (inmutable)</FieldLabel>
-              <input
+              <Input
                 id="edit-zone-code"
                 readOnly
                 aria-readonly="true"
-                className={`${formControlClass} bg-muted/50 cursor-not-allowed`}
+                className="bg-muted/50"
                 value={editingZone.code}
               />
             </Field>
 
             <Field>
               <FieldLabel htmlFor="edit-zone-name">Nombre</FieldLabel>
-              <input
+              <Input
                 id="edit-zone-name"
                 required
-                className={formControlClass}
                 value={editDraft.name}
-                aria-invalid={Boolean(editError)}
-                aria-describedby={editError ? "edit-zone-name-error" : undefined}
                 onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
               />
-              <FieldError id="edit-zone-name-error" role="none">{editError}</FieldError>
             </Field>
 
-            <div className="sm:col-span-2 flex items-center gap-2 pt-2">
-              <input
+            <Field orientation="horizontal" className="pt-2 sm:col-span-2">
+              <Checkbox
                 id="edit-zone-active"
-                type="checkbox"
-                className="h-4 w-4 rounded border-border"
                 checked={editDraft.active}
-                onChange={(e) => setEditDraft({ ...editDraft, active: e.target.checked })}
+                onCheckedChange={(checked) => setEditDraft({ ...editDraft, active: checked })}
               />
-              <label htmlFor="edit-zone-active" className="text-sm font-medium">
-                Zona activa para asignaciones
-              </label>
-            </div>
+              <FieldLabel htmlFor="edit-zone-active">Zona activa para asignaciones</FieldLabel>
+            </Field>
           </FieldGroup>
 
           <div className="mt-5 flex justify-end gap-2">
@@ -517,6 +532,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmittingEdit}>
+              {isSubmittingEdit && <Spinner aria-hidden="true" />}
               {isSubmittingEdit ? "Guardando..." : "Guardar cambios"}
             </Button>
           </div>
@@ -533,8 +549,8 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       )}
 
       {state.status === "error" && (
-        <div role="alert" className="rounded-xl border border-destructive/30 bg-card p-5">
-          <p className="text-destructive font-medium">{state.message}</p>
+        <Alert variant="destructive" className="rounded-xl p-5">
+          <AlertDescription>{state.message}</AlertDescription>
           <Button
             type="button"
             variant="outline"
@@ -544,7 +560,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
             Reintentar
           </Button>
-        </div>
+        </Alert>
       )}
 
       {state.status === "ready" && state.items.length === 0 && (
@@ -588,15 +604,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                       : "Sin barrios"}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        zone.active
-                          ? "bg-[var(--color-success-fill)] text-[var(--color-success)]"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
+                    <Badge variant={zone.active ? "success" : "secondary"}>
                       {zone.active ? "Activa" : "Inactiva"}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-4 py-3 text-right">
                     {canManage ? (
@@ -667,14 +677,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           </DialogHeader>
 
           {neighborhoodError && (
-            <div role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-              {neighborhoodError}
-            </div>
-          )}
-          {neighborhoodNotice && (
-            <div role="status" className="rounded-md bg-[var(--color-success-fill)] p-3 text-sm text-[var(--color-success)]">
-              {neighborhoodNotice}
-            </div>
+            <Alert variant="destructive">
+              <AlertDescription>{neighborhoodError}</AlertDescription>
+            </Alert>
           )}
 
           <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -690,7 +695,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
               {isLoadingNeighborhoods ? (
                 <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  <Spinner aria-hidden="true" />
                   Cargando barrios...
                 </div>
               ) : assignedNeighborhoods.length === 0 ? (
@@ -698,13 +703,21 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   Esta zona todavía no tiene barrios asignados.
                 </p>
               ) : (
-                <ul className="divide-y rounded-md border border-border" aria-label="Barrios asignados">
+                <ItemGroup
+                  aria-label="Barrios asignados"
+                  className="gap-0 overflow-hidden rounded-md border border-border"
+                >
                   {assignedNeighborhoods.map((neighborhood) => (
-                    <li key={neighborhood.id} className="flex items-center justify-between gap-3 p-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{neighborhood.name}</p>
-                        <p className="font-mono text-xs text-muted-foreground">{neighborhood.id}</p>
-                      </div>
+                    <Item
+                      key={neighborhood.id}
+                      variant="outline"
+                      size="sm"
+                      className="items-center justify-between gap-3 rounded-none border-x-0 border-t-0 last:border-b-0"
+                    >
+                      <ItemContent className="min-w-0">
+                        <ItemTitle className="truncate">{neighborhood.name}</ItemTitle>
+                        <ItemDescription className="font-mono">{neighborhood.id}</ItemDescription>
+                      </ItemContent>
                       <Button
                         type="button"
                         size="sm"
@@ -715,15 +728,15 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                         aria-label={`Quitar ${neighborhood.name}`}
                       >
                         {removingNeighborhoodId === neighborhood.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                          <Spinner aria-hidden="true" />
                         ) : (
                           <X className="h-3.5 w-3.5" aria-hidden="true" />
                         )}
                         Quitar
                       </Button>
-                    </li>
+                    </Item>
                   ))}
-                </ul>
+                </ItemGroup>
               )}
             </section>
 
@@ -741,9 +754,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 <FieldLabel htmlFor="neighborhood-search">Buscar barrios</FieldLabel>
                 <div className="relative flex items-center">
                   <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <input
+                  <Input
                     id="neighborhood-search"
-                    className={`${formControlClass} w-full pl-9`}
+                    className="pl-9"
                     placeholder="Buscar por nombre o identificador"
                     value={neighborhoodSearch}
                     onChange={(event) => setNeighborhoodSearch(event.target.value)}
@@ -761,32 +774,37 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   {neighborhoodOptions.map((neighborhood) => {
                     const isAssigned = neighborhoodZone?.neighborhoodIds?.includes(neighborhood.id) ?? false;
                     const isSelected = selectedNeighborhoodIds.includes(neighborhood.id);
+                    const inputId = `neighborhood-${neighborhood.id}`;
                     return (
-                      <label
+                      <Field
                         key={neighborhood.id}
-                        className={`flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-3 py-2 last:border-0 ${
-                          isAssigned ? "cursor-not-allowed bg-muted/50" : "hover:bg-muted/40"
+                        orientation="horizontal"
+                        data-disabled={isAssigned || isSubmittingNeighborhoods || undefined}
+                        className={`min-h-11 gap-3 border-b border-border px-3 py-2 last:border-0 ${
+                          isAssigned ? "bg-muted/50" : "hover:bg-muted/40"
                         }`}
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
+                          id={inputId}
                           checked={isAssigned || isSelected}
                           disabled={isAssigned || isSubmittingNeighborhoods}
-                          onChange={(event) => {
+                          onCheckedChange={(checked) => {
                             setSelectedNeighborhoodIds((current) =>
-                              event.target.checked
+                              checked
                                 ? [...current, neighborhood.id]
                                 : current.filter((id) => id !== neighborhood.id),
                             );
                           }}
-                          className="h-4 w-4 rounded border-[var(--color-border-strong)] text-primary focus:ring-primary"
                         />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{neighborhood.name}</span>
-                          <span className="block font-mono text-xs text-muted-foreground">{neighborhood.id}</span>
-                        </span>
-                        {isAssigned && <Check className="h-4 w-4 text-primary" aria-label="Ya asignado" />}
-                      </label>
+                        <FieldContent>
+                          <FieldLabel htmlFor={inputId} className="min-w-0 cursor-pointer">
+                            <span className="truncate">{neighborhood.name}</span>
+                          </FieldLabel>
+                          <FieldDescription className="font-mono text-xs">
+                            {neighborhood.id}
+                          </FieldDescription>
+                        </FieldContent>
+                      </Field>
                     );
                   })}
                 </div>
@@ -798,7 +816,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 onClick={() => void handleAssignNeighborhoods()}
                 disabled={selectedNeighborhoodIds.length === 0 || isSubmittingNeighborhoods || isLoadingNeighborhoods}
               >
-                {isSubmittingNeighborhoods && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                {isSubmittingNeighborhoods && <Spinner aria-hidden="true" />}
                 {isSubmittingNeighborhoods ? "Asignando..." : "Asignar seleccionados"}
               </Button>
             </section>
@@ -829,39 +847,87 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
         isSubmitting={isSubmittingDeactivate}
         onConfirm={() => void handleConfirmDeactivate()}
       >
-        {deactivateError ? <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{deactivateError}</p> : null}
+        {deactivateError ? (
+          <Alert variant="destructive">
+            <AlertDescription>{deactivateError}</AlertDescription>
+          </Alert>
+        ) : null}
         {isLoadingReferences ? (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            <Spinner aria-hidden="true" />
             Verificando referencias de la zona...
           </div>
         ) : referencesUnavailable ? (
           <div className="flex flex-col gap-3">
-            <Alert className="border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
+            <Alert variant="warning">
               <AlertTriangle aria-hidden="true" />
-              <AlertDescription className="text-[var(--color-warning)]">
+              <AlertDescription>
                 No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
               </AlertDescription>
             </Alert>
-            <Field>
-              <FieldLabel className="flex min-h-10 cursor-pointer items-center gap-3 [@media(max-width:760px)]:min-h-12">
-                <Checkbox checked={referencesAcknowledged} onCheckedChange={setReferencesAcknowledged} disabled={isSubmittingDeactivate} />
+            <Field orientation="horizontal">
+              <Checkbox
+                id="zone-reference-acknowledgement"
+                checked={referencesAcknowledged}
+                onCheckedChange={setReferencesAcknowledged}
+                disabled={isSubmittingDeactivate}
+              />
+              <FieldLabel htmlFor="zone-reference-acknowledgement">
                 Entiendo que no se verificaron las referencias
               </FieldLabel>
             </Field>
           </div>
         ) : referencesReport && referencesReport.totalReferences > 0 ? (
           <div className="flex flex-col gap-3 py-2 text-sm">
-            <div className="rounded-lg border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-[var(--color-warning)]">
-              <p className="font-medium">Advertencia: esta zona todavía cuenta con elementos activos referenciados:</p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-                {referencesReport.activeRoutes.length > 0 ? <li><strong>Recorridos activos ({referencesReport.activeRoutes.length}):</strong> {referencesReport.activeRoutes.map((route) => `${route.code} (${route.name})`).join(", ")}</li> : null}
-                {referencesReport.containersCount > 0 ? <li><strong>Contenedores asociados:</strong> {referencesReport.containersCount}</li> : null}
-                {referencesReport.treesCount > 0 ? <li><strong>Árboles censados:</strong> {referencesReport.treesCount}</li> : null}
-                {referencesReport.greenSpacesCount > 0 ? <li><strong>Espacios verdes:</strong> {referencesReport.greenSpacesCount}</li> : null}
-              </ul>
-            </div>
-            <p className="text-xs text-muted-foreground">El backend no realiza control de integridad referencial; los elementos asociados seguirán vinculados a una zona inactiva.</p>
+            <Alert variant="warning">
+              <AlertTriangle aria-hidden="true" />
+              <AlertTitle>
+                Advertencia: esta zona todavía cuenta con elementos activos referenciados:
+              </AlertTitle>
+              <AlertDescription>
+                <ItemGroup className="gap-1">
+                  {referencesReport.activeRoutes.length > 0 ? (
+                    <Item size="xs">
+                      <ItemContent>
+                        <ItemTitle>Recorridos activos ({referencesReport.activeRoutes.length})</ItemTitle>
+                        <ItemDescription>
+                          {referencesReport.activeRoutes
+                            .map((route) => `${route.code} (${route.name})`)
+                            .join(", ")}
+                        </ItemDescription>
+                      </ItemContent>
+                    </Item>
+                  ) : null}
+                  {referencesReport.containersCount > 0 ? (
+                    <Item size="xs">
+                      <ItemContent>
+                        <ItemTitle>Contenedores asociados:</ItemTitle>
+                        <ItemDescription>{referencesReport.containersCount}</ItemDescription>
+                      </ItemContent>
+                    </Item>
+                  ) : null}
+                  {referencesReport.treesCount > 0 ? (
+                    <Item size="xs">
+                      <ItemContent>
+                        <ItemTitle>Árboles censados:</ItemTitle>
+                        <ItemDescription>{referencesReport.treesCount}</ItemDescription>
+                      </ItemContent>
+                    </Item>
+                  ) : null}
+                  {referencesReport.greenSpacesCount > 0 ? (
+                    <Item size="xs">
+                      <ItemContent>
+                        <ItemTitle>Espacios verdes:</ItemTitle>
+                        <ItemDescription>{referencesReport.greenSpacesCount}</ItemDescription>
+                      </ItemContent>
+                    </Item>
+                  ) : null}
+                </ItemGroup>
+                <p className="mt-2">
+                  El backend no realiza control de integridad referencial; los elementos asociados seguirán vinculados a una zona inactiva.
+                </p>
+              </AlertDescription>
+            </Alert>
           </div>
         ) : null}
       </CatalogDeactivationDialog>
