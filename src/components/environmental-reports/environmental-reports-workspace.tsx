@@ -38,6 +38,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
+import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime } from "@/lib/argentina-date";
 import {
   ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS,
   ENVIRONMENTAL_SEVERITY_LABELS as severityLabels,
@@ -144,24 +145,7 @@ function visibleToScenario(report: EnvironmentalReport, scenario: OperationalSce
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "No informado";
-  return formatDateTime(value);
-}
-
-const calendarDateFormatter = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
-const argentinaDateTimeFormatter = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Argentina/Buenos_Aires" });
-
-function formatCalendarDate(value: string) {
-  const day = value.slice(0, 10);
-  const date = new Date(`${day}T00:00:00.000Z`);
-  return /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === day
-    ? calendarDateFormatter.format(date)
-    : value;
-}
-
-function formatDateTime(value: string) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return formatCalendarDate(value);
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : argentinaDateTimeFormatter.format(date);
+  return formatArgentinaNumericDateTime(value);
 }
 
 type SchedulingMode = "schedule" | "reinspection" | "service";
@@ -184,7 +168,7 @@ type InspectionServiceDraft = {
  */
 function inspectionAgenda(inspection: EnvironmentalInspection, service: Service | null | undefined) {
   const day = service?.scheduledDate ?? inspection.scheduledDate;
-  const date = day ? formatCalendarDate(day) : inspection.inspectedAt ? formatDateTime(inspection.inspectedAt) : "—";
+  const date = day ? formatArgentinaCalendarDate(day) : inspection.inspectedAt ? formatArgentinaNumericDateTime(inspection.inspectedAt) : "—";
   const window = service?.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : inspection.timeWindow ? `${inspection.timeWindow.start}–${inspection.timeWindow.end}` : "—";
   return `${date} · ${window}`;
 }

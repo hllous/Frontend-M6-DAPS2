@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
 import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
 import { serviceSourceHref } from "@/lib/referrals";
@@ -124,7 +125,7 @@ function serviceToTraceRecord(service: Service): TraceRecord {
     id: service.id,
     href: serviceSourceHref(service.id),
     title: service.title,
-    detail: `${formatCalendarDate(service.scheduledDate)}${service.windowFrom ? ` · ${service.windowFrom}–${service.windowTo ?? ""}` : ""}`,
+    detail: `${formatArgentinaCalendarDate(service.scheduledDate)}${service.windowFrom ? ` · ${service.windowFrom}–${service.windowTo ?? ""}` : ""}`,
     zone: service.zoneNames.length > 0 ? service.zoneNames.join(" · ") : "Sin zona informada",
     status: STATUS_LABEL[service.status],
   };
@@ -146,23 +147,11 @@ function formatNumber(value: number, unit: string) {
 }
 
 function formatDate(value: string) {
-  return formatCalendarDate(value);
-}
-
-const calendarDateFormatter = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
-const argentinaDateTimeFormatter = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Argentina/Buenos_Aires" });
-
-function formatCalendarDate(value: string) {
-  const day = value.slice(0, 10);
-  const date = new Date(`${day}T00:00:00.000Z`);
-  return /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === day
-    ? calendarDateFormatter.format(date)
-    : value;
+  return formatArgentinaCalendarDate(value);
 }
 
 function formatDateTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? value : argentinaDateTimeFormatter.format(date);
+  return formatArgentinaNumericDateTime(value);
 }
 
 function familySummary(data: IndicatorData) {
