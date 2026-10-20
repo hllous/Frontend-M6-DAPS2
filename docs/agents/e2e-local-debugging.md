@@ -21,11 +21,14 @@ M6_AUTH_MODE=mock NEXT_PUBLIC_DISABLE_MSW=true PLAYWRIGHT_BASE_URL=http://127.0.
 Confirm the server is actually up before trusting a test run against it:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:<port>/api/session/login -H "content-type: application/json" -d '{"scenarioId":"office-duty-queue"}'
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:<port>/api/session/login -H "content-type: application/json" -H "x-requested-with: XMLHttpRequest" -d '{"scenarioId":"office-duty-queue"}'
 ```
 
 `200` means it's ready. `404` almost always means the two env vars above,
-not the code under test.
+not the code under test. The `x-requested-with` header is required by the
+session routes (`SESSION_MUTATION_HEADERS` in `src/lib/session-request.ts`):
+without it the route answers `403`, and without a JSON `content-type`, `415`,
+even when the server is healthy.
 
 ## Killing a manually-started server on Windows
 

@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -12,6 +12,13 @@ import { servicesAdapter } from "@/lib/services";
 import { TreeInterventionsPanel } from "./tree-interventions-panel";
 
 const server = setupServer(...handlers);
+
+async function chooseSelectOption(user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement, name: string | RegExp) {
+  await waitFor(() => expect(trigger).toBeEnabled());
+  await user.click(trigger);
+  await user.click(await screen.findByRole("option", { name }));
+  if (trigger.getAttribute("aria-expanded") === "true") await user.keyboard("{Escape}");
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
@@ -43,9 +50,18 @@ describe("TreeInterventionsPanel", () => {
     expect(within(detail).queryByRole("button", { name: "Solicitar corte de calle" })).not.toBeInTheDocument();
 
     await within(detail).getByRole("button", { name: "Cerrar detalle" }).click();
-    await user.selectOptions(screen.getByLabelText("Filtrar por estado"), "AUTHORIZED");
+    await chooseSelectOption(user, screen.getByRole("combobox", { name: "Filtrar por estado" }), "Autorizada");
     expect(await screen.findByRole("article", { name: /intervention-2|Tratamiento/i })).toBeVisible();
     expect(screen.queryByRole("article", { name: /intervention-1|Poda de seguridad/i })).not.toBeInTheDocument();
+    const statusFilter = screen.getByRole("combobox", { name: "Filtrar por estado" });
+    await chooseSelectOption(user, statusFilter, "Todos");
+    expect(await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i })).toBeVisible();
+
+    const typeFilter = screen.getByRole("combobox", { name: "Filtrar por tipo de intervención" });
+    await chooseSelectOption(user, typeFilter, "Tratamiento");
+    expect(screen.queryByRole("article", { name: /intervention-1|Poda de seguridad/i })).not.toBeInTheDocument();
+    await chooseSelectOption(user, typeFilter, "Todos");
+    expect(await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i })).toBeVisible();
   });
 
   it("names each card by its trees, never by the request id, and falls back to the tree address", async () => {
@@ -57,6 +73,48 @@ describe("TreeInterventionsPanel", () => {
     expect(screen.queryByText("intervention-1")).not.toBeInTheDocument();
     const removal = await screen.findByRole("article", { name: "Extracción · ARB-00445" });
     expect(within(removal).getByText("Av. Las Heras 2100")).toBeVisible();
+  });
+
+  it("shows each intervention priority as a text-labeled semantic badge", async () => {
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+
+    const cases = [
+      { name: /intervention-1|Poda de seguridad/i, label: "Alta", variant: "warning" },
+      { name: /intervention-2|Tratamiento/i, label: "Media", variant: "info" },
+      { name: /intervention-3|Extracción/i, label: "Crítica", variant: "danger" },
+    ] as const;
+
+    for (const { name, label, variant } of cases) {
+      const request = await screen.findByRole("article", { name });
+      const priority = within(request).getByText(label);
+
+      expect(priority).toHaveAttribute("data-variant", variant);
+    }
+  });
+
+  it("shows the priority badge and keeps the decision actions in the detail footer", async () => {
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+
+    const request = await screen.findByRole("article", { name: /Poda de seguridad/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    const priority = await within(detail).findByText("Alta");
+    expect(priority).toHaveAttribute("data-slot", "badge");
+    const footer = detail.querySelector("[data-slot=dialog-footer]") as HTMLElement;
+    expect(within(footer).getByRole("button", { name: "Autorizar intervención" })).toBeVisible();
+    expect(within(footer).getByRole("button", { name: "Cerrar detalle" })).toBeVisible();
+  });
+
+  it("shows an unrecorded intervention priority as neutral text", async () => {
+    updateTreeInterventionFixture("intervention-1", { priority: "LOW" });
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+
+    const request = await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i });
+    const priority = within(request).getByText("Baja");
+
+    expect(priority).toHaveAttribute("data-variant", "secondary");
   });
 
   it("offers a street closure request only from an authorized intervention", async () => {
@@ -82,25 +140,30 @@ describe("TreeInterventionsPanel", () => {
     await screen.findByRole("heading", { name: "Intervenciones de arbolado" });
     await screen.getByRole("button", { name: "Solicitar intervención" }).click();
     const dialog = screen.getByRole("dialog", { name: /Solicitar intervención/ });
-    await user.selectOptions(within(dialog).getByLabelText(/^Tipo de intervención/), "REMOVAL");
-    await within(dialog).getByRole("button", { name: "Crear solicitud de intervención" }).click();
-    const treesInput = within(dialog).getByLabelText(/^Árboles a intervenir/);
+    const interventionType = within(dialog).getByRole("combobox", { name: "Tipo de intervención" });
+    expect(interventionType).toHaveAttribute("aria-required", "true");
+    await chooseSelectOption(user, interventionType, /Extracci/);
+    await user.click(within(dialog).getByRole("button", { name: "Crear solicitud de intervención" }));
+    const treesInput = within(dialog).getByRole("combobox", { name: "Árboles a intervenir" });
+    expect(treesInput).toHaveAttribute("aria-required", "true");
     expect(await within(dialog).findByText("Seleccione al menos un árbol.")).toBeVisible();
     expect(treesInput).toHaveAttribute("aria-invalid", "true");
     expect(treesInput).toHaveAttribute("aria-describedby", "intervention-trees-help intervention-trees-error");
 
-    await user.selectOptions(within(dialog).getByLabelText(/^Árboles a intervenir/), ["tree-2", "tree-4"]);
+    await chooseSelectOption(user, treesInput, /ARB-00443/);
+    await chooseSelectOption(user, treesInput, /ARB-00445/);
     await user.type(within(dialog).getByLabelText(/^Dirección/), "Paseo de la Costa 220");
-    await within(dialog).getByRole("button", { name: "Crear solicitud de intervención" }).click();
+    await user.click(within(dialog).getByRole("button", { name: "Crear solicitud de intervención" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("justificación");
     const justificationInput = within(dialog).getByLabelText(/^Justificación/);
     expect(justificationInput).toHaveAttribute("aria-invalid", "true");
     expect(justificationInput).toHaveAttribute("aria-describedby", "intervention-justification-help intervention-justification-error");
 
     await user.type(within(dialog).getByLabelText(/^Justificación/), "El tronco presenta inestabilidad crítica.");
-    await within(dialog).getByRole("button", { name: "Crear solicitud de intervención" }).click();
+    expect(within(dialog).getByLabelText(/^Justificación/)).toBeRequired();
+    await user.click(within(dialog).getByRole("button", { name: "Crear solicitud de intervención" }));
     expect(await screen.findByText("Solicitud de intervención creada. Estado inicial: solicitada.")).toBeVisible();
-  });
+  }, 15_000);
 
   it("keeps the request action out of read-only sessions", async () => {
     render(<TreeInterventionsPanel scenario={scenarios.officeLimited} />);
@@ -136,9 +199,13 @@ describe("TreeInterventionsPanel", () => {
 
     const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
     expect(await within(form).findByText(/Se creará un servicio de punto/)).toBeVisible();
-    expect(within(form).getByLabelText("Fecha programada")).toBeVisible();
-    expect(within(form).getByLabelText("Desde")).toBeVisible();
-    expect(within(form).getByLabelText("Hasta")).toBeVisible();
+    expect(within(form).getByLabelText(/^Fecha programada/)).toBeVisible();
+    const fromGroup = within(form).getByRole("group", { name: "Desde" });
+    const toGroup = within(form).getByRole("group", { name: "Hasta" });
+    expect(fromGroup).toBeVisible();
+    expect(toGroup).toBeVisible();
+    for (const control of within(fromGroup).getAllByRole("combobox")) expect(control).toHaveAttribute("aria-required", "true");
+    for (const control of within(toGroup).getAllByRole("combobox")) expect(control).toHaveAttribute("aria-required", "true");
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
     expect(await within(detail).findByRole("alert")).toHaveTextContent(/Servicio vinculado: SVC-/);
     expect(within(detail).getByText(/ARB-00443/)).toBeVisible();
@@ -322,9 +389,8 @@ describe("TreeInterventionsPanel", () => {
   it("assigns the chosen crew and vehicle when it creates the Service", async () => {
     const user = userEvent.setup();
     const { detail, form } = await openScheduleForm(user, /intervention-2|Tratamiento/i);
-    await within(form).findByRole("option", { name: "Cuadrilla A · López" });
-    await user.selectOptions(within(form).getByLabelText(/Cuadrilla/), "crew-a");
-    await user.selectOptions(within(form).getByLabelText(/Vehículo/), "vehicle-1");
+    await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Cuadrilla (opcional)" }), /Cuadrilla A/);
+    await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Vehículo (opcional)" }), /AA 123 AA/);
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
 
     const serviceId = (await within(detail).findByRole("link", { name: /SVC-\d+/ })).textContent;
@@ -423,10 +489,10 @@ describe("TreeInterventionsPanel", () => {
     expect(within(detail).queryByText(/motivo/i)).not.toBeInTheDocument();
     await user.click(within(detail).getByRole("button", { name: "Crear nueva solicitud" }));
     const freshRequest = await screen.findByRole("dialog", { name: /Solicitar intervención/ });
-    expect(within(freshRequest).getByLabelText(/^Tipo de intervención/)).toHaveValue("REMOVAL");
-    expect(within(freshRequest).getByLabelText(/^Árboles a intervenir/)).toHaveValue(["tree-4"]);
+    expect(within(freshRequest).getByRole("combobox", { name: "Tipo de intervención" })).toHaveTextContent("Extracción");
+    expect(within(freshRequest).getByRole("combobox", { name: "Árboles a intervenir" })).toHaveTextContent("ARB-00445");
     expect(within(freshRequest).getByLabelText(/^Dirección/)).toHaveValue("Paseo de la Costa 220");
-    expect(within(freshRequest).getByLabelText(/^Prioridad/)).toHaveValue("CRITICAL");
+    expect(within(freshRequest).getByRole("combobox", { name: "Prioridad" })).toHaveTextContent("Crítica");
     expect(within(freshRequest).getByLabelText(/^Justificación/)).toHaveValue("El ejemplar presenta inestabilidad crítica.");
   });
 

@@ -19,6 +19,7 @@ Read the one whose trigger applies:
 - Opening a PR, branch protection, or a `hotfix/*`: [`docs/agents/git-flow.md`](docs/agents/git-flow.md)
 - Creating, triaging or splitting issues (`to-spec`, `to-tickets`, labels): [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md)
 - Reproducing a CI e2e failure against your own `pnpm dev`: [`docs/agents/e2e-local-debugging.md`](docs/agents/e2e-local-debugging.md)
+- Checking a UI change in the running app (screenshots, `playwright-cli`): [`docs/agents/visual-verification.md`](docs/agents/visual-verification.md)
 - Adding or changing a `src/mocks` handler, or testing a BFF route: [`docs/agents/msw-bff-tests.md`](docs/agents/msw-bff-tests.md)
 - Editing the Orca worktree setup script: [`docs/agents/orca-worktree-setup.md`](docs/agents/orca-worktree-setup.md)
 - Changing any `.md`: run `pnpm dlx markdownlint-cli2@0.23.3` and `lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'`; CI runs both. Details: [`docs/README.md`](docs/README.md)

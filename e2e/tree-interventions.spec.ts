@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseTreeSelectOption, chooseTreeSelectOptions } from "./support/tree-selects";
 
 test.describe("TreeIntervention requests #128", () => {
   test("Office can create a multi-tree request, inspect all linked trees, and use the guided survey flow", async ({ page }) => {
@@ -18,20 +19,28 @@ test.describe("TreeIntervention requests #128", () => {
 
     await page.getByRole("button", { name: "Solicitar intervención" }).click();
     const form = page.getByRole("dialog", { name: /Solicitar intervención/ });
-    await form.getByLabel(/^Tipo de intervención/).selectOption("SAFETY_PRUNING");
-    await form.getByLabel(/^Árboles a intervenir/).selectOption(["tree-2", "tree-4"]);
-    await form.getByLabel(/^Prioridad/).selectOption("HIGH");
+    await chooseTreeSelectOption(page, form, "Tipo de intervención", "Poda de seguridad");
+    await chooseTreeSelectOptions(page, form, "Árboles a intervenir", [/^ARB-00443/, /^ARB-00445/]);
+    await chooseTreeSelectOption(page, form, "Prioridad", "Alta");
+    const createInterventionRequest = page.waitForRequest((request) => request.url().endsWith("/api/tree-interventions") && request.method() === "POST");
     await form.getByRole("button", { name: "Crear solicitud de intervención" }).click();
+    await expect(await createInterventionRequest.then((request) => request.postDataJSON())).toEqual({
+      interventionType: "SAFETY_PRUNING",
+      treeIds: ["tree-2", "tree-4"],
+      address: "Parque del Bicentenario, sector norte",
+      requiresStreetClosure: false,
+      priority: "HIGH",
+    });
     await expect(form).not.toBeVisible();
     await expect(page.getByText("Solicitud de intervención creada. Estado inicial: solicitada.")).toBeVisible();
 
     await page.goto("/app/catalog/trees");
-    await page.getByLabel("Árbol para relevar").selectOption("tree-4");
+    await chooseTreeSelectOption(page, page, "Árbol para relevar", /^ARB-00445/);
     await page.getByRole("button", { name: "Ver historial de relevamientos" }).click();
     await expect(page.getByRole("article", { name: /05\/09\/2026/ })).toBeVisible();
     await page.getByRole("button", { name: "Solicitar intervención sugerida" }).click();
     const guided = page.getByRole("dialog", { name: /Solicitar intervención/ });
-    await expect(guided.getByLabel(/^Tipo de intervención/)).toHaveValue("REMOVAL");
+    await expect(guided.getByRole("combobox", { name: "Tipo de intervención" })).toContainText("Extracción");
     await expect(guided.getByLabel(/^Justificación/)).toHaveValue("Relevamiento 05/09/2026 (survey-4).");
   });
 

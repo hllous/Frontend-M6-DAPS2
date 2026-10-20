@@ -46,7 +46,7 @@ type DatePickerProps = {
   className?: string;
 } & Pick<
   ComponentProps<"button">,
-  "aria-describedby" | "aria-label" | "aria-labelledby" | "onBlur"
+  "aria-describedby" | "aria-label" | "aria-labelledby" | "aria-required" | "onBlur"
 >;
 
 function DatePicker({

@@ -26,6 +26,7 @@ type CatalogDeactivationDialogProps = {
   children?: ReactNode;
   contentClassName?: string;
   confirmDataTestId?: string;
+  footerClassName?: string;
 };
 
 export function CatalogDeactivationDialog({
@@ -41,6 +42,7 @@ export function CatalogDeactivationDialog({
   children,
   contentClassName,
   confirmDataTestId,
+  footerClassName,
 }: CatalogDeactivationDialogProps) {
   function handleOpenChange(nextOpen: boolean) {
     if (isSubmitting && !nextOpen) return;
@@ -55,7 +57,7 @@ export function CatalogDeactivationDialog({
           <DialogDescription>{consequence}</DialogDescription>
         </DialogHeader>
         {children}
-        <DialogFooter>
+        <DialogFooter className={footerClassName}>
           <Button
             type="button"
             variant="outline"
