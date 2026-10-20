@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { argentinaDay, formatArgentinaDateTime, formatCalendarDay, todayInArgentina } from "./argentina-date";
+import { argentinaDay, formatArgentinaCalendarDate, formatArgentinaDateTime, formatArgentinaNumericDateTime, formatCalendarDay, todayInArgentina } from "./argentina-date";
 
 describe("todayInArgentina", () => {
   it("returns the day at 22:30 ART even when UTC is already the next day", () => {
@@ -55,6 +55,18 @@ describe("formatCalendarDay", () => {
   });
 });
 
+describe("formatArgentinaCalendarDate", () => {
+  it("formats calendar dates numerically without shifting them", () => {
+    expect(formatArgentinaCalendarDate("2026-09-05")).toBe("05/09/2026");
+    expect(formatArgentinaCalendarDate("2026-09-05T00:00:00.000Z")).toBe("05/09/2026");
+  });
+
+  it("returns values that are not valid calendar dates untouched", () => {
+    expect(formatArgentinaCalendarDate("sin fecha")).toBe("sin fecha");
+    expect(formatArgentinaCalendarDate("2026-02-30")).toBe("2026-02-30");
+  });
+});
+
 describe("formatArgentinaDateTime", () => {
   it("formats an instant in Argentina time", () => {
     // Intl separa "a. m." con espacios finos (U+202F), de ahí el \s.
@@ -67,5 +79,19 @@ describe("formatArgentinaDateTime", () => {
 
   it("returns values that are not dates untouched", () => {
     expect(formatArgentinaDateTime("sin fecha")).toBe("sin fecha");
+  });
+});
+
+describe("formatArgentinaNumericDateTime", () => {
+  it("formats instants in Argentina time using a 24-hour clock", () => {
+    expect(formatArgentinaNumericDateTime("2026-09-22T13:43:09.525Z")).toBe("22/09/2026, 10:43");
+  });
+
+  it("formats date-only values numerically without shifting the calendar day", () => {
+    expect(formatArgentinaNumericDateTime("2026-09-22")).toBe("22/09/2026");
+  });
+
+  it("returns values that are not dates untouched", () => {
+    expect(formatArgentinaNumericDateTime("sin fecha")).toBe("sin fecha");
   });
 });

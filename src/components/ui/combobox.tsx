@@ -32,7 +32,7 @@ type ComboboxProps = {
   /** Options are still loading. */
   busy?: boolean;
   className?: string;
-} & Pick<ComponentProps<"button">, "aria-describedby" | "aria-label" | "aria-labelledby" | "onBlur">;
+} & Pick<ComponentProps<"button">, "aria-describedby" | "aria-label" | "aria-labelledby" | "aria-required" | "onBlur">;
 
 function Combobox({
   id,

@@ -7,11 +7,23 @@ import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
 const Select = SelectPrimitive.Root
 
-function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
+function SelectGroup({
+  className,
+  variant = "default",
+  ...props
+}: SelectPrimitive.Group.Props & {
+  /** `nested`: guía vertical a la izquierda del grupo, como los sub-ítems del Sidebar. */
+  variant?: "default" | "nested"
+}) {
   return (
     <SelectPrimitive.Group
       data-slot="select-group"
-      className={cn("scroll-my-1 p-1", className)}
+      data-variant={variant}
+      className={cn(
+        "scroll-my-1 p-1",
+        variant === "nested" && "mx-3 my-1 border-l border-[var(--color-border-strong)] py-0 pr-0 pl-1.5",
+        className
+      )}
       {...props}
     />
   )
