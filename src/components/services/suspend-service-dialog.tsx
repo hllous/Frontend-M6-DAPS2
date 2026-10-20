@@ -110,6 +110,7 @@ function SuspendServiceForm({
   onSuspended: (updatedService: Service) => void;
 }) {
   const formId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const existingDraft = getFieldDraft<SuspendDraftPayload>(service.id, "suspend");
 
@@ -471,13 +472,27 @@ function SuspendServiceForm({
                     : "Opcional, cuando sea aplicable (ej. fotografía del desperfecto o del obstáculo)."}
                 </FieldDescription>
                 {!suspendedService && (
-                  <Input
-                    id={`${formId}-evidence-input`}
-                    type="file"
-                    multiple
-                    accept="image/jpeg,image/png,image/webp,application/pdf"
-                    onChange={handleFileSelect}
-                  />
+                  <>
+                    <Input
+                      ref={fileInputRef}
+                      id={`${formId}-evidence-input`}
+                      type="file"
+                      className="sr-only"
+                      tabIndex={-1}
+                      multiple
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      onChange={handleFileSelect}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="self-start"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip data-icon="inline-start" aria-hidden />
+                      Adjuntar archivos
+                    </Button>
+                  </>
                 )}
 
                 {queuedFiles.length > 0 && (

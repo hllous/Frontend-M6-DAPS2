@@ -173,6 +173,24 @@ describe("SuspendServiceDialog", () => {
     expect(idempotencyKeys[1]).toBe(idempotencyKeys[0]);
   });
 
+  it("opens the native picker from the Spanish attach button and queues the chosen files", async () => {
+    const user = userEvent.setup();
+    render(<ControlledSuspendServiceDialog onOpenChange={vi.fn()} onSuspended={vi.fn()} />);
+
+    const input = screen.getByLabelText("Evidencia adjunta") as HTMLInputElement;
+    const clickSpy = vi.spyOn(input, "click");
+    await user.click(screen.getByRole("button", { name: "Adjuntar archivos" }));
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    await user.upload(input, [
+      new File(["a"], "uno.jpg", { type: "image/jpeg" }),
+      new File(["b"], "dos.pdf", { type: "application/pdf" }),
+    ]);
+    expect(screen.getByText("uno.jpg")).toBeVisible();
+    expect(screen.getByText("dos.pdf")).toBeVisible();
+    expect(screen.getAllByText("Pendiente")).toHaveLength(2);
+  });
+
   it("retries only failed uploads when another evidence file already succeeded", async () => {
     let uploadAttempts = 0;
     const idempotencyKeys: string[] = [];
