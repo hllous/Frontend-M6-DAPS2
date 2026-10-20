@@ -197,6 +197,29 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(row.locator("button[data-service-select]")).toBeFocused();
   });
 
+  test("narrow viewport keeps the schedule dialog above the service-list drawer", async ({ page }) => {
+    // Opening the dialog on a wide viewport and narrowing remounts the list drawer after the dialog portal.
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await openServices(page);
+    await page.getByRole("button", { name: "Programar nuevo servicio" }).click();
+    const dialog = page.getByRole("dialog", { name: "Programar nuevo servicio" });
+    await expect(dialog).toBeVisible();
+    await page.setViewportSize(NARROW_VIEWPORT);
+
+    const footerButton = dialog.getByRole("button", { name: "Cancelar" });
+    await footerButton.scrollIntoViewIfNeeded();
+    await expect.poll(() => footerButton.evaluate((button) => {
+      const { left, top, width, height } = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(left + width / 2, top + height / 2);
+      return Boolean(hit && button.contains(hit));
+    })).toBe(true);
+    await expect(page.getByRole("dialog", { name: /servicios/ })).toHaveCount(0);
+
+    await footerButton.click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("dialog", { name: /servicios/ })).toBeVisible();
+  });
+
   test("narrow viewport keeps the map behind a three-state service-list drawer", async ({ page }) => {
     await page.setViewportSize(NARROW_VIEWPORT);
     await openServices(page);
