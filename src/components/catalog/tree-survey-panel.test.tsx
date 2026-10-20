@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 
@@ -12,6 +13,13 @@ import { TreeSurveyPanel } from "./tree-survey-panel";
 const server = setupServer(...handlers);
 const tree: Tree = { id: "tree-2", surveyCode: "ARB-00443", zoneId: "zone-2", species: "Tipa", address: "Parque del Bicentenario, sector norte", lat: -34.5692, lng: -58.4051, heightM: 18, diameterCm: 72.5, active: true, lastSurvey: null };
 
+async function chooseSelectOption(user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement, name: string | RegExp) {
+  await waitFor(() => expect(trigger).toBeEnabled());
+  await user.click(trigger);
+  await user.click(await screen.findByRole("option", { name }));
+  if (trigger.getAttribute("aria-expanded") === "true") await user.keyboard("{Escape}");
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => resetTreeSurveyFixtures());
 afterEach(() => {
@@ -21,6 +29,34 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("TreeSurveyPanel", () => {
+  it("lets users clear survey filters and optional survey selections", async () => {
+    const user = userEvent.setup();
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    await screen.findByRole("heading", { name: /Historial de relevamientos/ });
+
+    const healthFilter = screen.getByRole("combobox", { name: "Filtrar por estado sanitario" });
+    await chooseSelectOption(user, healthFilter, "Debilitado");
+    await chooseSelectOption(user, healthFilter, "Todos");
+    expect(healthFilter).toHaveTextContent("Todos");
+
+    const riskFilter = screen.getByRole("combobox", { name: "Filtrar por nivel de riesgo" });
+    await chooseSelectOption(user, riskFilter, "Alto");
+    await chooseSelectOption(user, riskFilter, "Todos");
+    expect(riskFilter).toHaveTextContent("Todos");
+
+    await user.click(screen.getByRole("button", { name: "Registrar relevamiento" }));
+    const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
+    const riskType = within(dialog).getByRole("combobox", { name: "Tipo de riesgo" });
+    await chooseSelectOption(user, riskType, "Caída de ramas");
+    await chooseSelectOption(user, riskType, "Sin tipo");
+    expect(riskType).toHaveTextContent("Seleccione un tipo");
+
+    const suggestedIntervention = within(dialog).getByRole("combobox", { name: "Intervención sugerida" });
+    await chooseSelectOption(user, suggestedIntervention, "Poda de formación");
+    await chooseSelectOption(user, suggestedIntervention, "Sin sugerencia");
+    expect(suggestedIntervention).toHaveTextContent("Sin sugerencia");
+  });
+
   it("lets Field review newest-first history and inspect an immutable detail", async () => {
     render(<TreeSurveyPanel tree={tree} scenario={scenarios.fieldCrewLeader} onClose={vi.fn()} />);
     expect(await screen.findByRole("heading", { name: /Historial de relevamientos/ })).toBeVisible();
@@ -34,17 +70,22 @@ describe("TreeSurveyPanel", () => {
   });
 
   it("blocks high-risk capture until riskType is selected and submits without Service linkage", async () => {
+    const user = userEvent.setup();
     render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
-    fireEvent.change(within(dialog).getByLabelText("Estado sanitario"), { target: { value: "WEAKENED" } });
-    fireEvent.change(within(dialog).getByLabelText("Nivel de riesgo"), { target: { value: "CRITICAL" } });
-    await within(dialog).getByRole("button", { name: "Guardar relevamiento" }).click();
+    expect(within(dialog).getByLabelText(/^Fecha del relevamiento/)).toBeVisible();
+    expect(within(dialog).getByRole("combobox", { name: "Estado sanitario" })).toHaveAttribute("aria-required", "true");
+    expect(within(dialog).getByRole("combobox", { name: "Nivel de riesgo" })).toHaveAttribute("aria-required", "true");
+    await chooseSelectOption(user, within(dialog).getByRole("combobox", { name: "Estado sanitario" }), "Debilitado");
+    await chooseSelectOption(user, within(dialog).getByRole("combobox", { name: "Nivel de riesgo" }), /Cr/);
+    expect(within(dialog).getByRole("combobox", { name: "Tipo de riesgo" })).toHaveAttribute("aria-required", "true");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar relevamiento" }));
     expect((await within(dialog).findByRole("alert")).textContent).toContain("tipo de riesgo");
 
-    fireEvent.change(within(dialog).getByLabelText("Tipo de riesgo"), { target: { value: "TRUNK_INSTABILITY" } });
-    await within(dialog).getByRole("button", { name: "Guardar relevamiento" }).click();
+    await chooseSelectOption(user, within(dialog).getByRole("combobox", { name: "Tipo de riesgo" }), "Inestabilidad del tronco");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar relevamiento" }));
     expect(await screen.findByText("Relevamiento registrado con éxito.")).toBeVisible();
     expect(screen.queryByText(/Service|servicio asignado/i)).not.toBeInTheDocument();
   });
@@ -60,8 +101,8 @@ describe("TreeSurveyPanel", () => {
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await (await screen.findByRole("button", { name: "Solicitar intervención sugerida" })).click();
     const dialog = screen.getByRole("dialog", { name: /Solicitar intervención/ });
-    expect(within(dialog).getByLabelText(/^Tipo de intervención/)).toHaveValue("SAFETY_PRUNING");
-    expect(within(dialog).getByLabelText(/^Árboles a intervenir/)).toHaveValue(["tree-2"]);
+    expect(within(dialog).getByRole("combobox", { name: "Tipo de intervención" })).toHaveTextContent("Poda de seguridad");
+    expect(within(dialog).getByRole("combobox", { name: "Árboles a intervenir" })).toHaveTextContent("ARB-00443");
     expect(within(dialog).getByLabelText(/^Justificación/)).toHaveValue("Relevamiento 06/09/2026 (survey-2).");
   });
 
@@ -84,9 +125,11 @@ describe("TreeSurveyPanel", () => {
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
-    const dateInput = within(dialog).getByLabelText("Fecha del relevamiento");
-    expect(dateInput).toHaveValue("2026-09-20");
-    expect(dateInput).toHaveAttribute("max", "2026-09-20");
+    const dateInput = within(dialog).getByLabelText(/^Fecha del relevamiento/);
+    expect(dateInput).toHaveTextContent("20/09/2026");
+    fireEvent.click(dateInput);
+    const tomorrow = screen.getAllByRole("button").find((button) => button.getAttribute("data-day") === "21/9/2026");
+    expect(tomorrow).toBeDisabled();
   });
 
   it("refreshes the default date each time the form opens instead of freezing it at load", async () => {
@@ -97,21 +140,18 @@ describe("TreeSurveyPanel", () => {
     vi.setSystemTime(new Date("2026-09-22T15:00:00Z"));
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
-    expect(within(dialog).getByLabelText("Fecha del relevamiento")).toHaveValue("2026-09-22");
+    expect(within(dialog).getByLabelText(/^Fecha del relevamiento/)).toHaveTextContent("22/09/2026");
   });
 
-  it("rejects a future date before calling the backend", async () => {
-    let posts = 0;
-    server.use(http.post("*/api/trees/:treeId/surveys", () => { posts += 1; return HttpResponse.json({}, { status: 500 }); }));
+  it("does not allow a future date to be selected", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-21T15:00:00Z"));
     render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
-    fireEvent.change(within(dialog).getByLabelText("Fecha del relevamiento"), { target: { value: "2099-01-01" } });
-    fireEvent.change(within(dialog).getByLabelText("Estado sanitario"), { target: { value: "HEALTHY" } });
-    fireEvent.change(within(dialog).getByLabelText("Nivel de riesgo"), { target: { value: "LOW" } });
-    await within(dialog).getByRole("button", { name: "Guardar relevamiento" }).click();
-    expect((await within(dialog).findByRole("alert")).textContent).toContain("no puede ser futura");
-    expect(posts).toBe(0);
+    fireEvent.click(within(dialog).getByLabelText(/^Fecha del relevamiento/));
+    const tomorrow = screen.getAllByRole("button").find((button) => button.getAttribute("data-day") === "22/9/2026");
+    expect(tomorrow).toBeDisabled();
   });
 });
