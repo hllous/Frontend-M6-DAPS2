@@ -49,10 +49,48 @@ async function chooseTime(user: ReturnType<typeof userEvent.setup>, scope: Retur
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); resetRepairRequestFixtures(); resetServiceFixtures(); window.localStorage.clear(); window.history.replaceState(null, "", "/app?destination=environment"); vi.useRealTimers(); });
+afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); resetRepairRequestFixtures(); resetServiceFixtures(); window.localStorage.clear(); window.history.replaceState(null, "", "/app?destination=environment"); server.events.removeAllListeners("request:start"); vi.useRealTimers(); });
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
+  it("restores a date range from the URL and clears it without clearing other filters", async () => {
+    window.history.replaceState(null, "", "/app?destination=environment&from=2026-09-04&to=2026-09-05&priority=HIGH");
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    expect(within(list).getByRole("button", { name: /ER-1006/ })).toBeVisible();
+    expect(within(list).queryByRole("button", { name: /ER-1001/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Desde" })).toHaveTextContent("04/09/2026");
+    expect(screen.getByRole("button", { name: "Hasta" })).toHaveTextContent("05/09/2026");
+    await user.click(screen.getByRole("button", { name: "Limpiar fechas" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /ER-1001/ })).toBeVisible());
+    expect(window.location.search).toContain("priority=HIGH");
+    expect(window.location.search).not.toMatch(/from=|to=/);
+  });
+
+  it("announces an inverted date range, blocks fetching and recovers when corrected", async () => {
+    window.history.replaceState(null, "", "/app?destination=environment&from=2026-09-07&to=2026-09-06&page=2");
+    const requests: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (new URL(request.url).pathname === "/api/environmental-reports") requests.push(request.url);
+    });
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("La fecha «Desde» no puede ser posterior a «Hasta».");
+    expect(screen.getByRole("button", { name: "Hasta" })).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: "Hasta" })).toHaveAccessibleDescription("La fecha «Desde» no puede ser posterior a «Hasta».");
+    expect(requests).toEqual([]);
+    await chooseDate(user, within(screen.getByRole("group", { name: "Última actualización" })), "Desde", "2026-09-06");
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    expect(requests).toHaveLength(1);
+    expect(new URL(requests[0]).searchParams.get("from")).toBe("2026-09-06");
+    expect(new URL(requests[0]).searchParams.get("to")).toBe("2026-09-06");
+    expect(new URL(requests[0]).searchParams.get("page")).toBe("1");
+    expect(window.location.search).toContain("from=2026-09-06");
+    expect(window.location.search).not.toContain("page=");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("shows an uncorrelated M4 outcome as an Office integration exception", async () => {
     ingestSanctionOutcomeFixture({
       violationNoticeId: "NOTICE-UNKNOWN",

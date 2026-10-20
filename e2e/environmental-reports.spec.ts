@@ -4,6 +4,32 @@ import { loginViaApi } from "./support/auth";
 import { chooseDate, chooseOption, chooseTime } from "./support/reports-indicators";
 
 test.describe("EnvironmentalReport case file", () => {
+  test("Office filters the queue by last update and restores the range from the URL", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=environment");
+    const filters = page.getByRole("region", { name: "Filtros de la cola" });
+    const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
+    await expect(list.getByRole("button", { name: /ER-1004/ })).toBeVisible();
+    await chooseDate(filters, "Desde", "2026-09-04");
+    const filtered = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/environmental-reports" && url.searchParams.get("from") === "2026-09-04" && url.searchParams.get("to") === "2026-09-05";
+    });
+    await chooseDate(filters, "Hasta", "2026-09-05");
+    expect((await filtered).ok()).toBe(true);
+    await expect(list.getByRole("button", { name: /ER-1004/ })).toBeVisible();
+    await expect(list.getByRole("button", { name: /ER-1006/ })).toBeVisible();
+    await expect(list.getByRole("button", { name: /ER-1003/ })).toHaveCount(0);
+    await expect(page).toHaveURL(/from=2026-09-04.*to=2026-09-05/);
+    await page.reload();
+    await expect(filters.getByRole("button", { name: "Desde" })).toHaveText(/04\/09\/2026/);
+    await expect(filters.getByRole("button", { name: "Hasta" })).toHaveText(/05\/09\/2026/);
+    await expect(list.getByRole("button", { name: /ER-1003/ })).toHaveCount(0);
+    await filters.getByRole("button", { name: "Limpiar fechas" }).click();
+    await expect(list.getByRole("button", { name: /ER-1003/ })).toBeVisible();
+    await expect(page).not.toHaveURL(/from=|to=/);
+  });
+
   test("Office returns focus to the report after forwarding and issuing a notice", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=environment");

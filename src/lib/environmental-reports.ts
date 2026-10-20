@@ -339,7 +339,17 @@ export const violationNoticeSchema = z.object({
 }).passthrough();
 export type ViolationNotice = z.infer<typeof violationNoticeSchema>;
 
+export const environmentalReportDateRangeSchema = z.object({
+  from: z.iso.date("Use una fecha válida con formato AAAA-MM-DD.").optional(),
+  to: z.iso.date("Use una fecha válida con formato AAAA-MM-DD.").optional(),
+}).refine((range) => !range.from || !range.to || range.from <= range.to, {
+  path: ["to"],
+  message: "La fecha «Desde» no puede ser posterior a «Hasta».",
+});
+
 export type EnvironmentalReportQuery = {
+  from?: string;
+  to?: string;
   status?: EnvironmentalReportStatus;
   reportType?: EnvironmentalReportType;
   priority?: EnvironmentalReportPriority;
@@ -418,6 +428,8 @@ const errorResponseSchema = z.object({
 
 function queryString(query: EnvironmentalReportQuery): string {
   const params = new URLSearchParams();
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
   if (query.status) params.set("status", query.status);
   if (query.reportType) params.set("reportType", query.reportType);
   if (query.priority) params.set("priority", query.priority);

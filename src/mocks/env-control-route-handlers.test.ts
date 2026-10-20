@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { setupServer } from "msw/node";
 
-import { resetEnvironmentalReportFixtures, ingestSanctionOutcomeFixture } from "@/lib/environmental-report-fixtures";
+import { resetEnvironmentalReportFixtures, ingestSanctionOutcomeFixture, getEnvironmentalReportFixture, environmentalReportFixtures } from "@/lib/environmental-report-fixtures";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import { createSessionCookie } from "@/test/session";
 
@@ -26,6 +26,40 @@ function call(method: string, path: string, cookie?: string, body?: unknown) {
 }
 
 describe("environmental control handlers delegate to the real BFF routes", () => {
+  it.each([
+    ["from=2026-09-06", ["ER-1001", "ER-1002", "ER-1003", "ER-1012"]],
+    ["to=2026-08-31", ["ER-1011"]],
+    ["from=2026-09-07&to=2026-09-08", []],
+  ])("supports open and empty ranges: %s", async (query, ids) => {
+    const response = await call("GET", `/api/environmental-reports?${query}`, officeCookie);
+    const payload = await response.json();
+    expect(payload.data.map((report: { id: string }) => report.id)).toEqual(ids);
+    expect(payload.meta.total).toBe(ids.length);
+  });
+
+  it.each([
+    "from=2026-09-07&to=2026-09-06",
+    "from=2026-02-30",
+    "to=06/09/2026",
+  ])("rejects invalid calendar ranges: %s", async (query) => {
+    const response = await call("GET", `/api/environmental-reports?${query}`, officeCookie);
+    expect(response.status).toBe(400);
+  });
+
+  it("filters by inclusive Argentine updatedAt days before pagination", async () => {
+    for (const report of environmentalReportFixtures) report.updatedAt = "2026-09-01T12:00:00Z";
+    Object.assign(getEnvironmentalReportFixture("ER-1001")!, { createdAt: "2026-09-01T12:00:00Z", updatedAt: "2026-09-07T02:59:59.999Z" });
+    Object.assign(getEnvironmentalReportFixture("ER-1002")!, { updatedAt: "2026-09-06T02:59:59.999Z" });
+    Object.assign(getEnvironmentalReportFixture("ER-1003")!, { updatedAt: "2026-09-06T03:00:00.000Z" });
+    const response = await call("GET", "/api/environmental-reports?from=2026-09-06&to=2026-09-06&pageSize=1", officeCookie);
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.meta).toMatchObject({ total: 2, totalPages: 2 });
+    expect(payload.data.map((report: { id: string }) => report.id)).toEqual(["ER-1001"]);
+    const second = await (await call("GET", "/api/environmental-reports?from=2026-09-06&to=2026-09-06&pageSize=1&page=2", officeCookie)).json();
+    expect(second.data.map((report: { id: string }) => report.id)).toEqual(["ER-1003"]);
+  });
+
   it("lists reports for Office with the M4 integration exceptions, and not for a crew session", async () => {
     ingestSanctionOutcomeFixture({
       violationNoticeId: "NOTICE-UNKNOWN",
