@@ -586,8 +586,9 @@ describe("ServicesWorkspace component", () => {
     expect(await screen.findByRole("heading", { name: "Programar nuevo servicio" })).toBeInTheDocument();
 
     // Select Route 1
-    const routeSelect = screen.getByLabelText(/Recorrido asignado/);
-    await user.selectOptions(routeSelect, "route-1");
+    await waitFor(() => expect(screen.getByRole("combobox", { name: /Recorrido asignado/ })).toHaveTextContent(/\(.+\)/));
+    await user.click(screen.getByRole("combobox", { name: /Recorrido asignado/ }));
+    await user.click(await screen.findByRole("option", { name: /REC-001/ }));
 
     // Submit form
     const submitBtn = screen.getByRole("button", { name: "Programar servicio" });
@@ -638,12 +639,12 @@ describe("ServicesWorkspace component", () => {
     // AssignCrewDialog opens
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: "Asignar cuadrilla y vehículo" })).toBeInTheDocument();
-    expect(within(dialog).getAllByText("Poda de árbol — Av. Rivadavia 2200")).toHaveLength(2);
+    expect(within(dialog).getByText("Poda de árbol — Av. Rivadavia 2200")).toBeInTheDocument();
 
     // Select crew-c (loaded from the crews adapter)
-    const crewSelect = within(dialog).getByLabelText(/Cuadrilla asignada/i);
-    await within(dialog).findByRole("option", { name: "Cuadrilla C · Ibáñez" });
-    await user.selectOptions(crewSelect, "crew-c");
+    await waitFor(() => expect(within(dialog).getByRole("combobox", { name: /Cuadrilla asignada/i })).toBeEnabled());
+    await user.click(within(dialog).getByRole("combobox", { name: /Cuadrilla asignada/i }));
+    await user.click(await screen.findByRole("option", { name: "Cuadrilla C · Ibáñez" }));
 
     // crew-c already holds SVC-1072 (13:00–16:00) that day: the backend requires a justification
     await user.type(
@@ -676,7 +677,7 @@ describe("ServicesWorkspace component", () => {
     // Dialog opens automatically based on URL params
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: "Asignar cuadrilla y vehículo" })).toBeInTheDocument();
-    expect(within(dialog).getAllByText("Poda de árbol — Av. Rivadavia 2200")).toHaveLength(2);
+    expect(within(dialog).getByText("Poda de árbol — Av. Rivadavia 2200")).toBeInTheDocument();
   });
 
   it("reschedules a scheduled service through the two-step Office flow, preserving its zones", async () => {
@@ -723,8 +724,9 @@ describe("ServicesWorkspace component", () => {
     // zoneIds snapshot is shown untouched
     expect(within(confirmDialog).getByText("Zona Centro")).toBeInTheDocument();
 
-    const dateInput = within(confirmDialog).getByLabelText(/Nueva fecha/i);
-    fireEvent.change(dateInput, { target: { value: "2099-09-12" } });
+    await user.click(within(confirmDialog).getByRole("button", { name: /^Nueva fecha/i }));
+    await user.click(await screen.findByRole("button", { name: "Mes siguiente" }));
+    await user.click(within(await screen.findByRole("grid")).getByRole("button", { name: /, 12 de /i }));
     await user.click(within(confirmDialog).getByRole("button", { name: "Confirmar nueva fecha" }));
 
     await waitFor(() => {
@@ -734,7 +736,7 @@ describe("ServicesWorkspace component", () => {
     await waitFor(() => {
       expect(screen.getByText("Programado")).toBeVisible();
     });
-    expect(screen.getByText("12 sept 2099")).toBeVisible();
+    expect(screen.getByText(/^12 [a-záéíóú]{3,5}\.? \d{4}$/i)).toBeVisible();
     // zoneIds preserved verbatim
     expect(screen.getByText("Zona Centro")).toBeVisible();
   });

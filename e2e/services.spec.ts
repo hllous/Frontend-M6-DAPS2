@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseDialogOption, pickDialogDay } from "./support/services-626-controls";
 
 const NARROW_VIEWPORT = { width: 390, height: 844 };
 const WIDE_VIEWPORT = { width: 1280, height: 900 };
@@ -196,6 +197,29 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(row.locator("button[data-service-select]")).toBeFocused();
   });
 
+  test("narrow viewport keeps the schedule dialog above the service-list drawer", async ({ page }) => {
+    // Opening the dialog on a wide viewport and narrowing remounts the list drawer after the dialog portal.
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await openServices(page);
+    await page.getByRole("button", { name: "Programar nuevo servicio" }).click();
+    const dialog = page.getByRole("dialog", { name: "Programar nuevo servicio" });
+    await expect(dialog).toBeVisible();
+    await page.setViewportSize(NARROW_VIEWPORT);
+
+    const footerButton = dialog.getByRole("button", { name: "Cancelar" });
+    await footerButton.scrollIntoViewIfNeeded();
+    await expect.poll(() => footerButton.evaluate((button) => {
+      const { left, top, width, height } = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(left + width / 2, top + height / 2);
+      return Boolean(hit && button.contains(hit));
+    })).toBe(true);
+    await expect(page.getByRole("dialog", { name: /servicios/ })).toHaveCount(0);
+
+    await footerButton.click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("dialog", { name: /servicios/ })).toBeVisible();
+  });
+
   test("narrow viewport keeps the map behind a three-state service-list drawer", async ({ page }) => {
     await page.setViewportSize(NARROW_VIEWPORT);
     await openServices(page);
@@ -356,15 +380,13 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(dialog).not.toContainText(linkedTicketId);
 
     // Select a POINT service type
-    await dialog.getByLabel(/Tipo de servicio/i).selectOption({ label: "Mantenimiento de contenedores (Punto)" });
+    await chooseDialogOption(dialog, /Tipo de servicio/i, "Mantenimiento de contenedores (Punto)");
     await expect(dialog.getByText("Punto fijo", { exact: true })).toBeVisible();
 
     // Pick the real container from the inventory (#319)
-    await expect(dialog.getByLabel(/Tipo de objetivo/i)).toHaveValue("CONTAINER");
+    await expect(dialog.getByRole("combobox", { name: /Tipo de objetivo/i })).toContainText("Contenedor");
     await dialog.getByLabel(/Buscar contenedor/i).fill("CONT-002");
-    const asset = dialog.getByLabel(/Bien del inventario/i);
-    await expect(asset.locator("option", { hasText: "CONT-002" })).toHaveCount(1);
-    await asset.selectOption({ label: "CONT-002 · Av. Santa Fe 3400" });
+    await chooseDialogOption(dialog, /Bien del inventario/i, "CONT-002 · Av. Santa Fe 3400");
 
     // Submit
     await dialog.getByRole("button", { name: "Programar servicio" }).click();
@@ -402,7 +424,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(dialog.getByText("Vehículo opcional")).toBeVisible();
 
     // Select a crew with no other service that day (crew catalog, not a fixture list)
-    await dialog.getByLabel(/Cuadrilla asignada/i).selectOption({ label: "Cuadrilla E - Membresia" });
+    await chooseDialogOption(dialog, /Cuadrilla asignada/i, "Cuadrilla E - Membresia");
     await expect(dialog.getByLabel(/Justificación del solapamiento/i)).toHaveCount(0);
 
     // Submit assignment
@@ -438,8 +460,8 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(dialog.getByText("Vehículo obligatorio")).toBeVisible();
 
     // Select crew and clear vehicle
-    await dialog.getByLabel(/Cuadrilla asignada/i).selectOption({ label: "Cuadrilla A · López" });
-    await dialog.getByLabel(/Vehículo operativo/i).selectOption({ value: "" });
+    await chooseDialogOption(dialog, /Cuadrilla asignada/i, "Cuadrilla A · López");
+    await chooseDialogOption(dialog, /Vehículo operativo/i, "Sin vehículo asignado");
 
     // Submitting without vehicle is rejected
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
@@ -448,7 +470,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     ).toBeVisible();
 
     // Select vehicle AA 123 AA (assigned to SVC-1042 at 09:00-13:00 on the same date)
-    await dialog.getByLabel(/Vehículo operativo/i).selectOption({ label: "AA 123 AA" });
+    await chooseDialogOption(dialog, /Vehículo operativo/i, "AA 123 AA");
 
     // Double-booking warning appears and asks for a justification (backend: overrideNote)
     await expect(dialog.getByText(/^Aviso de superposición horaria$/i)).toBeVisible();
@@ -719,7 +741,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(suspendDialog.getByRole("heading", { name: /Suspender Recolección de residuos — Recorrido 5/i })).toBeVisible();
 
     // Required reason + note
-    await suspendDialog.getByLabel(/Motivo de suspensión/i).selectOption("VEHICLE_BREAKDOWN");
+    await chooseDialogOption(suspendDialog, /Motivo de suspensión/i, "Desperfecto vehicular");
     await suspendDialog.getByLabel(/^Nota/i).fill("El camión no arranca, se solicitó grúa.");
 
     // Applicable evidence attached
@@ -805,13 +827,14 @@ test.describe("Office two-step Service reschedule flow @smoke", () => {
     // zoneIds snapshot is shown untouched ahead of confirming
     await expect(confirmDialog.getByText("Zona Sur")).toBeVisible();
 
-    await confirmDialog.locator("input[type='date']").fill("2099-09-13");
+    const pickedLabel = await pickDialogDay(confirmDialog, /^Nueva fecha/i, { monthsAhead: 1, day: 13 });
+    const pickedYear = pickedLabel.slice(-4);
     await confirmDialog.getByRole("button", { name: "Confirmar nueva fecha" }).click();
     await expect(confirmDialog).not.toBeVisible();
 
     // Back to SCHEDULED with the new date, zones preserved verbatim
     await expect(detailRegion.getByText("Programado").first()).toBeVisible();
-    await expect(detailRegion.getByText("13 sept 2099", { exact: true })).toBeVisible();
+    await expect(detailRegion.getByText(new RegExp(`^13 [a-záéíóú]{3,5}\\.? ${pickedYear}$`, "i"))).toBeVisible();
     await expect(detailRegion.getByText("Zona Sur").first()).toBeVisible();
   });
 
@@ -874,7 +897,7 @@ test.describe("Office cancels a Service @smoke", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     // No date/window input is ever offered for a RESCHEDULED cancellation
-    await expect(dialog.locator("input[type='date']")).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: /fecha/i })).toHaveCount(0);
 
     await dialog.getByLabel(/^Motivo/i).fill("Ya no se requiere el servicio.");
     await dialog.getByRole("button", { name: "Cancelar servicio" }).click();
@@ -941,7 +964,7 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await detailRegion.getByRole("button", { name: "Suspender servicio" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await dialog.getByLabel(/Motivo de suspensión/i).selectOption("VEHICLE_BREAKDOWN");
+    await chooseDialogOption(dialog, /Motivo de suspensión/i, "Desperfecto vehicular");
     await dialog.getByLabel(/^Nota/i).fill("El camión no arranca, se solicitó grúa.");
 
     // Simulate connectivity loss on the suspend submission
@@ -961,7 +984,7 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await detailRegion.getByRole("button", { name: "Suspender servicio" }).click();
     const reopenedDialog = page.getByRole("dialog");
     await expect(reopenedDialog).toBeVisible();
-    await expect(reopenedDialog.getByLabel(/Motivo de suspensión/i)).toHaveValue("VEHICLE_BREAKDOWN");
+    await expect(reopenedDialog.getByRole("combobox", { name: /Motivo de suspensión/i })).toContainText("Desperfecto vehicular");
     await expect(reopenedDialog.getByLabel(/^Nota/i)).toHaveValue(
       "El camión no arranca, se solicitó grúa.",
     );
@@ -979,7 +1002,7 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     const secondDetailRegion = secondTab.getByRole("region", { name: /Detalle completo de/ });
     await secondDetailRegion.getByRole("button", { name: "Suspender servicio" }).click();
     const secondDialog = secondTab.getByRole("dialog");
-    await secondDialog.getByLabel(/Motivo de suspensión/i).selectOption("CREW_UNAVAILABLE");
+    await chooseDialogOption(secondDialog, /Motivo de suspensión/i, "Cuadrilla no disponible");
     await secondDialog.getByLabel(/^Nota/i).fill("Cuadrilla reasignada a otro servicio urgente.");
     await secondDialog.getByRole("button", { name: "Suspender servicio" }).click();
     await expect(secondDialog).not.toBeVisible();

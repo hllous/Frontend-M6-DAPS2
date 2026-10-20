@@ -1163,7 +1163,8 @@ export function ServicesWorkspace({
                         summary={`${sortedServices.length} servicios`}
                         snapState={mobileDrawerSnap}
                         onSnapStateChange={setMobileDrawerSnap}
-                        suspended={Boolean(selectedService)}
+                        // A modal dialog must stay the topmost layer: the sheet portal would otherwise remount above it on a resize.
+                        suspended={Boolean(selectedService) || isScheduleOpen || Boolean(assigningService)}
                         className={styles.mobileServiceDrawer}
                       >
                         <div className={styles.mobileDrawerContent}>

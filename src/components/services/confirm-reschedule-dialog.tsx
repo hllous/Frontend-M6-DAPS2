@@ -2,10 +2,13 @@
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
-import { AlertCircle, CalendarCheck2, Check, Loader2, MapPin } from "lucide-react";
+import { useRevealFirstError } from "./use-reveal-first-error";
+import { AlertCircle, CalendarCheck2, Check, MapPin } from "lucide-react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FormControl } from "@/components/ui/form-control";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +17,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldError, FieldLabel } from "@/components/ui/legacy-field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Item, ItemContent, ItemTitle } from "@/components/ui/item";
+import { Spinner } from "@/components/ui/spinner";
+import { TimePicker } from "@/components/ui/time-picker";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { confirmRescheduleInputSchema, servicesAdapter, type Service } from "@/lib/services";
 
@@ -35,7 +41,7 @@ export function ConfirmRescheduleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg border-[var(--color-border)] bg-[var(--color-surface)]">
+      <DialogContent className="max-w-lg">
         <ConfirmRescheduleForm
           key={service.id}
           service={service}
@@ -65,6 +71,7 @@ function ConfirmRescheduleForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ date?: string; start?: string; end?: string }>({});
+  const formRef = useRevealFirstError<HTMLFormElement>(errorMessage, fieldErrors);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -115,80 +122,74 @@ function ConfirmRescheduleForm({
         </DialogDescription>
       </DialogHeader>
 
-      <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4 py-2">
+      <form ref={formRef} id={formId} noValidate onSubmit={handleSubmit} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
         {errorMessage && (
-          <div
-            role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-            <span>{errorMessage}</span>
-          </div>
+          <Alert variant="danger">
+            <AlertCircle aria-hidden />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
         )}
 
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-xs">
-          <div className="flex items-center gap-1.5 font-semibold text-[var(--color-text)]">
-            <MapPin className="h-3.5 w-3.5 text-[var(--color-action)]" aria-hidden />
-            <span>Zonas operativas (snapshot preservado)</span>
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {service.zoneNames.map((zn) => (
-              <span
-                key={zn}
-                className="inline-flex items-center gap-1 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] px-2 py-0.5 text-[var(--color-text)]"
-              >
-                <Check className="h-3 w-3 text-[var(--color-success)]" aria-hidden />
-                {zn}
-              </span>
-            ))}
-          </div>
-        </div>
+        <Item variant="muted" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              <MapPin className="size-4 text-primary" aria-hidden />
+              Zonas operativas (snapshot preservado)
+            </ItemTitle>
+            <ul className="flex flex-wrap gap-1.5" aria-label="Zonas operativas">
+              {service.zoneNames.map((zn) => (
+                <li key={zn}>
+                  <Badge variant="neutral">
+                    <Check aria-hidden />
+                    {zn}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          </ItemContent>
+        </Item>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Field className="sm:col-span-1">
-            <FieldLabel htmlFor={`${formId}-date`}>Nueva fecha *</FieldLabel>
-            <FormControl
+        <FieldGroup className="grid gap-4 sm:grid-cols-2">
+          <Field className="sm:col-span-2" data-invalid={Boolean(fieldErrors.date) || undefined}>
+            <FieldLabel htmlFor={`${formId}-date`}>Nueva fecha{" "}<span aria-hidden>*</span></FieldLabel>
+            <DatePicker
               id={`${formId}-date`}
-              type="date"
               min={minDate}
               value={scheduledDate}
-              onChange={(e) => { setScheduledDate(e.target.value); setFieldErrors((prev) => ({ ...prev, date: undefined })); }}
-              required
-              aria-invalid={Boolean(fieldErrors.date)}
+              onChange={(value) => { setScheduledDate(value); setFieldErrors((prev) => ({ ...prev, date: undefined })); }}
+              aria-required
+              invalid={Boolean(fieldErrors.date)}
               aria-describedby={fieldErrors.date ? `${formId}-date-error` : undefined}
-              className="py-1.5 text-xs"
             />
             {fieldErrors.date && <FieldError id={`${formId}-date-error`}>{fieldErrors.date}</FieldError>}
           </Field>
-          <Field className="sm:col-span-1">
-            <FieldLabel htmlFor={`${formId}-start`}>Desde *</FieldLabel>
-            <FormControl
+          <Field data-invalid={Boolean(fieldErrors.start) || undefined}>
+            <FieldLabel id={`${formId}-start-label`} htmlFor={`${formId}-start`}>Desde{" "}<span aria-hidden>*</span></FieldLabel>
+            <TimePicker
               id={`${formId}-start`}
-              type="time"
               value={windowStart}
-              onChange={(e) => { setWindowStart(e.target.value); setFieldErrors((prev) => ({ ...prev, start: undefined })); }}
+              onChange={(value) => { setWindowStart(value); setFieldErrors((prev) => ({ ...prev, start: undefined })); }}
               required
-              aria-invalid={Boolean(fieldErrors.start)}
+              invalid={Boolean(fieldErrors.start)}
+              aria-labelledby={`${formId}-start-label`}
               aria-describedby={fieldErrors.start ? `${formId}-start-error` : undefined}
-              className="py-1.5 text-xs"
             />
             {fieldErrors.start && <FieldError id={`${formId}-start-error`}>{fieldErrors.start}</FieldError>}
           </Field>
-          <Field className="sm:col-span-1">
-            <FieldLabel htmlFor={`${formId}-end`}>Hasta *</FieldLabel>
-            <FormControl
+          <Field data-invalid={Boolean(fieldErrors.end) || undefined}>
+            <FieldLabel id={`${formId}-end-label`} htmlFor={`${formId}-end`}>Hasta{" "}<span aria-hidden>*</span></FieldLabel>
+            <TimePicker
               id={`${formId}-end`}
-              type="time"
               value={windowEnd}
-              onChange={(e) => { setWindowEnd(e.target.value); setFieldErrors((prev) => ({ ...prev, end: undefined })); }}
+              onChange={(value) => { setWindowEnd(value); setFieldErrors((prev) => ({ ...prev, end: undefined })); }}
               required
-              aria-invalid={Boolean(fieldErrors.end)}
+              invalid={Boolean(fieldErrors.end)}
+              aria-labelledby={`${formId}-end-label`}
               aria-describedby={fieldErrors.end ? `${formId}-end-error` : undefined}
-              className="py-1.5 text-xs"
             />
             {fieldErrors.end && <FieldError id={`${formId}-end-error`}>{fieldErrors.end}</FieldError>}
           </Field>
-        </div>
+        </FieldGroup>
       </form>
 
       <DialogFooter className="flex-wrap">
@@ -200,8 +201,8 @@ function ConfirmRescheduleForm({
         >
           Cancelar
         </Button>
-        <Button type="submit" form={formId} disabled={isSubmitting} aria-busy={isSubmitting} className="min-h-12 font-semibold min-[761px]:min-h-10">
-          <Loader2 data-icon="inline-start" className={isSubmitting ? "animate-spin" : "invisible"} aria-hidden />
+        <Button type="submit" form={formId} disabled={isSubmitting} aria-busy={isSubmitting}>
+          {isSubmitting && <Spinner data-icon="inline-start" aria-hidden="true" />}
           <span>Confirmar nueva fecha</span>
         </Button>
       </DialogFooter>

@@ -11,6 +11,13 @@ import { SuspendServiceDialog } from "./suspend-service-dialog";
 
 const server = setupServer(...handlers);
 
+type User = ReturnType<typeof userEvent.setup>;
+
+async function chooseReason(user: User, option: string) {
+  await user.click(screen.getByRole("combobox", { name: /Motivo de suspensión/i }));
+  await user.click(await screen.findByRole("option", { name: option }));
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
@@ -89,16 +96,16 @@ describe("SuspendServiceDialog", () => {
   it("associates required-field validation with the reason and note controls", async () => {
     const user = userEvent.setup();
     render(<ControlledSuspendServiceDialog onOpenChange={vi.fn()} onSuspended={vi.fn()} />);
-    const reason = screen.getByLabelText(/Motivo de suspensión/i);
+    const reason = screen.getByRole("combobox", { name: /Motivo de suspensión/i });
     const note = screen.getByLabelText(/^Nota/i);
-    expect(reason).toHaveAttribute("data-slot", "form-control");
-    expect(note).toHaveAttribute("data-slot", "form-control");
+    expect(reason).toHaveAttribute("data-slot", "select-trigger");
+    expect(note).toHaveAttribute("data-slot", "textarea");
 
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
     expect(reason).toHaveAttribute("aria-invalid", "true");
     expect(document.getElementById(reason.getAttribute("aria-describedby")!)).toHaveTextContent("Debe seleccionar un motivo de suspensión.");
 
-    await user.selectOptions(reason, "VEHICLE_BREAKDOWN");
+    await chooseReason(user, "Desperfecto vehicular");
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
     expect(note).toHaveAttribute("aria-invalid", "true");
     expect(document.getElementById(note.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent("Debe indicar una nota describiendo la suspensión.");
@@ -136,10 +143,10 @@ describe("SuspendServiceDialog", () => {
       <ControlledSuspendServiceDialog onOpenChange={onOpenChange} onSuspended={onSuspended} />,
     );
 
-    await user.selectOptions(screen.getByLabelText(/Motivo de suspensión/i), "VEHICLE_BREAKDOWN");
+    await chooseReason(user, "Desperfecto vehicular");
     await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
     await user.upload(
-      screen.getByLabelText("Seleccionar archivo"),
+      screen.getByLabelText("Evidencia adjunta"),
       new File(["foto"], "evidencia.jpg", { type: "image/jpeg" }),
     );
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
@@ -150,12 +157,12 @@ describe("SuspendServiceDialog", () => {
       "Servicio suspendido; falta subir 1 archivo",
     );
     expect(screen.getByText("No se pudo validar el archivo.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Reintentar" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Reintentar evidencia.jpg" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Suspender servicio" })).not.toBeInTheDocument();
     expect(onSuspended).not.toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
 
-    await user.click(screen.getByRole("button", { name: "Reintentar" }));
+    await user.click(screen.getByRole("button", { name: "Reintentar evidencia.jpg" }));
 
     await waitFor(() => {
       expect(onSuspended).toHaveBeenCalledTimes(1);
@@ -164,6 +171,24 @@ describe("SuspendServiceDialog", () => {
     expect(uploadAttempts).toBe(2);
     expect(idempotencyKeys[0]).toBeTruthy();
     expect(idempotencyKeys[1]).toBe(idempotencyKeys[0]);
+  });
+
+  it("opens the native picker from the Spanish attach button and queues the chosen files", async () => {
+    const user = userEvent.setup();
+    render(<ControlledSuspendServiceDialog onOpenChange={vi.fn()} onSuspended={vi.fn()} />);
+
+    const input = screen.getByLabelText("Evidencia adjunta") as HTMLInputElement;
+    const clickSpy = vi.spyOn(input, "click");
+    await user.click(screen.getByRole("button", { name: "Adjuntar archivos" }));
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    await user.upload(input, [
+      new File(["a"], "uno.jpg", { type: "image/jpeg" }),
+      new File(["b"], "dos.pdf", { type: "application/pdf" }),
+    ]);
+    expect(screen.getByText("uno.jpg")).toBeVisible();
+    expect(screen.getByText("dos.pdf")).toBeVisible();
+    expect(screen.getAllByText("Pendiente")).toHaveLength(2);
   });
 
   it("retries only failed uploads when another evidence file already succeeded", async () => {
@@ -195,9 +220,9 @@ describe("SuspendServiceDialog", () => {
     render(
       <ControlledSuspendServiceDialog onOpenChange={onOpenChange} onSuspended={onSuspended} />,
     );
-    await user.selectOptions(screen.getByLabelText(/Motivo de suspensión/i), "VEHICLE_BREAKDOWN");
+    await chooseReason(user, "Desperfecto vehicular");
     await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
-    await user.upload(screen.getByLabelText("Seleccionar archivo"), [
+    await user.upload(screen.getByLabelText("Evidencia adjunta"), [
       new File(["foto 1"], "evidencia-1.jpg", { type: "image/jpeg" }),
       new File(["foto 2"], "evidencia-2.jpg", { type: "image/jpeg" }),
     ]);
@@ -242,10 +267,10 @@ describe("SuspendServiceDialog", () => {
     render(
       <ControlledSuspendServiceDialog onOpenChange={onOpenChange} onSuspended={onSuspended} />,
     );
-    await user.selectOptions(screen.getByLabelText(/Motivo de suspensión/i), "VEHICLE_BREAKDOWN");
+    await chooseReason(user, "Desperfecto vehicular");
     await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
     await user.upload(
-      screen.getByLabelText("Seleccionar archivo"),
+      screen.getByLabelText("Evidencia adjunta"),
       new File(["foto"], "evidencia.jpg", { type: "image/jpeg" }),
     );
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
@@ -275,10 +300,10 @@ describe("SuspendServiceDialog", () => {
     render(
       <ControlledSuspendServiceDialog onOpenChange={onOpenChange} onSuspended={onSuspended} />,
     );
-    await user.selectOptions(screen.getByLabelText(/Motivo de suspensión/i), "VEHICLE_BREAKDOWN");
+    await chooseReason(user, "Desperfecto vehicular");
     await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
     await user.upload(
-      screen.getByLabelText("Seleccionar archivo"),
+      screen.getByLabelText("Evidencia adjunta"),
       new File(["foto"], "evidencia.jpg", { type: "image/jpeg" }),
     );
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));

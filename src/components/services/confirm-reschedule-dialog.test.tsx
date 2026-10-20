@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -21,15 +21,27 @@ const service = serviceFixtures.find((candidate) => candidate.id === "SVC-1053")
 
 function renderDialog(onConfirmed = vi.fn()) {
   render(<ConfirmRescheduleDialog open onOpenChange={vi.fn()} service={service} onConfirmed={onConfirmed} />);
-  return { onConfirmed, dateInput: screen.getByLabelText(/Nueva fecha/i) };
+  return { onConfirmed, dateInput: screen.getByRole("button", { name: /^Nueva fecha/i }) };
 }
 
 describe("ConfirmRescheduleDialog", () => {
-  it("does not prefill the previous (past) date and restricts the input to today in Argentina onwards", () => {
+  it("does not prefill the previous (past) date and shows the 24-hour window of the service", () => {
     const { dateInput } = renderDialog();
-    expect(dateInput).toHaveAttribute("data-slot", "form-control");
-    expect(dateInput).toHaveValue("");
-    expect(dateInput).toHaveAttribute("min", todayInArgentina());
+    expect(dateInput).toHaveTextContent("dd/mm/aaaa");
+    const from = within(screen.getByRole("group", { name: /Desde/ }));
+    const to = within(screen.getByRole("group", { name: /Hasta/ }));
+    expect(from.getByRole("combobox", { name: "Hora" })).toHaveTextContent("16");
+    expect(from.getByRole("combobox", { name: "Minutos" })).toHaveTextContent("00");
+    expect(to.getByRole("combobox", { name: "Hora" })).toHaveTextContent("19");
+  });
+
+  it("disables days before today in Argentina", async () => {
+    const { dateInput } = renderDialog();
+    const day = todayInArgentina().split("-").map(Number)[2];
+    await userEvent.click(dateInput);
+    const grid = await screen.findByRole("grid");
+    expect(within(grid).getByRole("button", { name: new RegExp(`, ${day} de `, "i") })).toBeEnabled();
+    if (day > 1) expect(within(grid).getByRole("button", { name: new RegExp(`, ${day - 1} de `, "i") })).toBeDisabled();
   });
 
   it("asks for a date when none was chosen, without calling the backend", async () => {
@@ -43,21 +55,13 @@ describe("ConfirmRescheduleDialog", () => {
     expect(posts).toBe(0);
   });
 
-  it("blocks a past date with a clear message and does not call the backend", async () => {
-    let posts = 0;
-    server.use(http.post("*/api/services/:id/confirm-reschedule", () => { posts += 1; return HttpResponse.json({}, { status: 500 }); }));
-    const { dateInput, onConfirmed } = renderDialog();
-    fireEvent.change(dateInput, { target: { value: "2020-01-01" } });
-    await userEvent.click(screen.getByRole("button", { name: "Confirmar nueva fecha" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("La nueva fecha no puede ser anterior a hoy.");
-    expect(posts).toBe(0);
-    expect(onConfirmed).not.toHaveBeenCalled();
-  });
-
   it("confirms a future date", async () => {
     const { dateInput, onConfirmed } = renderDialog();
-    fireEvent.change(dateInput, { target: { value: "2099-09-12" } });
+    await userEvent.click(dateInput);
+    await userEvent.click(await screen.findByRole("button", { name: "Mes siguiente" }));
+    await userEvent.click(within(await screen.findByRole("grid")).getByRole("button", { name: /, 15 de /i }));
+    expect(dateInput).toHaveTextContent(/^15\/\d{2}\/\d{4}/);
     await userEvent.click(screen.getByRole("button", { name: "Confirmar nueva fecha" }));
-    await vi.waitFor(() => expect(onConfirmed).toHaveBeenCalledWith(expect.objectContaining({ status: "SCHEDULED", scheduledDate: "2099-09-12" })));
+    await vi.waitFor(() => expect(onConfirmed).toHaveBeenCalledWith(expect.objectContaining({ status: "SCHEDULED" })));
   });
 });

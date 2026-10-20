@@ -79,21 +79,6 @@
       "count": 2
     }
   },
-  "src/components/services/assign-crew-dialog.tsx": {
-    "no-restricted-syntax": {
-      "count": 2
-    }
-  },
-  "src/components/services/cancel-service-dialog.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/components/services/confirm-reschedule-dialog.tsx": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
   "src/components/services/create-repair-request-dialog.tsx": {
     "no-restricted-syntax": {
       "count": 6
@@ -114,16 +99,6 @@
       "count": 2
     }
   },
-  "src/components/services/reschedule-reason-dialog.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/components/services/schedule-service-dialog.tsx": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
   "src/components/services/service-detail.tsx": {
     "no-restricted-syntax": {
       "count": 1
@@ -137,11 +112,6 @@
   "src/components/services/services-workspace.tsx": {
     "no-restricted-syntax": {
       "count": 4
-    }
-  },
-  "src/components/services/suspend-service-dialog.tsx": {
-    "no-restricted-syntax": {
-      "count": 5
     }
   },
   "src/components/services/zone-execution-panel.tsx": {
