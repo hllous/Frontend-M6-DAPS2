@@ -15,6 +15,7 @@ type TimePickerProps = {
   onChange: (value: string) => void;
   /** Goes on the hour select. */
   id?: string;
+  required?: boolean;
   invalid?: boolean;
   disabled?: boolean;
   className?: string;
@@ -26,7 +27,7 @@ function splitTime(value: string) {
 }
 
 /** 24-hour time as two shadcn Selects: hours 00-23 and every minute 00-59. */
-function TimePicker({ value, onChange, id, invalid, disabled, className, ...groupProps }: TimePickerProps) {
+function TimePicker({ value, onChange, id, required, invalid, disabled, className, ...groupProps }: TimePickerProps) {
   const [parts, setParts] = useState(() => splitTime(value));
   const [formValue, setFormValue] = useState(value);
 
@@ -46,7 +47,7 @@ function TimePicker({ value, onChange, id, invalid, disabled, className, ...grou
   return (
     <div role="group" data-slot="time-picker" className={cn("flex items-center gap-2", className)} {...groupProps}>
       <Select value={parts.hour || null} disabled={disabled} onValueChange={(hour) => choose({ ...parts, hour: String(hour) })}>
-        <SelectTrigger id={id} aria-label="Hora" aria-invalid={invalid || undefined}>
+        <SelectTrigger id={id} aria-label="Hora" aria-required={required || undefined} aria-invalid={invalid || undefined} aria-describedby={groupProps["aria-describedby"]}>
           <SelectValue placeholder="hh" />
         </SelectTrigger>
         <SelectContent>
@@ -61,7 +62,7 @@ function TimePicker({ value, onChange, id, invalid, disabled, className, ...grou
       </Select>
       <span aria-hidden="true">:</span>
       <Select value={parts.minute || null} disabled={disabled} onValueChange={(minute) => choose({ ...parts, minute: String(minute) })}>
-        <SelectTrigger aria-label="Minutos" aria-invalid={invalid || undefined}>
+        <SelectTrigger aria-label="Minutos" aria-required={required || undefined} aria-invalid={invalid || undefined} aria-describedby={groupProps["aria-describedby"]}>
           <SelectValue placeholder="mm" />
         </SelectTrigger>
         <SelectContent>
