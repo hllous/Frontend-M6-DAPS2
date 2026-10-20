@@ -685,13 +685,10 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 </div>
 
                 {stopEditorError && (
-                  <div
-                    className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2"
-                    data-testid="stop-editor-error"
-                  >
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <span>{stopEditorError}</span>
-                  </div>
+                  <Alert variant="destructive" id="stop-editor-error" data-testid="stop-editor-error">
+                    <AlertTriangle aria-hidden="true" />
+                    <AlertDescription>{stopEditorError}</AlertDescription>
+                  </Alert>
                 )}
 
                 {/* Ordered sequence list */}
@@ -829,9 +826,12 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                               `${zone.code} — ${zone.name}${draftStops.some((stop) => stop.zoneId === zone.id) ? " (Ya en recorrido)" : ""}`,
                             ]),
                         )}
-                        onValueChange={(value) => setNewStopZoneId(value ?? "")}
+                        onValueChange={(value) => {
+                          setNewStopZoneId(value ?? "");
+                          setStopEditorError(null);
+                        }}
                       >
-                        <SelectTrigger id="stop-zone-select" aria-label="Zona operativa" data-testid="stop-zone-select" className="text-xs">
+                        <SelectTrigger id="stop-zone-select" aria-label="Zona operativa" aria-invalid={stopEditorError ? true : undefined} aria-describedby={stopEditorError ? "stop-editor-error" : undefined} data-testid="stop-zone-select" className="text-xs">
                           <SelectValue placeholder="Seleccione una zona operativa activa..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -863,7 +863,12 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                         min={1}
                         max={1440}
                         value={newStopDuration}
-                        onChange={(e) => setNewStopDuration(Number(e.target.value))}
+                        onChange={(e) => {
+                          setNewStopDuration(Number(e.target.value));
+                          setStopEditorError(null);
+                        }}
+                        aria-invalid={stopEditorError ? true : undefined}
+                        aria-describedby={stopEditorError ? "stop-editor-error" : undefined}
                         className="h-10 w-20 px-2 text-right text-xs"
                         data-testid="stop-duration-input"
                       />
@@ -1108,7 +1113,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                           variant="ghost"
                           size="sm"
                           onClick={() => setSelectedRoute(route)}
-                          className="h-8 px-2 text-xs"
+                          className="h-8 max-[760px]:h-10 px-2 text-xs"
                           data-testid={`view-route-${route.id}`}
                         >
                           <Eye className="h-3.5 w-3.5 mr-1" />
@@ -1122,7 +1127,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleOpenEdit(route)}
-                                  className="h-8 px-2 text-xs"
+                                  className="h-8 max-[760px]:h-10 px-2 text-xs"
                                   aria-label="Editar recorrido"
                                   data-testid={`edit-route-${route.id}`}
                                 >
@@ -1138,7 +1143,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => handleOpenDeactivate(route)}
-                                    className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
+                                    className="h-8 max-[760px]:h-10 px-2 text-xs text-destructive hover:bg-destructive/10"
                                     aria-label="Desactivar recorrido"
                                     data-testid={`deactivate-route-${route.id}`}
                                   >

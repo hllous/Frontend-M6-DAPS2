@@ -684,7 +684,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                           size="sm"
                           variant="outline"
                           onClick={() => void handleStartNeighborhoods(zone)}
-                          className="h-8 gap-1 text-xs"
+                          className="h-8 max-[760px]:h-10 gap-1 text-xs"
                         >
                           <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
                           Gestionar barrios
@@ -694,7 +694,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                           size="sm"
                           variant="outline"
                           onClick={() => handleStartEdit(zone)}
-                          className="h-8 gap-1 text-xs"
+                          className="h-8 max-[760px]:h-10 gap-1 text-xs"
                         >
                           <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                           Editar
@@ -705,7 +705,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                             size="sm"
                             variant="destructive"
                             onClick={() => handleStartDeactivate(zone)}
-                            className="h-8 gap-1 text-xs"
+                            className="h-8 max-[760px]:h-10 gap-1 text-xs"
                           >
                             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                             Dar de baja
