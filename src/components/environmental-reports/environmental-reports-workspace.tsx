@@ -879,7 +879,7 @@ function InspectionSchedulingDialog({ open, mode, initial, onOpenChange, onSubmi
     <DialogContent className="max-w-lg">
       <DialogHeader><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-action)]"><CalendarDays aria-hidden />Programación operativa</div><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>
       {error && <Alert variant="danger">{error}</Alert>}
-      <form id="inspection-scheduling-form" onSubmit={submit}>
+      <form id="inspection-scheduling-form" onSubmit={submit} className="-mx-1 min-h-0 overflow-y-auto px-1">
         <FieldGroup>
           <Field><FieldLabel htmlFor="inspection-scheduled-date">Fecha de inspección <span aria-hidden="true">*</span></FieldLabel><DatePicker id="inspection-scheduled-date" value={date} onChange={setDate} disabled={submitting} aria-required="true" invalid={missingDate} aria-describedby={missingDate ? "inspection-date-error" : undefined} />{missingDate && <FieldError id="inspection-date-error">Indique la fecha.</FieldError>}</Field>
           <div className="grid gap-4 sm:grid-cols-2">
