@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 
+import { notifyError } from "@/components/ui/feedback";
 import { FoundationDemo } from "@/components/shell/foundation-demo";
 import { ShellLoading } from "@/components/shell/shell-states";
 import { getFieldDraftOwner, setFieldDraftOwner, subscribeFieldDraftOwner } from "@/lib/field-drafts";
@@ -14,16 +15,14 @@ export function SessionShell({ actorId, scenarioId, logoutAction, children }: {
   logoutAction: (formData: FormData) => Promise<void>;
   children?: ReactNode;
 }) {
-  const [logoutError, setLogoutError] = useState<string>();
   const draftOwner = useSyncExternalStore(subscribeFieldDraftOwner, getFieldDraftOwner, () => undefined);
   useEffect(() => setFieldDraftOwner(actorId), [actorId]);
 
   async function logout(formData: FormData) {
-    setLogoutError(undefined);
     try {
       await logoutAction(formData);
     } catch {
-      setLogoutError("No se pudo cerrar la sesión. Reintente.");
+      notifyError("No se pudo cerrar la sesión. Reintente.");
       return;
     }
     await broadcastLogout();
@@ -31,10 +30,5 @@ export function SessionShell({ actorId, scenarioId, logoutAction, children }: {
 
   if (draftOwner !== actorId) return <main className="p-6"><ShellLoading /></main>;
 
-  return (
-    <>
-      {logoutError ? <p role="alert" className="fixed inset-x-4 top-20 z-50 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-4 text-[var(--color-danger)] sm:left-auto">{logoutError}</p> : null}
-      <FoundationDemo scenarioId={scenarioId} logoutAction={logout}>{children}</FoundationDemo>
-    </>
-  );
+  return <FoundationDemo scenarioId={scenarioId} logoutAction={logout}>{children}</FoundationDemo>;
 }

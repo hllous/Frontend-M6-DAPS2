@@ -2,9 +2,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
+import { notifyError } from "@/components/ui/feedback";
 import { getScenario } from "@/lib/scenarios";
 import { getFieldDraft, setFieldDraftOwner } from "@/lib/field-drafts";
 import { SessionShell } from "./session-shell";
+
+vi.mock("@/components/ui/feedback", () => ({ notifyError: vi.fn(), notifySuccess: vi.fn() }));
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -36,7 +39,7 @@ it("shows a retry message without broadcasting when the logout action fails", as
   remote.addEventListener("message", received);
   render(<SessionShell actorId="actor-a" scenarioId="office-duty-queue" logoutAction={async () => { throw new TypeError("offline"); }} />);
   await userEvent.click(await screen.findByRole("button", { name: "Cerrar sesión" }));
-  expect(await screen.findByText("No se pudo cerrar la sesión. Reintente.")).toHaveAttribute("role", "alert");
+  await waitFor(() => expect(notifyError).toHaveBeenCalledWith("No se pudo cerrar la sesión. Reintente."));
   await waitFor(() => expect(assign).not.toHaveBeenCalled());
   expect(received).not.toHaveBeenCalled();
   remote.close();

@@ -7,7 +7,8 @@ import type { ScenarioId } from "../../src/lib/scenarios";
 /** Drives the real login form — used by the journeys that must prove entry itself works. */
 export async function loginViaUi(page: Page, scenarioLabel: string) {
   await page.goto("/login");
-  await page.getByLabel("Escenario operativo").selectOption({ label: scenarioLabel });
+  await page.getByRole("combobox", { name: "Escenario operativo" }).click();
+  await page.getByRole("option", { name: scenarioLabel, exact: true }).click();
   await page.getByRole("button", { name: "Ingresar al sistema" }).click();
   await page.waitForURL("**/app");
 }
