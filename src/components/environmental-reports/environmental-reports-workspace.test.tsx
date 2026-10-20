@@ -299,7 +299,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ origin: "INSPECTION", inspectionId: expect.any(String), crewId: "crew-a", zoneIds: ["zone-1"], scheduledDate: "2026-09-10", timeWindow: { start: "09:30", end: "10:30" } }));
     expect(assignCrew).not.toHaveBeenCalled();
     expect(within(detail).queryByRole("button", { name: "Programar servicio" })).not.toBeInTheDocument();
-  }, 15000);
+  });
 
   it("keeps the inspection and offers to retry only the Service when its creation fails (#320)", async () => {
     const user = userEvent.setup();
@@ -371,7 +371,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ origin: "INSPECTION", inspectionId, crewId: "crew-a", overrideNote: "La otra parada termina antes." }));
     expect(await within(detail).findByText(/^SVC-/)).toBeVisible();
     expect(within(detail).queryByRole("button", { name: "Programar servicio" })).not.toBeInTheDocument();
-  }, 15000);  it("reprograms a scheduled inspection through its linked Service instead of creating another inspection (#294)", async () => {
+  });
+
+  it("reprograms a scheduled inspection through its linked Service instead of creating another inspection (#294)", async () => {
     const user = userEvent.setup();
     const schedule = vi.spyOn(environmentalReportsAdapter, "schedule");
     const reschedule = vi.spyOn(servicesAdapter, "reschedule");

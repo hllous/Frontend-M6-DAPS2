@@ -423,5 +423,5 @@ describe("IndicatorsDashboard", () => {
 
     await chooseDate(user, "Hasta", "2026-09-20");
     expect(screen.queryByText("La fecha «Desde» no puede ser posterior a «Hasta».")).not.toBeInTheDocument();
-  }, 15000);
+  });
 });
