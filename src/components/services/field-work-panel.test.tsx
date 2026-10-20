@@ -446,10 +446,8 @@ describe("FieldWorkPanel component", () => {
       }),
     ).toBeVisible();
 
-    await user.selectOptions(
-      screen.getByLabelText(/Motivo de suspensión/i),
-      "VEHICLE_BREAKDOWN",
-    );
+    await user.click(screen.getByRole("combobox", { name: /Motivo de suspensión/i }));
+    await user.click(await screen.findByRole("option", { name: "Desperfecto vehicular" }));
     await user.type(screen.getByLabelText(/^Nota/i), "El camión no arranca.");
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
 
@@ -531,10 +529,8 @@ describe("FieldWorkPanel component", () => {
 
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
     const dialog = await screen.findByRole("dialog");
-    await user.selectOptions(
-      within(dialog).getByLabelText(/Motivo de suspensión/i),
-      "VEHICLE_BREAKDOWN",
-    );
+    await user.click(within(dialog).getByRole("combobox", { name: /Motivo de suspensión/i }));
+    await user.click(await screen.findByRole("option", { name: "Desperfecto vehicular" }));
     await user.type(within(dialog).getByLabelText(/^Nota/i), "El camión no arranca.");
     await user.click(within(dialog).getByRole("button", { name: "Suspender servicio" }));
 
@@ -550,8 +546,8 @@ describe("FieldWorkPanel component", () => {
 
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
     const reopenedDialog = await screen.findByRole("dialog");
-    expect(within(reopenedDialog).getByLabelText(/Motivo de suspensión/i)).toHaveValue(
-      "VEHICLE_BREAKDOWN",
+    expect(within(reopenedDialog).getByRole("combobox", { name: /Motivo de suspensión/i })).toHaveTextContent(
+      "Desperfecto vehicular",
     );
     expect(within(reopenedDialog).getByLabelText(/^Nota/i)).toHaveValue("El camión no arranca.");
     expect(within(reopenedDialog).getByRole("status")).toHaveTextContent(/borrador local pendiente/i);
@@ -570,7 +566,7 @@ describe("FieldWorkPanel component", () => {
     await waitFor(() => {
       expect(within(reopenedDialog).queryByRole("status")).not.toBeInTheDocument();
     });
-    expect(within(reopenedDialog).getByLabelText(/Motivo de suspensión/i)).toHaveValue("");
+    expect(within(reopenedDialog).getByRole("combobox", { name: /Motivo de suspensión/i })).toHaveTextContent("Seleccione un motivo…");
   });
 
   it("does not offer suspend/resume actions to a Crew Member", async () => {

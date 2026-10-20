@@ -11,6 +11,13 @@ import { SuspendServiceDialog } from "./suspend-service-dialog";
 
 const server = setupServer(...handlers);
 
+type User = ReturnType<typeof userEvent.setup>;
+
+async function chooseReason(user: User, option: string) {
+  await user.click(screen.getByRole("combobox", { name: /Motivo de suspensión/i }));
+  await user.click(await screen.findByRole("option", { name: option }));
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
@@ -89,16 +96,16 @@ describe("SuspendServiceDialog", () => {
   it("associates required-field validation with the reason and note controls", async () => {
     const user = userEvent.setup();
     render(<ControlledSuspendServiceDialog onOpenChange={vi.fn()} onSuspended={vi.fn()} />);
-    const reason = screen.getByLabelText(/Motivo de suspensión/i);
+    const reason = screen.getByRole("combobox", { name: /Motivo de suspensión/i });
     const note = screen.getByLabelText(/^Nota/i);
-    expect(reason).toHaveAttribute("data-slot", "form-control");
-    expect(note).toHaveAttribute("data-slot", "form-control");
+    expect(reason).toHaveAttribute("data-slot", "select-trigger");
+    expect(note).toHaveAttribute("data-slot", "textarea");
 
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
     expect(reason).toHaveAttribute("aria-invalid", "true");
     expect(document.getElementById(reason.getAttribute("aria-describedby")!)).toHaveTextContent("Debe seleccionar un motivo de suspensión.");
 
-    await user.selectOptions(reason, "VEHICLE_BREAKDOWN");
+    await chooseReason(user, "Desperfecto vehicular");
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
     expect(note).toHaveAttribute("aria-invalid", "true");
     expect(document.getElementById(note.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent("Debe indicar una nota describiendo la suspensión.");
@@ -136,10 +143,10 @@ describe("SuspendServiceDialog", () => {
       <ControlledSuspendServiceDialog onOpenChange={onOpenChange} onSuspended={onSuspended} />,
     );
 
-    await user.selectOptions(screen.getByLabelText(/Motivo de suspensión/i), "VEHICLE_BREAKDOWN");
+    await chooseReason(user, "Desperfecto vehicular");
     await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
     await user.upload(
-      screen.getByLabelText("Seleccionar archivo"),
+      screen.getByLabelText("Evidencia adjunta"),
       new File(["foto"], "evidencia.jpg", { type: "image/jpeg" }),
     );
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
@@ -195,9 +202,9 @@ describe("SuspendServiceDialog", () => {
     render(
       <ControlledSuspendServiceDialog onOpenChange={onOpenChange} onSuspended={onSuspended} />,
     );
-    await user.selectOptions(screen.getByLabelText(/Motivo de suspensión/i), "VEHICLE_BREAKDOWN");
+    await chooseReason(user, "Desperfecto vehicular");
     await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
-    await user.upload(screen.getByLabelText("Seleccionar archivo"), [
+    await user.upload(screen.getByLabelText("Evidencia adjunta"), [
       new File(["foto 1"], "evidencia-1.jpg", { type: "image/jpeg" }),
       new File(["foto 2"], "evidencia-2.jpg", { type: "image/jpeg" }),
     ]);
@@ -242,10 +249,10 @@ describe("SuspendServiceDialog", () => {
     render(
       <ControlledSuspendServiceDialog onOpenChange={onOpenChange} onSuspended={onSuspended} />,
     );
-    await user.selectOptions(screen.getByLabelText(/Motivo de suspensión/i), "VEHICLE_BREAKDOWN");
+    await chooseReason(user, "Desperfecto vehicular");
     await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
     await user.upload(
-      screen.getByLabelText("Seleccionar archivo"),
+      screen.getByLabelText("Evidencia adjunta"),
       new File(["foto"], "evidencia.jpg", { type: "image/jpeg" }),
     );
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
@@ -275,10 +282,10 @@ describe("SuspendServiceDialog", () => {
     render(
       <ControlledSuspendServiceDialog onOpenChange={onOpenChange} onSuspended={onSuspended} />,
     );
-    await user.selectOptions(screen.getByLabelText(/Motivo de suspensión/i), "VEHICLE_BREAKDOWN");
+    await chooseReason(user, "Desperfecto vehicular");
     await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
     await user.upload(
-      screen.getByLabelText("Seleccionar archivo"),
+      screen.getByLabelText("Evidencia adjunta"),
       new File(["foto"], "evidencia.jpg", { type: "image/jpeg" }),
     );
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));

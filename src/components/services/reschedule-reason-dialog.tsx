@@ -2,10 +2,10 @@
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
-import { AlertCircle, CalendarClock, Loader2 } from "lucide-react";
+import { AlertCircle, CalendarClock } from "lucide-react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { FormControl } from "@/components/ui/form-control";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/legacy-field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { servicesAdapter, type Service } from "@/lib/services";
 import { MAX_REASON_LENGTH } from "@/lib/input-limits";
 
@@ -35,7 +37,7 @@ export function RescheduleReasonDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg border-[var(--color-border)] bg-[var(--color-surface)]">
+      <DialogContent className="max-w-lg">
         <RescheduleReasonForm
           key={service.id}
           service={service}
@@ -100,37 +102,32 @@ function RescheduleReasonForm({
         </DialogDescription>
       </DialogHeader>
 
-      <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4 py-2">
+      <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
         {errorMessage && (
-          <div
-            role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-            <span>{errorMessage}</span>
-          </div>
+          <Alert variant="danger">
+            <AlertCircle aria-hidden />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
         )}
 
         <Field>
           <FieldLabel htmlFor={`${formId}-reason`}>
             Motivo <span className="text-[var(--color-danger)]" aria-hidden>*</span>
           </FieldLabel>
-          <FormControl
-            as="textarea"
+          <Textarea
             id={`${formId}-reason`}
             rows={3}
             maxLength={MAX_REASON_LENGTH}
             value={reason}
             onChange={(e) => {
               setReason(e.target.value);
-            setReasonError(null);
+              setReasonError(null);
               setErrorMessage(null);
             }}
             required
             aria-invalid={Boolean(reasonError)}
             aria-describedby={reasonError ? `${formId}-reason-help ${formId}-reason-error` : `${formId}-reason-help`}
             placeholder="Ej. Alerta meteorológica, rechazo de corte de calle por Tránsito…"
-            className="text-xs"
           />
           <FieldDescription id={`${formId}-reason-help`}>
             La nueva fecha y ventana horaria se definen en un segundo paso, una vez confirmado el motivo.
@@ -148,8 +145,8 @@ function RescheduleReasonForm({
         >
           Cancelar
         </Button>
-        <Button type="submit" form={formId} disabled={isSubmitting} aria-busy={isSubmitting} className="min-h-12 font-semibold min-[761px]:min-h-10">
-          <Loader2 data-icon="inline-start" className={isSubmitting ? "animate-spin" : "invisible"} aria-hidden />
+        <Button type="submit" form={formId} disabled={isSubmitting} aria-busy={isSubmitting}>
+          {isSubmitting && <Spinner data-icon="inline-start" aria-hidden="true" />}
           <span>Mover a reprogramar</span>
         </Button>
       </DialogFooter>

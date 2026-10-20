@@ -104,6 +104,13 @@ function captureAssign(responses: Array<{ status: number; body: Record<string, u
   return bodies;
 }
 
+type User = ReturnType<typeof userEvent.setup>;
+
+async function choose(user: User, name: RegExp, option: string) {
+  await user.click(screen.getByRole("combobox", { name }));
+  await user.click(await screen.findByRole("option", { name: option }));
+}
+
 function renderDialog(props: { allServices?: Service[]; onAssigned?: (s: Service) => void } = {}) {
   render(
     <AssignCrewDialog
@@ -128,17 +135,16 @@ describe("AssignCrewDialog", () => {
     expect(screen.queryByRole("option", { name: /Cuadrilla A · López/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /AF 123 CD/ })).not.toBeInTheDocument();
 
-    const crew = screen.getByLabelText(/Cuadrilla asignada/i);
-    expect(crew).toHaveAttribute("data-slot", "form-control");
-    await user.selectOptions(crew, CREW_ID);
+    expect(screen.getByRole("combobox", { name: /Cuadrilla asignada/i })).toHaveAttribute("data-slot", "select-trigger");
+    await choose(user, /Cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
     expect(screen.getByText(/requiere la asignación obligatoria de un vehículo/i)).toBeInTheDocument();
-    const vehicle = screen.getByLabelText(/Vehículo operativo/i);
+    const vehicle = screen.getByRole("combobox", { name: /Vehículo operativo/i });
     expect(vehicle).toHaveAttribute("aria-invalid", "true");
     expect(document.getElementById(vehicle.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent(/requiere la asignación obligatoria de un vehículo/i);
     expect(bodies).toHaveLength(0);
 
-    await user.selectOptions(screen.getByLabelText(/Vehículo operativo/i), VEHICLE_ID);
+    await choose(user, /Vehículo operativo/i, "AC 101 BG");
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
 
     await waitFor(() => expect(onAssigned).toHaveBeenCalledTimes(1));
@@ -193,7 +199,7 @@ describe("AssignCrewDialog", () => {
     renderDialog({ allServices: [overlapping], onAssigned });
 
     await screen.findByText(/Vehículo opcional/i);
-    await user.selectOptions(screen.getByLabelText(/Cuadrilla asignada/i), CREW_ID);
+    await choose(user, /Cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
 
     const warning = screen.getByText(/Aviso de superposición horaria$/i).closest("[role=status]") as HTMLElement;
     expect(within(warning).getByText(overlapping.id)).toBeInTheDocument();
@@ -218,7 +224,7 @@ describe("AssignCrewDialog", () => {
     renderDialog({ allServices: [overlapping], onAssigned });
 
     await screen.findByText(/Vehículo opcional/i);
-    await user.selectOptions(screen.getByLabelText(/Cuadrilla asignada/i), OTHER_CREW_ID);
+    await choose(user, /Cuadrilla asignada/i, "Cuadrilla Palermo — Recolección");
     expect(screen.queryByLabelText(/Justificación del solapamiento/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
 
@@ -237,7 +243,7 @@ describe("AssignCrewDialog", () => {
     renderDialog({ onAssigned });
 
     await screen.findByText(/Vehículo opcional/i);
-    await user.selectOptions(screen.getByLabelText(/Cuadrilla asignada/i), CREW_ID);
+    await choose(user, /Cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -261,7 +267,7 @@ describe("AssignCrewDialog", () => {
     renderDialog({ allServices: [overlapping], onAssigned });
 
     await screen.findByText(/Vehículo opcional/i);
-    await user.selectOptions(screen.getByLabelText(/Cuadrilla asignada/i), CREW_ID);
+    await choose(user, /Cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
     await user.type(
       screen.getByLabelText(/Justificación del solapamiento/i),
       "Se coordinó con el jefe de cuadrilla.",
