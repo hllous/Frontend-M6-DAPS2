@@ -4,6 +4,34 @@ import { loginViaApi } from "./support/auth";
 import { chooseTreeSelectOption, chooseTreeSelectOptions } from "./support/tree-selects";
 
 test.describe("TreeIntervention requests #128", () => {
+  test("filters tree interventions by Prioridad #621", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app/catalog/tree-interventions");
+    await expect(page.getByRole("article", { name: /Poda de seguridad/ }).first()).toBeVisible();
+    const filtered = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/tree-interventions" && url.searchParams.get("priority") === "CRITICAL";
+    });
+    await chooseTreeSelectOption(page, page, "Filtrar por prioridad", "Crítica");
+    const response = await filtered;
+    expect(response.ok()).toBeTruthy();
+    const result = await response.json();
+    expect(result.data.length).toBeGreaterThan(0);
+    expect(result.data.every((item: { priority: string }) => item.priority === "CRITICAL")).toBeTruthy();
+    await expect(page.getByRole("article", { name: /Extracción/ }).first()).toBeVisible();
+    await expect(page.getByRole("article", { name: /Poda de seguridad/ })).toHaveCount(0);
+    await chooseTreeSelectOption(page, page, "Filtrar por estado", "Autorizada");
+    await expect(page.getByText("Sin solicitudes de intervención", { exact: true })).toBeVisible();
+    await chooseTreeSelectOption(page, page, "Filtrar por estado", "Todos");
+    const unfiltered = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/tree-interventions" && !url.searchParams.has("priority");
+    });
+    await chooseTreeSelectOption(page, page, "Filtrar por prioridad", "Todas");
+    expect((await unfiltered).ok()).toBeTruthy();
+    await expect(page.getByRole("article", { name: /Poda de seguridad/ }).first()).toBeVisible();
+  });
+
   test("Office can create a multi-tree request, inspect all linked trees, and use the guided survey flow", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/catalog/tree-interventions");

@@ -37,6 +37,25 @@ function call(method: string, path: string, cookie?: string, body?: unknown) {
 }
 
 describe("tree, green space and green point handlers delegate to the real BFF routes", () => {
+  it.each([
+    ["HIGH", ["intervention-1"]],
+    ["MEDIUM", ["intervention-2"]],
+    ["CRITICAL", ["intervention-3"]],
+    ["LOW", []],
+  ])("filters intervention priority %s before pagination", async (priority, ids) => {
+    const list = await (await call("GET", `/api/tree-interventions?priority=${priority}&pageSize=1`)).json();
+    expect(list.data.map((item: { id: string }) => item.id)).toEqual(ids);
+    expect(list.meta.total).toBe(ids.length);
+  });
+
+  it("combines intervention priority with type and status", async () => {
+    const list = await (await call("GET", "/api/tree-interventions?priority=HIGH&interventionType=REMOVAL&status=REQUESTED")).json();
+    expect(list.data).toEqual([]);
+    expect(list.meta.total).toBe(0);
+    const all = await (await call("GET", "/api/tree-interventions")).json();
+    expect(all.meta.total).toBe(3);
+  });
+
   it("serves the tree catalog and a real 404 for an unknown tree", async () => {
     const list = await (await call("GET", "/api/trees")).json();
     expect(list.meta.total).toBe(list.data.length);

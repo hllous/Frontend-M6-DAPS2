@@ -51,13 +51,13 @@ describe("treeInterventionsAdapter", () => {
     );
 
     await expect(
-      treeInterventionsAdapter.list({ interventionType: "SAFETY_PRUNING", status: "REQUESTED", page: 1, pageSize: 10 }),
+      treeInterventionsAdapter.list({ interventionType: "SAFETY_PRUNING", status: "REQUESTED", priority: "HIGH", page: 1, pageSize: 10 }),
     ).resolves.toMatchObject({
       interventions: [{ ...intervention, treeIds: ["tree-2"] }],
       totalPages: 1,
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/tree-interventions?interventionType=SAFETY_PRUNING&status=REQUESTED&page=1&pageSize=10",
+      "/api/tree-interventions?interventionType=SAFETY_PRUNING&status=REQUESTED&priority=HIGH&page=1&pageSize=10",
       expect.objectContaining({ cache: "no-store" }),
     );
   });

@@ -65,6 +65,7 @@ export type TreeInterventionAssignServiceInput = z.infer<typeof treeIntervention
 export type TreeInterventionQuery = {
   interventionType?: TreeInterventionType;
   status?: TreeInterventionStatus;
+  priority?: TreeInterventionPriority;
   page?: number;
   pageSize?: number;
 };
@@ -110,6 +111,7 @@ function queryString(query: TreeInterventionQuery) {
   const params = new URLSearchParams();
   if (query.interventionType) params.set("interventionType", query.interventionType);
   if (query.status) params.set("status", query.status);
+  if (query.priority) params.set("priority", query.priority);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
   const value = params.toString();
