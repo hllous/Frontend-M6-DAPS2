@@ -1,4 +1,4 @@
-import type { Locator, Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 function ownerPage(scope: Page | Locator): Page {
   const locator = scope as Locator;
@@ -31,9 +31,14 @@ export async function chooseTime(scope: Page | Locator, label: string, value: st
   const page = ownerPage(scope);
   const [hour, minute] = value.split(":");
   const timeGroup = scope.getByRole("group", { name: label });
-  const hourSelect = timeGroup.getByRole("combobox", { name: "Hora" });
-  await hourSelect.click();
-  await page.getByRole("listbox").getByRole("option", { name: hour, exact: true }).click();
-  await timeGroup.getByRole("combobox", { name: "Minutos" }).click();
-  await page.getByRole("listbox").getByRole("option", { name: minute, exact: true }).click();
+  // Teclado: las listas de hora/minuto se alinean al ítem seleccionado y salen parcialmente del viewport en mobile, donde el click de Playwright no las estabiliza.
+  for (const [name, option] of [["Hora", hour], ["Minutos", minute]] as const) {
+    await timeGroup.getByRole("combobox", { name }).click();
+    await expect(page.getByRole("listbox")).toBeVisible();
+    await page.keyboard.type(option);
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+  }
+  await expect(timeGroup.getByRole("combobox", { name: "Hora" })).toContainText(hour);
+  await expect(timeGroup.getByRole("combobox", { name: "Minutos" })).toContainText(minute);
 }
