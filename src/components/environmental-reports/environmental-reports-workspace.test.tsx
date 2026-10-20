@@ -140,6 +140,21 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(detail).getByRole("button", { name: "Desestimar expediente" })).toBeVisible();
   });
 
+  it("agrupa los estados del filtro con etiquetas accesibles e íconos decorativos", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    const trigger = screen.getByRole("combobox", { name: "Estado" });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    const listbox = await screen.findByRole("listbox");
+    const group = within(listbox).getByRole("group", { name: "Ingreso y revisión" });
+    const option = within(group).getByRole("option", { name: "Recibido" });
+    expect(within(group).getByRole("option", { name: "En revisión" })).toBeVisible();
+    expect(option.querySelector("svg[aria-hidden='true']")).not.toBeNull();
+    for (const name of ["Derivación", "Inspección y resultado", "Acta y cierre"]) expect(within(listbox).getByRole("group", { name })).toBeVisible();
+  });
+
   it("pide al backend el filtro de prioridad y lo deja en la URL (#332)", async () => {
     const user = userEvent.setup();
     const requested: URLSearchParams[] = [];
