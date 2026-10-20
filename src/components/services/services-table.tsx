@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { DataTableResizeHandle } from "@/components/ui/data-table-resize-handle";
+import { DataTable, DataTableSortButton, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import {
   Empty,
   EmptyContent,
@@ -193,127 +195,6 @@ function ScheduledFilterPopover({
   );
 }
 
-function ColumnResizeHandle({
-  columnKey,
-  label,
-  width,
-  minimumWidth,
-  maximumWidth,
-  dense,
-  onResize,
-}: {
-  columnKey: ServicesColumnKey;
-  label: string;
-  width: number;
-  minimumWidth: number;
-  maximumWidth: number;
-  dense: boolean;
-  onResize: (key: ServicesColumnKey, width: number) => void;
-}) {
-  const drag = useRef<{
-    pointerId: number;
-    startX: number;
-    startWidth: number;
-    scroller: HTMLElement | null;
-    previousOverflowAnchor: string;
-  } | null>(null);
-
-  function startResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-    const table = event.currentTarget.closest<HTMLTableElement>("table");
-    if (!table) return;
-    const scroller = table.parentElement;
-    const previousOverflowAnchor = scroller?.style.getPropertyValue("overflow-anchor") ?? "";
-    if (scroller) {
-      const tableWidth = table.getBoundingClientRect().width;
-      const visibleWidth = scroller.scrollLeft + scroller.clientWidth;
-      table.style.setProperty("--column-resize-width-floor", `${Math.max(tableWidth, visibleWidth)}px`);
-      scroller.style.setProperty("overflow-anchor", "none");
-    }
-    table.dataset.columnResizing = "true";
-    drag.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startWidth: width,
-      scroller,
-      previousOverflowAnchor,
-    };
-    if (typeof event.currentTarget.setPointerCapture === "function") {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    }
-  }
-
-  function resize(event: ReactPointerEvent<HTMLButtonElement>) {
-    const activeDrag = drag.current;
-    if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
-    onResize(columnKey, activeDrag.startWidth + event.clientX - activeDrag.startX);
-  }
-
-  function finishResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    const activeDrag = drag.current;
-    if (activeDrag?.pointerId !== event.pointerId) return;
-    drag.current = null;
-    if (activeDrag.scroller) {
-      if (activeDrag.previousOverflowAnchor) {
-        activeDrag.scroller.style.setProperty("overflow-anchor", activeDrag.previousOverflowAnchor);
-      } else {
-        activeDrag.scroller.style.removeProperty("overflow-anchor");
-      }
-    }
-    const table = event.currentTarget.closest<HTMLTableElement>("table");
-    if (table) {
-      delete table.dataset.columnResizing;
-      table.style.removeProperty("--column-resize-width-floor");
-    }
-    if (typeof event.currentTarget.hasPointerCapture === "function" && event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }
-
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      role="slider"
-      aria-label={`Ancho de columna ${label}`}
-      aria-orientation="vertical"
-      aria-valuemin={minimumWidth}
-      aria-valuemax={maximumWidth}
-      aria-valuenow={width}
-      aria-valuetext={`${width} px`}
-      aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
-      title="Arrastre para cambiar el ancho; use las flechas para ajustar"
-      onPointerDown={startResize}
-      onPointerMove={resize}
-      onPointerUp={finishResize}
-      onPointerCancel={finishResize}
-      onKeyDown={(event) => {
-        const delta = event.key === "ArrowRight" || event.key === "ArrowUp"
-          ? 10
-          : event.key === "ArrowLeft" || event.key === "ArrowDown"
-            ? -10
-            : 0;
-        if (delta === 0) return;
-        event.preventDefault();
-        event.stopPropagation();
-        onResize(columnKey, width + delta);
-      }}
-      data-column-resize-edge={columnKey}
-      style={{
-        minHeight: dense ? 48 : 0,
-        minWidth: 0,
-        width: dense ? 44 : 24,
-        right: 0,
-      }}
-      className="absolute right-0 top-0 h-full min-h-0 min-w-0 w-6 touch-none cursor-col-resize rounded-none px-0 text-[var(--color-text-secondary)] hover:text-[var(--color-action)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2"
-    >
-      <span aria-hidden="true" className="pointer-events-none absolute right-0 top-1/2 h-5 w-px translate-x-1/2 -translate-y-1/2 bg-current opacity-60" />
-    </Button>
-  );
-}
-
 export function ServicesTable({
   services,
   serviceOrdinals: suppliedServiceOrdinals,
@@ -345,6 +226,46 @@ export function ServicesTable({
   dense?: boolean;
   columnPreferences?: ServicesColumnPreferencesController | null;
 }) {
+  const tableColumns = useMemo<DataTableColumn<Service>[]>(
+    () =>
+      SERVICES_COLUMN_DEFINITIONS.map((column) => ({
+        id: column.key,
+        header: column.label,
+        accessorFn: (service) => {
+          switch (column.key) {
+            case "service":
+              return service.title;
+            case "status":
+              return service.status;
+            case "zone":
+              return service.zoneNames.join(", ");
+            case "crew":
+              return service.crewName ?? "Sin asignar";
+            case "scheduled":
+              return service.scheduledDate;
+          }
+        },
+      })),
+    [],
+  );
+  // The workspace also orders map stops and ordinals; retain its controlled sort.
+  const dataTable = useDataTable({
+    data: services,
+    columns: tableColumns,
+    manualSorting: true,
+    getRowId: (service) => service.id,
+    state: {
+      sorting: sortKey ? [{ id: sortKey, desc: sortDir === "desc" }] : [],
+    },
+    onSortingChange: (updater) => {
+      const current = sortKey
+        ? [{ id: sortKey, desc: sortDir === "desc" }]
+        : [];
+      const next = typeof updater === "function" ? updater(current) : updater;
+      const key = next[0]?.id ?? sortKey;
+      if (key) onSortChange(key as SortKey);
+    },
+  });
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const tableRef = useRef<HTMLTableElement>(null);
   const [draggedColumn, setDraggedColumn] = useState<ServicesColumnKey | null>(null);
@@ -639,7 +560,9 @@ export function ServicesTable({
         data-preview-clip={!dense ? "true" : undefined}
         className="min-h-0 flex-1 overflow-x-auto overflow-y-auto bg-[var(--color-surface)] [scrollbar-gutter:auto]"
       >
-        <table
+        <DataTable
+          table={dataTable}
+          container={false}
           ref={tableRef}
           className="min-w-full table-fixed border-collapse bg-[var(--color-surface)] text-left text-xs"
           aria-label="Servicios operativos"
@@ -647,21 +570,10 @@ export function ServicesTable({
             width: tablePixelWidth,
             minWidth: "max(100%, var(--column-resize-width-floor, 0px))",
           }}
-        >
-          <colgroup>
-            <col data-column-key="ordinal" style={{ width: `${ordinalWidth}px` }} />
-            {currentColumns.map((column) => (
-              <col
-                key={column.key}
-                data-column-key={column.key}
-                style={{ width: `${getDataColumnWidth(column.key)}px` }}
-              />
-            ))}
-            <col data-column-filler />
-          </colgroup>
-          <thead className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
-            <tr>
-              <th scope="col" data-column-key="ordinal" aria-label="Número de parada" className="sticky left-0 top-0 z-20 bg-[var(--color-surface-subtle)] px-1 py-3 text-center">#</th>
+          bodyClassName="divide-y divide-[var(--color-border)]"
+          renderHeader={() => (<thead data-slot="table-header" className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
+            <tr data-slot="table-row">
+              <th data-slot="table-head" scope="col" data-column-key="ordinal" aria-label="Número de parada" className="sticky left-0 top-0 z-20 bg-[var(--color-surface-subtle)] px-1 py-3 text-center">#</th>
               {currentColumns.map((col) => {
                 const isSorted = sortKey === col.key;
                 const isCompactDateSort = compactColumns && col.key === "service" && sortKey === "scheduled";
@@ -670,11 +582,9 @@ export function ServicesTable({
                     ? "ascending"
                     : "descending"
                   : "none";
-                const sortButtonAriaSort = isSorted ? ariaSort : "none";
-                const directionLabel = sortDir === "asc" ? "ascendente" : "descendente";
 
                 return (
-                  <th
+                  <th data-slot="table-head"
                     key={col.key}
                     scope="col"
                     aria-sort={ariaSort}
@@ -713,14 +623,15 @@ export function ServicesTable({
                       dense && "gap-1",
                       activeColumnPreferences && (dense ? "pr-11" : "pr-7"),
                     )}>
-                      <button
-                        type="button"
-                        onClick={() => onSortChange(col.key)}
+                      <DataTableSortButton
+                        operational
+                        label={col.label}
+                        direction={isSorted ? sortDir : false}
+                        onClick={() => dataTable.getColumn(col.key)?.toggleSorting()}
                         className={cn(
                           "flex min-w-0 items-center gap-1 hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)] rounded",
                           dense && "gap-0.5",
                         )}
-                        aria-label={`Ordenar por ${col.label}, actualmente ${sortButtonAriaSort === "none" ? "sin ordenar" : directionLabel}`}
                       >
                         <span>{col.key === "scheduled" ? "Fecha" : col.key === "crew" ? "Equipo" : col.label}</span>
                         {isSorted ? (
@@ -732,14 +643,15 @@ export function ServicesTable({
                         ) : (
                           <ArrowUpDown className={cn("h-3 w-3 opacity-40 hover:opacity-100", dense && "hidden")} aria-hidden />
                         )}
-                      </button>
+                      </DataTableSortButton>
 
                       {compactColumns && col.key === "service" && (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => onSortChange("scheduled")}
-                            aria-label={`Ordenar por Fecha, actualmente ${sortKey === "scheduled" ? directionLabel : "sin ordenar"}`}
+                          <DataTableSortButton
+                            operational
+                            label="Fecha"
+                            direction={sortKey === "scheduled" ? sortDir : false}
+                            onClick={() => dataTable.getColumn("scheduled")?.toggleSorting()}
                             className="inline-flex size-6 shrink-0 items-center justify-center rounded hover:text-[var(--color-text)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-focus)]"
                           >
                             {sortKey === "scheduled" ? (
@@ -751,7 +663,7 @@ export function ServicesTable({
                             ) : (
                               <CalendarClock className="h-3.5 w-3.5" aria-hidden />
                             )}
-                          </button>
+                          </DataTableSortButton>
                           <ScheduledFilterPopover
                             columnFilters={columnFilters}
                             onColumnFiltersChange={onColumnFiltersChange}
@@ -837,7 +749,7 @@ export function ServicesTable({
                     </div>
 
                     {activeColumnPreferences && (
-                      <ColumnResizeHandle
+                      <DataTableResizeHandle
                         columnKey={col.key}
                         label={col.label}
                         width={activeColumnPreferences.table.getColumn(col.key)?.getSize()
@@ -852,9 +764,9 @@ export function ServicesTable({
                 );
               })}
             </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--color-border)]">
-            {services.map((service) => {
+          </thead>)}
+          renderRow={(row) => {
+              const service = row.original;
               const isSelected = service.id === selectedId;
               const ordinal = serviceOrdinals.get(service.id)!;
               const compactSecondaryInfo = [
@@ -866,7 +778,7 @@ export function ServicesTable({
               const compactMetadataColumn = currentColumns.at(-1)?.key;
 
               return (
-                <tr
+                <tr data-slot="table-row"
                   key={service.id}
                   data-service-id={service.id}
                   data-service-ordinal={ordinal}
@@ -882,7 +794,7 @@ export function ServicesTable({
                       : "hover:bg-[var(--color-canvas)]",
                   )}
                 >
-                  <td data-column-key="ordinal" className={cn("sticky left-0 z-10 bg-inherit text-center tabular-nums", dense ? "px-1 py-2" : "px-1.5 py-2")}>
+                  <td data-slot="table-cell" data-column-key="ordinal" className={cn("sticky left-0 z-10 bg-inherit text-center tabular-nums", dense ? "px-1 py-2" : "px-1.5 py-2")}>
                     <span
                       aria-label={`Parada ${ordinal}`}
                       className="inline-flex size-7 items-center justify-center rounded-full bg-[var(--color-action)] text-xs font-bold text-[var(--color-on-institutional)]"
@@ -952,7 +864,7 @@ export function ServicesTable({
                     const compactMetadata = dense && compactMetadataColumn === column.key && compactSecondaryInfo;
 
                     return (
-                      <td
+                      <td data-slot="table-cell"
                         key={column.key}
                         {...cellAttributes}
                         data-column-dragging={draggedColumn === column.key ? "true" : undefined}
@@ -972,14 +884,12 @@ export function ServicesTable({
                       </td>
                     );
                   })}
-                  <td aria-hidden="true" className="p-0" />
+                  <td data-slot="table-cell" aria-hidden="true" className="p-0" />
                 </tr>
               );
-            })}
-
-            {services.length === 0 && (
-              <tr>
-                <td colSpan={currentColumns.length + 2} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
+            }}
+          renderEmpty={() => (<tr data-slot="table-row">
+                <td data-slot="table-cell" colSpan={currentColumns.length + 2} className="p-8 text-center text-sm text-[var(--color-text-secondary)]">
                   <Empty className="mx-auto max-w-sm gap-3 rounded-none p-0" role="status">
                     <EmptyHeader>
                       <EmptyTitle>
@@ -1001,10 +911,20 @@ export function ServicesTable({
                     )}
                   </Empty>
                 </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              </tr>)}
+        >
+          <colgroup>
+            <col data-column-key="ordinal" style={{ width: `${ordinalWidth}px` }} />
+            {currentColumns.map((column) => (
+              <col
+                key={column.key}
+                data-column-key={column.key}
+                style={{ width: `${getDataColumnWidth(column.key)}px` }}
+              />
+            ))}
+            <col data-column-filler />
+          </colgroup>
+        </DataTable>
         {activeColumnPreferences && (
           <span className="sr-only" aria-live="polite" aria-atomic="true">
             {reorderAnnouncement}

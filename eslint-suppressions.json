@@ -106,7 +106,7 @@
   },
   "src/components/services/services-table.tsx": {
     "no-restricted-syntax": {
-      "count": 17
+      "count": 14
     }
   },
   "src/components/services/services-workspace.tsx": {
