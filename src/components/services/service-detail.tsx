@@ -335,6 +335,22 @@ export function ServiceDetail({
             </div>
           )}
 
+          {streetClosureDependency?.outcome === "expired" && (
+            <div
+              role="status"
+              aria-label="Corte de calle vencido"
+              className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-warning)]">
+                <Siren className="h-4 w-4" aria-hidden />
+                Corte de calle vencido
+              </div>
+              <p className="mt-1 text-sm text-[var(--color-warning)]">
+                El corte aprobado venció sin activarse. Si el Servicio no había iniciado, quedó para reprogramar.
+              </p>
+            </div>
+          )}
+
           {streetClosureDependency?.outcome === "rejected" && (
             <div
               role="status"

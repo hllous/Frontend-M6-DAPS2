@@ -357,4 +357,18 @@ describe("ReferralsWorkspace", () => {
     render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudieron cargar las derivaciones");
   });
+  it("labels an EXPIRED closure as Vencido and warns when the BFF dropped unreadable records", async () => {
+    const closure = fixtureReferrals().find((referral) => referral.kind === "STREET_CLOSURE_REQUEST");
+    if (!closure || closure.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a closure fixture");
+    const expired = { ...closure, status: "EXPIRED", request: { ...closure.request, status: "EXPIRED" } };
+    server.use(http.get("*/api/referrals", () => HttpResponse.json({ data: [expired], meta: { total: 1, invalid: 2 } })));
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    expect(screen.getByRole("status", { name: /derivaciones sin mostrar/i })).toHaveTextContent("2");
+    await user.click(within(list).getByRole("button", { name: new RegExp(closure.id) }));
+    const detail = await screen.findByRole("region", { name: `Detalle de ${closure.id}` });
+    expect(within(detail).getByRole("status", { name: "Estado: Vencido" })).toBeVisible();
+  });
 });

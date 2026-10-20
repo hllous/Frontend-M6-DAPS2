@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { fixtureReferrals } from "@/app/api/referrals/route";
-import { getReferralAnomalies, isReferralStale, REFERRAL_STALE_AFTER_HOURS } from "./referral-anomalies";
+import { getReferralAnomalies, isReferralOpen, isReferralStale, REFERRAL_STALE_AFTER_HOURS } from "./referral-anomalies";
 import { serviceFixtures } from "./services-fixtures";
 
 describe("referral anomaly detection", () => {
@@ -14,6 +14,15 @@ describe("referral anomaly detection", () => {
     expect(isReferralStale(staleReferral, new Date("2026-01-04T00:00:00.001Z"))).toBe(true);
     expect(isReferralStale(staleReferral, new Date("2026-01-04T00:00:00.000Z"))).toBe(false);
     expect(isReferralStale({ ...staleReferral, status: "CLOSED" }, new Date("2026-01-04T00:00:00.001Z"))).toBe(false);
+  });
+
+  it("treats an EXPIRED closure as terminal: neither open nor stale", () => {
+    const closure = fixtureReferrals().find((candidate) => candidate.kind === "STREET_CLOSURE_REQUEST");
+    if (!closure) throw new Error("Expected a closure referral fixture");
+    const expired = { ...closure, status: "EXPIRED" as const, updatedAt: "2026-01-01T00:00:00.000Z" };
+
+    expect(isReferralOpen(expired)).toBe(false);
+    expect(isReferralStale(expired, new Date("2026-02-01T00:00:00.000Z"))).toBe(false);
   });
 
   it("parses timestamps without an offset as local time at the stale boundary", () => {

@@ -55,7 +55,7 @@ export async function handleStreetClosureTransition(
     const valid =
       (transition === "approve" && current.status === "REQUESTED") ||
       (transition === "reject" && current.status === "REQUESTED") ||
-      (transition === "end" && current.status === "APPROVED");
+      (transition === "end" && (current.status === "APPROVED" || current.status === "EXPIRED"));
     if (!valid) return errorResponse(409, "La transición no es válida para el estado actual de la solicitud.", path);
 
     const changes = {
