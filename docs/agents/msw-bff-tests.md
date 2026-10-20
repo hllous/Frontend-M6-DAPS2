@@ -2,6 +2,24 @@
 
 Component tests reach the real Next.js route exports through MSW Node handlers. The browser demo calls the real BFF routes directly. No domain behavior is reimplemented in `src/mocks`; the only handwritten handlers are the two session and scenario stubs below, kept as stubs on purpose (the scenario list has no BFF route of its own, and logout is a no-op so tests and the demo never clear the session).
 
+## Delaying a component-test response
+
+Keep delays in a test-specific `server.use` override so the shared and browser handlers stay unchanged. `mockResponseAfter` waits using MSW's delay support, then builds the response:
+
+```ts
+import { http, HttpResponse } from "msw";
+
+import { mockResponseAfter } from "@/mocks/delayed-response";
+
+server.use(
+  http.get("*/api/service-types", () =>
+    mockResponseAfter(350, () => HttpResponse.json({ data: [] })),
+  ),
+);
+```
+
+Here, `server` is the suite's existing `setupServer(...handlers)` instance. Use the route's normal response fixture in place of the empty list when the component needs data after loading.
+
 ## Layout
 
 - `src/mocks/handlers.shared.ts`: session and mock-scenario handlers only (`/api/mock/scenarios`, `/api/session/logout`). Used by the browser worker and, through `handlers.ts`, by tests. Do not add domain handlers here.
