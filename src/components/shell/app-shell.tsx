@@ -402,11 +402,11 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
       <ItemGroup>
         {scenario.work.items.map((item, index) => (
           <Item key={item} variant="outline">
-            <ItemMedia className="text-xs text-muted-foreground tabular-nums">{String(index + 1).padStart(2, "0")}</ItemMedia>
+            <ItemMedia className="w-6 text-xs text-muted-foreground tabular-nums">{String(index + 1).padStart(2, "0")}</ItemMedia>
             <ItemContent>
               <ItemTitle>{item}</ItemTitle>
             </ItemContent>
-            <ItemActions className="max-sm:w-full">
+            <ItemActions className="max-sm:basis-full max-sm:pl-[calc(1.5rem+0.625rem)]">
               {mayExecuteService && index === 0 ? (
                 <Button className="max-sm:w-full" onClick={() => undefined}>
                   <Play data-icon="inline-start" aria-hidden />
@@ -418,19 +418,6 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
             </ItemActions>
           </Item>
         ))}
-        {queue.status === "loading" ? (
-          <Item variant="muted" aria-live="polite">
-            <ItemMedia><Spinner aria-hidden role="presentation" /></ItemMedia>
-            <ItemContent>
-              <ItemDescription>Cargando decisiones de arbolado…</ItemDescription>
-            </ItemContent>
-          </Item>
-        ) : null}
-        {queue.status === "error" ? (
-          <Alert variant="danger">
-            <AlertDescription>{queue.message}</AlertDescription>
-          </Alert>
-        ) : null}
         {queue.status === "ready"
           ? queue.interventions.map((intervention, index) => (
               <TreeInterventionWorkItem
@@ -441,6 +428,19 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
             ))
           : null}
       </ItemGroup>
+      {queue.status === "loading" ? (
+        <Item variant="muted" aria-live="polite">
+          <ItemMedia><Spinner aria-hidden role="presentation" /></ItemMedia>
+          <ItemContent>
+            <ItemDescription>Cargando decisiones de arbolado…</ItemDescription>
+          </ItemContent>
+        </Item>
+      ) : null}
+      {queue.status === "error" ? (
+        <Alert variant="danger">
+          <AlertDescription>{queue.message}</AlertDescription>
+        </Alert>
+      ) : null}
     </section>
   );
 }
@@ -456,7 +456,7 @@ function TreeInterventionWorkItem({
 
   return (
     <Item variant="outline">
-      <ItemMedia className="text-xs text-muted-foreground tabular-nums">{String(index).padStart(2, "0")}</ItemMedia>
+      <ItemMedia className="w-6 text-xs text-muted-foreground tabular-nums">{String(index).padStart(2, "0")}</ItemMedia>
       <ItemContent>
         <ItemTitle>
           <Link href="/app/catalog/tree-interventions" className="hover:underline focus-visible:underline">
@@ -465,7 +465,7 @@ function TreeInterventionWorkItem({
         </ItemTitle>
         <ItemDescription>Intervención de arbolado</ItemDescription>
       </ItemContent>
-      <ItemActions>
+      <ItemActions className="max-sm:basis-full max-sm:pl-[calc(1.5rem+0.625rem)]">
         <Badge variant={intervention.status === "PENDING_AUTHORIZATION" ? "warning" : "info"}>
           <StatusIcon data-icon="inline-start" aria-hidden />
           {treeInterventionStatusLabels[intervention.status]}
