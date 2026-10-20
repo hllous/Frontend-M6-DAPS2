@@ -139,7 +139,7 @@ describe("ServicesWorkspace component", () => {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 760 });
       render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
       expect(await screen.findByRole("region", { name: "Mapa territorial de Servicios" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Expandir lista a pantalla completa" })).toBeInTheDocument();
+      expect(screen.getByRole("slider", { name: "Altura de la lista" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Lista" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Mapa" })).not.toBeInTheDocument();
 
@@ -207,9 +207,9 @@ describe("ServicesWorkspace component", () => {
       expect(closePreview).toHaveFocus();
       await user.click(closePreview);
       await waitFor(() => expect(document.querySelector("[data-slot='drawer-popup']")).toBeInTheDocument());
-      expect(screen.getByRole("button", { name: "Expandir lista a pantalla completa" })).toHaveAttribute(
-        "aria-expanded",
-        "true",
+      expect(screen.getByRole("slider", { name: "Altura de la lista" })).toHaveAttribute(
+        "aria-valuetext",
+        "media",
       );
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });

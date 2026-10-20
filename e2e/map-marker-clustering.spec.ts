@@ -45,7 +45,7 @@ test("keeps the mobile map visible with a keyboard accessible inventory drawer #
 
   const drawer = page.getByRole("complementary", { name: "Controles de la vista Inventario" });
   const map = page.locator(".leaflet-container");
-  const trigger = drawer.getByRole("button", { name: "Mostrar lista" });
+  const trigger = page.getByRole("slider", { name: "Altura de la lista" });
 
   await expect(map).toBeVisible();
   await expect(trigger).toBeInViewport({ ratio: 0.95 });
@@ -59,9 +59,9 @@ test("keeps the mobile map visible with a keyboard accessible inventory drawer #
   await expect(firstItem).toBeVisible();
   await expect(map).toBeVisible();
 
-  await content.getByRole("button", { name: "Cerrar lista" }).click();
-  await expect(content).not.toBeVisible();
-  await expect(trigger).toBeFocused();
+  await trigger.press("Home");
+  await expect(drawer).toHaveAttribute("data-snap", "peek");
+  await expect(firstItem).not.toBeInViewport();
 
   await expect(map).toBeVisible();
 });
@@ -108,7 +108,7 @@ test("keeps the map box height constant across tabs on desktop and mobile #423",
       let listArea: Locator;
       let inventoryDialog: Locator | undefined;
       if (label === "Inventario" && viewport.width <= 760) {
-        await page.getByRole("button", { name: "Mostrar lista" }).click();
+        await page.getByRole("slider", { name: "Altura de la lista" }).press("Enter");
         inventoryDialog = page.getByRole("dialog", { name: "Elementos" });
         await expect(inventoryDialog).toBeVisible();
         listArea = inventoryDialog.getByRole("list", { name: "Elementos visibles" });
@@ -121,7 +121,7 @@ test("keeps the map box height constant across tabs on desktop and mobile #423",
       const box = await mapPanel.boundingBox();
       if (!box) throw new Error(`Expected the map panel to be visible for ${label}.`);
       heights.push(box.height);
-      if (inventoryDialog) await inventoryDialog.getByRole("button", { name: "Cerrar lista" }).click();
+      if (inventoryDialog) await page.getByRole("slider", { name: "Altura de la lista" }).press("Home");
     }
 
     expect(
@@ -161,14 +161,18 @@ test("keeps mobile navigation usable while the inventory drawer is open", async 
   await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
 
   const drawer = page.getByRole("complementary", { name: "Controles de la vista Inventario" });
-  await drawer.getByRole("button", { name: "Mostrar lista" }).click();
+  await page.getByRole("slider", { name: "Altura de la lista" }).press("Enter");
   const panel = page.getByRole("dialog", { name: "Elementos" });
   await expect(panel).toBeVisible();
 
   const mobileNavigation = page.getByRole("navigation", { name: "Navegación móvil" });
-  await expect.poll(async () => panel.evaluate((element) => {
+  // The sheet slides under the nav and is clipped there: the nav must keep receiving pointer events.
+  await expect.poll(async () => page.evaluate(() => {
     const navigation = document.querySelector<HTMLElement>('nav[aria-label="Navegación móvil"]');
-    return navigation !== null && element.getBoundingClientRect().bottom <= navigation.getBoundingClientRect().top + 1;
+    if (!navigation) return false;
+    const rect = navigation.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return hit !== null && navigation.contains(hit);
   })).toBe(true);
   await expect.poll(() => panel.evaluate((element) => getComputedStyle(element, "::after").backgroundColor)).toBe("rgba(0, 0, 0, 0)");
   await mobileNavigation.getByRole("link", { name: "Servicios", exact: true }).click();

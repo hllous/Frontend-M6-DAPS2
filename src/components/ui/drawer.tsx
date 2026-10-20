@@ -99,8 +99,11 @@ function DrawerSwipeHandle({
 function DrawerContent({
   className,
   children,
+  viewportProps,
   ...props
-}: DrawerPrimitive.Popup.Props) {
+}: DrawerPrimitive.Popup.Props & {
+  viewportProps?: DrawerPrimitive.Viewport.Props
+}) {
   const { hasSnapPoints, modal, showSwipeHandle, swipeDirection } = useDrawer()
   const swipeAxis =
     swipeDirection === "down" || swipeDirection === "up" ? "y" : "x"
@@ -113,7 +116,11 @@ function DrawerContent({
       <DrawerPrimitive.Viewport
         data-slot="drawer-viewport"
         data-modal={modal}
-        className="pointer-events-none fixed inset-0 z-50 select-none data-[modal=true]:pointer-events-auto"
+        {...viewportProps}
+        className={cn(
+          "pointer-events-none fixed inset-0 z-50 select-none data-[modal=true]:pointer-events-auto",
+          viewportProps?.className
+        )}
       >
         <DrawerPrimitive.Popup
           data-slot="drawer-popup"

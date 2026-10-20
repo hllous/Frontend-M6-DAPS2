@@ -12,28 +12,42 @@
 }
 
 .handle {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 1;
   display: flex;
-  min-height: 52px;
+  height: 24px;
+  flex-shrink: 0;
+  cursor: grab;
+  align-items: center;
   justify-content: center;
-  border-radius: 12px 12px 0 0;
-  padding: 6px 16px;
-  pointer-events: auto;
+  touch-action: none;
 }
 
-.hiddenHandle {
-  display: none;
+.handle:active {
+  cursor: grabbing;
+}
+
+.handle:focus-visible {
+  outline: none;
+}
+
+.handle:focus-visible .grabber {
+  opacity: 1;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.grabber {
+  width: 40px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--muted-foreground);
+  opacity: 0.5;
 }
 
 .popup {
   --drawer-bleed-background: transparent;
   bottom: calc(4.5rem + env(safe-area-inset-bottom));
   width: 100%;
-  max-height: calc(100dvh - 9rem - env(safe-area-inset-bottom));
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 0.12);
 }
 
 .header {
@@ -41,7 +55,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px 8px;
+  padding: 0 16px 6px;
   text-align: left;
 }
 
