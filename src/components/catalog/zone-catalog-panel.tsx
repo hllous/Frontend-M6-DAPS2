@@ -17,6 +17,7 @@ import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactiva
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -72,6 +73,11 @@ type LoadState =
   | { status: "error"; message: string };
 
 type FormErrors = { code?: string; name?: string; form?: string };
+
+/** preventDefault on `invalid` also suppresses the browser's focus, so move it to the first invalid field. */
+function focusIfFirstInvalid(field: HTMLInputElement) {
+  if (field.form?.querySelector(":invalid") === field) field.focus();
+}
 
 function mapFormError(message: string): FormErrors {
   const errors: FormErrors = {};
@@ -166,6 +172,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     if (!createDraft.name.trim()) validationErrors.name = "El nombre es obligatorio.";
     if (Object.keys(validationErrors).length > 0) {
       setCreateErrors(validationErrors);
+      document.getElementById(validationErrors.code ? "create-zone-code" : "create-zone-name")?.focus();
       return;
     }
 
@@ -202,6 +209,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     setEditErrors({});
     if (!editDraft.name.trim()) {
       setEditErrors({ name: "El nombre es obligatorio." });
+      document.getElementById("edit-zone-name")?.focus();
       return;
     }
 
@@ -375,7 +383,8 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       />
 
       {/* Filter and search bar */}
-      <div className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_200px]">
+      <Card size="sm">
+      <CardContent className="grid gap-3 sm:grid-cols-[1fr_200px]">
         <Field>
           <FieldLabel htmlFor="zone-search">Buscar</FieldLabel>
           <div className="relative flex items-center">
@@ -411,15 +420,17 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             </SelectContent>
           </Select>
         </Field>
-      </div>
+      </CardContent>
+      </Card>
 
       {/* Create form section (if expanded) */}
       {showCreate && canManage && (
         <form
           onSubmit={handleCreateSubmit}
           aria-label="Formulario de nueva zona"
-          className="rounded-xl border border-border bg-card p-5"
         >
+          <Card>
+          <CardContent>
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
               <h2 className="text-lg font-semibold">Nueva zona operativa</h2>
@@ -454,6 +465,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 value={createDraft.code}
                 onInvalid={(event) => {
                   event.preventDefault();
+                  focusIfFirstInvalid(event.currentTarget);
                   setCreateErrors((errors) => ({ ...errors, code: "El código es obligatorio.", form: undefined }));
                 }}
                 onChange={(e) => {
@@ -479,6 +491,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 value={createDraft.name}
                 onInvalid={(event) => {
                   event.preventDefault();
+                  focusIfFirstInvalid(event.currentTarget);
                   setCreateErrors((errors) => ({ ...errors, name: "El nombre es obligatorio.", form: undefined }));
                 }}
                 onChange={(e) => {
@@ -510,6 +523,8 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               {isSubmittingCreate ? "Creando..." : "Crear zona"}
             </Button>
           </div>
+          </CardContent>
+          </Card>
         </form>
       )}
 
@@ -518,8 +533,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
         <form
           onSubmit={handleEditSubmit}
           aria-label="Formulario de edición de zona"
-          className="rounded-xl border border-border bg-card p-5"
         >
+          <Card>
+          <CardContent>
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
               <h2 className="text-lg font-semibold">Editar zona operativa</h2>
@@ -564,6 +580,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 value={editDraft.name}
                 onInvalid={(event) => {
                   event.preventDefault();
+                  focusIfFirstInvalid(event.currentTarget);
                   setEditErrors((errors) => ({ ...errors, name: "El nombre es obligatorio.", form: undefined }));
                 }}
                 onChange={(e) => {
@@ -604,6 +621,8 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               {isSubmittingEdit ? "Guardando..." : "Guardar cambios"}
             </Button>
           </div>
+          </CardContent>
+          </Card>
         </form>
       )}
 
@@ -767,9 +786,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   Cargando barrios...
                 </div>
               ) : assignedNeighborhoods.length === 0 ? (
-                <p className="rounded-md border border-dashed border-[var(--color-border-strong)] p-3 text-sm text-muted-foreground">
-                  Esta zona todavía no tiene barrios asignados.
-                </p>
+                <Empty className="border p-3">
+                  <EmptyDescription>Esta zona todavía no tiene barrios asignados.</EmptyDescription>
+                </Empty>
               ) : (
                 <ItemGroup
                   aria-label="Barrios asignados"
@@ -834,9 +853,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               </Field>
 
               {neighborhoodOptions.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
-                  No se encontraron barrios para esta búsqueda.
-                </p>
+                <Empty className="border p-3">
+                  <EmptyDescription>No se encontraron barrios para esta búsqueda.</EmptyDescription>
+                </Empty>
               ) : (
                 <div className="max-h-56 overflow-y-auto rounded-md border border-border" role="group" aria-label="Barrios disponibles">
                   {neighborhoodOptions.map((neighborhood) => {

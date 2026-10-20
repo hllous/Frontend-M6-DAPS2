@@ -21,8 +21,9 @@ import {
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -32,7 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
@@ -509,10 +510,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
       {/* Detail View of Selected Route (Lands here after creation or clicking Ver Detalle) */}
       {selectedRoute && (
-        <section
-          className="rounded-lg border bg-card p-6 space-y-5"
-          data-testid="route-detail-view"
-        >
+        <Card data-testid="route-detail-view">
+          <CardContent className="space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -594,22 +593,17 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
                 {selectedRoute.stops.length === 0 ? (
                   /* Acceptance Criteria #2: Empty stops section with obvious call-to-action */
-                  <div
-                    className="rounded-lg border border-dashed p-6 text-center space-y-3 bg-muted/20"
-                    data-testid="empty-stops-section"
-                  >
-                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                      <MapPin className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-medium text-foreground">
-                        Este recorrido no tiene paradas configuradas
-                      </h4>
-                      <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                  <Empty className="border" data-testid="empty-stops-section">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <MapPin aria-hidden="true" />
+                      </EmptyMedia>
+                      <EmptyTitle>Este recorrido no tiene paradas configuradas</EmptyTitle>
+                      <EmptyDescription>
                         Los recorridos nuevos nacen sin paradas. Para diagramar y ordenar la secuencia de paradas operativas, utilice el generador de secuencias.
-                      </p>
-                    </div>
-                    <div>
+                      </EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
                       {canManage ? (
                         <Button
                           variant="default"
@@ -626,8 +620,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                           Modo lectura: se requieren permisos de oficina para configurar paradas.
                         </span>
                       )}
-                    </div>
-                  </div>
+                    </EmptyContent>
+                  </Empty>
                 ) : (
                   <div className="divide-y rounded-md border bg-background" data-testid="stops-list">
                     {selectedRoute.stops.map((stop) => (
@@ -659,10 +653,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               </>
             ) : (
               /* Stop Sequence Builder (#111) */
-              <div
-                className="rounded-lg border bg-card p-4 space-y-4"
-                data-testid="stop-sequence-builder"
-              >
+              <Card size="sm" data-testid="stop-sequence-builder">
+                <CardContent className="space-y-4">
                 <div className="flex items-center justify-between border-b pb-3">
                   <div>
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -920,14 +912,17 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                     </Button>
                   </div>
                 </div>
-              </div>
+                </CardContent>
+              </Card>
             )}
           </div>
-        </section>
+          </CardContent>
+        </Card>
       )}
 
       {/* Filters band */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border bg-card p-4">
+      <Card size="sm">
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           {/* Search */}
           <div className="relative min-w-0 max-w-sm flex-1">
@@ -1011,7 +1006,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
           <RefreshCw className="h-3.5 w-3.5" />
           Actualizar
         </Button>
-      </div>
+      </CardContent>
+      </Card>
 
       {/* Routes list table / content */}
       <div className="rounded-lg border bg-card overflow-hidden">
@@ -1404,27 +1400,27 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         ) : referencesReport ? (
           referencesReport.totalReferences > 0 ? (
             <div className="space-y-3">
-              <div className="space-y-2 rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-xs text-[var(--color-warning)]" data-testid="references-warning-dialog">
-                <div className="flex items-center gap-1.5 font-semibold">
-                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  Advertencia: el recorrido está asignado a frecuencias de servicio activas
-                </div>
-                <p>El backend no realiza control referencial automático. Desactivar este recorrido mantendrá las frecuencias existentes pero podría impactar en la programación operativa futura.</p>
-                <div className="mt-1 space-y-1 rounded border bg-background/50 p-2">
-                  <div className="text-xs font-medium">Frecuencias activas ({referencesReport.activeServiceFrequencies.length}):</div>
-                  <ItemGroup className="gap-1">
-                    {referencesReport.activeServiceFrequencies.map((frequency) => (
-                      <Item key={frequency.id} variant="outline" size="xs" className="border-0 bg-background/50">
-                        <ItemContent>
-                          <ItemTitle>
-                            <strong>{frequency.serviceTypeName}</strong> — Turno {frequency.shift} ({frequency.weekdays.join(", ")})
-                          </ItemTitle>
-                        </ItemContent>
-                      </Item>
-                    ))}
-                  </ItemGroup>
-                </div>
-              </div>
+              <Alert variant="warning" data-testid="references-warning-dialog">
+                <AlertTriangle aria-hidden="true" />
+                <AlertTitle>Advertencia: el recorrido está asignado a frecuencias de servicio activas</AlertTitle>
+                <AlertDescription>
+                  <p>El backend no realiza control referencial automático. Desactivar este recorrido mantendrá las frecuencias existentes pero podría impactar en la programación operativa futura.</p>
+                  <div className="mt-2 space-y-1">
+                    <div className="text-xs font-medium">Frecuencias activas ({referencesReport.activeServiceFrequencies.length}):</div>
+                    <ItemGroup className="gap-1">
+                      {referencesReport.activeServiceFrequencies.map((frequency) => (
+                        <Item key={frequency.id} variant="outline" size="xs" className="border-0 bg-background/50">
+                          <ItemContent>
+                            <ItemTitle>
+                              <strong>{frequency.serviceTypeName}</strong> — Turno {frequency.shift} ({frequency.weekdays.join(", ")})
+                            </ItemTitle>
+                          </ItemContent>
+                        </Item>
+                      ))}
+                    </ItemGroup>
+                  </div>
+                </AlertDescription>
+              </Alert>
             </div>
           ) : (
             <div className="flex items-center gap-2 rounded-md bg-[var(--color-success-fill)] p-2.5 text-xs text-[var(--color-success)]">
@@ -1456,12 +1452,12 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   ? "No se pudo comprobar si el recorrido fue modificado en el servidor."
                   : "El recorrido fue modificado en el servidor después de que abrió este editor."}
               </span>
-              <span className="block rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-2.5 text-left font-medium text-[var(--color-warning)]">
-                {stalenessWarningReason === "unavailable"
-                  ? "Aviso informativo: no fue posible verificar la secuencia actual. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."
-                  : "Aviso informativo (no autoritativo): El backend no posee control de concurrencia ni bloqueo optimista para paradas. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."}
-              </span>
             </DialogDescription>
+              <Alert variant="warning" className="text-left">
+                <AlertDescription>{stalenessWarningReason === "unavailable"
+                  ? "Aviso informativo: no fue posible verificar la secuencia actual. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."
+                  : "Aviso informativo (no autoritativo): El backend no posee control de concurrencia ni bloqueo optimista para paradas. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."}</AlertDescription>
+              </Alert>
           </DialogHeader>
           <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
             <Button

@@ -97,6 +97,20 @@ describe("ZoneCatalogPanel component", () => {
     });
   });
 
+  it("focuses the first invalid field when the create form is submitted empty", async () => {
+    const user = userEvent.setup();
+    render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => expect(screen.getByText("Z-BEL")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /nueva zona/i }));
+    await user.click(screen.getByRole("button", { name: "Crear zona" }));
+
+    const codeInput = screen.getByLabelText("Código");
+    await waitFor(() => expect(codeInput).toHaveAttribute("aria-invalid", "true"));
+    expect(screen.getByLabelText("Nombre")).toHaveAttribute("aria-invalid", "true");
+    expect(codeInput).toHaveFocus();
+  });
+
   it("allows Office to create a new zone with unique code and name", async () => {
     const user = userEvent.setup();
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
@@ -180,6 +194,7 @@ describe("ZoneCatalogPanel component", () => {
     await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
 
     await waitFor(() => expect(nameInput).toHaveAttribute("aria-invalid", "true"));
+    expect(nameInput).toHaveFocus();
     const errorId = nameInput.getAttribute("aria-describedby");
     expect(errorId).toBeTruthy();
     expect(errorId ? document.getElementById(errorId) : null).toHaveTextContent("El nombre es obligatorio.");

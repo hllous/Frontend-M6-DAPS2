@@ -128,7 +128,11 @@ describe("RouteCatalogPanel component", () => {
     const confirm = within(dialog).getByTestId("confirm-deactivate-button");
     await waitFor(() => expect(confirm).toBeEnabled());
     await user.click(confirm);
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("No se pudo dar de baja el recorrido.");
+    await waitFor(() =>
+      expect(within(dialog).getAllByRole("alert").map((alert) => alert.textContent)).toContain(
+        "No se pudo dar de baja el recorrido.",
+      ),
+    );
     expect(dialog).toBeVisible();
   });
 
