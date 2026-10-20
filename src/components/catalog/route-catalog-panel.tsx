@@ -9,8 +9,6 @@ import {
   CheckCircle2,
   Clock,
   Eye,
-  Info,
-  Loader2,
   MapPin,
   Pencil,
   Plus,
@@ -23,7 +21,9 @@ import {
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -33,10 +33,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
-import { formControlClass } from "@/components/ui/form-control";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { notifySuccess } from "@/components/ui/feedback";
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   type CreateRouteInput,
@@ -53,6 +65,16 @@ type LoadState =
   | { status: "loading" }
   | { status: "ready"; items: Route[] }
   | { status: "error"; message: string };
+
+type FormErrors = { code?: string; name?: string; form?: string };
+
+function mapFormError(message: string): FormErrors {
+  const errors: FormErrors = {};
+  if (/\bc[oó]digo\b/i.test(message)) errors.code = message;
+  if (/\bnombre\b/i.test(message)) errors.name = message;
+  if (!errors.code && !errors.name) errors.form = message;
+  return errors;
+}
 
 type StalenessWarningReason = "changed" | "unavailable" | null;
 
@@ -90,7 +112,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   // Create state
   const [showCreate, setShowCreate] = useState(false);
   const [createDraft, setCreateDraft] = useState<CreateRouteInput>({ code: "", name: "" });
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [createErrors, setCreateErrors] = useState<FormErrors>({});
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
 
   // Edit state
@@ -99,7 +121,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     name: "",
     active: true,
   });
-  const [editError, setEditError] = useState<string | null>(null);
+  const [editErrors, setEditErrors] = useState<FormErrors>({});
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // Deactivate confirmation state
@@ -191,9 +213,12 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
   async function handleCreateSubmit(event: React.FormEvent) {
     event.preventDefault();
-    setCreateError(null);
-    if (!createDraft.code.trim() || !createDraft.name.trim()) {
-      setCreateError("El código y el nombre son obligatorios.");
+    setCreateErrors({});
+    const validationErrors: FormErrors = {};
+    if (!createDraft.code.trim()) validationErrors.code = "El código es obligatorio.";
+    if (!createDraft.name.trim()) validationErrors.name = "El nombre es obligatorio.";
+    if (Object.keys(validationErrors).length > 0) {
+      setCreateErrors(validationErrors);
       return;
     }
 
@@ -210,12 +235,14 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       // with an empty stops section and an obvious call-to-action, not an auto-redirect into stop-editing mode."
       setSelectedRoute(created);
       setRequestVersion((v) => v + 1);
+      setCreateErrors({});
+      notifySuccess("Recorrido creado.");
     } catch (caught) {
       const message =
         caught instanceof RouteRequestError
           ? caught.message
           : "No se pudo crear el recorrido. Intente nuevamente.";
-      setCreateError(message);
+      setCreateErrors(mapFormError(message));
     } finally {
       setIsSubmittingCreate(false);
     }
@@ -224,15 +251,15 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   function handleOpenEdit(route: Route) {
     setEditingRoute(route);
     setEditDraft({ name: route.name, active: route.active });
-    setEditError(null);
+    setEditErrors({});
   }
 
   async function handleEditSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!editingRoute) return;
-    setEditError(null);
+    setEditErrors({});
     if (!editDraft.name.trim()) {
-      setEditError("El nombre es obligatorio.");
+      setEditErrors({ name: "El nombre es obligatorio." });
       return;
     }
 
@@ -247,12 +274,14 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         setSelectedRoute(updated);
       }
       setRequestVersion((v) => v + 1);
+      setEditErrors({});
+      notifySuccess("Cambios guardados.");
     } catch (caught) {
       const message =
         caught instanceof RouteRequestError
           ? caught.message
           : "No se pudo actualizar el recorrido. Intente nuevamente.";
-      setEditError(message);
+      setEditErrors(mapFormError(message));
     } finally {
       setIsSubmittingEdit(false);
     }
@@ -286,6 +315,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         setSelectedRoute(updated);
       }
       setRequestVersion((v) => v + 1);
+      notifySuccess("Recorrido dado de baja.");
     } catch (caught) {
       setDeactivateError(caught instanceof RouteRequestError ? caught.message : "No se pudo dar de baja el recorrido.");
     } finally {
@@ -369,6 +399,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   }
 
   function handleDurationChange(index: number, value: number) {
+    setStopEditorError(null);
     setDraftStops((prev) => {
       const next = [...prev];
       if (next[index]) {
@@ -443,6 +474,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       setSelectedRoute(updated);
       setIsEditingStops(false);
       setRequestVersion((v) => v + 1);
+      notifySuccess("Secuencia de paradas guardada.");
     } catch (caught) {
       const message =
         caught instanceof RouteRequestError
@@ -479,25 +511,17 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
       {/* Detail View of Selected Route (Lands here after creation or clicking Ver Detalle) */}
       {selectedRoute && (
-        <section
-          className="rounded-lg border bg-card p-6 space-y-5"
-          data-testid="route-detail-view"
-        >
+        <Card data-testid="route-detail-view">
+          <CardContent className="space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-md bg-secondary px-2.5 py-0.5 text-xs font-mono font-medium text-secondary-foreground">
+                <Badge variant="secondary" className="font-mono">
                   {selectedRoute.code}
-                </span>
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    selectedRoute.active
-                      ? "bg-[var(--color-success-fill)] text-[var(--color-success)]"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
+                </Badge>
+                <Badge variant={selectedRoute.active ? "success" : "secondary"}>
                   {selectedRoute.active ? "Activo" : "Inactivo"}
-                </span>
+                </Badge>
               </div>
               <h2 className="text-xl font-semibold text-foreground">
                 {selectedRoute.name}
@@ -570,22 +594,17 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
                 {selectedRoute.stops.length === 0 ? (
                   /* Acceptance Criteria #2: Empty stops section with obvious call-to-action */
-                  <div
-                    className="rounded-lg border border-dashed p-6 text-center space-y-3 bg-muted/20"
-                    data-testid="empty-stops-section"
-                  >
-                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                      <MapPin className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-medium text-foreground">
-                        Este recorrido no tiene paradas configuradas
-                      </h4>
-                      <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                  <Empty className="border" data-testid="empty-stops-section">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <MapPin aria-hidden="true" />
+                      </EmptyMedia>
+                      <EmptyTitle>Este recorrido no tiene paradas configuradas</EmptyTitle>
+                      <EmptyDescription>
                         Los recorridos nuevos nacen sin paradas. Para diagramar y ordenar la secuencia de paradas operativas, utilice el generador de secuencias.
-                      </p>
-                    </div>
-                    <div>
+                      </EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
                       {canManage ? (
                         <Button
                           variant="default"
@@ -602,8 +621,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                           Modo lectura: se requieren permisos de oficina para configurar paradas.
                         </span>
                       )}
-                    </div>
-                  </div>
+                    </EmptyContent>
+                  </Empty>
                 ) : (
                   <div className="divide-y rounded-md border bg-background" data-testid="stops-list">
                     {selectedRoute.stops.map((stop) => (
@@ -635,10 +654,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               </>
             ) : (
               /* Stop Sequence Builder (#111) */
-              <div
-                className="rounded-lg border bg-card p-4 space-y-4"
-                data-testid="stop-sequence-builder"
-              >
+              <Card size="sm" data-testid="stop-sequence-builder">
+                <CardContent className="space-y-4">
                 <div className="flex items-center justify-between border-b pb-3">
                   <div>
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -661,13 +678,10 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 </div>
 
                 {stopEditorError && (
-                  <div
-                    className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2"
-                    data-testid="stop-editor-error"
-                  >
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <span>{stopEditorError}</span>
-                  </div>
+                  <Alert variant="destructive" id="stop-editor-error" data-testid="stop-editor-error">
+                    <AlertTriangle aria-hidden="true" />
+                    <AlertDescription>{stopEditorError}</AlertDescription>
+                  </Alert>
                 )}
 
                 {/* Ordered sequence list */}
@@ -677,12 +691,11 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   </div>
 
                   {draftStops.length === 0 ? (
-                    <div
-                      className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground bg-muted/10"
-                      data-testid="builder-empty-stops"
-                    >
-                      No hay paradas en la secuencia. Puede guardar el recorrido sin paradas o agregar zonas debajo.
-                    </div>
+                    <Empty className="border p-4" data-testid="builder-empty-stops">
+                      <EmptyDescription>
+                        No hay paradas en la secuencia. Puede guardar el recorrido sin paradas o agregar zonas debajo.
+                      </EmptyDescription>
+                    </Empty>
                   ) : (
                     <div className="divide-y rounded-md border bg-background" data-testid="builder-stops-list">
                       {draftStops.map((stop, idx) => (
@@ -706,65 +719,77 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <div className="flex flex-wrap items-center justify-between gap-2 self-stretch sm:flex-nowrap sm:self-auto">
                             <div className="flex items-center gap-1.5">
-                              <label
+                              <FieldLabel
                                 htmlFor={`duration-${idx}`}
                                 className="text-xs text-muted-foreground whitespace-nowrap"
                               >
                                 Duración:
-                              </label>
-                              <input
+                              </FieldLabel>
+                              <Input
                                 id={`duration-${idx}`}
                                 type="number"
                                 min={1}
                                 max={1440}
                                 value={stop.estimatedDurationMin}
                                 onChange={(e) => handleDurationChange(idx, Number(e.target.value))}
-                                className="h-10 w-20 rounded-md border border-input bg-transparent px-2 text-xs text-right max-[760px]:h-12"
+                                className="h-10 w-20 px-2 text-right text-xs"
                                 data-testid={`stop-duration-input-${idx}`}
                               />
                               <span className="text-xs text-muted-foreground">min</span>
                             </div>
-                            <div className="flex items-center gap-1 ml-2">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleMoveStop(idx, "up")}
-                                disabled={idx === 0}
-                                className="h-10 w-10 p-0 max-[760px]:h-12 max-[760px]:w-12"
-                                title="Mover arriba"
-                                aria-label="Mover arriba"
-                                data-testid={`stop-move-up-${idx}`}
-                              >
-                                <ArrowUp className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleMoveStop(idx, "down")}
-                                disabled={idx === draftStops.length - 1}
-                                className="h-10 w-10 p-0 max-[760px]:h-12 max-[760px]:w-12"
-                                title="Mover abajo"
-                                aria-label="Mover abajo"
-                                data-testid={`stop-move-down-${idx}`}
-                              >
-                                <ArrowDown className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveStop(idx)}
-                                className="h-10 w-10 p-0 text-destructive hover:bg-destructive/10 max-[760px]:h-12 max-[760px]:w-12"
-                                title="Quitar parada"
-                                aria-label="Quitar parada"
-                                data-testid={`stop-remove-${idx}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                            <div className="flex items-center gap-1 sm:ml-2">
+                              <Tooltip>
+                                <TooltipTrigger render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleMoveStop(idx, "up")}
+                                    disabled={idx === 0}
+                                    className="h-10 w-10 p-0 max-[760px]:h-12 max-[760px]:w-12"
+                                    aria-label="Mover arriba"
+                                    data-testid={`stop-move-up-${idx}`}
+                                  >
+                                    <ArrowUp className="h-3.5 w-3.5" />
+                                  </Button>
+                                } />
+                                <TooltipContent>Mover arriba</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleMoveStop(idx, "down")}
+                                    disabled={idx === draftStops.length - 1}
+                                    className="h-10 w-10 p-0 max-[760px]:h-12 max-[760px]:w-12"
+                                    aria-label="Mover abajo"
+                                    data-testid={`stop-move-down-${idx}`}
+                                  >
+                                    <ArrowDown className="h-3.5 w-3.5" />
+                                  </Button>
+                                } />
+                                <TooltipContent>Mover abajo</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveStop(idx)}
+                                    className="h-10 w-10 p-0 text-destructive hover:bg-destructive/10 max-[760px]:h-12 max-[760px]:w-12"
+                                    aria-label="Quitar parada"
+                                    data-testid={`stop-remove-${idx}`}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                } />
+                                <TooltipContent>Quitar parada</TooltipContent>
+                              </Tooltip>
                             </div>
                           </div>
                         </div>
@@ -779,45 +804,64 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                     Agregar parada operativa al recorrido
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <div className="flex-1">
-                      <label htmlFor="stop-zone-select" className="mb-1 block text-xs font-medium text-foreground">
+                    <Field className="flex-1">
+                      <FieldLabel htmlFor="stop-zone-select" className="mb-1 text-xs font-medium text-foreground">
                         Zona operativa
-                      </label>
-                      <select
-                        id="stop-zone-select"
-                        value={newStopZoneId}
-                        onChange={(e) => setNewStopZoneId(e.target.value)}
-                        className={`${formControlClass} w-full text-xs`}
-                        data-testid="stop-zone-select"
+                      </FieldLabel>
+                      <Select
+                        value={newStopZoneId || null}
+                        items={Object.fromEntries(
+                          availableZones
+                            .filter((zone) => zone.active)
+                            .map((zone) => [
+                              zone.id,
+                              `${zone.code} — ${zone.name}${draftStops.some((stop) => stop.zoneId === zone.id) ? " (Ya en recorrido)" : ""}`,
+                            ]),
+                        )}
+                        onValueChange={(value) => {
+                          setNewStopZoneId(value ?? "");
+                          setStopEditorError(null);
+                        }}
                       >
-                        <option value="">Seleccione una zona operativa activa...</option>
-                        {availableZones
-                          .filter((z) => z.active)
-                          .map((z) => {
-                            const isAlreadyAdded = draftStops.some((s) => s.zoneId === z.id);
-                            return (
-                              <option key={z.id} value={z.id}>
-                                {z.code} — {z.name} {isAlreadyAdded ? "(Ya en recorrido)" : ""}
-                              </option>
-                            );
-                          })}
-                      </select>
-                    </div>
+                        <SelectTrigger id="stop-zone-select" aria-label="Zona operativa" aria-invalid={stopEditorError ? true : undefined} aria-describedby={stopEditorError ? "stop-editor-error" : undefined} data-testid="stop-zone-select" className="text-xs">
+                          <SelectValue placeholder="Seleccione una zona operativa activa..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {availableZones
+                              .filter((z) => z.active)
+                              .map((z) => {
+                                const isAlreadyAdded = draftStops.some((s) => s.zoneId === z.id);
+                                return (
+                                  <SelectItem key={z.id} value={z.id}>
+                                    {z.code} — {z.name}{isAlreadyAdded ? " (Ya en recorrido)" : ""}
+                                  </SelectItem>
+                                );
+                              })}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
                     <div className="flex items-center gap-1.5">
-                      <label
+                      <FieldLabel
                         htmlFor="new-stop-duration"
                         className="text-xs text-muted-foreground whitespace-nowrap"
                       >
                         Duración est.:
-                      </label>
-                      <input
+                      </FieldLabel>
+                      <Input
                         id="new-stop-duration"
                         type="number"
                         min={1}
                         max={1440}
                         value={newStopDuration}
-                        onChange={(e) => setNewStopDuration(Number(e.target.value))}
-                        className="h-10 max-[760px]:h-12 w-20 rounded-md border border-input bg-transparent px-2 text-xs text-right"
+                        onChange={(e) => {
+                          setNewStopDuration(Number(e.target.value));
+                          setStopEditorError(null);
+                        }}
+                        aria-invalid={stopEditorError ? true : undefined}
+                        aria-describedby={stopEditorError ? "stop-editor-error" : undefined}
+                        className="h-10 w-20 px-2 text-right text-xs"
                         data-testid="stop-duration-input"
                       />
                       <span className="text-xs text-muted-foreground">min</span>
@@ -863,75 +907,93 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                       className="inline-flex items-center gap-1.5"
                       data-testid="save-sequence-button"
                     >
-                      {isSavingStops && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {isSavingStops && <Spinner aria-hidden="true" className="size-3.5" />}
                       Guardar secuencia
                     </Button>
                   </div>
                 </div>
-              </div>
+                </CardContent>
+              </Card>
             )}
           </div>
-        </section>
+          </CardContent>
+        </Card>
       )}
 
       {/* Filters band */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border bg-card p-4">
+      <Card size="sm">
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           {/* Search */}
-          <div className="relative flex-1 max-w-sm">
-            <label htmlFor="search-routes-input" className="mb-1 block text-xs font-medium text-foreground">
+          <div className="relative min-w-0 max-w-sm flex-1">
+            <FieldLabel htmlFor="search-routes-input" className="mb-1 text-xs font-medium text-foreground">
               Buscar recorridos
-            </label>
-            <Search className="absolute left-2.5 top-8 h-4 w-4 text-muted-foreground max-[760px]:top-9" />
-            <input
-              id="search-routes-input"
-              type="text"
-              placeholder="Buscar por código o nombre..."
-              value={search}
-              maxLength={MAX_SEARCH_LENGTH}
-              onChange={(e) => setSearch(e.target.value)}
-              className={`${formControlClass} pl-9 w-full`}
-              data-testid="search-routes-input"
-            />
+            </FieldLabel>
+            <div className="relative flex w-full items-center">
+              <Search aria-hidden="true" className="absolute left-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="search-routes-input"
+                type="text"
+                placeholder="Buscar por código o nombre..."
+                value={search}
+                maxLength={MAX_SEARCH_LENGTH}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+                data-testid="search-routes-input"
+              />
+            </div>
           </div>
 
           {/* Active status filter */}
           <div className="flex items-center gap-2">
-            <label htmlFor="route-active-filter" className="text-xs text-muted-foreground whitespace-nowrap">
+            <FieldLabel htmlFor="route-active-filter" className="text-xs text-muted-foreground whitespace-nowrap">
               Estado:
-            </label>
-            <select
-              id="route-active-filter"
+            </FieldLabel>
+            <Select
               value={activeFilter}
-              onChange={(e) => setActiveFilter(e.target.value as "all" | "true" | "false")}
-              className={formControlClass}
-              data-testid="active-filter-select"
+              items={{ all: "Todos", true: "Solo activos", false: "Solo inactivos" }}
+              onValueChange={(value) => setActiveFilter(value as "all" | "true" | "false")}
             >
-              <option value="all">Todos</option>
-              <option value="true">Solo activos</option>
-              <option value="false">Solo inactivos</option>
-            </select>
+              <SelectTrigger id="route-active-filter" aria-label="Estado:" data-testid="active-filter-select" className="sm:w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="true">Solo activos</SelectItem>
+                  <SelectItem value="false">Solo inactivos</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Zone filter */}
           <div className="flex items-center gap-2">
-            <label htmlFor="route-zone-filter" className="text-xs text-muted-foreground whitespace-nowrap">
+            <FieldLabel htmlFor="route-zone-filter" className="text-xs text-muted-foreground whitespace-nowrap">
               Zona:
-            </label>
-            <select
-              id="route-zone-filter"
+            </FieldLabel>
+            <Select
               value={zoneFilter}
-              onChange={(e) => setZoneFilter(e.target.value)}
-              className={formControlClass}
-              data-testid="zone-filter-select"
+              items={Object.fromEntries([
+                ["all", "Todas las zonas"],
+                ...availableZones.map((zone) => [zone.id, `${zone.name} (${zone.code})`]),
+              ])}
+              onValueChange={(value) => setZoneFilter(value ?? "all")}
             >
-              <option value="all">Todas las zonas</option>
-              {availableZones.map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.name} ({z.code})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="route-zone-filter" aria-label="Zona:" data-testid="zone-filter-select" className="sm:w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">Todas las zonas</SelectItem>
+                  {availableZones.map((z) => (
+                    <SelectItem key={z.id} value={z.id}>
+                      {z.name} ({z.code})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -940,12 +1002,12 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
           size="sm"
           onClick={() => setRequestVersion((v) => v + 1)}
           className="inline-flex items-center gap-1.5 self-start sm:self-auto"
-          title="Actualizar listado"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Actualizar
         </Button>
-      </div>
+      </CardContent>
+      </Card>
 
       {/* Routes list table / content */}
       <div className="rounded-lg border bg-card overflow-hidden">
@@ -958,23 +1020,21 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         )}
 
         {state.status === "error" && (
-          <div className="p-6">
-            <Empty>
-              <EmptyHeader>
-                <AlertTriangle className="h-8 w-8 text-destructive" />
-                <EmptyTitle>Error al cargar recorridos</EmptyTitle>
-                <EmptyDescription>{state.message}</EmptyDescription>
-              </EmptyHeader>
+          <Alert variant="destructive" className="rounded-none border-0">
+            <AlertTriangle aria-hidden="true" />
+            <AlertTitle>Error al cargar recorridos</AlertTitle>
+            <AlertDescription>
+              {state.message}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setRequestVersion((v) => v + 1)}
-                className="mt-4"
+                className="mt-3"
               >
                 Reintentar
               </Button>
-            </Empty>
-          </div>
+            </AlertDescription>
+          </Alert>
         )}
 
         {state.status === "ready" && state.items.length === 0 && (
@@ -1037,15 +1097,9 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          route.active
-                            ? "bg-[var(--color-success-fill)] text-[var(--color-success)]"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
+                      <Badge variant={route.active ? "success" : "secondary"}>
                         {route.active ? "Activo" : "Inactivo"}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center justify-end gap-1">
@@ -1053,8 +1107,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                           variant="ghost"
                           size="sm"
                           onClick={() => setSelectedRoute(route)}
-                          className="h-8 px-2 text-xs"
-                          title="Ver detalle"
+                          className="h-8 max-[760px]:h-10 px-2 text-xs"
                           data-testid={`view-route-${route.id}`}
                         >
                           <Eye className="h-3.5 w-3.5 mr-1" />
@@ -1062,29 +1115,37 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                         </Button>
                         {canManage && (
                           <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenEdit(route)}
-                              className="h-8 px-2 text-xs"
-                              title="Editar recorrido"
-                              data-testid={`edit-route-${route.id}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                              <span className="sr-only">Editar</span>
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger render={
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenEdit(route)}
+                                  className="h-8 max-[760px]:h-10 px-2 text-xs"
+                                  aria-label="Editar recorrido"
+                                  data-testid={`edit-route-${route.id}`}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              } />
+                              <TooltipContent>Editar recorrido</TooltipContent>
+                            </Tooltip>
                             {route.active && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleOpenDeactivate(route)}
-                                className="h-8 px-2 text-xs text-destructive hover:bg-destructive/10"
-                                title="Desactivar recorrido"
-                                data-testid={`deactivate-route-${route.id}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                <span className="sr-only">Desactivar</span>
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger render={
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleOpenDeactivate(route)}
+                                    className="h-8 max-[760px]:h-10 px-2 text-xs text-destructive hover:bg-destructive/10"
+                                    aria-label="Desactivar recorrido"
+                                    data-testid={`deactivate-route-${route.id}`}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                } />
+                                <TooltipContent>Desactivar recorrido</TooltipContent>
+                              </Tooltip>
                             )}
                           </>
                         )}
@@ -1099,7 +1160,13 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       </div>
 
       {/* Modal: Crear Recorrido */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog
+        open={showCreate}
+        onOpenChange={(open) => {
+          setShowCreate(open);
+          if (!open) setCreateErrors({});
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <form onSubmit={handleCreateSubmit} className="space-y-4">
             <DialogHeader>
@@ -1109,48 +1176,58 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               </DialogDescription>
             </DialogHeader>
 
-            {createError && (
-              <div
-                className="rounded-md bg-destructive/15 p-3 text-xs text-destructive font-medium"
-                data-testid="create-route-error"
-              >
-                {createError}
-              </div>
+            {createErrors.form && (
+              <Alert variant="destructive" data-testid="create-route-error">
+                <AlertDescription>{createErrors.form}</AlertDescription>
+              </Alert>
             )}
 
             <FieldGroup className="space-y-3">
               <Field>
                 <FieldLabel htmlFor="create-route-code">Código del recorrido</FieldLabel>
-                <input
+                <Input
                   id="create-route-code"
                   type="text"
                   placeholder="Ej: REC-004"
                   value={createDraft.code}
-                  onChange={(e) => setCreateDraft((d) => ({ ...d, code: e.target.value }))}
-                  className={`${formControlClass} w-full`}
+                  onChange={(e) => {
+                    setCreateDraft((d) => ({ ...d, code: e.target.value }));
+                    setCreateErrors((errors) => ({ ...errors, code: undefined, form: undefined }));
+                  }}
                   disabled={isSubmittingCreate}
                   data-testid="create-route-code-input"
-                  aria-invalid={Boolean(createError)}
-                  aria-describedby={createError ? "create-route-code-error" : undefined}
+                  aria-invalid={createErrors.code ? true : undefined}
+                  aria-describedby={`create-route-code-help${createErrors.code ? " create-route-code-error" : ""}`}
                 />
-                <FieldError id="create-route-code-error">{createError}</FieldError>
-                <FieldDescription>
+                {createErrors.code && (
+                  <FieldError id="create-route-code-error" data-testid="create-route-error">
+                    {createErrors.code}
+                  </FieldError>
+                )}
+                <FieldDescription id="create-route-code-help">
                   Identificador único (inmutable tras la creación).
                 </FieldDescription>
               </Field>
 
               <Field>
                 <FieldLabel htmlFor="create-route-name">Nombre descriptivo</FieldLabel>
-                <input
+                <Input
                   id="create-route-name"
                   type="text"
                   placeholder="Ej: Recorrido Nocturno San Telmo"
                   value={createDraft.name}
-                  onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))}
-                  className={`${formControlClass} w-full`}
+                  onChange={(e) => {
+                    setCreateDraft((d) => ({ ...d, name: e.target.value }));
+                    setCreateErrors((errors) => ({ ...errors, name: undefined, form: undefined }));
+                  }}
                   disabled={isSubmittingCreate}
                   data-testid="create-route-name-input"
+                  aria-invalid={createErrors.name ? true : undefined}
+                  aria-describedby={createErrors.name ? "create-route-name-error" : undefined}
                 />
+                {createErrors.name && (
+                  <FieldError id="create-route-name-error">{createErrors.name}</FieldError>
+                )}
               </Field>
             </FieldGroup>
 
@@ -1158,7 +1235,10 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowCreate(false)}
+                onClick={() => {
+                  setShowCreate(false);
+                  setCreateErrors({});
+                }}
                 disabled={isSubmittingCreate}
               >
                 Cancelar
@@ -1168,7 +1248,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 disabled={isSubmittingCreate}
                 data-testid="submit-create-route"
               >
-                {isSubmittingCreate && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                {isSubmittingCreate && <Spinner aria-hidden="true" className="mr-1.5 size-3.5" />}
                 Crear recorrido
               </Button>
             </DialogFooter>
@@ -1190,62 +1270,63 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               </DialogDescription>
             </DialogHeader>
 
-            {editError && (
-              <div
-                className="rounded-md bg-destructive/15 p-3 text-xs text-destructive font-medium"
-                data-testid="edit-route-error"
-              >
-                {editError}
-              </div>
+            {editErrors.form && (
+              <Alert variant="destructive" data-testid="edit-route-error">
+                <AlertDescription>{editErrors.form}</AlertDescription>
+              </Alert>
             )}
 
             <FieldGroup className="space-y-3">
               <Field>
                 <FieldLabel htmlFor="edit-route-code">Código</FieldLabel>
-                <input
+                <Input
                   id="edit-route-code"
                   type="text"
                   value={editingRoute?.code ?? ""}
                   readOnly
                   disabled
-                  className={`${formControlClass} w-full bg-muted font-mono cursor-not-allowed`}
+                  aria-readonly="true"
+                  aria-describedby="edit-route-code-help"
+                  className="bg-muted/50 font-mono"
                   data-testid="edit-route-code-readonly"
                 />
-                <FieldDescription>
+                <FieldDescription id="edit-route-code-help">
                   El código es inmutable tras la creación.
                 </FieldDescription>
               </Field>
 
               <Field>
                 <FieldLabel htmlFor="edit-route-name">Nombre descriptivo</FieldLabel>
-                <input
+                <Input
                   id="edit-route-name"
                   type="text"
                   value={editDraft.name}
-                  onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
-                  className={`${formControlClass} w-full`}
+                  onChange={(e) => {
+                    setEditDraft((d) => ({ ...d, name: e.target.value }));
+                    setEditErrors((errors) => ({ ...errors, name: undefined, form: undefined }));
+                  }}
                   disabled={isSubmittingEdit}
                   data-testid="edit-route-name-input"
-                  aria-invalid={Boolean(editError)}
-                  aria-describedby={editError ? "edit-route-name-error" : undefined}
+                  aria-invalid={editErrors.name ? true : undefined}
+                  aria-describedby={editErrors.name ? "edit-route-name-error" : undefined}
                 />
-                <FieldError id="edit-route-name-error">{editError}</FieldError>
+                {editErrors.name && (
+                  <FieldError id="edit-route-name-error">{editErrors.name}</FieldError>
+                )}
               </Field>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
+              <Field orientation="horizontal" className="pt-1">
+                <Checkbox
                   id="edit-route-active"
                   checked={editDraft.active}
-                  onChange={(e) => setEditDraft((d) => ({ ...d, active: e.target.checked }))}
+                  onCheckedChange={(checked) => setEditDraft((d) => ({ ...d, active: checked === true }))}
                   disabled={isSubmittingEdit}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                   data-testid="edit-route-active-checkbox"
                 />
-                <label htmlFor="edit-route-active" className="text-sm font-medium text-foreground">
+                <FieldLabel htmlFor="edit-route-active" className="text-sm font-medium text-foreground">
                   Recorrido activo
-                </label>
-              </div>
+                </FieldLabel>
+              </Field>
             </FieldGroup>
 
             <DialogFooter>
@@ -1262,7 +1343,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 disabled={isSubmittingEdit}
                 data-testid="submit-edit-route"
               >
-                {isSubmittingEdit && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                {isSubmittingEdit && <Spinner aria-hidden="true" className="mr-1.5 size-3.5" />}
                 Guardar cambios
               </Button>
             </DialogFooter>
@@ -1289,17 +1370,21 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         contentClassName="sm:max-w-md"
         confirmDataTestId="confirm-deactivate-button"
       >
-        {deactivateError ? <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{deactivateError}</p> : null}
+        {deactivateError ? (
+          <Alert variant="destructive">
+            <AlertDescription>{deactivateError}</AlertDescription>
+          </Alert>
+        ) : null}
         {isLoadingReferences ? (
           <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            <Spinner aria-hidden="true" />
             Verificando referencias a frecuencias de servicio...
           </div>
         ) : referencesUnavailable ? (
           <div className="flex flex-col gap-3">
-            <Alert className="border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]">
+            <Alert variant="warning">
               <AlertTriangle aria-hidden="true" />
-              <AlertDescription className="text-[var(--color-warning)]">
+              <AlertDescription>
                 No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
               </AlertDescription>
             </Alert>
@@ -1313,19 +1398,27 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         ) : referencesReport ? (
           referencesReport.totalReferences > 0 ? (
             <div className="space-y-3">
-              <div className="space-y-2 rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-xs text-[var(--color-warning)]" data-testid="references-warning-dialog">
-                <div className="flex items-center gap-1.5 font-semibold">
-                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  Advertencia: el recorrido está asignado a frecuencias de servicio activas
-                </div>
-                <p>El backend no realiza control referencial automático. Desactivar este recorrido mantendrá las frecuencias existentes pero podría impactar en la programación operativa futura.</p>
-                <div className="mt-1 space-y-1 rounded border bg-background/50 p-2">
-                  <div className="text-xs font-medium">Frecuencias activas ({referencesReport.activeServiceFrequencies.length}):</div>
-                  <ul className="list-disc space-y-0.5 pl-4">
-                    {referencesReport.activeServiceFrequencies.map((frequency) => <li key={frequency.id}><strong>{frequency.serviceTypeName}</strong> — Turno {frequency.shift} ({frequency.weekdays.join(", ")})</li>)}
-                  </ul>
-                </div>
-              </div>
+              <Alert variant="warning" data-testid="references-warning-dialog">
+                <AlertTriangle aria-hidden="true" />
+                <AlertTitle>Advertencia: el recorrido está asignado a frecuencias de servicio activas</AlertTitle>
+                <AlertDescription>
+                  <p>El backend no realiza control referencial automático. Desactivar este recorrido mantendrá las frecuencias existentes pero podría impactar en la programación operativa futura.</p>
+                  <div className="mt-2 space-y-1">
+                    <div className="text-xs font-medium">Frecuencias activas ({referencesReport.activeServiceFrequencies.length}):</div>
+                    <ItemGroup className="gap-1">
+                      {referencesReport.activeServiceFrequencies.map((frequency) => (
+                        <Item key={frequency.id} variant="outline" size="xs" className="border-0 bg-background/50">
+                          <ItemContent>
+                            <ItemTitle>
+                              <strong>{frequency.serviceTypeName}</strong> — Turno {frequency.shift} ({frequency.weekdays.join(", ")})
+                            </ItemTitle>
+                          </ItemContent>
+                        </Item>
+                      ))}
+                    </ItemGroup>
+                  </div>
+                </AlertDescription>
+              </Alert>
             </div>
           ) : (
             <div className="flex items-center gap-2 rounded-md bg-[var(--color-success-fill)] p-2.5 text-xs text-[var(--color-success)]">
@@ -1357,12 +1450,12 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   ? "No se pudo comprobar si el recorrido fue modificado en el servidor."
                   : "El recorrido fue modificado en el servidor después de que abrió este editor."}
               </span>
-              <span className="block rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-2.5 text-left font-medium text-[var(--color-warning)]">
-                {stalenessWarningReason === "unavailable"
-                  ? "Aviso informativo: no fue posible verificar la secuencia actual. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."
-                  : "Aviso informativo (no autoritativo): El backend no posee control de concurrencia ni bloqueo optimista para paradas. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."}
-              </span>
             </DialogDescription>
+              <Alert variant="warning" className="text-left">
+                <AlertDescription>{stalenessWarningReason === "unavailable"
+                  ? "Aviso informativo: no fue posible verificar la secuencia actual. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."
+                  : "Aviso informativo (no autoritativo): El backend no posee control de concurrencia ni bloqueo optimista para paradas. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."}</AlertDescription>
+              </Alert>
           </DialogHeader>
           <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
             <Button
@@ -1381,7 +1474,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               disabled={isSavingStops}
               data-testid="confirm-staleness-save-button"
             >
-              {isSavingStops && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              {isSavingStops && <Spinner aria-hidden="true" className="mr-1.5 size-3.5" />}
               Continuar y guardar
             </Button>
           </DialogFooter>
