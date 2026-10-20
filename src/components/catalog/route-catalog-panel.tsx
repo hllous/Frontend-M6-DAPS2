@@ -399,6 +399,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   }
 
   function handleDurationChange(index: number, value: number) {
+    setStopEditorError(null);
     setDraftStops((prev) => {
       const next = [...prev];
       if (next[index]) {
@@ -515,9 +516,9 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-md bg-secondary px-2.5 py-0.5 text-xs font-mono font-medium text-secondary-foreground">
+                <Badge variant="secondary" className="font-mono">
                   {selectedRoute.code}
-                </span>
+                </Badge>
                 <Badge variant={selectedRoute.active ? "success" : "secondary"}>
                   {selectedRoute.active ? "Activo" : "Inactivo"}
                 </Badge>
@@ -690,12 +691,11 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   </div>
 
                   {draftStops.length === 0 ? (
-                    <div
-                      className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground bg-muted/10"
-                      data-testid="builder-empty-stops"
-                    >
-                      No hay paradas en la secuencia. Puede guardar el recorrido sin paradas o agregar zonas debajo.
-                    </div>
+                    <Empty className="border p-4" data-testid="builder-empty-stops">
+                      <EmptyDescription>
+                        No hay paradas en la secuencia. Puede guardar el recorrido sin paradas o agregar zonas debajo.
+                      </EmptyDescription>
+                    </Empty>
                   ) : (
                     <div className="divide-y rounded-md border bg-background" data-testid="builder-stops-list">
                       {draftStops.map((stop, idx) => (
@@ -1020,23 +1020,21 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         )}
 
         {state.status === "error" && (
-          <div className="p-6">
-            <Empty>
-              <EmptyHeader>
-                <AlertTriangle className="h-8 w-8 text-destructive" />
-                <EmptyTitle>Error al cargar recorridos</EmptyTitle>
-                <EmptyDescription>{state.message}</EmptyDescription>
-              </EmptyHeader>
+          <Alert variant="destructive" className="rounded-none border-0">
+            <AlertTriangle aria-hidden="true" />
+            <AlertTitle>Error al cargar recorridos</AlertTitle>
+            <AlertDescription>
+              {state.message}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setRequestVersion((v) => v + 1)}
-                className="mt-4"
+                className="mt-3"
               >
                 Reintentar
               </Button>
-            </Empty>
-          </div>
+            </AlertDescription>
+          </Alert>
         )}
 
         {state.status === "ready" && state.items.length === 0 && (
