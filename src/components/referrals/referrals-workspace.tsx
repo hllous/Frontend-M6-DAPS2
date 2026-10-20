@@ -231,8 +231,11 @@ function formatDate(value: string): string {
   }).format(date);
 }
 
+// Una hora sin zona (`2026-09-05T08:00`) es hora argentina (UTC-3, sin horario de verano), no la de la máquina.
+const ZONELESS_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
 function formatDateTime(value: string): string {
-  const date = new Date(value);
+  const date = new Date(ZONELESS_DATE_TIME.test(value) ? `${value}-03:00` : value);
   if (Number.isNaN(date.valueOf())) return value;
   const timeZone = "America/Argentina/Buenos_Aires";
   const dateLabel = new Intl.DateTimeFormat("es-AR", {
