@@ -149,7 +149,7 @@ function ConfirmRescheduleForm({
 
         <FieldGroup className="grid gap-4 sm:grid-cols-2">
           <Field className="sm:col-span-2" data-invalid={Boolean(fieldErrors.date) || undefined}>
-            <FieldLabel htmlFor={`${formId}-date`}>Nueva fecha *</FieldLabel>
+            <FieldLabel htmlFor={`${formId}-date`}>Nueva fecha{" "}<span aria-hidden>*</span></FieldLabel>
             <DatePicker
               id={`${formId}-date`}
               min={minDate}
@@ -162,7 +162,7 @@ function ConfirmRescheduleForm({
             {fieldErrors.date && <FieldError id={`${formId}-date-error`}>{fieldErrors.date}</FieldError>}
           </Field>
           <Field data-invalid={Boolean(fieldErrors.start) || undefined}>
-            <FieldLabel id={`${formId}-start-label`} htmlFor={`${formId}-start`}>Desde *</FieldLabel>
+            <FieldLabel id={`${formId}-start-label`} htmlFor={`${formId}-start`}>Desde{" "}<span aria-hidden>*</span></FieldLabel>
             <TimePicker
               id={`${formId}-start`}
               value={windowStart}
@@ -175,7 +175,7 @@ function ConfirmRescheduleForm({
             {fieldErrors.start && <FieldError id={`${formId}-start-error`}>{fieldErrors.start}</FieldError>}
           </Field>
           <Field data-invalid={Boolean(fieldErrors.end) || undefined}>
-            <FieldLabel id={`${formId}-end-label`} htmlFor={`${formId}-end`}>Hasta *</FieldLabel>
+            <FieldLabel id={`${formId}-end-label`} htmlFor={`${formId}-end`}>Hasta{" "}<span aria-hidden>*</span></FieldLabel>
             <TimePicker
               id={`${formId}-end`}
               value={windowEnd}

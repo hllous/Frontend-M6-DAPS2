@@ -43,6 +43,7 @@ import {
   type FieldDraftServiceSnapshot,
 } from "@/lib/field-drafts";
 import { DraftConflictView } from "./draft-conflict-view";
+import { useRevealFirstError } from "./use-reveal-first-error";
 
 interface SuspendDraftPayload {
   reason: NotServicedReason;
@@ -130,6 +131,7 @@ function SuspendServiceForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ reason?: string; note?: string }>({});
+  const scrollRef = useRevealFirstError(errorMessage, fieldErrors);
   const pendingEvidenceCount = queuedFiles.filter((file) => file.status !== "success").length;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -356,7 +358,7 @@ function SuspendServiceForm({
         </DialogDescription>
       </DialogHeader>
 
-      <div className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
+      <div ref={scrollRef} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
         {conflict ? (
           <DraftConflictView
             serviceId={service.id}
@@ -496,7 +498,7 @@ function SuspendServiceForm({
                 )}
 
                 {queuedFiles.length > 0 && (
-                  <ItemGroup className="gap-2">
+                  <ItemGroup className="gap-2" aria-live="polite">
                     {queuedFiles.map((item) => (
                       <Item key={item.id} variant="outline" size="sm">
                         <ItemMedia variant="icon">
@@ -566,10 +568,10 @@ function SuspendServiceForm({
             <>
               <Button
                 type="button"
-                variant="outline"
+                variant="destructive"
                 disabled={isSubmitting}
                 onClick={() => setConfirmDiscardOpen(true)}
-                className="mr-auto text-destructive"
+                className="mr-auto"
               >
                 Descartar archivos pendientes
               </Button>

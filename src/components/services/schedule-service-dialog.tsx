@@ -35,6 +35,7 @@ import { greenPointsAdapter } from "@/lib/green-points";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { MAX_NOTES_LENGTH } from "@/lib/input-limits";
 import { SERVICE_MODE_LABEL, SERVICE_ORIGIN_LABEL } from "./service-ui-labels";
+import { useRevealFirstError } from "./use-reveal-first-error";
 
 interface ScheduleServiceDialogProps {
   open: boolean;
@@ -180,6 +181,7 @@ export function ScheduleServiceDialog({
     route?: string;
     zone?: string;
   }>({});
+  const scrollRef = useRevealFirstError(errorMessage, scheduledDateError, fieldErrors);
 
   // Los tipos de servicio, recorridos y zonas son los del backend (UUID): no se pueden fijar en el código.
   useEffect(() => {
@@ -397,7 +399,7 @@ export function ScheduleServiceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
+        <div ref={scrollRef} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
           {errorMessage && (
             <Alert variant="danger">
               <AlertCircle aria-hidden />
@@ -425,7 +427,7 @@ export function ScheduleServiceDialog({
                   </ItemDescription>
                   {origin === "TICKET" && !hasTrustedTicketContext && (
                     <Field className="mt-2" data-invalid={Boolean(fieldErrors.reference) || undefined}>
-                      <FieldLabel htmlFor="linked-ticket-id">UUID del ticket de M2 *</FieldLabel>
+                      <FieldLabel htmlFor="linked-ticket-id">UUID del ticket de M2{" "}<span aria-hidden>*</span></FieldLabel>
                       <Input
                         id="linked-ticket-id"
                         value={manualTicketId}
@@ -442,7 +444,7 @@ export function ScheduleServiceDialog({
               </Item>
             ) : (
               <Field>
-                <FieldLabel htmlFor="service-origin">Origen del servicio *</FieldLabel>
+                <FieldLabel htmlFor="service-origin">Origen del servicio{" "}<span aria-hidden>*</span></FieldLabel>
                 <Select
                   value={genericOrigin}
                   items={originItems}
@@ -465,7 +467,7 @@ export function ScheduleServiceDialog({
             )}
 
             <Field data-invalid={Boolean(fieldErrors.serviceType) || undefined}>
-              <FieldLabel htmlFor="service-type">Tipo de servicio *</FieldLabel>
+              <FieldLabel htmlFor="service-type">Tipo de servicio{" "}<span aria-hidden>*</span></FieldLabel>
               <Select
                 value={serviceTypeId || null}
                 items={serviceTypeItems}
@@ -514,7 +516,7 @@ export function ScheduleServiceDialog({
               <Card size="sm">
                 <CardContent className="flex flex-col gap-3">
                   <Field data-invalid={Boolean(fieldErrors.route) || undefined}>
-                    <FieldLabel htmlFor="service-route">Recorrido asignado *</FieldLabel>
+                    <FieldLabel htmlFor="service-route">Recorrido asignado{" "}<span aria-hidden>*</span></FieldLabel>
                     <Select
                       value={routeId || null}
                       items={routeItems}
@@ -561,7 +563,7 @@ export function ScheduleServiceDialog({
               <Card size="sm">
                 <CardContent className="flex flex-col gap-3">
                   <Field>
-                    <FieldLabel htmlFor="target-type">Tipo de objetivo *</FieldLabel>
+                    <FieldLabel htmlFor="target-type">Tipo de objetivo{" "}<span aria-hidden>*</span></FieldLabel>
                     <Select
                       value={targetType}
                       items={TARGET_KIND_LABELS}
@@ -595,7 +597,7 @@ export function ScheduleServiceDialog({
                         />
                       </Field>
                       <Field data-invalid={Boolean(fieldErrors.target) || undefined}>
-                        <FieldLabel htmlFor="target-id">Bien del inventario *</FieldLabel>
+                        <FieldLabel htmlFor="target-id">Bien del inventario{" "}<span aria-hidden>*</span></FieldLabel>
                         <Select
                           value={selectedTarget?.id ?? null}
                           items={targetItems}
@@ -640,7 +642,7 @@ export function ScheduleServiceDialog({
                   ) : (
                     <FieldGroup className="grid gap-4 sm:grid-cols-2">
                       <Field data-invalid={Boolean(fieldErrors.zone) || undefined}>
-                        <FieldLabel htmlFor="point-zone">Zona operativa *</FieldLabel>
+                        <FieldLabel htmlFor="point-zone">Zona operativa{" "}<span aria-hidden>*</span></FieldLabel>
                         <Select
                           value={pointZoneId || null}
                           items={zoneItems}
@@ -666,7 +668,7 @@ export function ScheduleServiceDialog({
                         {fieldErrors.zone && <FieldError id="point-zone-error">{fieldErrors.zone}</FieldError>}
                       </Field>
                       <Field data-invalid={Boolean(fieldErrors.targetRef) || undefined}>
-                        <FieldLabel htmlFor="target-ref">Dirección o referencia *</FieldLabel>
+                        <FieldLabel htmlFor="target-ref">Dirección o referencia{" "}<span aria-hidden>*</span></FieldLabel>
                         <Input
                           id="target-ref"
                           type="text"
@@ -688,7 +690,7 @@ export function ScheduleServiceDialog({
 
             <FieldGroup className="grid gap-4 sm:grid-cols-2">
               <Field className="sm:col-span-2" data-invalid={Boolean(scheduledDateError) || undefined}>
-                <FieldLabel htmlFor="scheduled-date">Fecha programada *</FieldLabel>
+                <FieldLabel htmlFor="scheduled-date">Fecha programada{" "}<span aria-hidden>*</span></FieldLabel>
                 <DatePicker
                   id="scheduled-date"
                   value={scheduledDate}
@@ -705,12 +707,12 @@ export function ScheduleServiceDialog({
               </Field>
 
               <Field>
-                <FieldLabel id="window-start-label" htmlFor="window-start">Desde *</FieldLabel>
+                <FieldLabel id="window-start-label" htmlFor="window-start">Desde{" "}<span aria-hidden>*</span></FieldLabel>
                 <TimePicker id="window-start" value={windowStart} onChange={setWindowStart} required aria-labelledby="window-start-label" />
               </Field>
 
               <Field>
-                <FieldLabel id="window-end-label" htmlFor="window-end">Hasta *</FieldLabel>
+                <FieldLabel id="window-end-label" htmlFor="window-end">Hasta{" "}<span aria-hidden>*</span></FieldLabel>
                 <TimePicker id="window-end" value={windowEnd} onChange={setWindowEnd} required aria-labelledby="window-end-label" />
               </Field>
             </FieldGroup>

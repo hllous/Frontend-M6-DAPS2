@@ -44,6 +44,7 @@ import {
 } from "@/lib/services";
 import { serviceTypesAdapter } from "@/lib/service-types";
 import { vehiclesAdapter, type Vehicle } from "@/lib/vehicles";
+import { useRevealFirstError } from "./use-reveal-first-error";
 
 /** Valor del ítem que borra el vehículo elegido: el Select no tiene opción vacía. */
 const NO_VEHICLE = "__none__";
@@ -101,6 +102,7 @@ function AssignCrewForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ crew?: string; vehicle?: string; overrideNote?: string }>({});
+  const scrollRef = useRevealFirstError(errorMessage, fieldErrors);
 
   // Cuadrillas, vehículos y requiresVehicle salen del backend: sin ellos no se puede confirmar.
   const [resources, setResources] = useState<
@@ -156,11 +158,9 @@ function AssignCrewForm({
   }, [service, crewId, vehicleId, allServices]);
   const needsOverrideNote = Boolean(conflicts.crewConflict || conflicts.vehicleConflict || backendConflict);
 
-  if (!service) return null;
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!service || !ready) return;
+    if (!ready) return;
 
     if (!crewId) {
       setErrorMessage(null);
@@ -239,7 +239,7 @@ function AssignCrewForm({
         </DialogDescription>
       </DialogHeader>
 
-      <div className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
+      <div ref={scrollRef} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
         <Item variant="muted">
           <ItemContent>
             <ItemTitle className="flex-wrap">
