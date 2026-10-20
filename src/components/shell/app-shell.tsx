@@ -21,13 +21,26 @@ import dynamic from "next/dynamic";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
+  EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Sheet,
   SheetContent,
@@ -189,10 +202,10 @@ export function AppShell({
           <p className={styles.actorName}>{scenario.actor.name}</p>
         </div>
         <div className={styles.topbarActions}>
-          <div className={styles.sessionState} aria-label="Estado de sesión">
-            <span aria-hidden="true" />
+          <Badge variant="status" className={styles.sessionState} aria-label="Estado de sesión">
+            <span className="size-2.5 rounded-full bg-[var(--color-success)]" aria-hidden="true" />
             Sesión operativa
-          </div>
+          </Badge>
           {logoutAction ? (
             <form action={logoutAction}>
               <Button type="submit" variant="outline">Cerrar sesión</Button>
@@ -259,16 +272,23 @@ export function AppShell({
             </SheetHeader>
             <div className={styles.sheetNavigation}>
               {availableItems.map((item) => (
-                <Link
+                <Button
                   key={item.id}
-                  href={destinationHref(item.id)}
-                  className={cn(buttonVariants({ variant: destination === item.id ? "default" : "outline" }), styles.sheetNavigationButton)}
-                  aria-current={destination === item.id ? "page" : undefined}
-                  onClick={() => setIsMoreOpen(false)}
+                  variant={destination === item.id ? "default" : "outline"}
+                  className={styles.sheetNavigationButton}
+                  nativeButton={false}
+                  role="link"
+                  render={
+                    <Link
+                      href={destinationHref(item.id)}
+                      aria-current={destination === item.id ? "page" : undefined}
+                      onClick={() => setIsMoreOpen(false)}
+                    />
+                  }
                 >
                   <item.icon data-icon="inline-start" aria-hidden />
                   {item.label}
-                </Link>
+                </Button>
               ))}
             </div>
           </SheetContent>
@@ -293,18 +313,16 @@ function NavigationLink({
   showTooltip?: boolean;
 }) {
   const link = (
-    <Link
-      href={destinationHref(item.id)}
-      className={cn(
-        buttonVariants({ variant: selected ? "default" : "ghost" }),
-        compact ? styles.mobileNavigationButton : styles.navigationButton,
-      )}
-      aria-current={selected ? "page" : undefined}
-      aria-label={item.label}
+    <Button
+      variant={compact ? (selected ? "default" : "ghost") : "sidebar"}
+      className={compact ? styles.mobileNavigationButton : styles.navigationButton}
+      nativeButton={false}
+      role="link"
+      render={<Link href={destinationHref(item.id)} aria-current={selected ? "page" : undefined} aria-label={item.label} />}
     >
       <item.icon data-icon="inline-start" aria-hidden />
       <span>{item.label}</span>
-    </Link>
+    </Button>
   );
 
   return compact || !showTooltip ? link : (
@@ -381,35 +399,25 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
         <h1 id="work-title">{scenario.work.title}</h1>
         <span>{scenario.work.summary}</span>
       </div>
-      <ol className={styles.workList}>
+      <ItemGroup>
         {scenario.work.items.map((item, index) => (
-          <li key={item}>
-            <div>
-              <span className={styles.workIndex}>{String(index + 1).padStart(2, "0")}</span>
-              <p>{item}</p>
-            </div>
-            {mayExecuteService && index === 0 ? (
-              <Button onClick={() => undefined}>
-                <Play data-icon="inline-start" aria-hidden />
-                Iniciar servicio
-              </Button>
-            ) : (
-              <span className={styles.workState}>
-                Requiere revisión
-              </span>
-            )}
-          </li>
+          <Item key={item} variant="outline">
+            <ItemMedia className="w-6 text-xs text-muted-foreground tabular-nums">{String(index + 1).padStart(2, "0")}</ItemMedia>
+            <ItemContent>
+              <ItemTitle>{item}</ItemTitle>
+            </ItemContent>
+            <ItemActions className="max-sm:basis-full max-sm:pl-[calc(1.5rem+0.625rem)]">
+              {mayExecuteService && index === 0 ? (
+                <Button className="max-sm:w-full" onClick={() => undefined}>
+                  <Play data-icon="inline-start" aria-hidden />
+                  Iniciar servicio
+                </Button>
+              ) : (
+                <Badge variant="info">Requiere revisión</Badge>
+              )}
+            </ItemActions>
+          </Item>
         ))}
-        {queue.status === "loading" ? (
-          <li className={styles.workQueueMessage} aria-live="polite">
-            <span>Cargando decisiones de arbolado…</span>
-          </li>
-        ) : null}
-        {queue.status === "error" ? (
-          <li className={styles.workQueueMessage} role="alert">
-            <span>{queue.message}</span>
-          </li>
-        ) : null}
         {queue.status === "ready"
           ? queue.interventions.map((intervention, index) => (
               <TreeInterventionWorkItem
@@ -419,7 +427,20 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
               />
             ))
           : null}
-      </ol>
+      </ItemGroup>
+      {queue.status === "loading" ? (
+        <Item variant="muted" aria-live="polite">
+          <ItemMedia><Spinner aria-hidden role="presentation" /></ItemMedia>
+          <ItemContent>
+            <ItemDescription>Cargando decisiones de arbolado…</ItemDescription>
+          </ItemContent>
+        </Item>
+      ) : null}
+      {queue.status === "error" ? (
+        <Alert variant="danger">
+          <AlertDescription>{queue.message}</AlertDescription>
+        </Alert>
+      ) : null}
     </section>
   );
 }
@@ -434,23 +455,23 @@ function TreeInterventionWorkItem({
   const StatusIcon = intervention.status === "REQUESTED" ? Clock3 : ShieldAlert;
 
   return (
-    <li>
-      <div>
-        <span className={styles.workIndex}>{String(index).padStart(2, "0")}</span>
-        <div className={styles.workInterventionCopy}>
-          <p>
-            <Link href="/app/catalog/tree-interventions">
-              {treeInterventionLabels[intervention.interventionType]} · {intervention.address}
-            </Link>
-          </p>
-          <span className={styles.workInterventionHint}>Intervención de arbolado</span>
-        </div>
-      </div>
-      <span className={`${styles.workState} ${intervention.status === "PENDING_AUTHORIZATION" ? styles.workStatePending : ""}`}>
-        <StatusIcon aria-hidden />
-        {treeInterventionStatusLabels[intervention.status]}
-      </span>
-    </li>
+    <Item variant="outline">
+      <ItemMedia className="w-6 text-xs text-muted-foreground tabular-nums">{String(index).padStart(2, "0")}</ItemMedia>
+      <ItemContent>
+        <ItemTitle>
+          <Link href="/app/catalog/tree-interventions" className="hover:underline focus-visible:underline">
+            {treeInterventionLabels[intervention.interventionType]} · {intervention.address}
+          </Link>
+        </ItemTitle>
+        <ItemDescription>Intervención de arbolado</ItemDescription>
+      </ItemContent>
+      <ItemActions className="max-sm:basis-full max-sm:pl-[calc(1.5rem+0.625rem)]">
+        <Badge variant={intervention.status === "PENDING_AUTHORIZATION" ? "warning" : "info"}>
+          <StatusIcon data-icon="inline-start" aria-hidden />
+          {treeInterventionStatusLabels[intervention.status]}
+        </Badge>
+      </ItemActions>
+    </Item>
   );
 }
 
@@ -458,9 +479,9 @@ function FoundationPlaceholder({ item, actor }: { item: NavigationItem; actor: s
   const Icon = item.icon;
 
   return (
-    <Empty className={styles.placeholder}>
+    <Empty className="min-h-[420px] border bg-card">
       <EmptyHeader>
-        <span className={styles.placeholderIcon} aria-hidden><Icon /></span>
+        <EmptyMedia variant="icon"><Icon aria-hidden /></EmptyMedia>
         <EmptyTitle>{item.label}</EmptyTitle>
         <EmptyDescription>
           Este destino estará disponible como flujo operativo en una próxima entrega. Su navegación ya se adapta al alcance de {actor.toLowerCase()}.

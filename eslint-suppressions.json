@@ -1,9 +1,4 @@
 {
-  "src/components/auth/login-form.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/components/catalog/catalog-deactivation-dialog.tsx": {
     "no-restricted-syntax": {
       "count": 1
@@ -152,11 +147,6 @@
   "src/components/services/zone-execution-panel.tsx": {
     "no-restricted-syntax": {
       "count": 22
-    }
-  },
-  "src/components/shell/shell-states.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
     }
   }
 }

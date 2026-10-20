@@ -13,7 +13,8 @@ describe("LoginForm", () => {
     );
 
     render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
-    await user.selectOptions(screen.getByLabelText("Escenario operativo"), "field-crew-leader-route");
+    await user.click(screen.getByRole("combobox", { name: "Escenario operativo" }));
+    await user.click(await screen.findByRole("option", { name: "Campo · responsable de recorrido" }));
     await user.click(screen.getByRole("button", { name: "Ingresar al sistema" }));
 
     expect(fetchMock).toHaveBeenCalledWith("/api/session/login", expect.objectContaining({
@@ -28,10 +29,24 @@ describe("LoginForm", () => {
     fetchMock.mockRestore();
   });
 
+  it("announces a server error from the BFF without leaving the form", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ message: "Escenario no disponible." }), { status: 400 }),
+    );
+
+    render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
+    await user.click(screen.getByRole("button", { name: "Ingresar al sistema" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Escenario no disponible.");
+    fetchMock.mockRestore();
+  });
+
   it("fails closed in unavailable real-M1 mode", () => {
     render(<LoginForm scenarios={Object.values(scenarios)} authMode="real-m1" redirectTo="/app" />);
 
     expect(screen.getByText(/autenticación real de M1 no está disponible/i)).toBeVisible();
+    expect(screen.getByRole("alert")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Ingresar al sistema" })).not.toBeInTheDocument();
   });
 });

@@ -3,12 +3,13 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AuthMode } from "@/lib/session";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import type { OperationalScenario, ScenarioId } from "@/lib/scenarios";
-
-import styles from "./login-form.module.css";
 
 export function LoginForm({
   scenarios,
@@ -45,41 +46,64 @@ export function LoginForm({
   }
 
   return (
-    <main className={styles.page}>
-      <section className={styles.panel} aria-labelledby="login-title">
-        <div className={styles.mark} aria-hidden="true">M6</div>
-        <p className={styles.kicker}>Ambiente y servicios</p>
-        <h1 id="login-title">Ingresar al sistema operativo</h1>
-        <p className={styles.intro}>
-          Seleccione un escenario de trabajo para abrir una sesión protegida.
-        </p>
-        {isUnavailable ? (
-          <p className={styles.unavailable} role="alert">
-            La autenticación real de M1 no está disponible hasta publicar su contrato.
-          </p>
-        ) : (
-          <form onSubmit={submit}>
-            <FieldGroup className={styles.form}>
-              <Field className={styles.field}>
-                <FieldLabel htmlFor="operational-scenario">Escenario operativo</FieldLabel>
-              <select
-                id="operational-scenario"
-                value={scenarioId}
-                onChange={(event) => setScenarioId(event.target.value as ScenarioId)}
-                aria-describedby="scenario-help"
-              >
-                {scenarios.map((scenario) => (
-                  <option key={scenario.id} value={scenario.id}>{scenario.label}</option>
-                ))}
-              </select>
-                <FieldDescription id="scenario-help">El alcance de la sesión se limita al escenario elegido.</FieldDescription>
-              </Field>
-              {error ? <FieldError className={styles.error}>{error}</FieldError> : null}
-              <Button type="submit">Ingresar al sistema</Button>
-            </FieldGroup>
-          </form>
-        )}
-      </section>
+    <main className="grid min-h-dvh place-items-center bg-[var(--color-canvas)] p-4 sm:p-6">
+      <Card className="w-full max-w-[520px] gap-0 p-4 sm:p-8">
+        <CardHeader className="gap-0 px-0">
+          <div
+            className="mb-5 grid size-12 place-items-center rounded-xl bg-[var(--color-institutional)] font-bold tracking-wide text-[var(--color-on-institutional)]"
+            aria-hidden="true"
+          >
+            M6
+          </div>
+          <p className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">Ambiente y servicios</p>
+          <h1 id="login-title" className="max-w-[16ch] text-[28px] leading-[34px]">
+            Ingresar al sistema operativo
+          </h1>
+          <CardDescription className="mt-3 mb-6 max-w-[48ch] text-base leading-6">
+            Seleccione un escenario de trabajo para abrir una sesión protegida.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-0">
+          {isUnavailable ? (
+            <Alert variant="danger">
+              <AlertDescription>
+                La autenticación real de M1 no está disponible hasta publicar su contrato.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <form onSubmit={submit}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="operational-scenario">Escenario operativo</FieldLabel>
+                  <Select
+                    value={scenarioId}
+                    items={Object.fromEntries(scenarios.map((scenario) => [scenario.id, scenario.label]))}
+                    onValueChange={(value) => setScenarioId(value as ScenarioId)}
+                  >
+                    <SelectTrigger id="operational-scenario" aria-label="Escenario operativo" aria-describedby="scenario-help">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {scenarios.map((scenario) => (
+                          <SelectItem key={scenario.id} value={scenario.id}>{scenario.label}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription id="scenario-help">El alcance de la sesión se limita al escenario elegido.</FieldDescription>
+                </Field>
+                {error ? (
+                  <Alert variant="danger">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <Button type="submit" className="w-full">Ingresar al sistema</Button>
+              </FieldGroup>
+            </form>
+          )}
+        </CardContent>
+      </Card>
     </main>
   );
 }

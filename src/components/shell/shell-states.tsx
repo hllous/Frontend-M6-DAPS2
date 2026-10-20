@@ -1,4 +1,5 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -11,6 +12,6 @@ export function ShellError({
   onRetry: () => void;
   title?: string;
   description?: string;
-}) { return <Alert variant="destructive"><AlertTitle>{title}</AlertTitle><AlertDescription>{description} <button className="underline" onClick={onRetry}>Reintentar carga</button></AlertDescription></Alert>; }
+}) { return <Alert variant="destructive"><AlertTitle>{title}</AlertTitle><AlertDescription>{description} <Button variant="link" className="h-auto min-h-0 p-0" onClick={onRetry}>Reintentar carga</Button></AlertDescription></Alert>; }
 export function ShellForbidden() { return <Empty><EmptyHeader><EmptyTitle>Acceso no disponible</EmptyTitle><EmptyDescription>Su sesión no cuenta con la capacidad necesaria para este módulo.</EmptyDescription></EmptyHeader></Empty>; }
-export function ShellUnauthenticated() { return <Empty><EmptyHeader><EmptyTitle>Inicie sesión para continuar</EmptyTitle><EmptyDescription>La aplicación operativa requiere una sesión activa. <a className="underline" href="/login">Volver a iniciar sesión</a></EmptyDescription></EmptyHeader></Empty>; }
+export function ShellUnauthenticated() { return <Empty><EmptyHeader><EmptyTitle>Inicie sesión para continuar</EmptyTitle><EmptyDescription>La aplicación operativa requiere una sesión activa. <Button variant="link" className="h-auto min-h-0 p-0" nativeButton={false} role="link" render={<a href="/login" />}>Volver a iniciar sesión</Button></EmptyDescription></EmptyHeader></Empty>; }

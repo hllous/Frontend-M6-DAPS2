@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ZoneRequestError, zonesAdapter, type Zone } from "@/lib/zones";
 
@@ -84,13 +85,15 @@ export function ZonesPanel() {
   return (
     <section aria-labelledby="zones-title" className="flex flex-col gap-3">
       <h2 id="zones-title" className="text-sm font-medium">Zonas operativas</h2>
-      <ul className="flex flex-col gap-2">
+      <ItemGroup className="gap-2">
         {state.zones.map((zone) => (
-          <li key={zone.id}>
-            <span className="font-medium">{zone.code}</span> — {zone.name}
-          </li>
+          <Item key={zone.id} variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle><span className="font-medium">{zone.code}</span> — {zone.name}</ItemTitle>
+            </ItemContent>
+          </Item>
         ))}
-      </ul>
+      </ItemGroup>
     </section>
   );
 }
