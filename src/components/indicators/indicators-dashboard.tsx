@@ -217,7 +217,7 @@ function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { sta
           </ToggleGroupItem>
           {state.status === "loading" ? <Skeleton className={styles.summarySkeleton} role="status" aria-label={`Cargando ${meta.label}`} /> : null}
           {state.status === "empty" ? <Alert role="status" className={styles.summaryState}>Sin datos</Alert> : null}
-          {state.status === "error" ? <Alert variant="destructive" className={styles.summaryState}><AlertTitle>No se pudo cargar {meta.label}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></Alert> : null}
+          {state.status === "error" ? <Alert variant="danger" className={styles.summaryState}><AlertTitle>No se pudo cargar {meta.label}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></Alert> : null}
         </Card>;
       })}
     </ToggleGroup>
@@ -230,7 +230,7 @@ function ModuleState({ label, status, onRetry, children }: { label: string; stat
   if (status === "ready") return <section className={styles.module} aria-label={label} role="region"><h2 id={titleId}>{label}</h2>{children}</section>;
   if (status === "loading") return <section className={styles.moduleState} aria-label={label} role="region"><h2 id={titleId}>{label}</h2><Skeleton className={styles.moduleSkeleton} aria-hidden /><Alert role="status">Cargando {label.toLowerCase()}…</Alert></section>;
   if (status === "empty") return <section className={styles.moduleState} aria-label={label} role="region"><Empty><EmptyHeader><EmptyTitle id={titleId}>Sin resultados {emptyLabel}</EmptyTitle><EmptyDescription>No hay datos para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty></section>;
-  return <section className={styles.moduleState} aria-label={label} role="region"><Alert variant="destructive"><AlertTitle id={titleId}>No se pudo cargar {label}</AlertTitle><AlertDescription>Verifique la conexión y vuelva a intentarlo. El período y la familia seleccionada se conservarán.</AlertDescription><Button type="button" variant="outline" onClick={onRetry}>Reintentar {label}</Button></Alert></section>;
+  return <section className={styles.moduleState} aria-label={label} role="region"><Alert variant="danger"><AlertTitle id={titleId}>No se pudo cargar {label}</AlertTitle><AlertDescription>Verifique la conexión y vuelva a intentarlo. El período y la familia seleccionada se conservarán.</AlertDescription><Button type="button" variant="outline" onClick={onRetry}>Reintentar {label}</Button></Alert></section>;
 }
 
 export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenario }) {
@@ -531,7 +531,7 @@ function AccessibleRecords({ family, plan, selection, breakdown, point, records,
   const hasSelection = Boolean(selection && breakdown && point);
   return <section className={styles.records} aria-labelledby="indicator-records-title">
     {familyStatus === "loading" && !plan ? <Alert role="status" className={styles.recordsMessage}>Cargando registros relacionados…</Alert> : null}
-    {familyStatus === "error" && !plan ? <Alert variant="destructive" className={styles.recordsMessage}>No se pudieron cargar los registros relacionados porque la familia seleccionada no está disponible.</Alert> : null}
+    {familyStatus === "error" && !plan ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros relacionados porque la familia seleccionada no está disponible.</Alert> : null}
     <div className={styles.recordsHeader}>
       <div><h2 id="indicator-records-title">Registros accesibles</h2><p>Consulte los registros que explican la señal sin habilitar su gestión desde el tablero.</p></div>
       {plan?.resource ? <Link className={styles.recordsLink} href={plan.href}>{plan.linkLabel}</Link> : null}
@@ -540,7 +540,7 @@ function AccessibleRecords({ family, plan, selection, breakdown, point, records,
       {plan?.resource === null && hasSelection ? <AlertDescription>{plan.reason}</AlertDescription> : hasSelection ? <AlertDescription><strong>Filtro activo:</strong> {meta.label} · {breakdown?.title} · {point?.label} · {pointText(point!)}</AlertDescription> : plan?.resource ? <AlertDescription><strong>Sin filtro de señal.</strong> Se muestran todos los {plan.title.toLowerCase()} accesibles en el período.</AlertDescription> : <AlertDescription>Seleccione una señal compatible para consultar sus registros accesibles.</AlertDescription>}
       {hasSelection ? <Button type="button" variant="outline" size="sm" onClick={onClear}>Quitar filtro de señal</Button> : null}
     </Alert>
-    {plan?.resource ? status === "loading" ? <Alert role="status" className={styles.recordsMessage}>Cargando registros accesibles…</Alert> : status === "error" ? <Alert variant="destructive" className={styles.recordsMessage}>No se pudieron cargar los registros accesibles.</Alert> : <TraceRecordsTable plan={plan} records={records} /> : <Alert role="status" className={styles.recordsMessage}>{hasSelection ? "No hay una relación de registros disponible para esta señal." : "Esta familia no tiene una vista de registros accesibles para la selección actual."}</Alert>}
+    {plan?.resource ? status === "loading" ? <Alert role="status" className={styles.recordsMessage}>Cargando registros accesibles…</Alert> : status === "error" ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros accesibles.</Alert> : <TraceRecordsTable plan={plan} records={records} /> : <Alert role="status" className={styles.recordsMessage}>{hasSelection ? "No hay una relación de registros disponible para esta señal." : "Esta familia no tiene una vista de registros accesibles para la selección actual."}</Alert>}
   </section>;
 }
 

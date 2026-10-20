@@ -104,3 +104,5 @@
   .chartPinnedDetail [data-slot="button"] { margin-inline-start: 0; min-height: 48px; }
   .mobileViewToggle { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); }
 }
+.viewToggle [data-slot="toggle-group-item"], .mobileViewToggle [data-slot="toggle-group-item"] { min-height: 40px; }
+@media (max-width: 760px) { .viewToggle [data-slot="toggle-group-item"], .mobileViewToggle [data-slot="toggle-group-item"] { min-height: 48px; } }

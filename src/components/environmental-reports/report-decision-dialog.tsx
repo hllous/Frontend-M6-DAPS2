@@ -79,7 +79,7 @@ function ReportDecisionForm({ decision, reportId, onOpenChange, onConfirm }: { d
       </DialogHeader>
       <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4 py-2">
         {errorMessage && (
-          <Alert variant="destructive" className="flex items-start gap-2.5">
+          <Alert variant="danger" className="flex items-start gap-2.5">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span id={reasonInvalid ? `${formId}-reason-error` : undefined}>{errorMessage}</span>
           </Alert>
