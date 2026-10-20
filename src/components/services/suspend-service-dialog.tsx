@@ -368,7 +368,7 @@ function SuspendServiceForm({
         ) : (
           <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
             {suspendedService && (
-              <Alert variant="warning" aria-live="assertive">
+              <Alert variant="warning">
                 <AlertCircle aria-hidden />
                 <AlertDescription>
                   Servicio suspendido; falta subir {pendingEvidenceCount}{" "}

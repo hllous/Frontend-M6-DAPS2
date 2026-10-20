@@ -410,13 +410,13 @@ function AssignCrewForm({
           </FieldGroup>
 
           {needsOverrideNote && (
-            <Alert variant="warning" role="status" aria-live="polite">
+            <Alert variant="warning" role="status">
               <AlertTriangle aria-hidden />
               <AlertTitle className="font-semibold uppercase tracking-wider">Aviso de superposición horaria</AlertTitle>
               <AlertDescription className="flex flex-col gap-2">
                 {conflicts.crewConflict && (
                   <p>
-                    Aviso de superposición horaria: La cuadrilla{" "}
+                    La cuadrilla{" "}
                     <strong>{selectedCrew?.name ?? conflicts.crewConflict.crewName}</strong> ya tiene asignado el servicio{" "}
                     <strong>{conflicts.crewConflict.id}</strong> (&quot;{conflicts.crewConflict.title}&quot;) en la misma fecha (
                     {formatArgentinaCalendarDate(conflicts.crewConflict.scheduledDate)} {conflicts.crewConflict.windowFrom ?? ""}&ndash;{conflicts.crewConflict.windowTo ?? ""}).
@@ -427,7 +427,7 @@ function AssignCrewForm({
 
                 {conflicts.vehicleConflict && (
                   <p>
-                    Aviso de superposición horaria: El vehículo{" "}
+                    El vehículo{" "}
                     <strong>{selectedVehicle?.plate ?? conflicts.vehicleConflict.vehiclePlate}</strong> ya está asignado al servicio{" "}
                     <strong>{conflicts.vehicleConflict.id}</strong> (&quot;{conflicts.vehicleConflict.title}&quot;) en la misma fecha (
                     {formatArgentinaCalendarDate(conflicts.vehicleConflict.scheduledDate)} {conflicts.vehicleConflict.windowFrom ?? ""}&ndash;{conflicts.vehicleConflict.windowTo ?? ""}).

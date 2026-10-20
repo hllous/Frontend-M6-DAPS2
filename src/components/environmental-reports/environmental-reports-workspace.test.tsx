@@ -404,10 +404,12 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(reasonDialog).getByRole("button", { name: "Mover a reprogramar" }));
 
     const confirmDialog = await screen.findByRole("dialog", { name: /^Confirmar reprogramación de/ });
-    await user.type(within(confirmDialog).getByLabelText("Nueva fecha *"), "2030-01-15");
+    await user.click(within(confirmDialog).getByRole("button", { name: /^Nueva fecha/ }));
+    await user.click(await screen.findByRole("button", { name: "Mes siguiente" }));
+    await user.click(within(await screen.findByRole("grid")).getByRole("button", { name: /, 15 de / }));
     await user.click(within(confirmDialog).getByRole("button", { name: "Confirmar nueva fecha" }));
 
-    await waitFor(() => expect(confirmReschedule).toHaveBeenCalledWith("SVC-1072", { scheduledDate: "2030-01-15", timeWindow: { start: "13:00", end: "16:00" } }));
+    await waitFor(() => expect(confirmReschedule).toHaveBeenCalledWith("SVC-1072", { scheduledDate: expect.stringMatching(/^\d{4}-\d{2}-15$/), timeWindow: { start: "13:00", end: "16:00" } }));
     expect(reschedule).toHaveBeenCalledWith("SVC-1072", { reason: "Alerta meteorológica" });
     expect(schedule).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());

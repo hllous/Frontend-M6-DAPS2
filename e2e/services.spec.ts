@@ -361,7 +361,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(dialog.getByText("Punto fijo", { exact: true })).toBeVisible();
 
     // Pick the real container from the inventory (#319)
-    await expect(dialog.getByRole("combobox", { name: /Tipo de objetivo/i })).toHaveText("Contenedor");
+    await expect(dialog.getByRole("combobox", { name: /Tipo de objetivo/i })).toContainText("Contenedor");
     await dialog.getByLabel(/Buscar contenedor/i).fill("CONT-002");
     await chooseDialogOption(dialog, /Bien del inventario/i, "CONT-002 · Av. Santa Fe 3400");
 
@@ -804,13 +804,14 @@ test.describe("Office two-step Service reschedule flow @smoke", () => {
     // zoneIds snapshot is shown untouched ahead of confirming
     await expect(confirmDialog.getByText("Zona Sur")).toBeVisible();
 
-    await pickDialogDay(confirmDialog, /^Nueva fecha/i, { monthsAhead: 1, day: 13 });
+    const pickedLabel = await pickDialogDay(confirmDialog, /^Nueva fecha/i, { monthsAhead: 1, day: 13 });
+    const pickedYear = pickedLabel.slice(-4);
     await confirmDialog.getByRole("button", { name: "Confirmar nueva fecha" }).click();
     await expect(confirmDialog).not.toBeVisible();
 
     // Back to SCHEDULED with the new date, zones preserved verbatim
     await expect(detailRegion.getByText("Programado").first()).toBeVisible();
-    await expect(detailRegion.getByText(/^13 [a-záéíóú]{3,5}\.? \d{4}$/i)).toBeVisible();
+    await expect(detailRegion.getByText(new RegExp(`^13 [a-záéíóú]{3,5}\\.? ${pickedYear}$`, "i"))).toBeVisible();
     await expect(detailRegion.getByText("Zona Sur").first()).toBeVisible();
   });
 
@@ -960,7 +961,7 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await detailRegion.getByRole("button", { name: "Suspender servicio" }).click();
     const reopenedDialog = page.getByRole("dialog");
     await expect(reopenedDialog).toBeVisible();
-    await expect(reopenedDialog.getByLabel(/Motivo de suspensión/i)).toHaveValue("VEHICLE_BREAKDOWN");
+    await expect(reopenedDialog.getByRole("combobox", { name: /Motivo de suspensión/i })).toContainText("Desperfecto vehicular");
     await expect(reopenedDialog.getByLabel(/^Nota/i)).toHaveValue(
       "El camión no arranca, se solicitó grúa.",
     );
