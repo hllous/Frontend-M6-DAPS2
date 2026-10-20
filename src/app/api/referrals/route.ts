@@ -38,9 +38,19 @@ export function referralsForScenario(scenario: ReturnType<typeof getScenario>): 
   );
 }
 
-export async function backendCollection<T>(request: Request, path: string, recordSchema: z.ZodType<T>): Promise<T[]> {
+/**
+ * Strict by default: any invalid record fails the collection. With `onInvalid` each record is
+ * validated on its own and invalid ones are reported and dropped, so one unknown value (e.g. a new
+ * backend enum member) cannot take down the rest of the list.
+ */
+export async function backendCollection<T>(
+  request: Request,
+  path: string,
+  recordSchema: z.ZodType<T>,
+  onInvalid?: (record: unknown) => void,
+): Promise<T[]> {
   const pageSchema = z.object({
-    data: z.array(recordSchema),
+    data: z.array(onInvalid ? z.unknown() : recordSchema),
     meta: z.object({
       total: z.number().int().nonnegative(),
       page: z.number().int().positive(),
@@ -56,7 +66,15 @@ export async function backendCollection<T>(request: Request, path: string, recor
     const response = await fetchBackend(request, `${path.split("?")[0]}?${query}`);
     if (!response.ok) throw new Error(`Backend respondió ${response.status} al consultar derivaciones.`);
     const payload = pageSchema.parse(await response.json());
-    records.push(...payload.data);
+    for (const record of payload.data) {
+      if (!onInvalid) {
+        records.push(record as T);
+        continue;
+      }
+      const parsed = recordSchema.safeParse(record);
+      if (parsed.success) records.push(parsed.data);
+      else onInvalid(record);
+    }
     if (page >= payload.meta.totalPages) return records;
   }
   throw new Error("La consulta de derivaciones superó el límite de páginas.");
@@ -82,16 +100,26 @@ export async function backendReferralSourceIds(request: Request, crewId: string)
   return sourceIds;
 }
 
-async function backendReferralCollection(request: Request, sourceIds: ReadonlySet<string> | undefined): Promise<Referral[]> {
+async function backendReferralCollection(
+  request: Request,
+  sourceIds: ReadonlySet<string> | undefined,
+): Promise<{ referrals: Referral[]; invalid: number }> {
+  let invalid = 0;
+  const skip = (resource: string) => (record: unknown) => {
+    invalid += 1;
+    const { id, status } = (record ?? {}) as { id?: unknown; status?: unknown };
+    console.warn(`Derivación ${resource} ${String(id ?? "?")} descartada: no respeta el contrato (status: ${String(status ?? "?")}).`);
+  };
   const [repairs, closures] = await Promise.all([
-    backendCollection(request, "/repair-requests", repairRequestSchema),
-    backendCollection(request, "/street-closure-requests", streetClosureRequestSchema),
+    backendCollection(request, "/repair-requests", repairRequestSchema, skip("repair-request")),
+    backendCollection(request, "/street-closure-requests", streetClosureRequestSchema, skip("street-closure-request")),
   ]);
-  return [
+  const referrals = [
     ...repairs.map(referralFromBackendRepairRequest),
     ...closures.map(referralFromStreetClosureRequest),
   ].filter((referral) => isReferralVisibleToBackendSources(referral, sourceIds))
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+  return { referrals, invalid };
 }
 
 export async function GET(request: Request) {
@@ -110,10 +138,10 @@ export async function GET(request: Request) {
     const sourceIds = useBackend && scenario.actor.kind === "FIELD"
       ? await backendReferralSourceIds(request, session.crew!.id)
       : undefined;
-    const referrals = useBackend
+    const { referrals, invalid } = useBackend
       ? await backendReferralCollection(request, sourceIds)
-      : referralsForScenario(scenario);
-    return NextResponse.json({ data: referrals, meta: { total: referrals.length } });
+      : { referrals: referralsForScenario(scenario), invalid: 0 };
+    return NextResponse.json({ data: referrals, meta: { total: referrals.length, ...(invalid ? { invalid } : {}) } });
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);

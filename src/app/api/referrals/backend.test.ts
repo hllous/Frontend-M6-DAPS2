@@ -88,6 +88,26 @@ describe("referrals against the backend", () => {
     ]);
   });
 
+  it("accepts EXPIRED closures and drops a record with an unknown status without hiding the rest", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const expired = { ...closure, id: "ce0bbfaa-8720-4566-b9d1-738cb37a6890", status: "EXPIRED", closureId: "M7-9" };
+    const unknown = { ...closure, id: "ce0bbfaa-8720-4566-b9d1-738cb37a6891", status: "FROM_THE_FUTURE" };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/repair-requests") return Response.json(page([repair], 1));
+      if (url.pathname === "/street-closure-requests") return Response.json(page([unknown, expired, closure], 3));
+      throw new Error(`Unexpected backend URL: ${url}`);
+    });
+    const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie: await loginAs("office-duty-queue") } }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data.map((referral: { id: string }) => referral.id).sort()).toEqual([closureId, expired.id, repairId].sort());
+    expect(body.data.find((referral: { id: string }) => referral.id === expired.id)).toMatchObject({ status: "EXPIRED" });
+    expect(body.meta).toEqual({ total: 3, invalid: 1 });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(unknown.id));
+  });
+
   it("denies Field collection and detail without a resolved crew before backend calls", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch");
     const session = createSession("field-crew-leader-route", {
@@ -210,11 +230,19 @@ describe("referrals against the backend", () => {
     expect(backendFetch.mock.calls.every(([, init]) => (init?.method ?? "GET") === "GET")).toBe(true);
   });
 
-  it("rejects malformed collection records at the backend boundary", async () => {
+  it("drops malformed collection records at the backend boundary and reports them", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
       Response.json(page(String(input).includes("/repair-requests") ? [{ id: repairId }] : [], 1)));
     const cookie = await loginAs("office-duty-queue");
     const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: [], meta: { total: 0, invalid: 1 } });
+  });
+
+  it("still fails when a page itself is malformed", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ data: "nope" }));
+    const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie: await loginAs("office-duty-queue") } }));
     expect(response.status).toBe(500);
   });
 

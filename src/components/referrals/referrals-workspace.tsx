@@ -15,6 +15,7 @@ import {
   Route,
   ShieldAlert,
   ShieldCheck,
+  TimerOff,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -55,7 +56,7 @@ type SourceServiceState = {
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | ({ status: "ready"; referrals: Referral[] } & SourceServiceState);
+  | ({ status: "ready"; referrals: Referral[]; invalid: number } & SourceServiceState);
 
 const referralKindLabel: Record<Referral["kind"], string> = {
   REPAIR_REQUEST: "M3 · Reparaciones",
@@ -113,6 +114,7 @@ const closureStatusLabel = {
   APPROVED: "Aprobada",
   REJECTED: "Rechazada",
   ENDED: "Finalizada",
+  EXPIRED: "Vencido",
 } as const;
 
 const repairDamageLabel: Record<string, string> = {
@@ -197,7 +199,7 @@ function recoveryActionsFor(referral: Referral): RecoveryAction[] {
       },
     ];
   }
-  if (referral.status === "APPROVED") {
+  if (referral.status === "APPROVED" || referral.status === "EXPIRED") {
     return [{
       kind: "STREET_CLOSURE_REQUEST",
       transition: "end",
@@ -287,7 +289,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
       else if (result.service) sources.set(result.sourceId, result.service);
     }
 
-    return { referrals, sources, sourceErrors } satisfies SourceServiceState & { referrals: Referral[] };
+    return { referrals, invalid: page.invalid, sources, sourceErrors } satisfies SourceServiceState & { referrals: Referral[]; invalid: number };
   }, []);
 
   useEffect(() => {
@@ -390,6 +392,17 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
               <RefreshCw className="h-4 w-4" aria-hidden />
               Reintentar carga
             </Button>
+          </Alert>
+        </div>
+      )}
+      {loadState.status === "ready" && loadState.invalid > 0 && (
+        <div className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6 lg:px-8">
+          <Alert role="status" aria-label="Derivaciones sin mostrar" className="rounded-xl border-[var(--color-warning-line)] bg-[var(--color-surface)] p-3">
+            <ShieldAlert aria-hidden />
+            <AlertTitle className="text-sm font-bold text-[var(--color-warning)]">Hay derivaciones sin mostrar</AlertTitle>
+            <AlertDescription className="text-[var(--color-text)]">
+              {loadState.invalid} {loadState.invalid === 1 ? "derivación llegó" : "derivaciones llegaron"} del backend con un formato que esta versión no reconoce y no se muestra. Consulte con el equipo de M6.
+            </AlertDescription>
           </Alert>
         </div>
       )}
@@ -1036,6 +1049,7 @@ function ReferralStatusIcon({ referral, className }: { referral: Referral; class
     return <CircleCheck className={className} aria-hidden />;
   }
   if (referral.status === "REJECTED") return <CircleAlert className={className} aria-hidden />;
+  if (referral.status === "EXPIRED") return <TimerOff className={className} aria-hidden />;
   if (referral.status === "IN_PROGRESS") return <Clock3 className={className} aria-hidden />;
   return <CircleDashed className={className} aria-hidden />;
 }

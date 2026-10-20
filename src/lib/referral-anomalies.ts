@@ -20,7 +20,7 @@ export type ReferralAnomaly = {
   sourceChanges: ReferralSourceChange[];
 };
 
-const terminalStatuses = new Set(["CLOSED", "REJECTED", "ENDED"]);
+const terminalStatuses = new Set(["CLOSED", "REJECTED", "ENDED", "EXPIRED"]);
 
 function normalizedLocation(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
