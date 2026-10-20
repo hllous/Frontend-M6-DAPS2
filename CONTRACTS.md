@@ -361,6 +361,7 @@ The main adapters and Office/Field workflows described here are implemented in `
 
 - After a fresh read, `CLOSED` is potentially reopenable. A reopen event returns the report to `UNDER_REVIEW`; `REOPENED` is an event type, not a report status.
 - Late `ESCALATION_CHANGED`, `INFORMATION_PROVIDED`, and `PRIORITY_CHANGED` data is displayed, including on a `CLOSED` report, without inventing a new frontend mutation or changing lifecycle state.
+- A `FORWARDED` report can change without any user action, because of what M2 does with the returned ticket (Backend #304, #308; M2, 20/10): a new `ROUTED` to M6 reactivates it to `UNDER_REVIEW`, and a `ROUTED` to another area or an administrative cancellation moves it to `CLOSED`. Refetch before offering actions on a returned report and treat these as server-driven transitions, not as frontend mutations. Backend orders late M2 data by `data.updatedAt`, not by arrival.
 - `SANCTIONED` remains terminal. No priority editor, `updatedBy` field, or field-level audit-history UI is added.
 
 ### Evidence workflow
