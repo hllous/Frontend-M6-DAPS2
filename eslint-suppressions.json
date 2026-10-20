@@ -51,7 +51,7 @@
   },
   "src/components/catalog/route-catalog-panel.tsx": {
     "no-restricted-syntax": {
-      "count": 24
+      "count": 1
     }
   },
   "src/components/catalog/service-frequencies-panel.tsx": {
@@ -76,7 +76,7 @@
   },
   "src/components/catalog/zone-catalog-panel.tsx": {
     "no-restricted-syntax": {
-      "count": 18
+      "count": 1
     }
   },
   "src/components/indicators/indicators-dashboard.tsx": {

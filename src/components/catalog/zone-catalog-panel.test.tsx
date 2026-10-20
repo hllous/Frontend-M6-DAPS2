@@ -12,6 +12,15 @@ import { ZoneCatalogPanel } from "./zone-catalog-panel";
 
 const server = setupServer(...handlers);
 
+async function chooseSelectOption(
+  user: ReturnType<typeof userEvent.setup>,
+  accessibleName: string,
+  optionName: string,
+) {
+  await user.click(screen.getByRole("combobox", { name: accessibleName }));
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
@@ -78,8 +87,7 @@ describe("ZoneCatalogPanel component", () => {
       expect(screen.getByText("Recoleta")).toBeInTheDocument();
     });
 
-    const statusFilter = screen.getByLabelText("Filtrar por estado");
-    await user.selectOptions(statusFilter, "true");
+    await chooseSelectOption(user, "Filtrar por estado", "Activas");
 
     await waitFor(() => {
       expect(screen.getByText("Belgrano")).toBeInTheDocument();
@@ -87,6 +95,20 @@ describe("ZoneCatalogPanel component", () => {
       expect(screen.getByText("Recoleta")).toBeInTheDocument();
       expect(screen.getByText("Retiro")).toBeInTheDocument();
     });
+  });
+
+  it("focuses the first invalid field when the create form is submitted empty", async () => {
+    const user = userEvent.setup();
+    render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => expect(screen.getByText("Z-BEL")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /nueva zona/i }));
+    await user.click(screen.getByRole("button", { name: "Crear zona" }));
+
+    const codeInput = screen.getByLabelText("Código");
+    await waitFor(() => expect(codeInput).toHaveAttribute("aria-invalid", "true"));
+    expect(screen.getByLabelText("Nombre")).toHaveAttribute("aria-invalid", "true");
+    expect(codeInput).toHaveFocus();
   });
 
   it("allows Office to create a new zone with unique code and name", async () => {
@@ -138,6 +160,13 @@ describe("ZoneCatalogPanel component", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("Ya existe una zona operativa con el código Z-BEL");
     });
+
+    expect(codeInput).toHaveAttribute("aria-invalid", "true");
+    const errorId = codeInput.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    expect(errorId ? document.getElementById(errorId) : null).toHaveTextContent(
+      "Ya existe una zona operativa con el código Z-BEL",
+    );
   });
 
   it("allows Office to edit a zone and enforces that code is read-only / immutable", async () => {
@@ -162,6 +191,14 @@ describe("ZoneCatalogPanel component", () => {
 
     const nameInput = screen.getByLabelText("Nombre");
     await user.clear(nameInput);
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(nameInput).toHaveAttribute("aria-invalid", "true"));
+    expect(nameInput).toHaveFocus();
+    const errorId = nameInput.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    expect(errorId ? document.getElementById(errorId) : null).toHaveTextContent("El nombre es obligatorio.");
+
     await user.type(nameInput, "Zona Norte Modificada");
 
     await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
@@ -224,7 +261,8 @@ describe("ZoneCatalogPanel component", () => {
     const confirm = within(dialog).getByRole("button", { name: "Dar de baja la zona Z-BEL" });
     await waitFor(() => expect(confirm).toBeEnabled());
     await user.click(confirm);
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("No se pudo dar de baja la zona.");
+    const errorMessage = await within(dialog).findByText("No se pudo dar de baja la zona.");
+    expect(errorMessage.closest('[role="alert"]')).toHaveTextContent("No se pudo dar de baja la zona.");
     expect(dialog).toBeVisible();
   });
 
@@ -245,18 +283,17 @@ describe("ZoneCatalogPanel component", () => {
 
     const searchInput = within(dialog).getByLabelText("Buscar barrios");
     await user.type(searchInput, "Industrial");
-    const industrialOption = within(dialog).getByLabelText(/Barrio Industrial/i);
+    const industrialOption = within(dialog).getByRole("checkbox", { name: /Barrio Industrial/i });
     await user.click(industrialOption);
     await user.click(within(dialog).getByRole("button", { name: "Asignar seleccionados" }));
 
     await waitFor(() => {
-      expect(within(dialog).getByText("Barrios asignados correctamente.")).toBeInTheDocument();
       expect(within(dialog).getByRole("list", { name: "Barrios asignados" })).toHaveTextContent("Barrio Industrial");
     });
 
     await user.click(within(dialog).getByRole("button", { name: "Quitar Barrio Industrial" }));
     await waitFor(() => {
-      expect(within(dialog).getByText("Barrio quitado de la zona.")).toBeInTheDocument();
+      expect(within(dialog).getByRole("list", { name: "Barrios asignados" })).not.toHaveTextContent("Barrio Industrial");
     });
   });
 

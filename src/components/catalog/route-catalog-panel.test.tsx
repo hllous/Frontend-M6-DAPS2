@@ -14,6 +14,15 @@ import { RouteCatalogPanel } from "./route-catalog-panel";
 
 const server = setupServer(...handlers);
 
+async function chooseSelectOption(
+  user: ReturnType<typeof userEvent.setup>,
+  accessibleName: string,
+  optionName: string | RegExp,
+) {
+  await user.click(screen.getByRole("combobox", { name: accessibleName }));
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
@@ -119,7 +128,11 @@ describe("RouteCatalogPanel component", () => {
     const confirm = within(dialog).getByTestId("confirm-deactivate-button");
     await waitFor(() => expect(confirm).toBeEnabled());
     await user.click(confirm);
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("No se pudo dar de baja el recorrido.");
+    await waitFor(() =>
+      expect(within(dialog).getAllByRole("alert").map((alert) => alert.textContent)).toContain(
+        "No se pudo dar de baja el recorrido.",
+      ),
+    );
     expect(dialog).toBeVisible();
   });
 
@@ -166,8 +179,7 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByText("REC-003")).toBeInTheDocument();
     });
 
-    const activeFilter = screen.getByTestId("active-filter-select");
-    await user.selectOptions(activeFilter, "true");
+    await chooseSelectOption(user, "Estado:", "Solo activos");
 
     await waitFor(() => {
       expect(screen.getByText("REC-001")).toBeInTheDocument();
@@ -186,9 +198,8 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByText("REC-002")).toBeInTheDocument();
     });
 
-    const zoneFilter = screen.getByTestId("zone-filter-select");
     // Select zone-1: only REC-001 passes through zone-1
-    await user.selectOptions(zoneFilter, "zone-1");
+    await chooseSelectOption(user, "Zona:", "Belgrano (Z-BEL)");
 
     await waitFor(() => {
       expect(screen.getByText("REC-001")).toBeInTheDocument();
@@ -256,6 +267,15 @@ describe("RouteCatalogPanel component", () => {
         "Ya existe un recorrido con el código REC-001.",
       );
     });
+
+    const codeInput = screen.getByTestId("create-route-code-input");
+    expect(codeInput).toHaveAttribute("aria-invalid", "true");
+    const errorId = codeInput.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    const fieldErrorId = errorId?.split(/\s+/).at(-1);
+    expect(fieldErrorId ? document.getElementById(fieldErrorId) : null).toHaveTextContent(
+      "Ya existe un recorrido con el código REC-001.",
+    );
   });
 
   it("allows Office to edit a route and enforces that code is read-only / immutable", async () => {
@@ -277,6 +297,14 @@ describe("RouteCatalogPanel component", () => {
     expect(codeInput).toBeDisabled();
 
     const nameInput = screen.getByTestId("edit-route-name-input");
+    await user.clear(nameInput);
+    await user.click(screen.getByTestId("submit-edit-route"));
+
+    await waitFor(() => expect(nameInput).toHaveAttribute("aria-invalid", "true"));
+    const errorId = nameInput.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    expect(errorId ? document.getElementById(errorId) : null).toHaveTextContent("El nombre es obligatorio.");
+
     await user.clear(nameInput);
     await user.type(nameInput, "Recorrido Casco Histórico Modificado");
 
@@ -363,8 +391,7 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByLabelText("Zona operativa")).toBeInTheDocument();
 
       // Select zone-1 and add
-      const zoneSelect = screen.getByTestId("stop-zone-select");
-      await user.selectOptions(zoneSelect, "zone-1");
+      await chooseSelectOption(user, "Zona operativa", /Z-BEL — Belgrano/);
       const durationInput = screen.getByTestId("stop-duration-input");
       await user.clear(durationInput);
       await user.type(durationInput, "45");
@@ -375,7 +402,7 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByText("Belgrano")).toBeInTheDocument();
 
       // Select zone-2 and add
-      await user.selectOptions(zoneSelect, "zone-2");
+      await chooseSelectOption(user, "Zona operativa", /Z-PAL — Palermo/);
       await user.clear(durationInput);
       await user.type(durationInput, "60");
       await user.click(screen.getByTestId("add-stop-button"));
@@ -419,8 +446,7 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByTestId("stop-item-1")).toBeInTheDocument();
 
       // Try adding zone-1 again
-      const zoneSelect = screen.getByTestId("stop-zone-select");
-      await user.selectOptions(zoneSelect, "zone-1");
+      await chooseSelectOption(user, "Zona operativa", /Z-BEL — Belgrano/);
       await user.click(screen.getByTestId("add-stop-button"));
 
       // Client-side error is displayed immediately
