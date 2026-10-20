@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { servicesMobileBreakpoint } from "@/lib/services-layout";
 import { cn } from "@/lib/utils";
 
@@ -12,8 +12,8 @@ type InventoryMapDrawerProps = {
   ariaLabel: string;
   children: ReactNode;
   className?: string;
-  expanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
+  expandToViewport?: boolean;
+  suspended?: boolean;
   snapState?: InventoryMapDrawerSnapState;
   onSnapStateChange?: (snapState: InventoryMapDrawerSnapState) => void;
   summary: string;
@@ -21,69 +21,32 @@ type InventoryMapDrawerProps = {
 
 export type InventoryMapDrawerSnapState = "peek" | "half" | "full";
 
-type DragStart = {
-  snapState: InventoryMapDrawerSnapState;
-  pointerId: number;
-  y: number;
+const SNAP_STATES: InventoryMapDrawerSnapState[] = ["peek", "half", "full"];
+const SNAP_LABEL: Record<InventoryMapDrawerSnapState, string> = {
+  peek: "colapsada",
+  half: "media",
+  full: "completa",
 };
-
-const HANDLE_HEIGHT = 52;
-const LEGACY_HANDLE_HEIGHT = 80;
-const DRAG_THRESHOLD = 6;
-const SNAP_STATES: InventoryMapDrawerSnapState[] = ["full", "half", "peek"];
-const FOCUSABLE_ELEMENT_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function snapOffset(snapState: InventoryMapDrawerSnapState, height: number, handleHeight = HANDLE_HEIGHT) {
-  if (snapState === "full") return 0;
-  if (snapState === "half") return height * 0.5;
-  return Math.max(0, height - handleHeight);
-}
+// Visible height when collapsed: grab bar plus the summary header.
+const PEEK_HEIGHT = 60;
 
 export function InventoryMapDrawer({
   ariaLabel,
   children,
   className,
-  expanded: controlledExpanded,
-  onExpandedChange,
+  expandToViewport = false,
+  suspended = false,
   snapState: controlledSnapState,
   onSnapStateChange,
   summary,
 }: InventoryMapDrawerProps) {
-  const contentId = useId();
-  const summaryId = `${contentId}-summary`;
-  const drawerRef = useRef<HTMLElement>(null);
-  const dragRef = useRef<DragStart | null>(null);
-  const draggedRef = useRef(false);
-  const focusContentOnExpandRef = useRef(false);
-  const [localSnapState, setLocalSnapState] = useState<InventoryMapDrawerSnapState>("peek");
-  const [localExpanded, setLocalExpanded] = useState(false);
-  const usesSnapPoints = controlledSnapState !== undefined || onSnapStateChange !== undefined;
-  const expanded = usesSnapPoints
-    ? (controlledSnapState ?? localSnapState) !== "peek"
-    : controlledExpanded ?? localExpanded;
-  const currentSnapState = usesSnapPoints
-    ? controlledSnapState ?? localSnapState
-    : expanded ? "full" : "peek";
+  const mobileRootRef = useRef<HTMLElement>(null);
+  const ignoreSnapChange = useRef(false);
   const [isCompact, setIsCompact] = useState(false);
-  const contentHidden = isCompact && currentSnapState === "peek";
-  const [dragDelta, setDragDelta] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-
-  function updateSnapState(nextSnapState: InventoryMapDrawerSnapState) {
-    if (usesSnapPoints) {
-      if (controlledSnapState === undefined) setLocalSnapState(nextSnapState);
-      onSnapStateChange?.(nextSnapState);
-      return;
-    }
-
-    const nextExpanded = nextSnapState !== "peek";
-    if (controlledExpanded === undefined) setLocalExpanded(nextExpanded);
-    onExpandedChange?.(nextExpanded);
-  }
-
-  function updateExpanded(nextExpanded: boolean) {
-    updateSnapState(nextExpanded ? "full" : "peek");
-  }
+  const [localSnapState, setLocalSnapState] = useState<InventoryMapDrawerSnapState>("peek");
+  const [popupStyle, setPopupStyle] = useState<CSSProperties>();
+  const [popupHeight, setPopupHeight] = useState(0);
+  const snapState = controlledSnapState ?? localSnapState;
 
   useEffect(() => {
     const updateViewport = () => setIsCompact(window.innerWidth <= servicesMobileBreakpoint());
@@ -92,139 +55,141 @@ export function InventoryMapDrawer({
     return () => window.removeEventListener("resize", updateViewport);
   }, []);
 
-  useEffect(() => {
-    if (!expanded || !focusContentOnExpandRef.current) return;
+  useLayoutEffect(() => {
+    if (!isCompact || !mobileRootRef.current) return;
 
-    focusContentOnExpandRef.current = false;
-    const content = document.getElementById(contentId);
-    content?.querySelector<HTMLElement>(FOCUSABLE_ELEMENT_SELECTOR)?.focus();
-  }, [contentId, expanded]);
+    const updateBounds = () => {
+      const viewportHeight = window.innerHeight;
+      const bounds = mobileRootRef.current?.getBoundingClientRect();
+      if (!bounds) return;
+      const shellHeaderBottom = expandToViewport
+        ? document.querySelector<HTMLElement>('header[class*="topbar"]')?.getBoundingClientRect().bottom
+        : undefined;
+      const mobileNavTop = document.querySelector<HTMLElement>('nav[aria-label="Navegación móvil"]')?.getBoundingClientRect().top;
+      const top = Math.max(0, Math.round(shellHeaderBottom ?? bounds.top));
+      const bottom = Math.max(0, Math.round(viewportHeight - (mobileNavTop ?? bounds.bottom)));
+      const height = Math.max(0, viewportHeight - top - bottom);
+      setPopupHeight(height);
+      setPopupStyle({ top, bottom, height, maxHeight: height } as CSSProperties);
+    };
 
-  function handleFocusCapture(event: FocusEvent<HTMLElement>) {
-    if (!(event.target instanceof HTMLElement) || event.target.dataset.inventoryMapDrawerHandle !== "true") {
-      updateExpanded(true);
-    }
+    updateBounds();
+    window.addEventListener("resize", updateBounds);
+    const resizeObserver = typeof ResizeObserver === "function"
+      ? new ResizeObserver(updateBounds)
+      : null;
+    if (resizeObserver) resizeObserver.observe(mobileRootRef.current);
+
+    return () => {
+      window.removeEventListener("resize", updateBounds);
+      resizeObserver?.disconnect();
+    };
+  }, [expandToViewport, isCompact]);
+
+  function updateSnapState(nextSnapState: InventoryMapDrawerSnapState) {
+    if (nextSnapState === snapState) return;
+    if (controlledSnapState === undefined) setLocalSnapState(nextSnapState);
+    onSnapStateChange?.(nextSnapState);
   }
 
-  function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-
-    dragRef.current = { snapState: currentSnapState, pointerId: event.pointerId, y: event.clientY };
-    draggedRef.current = false;
-    setIsDragging(true);
-    setDragDelta(0);
-    if (typeof event.currentTarget.setPointerCapture === "function") {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    }
+  if (!isCompact) {
+    return (
+      <aside className={cn(styles.desktopPanel, className)} aria-label={ariaLabel}>
+        {children}
+      </aside>
+    );
   }
 
-  function handlePointerMove(event: PointerEvent<HTMLButtonElement>) {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+  // Visible heights in px: Base UI resolves each one against the popup height.
+  // Before the first measurement fall back to the window so the snap points are defined from the first render.
+  const sheetHeight = Math.max(popupHeight || window.innerHeight, PEEK_HEIGHT * 3);
+  const snapPointByState: Record<InventoryMapDrawerSnapState, number> = {
+    peek: PEEK_HEIGHT,
+    half: Math.round(sheetHeight * 0.5),
+    full: sheetHeight,
+  };
+  const snapPoints = SNAP_STATES.map((state) => snapPointByState[state]);
 
-    const nextDelta = event.clientY - drag.y;
-    if (Math.abs(nextDelta) > DRAG_THRESHOLD) draggedRef.current = true;
-    setDragDelta(nextDelta);
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    const index = SNAP_STATES.indexOf(snapState);
+    const next = {
+      ArrowUp: SNAP_STATES[Math.min(index + 1, SNAP_STATES.length - 1)],
+      ArrowDown: SNAP_STATES[Math.max(index - 1, 0)],
+      Home: SNAP_STATES[0],
+      End: SNAP_STATES[SNAP_STATES.length - 1],
+    }[event.key];
+    if (!next) return;
+    event.preventDefault();
+    updateSnapState(next);
   }
 
-  function finishDrag(event: PointerEvent<HTMLButtonElement>) {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-
-    const delta = event.clientY - drag.y;
-    if (event.type !== "pointercancel" && Math.abs(delta) > DRAG_THRESHOLD) {
-      draggedRef.current = true;
-      const handleHeight = usesSnapPoints ? HANDLE_HEIGHT : LEGACY_HANDLE_HEIGHT;
-      const drawerHeight = drawerRef.current?.getBoundingClientRect().height || handleHeight;
-      const closedOffset = Math.max(0, drawerHeight - handleHeight);
-      const finalOffset = Math.max(0, Math.min(closedOffset, snapOffset(drag.snapState, drawerHeight, handleHeight) + delta));
-      const candidates = usesSnapPoints ? SNAP_STATES : ["full", "peek"] as const;
-      const nextSnapState = candidates.reduce((closest, candidate) =>
-        Math.abs(snapOffset(candidate, drawerHeight, handleHeight) - finalOffset) < Math.abs(snapOffset(closest, drawerHeight, handleHeight) - finalOffset)
-          ? candidate
-          : closest,
-      );
-      updateSnapState(nextSnapState);
-    }
-
-    if (event.type === "pointercancel") draggedRef.current = false;
-    dragRef.current = null;
-    setIsDragging(false);
-    setDragDelta(0);
+  function cycleSnapState() {
+    updateSnapState(SNAP_STATES[(SNAP_STATES.indexOf(snapState) + 1) % SNAP_STATES.length]);
   }
-
-  function handleClick() {
-    if (draggedRef.current) {
-      draggedRef.current = false;
-      return;
-    }
-    if (!usesSnapPoints) {
-      updateExpanded(!expanded);
-      return;
-    }
-
-    const currentIndex = SNAP_STATES.indexOf(currentSnapState);
-    updateSnapState(SNAP_STATES[(currentIndex + SNAP_STATES.length - 1) % SNAP_STATES.length]);
-  }
-
-  const handleLabel = !usesSnapPoints
-    ? expanded ? "Ocultar lista" : "Mostrar lista"
-    : currentSnapState === "peek"
-      ? "Expandir lista a media altura"
-      : currentSnapState === "half"
-        ? "Expandir lista a pantalla completa"
-        : "Reducir lista y mostrar mapa";
 
   return (
-    <aside
-      ref={drawerRef}
-      className={cn(styles.drawer, className)}
-      aria-label={ariaLabel}
-      data-compact={isCompact}
-      data-expanded={expanded}
-      data-snap={currentSnapState}
-      data-snap-points={usesSnapPoints}
-      data-dragging={isDragging}
-      style={{
-        "--drawer-drag-offset": `${dragDelta}px`,
-        "--drawer-handle-height": `${usesSnapPoints ? HANDLE_HEIGHT : LEGACY_HANDLE_HEIGHT}px`,
-      } as CSSProperties}
-      onFocusCapture={handleFocusCapture}
-    >
-      <Button
-        className={styles.handle}
-        variant="ghost"
-        size="lg"
-        type="button"
-        aria-label={handleLabel}
-        aria-expanded={expanded}
-        aria-controls={contentId}
-        aria-describedby={summary ? summaryId : undefined}
-        data-inventory-map-drawer-handle="true"
-        onClick={handleClick}
-        onKeyDown={(event) => {
-          if (event.key !== "Tab" || event.shiftKey || expanded) return;
-
-          event.preventDefault();
-          focusContentOnExpandRef.current = true;
-          updateExpanded(true);
+    <aside ref={mobileRootRef} className={styles.mobileRoot} aria-label={ariaLabel} data-snap={snapState}>
+      <Drawer
+        open={!suspended}
+        // Swiping below the lowest snap point or pressing Escape collapses the sheet instead of removing it.
+        onOpenChange={(open) => {
+          if (open) return;
+          // The sheet never closes, so Base UI reverts the swipe on the next frame and restores its pre-swipe
+          // snap point; that restore must not win over the collapse.
+          ignoreSnapChange.current = true;
+          window.setTimeout(() => {
+            ignoreSnapChange.current = false;
+          }, 100);
+          updateSnapState("peek");
         }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={finishDrag}
-        onPointerCancel={finishDrag}
+        modal={false}
+        disablePointerDismissal
+        snapPoints={snapPoints}
+        snapPoint={snapPointByState[snapState]}
+        onSnapPointChange={(point) => {
+          if (ignoreSnapChange.current) return;
+          const matched = SNAP_STATES.find((state) => snapPointByState[state] === point);
+          if (matched) updateSnapState(matched);
+        }}
       >
-        <span className={styles.grabber} aria-hidden="true" />
-        {summary ? <span id={summaryId} className={styles.summary}>{summary}</span> : null}
-      </Button>
-      <div
-        id={contentId}
-        className={styles.content}
-        aria-hidden={contentHidden || undefined}
-        inert={contentHidden}
-      >
-        {children}
-      </div>
+        <DrawerContent
+          className={styles.popup}
+          initialFocus={false}
+          finalFocus={false}
+          style={popupStyle}
+          // The sheet slides under the mobile nav when collapsed: clip it to the area above the nav.
+          viewportProps={{ style: { clipPath: `inset(0 0 ${popupStyle?.bottom ?? 0}px 0)` } }}
+        >
+          <div
+            role="slider"
+            tabIndex={0}
+            aria-label="Altura de la lista"
+            aria-orientation="vertical"
+            aria-valuemin={0}
+            aria-valuemax={SNAP_STATES.length - 1}
+            aria-valuenow={SNAP_STATES.indexOf(snapState)}
+            aria-valuetext={SNAP_LABEL[snapState]}
+            className={styles.handle}
+            onClick={cycleSnapState}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                cycleSnapState();
+                return;
+              }
+              handleKeyDown(event);
+            }}
+          >
+            <span className={styles.grabber} aria-hidden="true" />
+          </div>
+          <DrawerHeader className={styles.header}>
+            <DrawerTitle>{summary}</DrawerTitle>
+          </DrawerHeader>
+          <div className={styles.content} aria-hidden={snapState === "peek" || undefined} inert={snapState === "peek"}>
+            {children}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </aside>
   );
 }

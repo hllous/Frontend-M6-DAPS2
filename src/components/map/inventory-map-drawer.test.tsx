@@ -1,57 +1,120 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { InventoryMapDrawer } from "./inventory-map-drawer";
 
+async function withWidth(width: number, run: () => Promise<void>) {
+  const originalWidth = window.innerWidth;
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+  try {
+    await run();
+  } finally {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+  }
+}
+
 describe("InventoryMapDrawer", () => {
-  it("toggles with its accessible button using pointer and keyboard", async () => {
-    const user = userEvent.setup();
+  it("renders a draggable sheet with a handle and no expand button", async () => {
+    await withWidth(390, async () => {
+      render(
+        <InventoryMapDrawer ariaLabel="Lista de servicios" summary="25 servicios">
+          <button type="button">Servicio</button>
+        </InventoryMapDrawer>,
+      );
 
-    render(
-      <InventoryMapDrawer ariaLabel="Inventario visible" summary="Elementos">
-        <button type="button">Primer elemento</button>
-      </InventoryMapDrawer>,
-    );
-
-    const handle = screen.getByRole("button", { name: "Mostrar lista" });
-    const summary = screen.getByText("Elementos");
-    expect(handle).toHaveAttribute("aria-expanded", "false");
-    expect(handle).toHaveAttribute("aria-describedby", summary.id);
-
-    await user.click(handle);
-
-    expect(screen.getByRole("button", { name: "Ocultar lista" })).toHaveAttribute("aria-expanded", "true");
-
-    await user.keyboard("{Enter}");
-
-    expect(screen.getByRole("button", { name: "Mostrar lista" })).toHaveAttribute("aria-expanded", "false");
-
-    await user.keyboard(" ");
-
-    expect(screen.getByRole("button", { name: "Ocultar lista" })).toHaveAttribute("aria-expanded", "true");
+      const drawer = await screen.findByRole("dialog", { name: "25 servicios" });
+      expect(drawer).not.toHaveAttribute("aria-modal", "true");
+      expect(within(drawer).getByRole("slider", { name: "Altura de la lista" })).toHaveAttribute("aria-valuetext", "colapsada");
+      expect(screen.queryByRole("button", { name: /expandir/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Cerrar lista" })).not.toBeInTheDocument();
+    });
   });
 
-  it("expands when keyboard focus moves from the handle into the list", async () => {
-    const user = userEvent.setup();
+  it("hides the collapsed list content from assistive technology", async () => {
+    await withWidth(390, async () => {
+      render(
+        <InventoryMapDrawer ariaLabel="Inventario visible" summary="Elementos">
+          <button type="button">Primer elemento</button>
+        </InventoryMapDrawer>,
+      );
 
-    render(
-      <InventoryMapDrawer ariaLabel="Inventario visible" summary="Elementos">
-        <button type="button">Primer elemento</button>
-      </InventoryMapDrawer>,
-    );
-
-    screen.getByRole("button", { name: "Mostrar lista" }).focus();
-    await user.tab();
-
-    expect(screen.getByRole("button", { name: "Primer elemento" })).toHaveFocus();
-    expect(screen.getByRole("button", { name: "Ocultar lista" })).toHaveAttribute("aria-expanded", "true");
+      await screen.findByRole("dialog", { name: "Elementos" });
+      expect(screen.queryByRole("button", { name: "Primer elemento" })).not.toBeInTheDocument();
+    });
   });
 
-  it("hides collapsed compact content from assistive technology until expanded", async () => {
+  it("changes snap with the handle by keyboard", async () => {
+    await withWidth(390, async () => {
+      const onSnapStateChange = vi.fn();
+      const user = userEvent.setup();
+      render(
+        <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Servicios" onSnapStateChange={onSnapStateChange}>
+          <button type="button">Servicio</button>
+        </InventoryMapDrawer>,
+      );
+
+      const region = await screen.findByRole("complementary", { name: "Lista de servicios" });
+      const handle = await screen.findByRole("slider", { name: "Altura de la lista" });
+      handle.focus();
+      await user.keyboard("{Enter}");
+      expect(onSnapStateChange).toHaveBeenLastCalledWith("half");
+      await waitFor(() => expect(region).toHaveAttribute("data-snap", "half"));
+      expect(handle).toHaveAttribute("aria-valuetext", "media");
+      expect(await screen.findByRole("button", { name: "Servicio" })).toBeVisible();
+
+      await user.keyboard("{ArrowUp}");
+      expect(onSnapStateChange).toHaveBeenLastCalledWith("full");
+      await user.keyboard("{ArrowDown}{ArrowDown}");
+      expect(onSnapStateChange).toHaveBeenLastCalledWith("peek");
+      await user.keyboard("{End}");
+      expect(onSnapStateChange).toHaveBeenLastCalledWith("full");
+      await user.keyboard(" ");
+      expect(onSnapStateChange).toHaveBeenLastCalledWith("peek");
+    });
+  });
+
+  it("changes snap when the handle is clicked", async () => {
+    await withWidth(390, async () => {
+      const onSnapStateChange = vi.fn();
+      const user = userEvent.setup();
+      render(
+        <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Servicios" snapState="half" onSnapStateChange={onSnapStateChange}>
+          <button type="button">Servicio</button>
+        </InventoryMapDrawer>,
+      );
+
+      await user.click(await screen.findByRole("slider", { name: "Altura de la lista" }));
+      expect(onSnapStateChange).toHaveBeenLastCalledWith("full");
+    });
+  });
+
+  it("collapses instead of closing on Escape and hides while suspended", async () => {
+    await withWidth(390, async () => {
+      const onSnapStateChange = vi.fn();
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Servicios" snapState="full" onSnapStateChange={onSnapStateChange}>
+          <button type="button">Servicio</button>
+        </InventoryMapDrawer>,
+      );
+
+      await screen.findByRole("dialog", { name: "Servicios" });
+      await user.keyboard("{Escape}");
+      expect(onSnapStateChange).toHaveBeenLastCalledWith("peek");
+
+      rerender(
+        <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Servicios" snapState="full" suspended>
+          <button type="button">Servicio</button>
+        </InventoryMapDrawer>,
+      );
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Servicios" })).not.toBeInTheDocument());
+    });
+  });
+
+  it("renders the desktop inventory panel as a complementary region", async () => {
     const originalWidth = window.innerWidth;
-    const user = userEvent.setup();
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
 
     try {
       render(
@@ -60,55 +123,9 @@ describe("InventoryMapDrawer", () => {
         </InventoryMapDrawer>,
       );
 
-      const drawer = await screen.findByRole("complementary", { name: "Inventario visible" });
-      await waitFor(() => expect(drawer).toHaveAttribute("data-compact", "true"));
-      const handle = screen.getByRole("button", { name: "Mostrar lista" });
-      const content = drawer.querySelector(`#${handle.getAttribute("aria-controls")}`)!;
-
-      expect(content).toHaveAttribute("aria-hidden", "true");
-      expect(content).toHaveAttribute("inert");
-      expect(screen.queryByRole("button", { name: "Primer elemento" })).not.toBeInTheDocument();
-
-      await user.click(handle);
-
-      expect(screen.getByRole("button", { name: "Primer elemento" })).toBeInTheDocument();
-    } finally {
-      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
-    }
-  });
-
-  it("moves from half to full on an upward drag and exposes the next snap action", async () => {
-    const originalWidth = window.innerWidth;
-    const onSnapStateChange = vi.fn();
-    const user = userEvent.setup();
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
-
-    try {
-      render(
-        <InventoryMapDrawer
-          ariaLabel="Lista de servicios"
-          summary="Servicios"
-          snapState="half"
-          onSnapStateChange={onSnapStateChange}
-        >
-          <button type="button">Servicio</button>
-        </InventoryMapDrawer>,
-      );
-
-      const drawer = await screen.findByRole("complementary", { name: "Lista de servicios" });
-      await waitFor(() => expect(drawer).toHaveAttribute("data-compact", "true"));
-      expect(drawer).toHaveAttribute("data-snap", "half");
-      const handle = screen.getByRole("button", { name: "Expandir lista a pantalla completa" });
-      expect(handle).toHaveAttribute("aria-expanded", "true");
-      vi.spyOn(drawer, "getBoundingClientRect").mockReturnValue({ height: 500 } as DOMRect);
-
-      fireEvent.pointerDown(handle, { pointerId: 1, pointerType: "touch", clientY: 320 });
-      fireEvent.pointerMove(handle, { pointerId: 1, pointerType: "touch", clientY: 100 });
-      fireEvent.pointerUp(handle, { pointerId: 1, pointerType: "touch", clientY: 100 });
-      expect(onSnapStateChange).toHaveBeenLastCalledWith("full");
-
-      await user.click(handle);
-      expect(onSnapStateChange).toHaveBeenLastCalledWith("full");
+      const panel = await screen.findByRole("complementary", { name: "Inventario visible" });
+      expect(within(panel).getByRole("button", { name: "Primer elemento" })).toBeVisible();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     }

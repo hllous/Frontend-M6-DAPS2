@@ -11,7 +11,6 @@ import {
   Construction,
   ExternalLink,
   History,
-  Loader2,
   RefreshCw,
   Route,
   ShieldAlert,
@@ -20,6 +19,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Item, ItemActions, ItemGroup } from "@/components/ui/item";
+import { Spinner } from "@/components/ui/spinner";
 import { referralsAdapter, referralFromRepairRequest, referralFromStreetClosureRequest, type Referral } from "@/lib/referrals";
 import { getReferralAnomalies, type ReferralAnomaly } from "@/lib/referral-anomalies";
 import {
@@ -211,9 +216,41 @@ function statusLabel(referral: Referral): string {
 }
 
 function formatDate(value: string): string {
+  const calendarDay = value.slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(calendarDay);
+  if (match && new Date(`${calendarDay}T00:00:00Z`).toISOString().slice(0, 10) === calendarDay) {
+    return `${match[3]}/${match[2]}/${match[1]}`;
+  }
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) return value;
-  return new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(date);
+}
+
+// Una hora sin zona (`2026-09-05T08:00`) es hora argentina (UTC-3, sin horario de verano), no la de la máquina.
+const ZONELESS_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
+function formatDateTime(value: string): string {
+  const date = new Date(ZONELESS_DATE_TIME.test(value) ? `${value}-03:00` : value);
+  if (Number.isNaN(date.valueOf())) return value;
+  const timeZone = "America/Argentina/Buenos_Aires";
+  const dateLabel = new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone,
+  }).format(date);
+  const timeLabel = new Intl.DateTimeFormat("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).format(date);
+  return `${dateLabel} ${timeLabel}`;
 }
 
 export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario }) {
@@ -345,15 +382,15 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
       {loadState.status === "loading" && <LoadingState />}
       {loadState.status === "error" && (
         <div className="flex flex-1 items-center justify-center p-6">
-          <div className="w-full max-w-md rounded-2xl border border-[var(--color-danger-line)] bg-[var(--color-surface)] p-6 text-center" role="alert">
+          <Alert variant="destructive" className="w-full max-w-md p-6 text-center">
             <CircleAlert className="mx-auto h-8 w-8 text-[var(--color-danger)]" aria-hidden />
-            <h2 className="mt-3 text-lg font-bold text-[var(--color-text)]">No se pudieron cargar las derivaciones</h2>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{loadState.message}</p>
+            <AlertTitle className="mt-3 text-lg font-bold text-[var(--color-text)]">No se pudieron cargar las derivaciones</AlertTitle>
+            <AlertDescription className="mt-1 text-sm text-[var(--color-text-secondary)]">{loadState.message}</AlertDescription>
             <Button className="mt-5 gap-2" onClick={loadReferrals}>
               <RefreshCw className="h-4 w-4" aria-hidden />
               Reintentar carga
             </Button>
-          </div>
+          </Alert>
         </div>
       )}
       {loadState.status === "ready" && loadState.referrals.length === 0 && <EmptyState />}
@@ -364,7 +401,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
             <p id="referrals-scope-note" className="sr-only">
               Seleccione una derivación para consultar su detalle. La fuente canónica se consulta mediante el enlace a su módulo de origen.
             </p>
-            <ul className="grid gap-3" role="list">
+            <ItemGroup className="grid min-w-0 grid-cols-1 gap-3" aria-label="Derivaciones">
               {loadState.referrals.map((referral) => (
                 <ReferralRow
                   key={`${referral.kind}-${referral.id}`}
@@ -374,7 +411,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
                   onOpen={() => setSelectedId(referral.id)}
                 />
               ))}
-            </ul>
+            </ItemGroup>
           </section>
         </div>
       )}
@@ -486,13 +523,19 @@ function ReferralRow({
   onOpen: () => void;
 }) {
   return (
-    <li>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex min-h-12 w-full items-start gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition-colors hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-subtle)] focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] sm:items-center"
-        aria-label={`${referral.id}, ${referralKindLabel[referral.kind]}, ${statusLabel(referral)}`}
-      >
+    <Item
+      variant="interactive"
+      className="min-h-12 w-full items-start gap-3 p-4 text-left sm:items-center"
+      render={(
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-auto min-h-12 min-w-0 w-full items-start justify-start whitespace-normal text-left sm:items-center"
+          onClick={onOpen}
+          aria-label={`${referral.id}, ${referralKindLabel[referral.kind]}, ${statusLabel(referral)}`}
+        />
+      )}
+    >
         <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-info-fill)] text-[var(--color-action)] sm:mt-0">
           {referral.kind === "REPAIR_REQUEST" ? <Construction className="h-4 w-4" aria-hidden /> : <Route className="h-4 w-4" aria-hidden />}
         </span>
@@ -507,13 +550,14 @@ function ReferralRow({
           <span className="mt-1 block truncate text-sm text-[var(--color-text)]">{referralKindDescriptionFor(referral)}</span>
           <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {referral.sourceId} · {referral.sourceLabel}</span>
         </span>
-        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text)]" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
-          <ReferralStatusIcon referral={referral} className="h-3.5 w-3.5" />
-          {statusLabel(referral)}
-        </span>
-        <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-secondary)] sm:mt-0" aria-hidden />
-      </button>
-    </li>
+        <ItemActions className="w-full basis-full justify-end sm:ml-auto sm:w-auto sm:basis-auto">
+          <Badge variant="status" className="min-h-7 shrink-0 gap-1.5 px-2.5 py-1 text-xs font-semibold" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
+            <ReferralStatusIcon referral={referral} className="h-3.5 w-3.5" />
+            {statusLabel(referral)}
+          </Badge>
+          <ArrowUpRight className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" aria-hidden />
+        </ItemActions>
+    </Item>
   );
 }
 
@@ -674,11 +718,12 @@ function ReferralReconciliationPanel({
         )}
 
         {sourceUnavailable && (
-          <div role="alert" className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-surface)] p-3">
-            <h3 className="text-sm font-bold text-[var(--color-warning)]">Servicio de origen sin verificar</h3>
-            <p className="mt-1 text-sm text-[var(--color-text)]">No se pudo consultar el estado actual del Servicio. No se asume que haya cambiado.</p>
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{sourceUnavailable}</p>
-          </div>
+          <Alert className="rounded-xl border-[var(--color-warning-line)] bg-[var(--color-surface)] p-3">
+            <CircleAlert aria-hidden />
+            <AlertTitle className="text-sm font-bold text-[var(--color-warning)]">Servicio de origen sin verificar</AlertTitle>
+            <AlertDescription className="text-[var(--color-text)]">No se pudo consultar el estado actual del Servicio. No se asume que haya cambiado.</AlertDescription>
+            <AlertDescription className="text-xs text-[var(--color-text-secondary)]">{sourceUnavailable}</AlertDescription>
+          </Alert>
         )}
 
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-xs text-[var(--color-text-secondary)]">
@@ -870,12 +915,12 @@ function ReferralRecoveryForm({
       </DialogHeader>
 
       <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4 py-2">
-        {errorMessage && (
-          <div id={`${formId}-external-id-error`} role="alert" className="flex items-start gap-2.5 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-xs text-[var(--color-danger)]">
-            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <span>{errorMessage}</span>
-          </div>
-        )}
+        {errorMessage && !action.externalLabel ? (
+          <Alert id={`${formId}-external-id-error`} variant="destructive" className="rounded-xl p-3 text-xs">
+            <CircleAlert aria-hidden />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        ) : null}
 
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-sm">
           <dl className="grid gap-2 sm:grid-cols-2">
@@ -887,11 +932,11 @@ function ReferralRecoveryForm({
         </div>
 
         {action.externalLabel && (
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={`${formId}-external-id`} className="text-sm font-semibold text-[var(--color-text)]">
+          <Field className="gap-1.5">
+            <FieldLabel htmlFor={`${formId}-external-id`} className="text-sm font-semibold text-[var(--color-text)]">
               {action.externalLabel} <span className="text-[var(--color-danger)]" aria-hidden>*</span>
-            </label>
-            <input
+            </FieldLabel>
+            <Input
               id={`${formId}-external-id`}
               value={externalId}
               onChange={(event) => {
@@ -902,10 +947,11 @@ function ReferralRecoveryForm({
               aria-invalid={Boolean(errorMessage)}
               aria-describedby={errorMessage ? `${formId}-external-id-error ${formId}-external-id-help` : `${formId}-external-id-help`}
               placeholder={referral.destination === "M3" ? "Ej. M3-OT-2048" : "Ej. M7-C-882"}
-              className="min-h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus-visible:ring-3 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] focus-visible:ring-[var(--color-focus)]"
+              className="bg-[var(--color-surface)] text-sm"
             />
-            <span id={`${formId}-external-id-help`} className="text-xs leading-4 text-[var(--color-text-secondary)]">{action.externalHelp}</span>
-          </div>
+            {errorMessage ? <FieldError id={`${formId}-external-id-error`}>{errorMessage}</FieldError> : null}
+            <FieldDescription id={`${formId}-external-id-help`} className="text-xs leading-4 text-[var(--color-text-secondary)]">{action.externalHelp}</FieldDescription>
+          </Field>
         )}
 
         <div className="flex items-start gap-2 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-xs text-[var(--color-warning)]">
@@ -921,7 +967,7 @@ function ReferralRecoveryForm({
         <Button type="submit" form={formId} disabled={isSubmitting} className="font-semibold">
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              <Spinner className="h-4 w-4" aria-hidden />
               <span>Registrando…</span>
             </>
           ) : (
@@ -957,20 +1003,20 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
       <dl className="mt-4 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
         <DataField label="Tipo de corte" value={request.closureType === "TOTAL" ? "Total" : "Parcial"} />
         <DataField label="Motivo" value={request.reason} />
-        <DataField label="Inicio solicitado" value={formatDate(request.requestedFrom)} />
-        <DataField label="Fin solicitado" value={formatDate(request.requestedTo)} />
+        <DataField label="Inicio solicitado" value={formatDateTime(request.requestedFrom)} />
+        <DataField label="Fin solicitado" value={formatDateTime(request.requestedTo)} />
         <DataField label="Identificador externo de M7" value={request.closureId ?? "M7 todavía no informó un identificador"} />
       </dl>
       <div className="mt-5 border-t border-[var(--color-border)] pt-4">
         <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Tramos afectados</h3>
-        <ul className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+        <ItemGroup className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
           {request.affectedSections.map((section, index) => (
-            <li key={`${section.streetName}-${index}`} className="rounded-xl bg-[var(--color-surface-subtle)] p-3 text-[var(--color-text)]">
+            <Item key={`${section.streetName}-${index}`} variant="muted" className="block rounded-xl p-3 text-[var(--color-text)]">
               <span className="font-semibold">{section.streetName}</span>
               <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">Entre {section.fromCross} y {section.toCross}</span>
-            </li>
+            </Item>
           ))}
-        </ul>
+        </ItemGroup>
       </div>
     </section>
   );
@@ -978,10 +1024,10 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
 
 function StatusBadge({ referral }: { referral: Referral }) {
   return (
-    <div className="flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-1.5 text-sm font-semibold text-[var(--color-text)]" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
+    <Badge variant="status" className="min-h-8 gap-2 px-3 py-1.5 text-sm font-semibold" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
       <ReferralStatusIcon referral={referral} className="h-4 w-4" />
       {statusLabel(referral)}
-    </div>
+    </Badge>
   );
 }
 
@@ -999,7 +1045,7 @@ function DataField({ label, value }: { label: string; value: string }) {
 }
 
 function DateField({ label, value }: { label: string; value: string }) {
-  return <DataField label={label} value={formatDate(value)} />;
+  return <DataField label={label} value={formatDateTime(value)} />;
 }
 
 function LoadingState() {

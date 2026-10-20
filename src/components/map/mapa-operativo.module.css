@@ -183,26 +183,20 @@
 .zoneList,
 .routeStopList,
 .todayZoneList,
-.todayServiceList ul {
-  display: flex;
-  flex-direction: column;
+.todayServiceItems {
   gap: var(--space-6);
   margin: 0;
   padding: 0;
-  list-style: none;
 }
 
 .zoneButton,
 .routeStopButton {
   display: grid;
   width: 100%;
+  min-height: 48px;
   align-items: center;
   gap: var(--space-10);
-  border: 1px solid transparent;
-  border-radius: 12px;
-  padding: var(--space-10);
-  background: transparent;
-  color: var(--color-text);
+  padding: var(--space-8);
   text-align: left;
 }
 
@@ -210,23 +204,6 @@
   grid-template-columns: auto minmax(0, 1fr);
 }
 
-.zoneButton:hover,
-.routeStopButton:hover {
-  background: var(--color-surface-subtle);
-}
-
-.zoneButton:focus-visible,
-.routeStopButton:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.selected {
-  border-color: var(--color-accent);
-  background: var(--color-info-fill);
-}
-
-.zoneButton > span:last-child,
 .routeStopCopy {
   display: flex;
   min-width: 0;
@@ -234,21 +211,13 @@
   gap: var(--space-4);
 }
 
-.zoneButton strong,
-.routeStopButton strong,
 .routeSummary strong,
-.todayZoneList strong,
-.todayServiceList strong {
+.todayServiceList h3 {
   color: var(--color-text);
   font-size: 0.875rem;
 }
 
-.zoneButton small,
-.routeStopCopy small,
-.routeSummary span,
-.todayZoneList small,
-.todayServiceList small,
-.todayServiceList span {
+.routeSummary span {
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   line-height: 1.4;
@@ -285,22 +254,6 @@
   color: var(--color-text);
   font-size: 0.75rem;
   font-weight: 600;
-}
-
-.routeSelect {
-  min-height: 40px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 12px;
-  padding: 0 var(--space-10);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-  font-size: 0.875rem;
-}
-
-.routeSelect:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
 }
 
 .routeSummary {
@@ -341,21 +294,18 @@
   font-variant-numeric: tabular-nums;
 }
 
-.todayZoneList li {
+.todayZoneItem {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-10);
-  padding: var(--space-10) 0;
-  border-bottom: 1px solid var(--color-border);
 }
 
 .todayStatus {
   border-radius: 50%;
 }
 
-.todayZoneList li > span:nth-child(2),
-.todayServiceList li {
+.todayZoneItem > [data-slot="item-content"] {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -386,13 +336,6 @@
 
 .todayServiceList h3 {
   margin: 0;
-  color: var(--color-text);
-  font-size: 0.875rem;
-}
-
-.todayServiceList li {
-  padding: var(--space-8) 0;
-  border-bottom: 1px solid var(--color-border);
 }
 
 .coverageLegend {
@@ -435,12 +378,9 @@
 }
 
 .coverageZoneList {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-6);
   margin: 0;
   padding: 0;
-  list-style: none;
 }
 
 .coverageZoneButton {
@@ -450,21 +390,8 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-10);
-  border: 1px solid transparent;
-  border-radius: 12px;
   padding: var(--space-8);
-  background: transparent;
-  color: var(--color-text);
   text-align: left;
-}
-
-.coverageZoneButton:hover {
-  background: var(--color-surface-subtle);
-}
-
-.coverageZoneButton:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
 }
 
 .coverageZoneCopy {
@@ -472,20 +399,6 @@
   min-width: 0;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-.coverageZoneCopy strong {
-  color: var(--color-text);
-  font-size: 0.875rem;
-}
-
-.coverageZoneCopy small {
-  overflow: hidden;
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .sideLoading {
@@ -587,36 +500,26 @@
   line-height: 1.45;
 }
 
-.visibleList ul {
-  display: flex;
+.visibleItemGroup {
+  gap: var(--space-4);
   min-height: 0;
   flex: 1;
-  flex-direction: column;
-  gap: var(--space-4);
   margin: 0;
   padding: 0 var(--space-8) var(--space-8);
   overflow-y: auto;
-  list-style: none;
   scrollbar-color: var(--color-border-strong) var(--color-surface-subtle);
   scrollbar-width: thin;
 }
 
-.visibleList li {
+.visibleItem {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   gap: var(--space-10);
-  padding: var(--space-8);
-  border-radius: 12px;
 }
 
-.visibleList li:hover {
-  background: var(--color-surface-subtle);
-}
-
-.visibleList li.selected {
-  border: 1px solid var(--color-accent);
-  background: var(--color-info-fill);
+.visibleItemContent {
+  min-width: 0;
 }
 
 .itemButton {
@@ -624,46 +527,8 @@
   min-width: 0;
   flex-direction: column;
   gap: var(--space-4);
-  border: 0;
   padding: 0;
-  background: transparent;
-  color: inherit;
   text-align: left;
-  cursor: pointer;
-}
-
-.itemButton:focus-visible,
-.itemLink:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.itemLink {
-  color: var(--color-action);
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-decoration: underline;
-}
-
-.visibleList li > span:last-child {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.visibleList li strong {
-  overflow: hidden;
-  color: var(--color-text);
-  font-size: 0.875rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.visibleList li small {
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.35;
 }
 
 .listMarker {
@@ -758,7 +623,6 @@
   .sidePanel { max-height: 52vh; }
   .layerControl { min-height: 48px; }
   .itemButton { min-height: 48px; }
-  .routeSelect { min-height: 48px; }
   .routeStopButton,
   .zoneButton { min-height: 48px; }
   .loadingMap,

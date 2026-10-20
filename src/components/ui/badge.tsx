@@ -21,6 +21,8 @@ const badgeVariants = cva(
         neutral: "border-[var(--color-border-strong)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]",
         outline:
           "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
+        status:
+          "h-auto rounded-full border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text)]",
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",

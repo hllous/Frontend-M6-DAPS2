@@ -237,22 +237,23 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     });
     expect(overlappingHeaderLabels).toEqual([]);
 
-    await listDrawer.getByRole("button", { name: "Expandir lista a pantalla completa" }).click();
+    await page.getByRole("slider", { name: "Altura de la lista" }).press("End");
     await expect(listDrawer).toHaveAttribute("data-snap", "full");
-    const fullDrawerBox = await listDrawer.boundingBox();
+    const fullDrawer = page.getByRole("dialog", { name: /servicios/i });
+    const fullDrawerBox = await fullDrawer.boundingBox();
     const mapBox = await mapFrame.boundingBox();
     expect(fullDrawerBox).not.toBeNull();
     expect(mapBox).not.toBeNull();
     await expect.poll(async () => {
-      const settledDrawerBox = await listDrawer.boundingBox();
+      const settledDrawerBox = await fullDrawer.boundingBox();
       const settledMapBox = await mapFrame.boundingBox();
       if (!settledDrawerBox || !settledMapBox) return Number.POSITIVE_INFINITY;
       return Math.abs(settledDrawerBox.y - settledMapBox.y);
     }).toBeLessThanOrEqual(1);
 
-    await listDrawer.getByRole("button", { name: "Reducir lista y mostrar mapa" }).click();
+    await page.getByRole("slider", { name: "Altura de la lista" }).press("Home");
     await expect(listDrawer).toHaveAttribute("data-snap", "peek");
-    await listDrawer.getByRole("button", { name: "Expandir lista a media altura" }).click();
+    await page.getByRole("slider", { name: "Altura de la lista" }).press("ArrowUp");
     await expect(listDrawerElement).toHaveAttribute("data-snap", "half");
     await expect(map).toBeVisible();
 

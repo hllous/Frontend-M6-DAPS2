@@ -1163,6 +1163,7 @@ export function ServicesWorkspace({
                         summary={`${sortedServices.length} servicios`}
                         snapState={mobileDrawerSnap}
                         onSnapStateChange={setMobileDrawerSnap}
+                        suspended={Boolean(selectedService)}
                         className={styles.mobileServiceDrawer}
                       >
                         <div className={styles.mobileDrawerContent}>
