@@ -497,8 +497,9 @@ function SuspendServiceForm({
                   </>
                 )}
 
+                <div aria-live="polite">
                 {queuedFiles.length > 0 && (
-                  <ItemGroup className="gap-2" aria-live="polite">
+                  <ItemGroup className="gap-2">
                     {queuedFiles.map((item) => (
                       <Item key={item.id} variant="outline" size="sm">
                         <ItemMedia variant="icon">
@@ -533,6 +534,7 @@ function SuspendServiceForm({
                               type="button"
                               variant="outline"
                               size="sm"
+                              aria-label={`Reintentar ${item.localFilename}`}
                               onClick={() => handleRetryUpload(item)}
                               disabled={isSubmitting}
                             >
@@ -556,6 +558,7 @@ function SuspendServiceForm({
                     ))}
                   </ItemGroup>
                 )}
+                </div>
               </Field>
             </FieldGroup>
           </form>

@@ -2,6 +2,7 @@
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
+import { useRevealFirstError } from "./use-reveal-first-error";
 import { AlertCircle, CalendarCheck2, Check, MapPin } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -70,6 +71,7 @@ function ConfirmRescheduleForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ date?: string; start?: string; end?: string }>({});
+  const formRef = useRevealFirstError<HTMLFormElement>(errorMessage, fieldErrors);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -120,7 +122,7 @@ function ConfirmRescheduleForm({
         </DialogDescription>
       </DialogHeader>
 
-      <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
+      <form ref={formRef} id={formId} noValidate onSubmit={handleSubmit} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
         {errorMessage && (
           <Alert variant="danger">
             <AlertCircle aria-hidden />

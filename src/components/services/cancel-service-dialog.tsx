@@ -2,6 +2,7 @@
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
+import { useRevealFirstError } from "./use-reveal-first-error";
 import { AlertCircle, Ban } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -63,6 +64,7 @@ function CancelServiceForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reasonError, setReasonError] = useState<string | null>(null);
+  const formRef = useRevealFirstError<HTMLFormElement>(errorMessage, reasonError);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -104,7 +106,7 @@ function CancelServiceForm({
         </DialogDescription>
       </DialogHeader>
 
-      <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
+      <form ref={formRef} id={formId} noValidate onSubmit={handleSubmit} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
         {errorMessage && (
           <Alert variant="danger">
             <AlertCircle aria-hidden />

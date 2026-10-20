@@ -201,7 +201,7 @@ describe("AssignCrewDialog", () => {
     await screen.findByText(/Vehículo opcional/i);
     await choose(user, /Cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
 
-    const warning = screen.getByText(/Aviso de superposición horaria$/i).closest("[role=status]") as HTMLElement;
+    const warning = screen.getByText(/Aviso de superposición horaria$/i).closest("[role=alert]") as HTMLElement;
     expect(within(warning).getByText(overlapping.id)).toBeInTheDocument();
     expect(screen.queryByText(/No se requiere justificación/i)).not.toBeInTheDocument();
 
@@ -275,7 +275,7 @@ describe("AssignCrewDialog", () => {
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
 
     await waitFor(() => expect(bodies).toHaveLength(1));
-    const warning = screen.getByText(/Aviso de superposición horaria$/i).closest("[role=status]") as HTMLElement;
+    const warning = screen.getByText(/Aviso de superposición horaria$/i).closest("[role=alert]") as HTMLElement;
     expect(within(warning).getByText(overlapping.id)).toBeInTheDocument();
     expect(screen.getByLabelText(/Justificación del solapamiento/i)).toBeVisible();
     expect(onAssigned).not.toHaveBeenCalled();

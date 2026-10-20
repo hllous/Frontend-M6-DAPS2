@@ -157,12 +157,12 @@ describe("SuspendServiceDialog", () => {
       "Servicio suspendido; falta subir 1 archivo",
     );
     expect(screen.getByText("No se pudo validar el archivo.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Reintentar" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Reintentar evidencia.jpg" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Suspender servicio" })).not.toBeInTheDocument();
     expect(onSuspended).not.toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
 
-    await user.click(screen.getByRole("button", { name: "Reintentar" }));
+    await user.click(screen.getByRole("button", { name: "Reintentar evidencia.jpg" }));
 
     await waitFor(() => {
       expect(onSuspended).toHaveBeenCalledTimes(1);

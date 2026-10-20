@@ -102,7 +102,7 @@ function AssignCrewForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ crew?: string; vehicle?: string; overrideNote?: string }>({});
-  const scrollRef = useRevealFirstError(errorMessage, fieldErrors);
+  const scrollRef = useRevealFirstError(errorMessage, fieldErrors, backendConflict);
 
   // Cuadrillas, vehículos y requiresVehicle salen del backend: sin ellos no se puede confirmar.
   const [resources, setResources] = useState<
@@ -410,7 +410,7 @@ function AssignCrewForm({
           </FieldGroup>
 
           {needsOverrideNote && (
-            <Alert variant="warning" role="status">
+            <Alert variant="warning" role="alert">
               <AlertTriangle aria-hidden />
               <AlertTitle className="font-semibold uppercase tracking-wider">Aviso de superposición horaria</AlertTitle>
               <AlertDescription className="flex flex-col gap-2">
