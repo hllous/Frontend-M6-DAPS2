@@ -76,7 +76,11 @@ type FormErrors = { code?: string; name?: string; form?: string };
 
 /** preventDefault on `invalid` also suppresses the browser's focus, so move it to the first invalid field. */
 function focusIfFirstInvalid(field: HTMLInputElement) {
-  if (field.form?.querySelector(":invalid") === field) field.focus();
+  // `validity` is a pure read; `:invalid` runs checkValidity in jsdom, which re-fires `invalid`.
+  const first = Array.from(field.form?.elements ?? []).find(
+    (el) => el instanceof HTMLInputElement && !el.validity.valid,
+  );
+  if (first === field) field.focus();
 }
 
 function mapFormError(message: string): FormErrors {
