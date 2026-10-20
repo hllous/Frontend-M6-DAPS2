@@ -92,6 +92,21 @@ describe("TreeInterventionsPanel", () => {
     }
   });
 
+  it("shows the priority badge and keeps the decision actions in the detail footer", async () => {
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+
+    const request = await screen.findByRole("article", { name: /Poda de seguridad/i });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    const priority = await within(detail).findByText("Alta");
+    expect(priority).toHaveAttribute("data-slot", "badge");
+    const footer = detail.querySelector("[data-slot=dialog-footer]") as HTMLElement;
+    expect(within(footer).getByRole("button", { name: "Autorizar intervención" })).toBeVisible();
+    expect(within(footer).getByRole("button", { name: "Cerrar detalle" })).toBeVisible();
+  });
+
   it("shows an unrecorded intervention priority as neutral text", async () => {
     updateTreeInterventionFixture("intervention-1", { priority: "LOW" });
     render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
