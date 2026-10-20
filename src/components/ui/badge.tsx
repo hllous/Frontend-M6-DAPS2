@@ -16,7 +16,7 @@ const badgeVariants = cva(
         outline:
           "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
         success:
-          "bg-[var(--color-success-fill)] text-[var(--color-success)]",
+          "border-[var(--color-success-line)] bg-[var(--color-success-fill)] text-[var(--color-success)]",
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
