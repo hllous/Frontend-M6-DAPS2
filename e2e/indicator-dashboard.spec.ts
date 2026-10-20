@@ -1,8 +1,34 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseOption } from "./support/reports-indicators";
 
 test.describe("operational indicator dashboard #138", () => {
+  test("keeps each family summary inside its selectable card at desktop and mobile widths", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=dashboards");
+
+    const coverageCard = page.getByRole("button", { name: "Cobertura: seleccionar familia" });
+    await expect(coverageCard).toContainText("82,2 %");
+    await expect(coverageCard).toContainText("Cobertura de objetivos");
+    await expect(coverageCard).toContainText(/Detalle seleccionado|Ver detalle/);
+
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport);
+      const geometry = await coverageCard.evaluate((card) => {
+        const cardRect = card.getBoundingClientRect();
+        const childrenFit = Array.from(card.children).every((child) => {
+          const childRect = child.getBoundingClientRect();
+          return childRect.top >= cardRect.top && childRect.bottom <= cardRect.bottom;
+        });
+        return { height: cardRect.height, childrenFit };
+      });
+
+      expect(geometry.height).toBeGreaterThan(100);
+      expect(geometry.childrenFit).toBe(true);
+    }
+  });
+
   test("Field can open the semantic indicator table on a narrow screen", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginViaApi(page, "office-duty-queue");
@@ -29,7 +55,7 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(page.getByText("Actualizado")).toBeVisible();
 
     const detail = page.locator("section[aria-labelledby='indicator-detail-title']");
-    await page.getByLabel("Zona operativa").selectOption("zone-2");
+    await chooseOption(page, "Zona operativa", "Palermo");
     await page.getByRole("button", { name: "Actualizar" }).click();
     await expect(detail.getByText("Costera").first()).toBeVisible();
 
