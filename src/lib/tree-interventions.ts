@@ -5,6 +5,7 @@ import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 import { treeSchema, type Tree } from "./trees";
 import { externalIdInput, externalIdListInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export const treeInterventionTypeSchema = z.enum(["FORMATION_PRUNING", "SAFETY_PRUNING", "REMOVAL", "PLANTING", "TREATMENT"]);
 export type TreeInterventionType = z.infer<typeof treeInterventionTypeSchema>;
@@ -96,7 +97,7 @@ export class TreeInterventionRequestError extends Error {
 }
 
 const pageSchema = z.object({
-  data: z.array(treeInterventionResponseSchema),
+  data: tolerantRecords(treeInterventionResponseSchema, "tree-interventions"),
   meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
 });
 const errorResponseSchema = z.object({

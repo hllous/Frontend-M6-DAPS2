@@ -10,6 +10,7 @@ import { catalogoDeEtiquetas, componerTituloDeServicio } from "./service-labels"
 import { serviceTypeCategorySchema } from "./service-types";
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_EXTERNAL_ID_LENGTH, MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
 export type ServiceMode = z.infer<typeof serviceModeSchema>;
@@ -509,7 +510,7 @@ export const STATUS_ORDER: Record<ServiceStatus, number> = {
 };
 
 export const servicesEnvelopeSchema = z.object({
-  data: z.array(serviceWireSchema),
+  data: tolerantRecords(serviceWireSchema, "services"),
   meta: z.object({
     total: z.number(),
     page: z.number(),

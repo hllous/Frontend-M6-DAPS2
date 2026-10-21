@@ -4,6 +4,7 @@ import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 import { externalIdInput, externalIdListInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export const crewTypeSchema = z.enum(["MUNICIPAL", "COOPERATIVE", "CONTRACTOR"]);
 export const shiftSchema = z.enum(["MORNING", "AFTERNOON", "NIGHT"]);
@@ -32,7 +33,7 @@ export type AddCrewMembersInput = z.infer<typeof addCrewMembersInputSchema>;
 export class CrewContractError extends Error { constructor(message: string, options?: { cause?: unknown }) { super(message, options); this.name = "CrewContractError"; } }
 export class CrewRequestError extends Error { readonly status: number; constructor(message: string, status: number, options?: { cause?: unknown }) { super(message, options); this.name = "CrewRequestError"; this.status = status; } }
 
-const pageSchema = z.object({ data: z.array(crewWireSchema), meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }) });
+const pageSchema = z.object({ data: tolerantRecords(crewWireSchema, "crews"), meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }) });
 const errorSchema = z.object({ statusCode: z.number(), message: z.union([z.string(), z.array(z.string())]), error: z.string(), timestamp: z.string(), path: z.string() });
 
 function queryString(query: CrewQuery) {

@@ -17,7 +17,6 @@ import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { repairRequestSchema } from "@/lib/repair-requests";
 import { streetClosureRequestSchema } from "@/lib/street-closure-requests";
-import { serviceSchema } from "@/lib/services";
 import { getStreetClosureRequestFixture, streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 
 
@@ -80,7 +79,14 @@ export async function backendCollection<T>(
   throw new Error("La consulta de derivaciones superó el límite de páginas.");
 }
 
-const referralServiceSchema = serviceSchema.pick({ id: true, crewId: true, origin: true, inspectionId: true });
+// Only the four fields the Field scope needs. Not `serviceSchema.pick`: that drags in the closed
+// service-status/origin enums, and a new backend value would take down /referrals for Field (#638).
+const referralServiceSchema = z.object({
+  id: z.string(),
+  crewId: z.string().nullable().optional(),
+  origin: z.string(),
+  inspectionId: z.string().nullable().optional(),
+}).passthrough();
 
 export async function backendReferralSourceIds(request: Request, crewId: string): Promise<ReadonlySet<string>> {
   const services = await backendCollection(request, `/services?crewId=${encodeURIComponent(crewId)}`, referralServiceSchema);
