@@ -12,6 +12,17 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); })
 afterAll(() => server.close());
 
 describe("environmental reports adapter", () => {
+  it("forwards calendar-day range values unchanged to the BFF", async () => {
+    let query: URLSearchParams | undefined;
+    server.use(http.get("*/api/environmental-reports", ({ request }) => {
+      query = new URL(request.url).searchParams;
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 20, totalPages: 1 } });
+    }));
+    await environmentalReportsAdapter.list({ from: "2026-09-05", to: "2026-09-06" });
+    expect(query?.get("from")).toBe("2026-09-05");
+    expect(query?.get("to")).toBe("2026-09-06");
+  });
+
   it("requires the real completion timestamp and the violation next step", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-20T15:00:00.000Z"));

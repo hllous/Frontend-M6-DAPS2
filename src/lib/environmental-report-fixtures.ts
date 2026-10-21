@@ -1,3 +1,4 @@
+import { argentinaDay } from "./argentina-date";
 import type {
   CreateEnvironmentalReportInput,
   EnvironmentalInspection,
@@ -336,6 +337,9 @@ export function createEnvironmentalReportFixture(input: CreateEnvironmentalRepor
 export function filterEnvironmentalReportFixtures(query: EnvironmentalReportQuery): EnvironmentalReport[] {
   const search = query.search?.trim().toLowerCase();
   return environmentalReportFixtures.filter((report) => {
+    const day = argentinaDay(report.updatedAt);
+    if (query.from && (!day || day < query.from)) return false;
+    if (query.to && (!day || day > query.to)) return false;
     if (query.status && report.status !== query.status) return false;
     if (query.reportType && report.reportType !== query.reportType) return false;
     if (query.priority && report.priority !== query.priority) return false;
