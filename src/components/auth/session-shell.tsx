@@ -4,7 +4,6 @@ import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 
 import { notifyError } from "@/components/ui/feedback";
 import { FoundationDemo } from "@/components/shell/foundation-demo";
-import { ShellLoading } from "@/components/shell/shell-states";
 import { getFieldDraftOwner, setFieldDraftOwner, subscribeFieldDraftOwner } from "@/lib/field-drafts";
 import type { ScenarioId } from "@/lib/scenarios";
 import { broadcastLogout } from "@/lib/session-client";
@@ -28,7 +27,9 @@ export function SessionShell({ actorId, scenarioId, logoutAction, children }: {
     await broadcastLogout();
   }
 
-  if (draftOwner !== actorId) return <main className="p-6"><ShellLoading /></main>;
-
-  return <FoundationDemo scenarioId={scenarioId} logoutAction={logout}>{children}</FoundationDemo>;
+  return (
+    <FoundationDemo scenarioId={scenarioId} logoutAction={logout} contentReady={draftOwner === actorId}>
+      {draftOwner === actorId ? children : null}
+    </FoundationDemo>
+  );
 }
