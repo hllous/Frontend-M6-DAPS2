@@ -95,10 +95,6 @@ const SEARCH_DEBOUNCE_MS = 300;
 const reportStatuses = Object.keys(ENVIRONMENTAL_REPORT_STATUS_LABELS) as EnvironmentalReportStatus[];
 const ALL_STATUSES_OPTION = "__environmental-report-all-statuses__";
 
-function statusGroupOption(label: string) {
-  return `__environmental-report-status-group__:${label}`;
-}
-
 function initialQueueParams() {
   const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
   const page = Number(params.get("page"));
@@ -414,9 +410,10 @@ function QueueFilters({ from, to, rangeError, onFrom, onTo, onClearDates, filter
 
 function QueueStatusFilter({ filterStatus, onStatus }: { filterStatus: EnvironmentalReportStatus[]; onStatus: (value: EnvironmentalReportStatus[]) => void }) {
   return (
-    <Field className="lg:w-64">
+    <Field className="w-64 max-w-full">
       <FieldLabel htmlFor="environmental-status">Estado</FieldLabel>
       <Select
+        modal={false}
         multiple
         value={filterStatus}
         onValueChange={(value) => {
@@ -426,39 +423,23 @@ function QueueStatusFilter({ filterStatus, onStatus }: { filterStatus: Environme
             return;
           }
 
-          const selectedGroup = statusGroups.find((group) => selectedValues.includes(statusGroupOption(group.label)));
-          if (selectedGroup) {
-            const groupStatuses = new Set<string>(selectedGroup.statuses);
-            const isSelected = selectedGroup.statuses.every((status) => filterStatus.includes(status));
-            onStatus(isSelected
-              ? filterStatus.filter((status) => !groupStatuses.has(status))
-              : reportStatuses.filter((status) => filterStatus.includes(status) || groupStatuses.has(status)));
-            return;
-          }
-
           const selectedStatuses = selectedValues.filter((value): value is EnvironmentalReportStatus => reportStatuses.includes(value as EnvironmentalReportStatus));
           onStatus(reportStatuses.filter((status) => selectedStatuses.includes(status)));
         }}
       >
-        <SelectTrigger id="environmental-status"><SelectValue>{statusSummary(filterStatus)}</SelectValue></SelectTrigger>
+        <SelectTrigger id="environmental-status" className="min-w-0"><SelectValue className="min-w-0 overflow-hidden"><span className="block truncate">{statusSummary(filterStatus)}</span></SelectValue></SelectTrigger>
         <SelectContent align="start" className="min-w-80 max-h-[min(24rem,calc(var(--available-height)-5rem))] overflow-y-auto overscroll-contain">
-          <SelectItem value={ALL_STATUSES_OPTION} className="sticky top-0 z-10 bg-popover">Todos los estados</SelectItem>
+          <SelectItem value={ALL_STATUSES_OPTION} className="sticky top-0 z-20 bg-popover">Todos los estados</SelectItem>
           <SelectSeparator />
-          {statusGroups.map((group) => {
-            const isSelected = group.statuses.every((status) => filterStatus.includes(status));
-            return (
-              <SelectGroup key={group.label} variant="nested">
-                <SelectLabel className="font-semibold text-[var(--color-text)]">{group.label}</SelectLabel>
-                <SelectItem value={statusGroupOption(group.label)}>
-                  {isSelected ? `Limpiar subsección de ${group.label}` : `Seleccionar todos en ${group.label}`}
-                </SelectItem>
-                {group.statuses.map((status) => {
-                  const Icon = statusIcon[status];
-                  return <SelectItem key={status} value={status}><Icon aria-hidden />{ENVIRONMENTAL_REPORT_STATUS_LABELS[status]}</SelectItem>;
-                })}
-              </SelectGroup>
-            );
-          })}
+          {statusGroups.map((group) => (
+            <SelectGroup key={group.label} variant="nested" className="mx-0 pl-2 before:hidden">
+              <SelectLabel className="sticky top-10 z-10 bg-popover px-0 font-semibold text-[var(--color-text)] [@media(max-width:760px)]:top-12">{group.label}</SelectLabel>
+              {group.statuses.map((status) => {
+                const Icon = statusIcon[status];
+                return <SelectItem key={status} value={status} className="pl-5 before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-[var(--color-border-strong)] before:content-['']"><Icon aria-hidden />{ENVIRONMENTAL_REPORT_STATUS_LABELS[status]}</SelectItem>;
+              })}
+            </SelectGroup>
+          ))}
         </SelectContent>
       </Select>
     </Field>

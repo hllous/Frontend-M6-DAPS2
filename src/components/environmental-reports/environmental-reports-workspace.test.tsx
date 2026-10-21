@@ -68,7 +68,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(content).toHaveClass("overflow-y-auto");
   });
 
-  it("selects and clears a subsection, summarizes the selection, and clears all statuses", async () => {
+  it("keeps subsection bulk actions out of the Estado options", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
@@ -76,20 +76,12 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(trigger).toHaveTextContent("Todos los estados");
 
     await user.click(trigger);
-    let group = within(await screen.findByRole("group", { name: "Ingreso y revisión" }));
-    await user.click(group.getByRole("option", { name: "Seleccionar todos en Ingreso y revisión" }));
-    expect(trigger).toHaveTextContent("Recibido, En revisión");
-    let listbox = screen.getByRole("listbox");
-    group = within(within(listbox).getByRole("group", { name: "Ingreso y revisión" }));
-    expect(group.getByRole("option", { name: "Recibido" })).toHaveAttribute("aria-selected", "true");
-    expect(group.getByRole("option", { name: "En revisión" })).toHaveAttribute("aria-selected", "true");
-    expect(new URLSearchParams(window.location.search).getAll("status")).toEqual(["RECEIVED", "UNDER_REVIEW"]);
+    const listbox = await screen.findByRole("listbox");
+    expect(within(listbox).queryAllByRole("option", { name: /Seleccionar todos en|Limpiar subsección de/ })).toHaveLength(0);
+    expect(within(listbox).getByRole("option", { name: "Todos los estados" })).toBeVisible();
+    expect(within(listbox).getByRole("option", { name: "Recibido" })).toBeVisible();
+    expect(within(listbox).getByRole("option", { name: "En revisión" })).toBeVisible();
 
-    await user.click(group.getByRole("option", { name: "Limpiar subsección de Ingreso y revisión" }));
-    expect(trigger).toHaveTextContent("Todos los estados");
-    expect(new URLSearchParams(window.location.search).getAll("status")).toEqual([]);
-
-    listbox = screen.getByRole("listbox");
     await user.click(within(listbox).getByRole("option", { name: "Recibido" }));
     await user.click(within(listbox).getByRole("option", { name: "Derivado" }));
     await user.click(within(listbox).getByRole("option", { name: "Desestimado" }));
@@ -97,6 +89,21 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(listbox).getByRole("option", { name: "Todos los estados" }));
     expect(trigger).toHaveTextContent("Todos los estados");
     expect(new URLSearchParams(window.location.search).getAll("status")).toEqual([]);
+  });
+
+  it("keeps subsection titles sticky within the Estado list", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+
+    await user.click(screen.getByRole("combobox", { name: "Estado" }));
+    const listbox = await screen.findByRole("listbox");
+    const group = await screen.findByRole("group", { name: "Ingreso y revisión" });
+    const title = within(group).getByText("Ingreso y revisión");
+    expect(title).toHaveClass("sticky", "top-10", "bg-popover", "px-0");
+    expect(within(listbox).getByRole("option", { name: "Todos los estados" })).toHaveClass("pl-2");
+    expect(group).toHaveClass("mx-0", "pl-2", "before:hidden");
+    expect(within(group).getByRole("option", { name: "Recibido" })).toHaveClass("pl-5", "before:absolute", "before:inset-y-0");
   });
 
   it("toggles a status from the keyboard and exposes its selected state", async () => {
