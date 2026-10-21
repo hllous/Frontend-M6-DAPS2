@@ -156,7 +156,60 @@
 
 :focus-visible { outline: 3px solid var(--color-focus) !important; outline-offset: 2px !important; }
 
+/* Keep dialog chrome visible while existing form/body compositions scroll. */
+[data-slot="dialog-content"] {
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
+}
+
+[data-slot="dialog-content"] > :not([data-slot="dialog-header"]):not([data-slot="dialog-footer"]):not([data-slot="dialog-close"]) {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+[data-slot="dialog-header"],
+[data-slot="dialog-footer"] {
+  flex-shrink: 0;
+}
+
+[data-slot="dialog-header"] + :not([data-slot="dialog-close"]):not([data-slot="dialog-footer"]),
+[data-slot="sheet-header"] + :not([data-slot="sheet-close"]) {
+  margin-top: 1rem;
+}
+
+[data-slot="dialog-header"] + [data-slot="dialog-footer"] {
+  border-top: 0;
+}
+
+@media (width < 640px) {
+  [data-slot="dialog-footer"] {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  [data-slot="dialog-footer"] > button {
+    width: 100%;
+    height: auto;
+    min-height: 3rem;
+    white-space: normal;
+  }
+}
+
+html[data-overlay-motion="off"] :is(
+  [data-slot="dialog-overlay"], [data-slot="dialog-content"],
+  [data-slot="alert-dialog-overlay"], [data-slot="alert-dialog-content"],
+  [data-slot="sheet-overlay"], [data-slot="sheet-content"],
+  [data-slot="drawer-overlay"], [data-slot="drawer-popup"], [data-slot="drawer-content"],
+  [data-slot="popover-content"], [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"],
+  [data-slot="combobox-content"]
+) {
+  transition: none !important;
+  animation: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  [data-slot^="alert-dialog-"],
   [data-slot^="dialog-"],
   [data-slot^="sheet-"],
   [data-slot^="drawer-"],
