@@ -15,6 +15,7 @@ import {
   FilePlus2,
   Forward,
   MapPin,
+  MessageCircleQuestion,
   RefreshCw,
   Search,
   ShieldAlert,
@@ -61,6 +62,7 @@ import {
   type EnvironmentalReportPriority,
   type EnvironmentalReportStatus,
   type EnvironmentalReportType,
+  type RequestInformationInput,
   type SanctionOutcomeIntegrationException,
   type ViolationNotice,
 } from "@/lib/environmental-reports";
@@ -76,6 +78,7 @@ import { CreateRepairRequestDialog } from "@/components/services/create-repair-r
 import { RescheduleReasonDialog } from "@/components/services/reschedule-reason-dialog";
 import { ConfirmRescheduleDialog } from "@/components/services/confirm-reschedule-dialog";
 import { ReportDecisionDialog, type ReportDecision } from "./report-decision-dialog";
+import { RequestInformationDialog } from "./request-information-dialog";
 import { MAX_SEARCH_LENGTH, parseCoordinateField } from "@/lib/input-limits";
 
 type LoadState =
@@ -144,6 +147,17 @@ const statusVariant: Record<EnvironmentalReport["status"], "info" | "success" | 
 
 function visibleToScenario(report: EnvironmentalReport, scenario: OperationalScenario) {
   return scenario.actor.kind !== "FIELD" || report.assignedCrewId === scenario.actor.crewId;
+}
+
+function InformationRequestPending({ report }: { report: EnvironmentalReport }) {
+  return (
+    <div role="status" aria-label="Solicitud de información pendiente" className="mt-4 space-y-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm">
+      <p className="font-semibold text-[var(--color-text)]">Esperando la respuesta del vecino</p>
+      {report.informationRequestMessage && <p className="text-[var(--color-text)]">{report.informationRequestMessage}</p>}
+      <p className="text-[var(--color-text-secondary)]">Pedido el {formatDate(report.informationRequestedAt)}{report.informationRequestRequiredBy ? ` · Fecha sugerida: ${formatDate(report.informationRequestRequiredBy)}` : ""}</p>
+      <p className="text-[var(--color-text-secondary)]">Mientras esté pendiente no se puede derivar, desestimar ni cerrar el expediente. Si el pedido vence sin respuesta, M2 cancela el reclamo y el expediente pasa a Desestimado.</p>
+    </div>
+  );
 }
 
 function formatDate(value: string | null | undefined) {
@@ -379,6 +393,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
   const [noticeError, setNoticeError] = useState<string | null>(null);
   const [issueNoticeOpen, setIssueNoticeOpen] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<ReportDecision | null>(null);
+  const [requestInfoOpen, setRequestInfoOpen] = useState(false);
   const [rescheduleStep, setRescheduleStep] = useState<"reason" | "confirm" | null>(null);
   const reportTitleRef = useRef<HTMLHeadingElement>(null);
   const focusTitleAfterDialogRef = useRef(false);
@@ -462,6 +477,10 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
   const showNoticeIssuance = canIssueViolationNotice && report.status === "VIOLATION_FOUND" && Boolean(completedViolationInspection);
   const hasInspectionEvidence = Boolean(completedViolationInspection?.attachments?.length);
   const canSubmitNotice = showNoticeIssuance && hasInspectionEvidence && !violationNotice && !noticeLoading;
+  // #639: una sola solicitud abierta por expediente; mientras está pendiente el backend responde 409
+  // a derivar, desestimar y cerrar, así que esas acciones no se ofrecen.
+  const infoPending = report.informationRequestPending === true;
+  const canRequestInfo = isOffice && report.status === "UNDER_REVIEW" && Boolean(report.ticketId) && !infoPending;
   const canSchedule = isOffice && report.status === "UNDER_REVIEW" && !activeInspection;
   // La agenda de la inspección vive en su Servicio POINT: reprogramar es reprogramar
   // ese servicio (reschedule + confirm-reschedule), no crear otra inspección.
@@ -479,13 +498,28 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
     const sourceService = inspectionServices[inspection.id];
     return scenario.actor.kind === "FIELD" && Boolean(sourceService?.crewId && sourceService.crewId === scenario.actor.crewId);
   };
-  const actions: { action: Action; label: string; icon: typeof Check; tone?: string }[] = report.status === "RECEIVED"
+  const allActions: { action: Action; label: string; icon: typeof Check; tone?: string }[] = report.status === "RECEIVED"
     ? [{ action: "start-review", label: "Iniciar revisión", icon: Search }]
     : report.status === "UNDER_REVIEW"
       ? [{ action: "forward", label: "Derivar expediente", icon: Forward }, { action: "dismiss", label: "Desestimar expediente", icon: X, tone: "text-[var(--color-danger)]" }]
       : ["FORWARDED", "DISMISSED", "NO_VIOLATION", "SANCTIONED"].includes(report.status)
         ? [{ action: "close", label: "Cerrar expediente", icon: Check, tone: "text-[var(--color-danger)]" }]
         : [];
+  const actions = infoPending ? allActions.filter(({ action }) => action !== "forward" && action !== "dismiss" && action !== "close") : allActions;
+
+  async function handleRequestInformation(input: RequestInformationInput): Promise<string | null> {
+    try {
+      onReportUpdated(await environmentalReportsAdapter.requestInformation(report.id, input));
+      focusTitleAfterDialogRef.current = true;
+      return null;
+    } catch (error) {
+      if (error instanceof EnvironmentalReportRequestError && error.status === 409) {
+        try { onReportUpdated(await environmentalReportsAdapter.get(report.id)); } catch { /* the 409 message below stays */ }
+        return "No se pudo pedir la información: ya hay una solicitud pendiente o el expediente cambió. Se actualizó el estado.";
+      }
+      return getErrorMessage(error, "No se pudo pedir la información al vecino.");
+    }
+  }
 
   // El servicio recién creado en modo mock todavía no está vinculado a la inspección.
   const linkedService = (inspection: EnvironmentalInspection) => inspectionServices[inspection.id] ?? (inspection.id === inspections[inspections.length - 1]?.id ? scheduledService : null);
@@ -601,7 +635,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
           <div><h1 ref={reportTitleRef} tabIndex={-1} className="text-2xl font-bold tracking-tight text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 sm:text-[28px]">Expediente {report.id}</h1><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · actualización de {formatDate(report.updatedAt)}</p></div>
           <StatusBadge status={report.status} />
         </div>
-        {isOffice && actions.length > 0 && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Siguiente decisión de Oficina</h2><p className="mt-1 text-sm text-[var(--color-text-secondary)]">Las acciones disponibles respetan el estado actual del expediente.</p><div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`gap-2 ${tone ?? ""}`} onClick={() => { if (action === "forward" || action === "dismiss") setPendingDecision(action); else void onAction(action, report); }}><Icon data-icon="inline-start" aria-hidden />{label}</Button>)}</div></section>}
+        {isOffice && (actions.length > 0 || canRequestInfo || infoPending) && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Siguiente decisión de Oficina</h2><p className="mt-1 text-sm text-[var(--color-text-secondary)]">Las acciones disponibles respetan el estado actual del expediente.</p><div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`gap-2 ${tone ?? ""}`} onClick={() => { if (action === "forward" || action === "dismiss") setPendingDecision(action); else void onAction(action, report); }}><Icon data-icon="inline-start" aria-hidden />{label}</Button>)}{canRequestInfo && <Button variant="outline" className="gap-2" onClick={() => setRequestInfoOpen(true)}><MessageCircleQuestion data-icon="inline-start" aria-hidden />Pedir información al vecino</Button>}</div>{infoPending && <InformationRequestPending report={report} />}</section>}
         {isOffice && (canSchedule || canReprogram || canReinspect || orphanInspection) && <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="inspection-scheduling-title"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><CalendarDays aria-hidden /><div><h2 id="inspection-scheduling-title" className="text-sm font-bold text-[var(--color-text)]">Programación de inspección</h2><p className="mt-1 max-w-2xl text-sm text-[var(--color-text-secondary)]">{orphanInspection ? `La inspección ${orphanInspection.id} quedó registrada sin Servicio POINT: falta programar su fecha y su cuadrilla.` : canReinspect ? "La inspección anterior fue inconclusa. Registre una nueva inspección y un nuevo Servicio POINT." : "Defina la fecha y la cuadrilla. El tipo de Servicio POINT se determina automáticamente."}</p></div></div><div className="flex flex-wrap gap-2">{orphanInspection && <Button className="gap-2" onClick={() => { setScheduleMode("service"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />Programar servicio</Button>}{(canSchedule || canReinspect) && <Button className="gap-2" onClick={() => { setScheduleMode(canReinspect ? "reinspection" : "schedule"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />{canReinspect ? "Programar reinspección" : "Programar inspección"}</Button>}{canReprogram && <Button variant="outline" className="gap-2" onClick={() => setRescheduleStep(activeService?.status === "RESCHEDULED" ? "confirm" : "reason")}><RefreshCw data-icon="inline-start" aria-hidden />{activeService?.status === "RESCHEDULED" ? "Confirmar nueva fecha" : "Reprogramar inspección"}</Button>}</div></div></section>}
         {scheduleError && <Alert variant="danger">{scheduleError}</Alert>}
         {canViewViolationNotice && completedViolationInspection && <ViolationNoticePanel inspection={completedViolationInspection} notice={violationNotice} loading={noticeLoading} error={noticeError} showIssue={showNoticeIssuance} canIssue={canSubmitNotice} hasEvidence={hasInspectionEvidence} onIssue={() => setIssueNoticeOpen(true)} />}
@@ -610,6 +644,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
         {visibleClosure && <EnvironmentalReportClosurePanel closure={visibleClosure} />}
         {canViewSanctionOutcome && report.sanctionOutcome && <SanctionOutcomePanel outcome={report.sanctionOutcome} />}
       </div>
+       <RequestInformationDialog open={requestInfoOpen} reportId={report.id} finalFocus={dialogFinalFocus} onOpenChange={setRequestInfoOpen} onConfirm={handleRequestInformation} />
        <ReportDecisionDialog decision={pendingDecision} reportId={report.id} finalFocus={dialogFinalFocus} onOpenChange={(open) => { if (!open) setPendingDecision(null); }} onConfirm={async (decision, reason) => { const error = await onAction(decision, report, reason); if (error === null) focusTitleAfterDialogRef.current = true; return error; }} />
        <InspectionSchedulingDialog key={scheduleOpen ? scheduleMode : "closed"} open={scheduleOpen} mode={scheduleMode} initial={scheduleMode === "service" && serviceDraft?.inspectionId === orphanInspection?.id ? serviceDraft : null} onOpenChange={setScheduleOpen} onSubmit={scheduleMode === "service" ? handleScheduleService : handleSchedule} />
        <RescheduleReasonDialog open={rescheduleStep === "reason"} onOpenChange={(open) => { if (!open) setRescheduleStep((step) => step === "reason" ? null : step); }} service={activeService} onRescheduled={(updated) => { replaceInspectionService(updated); setRescheduleStep("confirm"); }} />
