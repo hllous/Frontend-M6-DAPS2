@@ -21,7 +21,7 @@ function SelectGroup({
       data-variant={variant}
       className={cn(
         "scroll-my-1 p-1",
-        variant === "nested" && "mx-3 my-1 border-l border-[var(--color-border-strong)] py-0 pr-0 pl-1.5",
+        variant === "nested" && "relative mx-3 my-1 py-0 pr-0 pl-1.5 before:absolute before:top-6 before:bottom-0 before:left-0 before:w-px before:bg-[var(--color-border-strong)] before:content-['']",
         className
       )}
       {...props}
