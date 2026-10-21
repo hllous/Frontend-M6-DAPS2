@@ -79,7 +79,8 @@ describe("VehicleCatalogPanel", () => {
 
     await user.click(await screen.findByRole("button", { name: "Registrar vehículo" }));
     await user.type(screen.getByLabelText("Patente"), "AA 999 ZZ");
-    await user.selectOptions(within(screen.getByRole("dialog")).getByLabelText("Tipo de vehículo"), "VAN");
+    await user.click(within(screen.getByRole("dialog")).getByRole("combobox", { name: "Tipo de vehículo" }));
+    await user.click(await screen.findByRole("option", { name: "Camioneta utilitaria" }));
     await user.clear(screen.getByLabelText("Capacidad (toneladas)"));
     await user.type(screen.getByLabelText("Capacidad (toneladas)"), "5");
     await user.click(screen.getByRole("button", { name: "Guardar vehículo" }));
@@ -126,8 +127,9 @@ describe("Vehicle catalog pagination", () => {
     await user.click(screen.getByRole("button", { name: "Siguiente" }));
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 20 })));
     expect(await screen.findByText("Mostrando 21–40 de 57")).toBeVisible();
-    for (const [label, value] of [["Estado", "true"], ["Tipo de vehículo", "VAN"]]) {
-      await user.selectOptions(screen.getByLabelText(label), value);
+    for (const [label, option] of [["Estado", "Activos"], ["Tipo de vehículo", "Camioneta utilitaria"]]) {
+      await user.click(screen.getByRole("combobox", { name: label }));
+      await user.click(await screen.findByRole("option", { name: option }));
       await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
       expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
       await user.click(screen.getByRole("button", { name: "Siguiente" }));
@@ -145,7 +147,8 @@ it("clamps the current page after its last active vehicle is deactivated", async
   const user = userEvent.setup();
   render(<VehicleCatalogPanel scenario={scenarios.officeDutyQueue} />);
   await screen.findByText("ZZ 999 ZZ");
-  await user.selectOptions(screen.getByLabelText("Estado"), "true");
+  await user.click(screen.getByRole("combobox", { name: "Estado" }));
+  await user.click(await screen.findByRole("option", { name: "Activos" }));
   await user.click(await screen.findByRole("button", { name: "Siguiente" }));
   await screen.findByText("Página 2 de 3");
   await user.click(screen.getByRole("button", { name: "Siguiente" }));

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseCatalogBOption } from "./support/catalog-612-controls";
 
 test.describe("ServiceType catalog management #102", () => {
   test("Office can create, edit, and logically deactivate a ServiceType while locked fields stay read-only", async ({ page }) => {
@@ -32,7 +33,7 @@ test.describe("ServiceType catalog management #102", () => {
     await expect(deactivateDialog.getByRole("heading", { name: `Confirmar baja del tipo de servicio ${code}` })).toBeVisible();
     await deactivateDialog.getByRole("button", { name: `Dar de baja el tipo de servicio ${code}` }).click();
     await expect(page.getByText("Tipo de servicio dado de baja")).toBeVisible();
-    await page.getByLabel("Filtrar por estado").selectOption("false");
+    await chooseCatalogBOption(page, page.getByRole("combobox", { name: "Filtrar por estado" }), "Inactivos");
     await expect(page.getByText(code)).toBeVisible();
     await expect(page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: "Eliminar" })).toHaveCount(0);
   });

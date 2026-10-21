@@ -6,9 +6,19 @@ import { useEffect, useState, type FormEvent } from "react";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
-import { formControlClass } from "@/components/ui/form-control";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import {
   serviceTypeCategorySchema,
@@ -22,6 +32,28 @@ import {
 import type { OperationalScenario } from "@/lib/scenarios";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { Input } from "@/components/ui/input";
+import { notifySuccess } from "@/components/ui/feedback";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import styles from "./catalog-panel.module.css";
 
 const categories: Array<{ value: ServiceTypeCategory; label: string }> = [
@@ -38,15 +70,41 @@ const modes: Array<{ value: ServiceTypeMode; label: string }> = [
   { value: "POINT", label: "Punto" },
 ];
 
-const tableColumnClasses = ["w-[13%]", "w-[26%]", "w-[15%]", "w-[9%]", "w-[8%]", "w-[8%]", "w-[21%]"] as const;
+const tableColumnClasses = [
+  "w-[13%]",
+  "w-[26%]",
+  "w-[15%]",
+  "w-[9%]",
+  "w-[8%]",
+  "w-[8%]",
+  "w-[21%]",
+] as const;
 
-const initialCreate = { code: "", name: "", category: "WASTE_COLLECTION" as ServiceTypeCategory, mode: "ROUTE" as ServiceTypeMode, requiresVehicle: true };
+const initialCreate = {
+  code: "",
+  name: "",
+  category: "WASTE_COLLECTION" as ServiceTypeCategory,
+  mode: "ROUTE" as ServiceTypeMode,
+  requiresVehicle: true,
+};
 
-type LoadState = { status: "loading"; rowCount: number } | { status: "ready"; items: ServiceType[] } | { status: "error"; message: string };
+type LoadState =
+  | { status: "loading"; rowCount: number }
+  | { status: "ready"; items: ServiceType[] }
+  | { status: "error"; message: string };
 
-export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario }) {
-  const canManage = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("serviceType:manage");
-  const [state, setState] = useState<LoadState>({ status: "loading", rowCount: 5 });
+export function ServiceTypesPanel({
+  scenario,
+}: {
+  scenario: OperationalScenario;
+}) {
+  const canManage =
+    scenario.actor.kind === "OFFICE" &&
+    scenario.capabilities.includes("serviceType:manage");
+  const [state, setState] = useState<LoadState>({
+    status: "loading",
+    rowCount: 5,
+  });
   const [search, setSearch] = useState("");
   const [active, setActive] = useState("all");
   const [category, setCategory] = useState<ServiceTypeCategory | "">("");
@@ -57,7 +115,6 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
   const [deactivating, setDeactivating] = useState<ServiceType | null>(null);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
@@ -65,7 +122,15 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
   useEffect(() => {
     let isCurrent = true;
     async function requestServiceTypes() {
-      setState((previous) => ({ status: "loading", rowCount: previous.status === "ready" ? previous.items.length : previous.status === "loading" ? previous.rowCount : 5 }));
+      setState((previous) => ({
+        status: "loading",
+        rowCount:
+          previous.status === "ready"
+            ? previous.items.length
+            : previous.status === "loading"
+              ? previous.rowCount
+              : 5,
+      }));
       try {
         const result = await serviceTypesAdapter.list({
           search: search || undefined,
@@ -73,27 +138,40 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
           category: category || undefined,
           mode: mode || undefined,
         });
-        if (isCurrent) setState({ status: "ready", items: result.serviceTypes });
+        if (isCurrent)
+          setState({ status: "ready", items: result.serviceTypes });
       } catch (error) {
-        if (isCurrent) setState({ status: "error", message: getErrorMessage(error, "No se pudieron cargar los tipos de servicio.") });
+        if (isCurrent)
+          setState({
+            status: "error",
+            message: getErrorMessage(
+              error,
+              "No se pudieron cargar los tipos de servicio.",
+            ),
+          });
       }
     }
     void requestServiceTypes();
-    return () => { isCurrent = false; };
+    return () => {
+      isCurrent = false;
+    };
   }, [active, category, mode, requestVersion, search]);
 
   const submitCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage(null);
+
     setCreateError(null);
     try {
       await serviceTypesAdapter.create(createDraft);
       setCreateDraft(initialCreate);
       setShowCreate(false);
-      setMessage("Tipo de servicio creado.");
+      notifySuccess("Tipo de servicio creado.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      const errorMessage = getErrorMessage(error, "No se pudo crear el tipo de servicio.");
+      const errorMessage = getErrorMessage(
+        error,
+        "No se pudo crear el tipo de servicio.",
+      );
       setCreateError(errorMessage);
     }
   };
@@ -101,15 +179,22 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
   const submitEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editing) return;
-    setMessage(null);
+
     setEditError(null);
     try {
-      await serviceTypesAdapter.update(editing.id, { name: editing.name, requiresVehicle: editing.requiresVehicle, active: editing.active });
+      await serviceTypesAdapter.update(editing.id, {
+        name: editing.name,
+        requiresVehicle: editing.requiresVehicle,
+        active: editing.active,
+      });
       setEditing(null);
-      setMessage("Tipo de servicio actualizado.");
+      notifySuccess("Tipo de servicio actualizado.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      const errorMessage = getErrorMessage(error, "No se pudo actualizar el tipo de servicio.");
+      const errorMessage = getErrorMessage(
+        error,
+        "No se pudo actualizar el tipo de servicio.",
+      );
       setEditError(errorMessage);
     }
   };
@@ -126,52 +211,344 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
     try {
       await serviceTypesAdapter.remove(deactivating.id);
       setDeactivating(null);
-      setMessage("Tipo de servicio dado de baja. Los servicios existentes conservan su configuración.");
+      notifySuccess(
+        "Tipo de servicio dado de baja. Los servicios existentes conservan su configuración.",
+      );
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      setDeactivateError(error instanceof ServiceTypeRequestError ? error.message : "No se pudo dar de baja el tipo de servicio.");
+      setDeactivateError(
+        error instanceof ServiceTypeRequestError
+          ? error.message
+          : "No se pudo dar de baja el tipo de servicio.",
+      );
     } finally {
       setIsSubmittingDeactivate(false);
     }
   };
 
   return (
-    <section aria-labelledby="service-types-title" className="flex flex-col gap-6">
+    <section
+      aria-labelledby="service-types-title"
+      className="flex flex-col gap-6"
+    >
       <CatalogPageHeader
         title="Tipos de servicio"
         titleId="service-types-title"
         description="Defina cómo se programan y ejecutan los servicios urbanos."
-        actions={canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nuevo tipo de servicio"}</Button> : null}
+        actions={
+          canManage ? (
+            <Button
+              type="button"
+              onClick={() => {
+                setShowCreate((value) => !value);
+                setEditing(null);
+              }}
+            >
+              {showCreate ? "Cerrar alta" : "Nuevo tipo de servicio"}
+            </Button>
+          ) : null
+        }
       />
 
-      {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Esta sesión puede consultar el catálogo, pero no administrarlo.</p> : null}
-      {message ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{message}</p> : null}
+      {!canManage ? (
+        <Alert role="status">
+          <AlertDescription>
+            Esta sesión puede consultar el catálogo, pero no administrarlo.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {showCreate && canManage ? (
-        <form onSubmit={submitCreate} className="rounded-xl border border-border bg-card p-5">
-          <h2 className="text-lg font-semibold">Alta de tipo de servicio</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Código, categoría y modo quedan fijos al crear el tipo.</p>
-          <FieldGroup className="mt-5 grid gap-4 md:grid-cols-2">
-            <Field><FieldLabel htmlFor="service-type-code">Código</FieldLabel><input id="service-type-code" className={formControlClass} required value={createDraft.code} aria-invalid={Boolean(createError)} aria-describedby={createError ? "service-type-code-error" : undefined} onChange={(event) => setCreateDraft({ ...createDraft, code: event.target.value })} /><FieldError id="service-type-code-error">{createError}</FieldError></Field>
-            <Field><FieldLabel htmlFor="service-type-name">Nombre</FieldLabel><input id="service-type-name" className={formControlClass} required value={createDraft.name} onChange={(event) => setCreateDraft({ ...createDraft, name: event.target.value })} /></Field>
-            <Field><FieldLabel htmlFor="service-type-category">Categoría</FieldLabel><select id="service-type-category" className={formControlClass} value={createDraft.category} onChange={(event) => { const parsed = serviceTypeCategorySchema.safeParse(event.target.value); if (parsed.success) setCreateDraft({ ...createDraft, category: parsed.data }); }}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
-            <Field><FieldLabel htmlFor="service-type-mode">Modo</FieldLabel><select id="service-type-mode" className={formControlClass} value={createDraft.mode} onChange={(event) => { const parsed = serviceTypeModeSchema.safeParse(event.target.value); if (parsed.success) setCreateDraft({ ...createDraft, mode: parsed.data }); }}>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
-            <label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm md:col-span-2"><input type="checkbox" checked={createDraft.requiresVehicle} onChange={(event) => setCreateDraft({ ...createDraft, requiresVehicle: event.target.checked })} /> Requiere vehículo</label>
-          </FieldGroup>
-          <div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button><Button type="submit">Crear tipo</Button></div>
+        <form onSubmit={submitCreate}>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>Alta de tipo de servicio</h2>
+              </CardTitle>
+              <CardDescription>
+                Código, categoría y modo quedan fijos al crear el tipo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup className="grid gap-4 md:grid-cols-2">
+                <Field data-invalid={Boolean(createError)}>
+                  <FieldLabel htmlFor="service-type-code">Código</FieldLabel>
+                  <Input
+                    id="service-type-code"
+                    required
+                    value={createDraft.code}
+                    aria-invalid={Boolean(createError)}
+                    aria-describedby={
+                      createError ? "service-type-code-error" : undefined
+                    }
+                    onChange={(event) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        code: event.target.value,
+                      })
+                    }
+                  />
+                  <FieldError id="service-type-code-error">
+                    {createError}
+                  </FieldError>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="service-type-name">Nombre</FieldLabel>
+                  <Input
+                    id="service-type-name"
+                    required
+                    value={createDraft.name}
+                    onChange={(event) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        name: event.target.value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="service-type-category">
+                    Categoría
+                  </FieldLabel>
+                  <Select
+                    items={Object.fromEntries([
+                      ...categories.map((item) => [item.value, item.label]),
+                    ])}
+                    value={createDraft.category}
+                    onValueChange={(value) => {
+                      if (value !== null) {
+                        const parsed =
+                          serviceTypeCategorySchema.safeParse(value);
+                        if (parsed.success)
+                          setCreateDraft({
+                            ...createDraft,
+                            category: parsed.data,
+                          });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="service-type-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {categories.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="service-type-mode">Modo</FieldLabel>
+                  <Select
+                    items={Object.fromEntries([
+                      ...modes.map((item) => [item.value, item.label]),
+                    ])}
+                    value={createDraft.mode}
+                    onValueChange={(value) => {
+                      if (value !== null) {
+                        const parsed = serviceTypeModeSchema.safeParse(value);
+                        if (parsed.success)
+                          setCreateDraft({ ...createDraft, mode: parsed.data });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="service-type-mode">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {modes.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field orientation="horizontal" className="md:col-span-2">
+                  <Checkbox
+                    id="service-types-panel-requires-vehicle-create"
+                    checked={createDraft.requiresVehicle}
+                    onCheckedChange={(checked) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        requiresVehicle: checked,
+                      })
+                    }
+                  />
+                  <FieldLabel htmlFor="service-types-panel-requires-vehicle-create">
+                    Requiere vehículo
+                  </FieldLabel>
+                </Field>
+              </FieldGroup>
+            </CardContent>
+            <CardFooter className="justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreate(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">Crear tipo</Button>
+            </CardFooter>
+          </Card>
         </form>
       ) : null}
 
-      <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_160px_190px_150px]">
-        <label className="flex flex-col gap-1 text-sm font-semibold">Buscar<input aria-label="Buscar tipos de servicio" className={formControlClass} placeholder="Código o nombre" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => setSearch(event.target.value)} /></label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">Estado<select aria-label="Filtrar por estado" className={formControlClass} value={active} onChange={(event) => setActive(event.target.value)}><option value="all">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select></label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">Categoría<select aria-label="Filtrar por categoría" className={formControlClass} value={category} onChange={(event) => setCategory(event.target.value as ServiceTypeCategory | "")}><option value="">Todas</option>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">Modo<select aria-label="Filtrar por modo" className={formControlClass} value={mode} onChange={(event) => setMode(event.target.value as ServiceTypeMode | "")}><option value="">Todos</option>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-      </div>
+      <Card>
+        <CardContent>
+          <FieldGroup className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_160px_190px_150px]">
+            <Field>
+              <FieldLabel htmlFor="service-types-panel-filter-1">
+                Buscar
+              </FieldLabel>
+              <Input
+                id="service-types-panel-filter-1"
+                aria-label="Buscar tipos de servicio"
+                placeholder="Código o nombre"
+                value={search}
+                maxLength={MAX_SEARCH_LENGTH}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="service-types-panel-filter-2">
+                Estado
+              </FieldLabel>
+              <Select
+                items={Object.fromEntries([
+                  ["all", "Todos"],
+                  ["true", "Activos"],
+                  ["false", "Inactivos"],
+                ])}
+                value={active}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setActive(value);
+                  }
+                }}
+              >
+                <SelectTrigger
+                  id="service-types-panel-filter-2"
+                  aria-label="Filtrar por estado"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="true">Activos</SelectItem>
+                    <SelectItem value="false">Inactivos</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="service-types-panel-filter-3">
+                Categoría
+              </FieldLabel>
+              <Select
+                items={Object.fromEntries([
+                  ["", "Todas"],
+                  ...categories.map((item) => [item.value, item.label]),
+                ])}
+                value={category}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setCategory(value as ServiceTypeCategory | "");
+                  }
+                }}
+              >
+                <SelectTrigger
+                  id="service-types-panel-filter-3"
+                  aria-label="Filtrar por categoría"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="">Todas</SelectItem>
+                    {categories.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="service-types-panel-filter-4">
+                Modo
+              </FieldLabel>
+              <Select
+                items={Object.fromEntries([
+                  ["", "Todos"],
+                  ...modes.map((item) => [item.value, item.label]),
+                ])}
+                value={mode}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setMode(value as ServiceTypeMode | "");
+                  }
+                }}
+              >
+                <SelectTrigger
+                  id="service-types-panel-filter-4"
+                  aria-label="Filtrar por modo"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="">Todos</SelectItem>
+                    {modes.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          </FieldGroup>
+        </CardContent>
+      </Card>
 
       {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio"><TableRowsSkeleton rowCount={state.rowCount} rowHeight="" columnClasses={tableColumnClasses} columnWidths={["w-16", "w-40", "w-28", "w-20", "w-8", "w-12", "w-44"]} columnLabels={["Código", "Nombre", "Categoría", "Modo", "Vehículo", "Estado", "Acciones"]} actionColumn actionCount={canManage ? 2 : 0} className={styles.tableWrap} tableClassName={`${styles.table} min-[761px]:table-fixed`} actionsClassName={styles.actions} /></div> : null}
-      {state.status === "error" ? <div role="alert" className="rounded-xl border border-destructive/30 bg-card p-5"><p>{state.message}</p><Button type="button" variant="outline" className="mt-3" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></div> : null}
-      {state.status === "ready" && state.items.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin tipos de servicio</EmptyTitle><EmptyDescription>No hay resultados para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty> : null}
+      {state.status === "error" ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {state.message}
+            <div className="mt-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3"
+                onClick={() => setRequestVersion((version) => version + 1)}
+              >
+                Reintentar
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {state.status === "ready" && state.items.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Sin tipos de servicio</EmptyTitle>
+            <EmptyDescription>
+              No hay resultados para los filtros seleccionados.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : null}
       {state.status === "ready" && state.items.length > 0 ? (
         <div className={styles.tableWrap}>
           <table className={`${styles.table} min-[761px]:table-fixed`}>
@@ -195,7 +572,122 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
         </div>
       ) : null}
 
-      {editing && canManage ? <form onSubmit={submitEdit} className="rounded-xl border border-border bg-card p-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">Editar tipo de servicio</h2><FieldDescription>El código, la categoría y el modo son de solo lectura porque ya pueden estar copiados en servicios programados.</FieldDescription></div><Button type="button" variant="ghost" onClick={() => setEditing(null)}>Cerrar</Button></div><FieldGroup className="mt-5 grid gap-4 md:grid-cols-2"><Field><FieldLabel htmlFor="edit-service-type-code">Código</FieldLabel><input id="edit-service-type-code" className={formControlClass} value={editing.code} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-service-type-name">Nombre</FieldLabel><input id="edit-service-type-name" className={formControlClass} required value={editing.name} aria-invalid={Boolean(editError)} aria-describedby={editError ? "edit-service-type-name-error" : undefined} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /><FieldError id="edit-service-type-name-error">{editError}</FieldError></Field><Field><FieldLabel htmlFor="edit-service-type-category">Categoría</FieldLabel><input id="edit-service-type-category" className={formControlClass} value={categories.find((item) => item.value === editing.category)?.label ?? editing.category} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-service-type-mode">Modo</FieldLabel><input id="edit-service-type-mode" className={formControlClass} value={editing.mode === "ROUTE" ? "Recorrido" : "Punto"} readOnly aria-readonly="true" /></Field><label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm"><input type="checkbox" checked={editing.requiresVehicle} onChange={(event) => setEditing({ ...editing, requiresVehicle: event.target.checked })} /> Requiere vehículo</label><label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(event) => setEditing({ ...editing, active: event.target.checked })} /> Activo</label></FieldGroup><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancelar</Button><Button type="submit">Guardar cambios</Button></div></form> : null}
+      {editing && canManage ? (
+        <form onSubmit={submitEdit}>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>Editar tipo de servicio</h2>
+              </CardTitle>
+              <CardDescription>
+                El código, la categoría y el modo son de solo lectura porque ya
+                pueden estar copiados en servicios programados.
+              </CardDescription>
+              <CardAction>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setEditing(null)}
+                >
+                  Cerrar
+                </Button>
+              </CardAction>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup className="grid gap-4 md:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="edit-service-type-code">
+                    Código
+                  </FieldLabel>
+                  <Input
+                    id="edit-service-type-code"
+                    value={editing.code}
+                    readOnly
+                    aria-readonly="true"
+                  />
+                </Field>
+                <Field data-invalid={Boolean(editError)}>
+                  <FieldLabel htmlFor="edit-service-type-name">
+                    Nombre
+                  </FieldLabel>
+                  <Input
+                    id="edit-service-type-name"
+                    required
+                    value={editing.name}
+                    aria-invalid={Boolean(editError)}
+                    aria-describedby={
+                      editError ? "edit-service-type-name-error" : undefined
+                    }
+                    onChange={(event) =>
+                      setEditing({ ...editing, name: event.target.value })
+                    }
+                  />
+                  <FieldError id="edit-service-type-name-error">
+                    {editError}
+                  </FieldError>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="edit-service-type-category">
+                    Categoría
+                  </FieldLabel>
+                  <Input
+                    id="edit-service-type-category"
+                    value={
+                      categories.find((item) => item.value === editing.category)
+                        ?.label ?? editing.category
+                    }
+                    readOnly
+                    aria-readonly="true"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="edit-service-type-mode">Modo</FieldLabel>
+                  <Input
+                    id="edit-service-type-mode"
+                    value={editing.mode === "ROUTE" ? "Recorrido" : "Punto"}
+                    readOnly
+                    aria-readonly="true"
+                  />
+                </Field>
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="service-types-panel-requires-vehicle-edit"
+                    checked={editing.requiresVehicle}
+                    onCheckedChange={(checked) =>
+                      setEditing({ ...editing, requiresVehicle: checked })
+                    }
+                  />
+                  <FieldLabel htmlFor="service-types-panel-requires-vehicle-edit">
+                    Requiere vehículo
+                  </FieldLabel>
+                </Field>
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="service-types-panel-active-edit"
+                    checked={editing.active}
+                    onCheckedChange={(checked) =>
+                      setEditing({ ...editing, active: checked })
+                    }
+                  />
+                  <FieldLabel htmlFor="service-types-panel-active-edit">
+                    Activo
+                  </FieldLabel>
+                </Field>
+              </FieldGroup>
+            </CardContent>
+            <CardFooter className="justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditing(null)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">Guardar cambios</Button>
+            </CardFooter>
+          </Card>
+        </form>
+      ) : null}
 
       <CatalogDeactivationDialog
         open={deactivating !== null}
@@ -212,7 +704,11 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
         onConfirm={() => void confirmDeactivation()}
         isSubmitting={isSubmittingDeactivate}
       >
-        {deactivateError ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{deactivateError}</p> : null}
+        {deactivateError ? (
+          <Alert variant="destructive">
+            <AlertDescription>{deactivateError}</AlertDescription>
+          </Alert>
+        ) : null}
       </CatalogDeactivationDialog>
     </section>
   );

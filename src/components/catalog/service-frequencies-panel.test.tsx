@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
@@ -10,7 +10,10 @@ import { resetServiceFrequencyFixtures } from "@/lib/service-frequency-fixtures"
 import { ServiceFrequenciesPanel } from "./service-frequencies-panel";
 
 const server = setupServer(...handlers);
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+  server.listen({ onUnhandledRequest: "error" });
+});
 afterEach(() => { server.resetHandlers(); resetServiceFrequencyFixtures(); });
 afterAll(() => server.close());
 
@@ -24,8 +27,10 @@ describe("ServiceFrequenciesPanel", () => {
     await user.click(screen.getByRole("button", { name: "Nueva frecuencia" }));
 
     const serviceTypeSelect = screen.getByRole("combobox", { name: "Tipo de servicio" });
-    expect(serviceTypeSelect).toHaveTextContent("Recolección domiciliaria");
-    expect(serviceTypeSelect).not.toHaveTextContent("Mantenimiento de contenedores");
+    await user.click(serviceTypeSelect);
+    expect(screen.getByRole("option", { name: "Recolección domiciliaria · WASTE-ROUTE" })).toBeVisible();
+    expect(screen.queryByRole("option", { name: /Mantenimiento de contenedores/ })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
     expect(screen.queryByText(/generar services/i)).not.toBeInTheDocument();
 
     await user.click(screen.getAllByRole("button", { name: "Editar" })[0]);
@@ -68,9 +73,11 @@ describe("ServiceFrequenciesPanel", () => {
     expect(row.querySelector('td[data-label="Acciones"]')).not.toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Nueva frecuencia" }));
-    const monday = screen.getByRole("checkbox", { name: "Lunes" });
+    const monday = screen.getByRole("button", { name: "Lunes" });
     monday.focus();
     expect(monday).toHaveFocus();
-    expect(monday.closest("label")).toHaveClass("focus-within:ring-[3px]");
+    expect(monday).toHaveAttribute("aria-pressed", "true");
+    await user.keyboard(" ");
+    expect(monday).toHaveAttribute("aria-pressed", "false");
   });
 });

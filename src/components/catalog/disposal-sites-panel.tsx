@@ -6,14 +6,52 @@ import { useEffect, useState, type FormEvent } from "react";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
-import { formControlClass } from "@/components/ui/form-control";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
-import { disposalSiteTypeSchema, disposalSitesAdapter, DisposalSiteRequestError, type DisposalSite, type DisposalSiteType } from "@/lib/disposal-sites";
+import {
+  disposalSiteTypeSchema,
+  disposalSitesAdapter,
+  DisposalSiteRequestError,
+  type DisposalSite,
+  type DisposalSiteType,
+} from "@/lib/disposal-sites";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { Input } from "@/components/ui/input";
+import { notifySuccess } from "@/components/ui/feedback";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import styles from "./catalog-panel.module.css";
 
 const siteTypes: Array<{ value: DisposalSiteType; label: string }> = [
@@ -22,11 +60,24 @@ const siteTypes: Array<{ value: DisposalSiteType; label: string }> = [
   { value: "RECYCLING_PLANT", label: "Planta de reciclaje" },
   { value: "COMPOSTING_PLANT", label: "Planta de compostaje" },
 ];
-const initialCreate = { code: "", siteType: "TRANSFER_STATION" as DisposalSiteType, name: "" };
-type LoadState = { status: "loading" } | { status: "ready"; items: DisposalSite[] } | { status: "error"; message: string };
+const initialCreate = {
+  code: "",
+  siteType: "TRANSFER_STATION" as DisposalSiteType,
+  name: "",
+};
+type LoadState =
+  | { status: "loading" }
+  | { status: "ready"; items: DisposalSite[] }
+  | { status: "error"; message: string };
 
-export function DisposalSitesPanel({ scenario }: { scenario: OperationalScenario }) {
-  const canManage = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("disposalSite:manage");
+export function DisposalSitesPanel({
+  scenario,
+}: {
+  scenario: OperationalScenario;
+}) {
+  const canManage =
+    scenario.actor.kind === "OFFICE" &&
+    scenario.capabilities.includes("disposalSite:manage");
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [active, setActive] = useState("all");
   const [siteType, setSiteType] = useState<DisposalSiteType | "">("");
@@ -37,7 +88,6 @@ export function DisposalSitesPanel({ scenario }: { scenario: OperationalScenario
   const [deactivating, setDeactivating] = useState<DisposalSite | null>(null);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
@@ -47,28 +97,69 @@ export function DisposalSitesPanel({ scenario }: { scenario: OperationalScenario
     async function requestSites() {
       setState({ status: "loading" });
       try {
-        const result = await disposalSitesAdapter.list({ active: active === "all" ? undefined : active === "true", siteType: siteType || undefined, search: search || undefined });
-        if (isCurrent) setState({ status: "ready", items: result.disposalSites });
+        const result = await disposalSitesAdapter.list({
+          active: active === "all" ? undefined : active === "true",
+          siteType: siteType || undefined,
+          search: search || undefined,
+        });
+        if (isCurrent)
+          setState({ status: "ready", items: result.disposalSites });
       } catch (error) {
-        if (isCurrent) setState({ status: "error", message: getErrorMessage(error, "No se pudieron cargar los sitios de disposición.") });
+        if (isCurrent)
+          setState({
+            status: "error",
+            message: getErrorMessage(
+              error,
+              "No se pudieron cargar los sitios de disposición.",
+            ),
+          });
       }
     }
     void requestSites();
-    return () => { isCurrent = false; };
+    return () => {
+      isCurrent = false;
+    };
   }, [active, requestVersion, search, siteType]);
 
   const submitCreate = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setMessage(null); setCreateError(null);
-    try { await disposalSitesAdapter.create(createDraft); setCreateDraft(initialCreate); setShowCreate(false); setMessage("Sitio de disposición creado."); setRequestVersion((version) => version + 1); }
-    catch (error) { const errorMessage = getErrorMessage(error, "No se pudo crear el sitio de disposición."); setCreateError(errorMessage); }
+    event.preventDefault();
+    setCreateError(null);
+    try {
+      await disposalSitesAdapter.create(createDraft);
+      setCreateDraft(initialCreate);
+      setShowCreate(false);
+      notifySuccess("Sitio de disposición creado.");
+      setRequestVersion((version) => version + 1);
+    } catch (error) {
+      const errorMessage = getErrorMessage(
+        error,
+        "No se pudo crear el sitio de disposición.",
+      );
+      setCreateError(errorMessage);
+    }
   };
   const submitEdit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); if (!editing) return; setMessage(null); setEditError(null);
-    try { await disposalSitesAdapter.update(editing.id, { name: editing.name, siteType: editing.siteType, active: editing.active }); setEditing(null); setMessage("Sitio de disposición actualizado."); setRequestVersion((version) => version + 1); }
-    catch (error) { const errorMessage = getErrorMessage(error, "No se pudo actualizar el sitio de disposición."); setEditError(errorMessage); }
+    event.preventDefault();
+    if (!editing) return;
+    setEditError(null);
+    try {
+      await disposalSitesAdapter.update(editing.id, {
+        name: editing.name,
+        siteType: editing.siteType,
+        active: editing.active,
+      });
+      setEditing(null);
+      notifySuccess("Sitio de disposición actualizado.");
+      setRequestVersion((version) => version + 1);
+    } catch (error) {
+      const errorMessage = getErrorMessage(
+        error,
+        "No se pudo actualizar el sitio de disposición.",
+      );
+      setEditError(errorMessage);
+    }
   };
   const deactivate = (item: DisposalSite) => {
-    setMessage(null);
     setDeactivateError(null);
     setDeactivating(item);
   };
@@ -79,30 +170,261 @@ export function DisposalSitesPanel({ scenario }: { scenario: OperationalScenario
     try {
       await disposalSitesAdapter.remove(deactivating.id);
       setDeactivating(null);
-      setMessage("Sitio de disposición dado de baja. Los registros existentes conservan su referencia.");
+      notifySuccess(
+        "Sitio de disposición dado de baja. Los registros existentes conservan su referencia.",
+      );
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      setDeactivateError(error instanceof DisposalSiteRequestError ? error.message : "No se pudo dar de baja el sitio de disposición.");
+      setDeactivateError(
+        error instanceof DisposalSiteRequestError
+          ? error.message
+          : "No se pudo dar de baja el sitio de disposición.",
+      );
     } finally {
       setIsSubmittingDeactivate(false);
     }
   };
 
   return (
-    <section aria-labelledby="disposal-sites-title" className="flex flex-col gap-6">
+    <section
+      aria-labelledby="disposal-sites-title"
+      className="flex flex-col gap-6"
+    >
       <CatalogPageHeader
         title="Sitios de disposición"
         titleId="disposal-sites-title"
         description="Destinos de disposición final que pueden referenciar los registros de recolección."
-        actions={canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nuevo sitio de disposición"}</Button> : null}
+        actions={
+          canManage ? (
+            <Button
+              type="button"
+              onClick={() => {
+                setShowCreate((value) => !value);
+                setEditing(null);
+              }}
+            >
+              {showCreate ? "Cerrar alta" : "Nuevo sitio de disposición"}
+            </Button>
+          ) : null
+        }
       />
-      {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Esta sesión puede consultar el catálogo, pero no administrarlo.</p> : null}
-      {message ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{message}</p> : null}
-      {showCreate && canManage ? <form onSubmit={submitCreate} className="rounded-xl border border-border bg-card p-5"><h2 className="text-lg font-semibold">Alta de sitio de disposición</h2><p className="mt-1 text-sm text-muted-foreground">El sitio podrá ser referenciado por registros de recolección existentes y futuros.</p><FieldGroup className="mt-5 grid gap-4 md:grid-cols-3"><Field><FieldLabel htmlFor="disposal-site-code">Código</FieldLabel><input id="disposal-site-code" className={formControlClass} required value={createDraft.code} aria-invalid={Boolean(createError)} aria-describedby={createError ? "disposal-site-code-error" : undefined} onChange={(event) => setCreateDraft({ ...createDraft, code: event.target.value })} /><FieldError id="disposal-site-code-error">{createError}</FieldError></Field><Field><FieldLabel htmlFor="disposal-site-name">Nombre</FieldLabel><input id="disposal-site-name" className={formControlClass} required value={createDraft.name} onChange={(event) => setCreateDraft({ ...createDraft, name: event.target.value })} /></Field><Field><FieldLabel htmlFor="disposal-site-type">Tipo</FieldLabel><select id="disposal-site-type" className={formControlClass} value={createDraft.siteType} onChange={(event) => { const parsed = disposalSiteTypeSchema.safeParse(event.target.value); if (parsed.success) setCreateDraft({ ...createDraft, siteType: parsed.data }); }}>{siteTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field></FieldGroup><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button><Button type="submit">Crear sitio</Button></div></form> : null}
-      <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[minmax(220px,1fr)_190px_160px]"><label className="flex flex-col gap-1 text-sm font-semibold">Buscar<input aria-label="Buscar sitios de disposición" className={formControlClass} placeholder="Código o nombre" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => setSearch(event.target.value)} /></label><label className="flex flex-col gap-1 text-sm font-semibold">Tipo<select aria-label="Filtrar por tipo de sitio" className={formControlClass} value={siteType} onChange={(event) => setSiteType(event.target.value as DisposalSiteType | "")}><option value="">Todos</option>{siteTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><label className="flex flex-col gap-1 text-sm font-semibold">Estado<select aria-label="Filtrar sitios por estado" className={formControlClass} value={active} onChange={(event) => setActive(event.target.value)}><option value="all">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select></label></div>
+      {!canManage ? (
+        <Alert role="status">
+          <AlertDescription>
+            Esta sesión puede consultar el catálogo, pero no administrarlo.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {showCreate && canManage ? (
+        <form onSubmit={submitCreate}>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>Alta de sitio de disposición</h2>
+              </CardTitle>
+              <CardDescription>
+                El sitio podrá ser referenciado por registros de recolección
+                existentes y futuros.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup className="grid gap-4 md:grid-cols-3">
+                <Field data-invalid={Boolean(createError)}>
+                  <FieldLabel htmlFor="disposal-site-code">Código</FieldLabel>
+                  <Input
+                    id="disposal-site-code"
+                    required
+                    value={createDraft.code}
+                    aria-invalid={Boolean(createError)}
+                    aria-describedby={
+                      createError ? "disposal-site-code-error" : undefined
+                    }
+                    onChange={(event) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        code: event.target.value,
+                      })
+                    }
+                  />
+                  <FieldError id="disposal-site-code-error">
+                    {createError}
+                  </FieldError>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="disposal-site-name">Nombre</FieldLabel>
+                  <Input
+                    id="disposal-site-name"
+                    required
+                    value={createDraft.name}
+                    onChange={(event) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        name: event.target.value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="disposal-site-type">Tipo</FieldLabel>
+                  <Select
+                    items={Object.fromEntries([
+                      ...siteTypes.map((item) => [item.value, item.label]),
+                    ])}
+                    value={createDraft.siteType}
+                    onValueChange={(value) => {
+                      if (value !== null) {
+                        const parsed = disposalSiteTypeSchema.safeParse(value);
+                        if (parsed.success)
+                          setCreateDraft({
+                            ...createDraft,
+                            siteType: parsed.data,
+                          });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="disposal-site-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {siteTypes.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </FieldGroup>
+            </CardContent>
+            <CardFooter className="justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreate(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">Crear sitio</Button>
+            </CardFooter>
+          </Card>
+        </form>
+      ) : null}
+      <Card>
+        <CardContent>
+          <FieldGroup className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_190px_160px]">
+            <Field>
+              <FieldLabel htmlFor="disposal-sites-panel-filter-1">
+                Buscar
+              </FieldLabel>
+              <Input
+                id="disposal-sites-panel-filter-1"
+                aria-label="Buscar sitios de disposición"
+                placeholder="Código o nombre"
+                value={search}
+                maxLength={MAX_SEARCH_LENGTH}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="disposal-sites-panel-filter-2">
+                Tipo
+              </FieldLabel>
+              <Select
+                items={Object.fromEntries([
+                  ["", "Todos"],
+                  ...siteTypes.map((item) => [item.value, item.label]),
+                ])}
+                value={siteType}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setSiteType(value as DisposalSiteType | "");
+                  }
+                }}
+              >
+                <SelectTrigger
+                  id="disposal-sites-panel-filter-2"
+                  aria-label="Filtrar por tipo de sitio"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="">Todos</SelectItem>
+                    {siteTypes.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="disposal-sites-panel-filter-3">
+                Estado
+              </FieldLabel>
+              <Select
+                items={Object.fromEntries([
+                  ["all", "Todos"],
+                  ["true", "Activos"],
+                  ["false", "Inactivos"],
+                ])}
+                value={active}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setActive(value);
+                  }
+                }}
+              >
+                <SelectTrigger
+                  id="disposal-sites-panel-filter-3"
+                  aria-label="Filtrar sitios por estado"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="true">Activos</SelectItem>
+                    <SelectItem value="false">Inactivos</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          </FieldGroup>
+        </CardContent>
+      </Card>
       {state.status === "loading" ? <div role="status" aria-label="Cargando sitios de disposición" className="flex flex-col gap-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : null}
-      {state.status === "error" ? <div role="alert" className="rounded-xl border border-destructive/30 bg-card p-5"><p>{state.message}</p><Button type="button" variant="outline" className="mt-3" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></div> : null}
-      {state.status === "ready" && state.items.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin sitios de disposición</EmptyTitle><EmptyDescription>No hay resultados para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty> : null}
+      {state.status === "error" ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {state.message}
+            <div className="mt-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3"
+                onClick={() => setRequestVersion((version) => version + 1)}
+              >
+                Reintentar
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {state.status === "ready" && state.items.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Sin sitios de disposición</EmptyTitle>
+            <EmptyDescription>
+              No hay resultados para los filtros seleccionados.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : null}
       {state.status === "ready" && state.items.length > 0 ? (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -120,7 +442,118 @@ export function DisposalSitesPanel({ scenario }: { scenario: OperationalScenario
           </table>
         </div>
       ) : null}
-      {editing && canManage ? <form onSubmit={submitEdit} className="rounded-xl border border-border bg-card p-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">Editar sitio de disposición</h2><FieldDescription>La baja siempre es lógica para preservar las referencias de los registros de recolección.</FieldDescription></div><Button type="button" variant="ghost" onClick={() => setEditing(null)}>Cerrar</Button></div><FieldGroup className="mt-5 grid gap-4 md:grid-cols-3"><Field><FieldLabel htmlFor="edit-disposal-site-code">Código</FieldLabel><input id="edit-disposal-site-code" className={formControlClass} value={editing.code} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-disposal-site-name">Nombre</FieldLabel><input id="edit-disposal-site-name" className={formControlClass} required value={editing.name} aria-invalid={Boolean(editError)} aria-describedby={editError ? "edit-disposal-site-name-error" : undefined} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /><FieldError id="edit-disposal-site-name-error">{editError}</FieldError></Field><Field><FieldLabel htmlFor="edit-disposal-site-type">Tipo</FieldLabel><select id="edit-disposal-site-type" className={formControlClass} value={editing.siteType} onChange={(event) => { const parsed = disposalSiteTypeSchema.safeParse(event.target.value); if (parsed.success) setEditing({ ...editing, siteType: parsed.data }); }}>{siteTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field><label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(event) => setEditing({ ...editing, active: event.target.checked })} /> Activo</label></FieldGroup><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancelar</Button><Button type="submit">Guardar cambios</Button></div></form> : null}
+      {editing && canManage ? (
+        <form onSubmit={submitEdit}>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <h2>Editar sitio de disposición</h2>
+              </CardTitle>
+              <CardDescription>
+                La baja siempre es lógica para preservar las referencias de los
+                registros de recolección.
+              </CardDescription>
+              <CardAction>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setEditing(null)}
+                >
+                  Cerrar
+                </Button>
+              </CardAction>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup className="grid gap-4 md:grid-cols-3">
+                <Field>
+                  <FieldLabel htmlFor="edit-disposal-site-code">
+                    Código
+                  </FieldLabel>
+                  <Input
+                    id="edit-disposal-site-code"
+                    value={editing.code}
+                    readOnly
+                    aria-readonly="true"
+                  />
+                </Field>
+                <Field data-invalid={Boolean(editError)}>
+                  <FieldLabel htmlFor="edit-disposal-site-name">
+                    Nombre
+                  </FieldLabel>
+                  <Input
+                    id="edit-disposal-site-name"
+                    required
+                    value={editing.name}
+                    aria-invalid={Boolean(editError)}
+                    aria-describedby={
+                      editError ? "edit-disposal-site-name-error" : undefined
+                    }
+                    onChange={(event) =>
+                      setEditing({ ...editing, name: event.target.value })
+                    }
+                  />
+                  <FieldError id="edit-disposal-site-name-error">
+                    {editError}
+                  </FieldError>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="edit-disposal-site-type">
+                    Tipo
+                  </FieldLabel>
+                  <Select
+                    items={Object.fromEntries([
+                      ...siteTypes.map((item) => [item.value, item.label]),
+                    ])}
+                    value={editing.siteType}
+                    onValueChange={(value) => {
+                      if (value !== null) {
+                        const parsed = disposalSiteTypeSchema.safeParse(value);
+                        if (parsed.success)
+                          setEditing({ ...editing, siteType: parsed.data });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="edit-disposal-site-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {siteTypes.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="disposal-sites-panel-active-edit"
+                    checked={editing.active}
+                    onCheckedChange={(checked) =>
+                      setEditing({ ...editing, active: checked })
+                    }
+                  />
+                  <FieldLabel htmlFor="disposal-sites-panel-active-edit">
+                    Activo
+                  </FieldLabel>
+                </Field>
+              </FieldGroup>
+            </CardContent>
+            <CardFooter className="justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditing(null)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">Guardar cambios</Button>
+            </CardFooter>
+          </Card>
+        </form>
+      ) : null}
       <CatalogDeactivationDialog
         open={Boolean(deactivating)}
         onOpenChange={(open) => {
@@ -136,7 +569,11 @@ export function DisposalSitesPanel({ scenario }: { scenario: OperationalScenario
         onConfirm={() => void confirmDeactivation()}
         isSubmitting={isSubmittingDeactivate}
       >
-        {deactivateError ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{deactivateError}</p> : null}
+        {deactivateError ? (
+          <Alert variant="destructive">
+            <AlertDescription>{deactivateError}</AlertDescription>
+          </Alert>
+        ) : null}
       </CatalogDeactivationDialog>
     </section>
   );

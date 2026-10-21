@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseCatalogBOption } from "./support/catalog-612-controls";
 
 test.describe("DisposalSite catalog management #103", () => {
   test("Office can create, edit, and logically deactivate a disposal site", async ({ page }) => {
@@ -29,7 +30,7 @@ test.describe("DisposalSite catalog management #103", () => {
     await expect(deactivateDialog.getByRole("heading", { name: `Confirmar baja del sitio de disposición ${code}` })).toBeVisible();
     await deactivateDialog.getByRole("button", { name: `Dar de baja el sitio de disposición ${code}` }).click();
     await expect(page.getByText("Sitio de disposición dado de baja")).toBeVisible();
-    await page.getByLabel("Filtrar sitios por estado").selectOption("false");
+    await chooseCatalogBOption(page, page.getByRole("combobox", { name: "Filtrar sitios por estado" }), "Inactivos");
     await expect(page.getByText(code)).toBeVisible();
     await expect(page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: /eliminar/i })).toHaveCount(0);
   });

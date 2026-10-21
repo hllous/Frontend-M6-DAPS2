@@ -43,11 +43,13 @@ describe("CrewCatalogPanel", () => {
     const members = within(dialog).getByRole("list", { name: "Integrantes de la cuadrilla" });
     expect(within(members).getByText("Ana Morales")).toBeVisible();
     expect(within(dialog).queryByText("user-ana")).not.toBeInTheDocument();
-    const memberSelect = within(dialog).getByRole("listbox", { name: "Agregar integrantes (M1)" });
+    const memberSelect = within(dialog).getByRole("combobox", { name: "Agregar integrantes (M1)" });
     await user.click(within(dialog).getByRole("button", { name: "Agregar integrantes" }));
     expect(memberSelect).toHaveAttribute("aria-invalid", "true");
     expect(memberSelect).toHaveAttribute("aria-describedby", "crew-members-error");
-    await user.selectOptions(memberSelect, "user-pedro");
+    await user.click(memberSelect);
+    await user.click(await screen.findByRole("option", { name: "Pedro Ruiz" }));
+    await user.keyboard("{Escape}");
     await user.click(within(dialog).getByRole("button", { name: "Agregar integrantes" }));
     expect(await within(members).findByText("Pedro Ruiz")).toBeVisible();
 
@@ -84,8 +86,9 @@ describe("CrewCatalogPanel pagination", () => {
     await user.click(screen.getByRole("button", { name: "Siguiente" }));
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 20 })));
     expect(await screen.findByText("Mostrando 21–40 de 57")).toBeVisible();
-    for (const [label, value] of [["Estado", "true"], ["Tipo de cuadrilla", "MUNICIPAL"], ["Turno", "MORNING"]]) {
-      await user.selectOptions(screen.getByLabelText(label), value);
+    for (const [label, option] of [["Estado", "Activas"], ["Tipo de cuadrilla", "Municipal"], ["Turno", "Mañana"]]) {
+      await user.click(screen.getByRole("combobox", { name: label }));
+      await user.click(await screen.findByRole("option", { name: option }));
       await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
       expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
       await user.click(screen.getByRole("button", { name: "Siguiente" }));
@@ -103,7 +106,8 @@ it("clamps the current page after its last active record is deactivated", async 
   const user = userEvent.setup();
   render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
   await screen.findByText("Equipo remoto");
-  await user.selectOptions(screen.getByLabelText("Estado"), "true");
+  await user.click(screen.getByRole("combobox", { name: "Estado" }));
+  await user.click(await screen.findByRole("option", { name: "Activas" }));
   await user.click(await screen.findByRole("button", { name: "Siguiente" }));
   await screen.findByText("Página 2 de 3");
   await user.click(screen.getByRole("button", { name: "Siguiente" }));

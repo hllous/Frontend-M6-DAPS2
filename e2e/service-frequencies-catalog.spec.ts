@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseCatalogBDate, chooseCatalogBOption } from "./support/catalog-612-controls";
 
 test.describe("ServiceFrequency rule authoring #112", () => {
   test("Office creates, edits, and closes a rule without a generation action", async ({ page }) => {
@@ -14,17 +15,22 @@ test.describe("ServiceFrequency rule authoring #112", () => {
     await expect(page.getByRole("button", { name: /generar/i })).toHaveCount(0);
 
     await page.getByRole("button", { name: "Nueva frecuencia" }).click();
-    await expect(page.getByRole("combobox", { name: "Tipo de servicio" })).toHaveValue("");
-    await expect(page.getByRole("combobox", { name: "Tipo de servicio" })).not.toContainText("Mantenimiento de contenedores");
-    await page.getByRole("combobox", { name: "Tipo de servicio" }).selectOption("st-waste-route");
-    await page.getByRole("combobox", { name: "Recorrido" }).selectOption("route-1");
-    await page.getByLabel("Válida desde").fill("2026-09-07");
+    const typePicker = page.getByRole("combobox", { name: "Tipo de servicio", exact: true });
+    await expect(typePicker).toContainText("Seleccione un tipo de recorrido");
+    await typePicker.click();
+    await expect(page.getByRole("option", { name: /Mantenimiento de contenedores/ })).toHaveCount(0);
+    await page.getByRole("option", { name: "Recolección domiciliaria · WASTE-ROUTE", exact: true }).click();
+    await chooseCatalogBOption(page, page.getByRole("combobox", { name: "Recorrido", exact: true }), "Recorrido Casco Histórico · REC-001");
+    await chooseCatalogBDate(page, page.getByRole("button", { name: "Válida desde", exact: true }), "2026-09-07");
+    await expect(page.getByRole("button", { name: "Válida desde", exact: true })).toContainText("07/09/2026");
+    const createRequest = page.waitForRequest((request) => request.url().endsWith("/api/service-frequencies") && request.method() === "POST");
     await page.getByRole("button", { name: "Crear frecuencia" }).click();
+    expect((await createRequest).postDataJSON()).toEqual({ serviceTypeId: "st-waste-route", routeId: "route-1", weekdays: [1], shift: "MORNING", validFrom: "2026-09-07", validTo: null });
     await expect(page.getByText(/Frecuencia creada/)).toBeVisible();
 
     const createdRow = page.getByRole("row").filter({ hasText: "Recolección domiciliaria" }).last();
     await createdRow.getByRole("button", { name: "Editar" }).click();
-    await page.getByLabel("Turno").last().selectOption("AFTERNOON");
+    await chooseCatalogBOption(page, page.getByRole("combobox", { name: "Turno", exact: true }), "Tarde");
     await page.getByRole("button", { name: "Guardar cambios" }).click();
     await expect(page.getByText(/Frecuencia actualizada/)).toBeVisible();
 
