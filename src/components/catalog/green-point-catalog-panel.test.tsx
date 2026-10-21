@@ -9,21 +9,33 @@ import { greenPointsAdapter } from "@/lib/green-points";
 import { GreenPointCatalogPanel } from "./green-point-catalog-panel";
 
 const server = setupServer(...handlers);
+async function openGreenPointDetail(
+  user: ReturnType<typeof userEvent.setup>,
+  row: HTMLElement,
+) {
+  await user.click(within(row).getByRole("button", { name: /^Ver detalle de / }));
+  return screen.getByRole("dialog");
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
 afterAll(() => server.close());
 
 describe("GreenPointCatalogPanel", () => {
   it("lists points for any authenticated actor and opens the detail without lifecycle actions", async () => {
+    const user = userEvent.setup();
     render(<GreenPointCatalogPanel scenario={scenarios.fieldCrewLeader} />);
     expect(await screen.findByRole("heading", { name: "Puntos verdes" })).toBeVisible();
     const row = await screen.findByRole("row", { name: /GP-001/ });
     expect(row).toBeVisible();
     expect(row.querySelector('th[data-label="Código"]')).not.toBeNull();
-    expect(row.querySelector('td[data-label="Acciones"]')).not.toBeNull();
-    expect(screen.getAllByRole("button", { name: "Ver detalle" }).length).toBeGreaterThan(0);
+    expect(row.querySelector('td[data-label="Acciones"]')).toBeNull();
+    expect(within(row).getByRole("button", { name: "Ver detalle de GP-001" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Registrar punto verde" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /dar de baja/i })).not.toBeInTheDocument();
+    const detail = await openGreenPointDetail(user, row);
+    expect(within(detail).getByRole("heading", { name: /Detalle del punto verde GP-001/ })).toBeVisible();
+    expect(within(detail).queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
   });
 
   it("lets Office edit the complete accepted-waste set and deactivate logically", async () => {
@@ -32,7 +44,8 @@ describe("GreenPointCatalogPanel", () => {
     render(<GreenPointCatalogPanel scenario={scenarios.officeDutyQueue} />);
     expect(await screen.findByRole("row", { name: /GP-001/ })).toBeVisible();
     const row = screen.getByRole("row", { name: /GP-001/ });
-    await user.click(within(row).getByRole("button", { name: "Editar" }));
+    const detail = await openGreenPointDetail(user, row);
+    await user.click(within(detail).getByRole("button", { name: "Editar" }));
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("conjunto completo");
     await user.click(within(dialog).getByRole("checkbox", { name: "Domiciliarios" }));
@@ -40,7 +53,8 @@ describe("GreenPointCatalogPanel", () => {
     expect(await screen.findByText("Punto verde actualizado con éxito.")).toBeVisible();
 
     const refreshedRow = await screen.findByRole("row", { name: /GP-001/ });
-    await user.click(within(refreshedRow).getByRole("button", { name: "Dar de baja" }));
+    const refreshedDetail = await openGreenPointDetail(user, refreshedRow);
+    await user.click(within(refreshedDetail).getByRole("button", { name: "Dar de baja" }));
     const confirmation = screen.getByRole("dialog");
     expect(confirmation).toHaveTextContent("GP-001");
     expect(within(confirmation).getByRole("button", { name: /Conservar el punto verde GP-001/ })).toBeVisible();
@@ -48,7 +62,8 @@ describe("GreenPointCatalogPanel", () => {
     await user.click(within(confirmation).getByRole("button", { name: /Conservar el punto verde GP-001/ }));
     expect(remove).not.toHaveBeenCalled();
 
-    await user.click(within(refreshedRow).getByRole("button", { name: "Dar de baja" }));
+    const refreshedDetailAgain = await openGreenPointDetail(user, refreshedRow);
+    await user.click(within(refreshedDetailAgain).getByRole("button", { name: "Dar de baja" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Dar de baja el punto verde GP-001/ }));
     expect(remove).toHaveBeenCalledWith("green-point-1");
     expect(await screen.findByText(/Punto verde dado de baja/)).toBeVisible();

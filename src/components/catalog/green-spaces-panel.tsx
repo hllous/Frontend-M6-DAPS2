@@ -2,12 +2,20 @@
 import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -99,6 +107,12 @@ export function GreenSpacesPanel({
   const [requestVersion, setRequestVersion] = useState(0);
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<GreenSpace | null>(null);
+  const [detailGreenSpace, setDetailGreenSpace] = useState<GreenSpace | null>(
+    null,
+  );
+  const [detailSheetSide, setDetailSheetSide] = useState<"right" | "bottom">(
+    "right",
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<GreenSpaceForm>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
@@ -106,6 +120,16 @@ export function GreenSpacesPanel({
   const [deactivating, setDeactivating] = useState<GreenSpace | null>(null);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(max-width: 760px)");
+    const updateSide = () =>
+      setDetailSheetSide(media.matches ? "bottom" : "right");
+    updateSide();
+    media.addEventListener("change", updateSide);
+    return () => media.removeEventListener("change", updateSide);
+  }, []);
 
   const query = useMemo<GreenSpaceQuery>(
     () => ({
@@ -187,6 +211,10 @@ export function GreenSpacesPanel({
     });
     setFormError(null);
     setFormOpen(true);
+  }
+
+  function openDetail(greenSpace: GreenSpace) {
+    setDetailGreenSpace(greenSpace);
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -395,15 +423,27 @@ export function GreenSpacesPanel({
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <caption className="sr-only">Espacios verdes registrados</caption>
-            <thead><tr><th scope="col">Nombre</th><th scope="col">Tipo</th><th scope="col">Superficie</th><th scope="col">Zona</th><th scope="col">Estado</th>{canManage ? <th scope="col"><span className="sr-only">Acciones</span></th> : null}</tr></thead>
+            <thead><tr><th scope="col">Nombre</th><th scope="col">Tipo</th><th scope="col">Superficie</th><th scope="col">Zona</th><th scope="col">Estado</th><th scope="col" className="sr-only">Abrir detalle</th></tr></thead>
             <tbody>{state.greenSpaces.map((greenSpace) => {
-              return <tr key={greenSpace.id}>
-                <th scope="row" data-label="Nombre">{greenSpace.name}</th>
+              return <tr key={greenSpace.id} className={styles.catalogRow}>
+                <th scope="row" data-label="Nombre">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Ver detalle de ${greenSpace.name}`}
+                    onClick={() => openDetail(greenSpace)}
+                    className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)]"
+                  >
+                    {greenSpace.name}
+                    <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
+                  </Button>
+                </th>
                 <td data-label="Tipo">{spaceTypeLabels[greenSpace.spaceType]}</td>
                 <td data-label="Superficie">{greenSpace.areaM2 === null ? "—" : `${greenSpace.areaM2.toLocaleString("es-AR")} m²`}</td>
                 <td data-label="Zona">{zoneLabel(zones, greenSpace.zoneId, zonesLoaded)}</td>
                 <td data-label="Estado"><span className="inline-flex items-center gap-1">{greenSpace.active ? <Check aria-hidden className="size-4 text-[var(--color-success)]" /> : <X aria-hidden className="size-4 text-muted-foreground" />}{greenSpace.active ? "Activo" : "Inactivo"}</span></td>
-                {canManage ? <td className={styles.actions} data-label="Acciones"><Button variant="outline" size="sm" onClick={() => openEdit(greenSpace)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{greenSpace.active ? <Button variant="destructive" size="sm" onClick={() => deactivate(greenSpace)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}
+                <td className={`${styles.rowChevron} px-4 py-3`} aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></td>
               </tr>;
             })}</tbody>
           </table>
@@ -444,6 +484,111 @@ export function GreenSpacesPanel({
           </Alert>
         ) : null}
       </CatalogDeactivationDialog>
+
+      <Sheet
+        open={Boolean(detailGreenSpace)}
+        onOpenChange={(open) => !open && setDetailGreenSpace(null)}
+      >
+        {detailGreenSpace ? (
+          <SheetContent
+            side={detailSheetSide}
+            className={
+              detailSheetSide === "bottom"
+                ? "max-h-[88dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)]"
+                : "w-[min(92vw,28rem)] overflow-y-auto"
+            }
+          >
+            <SheetHeader>
+              <SheetTitle>Detalle del espacio verde</SheetTitle>
+              <SheetDescription>
+                Información del espacio y su zona operativa.
+              </SheetDescription>
+            </SheetHeader>
+            <dl className="grid gap-4 px-4 text-sm sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Nombre
+                </dt>
+                <dd className="mt-0.5 font-medium">{detailGreenSpace.name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Tipo
+                </dt>
+                <dd className="mt-0.5">{spaceTypeLabels[detailGreenSpace.spaceType]}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Superficie
+                </dt>
+                <dd className="mt-0.5">
+                  {detailGreenSpace.areaM2 === null
+                    ? "Sin registrar"
+                    : `${detailGreenSpace.areaM2.toLocaleString("es-AR")} m²`}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Zona operativa
+                </dt>
+                <dd className="mt-0.5">
+                  {zoneLabel(zones, detailGreenSpace.zoneId, zonesLoaded)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Estado
+                </dt>
+                <dd className="mt-0.5">
+                  {detailGreenSpace.active ? "Activo" : "Inactivo"}
+                </dd>
+              </div>
+            </dl>
+            <SheetFooter className="gap-4 pt-0">
+              {canManage ? (
+                <section aria-label="Gestión" className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Gestión
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      const target = detailGreenSpace;
+                      setDetailGreenSpace(null);
+                      openEdit(target);
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" aria-hidden />
+                    Editar
+                  </Button>
+                </section>
+              ) : null}
+              {canManage && detailGreenSpace.active ? (
+                <section aria-label="Destructivas" className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Destructivas
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      const target = detailGreenSpace;
+                      setDetailGreenSpace(null);
+                      deactivate(target);
+                    }}
+                  >
+                    <Trash2 data-icon="inline-start" aria-hidden />
+                    Dar de baja
+                  </Button>
+                </section>
+              ) : null}
+            </SheetFooter>
+          </SheetContent>
+        ) : null}
+      </Sheet>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="overflow-y-auto">

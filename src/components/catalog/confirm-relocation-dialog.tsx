@@ -152,7 +152,7 @@ function ConfirmRelocationModalContent({
         className="flex flex-col gap-4"
       >
         <Alert role="note">
-          <AlertDescription>
+          <AlertDescription className="grid gap-2">
             <p className="font-medium text-foreground">
               Ubicación anterior registrada:
             </p>

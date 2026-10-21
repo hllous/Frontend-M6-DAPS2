@@ -11,8 +11,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Field, FieldDescription } from "@/components/ui/field";
 import {
   Item,
   ItemActions,
@@ -28,6 +27,7 @@ import {
   MAX_EVIDENCE_FILE_SIZE_BYTES,
 } from "@/lib/evidence-limits";
 import { containersAdapter, ContainerRequestError } from "@/lib/containers";
+import { EvidenceUploadField } from "./evidence-upload-field";
 
 export interface QueuedEvidenceFile {
   id: string;
@@ -185,20 +185,18 @@ export function EvidenceQueueView({
 
   return (
     <Field data-invalid={Boolean(fileValidationError)} data-disabled={disabled}>
-      <FieldLabel htmlFor={inputId}>Seleccionar archivo</FieldLabel>
+      <p className="text-sm font-medium text-foreground">Evidencia adjunta</p>
       <FieldDescription id={`${inputId}-help`}>
-        Evidencia adjunta opcional. Formatos JPEG, PNG, WebP o PDF hasta{" "}
-        {EVIDENCE_FILE_SIZE_LABEL}.
+        Formatos JPEG, PNG, WebP o PDF hasta {EVIDENCE_FILE_SIZE_LABEL}.
       </FieldDescription>
-      <Input
+      <EvidenceUploadField
         id={inputId}
-        type="file"
-        multiple
         accept={ACCEPTED_FILE_TYPES}
+        describedBy={`${inputId}-help${fileValidationError ? ` ${errorId}` : ""}`}
+        multiple
         onChange={onFileSelect}
         disabled={disabled}
-        aria-invalid={Boolean(fileValidationError)}
-        aria-describedby={`${inputId}-help${fileValidationError ? ` ${errorId}` : ""}`}
+        invalid={Boolean(fileValidationError)}
       />
       {fileValidationError && (
         <Alert id={errorId} variant="destructive">

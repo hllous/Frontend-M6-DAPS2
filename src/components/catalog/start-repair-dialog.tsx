@@ -101,7 +101,7 @@ function StartRepairModalContent({
         className="flex flex-col gap-4"
       >
         <Alert role="note">
-          <AlertDescription>
+          <AlertDescription className="grid gap-2">
             <p className="font-medium text-foreground">{container.code}</p>
             <p className="mt-1 text-muted-foreground">Estado actual: Dañado</p>
             <p className="text-muted-foreground">Nuevo estado: En reparación</p>

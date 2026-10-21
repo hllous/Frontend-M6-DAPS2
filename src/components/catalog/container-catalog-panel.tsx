@@ -17,8 +17,8 @@ import {
   ArchiveX,
   Check,
   CheckCircle2,
+  ChevronRight,
   Clock,
-  Eye,
   FileText,
   MapPin,
   Pencil,
@@ -56,6 +56,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Field,
   FieldDescription,
@@ -200,6 +208,9 @@ export function ContainerCatalogPanel({
   const [detailContainer, setDetailContainer] = useState<Container | null>(
     null,
   );
+  const [detailSheetSide, setDetailSheetSide] = useState<"right" | "bottom">(
+    "right",
+  );
   const [detailEvidence, setDetailEvidence] = useState<Attachment[]>([]);
   const [isLoadingEvidence, setIsLoadingEvidence] = useState(false);
 
@@ -226,6 +237,15 @@ export function ContainerCatalogPanel({
     null,
   );
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(max-width: 760px)");
+    const updateSide = () => setDetailSheetSide(media.matches ? "bottom" : "right");
+    updateSide();
+    media.addEventListener("change", updateSide);
+    return () => media.removeEventListener("change", updateSide);
+  }, []);
 
   useEffect(() => {
     if (startingRepairContainer || !pendingRepairFocusId.current) return;
@@ -660,19 +680,27 @@ export function ContainerCatalogPanel({
                 <th scope="col" className="px-4 py-3">Dirección</th>
                 <th scope="col" className="px-4 py-3">Capacidad</th>
                 <th scope="col" className="px-4 py-3">Estado</th>
-                <th scope="col" className="px-4 py-3">
-                  <span className="sr-only">Acciones</span>
-                </th>
+                <th scope="col" className="sr-only">Abrir detalle</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {state.containers.map((container) => {
                 const zone = zones.find((z) => z.id === container.zoneId);
-                const inFlight = findInFlightServiceForContainer(container, services);
                 return (
-                  <tr key={container.id}>
+                  <tr key={container.id} className={styles.catalogRow}>
                     <th scope="row" data-label="Código" className="px-4 py-3 font-semibold text-foreground">
-                      {container.code}
+                      <Button
+                        id={`container-detail-${container.id}`}
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Ver detalle de ${container.code}`}
+                        onClick={() => openDetail(container)}
+                        className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)]"
+                      >
+                        {container.code}
+                        <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
+                      </Button>
                     </th>
                     <td data-label="Tipo" className="px-4 py-3">{CONTAINER_TYPE_LABELS[container.containerType]}</td>
                     <td data-label="Zona" className="px-4 py-3">
@@ -683,141 +711,8 @@ export function ContainerCatalogPanel({
                     <td data-label="Estado" className="px-4 py-3">
                       <StatusBadge status={container.status} />
                     </td>
-                    <td data-label="Acciones" className={`${styles.actions} px-4 py-3`}>
-                      <Button
-                        id={`container-detail-${container.id}`}
-                        variant="outline"
-                        size="sm"
-
-                        onClick={() => openDetail(container)}
-                      >
-                        <Eye data-icon="inline-start" aria-hidden />
-                        Ver detalle
-                      </Button>
-                      <div className="flex flex-wrap gap-2 max-[760px]:hidden">
-                      {canManage && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEdit(container)}
-                        >
-                          <Pencil data-icon="inline-start" aria-hidden />
-                          Editar
-                        </Button>
-                      )}
-                      {canReport && container.status === "ACTIVE" && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setReportingOverflowContainer(container)}
-
-                          >
-                            <AlertTriangle data-icon="inline-start" aria-hidden />
-                            Reportar desborde
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setReportingDamageContainer(container)}
-
-                          >
-                            <AlertTriangle data-icon="inline-start" aria-hidden />
-                            Reportar daño
-                          </Button>
-                        </>
-                      )}
-                      {canManage && container.status === "OVERFLOWED" && (
-                        inFlight ? (
-                          <Tooltip><TooltipTrigger render={<Badge variant="info" className="max-w-full" tabIndex={0} data-testid={`in-flight-badge-${container.id}`} />}><Clock data-icon="inline-start" aria-hidden /><span className="truncate">Servicio en curso ({inFlight.id})</span></TooltipTrigger><TooltipContent>{`Servicio en curso vinculado: ${inFlight.id}`}</TooltipContent></Tooltip>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={servicesStatus !== "ready"}
-                            onClick={() => setEmptyContainer(container)}
-
-                          >
-                            <Check data-icon="inline-start" aria-hidden />
-                            Vaciar contenedor
-                          </Button>
-                        )
-                      )}
-                      {canManage && container.status === "ACTIVE" && (
-                        inFlight ? (
-                          <Tooltip><TooltipTrigger render={<Badge variant="info" className="max-w-full" tabIndex={0} data-testid={`in-flight-badge-${container.id}`} />}><Clock data-icon="inline-start" aria-hidden /><span className="truncate">Servicio en curso ({inFlight.id})</span></TooltipTrigger><TooltipContent>{`Servicio en curso vinculado: ${inFlight.id}`}</TooltipContent></Tooltip>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={servicesStatus !== "ready"}
-                            onClick={() => setStartRelocatingContainer(container)}
-
-                          >
-                            <RotateCcw data-icon="inline-start" aria-hidden />
-                            Reubicar
-                          </Button>
-                        )
-                      )}
-                      {canManage && container.status === "RELOCATING" && (
-                        inFlight ? (
-                          <Tooltip><TooltipTrigger render={<Badge variant="info" className="max-w-full" tabIndex={0} data-testid={`in-flight-badge-${container.id}`} />}><Clock data-icon="inline-start" aria-hidden /><span className="truncate">Servicio en curso ({inFlight.id})</span></TooltipTrigger><TooltipContent>{`Servicio en curso vinculado: ${inFlight.id}`}</TooltipContent></Tooltip>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={servicesStatus !== "ready"}
-                            onClick={() => setConfirmRelocatingContainer(container)}
-
-                          >
-                            <MapPin data-icon="inline-start" aria-hidden />
-                            Confirmar ubicación
-                          </Button>
-                        )
-                      )}
-                      {canManage && container.status === "DAMAGED" && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              pendingRepairFocusId.current = container.id;
-                              setStartingRepairContainer(container);
-                            }}
-
-                          >
-                            <Wrench data-icon="inline-start" aria-hidden />
-                            Iniciar reparación independiente
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={servicesStatus !== "ready" || Boolean(inFlight)}
-                            onClick={() => setRemovingContainer(container)}
-
-                          >
-                            <ArchiveX data-icon="inline-start" aria-hidden />
-                            Retirar contenedor
-                          </Button>
-                        </>
-                      )}
-                      {canManage && container.status === "UNDER_REPAIR" && (
-                        inFlight ? (
-                          <Tooltip><TooltipTrigger render={<Badge variant="info" className="max-w-full" tabIndex={0} data-testid={`in-flight-badge-${container.id}`} />}><Clock data-icon="inline-start" aria-hidden /><span className="truncate">Servicio en curso ({inFlight.id})</span></TooltipTrigger><TooltipContent>{`Servicio en curso vinculado: ${inFlight.id}`}</TooltipContent></Tooltip>
-                        ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={servicesStatus !== "ready"}
-                          onClick={() => setCompletingRepairContainer(container)}
-
-                        >
-                          <CheckCircle2 data-icon="inline-start" aria-hidden />
-                          Completar reparación independiente
-                        </Button>
-                        )
-                      )}
-                      </div>
+                    <td className={`${styles.rowChevron} px-4 py-3`} aria-hidden="true">
+                      <ChevronRight className="ml-auto size-4 text-muted-foreground" />
                     </td>
                   </tr>
                 );
@@ -1069,27 +964,34 @@ export function ContainerCatalogPanel({
         </DialogContent>
       </Dialog>
 
-      {/* Detail Dialog */}
-      <Dialog
+      {/* Detail Sheet */}
+      <Sheet
         open={Boolean(detailContainer)}
         onOpenChange={(open) => !open && closeDetail()}
       >
         {detailContainer && (
-          <DialogContent className="overflow-y-auto">
-            <DialogHeader>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <DialogTitle>
+          <SheetContent
+            side={detailSheetSide}
+            className={
+              detailSheetSide === "bottom"
+                ? "max-h-[88dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)]"
+                : "w-[min(92vw,28rem)] overflow-y-auto"
+            }
+          >
+            <SheetHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2 pr-8">
+                <SheetTitle>
                   Detalle del contenedor {detailContainer.code}
-                </DialogTitle>
+                </SheetTitle>
                 <StatusBadge status={detailContainer.status} />
               </div>
-              <DialogDescription>
+              <SheetDescription>
                 Información técnica y geográfica registrada en el inventario
                 urbano.
-              </DialogDescription>
-            </DialogHeader>
+              </SheetDescription>
+            </SheetHeader>
 
-            <dl className="grid grid-cols-2 gap-4 text-sm">
+            <dl className="grid grid-cols-2 gap-4 px-4 text-sm">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Tipo
@@ -1240,23 +1142,53 @@ export function ContainerCatalogPanel({
               </div>
             </dl>
 
-            <DialogFooter className="flex flex-col gap-2">
-              {(canReport && detailContainer.status === "ACTIVE") ||
-              (canManage &&
-                [
-                  "DAMAGED",
-                  "UNDER_REPAIR",
-                  "OVERFLOWED",
-                  "ACTIVE",
-                  "RELOCATING",
-                ].includes(detailContainer.status)) ? (
-                <div className="flex flex-wrap gap-2">
-                  {canReport && detailContainer.status === "ACTIVE" && (
+            <SheetFooter className="gap-4 pt-0">
+              {canManage && servicesStatus === "error" ? (
+                <Alert role="status">
+                  <AlertDescription>
+                    <p>{serviceLookupFailure}</p>
+                    <Button variant="outline" onClick={refreshServiceLookup}>
+                      Reintentar
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              {canManage ? (
+                <section aria-label="Gestión" className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Gestión
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      const target = detailContainer;
+                      closeDetail();
+                      openEdit(target);
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" aria-hidden />
+                    Editar
+                  </Button>
+                </section>
+              ) : null}
+
+              {((canReport && detailContainer.status === "ACTIVE") ||
+                (canManage &&
+                  ["OVERFLOWED", "ACTIVE", "RELOCATING"].includes(
+                    detailContainer.status,
+                  ))) && (
+                <section aria-label="Operación" className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Operación
+                  </h3>
+                  {canReport && detailContainer.status === "ACTIVE" ? (
                     <>
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
+                        className="w-full justify-start"
                         onClick={() => {
                           const target = detailContainer;
                           closeDetail();
@@ -1269,7 +1201,7 @@ export function ContainerCatalogPanel({
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
+                        className="w-full justify-start"
                         onClick={() => {
                           const target = detailContainer;
                           closeDetail();
@@ -1280,197 +1212,150 @@ export function ContainerCatalogPanel({
                         Reportar daño
                       </Button>
                     </>
-                  )}
-                  {servicesStatus === "error" ? (
-                    <Alert role="status">
-                      <AlertDescription>
-                        <p>{serviceLookupFailure}</p>
-                        <Button
-                          variant="outline"
-                          onClick={refreshServiceLookup}
-                        >
-                          Reintentar
-                        </Button>
-                      </AlertDescription>
-                    </Alert>
                   ) : null}
-                  {(() => {
-                    const detailInFlight = findInFlightServiceForContainer(
-                      detailContainer,
-                      services,
-                    );
-                    return (
-                      <>
-                        {canManage &&
-                          detailContainer.status === "OVERFLOWED" &&
-                          (detailInFlight ? (
-                            <Tooltip>
-                              <TooltipTrigger
-                                render={<Badge variant="info" className="max-w-full" tabIndex={0} />}
-                              >
-                                <Clock data-icon="inline-start" aria-hidden />
-                                <span className="truncate">Servicio en curso ({detailInFlight.id})</span>
-                              </TooltipTrigger>
-                              <TooltipContent>{`Servicio en curso vinculado: ${detailInFlight.id}`}</TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={servicesStatus !== "ready"}
-                              onClick={() => {
-                                const target = detailContainer;
-                                closeDetail();
-                                setEmptyContainer(target);
-                              }}
-                            >
-                              <Check data-icon="inline-start" aria-hidden />
-                              Vaciar contenedor
-                            </Button>
-                          ))}
-                        {canManage &&
-                          detailContainer.status === "ACTIVE" &&
-                          (detailInFlight ? (
-                            <Tooltip>
-                              <TooltipTrigger
-                                render={<Badge variant="info" className="max-w-full" tabIndex={0} />}
-                              >
-                                <Clock data-icon="inline-start" aria-hidden />
-                                <span className="truncate">Servicio en curso ({detailInFlight.id})</span>
-                              </TooltipTrigger>
-                              <TooltipContent>{`Servicio en curso vinculado: ${detailInFlight.id}`}</TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={servicesStatus !== "ready"}
-                              onClick={() => {
-                                const target = detailContainer;
-                                closeDetail();
-                                setStartRelocatingContainer(target);
-                              }}
-                            >
-                              <RotateCcw data-icon="inline-start" aria-hidden />
-                              Reubicar
-                            </Button>
-                          ))}
-                        {canManage &&
-                          detailContainer.status === "RELOCATING" &&
-                          (detailInFlight ? (
-                            <Tooltip>
-                              <TooltipTrigger
-                                render={<Badge variant="info" className="max-w-full" tabIndex={0} />}
-                              >
-                                <Clock data-icon="inline-start" aria-hidden />
-                                <span className="truncate">Servicio en curso ({detailInFlight.id})</span>
-                              </TooltipTrigger>
-                              <TooltipContent>{`Servicio en curso vinculado: ${detailInFlight.id}`}</TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={servicesStatus !== "ready"}
-                              onClick={() => {
-                                const target = detailContainer;
-                                closeDetail();
-                                setConfirmRelocatingContainer(target);
-                              }}
-                            >
-                              <MapPin data-icon="inline-start" aria-hidden />
-                              Confirmar ubicación
-                            </Button>
-                          ))}
-                      </>
-                    );
-                  })()}
-                  {canManage && detailContainer.status === "DAMAGED" && (
-                    <>
+                  {canManage && detailContainer.status === "OVERFLOWED" ? (
+                    detailInFlight ? (
+                      <Badge variant="info" className="w-fit max-w-full">
+                        <Clock data-icon="inline-start" aria-hidden />
+                        Servicio en curso ({detailInFlight.id})
+                      </Badge>
+                    ) : (
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const target = detailContainer;
-                          pendingRepairFocusId.current = target.id;
-                          closeDetail();
-                          setStartingRepairContainer(target);
-                        }}
-                      >
-                        <Wrench data-icon="inline-start" aria-hidden />
-                        Iniciar reparación independiente
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          servicesStatus !== "ready" || Boolean(detailInFlight)
-                        }
-                        onClick={() => {
-                          const target = detailContainer;
-                          closeDetail();
-                          setRemovingContainer(target);
-                        }}
-                      >
-                        <ArchiveX data-icon="inline-start" aria-hidden />
-                        Retirar contenedor
-                      </Button>
-                    </>
-                  )}
-                  {canManage &&
-                    detailContainer.status === "UNDER_REPAIR" &&
-                    detailInFlight && (
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <Badge
-                              variant="info"
-                              className="max-w-full"
-                              tabIndex={0}
-                              data-testid={`in-flight-badge-${detailContainer.id}`}
-                            />
-                          }
-                        >
-                          <Clock data-icon="inline-start" aria-hidden />
-                          <span className="truncate">Servicio en curso ({detailInFlight.id})</span>
-                        </TooltipTrigger>
-                        <TooltipContent>{`Servicio en curso vinculado: ${detailInFlight.id}`}</TooltipContent>
-                      </Tooltip>
-                    )}
-                  {canManage &&
-                    detailContainer.status === "UNDER_REPAIR" &&
-                    !detailInFlight && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
+                        className="w-full justify-start"
                         disabled={servicesStatus !== "ready"}
                         onClick={() => {
                           const target = detailContainer;
                           closeDetail();
-                          setCompletingRepairContainer(target);
+                          setEmptyContainer(target);
                         }}
                       >
-                        <CheckCircle2 data-icon="inline-start" aria-hidden />
-                        Completar reparación independiente
+                        <Check data-icon="inline-start" aria-hidden />
+                        Vaciar contenedor
                       </Button>
-                    )}
-                </div>
-              ) : (
-                <div />
+                    )
+                  ) : null}
+                  {canManage && detailContainer.status === "ACTIVE" ? (
+                    detailInFlight ? (
+                      <Badge variant="info" className="w-fit max-w-full">
+                        <Clock data-icon="inline-start" aria-hidden />
+                        Servicio en curso ({detailInFlight.id})
+                      </Badge>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-start"
+                        disabled={servicesStatus !== "ready"}
+                        onClick={() => {
+                          const target = detailContainer;
+                          closeDetail();
+                          setStartRelocatingContainer(target);
+                        }}
+                      >
+                        <RotateCcw data-icon="inline-start" aria-hidden />
+                        Reubicar
+                      </Button>
+                    )
+                  ) : null}
+                  {canManage && detailContainer.status === "RELOCATING" ? (
+                    detailInFlight ? (
+                      <Badge variant="info" className="w-fit max-w-full">
+                        <Clock data-icon="inline-start" aria-hidden />
+                        Servicio en curso ({detailInFlight.id})
+                      </Badge>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-start"
+                        disabled={servicesStatus !== "ready"}
+                        onClick={() => {
+                          const target = detailContainer;
+                          closeDetail();
+                          setConfirmRelocatingContainer(target);
+                        }}
+                      >
+                        <MapPin data-icon="inline-start" aria-hidden />
+                        Confirmar ubicación
+                      </Button>
+                    )
+                  ) : null}
+                </section>
               )}
-              <Button type="button" variant="outline" onClick={closeDetail}>
-                Cerrar detalle
-              </Button>
-            </DialogFooter>
-          </DialogContent>
+
+              {canManage &&
+              (detailContainer.status === "DAMAGED" ||
+                detailContainer.status === "UNDER_REPAIR") ? (
+                <section aria-label="Mantenimiento" className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Mantenimiento
+                  </h3>
+                  {detailContainer.status === "DAMAGED" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const target = detailContainer;
+                        pendingRepairFocusId.current = target.id;
+                        closeDetail();
+                        setStartingRepairContainer(target);
+                      }}
+                    >
+                      <Wrench data-icon="inline-start" aria-hidden />
+                      Iniciar reparación independiente
+                    </Button>
+                  ) : detailInFlight ? (
+                    <Badge variant="info" className="w-fit max-w-full">
+                      <Clock data-icon="inline-start" aria-hidden />
+                      Servicio en curso ({detailInFlight.id})
+                    </Badge>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start"
+                      disabled={servicesStatus !== "ready"}
+                      onClick={() => {
+                        const target = detailContainer;
+                        closeDetail();
+                        setCompletingRepairContainer(target);
+                      }}
+                    >
+                      <CheckCircle2 data-icon="inline-start" aria-hidden />
+                      Completar reparación independiente
+                    </Button>
+                  )}
+                </section>
+              ) : null}
+
+              {canManage && detailContainer.status === "DAMAGED" ? (
+                <section aria-label="Destructivas" className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Destructivas
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="w-full justify-start"
+                    disabled={servicesStatus !== "ready" || Boolean(detailInFlight)}
+                    onClick={() => {
+                      const target = detailContainer;
+                      closeDetail();
+                      setRemovingContainer(target);
+                    }}
+                  >
+                    <ArchiveX data-icon="inline-start" aria-hidden />
+                    Retirar contenedor
+                  </Button>
+                </section>
+              ) : null}
+            </SheetFooter>
+          </SheetContent>
         )}
-      </Dialog>
+      </Sheet>
 
       {/* Report Overflow Dialog */}
       <ReportOverflowDialog

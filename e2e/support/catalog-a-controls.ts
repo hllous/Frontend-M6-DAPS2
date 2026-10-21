@@ -1,5 +1,18 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
+export async function openCatalogRowDetail(row: Locator) {
+  await row.getByRole("button", { name: /^Ver detalle de / }).click();
+  return row.page().getByRole("dialog");
+}
+
+export async function clickCatalogRowAction(
+  row: Locator,
+  action: string | RegExp,
+) {
+  const detail = await openCatalogRowDetail(row);
+  await detail.getByRole("button", { name: action }).click();
+}
+
 export async function chooseCatalogAOption(
   page: Page,
   scope: Page | Locator,

@@ -1,4 +1,8 @@
-import { chooseCatalogAOption } from "./support/catalog-a-controls";
+import {
+  chooseCatalogAOption,
+  clickCatalogRowAction,
+  openCatalogRowDetail,
+} from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
@@ -30,13 +34,13 @@ test.describe("Green Spaces catalog management @smoke", () => {
 
     const createdRow = panel.getByRole("row", { name: new RegExp(name) });
     await expect(createdRow).toBeVisible();
-    await createdRow.getByRole("button", { name: "Editar" }).click();
+    await clickCatalogRowAction(createdRow, "Editar");
     await page.getByRole("dialog").getByLabel("Nombre").fill("Espacio E2E editado #108");
     await page.getByRole("dialog").getByRole("button", { name: "Guardar espacio verde" }).click();
     const editedRow = panel.getByRole("row", { name: /Espacio E2E editado #108/ });
     await expect(editedRow).toBeVisible();
 
-    await editedRow.getByRole("button", { name: "Dar de baja" }).click();
+    await clickCatalogRowAction(editedRow, "Dar de baja");
     const deactivateDialog = page.getByRole("dialog");
     await expect(deactivateDialog.getByRole("heading", { name: "Confirmar baja del espacio verde Espacio E2E editado #108" })).toBeVisible();
     await deactivateDialog.getByRole("button", { name: "Dar de baja el espacio verde Espacio E2E editado #108" }).click();
@@ -54,5 +58,8 @@ test.describe("Green Spaces catalog management @smoke", () => {
     await expect(panel.getByRole("button", { name: "Registrar espacio verde" })).toHaveCount(0);
     await expect(panel.getByRole("button", { name: "Editar" })).toHaveCount(0);
     await expect(panel.getByRole("button", { name: "Dar de baja" })).toHaveCount(0);
+    const detail = await openCatalogRowDetail(panel.getByRole("row", { name: /Parque del Bicentenario/ }));
+    await expect(detail.getByRole("button", { name: "Editar" })).toHaveCount(0);
+    await expect(detail.getByRole("button", { name: "Dar de baja" })).toHaveCount(0);
   });
 });

@@ -163,6 +163,7 @@ function ReportOverflowModalContent({
         <Button
           type="submit"
           form="report-overflow-form"
+          variant="warning"
           disabled={isSubmitting}
         >
           {isSubmitting ? "Reportando…" : "Confirmar desborde"}

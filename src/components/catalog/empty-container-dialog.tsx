@@ -113,7 +113,7 @@ function EmptyContainerModalContent({
         className="flex flex-col gap-4"
       >
         <Alert role="note">
-          <AlertDescription>
+          <AlertDescription className="grid gap-2">
             <p className="font-medium text-foreground">
               Detalles del contenedor:
             </p>
@@ -144,6 +144,7 @@ function EmptyContainerModalContent({
         <Button
           type="submit"
           form="empty-container-form"
+          variant="success"
           disabled={isSubmitting}
         >
           {isSubmitting ? "Vaciando…" : "Confirmar vaciado"}

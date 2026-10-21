@@ -1,4 +1,9 @@
-import { chooseCatalogAOption, expectCatalogAMutation } from "./support/catalog-a-controls";
+import {
+  chooseCatalogAOption,
+  clickCatalogRowAction,
+  expectCatalogAMutation,
+  openCatalogRowDetail,
+} from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
@@ -28,21 +33,21 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await page.getByLabel("Buscar contenedor").fill("CONT-E2E-REPAIR");
     const row = page.locator("tr", { hasText: "CONT-E2E-REPAIR" });
     await expect(row).toBeVisible();
-    await row.getByRole("button", { name: "Reportar daño" }).click();
+    await clickCatalogRowAction(row, "Reportar daño");
     const damageDialog = page.getByRole("dialog");
     await chooseCatalogAOption(page, damageDialog, "Tipo de daño", "Estructural");
     await chooseCatalogAOption(page, damageDialog, "Severidad", "Alta");
     await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "STRUCTURAL", severity: "HIGH", requiresPublicWorks: false }, () => damageDialog.getByRole("button", { name: "Confirmar daño" }).click());
     await expect(row.getByText("Dañado")).toBeVisible();
 
-    await row.getByRole("button", { name: "Iniciar reparación independiente" }).click();
+    await clickCatalogRowAction(row, "Iniciar reparación independiente");
 
     const startDialog = page.getByRole("dialog");
     await expect(startDialog.getByRole("heading", { name: /Iniciar reparación independiente/ })).toBeVisible();
     await expectCatalogAMutation(page, /\/start-repair$/, null, () => startDialog.getByRole("button", { name: "Iniciar reparación" }).click());
     await expect(row.getByText("En reparación")).toBeVisible();
 
-    await row.getByRole("button", { name: "Completar reparación independiente" }).click();
+    await clickCatalogRowAction(row, "Completar reparación independiente");
     const completeDialog = page.getByRole("dialog");
     await expect(completeDialog.getByText(/no corresponde al completado de un Servicio/i)).toBeVisible();
     await completeDialog.locator('input[type="file"]').setInputFiles({
@@ -56,7 +61,8 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await expect(page.getByText("Reparación completada con éxito para el contenedor CONT-E2E-REPAIR.")).toBeVisible();
     await expect(completeDialog).not.toBeVisible();
     await expect(row.getByText("Activo")).toBeVisible();
-    await expect(row.getByRole("button", { name: /reparación independiente|Retirar contenedor/i })).not.toBeVisible();
+    const activeDetail = await openCatalogRowDetail(row);
+    await expect(activeDetail.getByRole("button", { name: /reparación independiente|Retirar contenedor/i })).toHaveCount(0);
   });
 
   test("Office removes a damaged container with evidence and keeps removal terminal", async ({ page }) => {
@@ -81,14 +87,14 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await page.getByLabel("Buscar contenedor").fill("CONT-E2E-122");
     const row = page.locator("tr", { hasText: "CONT-E2E-122" });
     await expect(row).toBeVisible();
-    await row.getByRole("button", { name: "Reportar daño" }).click();
+    await clickCatalogRowAction(row, "Reportar daño");
     const damageDialog = page.getByRole("dialog");
     await chooseCatalogAOption(page, damageDialog, "Tipo de daño", "Estructural");
     await chooseCatalogAOption(page, damageDialog, "Severidad", "Alta");
     await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "STRUCTURAL", severity: "HIGH", requiresPublicWorks: false }, () => damageDialog.getByRole("button", { name: "Confirmar daño" }).click());
     await expect(row.getByText("Dañado")).toBeVisible();
 
-    await row.getByRole("button", { name: "Retirar contenedor" }).click();
+    await clickCatalogRowAction(row, "Retirar contenedor");
     const removeDialog = page.getByRole("dialog");
     await expect(removeDialog.getByRole("heading", { name: /Retirar contenedor CONT-E2E-122/ })).toBeVisible();
     await removeDialog.locator('input[type="file"]').setInputFiles({
@@ -101,7 +107,8 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await expect(page.getByText("Contenedor CONT-E2E-122 retirado con éxito.")).toBeVisible();
     await expect(removeDialog).not.toBeVisible();
     await expect(row.getByText("Retirado")).toBeVisible();
-    await expect(row.getByRole("button", { name: /reparación independiente|Retirar contenedor/i })).not.toBeVisible();
+    const removedDetail = await openCatalogRowDetail(row);
+    await expect(removedDetail.getByRole("button", { name: /reparación independiente|Retirar contenedor/i })).toHaveCount(0);
   });
 
   test("Field cannot access Office lifecycle dispatch controls", async ({ page }) => {
@@ -109,7 +116,8 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await page.goto("/app/catalog/containers");
 
     await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /reparación independiente/i })).not.toBeVisible();
-    await expect(page.getByRole("button", { name: "Retirar contenedor" })).not.toBeVisible();
+    const damagedDetail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-003/ }));
+    await expect(damagedDetail.getByRole("button", { name: /reparación independiente/i })).toHaveCount(0);
+    await expect(damagedDetail.getByRole("button", { name: "Retirar contenedor" })).toHaveCount(0);
   });
 });

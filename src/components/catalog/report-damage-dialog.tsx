@@ -269,25 +269,26 @@ function ReportDamageModalContent({
             )}
           </Field>
 
-          <Field>
-            <Field orientation="horizontal">
-              <Checkbox
-                id="damage-public-works"
-                checked={requiresPublicWorks}
-                onCheckedChange={(checked) => setRequiresPublicWorks(checked)}
-                disabled={isSubmitting}
-              />
-              <FieldContent>
-                <FieldLabel htmlFor="damage-public-works">
-                  Requiere intervención de Obras Públicas (M3)
-                </FieldLabel>
-                <FieldDescription>
-                  Marque si el daño involucra rotura de calzada, vereda,
-                  anclajes civiles o requiere obra civil externa antes de poder
-                  restituir o reinstalar el contenedor.
-                </FieldDescription>
-              </FieldContent>
-            </Field>
+          <Field
+            orientation="horizontal"
+            className="items-start rounded-lg border border-border p-4"
+          >
+            <Checkbox
+              id="damage-public-works"
+              checked={requiresPublicWorks}
+              onCheckedChange={(checked) => setRequiresPublicWorks(checked)}
+              disabled={isSubmitting}
+            />
+            <FieldContent>
+              <FieldLabel htmlFor="damage-public-works">
+                Requiere intervención de Obras Públicas (M3)
+              </FieldLabel>
+              <FieldDescription>
+                Marque si el daño involucra rotura de calzada, vereda,
+                anclajes civiles o requiere obra civil externa antes de poder
+                restituir o reinstalar el contenedor.
+              </FieldDescription>
+            </FieldContent>
           </Field>
 
           <EvidenceQueueView
@@ -316,7 +317,7 @@ function ReportDamageModalContent({
           type="submit"
           form="report-damage-form"
           disabled={isSubmitting}
-          variant="destructive"
+          variant="destructive-solid"
         >
           {isSubmitting ? "Registrando…" : "Confirmar daño"}
         </Button>

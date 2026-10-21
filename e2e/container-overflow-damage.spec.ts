@@ -1,4 +1,9 @@
-import { chooseCatalogAOption, expectCatalogAMutation } from "./support/catalog-a-controls";
+import {
+  chooseCatalogAOption,
+  clickCatalogRowAction,
+  expectCatalogAMutation,
+  openCatalogRowDetail,
+} from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
 
@@ -16,11 +21,8 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     const row = page.locator("tr", { hasText: "CONT-008" });
     await expect(row).toBeVisible();
 
-    // Report buttons are available directly from catalog without an assigned Service
-    const overflowBtn = row.getByRole("button", { name: "Reportar desborde" });
-    await expect(overflowBtn).toBeVisible();
-
-    await overflowBtn.click();
+    // Reporting remains available from the row detail without an assigned Service.
+    await clickCatalogRowAction(row, "Reportar desborde");
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -37,8 +39,9 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
 
     // Row now shows OVERFLOWED status and report buttons are removed
     await expect(row.getByText("Desbordado")).toBeVisible();
-    await expect(row.getByRole("button", { name: "Reportar desborde" })).not.toBeVisible();
-    await expect(row.getByRole("button", { name: "Reportar daño" })).not.toBeVisible();
+    const detail = await openCatalogRowDetail(row);
+    await expect(detail.getByRole("button", { name: "Reportar desborde" })).toHaveCount(0);
+    await expect(detail.getByRole("button", { name: "Reportar daño" })).toHaveCount(0);
   });
 
   test("Office actor reports damage with type, severity, public works flag, and evidence", async ({
@@ -52,9 +55,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     const row = page.locator("tr", { hasText: "CONT-007" });
     await expect(row).toBeVisible();
 
-    const damageBtn = row.getByRole("button", { name: "Reportar daño" });
-    await expect(damageBtn).toBeVisible();
-    await damageBtn.click();
+    await clickCatalogRowAction(row, "Reportar daño");
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -86,8 +87,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await expect(row.getByText("Dañado")).toBeVisible();
 
     // Open detail dialog to inspect damage diagnostic and attached evidence
-    await row.getByRole("button", { name: "Ver detalle" }).click();
-    const detailDialog = page.getByRole("dialog");
+    const detailDialog = await openCatalogRowDetail(row);
     await expect(detailDialog).toBeVisible();
     await expect(
       detailDialog.getByRole("heading", { name: "Detalle del contenedor CONT-007" }),
@@ -109,8 +109,9 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await expect(page.getByText("CONT-001")).toBeVisible();
 
     // Report buttons must be completely absent for actors lacking container:report
-    await expect(page.getByRole("button", { name: "Reportar desborde" })).not.toBeVisible();
-    await expect(page.getByRole("button", { name: "Reportar daño" })).not.toBeVisible();
+    const detail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-001/ }));
+    await expect(detail.getByRole("button", { name: "Reportar desborde" })).toHaveCount(0);
+    await expect(detail.getByRole("button", { name: "Reportar daño" })).toHaveCount(0);
   });
 
   test("Validates file constraints as defense in depth on the client", async ({ page }) => {
@@ -133,7 +134,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     const row = page.locator("tr", { hasText: "CONT-VAL-01" });
     await expect(row).toBeVisible();
 
-    await row.getByRole("button", { name: "Reportar desborde" }).click();
+    await clickCatalogRowAction(row, "Reportar desborde");
     const overflowDialog = page.getByRole("dialog");
     await expect(overflowDialog).toBeVisible();
 

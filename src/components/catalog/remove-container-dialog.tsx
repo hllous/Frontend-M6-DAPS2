@@ -141,7 +141,7 @@ function RemoveContainerModalContent({
         <Button
           type="submit"
           form="remove-container-form"
-          variant="destructive"
+          variant="destructive-solid"
           disabled={isSubmitting}
         >
           <ArchiveX data-icon="inline-start" aria-hidden />

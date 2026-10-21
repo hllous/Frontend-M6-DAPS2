@@ -14,6 +14,24 @@ import { ContainerCatalogPanel } from "./container-catalog-panel";
 
 const server = setupServer(...handlers);
 
+async function openContainerDetail(
+  user: ReturnType<typeof userEvent.setup>,
+  row: HTMLElement,
+) {
+  await user.click(within(row).getByRole("button", { name: /^Ver detalle de / }));
+  return screen.getByRole("dialog");
+}
+
+async function clickContainerAction(
+  user: ReturnType<typeof userEvent.setup>,
+  row: HTMLElement,
+  action: string,
+) {
+  const detail = await openContainerDetail(user, row);
+  await user.click(within(detail).getByRole("button", { name: action }));
+  return detail;
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
@@ -42,7 +60,7 @@ describe("Container Service lookup", () => {
     const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
-    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
     expect(await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.")).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeDisabled();
@@ -71,7 +89,7 @@ describe("Container Service lookup", () => {
     const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
-    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
     expect(await within(dialog).findByText(`Servicio en curso (${service.id})`)).toBeVisible();
     expect(within(dialog).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
@@ -88,7 +106,7 @@ describe("Container Service lookup", () => {
     const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
-    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
     expect(await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.")).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeDisabled();
@@ -103,7 +121,7 @@ describe("Container Service lookup", () => {
     const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
-    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
     expect(await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.")).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeDisabled();
@@ -118,13 +136,12 @@ describe("Container Service lookup", () => {
     const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
-    await waitFor(() => expect(within(row).getByRole("button", { name: "Vaciar contenedor" })).toBeEnabled());
     const previousLookups = lookups;
-    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    await openContainerDetail(user, row);
+    const detail = screen.getByRole("dialog");
+    await waitFor(() => expect(within(detail).getByRole("button", { name: "Vaciar contenedor" })).toBeEnabled());
     await waitFor(() => expect(lookups).toBeGreaterThan(previousLookups));
-    const dialog = screen.getByRole("dialog");
-    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeEnabled());
-    expect(within(dialog).queryByText(/Servicio en curso/)).not.toBeInTheDocument();
+    expect(within(detail).queryByText(/Servicio en curso/)).not.toBeInTheDocument();
   });
 
   it.each<[ContainerStatus, string]>([
@@ -143,11 +160,10 @@ describe("Container Service lookup", () => {
     const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
-    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
     await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.");
     expect(within(dialog).getByRole("button", { name: action })).toBeDisabled();
-    expect(within(row).getByRole("button", { name: action, hidden: true })).toBeDisabled();
   });
 });
 
@@ -200,7 +216,7 @@ describe("ContainerCatalogPanel", () => {
     expect(await screen.findByText("CONT-003")).toBeVisible();
 
     const row = screen.getByRole("row", { name: /CONT-003/ });
-    await user.click(within(row).getByRole("button", { name: "Ver detalle" }));
+    await openContainerDetail(user, row);
 
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /Detalle del contenedor CONT-003/ })).toBeVisible();
@@ -208,8 +224,26 @@ describe("ContainerCatalogPanel", () => {
     expect(within(dialog).getByText("Tapa rota")).toBeVisible();
     expect(within(dialog).getByText("Media")).toBeVisible();
 
-    await user.click(within(dialog).getByRole("button", { name: "Cerrar detalle" }));
+    await user.click(within(dialog).getByRole("button", { name: "Cerrar" }));
     expect(dialog).not.toBeVisible();
+  });
+
+  it("opens the detail with Enter and restores focus to the row after closing", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewMember} />);
+
+    await screen.findByText("CONT-003");
+    const rowButton = screen.getByRole("button", { name: "Ver detalle de CONT-003" });
+    rowButton.focus();
+    expect(rowButton).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    const detail = screen.getByRole("dialog", { name: /Detalle del contenedor CONT-003/ });
+    expect(detail).toBeVisible();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(detail).not.toBeInTheDocument());
+    expect(rowButton).toHaveFocus();
   });
 
   it("allows Office to create and edit a Container", async () => {
@@ -238,7 +272,7 @@ describe("ContainerCatalogPanel", () => {
 
     // Edit container
     const createdRow = screen.getByRole("row", { name: /CONT-PANEL-01/ });
-    await user.click(within(createdRow).getByRole("button", { name: "Editar" }));
+    await clickContainerAction(user, createdRow, "Editar");
 
     const editDialog = screen.getByRole("dialog");
     expect(within(editDialog).getByLabelText("Código")).toBeDisabled();
@@ -262,7 +296,7 @@ describe("ContainerCatalogPanel", () => {
     expect(screen.queryByRole("button", { name: /reparación independiente/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retirar contenedor" })).not.toBeInTheDocument();
     // Detail button remains accessible to Field
-    expect(screen.getAllByRole("button", { name: "Ver detalle" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /^Ver detalle de / }).length).toBeGreaterThan(0);
   });
 
   it("labels each container table cell for the Field-width list layout", async () => {
@@ -276,9 +310,8 @@ describe("ContainerCatalogPanel", () => {
       "Dirección",
       "Capacidad",
       "Estado",
-      "Acciones",
     ]);
-    expect(within(row).getByRole("button", { name: "Ver detalle" })).toBeEnabled();
+    expect(within(row).getByRole("button", { name: "Ver detalle de CONT-001" })).toBeEnabled();
   });
 
   it("lets Office dispatch standalone repair and removal transitions", async () => {
@@ -288,16 +321,14 @@ describe("ContainerCatalogPanel", () => {
     expect(await screen.findByText("CONT-003")).toBeVisible();
     const damagedRow = screen.getByRole("row", { name: /CONT-003/ });
 
-    await user.click(within(damagedRow).getByRole("button", { name: "Iniciar reparación independiente" }));
+    await clickContainerAction(user, damagedRow, "Iniciar reparación independiente");
     const startDialog = screen.getByRole("dialog");
     expect(within(startDialog).getByText(/acción independiente de Oficina/i)).toBeVisible();
     await user.click(within(startDialog).getByRole("button", { name: "Iniciar reparación" }));
 
     const repairRow = screen.getByRole("row", { name: /CONT-003/ });
     expect(within(repairRow).getByText("En reparación")).toBeVisible();
-    const completeRepairButton = within(repairRow).getByRole("button", { name: "Completar reparación independiente" });
-    await waitFor(() => expect(completeRepairButton).toBeEnabled());
-    await user.click(completeRepairButton);
+    await clickContainerAction(user, repairRow, "Completar reparación independiente");
     const completeDialog = await screen.findByRole("dialog");
     expect(within(completeDialog).getByText(/no corresponde al completado de un Servicio/i)).toBeVisible();
     await user.click(within(completeDialog).getByRole("button", { name: "Confirmar reparación completa" }));
@@ -307,7 +338,8 @@ describe("ContainerCatalogPanel", () => {
 
     // A fresh damaged fixture is used by the next test; this confirms no removal
     // action was rendered for the active state.
-    expect(within(activeRow).queryByRole("button", { name: "Retirar contenedor" })).not.toBeInTheDocument();
+    await openContainerDetail(user, activeRow);
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Retirar contenedor" })).not.toBeInTheDocument();
   });
 
   it("keeps the repair action name stable and returns focus to container detail after repair starts", async () => {
@@ -325,7 +357,7 @@ describe("ContainerCatalogPanel", () => {
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     const row = await screen.findByRole("row", { name: /CONT-003/ });
-    const detailButton = within(row).getByRole("button", { name: "Ver detalle" });
+    const detailButton = within(row).getByRole("button", { name: "Ver detalle de CONT-003" });
     await user.click(detailButton);
     const detailDialog = screen.getByRole("dialog", { name: /Detalle del contenedor CONT-003/ });
     await user.click(within(detailDialog).getByRole("button", { name: "Iniciar reparación independiente" }));
@@ -347,7 +379,7 @@ describe("ContainerCatalogPanel", () => {
 
     expect(await screen.findByText("CONT-003")).toBeVisible();
     const row = screen.getByRole("row", { name: /CONT-003/ });
-    await user.click(within(row).getByRole("button", { name: "Retirar contenedor" }));
+    await clickContainerAction(user, row, "Retirar contenedor");
 
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /Retirar contenedor CONT-003/ })).toBeVisible();
@@ -380,7 +412,7 @@ describe("ContainerCatalogPanel", () => {
 
     expect(await screen.findByText("CONT-004")).toBeVisible();
     const row = screen.getByRole("row", { name: /CONT-004/ });
-    await user.click(within(row).getByRole("button", { name: "Completar reparación independiente" }));
+    await clickContainerAction(user, row, "Completar reparación independiente");
     const dialog = screen.getByRole("dialog");
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(fileInput, new File(["image-bytes"], "repair.png", { type: "image/png" }));
@@ -411,7 +443,7 @@ describe("ContainerCatalogPanel", () => {
 
     expect(await screen.findByText("CONT-003")).toBeVisible();
     const row = screen.getByRole("row", { name: /CONT-003/ });
-    await user.click(within(row).getByRole("button", { name: "Retirar contenedor" }));
+    await clickContainerAction(user, row, "Retirar contenedor");
     const dialog = screen.getByRole("dialog");
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(fileInput, new File(["pdf-bytes"], "removal.pdf", { type: "application/pdf" }));
@@ -450,7 +482,8 @@ describe("ContainerCatalogPanel", () => {
     expect(await screen.findByText("CONT-001")).toBeVisible();
 
     const row = screen.getByRole("row", { name: /CONT-001/ });
-    const overflowButton = within(row).getByRole("button", { name: "Reportar desborde" });
+    const detail = await openContainerDetail(user, row);
+    const overflowButton = within(detail).getByRole("button", { name: "Reportar desborde" });
     expect(overflowButton).toBeVisible();
 
     await user.click(overflowButton);
@@ -467,8 +500,9 @@ describe("ContainerCatalogPanel", () => {
     expect(within(updatedRow).getByText("Desbordado")).toBeVisible();
 
     // Report buttons are gone since status is no longer ACTIVE
-    expect(within(updatedRow).queryByRole("button", { name: "Reportar desborde" })).not.toBeInTheDocument();
-    expect(within(updatedRow).queryByRole("button", { name: "Reportar daño" })).not.toBeInTheDocument();
+    await openContainerDetail(user, updatedRow);
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Reportar desborde" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Reportar daño" })).not.toBeInTheDocument();
   });
 
   it("allows reporting container damage with damageType, severity, and requiresPublicWorks", async () => {
@@ -478,7 +512,7 @@ describe("ContainerCatalogPanel", () => {
     expect(await screen.findByText("CONT-001")).toBeVisible();
 
     const row = screen.getByRole("row", { name: /CONT-001/ });
-    await user.click(within(row).getByRole("button", { name: "Reportar daño" }));
+    await clickContainerAction(user, row, "Reportar daño");
 
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /Reportar daño en contenedor CONT-001/ })).toBeVisible();
@@ -496,7 +530,7 @@ describe("ContainerCatalogPanel", () => {
     expect(within(updatedRow).getByText("Dañado")).toBeVisible();
 
     // Verify detail reflects damage
-    await user.click(within(updatedRow).getByRole("button", { name: "Ver detalle" }));
+    await openContainerDetail(user, updatedRow);
     const detailDialog = screen.getByRole("dialog");
     expect(within(detailDialog).getByText("Vandalizado")).toBeVisible();
     expect(within(detailDialog).getByText("Alta")).toBeVisible();
@@ -504,13 +538,16 @@ describe("ContainerCatalogPanel", () => {
   });
 
   it("hides report buttons when actor lacks container:report or container is not ACTIVE", async () => {
+    const user = userEvent.setup({ delay: null });
     render(<ContainerCatalogPanel scenario={scenarios.officeLimited} />);
 
     expect(await screen.findByText("CONT-001")).toBeVisible();
 
     // officeLimited lacks container:report, so neither button is rendered
-    expect(screen.queryByRole("button", { name: "Reportar desborde" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Reportar daño" })).not.toBeInTheDocument();
+    const row = await screen.findByRole("row", { name: /CONT-001/ });
+    await user.click(within(row).getByRole("button", { name: "Ver detalle de CONT-001" }));
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Reportar desborde" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Reportar daño" })).not.toBeInTheDocument();
   });
 
   it("validates evidence file constraints as defense in depth", async () => {
@@ -519,11 +556,15 @@ describe("ContainerCatalogPanel", () => {
 
     expect(await screen.findByText("CONT-001")).toBeVisible();
     const row = screen.getByRole("row", { name: /CONT-001/ });
-    await user.click(within(row).getByRole("button", { name: "Reportar desborde" }));
+    await clickContainerAction(user, row, "Reportar desborde");
 
     const dialog = screen.getByRole("dialog");
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
+    expect(within(dialog).getByText("Evidencia adjunta")).toBeVisible();
+    expect(
+      within(dialog).getByText("Formatos JPEG, PNG, WebP o PDF hasta 4 MB."),
+    ).toBeVisible();
     const pickerLabel = within(dialog).getByText("Seleccionar archivo").closest("label");
     expect(pickerLabel).toHaveAttribute("for", fileInput.id);
     fileInput.focus();
@@ -593,7 +634,7 @@ describe("ContainerCatalogPanel", () => {
 
     expect(await screen.findByText("CONT-001")).toBeVisible();
     const row = screen.getByRole("row", { name: /CONT-001/ });
-    await user.click(within(row).getByRole("button", { name: "Reportar desborde" }));
+    await clickContainerAction(user, row, "Reportar desborde");
 
     const dialog = screen.getByRole("dialog");
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
@@ -647,7 +688,7 @@ describe("ContainerCatalogPanel", () => {
 
     expect(await screen.findByText("CONT-001")).toBeVisible();
     const row = screen.getByRole("row", { name: /CONT-001/ });
-    await user.click(within(row).getByRole("button", { name: "Reportar desborde" }));
+    await clickContainerAction(user, row, "Reportar desborde");
 
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Confirmar desborde" }));
@@ -675,8 +716,7 @@ describe("ContainerCatalogPanel", () => {
       const row = screen.getByRole("row", { name: /CONT-002/ });
       expect(within(row).getByText("Desbordado")).toBeVisible();
 
-      const emptyButton = within(row).getByRole("button", { name: "Vaciar contenedor" });
-      await user.click(emptyButton);
+      await clickContainerAction(user, row, "Vaciar contenedor");
 
       const dialog = screen.getByRole("dialog");
       expect(within(dialog).getByRole("heading", { name: /Registrar vaciado de contenedor CONT-002/i })).toBeVisible();
@@ -686,7 +726,8 @@ describe("ContainerCatalogPanel", () => {
       expect(await screen.findByText("Vaciado registrado con éxito para el contenedor CONT-002.")).toBeVisible();
       const updatedRow = screen.getByRole("row", { name: /CONT-002/ });
       expect(within(updatedRow).getByText("Activo")).toBeVisible();
-      expect(within(updatedRow).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
+      await openContainerDetail(user, updatedRow);
+      expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
     });
 
     it("allows Office actor to initiate and confirm relocation (ACTIVE -> RELOCATING -> ACTIVE with new address)", { timeout: 15000 }, async () => {
@@ -698,8 +739,7 @@ describe("ContainerCatalogPanel", () => {
       expect(within(initialRow).getByText("Activo")).toBeVisible();
 
       // Step 1: Start relocation
-      const relocateButton = within(initialRow).getByRole("button", { name: "Reubicar" });
-      await user.click(relocateButton);
+      await clickContainerAction(user, initialRow, "Reubicar");
 
       const startDialog = screen.getByRole("dialog");
       expect(within(startDialog).getByRole("heading", { name: /Iniciar reubicación de contenedor CONT-001/i })).toBeVisible();
@@ -711,8 +751,7 @@ describe("ContainerCatalogPanel", () => {
       expect(within(relocatingRow).getByText("En reubicación")).toBeVisible();
 
       // Step 2: Confirm relocation with new address and coordinates
-      const confirmButton = within(relocatingRow).getByRole("button", { name: "Confirmar ubicación" });
-      await user.click(confirmButton);
+      await clickContainerAction(user, relocatingRow, "Confirmar ubicación");
 
       const confirmDialog = screen.getByRole("dialog");
       expect(within(confirmDialog).getByRole("heading", { name: /Confirmar nueva ubicación de contenedor CONT-001/i })).toBeVisible();
@@ -732,6 +771,7 @@ describe("ContainerCatalogPanel", () => {
     });
 
     it("prevents duplicate standalone transition when an in-flight linked service exists", async () => {
+      const user = userEvent.setup({ delay: null });
       server.use(
         http.get("*/api/services", () => {
           return HttpResponse.json({
@@ -757,36 +797,43 @@ describe("ContainerCatalogPanel", () => {
 
       render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
-      expect(await screen.findByTestId("in-flight-badge-cont-2")).toBeVisible();
+      await screen.findByText("CONT-002");
       const row = screen.getByRole("row", { name: /CONT-002/ });
+      const detail = await openContainerDetail(user, row);
 
       // Standalone "Vaciar contenedor" button must NOT be rendered
-      expect(within(row).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
+      expect(within(detail).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
 
       // Instead, in-flight badge must be rendered
-      expect(within(row).getByText(/Servicio en curso \(SVC-9901\)/)).toBeVisible();
+      expect(await within(detail).findByText(/Servicio en curso \(SVC-9901\)/)).toBeVisible();
     });
 
     it("keeps standalone emptying and relocation dispatch hidden for Field actors", async () => {
+      const user = userEvent.setup({ delay: null });
       render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
 
       expect(await screen.findByText("CONT-001")).toBeVisible();
       expect(screen.getByText("CONT-002")).toBeVisible();
 
-      expect(screen.queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Reubicar" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Confirmar ubicación" })).not.toBeInTheDocument();
+      const activeDetail = await openContainerDetail(user, screen.getByRole("row", { name: /CONT-001/ }));
+      expect(within(activeDetail).queryByRole("button", { name: "Reubicar" })).not.toBeInTheDocument();
+      await user.keyboard("{Escape}");
+      const overflowDetail = await openContainerDetail(user, screen.getByRole("row", { name: /CONT-002/ }));
+      expect(within(overflowDetail).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
     });
 
     it("keeps standalone emptying and relocation dispatch hidden for Office actor without container:manage", async () => {
+      const user = userEvent.setup({ delay: null });
       render(<ContainerCatalogPanel scenario={scenarios.officeLimited} />);
 
       expect(await screen.findByText("CONT-001")).toBeVisible();
       expect(screen.getByText("CONT-002")).toBeVisible();
 
-      expect(screen.queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Reubicar" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Confirmar ubicación" })).not.toBeInTheDocument();
+      const activeDetail = await openContainerDetail(user, screen.getByRole("row", { name: /CONT-001/ }));
+      expect(within(activeDetail).queryByRole("button", { name: "Reubicar" })).not.toBeInTheDocument();
+      await user.keyboard("{Escape}");
+      const overflowDetail = await openContainerDetail(user, screen.getByRole("row", { name: /CONT-002/ }));
+      expect(within(overflowDetail).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
     });
 
     it("surfaces authoritative backend failure in emptying dialog without false success", async () => {
@@ -811,7 +858,7 @@ describe("ContainerCatalogPanel", () => {
 
       expect(await screen.findByText("CONT-002")).toBeVisible();
       const row = screen.getByRole("row", { name: /CONT-002/ });
-      await user.click(within(row).getByRole("button", { name: "Vaciar contenedor" }));
+      await clickContainerAction(user, row, "Vaciar contenedor");
 
       const dialog = screen.getByRole("dialog");
       await user.click(within(dialog).getByRole("button", { name: "Confirmar vaciado" }));

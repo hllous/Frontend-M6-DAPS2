@@ -17,17 +17,24 @@ import {
   CardDescription,
   CardAction,
   CardContent,
-  CardFooter,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, Eye, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -148,6 +155,9 @@ export function GreenPointCatalogPanel({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [detailPoint, setDetailPoint] = useState<GreenPoint | null>(null);
+  const [detailSheetSide, setDetailSheetSide] = useState<"right" | "bottom">(
+    "right",
+  );
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -156,6 +166,16 @@ export function GreenPointCatalogPanel({
   );
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(max-width: 760px)");
+    const updateSide = () =>
+      setDetailSheetSide(media.matches ? "bottom" : "right");
+    updateSide();
+    media.addEventListener("change", updateSide);
+    return () => media.removeEventListener("change", updateSide);
+  }, []);
 
   const query = useMemo<GreenPointQuery>(
     () => ({
@@ -531,25 +551,48 @@ export function GreenPointCatalogPanel({
           <div className={`${styles.tableWrap} hidden md:block`}>
             <table className={styles.table}>
             <caption className="sr-only">Catálogo de puntos verdes</caption>
-            <thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Zona</th><th scope="col">Residuos aceptados</th><th scope="col">Ubicación</th><th scope="col">Estado</th><th scope="col"><span className="sr-only">Acciones</span></th></tr></thead>
+            <thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Zona</th><th scope="col">Residuos aceptados</th><th scope="col">Ubicación</th><th scope="col">Estado</th><th scope="col" className="sr-only">Abrir detalle</th></tr></thead>
             <tbody>{state.items.map((point) => (
-              <tr key={point.id}>
-                <th scope="row" data-label="Código">{point.code}</th>
+              <tr key={point.id} className={styles.catalogRow}>
+                <th scope="row" data-label="Código">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Ver detalle de ${point.code}`}
+                    onClick={() => void openDetail(point)}
+                    className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)]"
+                  >
+                    {point.code}
+                  </Button>
+                </th>
                 <td data-label="Nombre">{point.name}</td>
                 <td data-label="Zona">{zoneLabel(zones, point.zoneId, zonesLoaded)}</td>
                 <td data-label="Residuos aceptados">{point.wasteTypes.map((type) => WASTE_TYPE_LABELS[type]).join(", ")}</td>
                 <td data-label="Ubicación" className="max-w-[220px]">{point.address ?? "Sin dirección registrada"}</td>
                 <td data-label="Estado"><span className="inline-flex items-center gap-1.5">{point.active ? <Check className="size-4 text-[var(--color-success)]" aria-hidden /> : null}{point.active ? "Activo" : "Inactivo"}</span></td>
-                <td className={styles.actions} data-label="Acciones"><Button type="button" size="sm" variant="outline" onClick={() => void openDetail(point)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button>{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => openEdit(point)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{point.active ? <Button type="button" size="sm" variant="destructive" onClick={() => deactivate(point)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</> : null}</td>
+                <td className={`${styles.rowChevron} px-4 py-3`} aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></td>
               </tr>
             ))}</tbody>
           </table>
           </div>
           <div className="grid gap-3 md:hidden">
             {state.items.map((point) => (
-              <Card key={point.id}>
+              <Card key={point.id} className={styles.clickableCard}>
                 <CardHeader>
-                  <CardDescription>{point.code}</CardDescription>
+                  <CardDescription>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Ver detalle de ${point.code}`}
+                      onClick={() => void openDetail(point)}
+                      className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)]"
+                    >
+                      {point.code}
+                      <ChevronRight data-icon="inline-end" aria-hidden />
+                    </Button>
+                  </CardDescription>
                   <CardTitle>{point.name}</CardTitle>
                   <CardAction>
                     <Badge variant={point.active ? "success" : "neutral"}>
@@ -587,41 +630,6 @@ export function GreenPointCatalogPanel({
                     </div>
                   </dl>
                 </CardContent>
-                <CardFooter className="flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void openDetail(point)}
-                  >
-                    <Eye data-icon="inline-start" aria-hidden />
-                    Ver detalle
-                  </Button>
-                  {canManage ? (
-                    <>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(point)}
-                      >
-                        <Pencil data-icon="inline-start" aria-hidden />
-                        Editar
-                      </Button>
-                      {point.active ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => void deactivate(point)}
-                        >
-                          <Trash2 data-icon="inline-start" aria-hidden />
-                          Dar de baja
-                        </Button>
-                      ) : null}
-                    </>
-                  ) : null}
-                </CardFooter>
               </Card>
             ))}
           </div>
@@ -768,13 +776,16 @@ export function GreenPointCatalogPanel({
                       orientation="horizontal"
                       className="min-h-12"
                     >
-                      <Checkbox
-                        id={`green-point-waste-${type}`}
-                        aria-invalid={Boolean(fieldErrors.wasteTypes)}
-                        checked={form.wasteTypes.includes(type)}
-                        onCheckedChange={() => toggleWasteType(type)}
-                      />
-                      <FieldLabel htmlFor={`green-point-waste-${type}`}>
+                      <FieldLabel
+                        htmlFor={`green-point-waste-${type}`}
+                        className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-muted/50 has-data-checked:border-primary/30 has-data-checked:bg-primary/5"
+                      >
+                        <Checkbox
+                          id={`green-point-waste-${type}`}
+                          aria-invalid={Boolean(fieldErrors.wasteTypes)}
+                          checked={form.wasteTypes.includes(type)}
+                          onCheckedChange={() => toggleWasteType(type)}
+                        />
                         {WASTE_TYPE_LABELS[type]}
                       </FieldLabel>
                     </Field>
@@ -917,20 +928,27 @@ export function GreenPointCatalogPanel({
         ) : null}
       </CatalogDeactivationDialog>
 
-      <Dialog
+      <Sheet
         open={Boolean(detailPoint)}
         onOpenChange={(open) => !open && setDetailPoint(null)}
       >
-        <DialogContent className="overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
+        <SheetContent
+          side={detailSheetSide}
+          className={
+            detailSheetSide === "bottom"
+              ? "max-h-[88dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)]"
+              : "w-[min(92vw,28rem)] overflow-y-auto"
+          }
+        >
+          <SheetHeader>
+            <SheetTitle>
               Detalle del punto verde {detailPoint?.code}
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               Información del emplazamiento y del conjunto completo de residuos
               aceptados.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
           {detailLoading ? (
             <Alert role="status">
               <AlertDescription>Cargando detalle…</AlertDescription>
@@ -942,7 +960,7 @@ export function GreenPointCatalogPanel({
             </Alert>
           ) : null}
           {detailPoint && !detailLoading && !detailError ? (
-            <dl className="grid gap-4 text-sm sm:grid-cols-2">
+            <dl className="grid gap-4 px-4 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Nombre
@@ -1001,17 +1019,50 @@ export function GreenPointCatalogPanel({
               </div>
             </dl>
           ) : null}
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDetailPoint(null)}
-            >
-              Cerrar detalle
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <SheetFooter className="gap-4 pt-0">
+            {canManage ? (
+              <section aria-label="Gestión" className="flex flex-col gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Gestión
+                </h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    const target = detailPoint;
+                    setDetailPoint(null);
+                    if (target) openEdit(target);
+                  }}
+                >
+                  <Pencil data-icon="inline-start" aria-hidden />
+                  Editar
+                </Button>
+              </section>
+            ) : null}
+            {canManage && detailPoint?.active ? (
+              <section aria-label="Destructivas" className="flex flex-col gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Destructivas
+                </h3>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    const target = detailPoint;
+                    setDetailPoint(null);
+                    void deactivate(target);
+                  }}
+                >
+                  <Trash2 data-icon="inline-start" aria-hidden />
+                  Dar de baja
+                </Button>
+              </section>
+            ) : null}
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </section>
   );
 }
