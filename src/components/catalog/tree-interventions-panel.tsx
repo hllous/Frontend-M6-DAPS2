@@ -24,7 +24,7 @@ import { CreateStreetClosureRequestDialog } from "@/components/services/create-s
 import Link from "next/link";
 import { servicesAdapter, type CreateServiceInput, type Service } from "@/lib/services";
 import { resolveServiceType, TREE_PRUNING_SERVICE_TYPE_RULE } from "@/lib/service-types";
-import { treeInterventionCreateInputSchema, treeInterventionsAdapter, TreeInterventionRequestError, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
+import { treeInterventionCreateInputSchema, treeInterventionsAdapter, TreeInterventionRequestError, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionPriority, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import { vehiclesAdapter, type Vehicle } from "@/lib/vehicles";
 import { todayInArgentina } from "@/lib/argentina-date";
@@ -263,6 +263,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [trees, setTrees] = useState<Tree[]>([]);
   const [interventionType, setInterventionType] = useState<TreeInterventionType | "">("");
   const [status, setStatus] = useState<TreeInterventionStatus | "">("");
+  const [priority, setPriority] = useState<TreeInterventionPriority | "">("");
   const [page, setPage] = useState(1);
   const [requestVersion, setRequestVersion] = useState(0);
   const [requestOpen, setRequestOpen] = useState(false);
@@ -287,7 +288,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     return new URLSearchParams(window.location.search).get("detail");
   });
   const [notice, setNotice] = useState<string | null>(null);
-  const query = useMemo<TreeInterventionQuery>(() => ({ interventionType: interventionType || undefined, status: status || undefined, page, pageSize: 10 }), [interventionType, page, status]);
+  const query = useMemo<TreeInterventionQuery>(() => ({ interventionType: interventionType || undefined, status: status || undefined, priority: priority || undefined, page, pageSize: 10 }), [interventionType, page, priority, status]);
 
   useEffect(() => {
     let current = true;
@@ -484,7 +485,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       />
       {!canRequest ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription>Esta sesión puede consultar las solicitudes, pero no crear intervenciones de arbolado.</AlertDescription></Alert> : null}
       {notice ? <Alert><CheckCircle2 data-icon="inline-start" aria-hidden /><AlertDescription>{notice}</AlertDescription></Alert> : null}
-      <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
+      <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-3">
         <Field>
           <FieldLabel htmlFor="intervention-type-filter">Tipo de intervención</FieldLabel>
           <Select items={{ __all__: "Todos", ...TREE_INTERVENTION_LABELS }} value={interventionType || "__all__"} onValueChange={(value) => { setInterventionType(value === "__all__" ? "" : String(value) as TreeInterventionType); setPage(1); }}>
@@ -499,10 +500,17 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
             <SelectContent><SelectGroup><SelectItem value="__all__">Todos</SelectItem>{Object.entries(TREE_INTERVENTION_STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
           </Select>
         </Field>
+        <Field>
+          <FieldLabel htmlFor="intervention-priority-filter">Prioridad</FieldLabel>
+          <Select items={{ __all__: "Todas", ...PRIORITY_LABELS }} value={priority || "__all__"} onValueChange={(value) => { setPriority(value === "__all__" ? "" : String(value) as TreeInterventionPriority); setPage(1); }}>
+            <SelectTrigger id="intervention-priority-filter" aria-label="Filtrar por prioridad"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectGroup><SelectItem value="__all__">Todas</SelectItem>{Object.entries(PRIORITY_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+        </Field>
       </FieldGroup>
       {state.status === "loading" ? <div role="status" aria-label="Cargando intervenciones" className="flex flex-col gap-3"><Skeleton className="h-28 w-full" /><Skeleton className="h-28 w-full" /></div> : null}
       {state.status === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{state.message}</span><Button type="button" variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></AlertDescription></Alert> : null}
-      {state.status === "ready" && state.page.interventions.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin solicitudes de intervención</EmptyTitle><EmptyDescription>{interventionType || status ? "No hay solicitudes para los filtros seleccionados. Quite uno o más filtros para consultar el registro completo." : "Todavía no hay solicitudes de intervención registradas."}</EmptyDescription></EmptyHeader></Empty> : null}
+      {state.status === "ready" && state.page.interventions.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin solicitudes de intervención</EmptyTitle><EmptyDescription>{interventionType || status || priority ? "No hay solicitudes para los filtros seleccionados. Quite uno o más filtros para consultar el registro completo." : "Todavía no hay solicitudes de intervención registradas."}</EmptyDescription></EmptyHeader></Empty> : null}
       {state.status === "ready" && state.page.interventions.length > 0 ? <>
         <p className="text-sm text-muted-foreground" aria-live="polite">{state.page.total} {state.page.total === 1 ? "solicitud" : "solicitudes"}</p>
         <div className="grid gap-3" aria-label="Solicitudes de intervención">

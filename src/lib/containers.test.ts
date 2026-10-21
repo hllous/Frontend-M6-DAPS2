@@ -163,6 +163,18 @@ describe("containers adapter", () => {
     });
   });
 
+  it("drops a container with an unknown status instead of failing the whole list (#638)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const good = { id: "c-ok", code: "CT-OK", containerType: "HOUSEHOLD", zoneId: "zone-1", address: null, lat: null, lng: null, capacityLiters: 1100, status: "ACTIVE", damageType: null, severity: null, requiresPublicWorks: null };
+    server.use(http.get("*/api/containers", () => HttpResponse.json({
+      data: [{ ...good, id: "c-new", status: "FROM_THE_FUTURE" }, good],
+      meta: { total: 2, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    const page = await containersAdapter.list();
+    expect(page.containers.map((container) => container.id)).toEqual(["c-ok"]);
+  });
+
   it("fails explicitly on malformed success payloads", async () => {
     server.use(
       http.get("*/api/containers", () =>

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseCalendarDay, setFieldTime } from "./support/services-608-controls";
 
 const WIDE_VIEWPORT = { width: 1280, height: 900 };
 
@@ -31,11 +32,13 @@ test.describe("StreetClosureRequest from Service context", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText("SVC-1072")).toBeVisible();
-    await expect(dialog.getByLabel("Inicio solicitado *")).toHaveValue("2026-09-05T13:00");
+    await expect(dialog.getByRole("button", { name: "Inicio solicitado *" })).toContainText("05/09/2026");
 
     // The scheduled window is an editable review value, not an immutable copy.
-    await dialog.getByLabel("Inicio solicitado *").fill("2026-09-05T09:00");
-    await dialog.getByLabel("Fin solicitado *").fill("2026-09-05T13:00");
+    await chooseCalendarDay(dialog, "Inicio solicitado *", { monthsAhead: 0, day: 5, monthName: "septiembre", year: 2026 });
+    await setFieldTime(dialog, "Inicio solicitado *", "09:00");
+    await chooseCalendarDay(dialog, "Fin solicitado *", { monthsAhead: 0, day: 5, monthName: "septiembre", year: 2026 });
+    await setFieldTime(dialog, "Fin solicitado *", "13:00");
     await dialog.getByLabel("Motivo *").fill("El Servicio requiere circulación reducida durante el operativo.");
 
     // An empty structured collection is rejected before the request is created.

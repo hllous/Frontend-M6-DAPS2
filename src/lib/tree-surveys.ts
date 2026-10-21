@@ -3,6 +3,7 @@ import { z } from "zod";
 import { argentinaDay, todayInArgentina } from "./argentina-date";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { tolerantRecords } from "./tolerant-records";
 
 export const treeHealthStatusSchema = z.enum(["HEALTHY", "WEAKENED", "DISEASED", "DEAD"]);
 export type TreeHealthStatus = z.infer<typeof treeHealthStatusSchema>;
@@ -80,7 +81,7 @@ export class TreeSurveyRequestError extends Error {
 }
 
 const pageSchema = z.object({
-  data: z.array(treeSurveySchema),
+  data: tolerantRecords(treeSurveySchema, "tree-surveys"),
   meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
 });
 const errorResponseSchema = z.object({ statusCode: z.number(), message: z.union([z.string(), z.array(z.string())]), error: z.string(), timestamp: z.string(), path: z.string() });

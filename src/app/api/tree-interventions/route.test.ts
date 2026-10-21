@@ -21,6 +21,8 @@ const validInput = {
 describe("/api/tree-interventions", () => {
 
   it.each([
+    ["?priority=HIGH&status=REQUESTED", "?status=REQUESTED&priority=HIGH"],
+    ["?priority=URGENT", ""],
     ["?pageSize=101", "?pageSize=100"],
     ["?page=0&pageSize=abc", "?page=1"],
     ["?status=APPROVED&evil=1", ""],

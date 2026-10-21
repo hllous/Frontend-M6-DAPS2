@@ -12,6 +12,17 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); })
 afterAll(() => server.close());
 
 describe("environmental reports adapter", () => {
+  it("forwards calendar-day range values unchanged to the BFF", async () => {
+    let query: URLSearchParams | undefined;
+    server.use(http.get("*/api/environmental-reports", ({ request }) => {
+      query = new URL(request.url).searchParams;
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 20, totalPages: 1 } });
+    }));
+    await environmentalReportsAdapter.list({ from: "2026-09-05", to: "2026-09-06" });
+    expect(query?.get("from")).toBe("2026-09-05");
+    expect(query?.get("to")).toBe("2026-09-06");
+  });
+
   it("requires the real completion timestamp and the violation next step", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-20T15:00:00.000Z"));
@@ -120,6 +131,18 @@ describe("environmental reports adapter", () => {
     await expect(environmentalReportsAdapter.forward("ER-1001", { reason: "   " })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
     await expect(environmentalReportsAdapter.dismiss("ER-1001", { reason: "x".repeat(501) })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
     expect(bodies).toHaveLength(2);
+  });
+
+  it("requests information with trimmed JSON, drops blank optionals and rejects invalid input before the request", async () => {
+    const bodies: unknown[] = [];
+    server.use(http.post("*/api/environmental-reports/ER-1002/request-information", async ({ request }) => { bodies.push(await request.json()); return HttpResponse.json({ ...(await environmentalReportsAdapter.get("ER-1002")), informationRequestPending: true }); }));
+    const updated = await environmentalReportsAdapter.requestInformation("ER-1002", { message: "  Una foto de noche  ", requiredBy: "2099-11-03", internalNote: "  " });
+    expect(updated.informationRequestPending).toBe(true);
+    expect(bodies).toEqual([{ message: "Una foto de noche", requiredBy: "2099-11-03" }]);
+    await expect(environmentalReportsAdapter.requestInformation("ER-1002", { message: "   " })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+    await expect(environmentalReportsAdapter.requestInformation("ER-1002", { message: "x".repeat(501) })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+    await expect(environmentalReportsAdapter.requestInformation("ER-1002", { message: "ok", requiredBy: "03/11/2099" })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+    expect(bodies).toHaveLength(1);
   });
 
   it("schedules an inspection with the selected checklist version and snapshot", async () => {

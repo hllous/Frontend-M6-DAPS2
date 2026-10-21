@@ -15,6 +15,7 @@ import {
   FilePlus2,
   Forward,
   MapPin,
+  MessageCircleQuestion,
   RefreshCw,
   Search,
   ShieldAlert,
@@ -30,7 +31,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemGroup } from "@/components/ui/item";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -48,6 +49,7 @@ import {
   ENVIRONMENTAL_REPORT_STATUS_LABELS,
   ENVIRONMENTAL_REPORT_TYPE_LABELS,
   environmentalReportTypeSchema,
+  environmentalReportDateRangeSchema,
   issueViolationNoticeInputSchema,
   mergeEnvironmentalReportRead,
   environmentalReportsAdapter,
@@ -60,6 +62,7 @@ import {
   type EnvironmentalReportPriority,
   type EnvironmentalReportStatus,
   type EnvironmentalReportType,
+  type RequestInformationInput,
   type SanctionOutcomeIntegrationException,
   type ViolationNotice,
 } from "@/lib/environmental-reports";
@@ -75,6 +78,7 @@ import { CreateRepairRequestDialog } from "@/components/services/create-repair-r
 import { RescheduleReasonDialog } from "@/components/services/reschedule-reason-dialog";
 import { ConfirmRescheduleDialog } from "@/components/services/confirm-reschedule-dialog";
 import { ReportDecisionDialog, type ReportDecision } from "./report-decision-dialog";
+import { RequestInformationDialog } from "./request-information-dialog";
 import { MAX_SEARCH_LENGTH, parseCoordinateField } from "@/lib/input-limits";
 
 type LoadState =
@@ -97,6 +101,8 @@ function initialQueueParams() {
     type: params.get("type") ?? "",
     priority: params.get("priority") ?? "",
     search: params.get("q") ?? "",
+    from: params.get("from") ?? "",
+    to: params.get("to") ?? "",
     page: Number.isInteger(page) && page > 0 ? page : 1,
   };
 }
@@ -141,6 +147,17 @@ const statusVariant: Record<EnvironmentalReport["status"], "info" | "success" | 
 
 function visibleToScenario(report: EnvironmentalReport, scenario: OperationalScenario) {
   return scenario.actor.kind !== "FIELD" || report.assignedCrewId === scenario.actor.crewId;
+}
+
+function InformationRequestPending({ report }: { report: EnvironmentalReport }) {
+  return (
+    <div role="status" aria-label="Solicitud de información pendiente" className="mt-4 space-y-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm">
+      <p className="font-semibold text-[var(--color-text)]">Esperando la respuesta del vecino</p>
+      {report.informationRequestMessage && <p className="text-[var(--color-text)]">{report.informationRequestMessage}</p>}
+      <p className="text-[var(--color-text-secondary)]">Pedido el {formatDate(report.informationRequestedAt)}{report.informationRequestRequiredBy ? ` · Fecha sugerida: ${formatDate(report.informationRequestRequiredBy)}` : ""}</p>
+      <p className="text-[var(--color-text-secondary)]">Mientras esté pendiente no se puede derivar, desestimar ni cerrar el expediente. Si el pedido vence sin respuesta, M2 cancela el reclamo y el expediente pasa a Desestimado.</p>
+    </div>
+  );
 }
 
 function formatDate(value: string | null | undefined) {
@@ -200,6 +217,10 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
   const [filterStatus, setFilterStatus] = useState<string>(initialParams.status);
   const [filterType, setFilterType] = useState<string>(initialParams.type);
   const [filterPriority, setFilterPriority] = useState<string>(initialParams.priority);
+  const [filterFrom, setFilterFrom] = useState(initialParams.from);
+  const [filterTo, setFilterTo] = useState(initialParams.to);
+  const range = environmentalReportDateRangeSchema.safeParse({ from: filterFrom || undefined, to: filterTo || undefined });
+  const rangeError = range.success ? undefined : range.error.issues[0].message;
   const [search, setSearch] = useState(initialParams.search);
   const [debouncedSearch, setDebouncedSearch] = useState(initialParams.search.trim());
   const [queuePage, setQueuePage] = useState(initialParams.page);
@@ -219,6 +240,8 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
       reportType: (filterType || undefined) as EnvironmentalReportType | undefined,
       priority: (filterPriority || undefined) as EnvironmentalReportPriority | undefined,
       search: debouncedSearch || undefined,
+      from: filterFrom || undefined,
+      to: filterTo || undefined,
     });
     return {
       reports: page.environmentalReports.filter((report) => visibleToScenario(report, scenario)),
@@ -226,28 +249,30 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
       totalPages: page.totalPages,
       sanctionOutcomeIntegrationExceptions: page.sanctionOutcomeIntegrationExceptions,
     };
-  }, [scenario, queuePage, filterStatus, filterType, filterPriority, debouncedSearch]);
+  }, [scenario, queuePage, filterStatus, filterType, filterPriority, debouncedSearch, filterFrom, filterTo]);
 
   const loadReports = useCallback(() => {
+    if (rangeError) return;
     setLoadState({ status: "loading" });
     void fetchReports().then((result) => setLoadState({ status: "ready", ...result })).catch((error: unknown) => setLoadState({ status: "error", message: getErrorMessage(error, "Intente nuevamente en unos instantes.") }));
-  }, [fetchReports]);
+  }, [fetchReports, rangeError]);
 
   useEffect(() => {
+    if (rangeError) return;
     let current = true;
     void fetchReports().then((result) => { if (current) setLoadState({ status: "ready", ...result }); }).catch((error: unknown) => { if (current) setLoadState({ status: "error", message: getErrorMessage(error, "Intente nuevamente en unos instantes.") }); });
     return () => { current = false; };
-  }, [fetchReports]);
+  }, [fetchReports, rangeError]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     if (selectedId) url.searchParams.set("detail", selectedId); else url.searchParams.delete("detail");
     if (selectedInspectionId) url.searchParams.set("inspectionId", selectedInspectionId); else url.searchParams.delete("inspectionId");
-    const queue: [string, string][] = [["status", filterStatus], ["type", filterType], ["priority", filterPriority], ["q", debouncedSearch], ["page", queuePage > 1 ? String(queuePage) : ""]];
+    const queue: [string, string][] = [["from", filterFrom], ["to", filterTo], ["status", filterStatus], ["type", filterType], ["priority", filterPriority], ["q", debouncedSearch], ["page", queuePage > 1 ? String(queuePage) : ""]];
     for (const [key, value] of queue) { if (value) url.searchParams.set(key, value); else url.searchParams.delete(key); }
     window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`.replace(/\?$/, ""));
-  }, [selectedId, selectedInspectionId, filterStatus, filterType, filterPriority, debouncedSearch, queuePage]);
+  }, [selectedId, selectedInspectionId, filterStatus, filterType, filterPriority, debouncedSearch, queuePage, filterFrom, filterTo]);
 
   const filteredReports = loadState.status === "ready" ? loadState.reports : [];
 
@@ -306,13 +331,13 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
 
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:px-6 sm:pt-5 sm:pb-6 lg:px-8 lg:pb-8">
         <div role="status" className="sr-only">{announcement}</div>
-        {scenario.actor.kind === "OFFICE" && <QueueFilters filterStatus={filterStatus} filterType={filterType} filterPriority={filterPriority} search={search} onStatus={(value) => { setFilterStatus(value); setQueuePage(1); }} onType={(value) => { setFilterType(value); setQueuePage(1); }} onPriority={(value) => { setFilterPriority(value); setQueuePage(1); }} onSearch={(value) => { setSearch(value); setQueuePage(1); }} />}
+        {scenario.actor.kind === "OFFICE" && <QueueFilters from={filterFrom} to={filterTo} rangeError={rangeError} onFrom={(value) => { setFilterFrom(value); setQueuePage(1); }} onTo={(value) => { setFilterTo(value); setQueuePage(1); }} onClearDates={() => { setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} filterStatus={filterStatus} filterType={filterType} filterPriority={filterPriority} search={search} onStatus={(value) => { setFilterStatus(value); setQueuePage(1); }} onType={(value) => { setFilterType(value); setQueuePage(1); }} onPriority={(value) => { setFilterPriority(value); setQueuePage(1); }} onSearch={(value) => { setSearch(value); setQueuePage(1); }} />}
         {loadState.status === "ready" && scenario.actor.kind === "OFFICE" && loadState.sanctionOutcomeIntegrationExceptions.length > 0 && <SanctionOutcomeIntegrationExceptionsPanel exceptions={loadState.sanctionOutcomeIntegrationExceptions} />}
-        {loadState.status === "loading" && <LoadingState />}
-        {loadState.status === "error" && <ErrorState message={loadState.message} onRetry={loadReports} />}
-        {loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={Boolean(filterStatus || filterType || filterPriority || search)} onClear={() => { setFilterStatus(""); setFilterType(""); setFilterPriority(""); setSearch(""); setQueuePage(1); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}
-        {loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"} aria-describedby="environmental-scope-note"><p id="environmental-scope-note" className="sr-only">Seleccione un expediente para consultar su detalle. Los estados representan el ciclo completo del expediente ambiental.</p><ItemGroup className="grid gap-3">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => { setSelectedId(report.id); setSelectedInspectionId(null); }} />)}</ItemGroup></section>}
-        {loadState.status === "ready" && loadState.totalPages > 1 && <QueuePagination page={queuePage} totalPages={loadState.totalPages} total={loadState.total} onPage={setQueuePage} />}
+        {!rangeError && loadState.status === "loading" && <LoadingState />}
+        {!rangeError && loadState.status === "error" && <ErrorState message={loadState.message} onRetry={loadReports} />}
+        {!rangeError && loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={Boolean(filterStatus || filterType || filterPriority || search || filterFrom || filterTo)} onClear={() => { setFilterStatus(""); setFilterType(""); setFilterPriority(""); setSearch(""); setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}
+        {!rangeError && loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"} aria-describedby="environmental-scope-note"><p id="environmental-scope-note" className="sr-only">Seleccione un expediente para consultar su detalle. Los estados representan el ciclo completo del expediente ambiental.</p><ItemGroup className="grid gap-3">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => { setSelectedId(report.id); setSelectedInspectionId(null); }} />)}</ItemGroup></section>}
+        {!rangeError && loadState.status === "ready" && loadState.totalPages > 1 && <QueuePagination page={queuePage} totalPages={loadState.totalPages} total={loadState.total} onPage={setQueuePage} />}
       </div>
 
       <CreateReportDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={handleCreated} />
@@ -326,8 +351,24 @@ function QueuePagination({ page, totalPages, total, onPage }: { page: number; to
   return <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[var(--color-text-secondary)]">Página {page} de {totalPages} · {total} expedientes</p><Pagination aria-label="Paginación de la cola" className="mx-0 w-auto"><PaginationContent><PaginationItem><PaginationPrevious href="#cola" aria-disabled={previousDisabled} tabIndex={previousDisabled ? -1 : undefined} onClick={(event) => { event.preventDefault(); if (!previousDisabled) onPage(page - 1); }} /></PaginationItem><PaginationItem><PaginationLink href="#cola" isActive aria-label={`Página ${page}`} onClick={(event) => event.preventDefault()}>{page}</PaginationLink></PaginationItem><PaginationItem><PaginationNext href="#cola" aria-disabled={nextDisabled} tabIndex={nextDisabled ? -1 : undefined} onClick={(event) => { event.preventDefault(); if (!nextDisabled) onPage(page + 1); }} /></PaginationItem></PaginationContent></Pagination></div>;
 }
 
-function QueueFilters({ filterStatus, filterType, filterPriority, search, onStatus, onType, onPriority, onSearch }: { filterStatus: string; filterType: string; filterPriority: string; search: string; onStatus: (value: string) => void; onType: (value: string) => void; onPriority: (value: string) => void; onSearch: (value: string) => void }) {
-  return <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4" aria-label="Filtros de la cola"><div className="flex flex-col gap-3 lg:flex-row lg:items-end"><Field className="flex-1"><FieldLabel htmlFor="environmental-search">Buscar expediente</FieldLabel><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden /><Input id="environmental-search" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => onSearch(event.target.value)} placeholder="ID, dirección o ticket" className="pl-9" /></div></Field><Field className="lg:w-64"><FieldLabel htmlFor="environmental-status">Estado</FieldLabel><Select value={filterStatus || "all"} onValueChange={(value) => onStatus(value === "all" ? "" : String(value ?? ""))}><SelectTrigger id="environmental-status"><SelectValue>{filterStatus ? ENVIRONMENTAL_REPORT_STATUS_LABELS[filterStatus as EnvironmentalReportStatus] : "Todos los estados"}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">Todos los estados</SelectItem>{statusGroups.map((group) => <SelectGroup key={group.label} variant="nested"><SelectLabel className="font-semibold text-[var(--color-text)]">{group.label}</SelectLabel>{group.statuses.map((status) => { const Icon = statusIcon[status]; return <SelectItem key={status} value={status}><Icon aria-hidden />{ENVIRONMENTAL_REPORT_STATUS_LABELS[status]}</SelectItem>; })}</SelectGroup>)}</SelectContent></Select></Field><Field className="lg:w-64"><FieldLabel htmlFor="environmental-type">Tipo de hallazgo</FieldLabel><Select value={filterType || "all"} onValueChange={(value) => onType(value === "all" ? "" : String(value ?? ""))}><SelectTrigger id="environmental-type"><SelectValue>{filterType ? ENVIRONMENTAL_REPORT_TYPE_LABELS[filterType as EnvironmentalReportType] : "Todos los tipos"}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">Todos los tipos</SelectItem>{reportTypes.map((type) => <SelectItem key={type} value={type}>{ENVIRONMENTAL_REPORT_TYPE_LABELS[type]}</SelectItem>)}</SelectGroup></SelectContent></Select></Field><Field className="lg:w-48"><FieldLabel htmlFor="environmental-priority">Prioridad</FieldLabel><Select value={filterPriority || "all"} onValueChange={(value) => onPriority(value === "all" ? "" : String(value ?? ""))}><SelectTrigger id="environmental-priority"><SelectValue>{filterPriority ? ENVIRONMENTAL_REPORT_PRIORITY_LABELS[filterPriority as EnvironmentalReportPriority] : "Todas las prioridades"}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">Todas las prioridades</SelectItem>{reportPriorities.map((priority) => <SelectItem key={priority} value={priority}>{ENVIRONMENTAL_REPORT_PRIORITY_LABELS[priority]}</SelectItem>)}</SelectGroup></SelectContent></Select></Field></div></section>;
+function QueueFilters({ from, to, rangeError, onFrom, onTo, onClearDates, filterStatus, filterType, filterPriority, search, onStatus, onType, onPriority, onSearch }: { from: string; to: string; rangeError?: string; onFrom: (value: string) => void; onTo: (value: string) => void; onClearDates: () => void; filterStatus: string; filterType: string; filterPriority: string; search: string; onStatus: (value: string) => void; onType: (value: string) => void; onPriority: (value: string) => void; onSearch: (value: string) => void }) {
+  return <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4" aria-label="Filtros de la cola"><div className="flex flex-col gap-3 lg:flex-row lg:items-end"><Field className="flex-1"><FieldLabel htmlFor="environmental-search">Buscar expediente</FieldLabel><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden /><Input id="environmental-search" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => onSearch(event.target.value)} placeholder="ID, dirección o ticket" className="pl-9" /></div></Field><Field className="lg:w-64"><FieldLabel htmlFor="environmental-status">Estado</FieldLabel><Select value={filterStatus || "all"} onValueChange={(value) => onStatus(value === "all" ? "" : String(value ?? ""))}><SelectTrigger id="environmental-status"><SelectValue>{filterStatus ? ENVIRONMENTAL_REPORT_STATUS_LABELS[filterStatus as EnvironmentalReportStatus] : "Todos los estados"}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">Todos los estados</SelectItem>{statusGroups.map((group) => <SelectGroup key={group.label} variant="nested"><SelectLabel className="font-semibold text-[var(--color-text)]">{group.label}</SelectLabel>{group.statuses.map((status) => { const Icon = statusIcon[status]; return <SelectItem key={status} value={status}><Icon aria-hidden />{ENVIRONMENTAL_REPORT_STATUS_LABELS[status]}</SelectItem>; })}</SelectGroup>)}</SelectContent></Select></Field><Field className="lg:w-64"><FieldLabel htmlFor="environmental-type">Tipo de hallazgo</FieldLabel><Select value={filterType || "all"} onValueChange={(value) => onType(value === "all" ? "" : String(value ?? ""))}><SelectTrigger id="environmental-type"><SelectValue>{filterType ? ENVIRONMENTAL_REPORT_TYPE_LABELS[filterType as EnvironmentalReportType] : "Todos los tipos"}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">Todos los tipos</SelectItem>{reportTypes.map((type) => <SelectItem key={type} value={type}>{ENVIRONMENTAL_REPORT_TYPE_LABELS[type]}</SelectItem>)}</SelectGroup></SelectContent></Select></Field><Field className="lg:w-48"><FieldLabel htmlFor="environmental-priority">Prioridad</FieldLabel><Select value={filterPriority || "all"} onValueChange={(value) => onPriority(value === "all" ? "" : String(value ?? ""))}><SelectTrigger id="environmental-priority"><SelectValue>{filterPriority ? ENVIRONMENTAL_REPORT_PRIORITY_LABELS[filterPriority as EnvironmentalReportPriority] : "Todas las prioridades"}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">Todas las prioridades</SelectItem>{reportPriorities.map((priority) => <SelectItem key={priority} value={priority}>{ENVIRONMENTAL_REPORT_PRIORITY_LABELS[priority]}</SelectItem>)}</SelectGroup></SelectContent></Select></Field></div>
+    <FieldSet className="mt-4" aria-describedby={rangeError ? "environmental-range-error" : undefined}>
+      <FieldLegend variant="label">Última actualización</FieldLegend>
+      <FieldGroup className="grid gap-3 sm:grid-cols-2 lg:max-w-xl">
+        <Field data-invalid={Boolean(rangeError)}>
+          <FieldLabel htmlFor="environmental-from">Desde</FieldLabel>
+          <DatePicker id="environmental-from" value={from} onChange={onFrom} invalid={Boolean(rangeError)} aria-describedby={rangeError ? "environmental-range-error" : undefined} />
+        </Field>
+        <Field data-invalid={Boolean(rangeError)}>
+          <FieldLabel htmlFor="environmental-to">Hasta</FieldLabel>
+          <DatePicker id="environmental-to" value={to} onChange={onTo} invalid={Boolean(rangeError)} aria-describedby={rangeError ? "environmental-range-error" : undefined} />
+        </Field>
+      </FieldGroup>
+      {rangeError && <FieldError id="environmental-range-error">{rangeError}</FieldError>}
+      {(from || to) && <Button variant="ghost" size="sm" className="self-start" onClick={onClearDates}>Limpiar fechas</Button>}
+    </FieldSet>
+  </section>;
 }
 
 function ReportRow({ report, onOpen }: { report: EnvironmentalReport; onOpen: () => void }) {
@@ -352,6 +393,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
   const [noticeError, setNoticeError] = useState<string | null>(null);
   const [issueNoticeOpen, setIssueNoticeOpen] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<ReportDecision | null>(null);
+  const [requestInfoOpen, setRequestInfoOpen] = useState(false);
   const [rescheduleStep, setRescheduleStep] = useState<"reason" | "confirm" | null>(null);
   const reportTitleRef = useRef<HTMLHeadingElement>(null);
   const focusTitleAfterDialogRef = useRef(false);
@@ -435,6 +477,10 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
   const showNoticeIssuance = canIssueViolationNotice && report.status === "VIOLATION_FOUND" && Boolean(completedViolationInspection);
   const hasInspectionEvidence = Boolean(completedViolationInspection?.attachments?.length);
   const canSubmitNotice = showNoticeIssuance && hasInspectionEvidence && !violationNotice && !noticeLoading;
+  // #639: una sola solicitud abierta por expediente; mientras está pendiente el backend responde 409
+  // a derivar, desestimar y cerrar, así que esas acciones no se ofrecen.
+  const infoPending = report.informationRequestPending === true;
+  const canRequestInfo = isOffice && report.status === "UNDER_REVIEW" && Boolean(report.ticketId) && !infoPending;
   const canSchedule = isOffice && report.status === "UNDER_REVIEW" && !activeInspection;
   // La agenda de la inspección vive en su Servicio POINT: reprogramar es reprogramar
   // ese servicio (reschedule + confirm-reschedule), no crear otra inspección.
@@ -452,13 +498,28 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
     const sourceService = inspectionServices[inspection.id];
     return scenario.actor.kind === "FIELD" && Boolean(sourceService?.crewId && sourceService.crewId === scenario.actor.crewId);
   };
-  const actions: { action: Action; label: string; icon: typeof Check; tone?: string }[] = report.status === "RECEIVED"
+  const allActions: { action: Action; label: string; icon: typeof Check; tone?: string }[] = report.status === "RECEIVED"
     ? [{ action: "start-review", label: "Iniciar revisión", icon: Search }]
     : report.status === "UNDER_REVIEW"
       ? [{ action: "forward", label: "Derivar expediente", icon: Forward }, { action: "dismiss", label: "Desestimar expediente", icon: X, tone: "text-[var(--color-danger)]" }]
       : ["FORWARDED", "DISMISSED", "NO_VIOLATION", "SANCTIONED"].includes(report.status)
         ? [{ action: "close", label: "Cerrar expediente", icon: Check, tone: "text-[var(--color-danger)]" }]
         : [];
+  const actions = infoPending ? allActions.filter(({ action }) => action !== "forward" && action !== "dismiss" && action !== "close") : allActions;
+
+  async function handleRequestInformation(input: RequestInformationInput): Promise<string | null> {
+    try {
+      onReportUpdated(await environmentalReportsAdapter.requestInformation(report.id, input));
+      focusTitleAfterDialogRef.current = true;
+      return null;
+    } catch (error) {
+      if (error instanceof EnvironmentalReportRequestError && error.status === 409) {
+        try { onReportUpdated(await environmentalReportsAdapter.get(report.id)); } catch { /* the 409 message below stays */ }
+        return "No se pudo pedir la información: ya hay una solicitud pendiente o el expediente cambió. Se actualizó el estado.";
+      }
+      return getErrorMessage(error, "No se pudo pedir la información al vecino.");
+    }
+  }
 
   // El servicio recién creado en modo mock todavía no está vinculado a la inspección.
   const linkedService = (inspection: EnvironmentalInspection) => inspectionServices[inspection.id] ?? (inspection.id === inspections[inspections.length - 1]?.id ? scheduledService : null);
@@ -574,7 +635,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
           <div><h1 ref={reportTitleRef} tabIndex={-1} className="text-2xl font-bold tracking-tight text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 sm:text-[28px]">Expediente {report.id}</h1><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · actualización de {formatDate(report.updatedAt)}</p></div>
           <StatusBadge status={report.status} />
         </div>
-        {isOffice && actions.length > 0 && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Siguiente decisión de Oficina</h2><p className="mt-1 text-sm text-[var(--color-text-secondary)]">Las acciones disponibles respetan el estado actual del expediente.</p><div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`gap-2 ${tone ?? ""}`} onClick={() => { if (action === "forward" || action === "dismiss") setPendingDecision(action); else void onAction(action, report); }}><Icon data-icon="inline-start" aria-hidden />{label}</Button>)}</div></section>}
+        {isOffice && (actions.length > 0 || canRequestInfo || infoPending) && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Siguiente decisión de Oficina</h2><p className="mt-1 text-sm text-[var(--color-text-secondary)]">Las acciones disponibles respetan el estado actual del expediente.</p><div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`gap-2 ${tone ?? ""}`} onClick={() => { if (action === "forward" || action === "dismiss") setPendingDecision(action); else void onAction(action, report); }}><Icon data-icon="inline-start" aria-hidden />{label}</Button>)}{canRequestInfo && <Button variant="outline" className="gap-2" onClick={() => setRequestInfoOpen(true)}><MessageCircleQuestion data-icon="inline-start" aria-hidden />Pedir información al vecino</Button>}</div>{infoPending && <InformationRequestPending report={report} />}</section>}
         {isOffice && (canSchedule || canReprogram || canReinspect || orphanInspection) && <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" aria-labelledby="inspection-scheduling-title"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><CalendarDays aria-hidden /><div><h2 id="inspection-scheduling-title" className="text-sm font-bold text-[var(--color-text)]">Programación de inspección</h2><p className="mt-1 max-w-2xl text-sm text-[var(--color-text-secondary)]">{orphanInspection ? `La inspección ${orphanInspection.id} quedó registrada sin Servicio POINT: falta programar su fecha y su cuadrilla.` : canReinspect ? "La inspección anterior fue inconclusa. Registre una nueva inspección y un nuevo Servicio POINT." : "Defina la fecha y la cuadrilla. El tipo de Servicio POINT se determina automáticamente."}</p></div></div><div className="flex flex-wrap gap-2">{orphanInspection && <Button className="gap-2" onClick={() => { setScheduleMode("service"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />Programar servicio</Button>}{(canSchedule || canReinspect) && <Button className="gap-2" onClick={() => { setScheduleMode(canReinspect ? "reinspection" : "schedule"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />{canReinspect ? "Programar reinspección" : "Programar inspección"}</Button>}{canReprogram && <Button variant="outline" className="gap-2" onClick={() => setRescheduleStep(activeService?.status === "RESCHEDULED" ? "confirm" : "reason")}><RefreshCw data-icon="inline-start" aria-hidden />{activeService?.status === "RESCHEDULED" ? "Confirmar nueva fecha" : "Reprogramar inspección"}</Button>}</div></div></section>}
         {scheduleError && <Alert variant="danger">{scheduleError}</Alert>}
         {canViewViolationNotice && completedViolationInspection && <ViolationNoticePanel inspection={completedViolationInspection} notice={violationNotice} loading={noticeLoading} error={noticeError} showIssue={showNoticeIssuance} canIssue={canSubmitNotice} hasEvidence={hasInspectionEvidence} onIssue={() => setIssueNoticeOpen(true)} />}
@@ -583,6 +644,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
         {visibleClosure && <EnvironmentalReportClosurePanel closure={visibleClosure} />}
         {canViewSanctionOutcome && report.sanctionOutcome && <SanctionOutcomePanel outcome={report.sanctionOutcome} />}
       </div>
+       <RequestInformationDialog open={requestInfoOpen} reportId={report.id} finalFocus={dialogFinalFocus} onOpenChange={setRequestInfoOpen} onConfirm={handleRequestInformation} />
        <ReportDecisionDialog decision={pendingDecision} reportId={report.id} finalFocus={dialogFinalFocus} onOpenChange={(open) => { if (!open) setPendingDecision(null); }} onConfirm={async (decision, reason) => { const error = await onAction(decision, report, reason); if (error === null) focusTitleAfterDialogRef.current = true; return error; }} />
        <InspectionSchedulingDialog key={scheduleOpen ? scheduleMode : "closed"} open={scheduleOpen} mode={scheduleMode} initial={scheduleMode === "service" && serviceDraft?.inspectionId === orphanInspection?.id ? serviceDraft : null} onOpenChange={setScheduleOpen} onSubmit={scheduleMode === "service" ? handleScheduleService : handleSchedule} />
        <RescheduleReasonDialog open={rescheduleStep === "reason"} onOpenChange={(open) => { if (!open) setRescheduleStep((step) => step === "reason" ? null : step); }} service={activeService} onRescheduled={(updated) => { replaceInspectionService(updated); setRescheduleStep("confirm"); }} />

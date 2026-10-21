@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { tolerantRecords } from "./tolerant-records";
 
 export const repairDamageTypeSchema = z.enum([
   "BROKEN_PAVEMENT",
@@ -194,7 +195,7 @@ export const repairRequestsAdapter = {
   async list(query: RepairRequestQuery = {}): Promise<RepairRequestsPage> {
     const payload = await requestJson(`/api/repair-requests${queryString(query)}`);
     const parsed = z.object({
-      data: z.array(repairRequestSchema),
+      data: tolerantRecords(repairRequestSchema, "repair-requests"),
       meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
     }).safeParse(payload);
     if (!parsed.success) {

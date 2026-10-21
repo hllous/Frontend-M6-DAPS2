@@ -3,6 +3,7 @@ import { GET as getEnvironmentalReport } from "@/app/api/environmental-reports/[
 import { POST as closeEnvironmentalReport } from "@/app/api/environmental-reports/[id]/close/route";
 import { POST as dismissEnvironmentalReport } from "@/app/api/environmental-reports/[id]/dismiss/route";
 import { POST as forwardEnvironmentalReport } from "@/app/api/environmental-reports/[id]/forward/route";
+import { POST as requestEnvironmentalReportInformation } from "@/app/api/environmental-reports/[id]/request-information/route";
 import { POST as startEnvironmentalReportReview } from "@/app/api/environmental-reports/[id]/start-review/route";
 import {
   GET as listEnvironmentalInspections,
@@ -38,6 +39,7 @@ export function envControlRouteHandlers(officeCookie: string, crewCookie: string
       { method: "post", path: "*/api/environmental-reports/:reportId/start-review", route: startEnvironmentalReportReview, params: byReportId },
       { method: "post", path: "*/api/environmental-reports/:reportId/forward", route: forwardEnvironmentalReport, params: byReportId },
       { method: "post", path: "*/api/environmental-reports/:reportId/dismiss", route: dismissEnvironmentalReport, params: byReportId },
+      { method: "post", path: "*/api/environmental-reports/:reportId/request-information", route: requestEnvironmentalReportInformation, params: byReportId },
       { method: "post", path: "*/api/environmental-reports/:reportId/close", route: closeEnvironmentalReport, params: byReportId },
       { method: "get", path: "*/api/environmental-inspections/:inspectionId", route: getEnvironmentalInspection, params: byInspectionId },
       { method: "get", path: "*/api/environmental-inspections/:inspectionId/violation-notice", route: getViolationNotice, params: byInspectionId },

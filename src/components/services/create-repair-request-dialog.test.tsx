@@ -31,8 +31,14 @@ describe("CreateRepairRequestDialog", () => {
     await user.click(screen.getByRole("button", { name: /Crear deriv.*a M3/ }));
     expect(screen.getByText("Debe indicar la ubicación del daño.")).toBeVisible();
 
-    await user.selectOptions(screen.getByLabelText(/^Severidad/), "LOW");
-    await user.click(screen.getByLabelText(/^Sí,/));
+    const damageType = screen.getByRole("combobox", { name: /Tipo de daño/ });
+    const address = screen.getByRole("textbox", { name: /Ubicación del daño/ });
+    const severity = screen.getByRole("combobox", { name: /Severidad/ });
+    expect(damageType).toHaveAttribute("data-slot", "select-trigger");
+    expect(address).toHaveAttribute("data-slot", "input");
+    await user.click(severity);
+    await user.click(await screen.findByRole("option", { name: "Baja" }));
+    await user.click(screen.getByRole("radio", { name: /^Sí,/ }));
     await user.type(screen.getByLabelText(/^Ubic/), "Av. Rivadavia 2200");
     await user.click(screen.getByRole("button", { name: /Crear deriv.*a M3/ }));
 

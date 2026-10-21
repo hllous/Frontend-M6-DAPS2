@@ -108,6 +108,36 @@ describe("referrals against the backend", () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(unknown.id));
   });
 
+  it("keeps the Field scope working when a Service carries an origin or status this version does not know (#638)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/crews") return Response.json({ data: [{ id: crewId, name: "Cuadrilla Belgrano — Recolección" }] });
+      if (url.pathname === "/services") return Response.json(page([{ id: serviceId, crewId, origin: "FROM_THE_FUTURE", status: "ALSO_NEW", inspectionId: null }], 1));
+      if (url.pathname === "/repair-requests") return Response.json(page([repair], 1));
+      if (url.pathname === "/street-closure-requests") return Response.json(page([], 0, 1, 0));
+      throw new Error(`Unexpected backend URL: ${url}`);
+    });
+    const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie: await loginAs("field-crew-leader-route") } }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: [{ id: repairId }], meta: { total: 1 } });
+  });
+
+  it("answers the detail of a referral with an unknown status with a readable 502, not a crash", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === `/repair-requests/${repairId}`) return Response.json({ ...repair, status: "FROM_THE_FUTURE" });
+      throw new Error(`Unexpected backend URL: ${url}`);
+    });
+    const response = await getDetail(await loginAs("office-duty-queue"));
+    const body = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(body.message).toContain("no reconoce");
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(repairId), expect.anything());
+  });
+
   it("denies Field collection and detail without a resolved crew before backend calls", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch");
     const session = createSession("field-crew-leader-route", {
@@ -312,7 +342,7 @@ describe("referrals against the backend", () => {
   it("rejects malformed successful payloads without trying another kind", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id: repairId }));
     const response = await getDetail(await loginAs("office-duty-queue"));
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(502);
     expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 });

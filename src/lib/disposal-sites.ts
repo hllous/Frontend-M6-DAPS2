@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import { tolerantRecords } from "./tolerant-records";
 
 export const disposalSiteTypeSchema = z.enum(["LANDFILL", "TRANSFER_STATION", "RECYCLING_PLANT", "COMPOSTING_PLANT"]);
 export type DisposalSiteType = z.infer<typeof disposalSiteTypeSchema>;
@@ -25,7 +26,7 @@ export class DisposalSiteRequestError extends Error {
   constructor(message: string, status: number, options?: { cause?: unknown }) { super(message, options); this.name = "DisposalSiteRequestError"; this.status = status; }
 }
 
-const pageSchema = z.object({ data: z.array(disposalSiteSchema), meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }) });
+const pageSchema = z.object({ data: tolerantRecords(disposalSiteSchema, "disposal-sites"), meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }) });
 const errorResponseSchema = z.object({ statusCode: z.number(), message: z.union([z.string(), z.array(z.string())]), error: z.string(), timestamp: z.string(), path: z.string() });
 
 function queryString(query: DisposalSiteQuery) {

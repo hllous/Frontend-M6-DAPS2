@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { tolerantRecords } from "./tolerant-records";
 
 export const serviceFrequencyShiftSchema = z.enum(["MORNING", "AFTERNOON", "NIGHT"]);
 export type ServiceFrequencyShift = z.infer<typeof serviceFrequencyShiftSchema>;
@@ -79,7 +80,7 @@ export class ServiceFrequencyRequestError extends Error {
 }
 
 const pageSchema = z.object({
-  data: z.array(serviceFrequencySchema),
+  data: tolerantRecords(serviceFrequencySchema, "service-frequencies"),
   meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
 });
 

@@ -4,6 +4,7 @@ import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { BackendContractError, parseBackendError, readJsonBody as readBackendJsonBody } from "./backend-client";
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_DECIMAL_10_2, boundedDecimalInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export const vehicleTypeSchema = z.enum([
   "COMPACTOR_TRUCK",
@@ -69,7 +70,7 @@ export class VehicleRequestError extends Error {
 }
 
 const vehiclesEnvelopeSchema = z.object({
-  data: z.array(vehicleSchema),
+  data: tolerantRecords(vehicleSchema, "vehicles"),
   meta: z.object({
     total: z.number(),
     page: z.number(),

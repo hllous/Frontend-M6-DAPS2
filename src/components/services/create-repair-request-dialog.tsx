@@ -2,11 +2,17 @@
 import { errorMessage } from "@/lib/error-message";
 
 import { useCallback, useEffect, useId, useState } from "react";
-import { AlertCircle, CheckCircle2, ExternalLink, Info, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ExternalLink, Info } from "lucide-react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { notifyError, notifySuccess } from "@/components/ui/feedback";
 import { NetworkFailureError } from "@/lib/authenticated-fetch";
 import type { EnvironmentalInspection, EnvironmentalReport } from "@/lib/environmental-reports";
 import {
@@ -138,6 +144,7 @@ export function CreateRepairRequestDialog({
     setOutcome(null);
     setErrors({});
     onCreated(request);
+    notifySuccess("La derivación de reparación ya está registrada.");
   }, [onCreated, sourceKey]);
 
   async function verifyLostResponse(payload: RepairRequestDraftPayload) {
@@ -272,6 +279,7 @@ export function CreateRepairRequestDialog({
             setComposedAgainst(null);
             setCreatedRequest(result.result);
             onCreated(result.result);
+            notifySuccess("Derivación de reparación creada.");
           } else if (result.kind === "conflict") {
             setOutcome("unsent");
             setConflict({ current: result.current, composedAgainst: result.composedAgainst });
@@ -293,6 +301,7 @@ export function CreateRepairRequestDialog({
         if (result.kind === "success") {
           setCreatedRequest(result.result);
           onCreated(result.result);
+          notifySuccess("Derivación de reparación creada.");
         } else if (result.kind === "draft-saved") {
           setValues(result.draft.payload.input);
           setComposedAgainst(result.draft.composedAgainst);
@@ -304,13 +313,16 @@ export function CreateRepairRequestDialog({
         const created = await repairRequestsAdapter.create(parsed.data);
         setCreatedRequest(created);
         onCreated(created);
+        notifySuccess("Derivación de reparación creada.");
       }
     } catch (cause) {
       if (!service && cause instanceof NetworkFailureError) {
         setValues(parsed.data);
         setOutcome("unsent");
       } else {
-        setErrors({ form: errorMessage(cause, "No se pudo crear la derivación.") });
+        const message = errorMessage(cause, "No se pudo crear la derivación.");
+        setErrors({ form: message });
+        notifyError(message);
       }
     } finally {
       setIsSubmitting(false);
@@ -327,7 +339,6 @@ export function CreateRepairRequestDialog({
     onOpenChange(nextOpen);
   }
 
-  const inputClass = "min-h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]";
   const resolvedRequest = createdRequest ?? alreadyRegisteredRequest;
 
   return (
@@ -359,10 +370,9 @@ export function CreateRepairRequestDialog({
         </div>
 
         {outcome && (
-          <div role="status" className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-[var(--color-warning)]">
-              <AlertCircle className="h-4 w-4" aria-hidden />
-              <span>
+          <Alert variant="warning" role="status">
+            <AlertCircle aria-hidden />
+            <AlertTitle>
                 {outcome === "checking"
                   ? "Verificando el estado de la derivación"
                   : outcome === "verification-failed"
@@ -370,9 +380,8 @@ export function CreateRepairRequestDialog({
                     : isInspection
                       ? "Derivación sin enviar"
                       : "Unsent referral"}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-[var(--color-text)]">
+            </AlertTitle>
+            <AlertDescription>
               {outcome === "checking"
                 ? "Comprobando si el Servicio ya tiene una derivación de este tipo."
                 : outcome === "verification-failed"
@@ -380,73 +389,93 @@ export function CreateRepairRequestDialog({
                   : isInspection
                     ? "No se recibió confirmación del envío. Los valores quedaron retenidos en este dispositivo."
                     : "No se recibió confirmación del envío y no se encontró una derivación del mismo tipo creada desde que se preparó el borrador."}
-            </p>
-          </div>
+            </AlertDescription>
+          </Alert>
         )}
 
         {resolvedRequest && (
-          <div role="status" className="rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)]/50 p-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-[var(--color-success)]">
-              <CheckCircle2 className="h-4 w-4" aria-hidden />
-              <span>
+          <Alert variant="success" role="status">
+            <CheckCircle2 aria-hidden />
+            <AlertTitle>
                 {alreadyRegisteredRequest
                   ? "Derivación ya registrada."
                   : "Derivación creada y pendiente de respuesta de M3."}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-[var(--color-text)]">
+            </AlertTitle>
+            <AlertDescription>
               Seguimiento {resolvedRequest.id} · {isInspection ? `Inspección ${sourceId}` : `Servicio ${sourceId}`}
-            </p>
-          </div>
+            </AlertDescription>
+          </Alert>
         )}
 
         {errors.form && (
-          <div role="alert" className="flex items-start gap-2 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/50 p-3 text-sm text-[var(--color-danger)]">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <span>{errors.form}</span>
-          </div>
+          <Alert variant="danger">
+            <AlertCircle aria-hidden />
+            <AlertDescription>{errors.form}</AlertDescription>
+          </Alert>
         )}
 
         {!resolvedRequest && !conflict && (
           <form id={formId} noValidate onSubmit={handleSubmit} className="py-2">
             <FieldGroup>
-              <Field>
+              <Field data-invalid={Boolean(errors.damageType) || undefined}>
                 <FieldLabel htmlFor="repair-damage-type">Tipo de daño *</FieldLabel>
-                <select id="repair-damage-type" className={inputClass} value={values.damageType} onChange={(event) => updateValue("damageType", event.target.value as RepairDamageType)} aria-invalid={Boolean(errors.damageType)} aria-describedby={errors.damageType ? "repair-damage-type-error" : undefined}>
-                  {Object.entries(REPAIR_DAMAGE_TYPE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
+                <Select value={values.damageType} onValueChange={(value) => updateValue("damageType", value as RepairDamageType)}>
+                  <SelectTrigger id="repair-damage-type" aria-invalid={Boolean(errors.damageType) || undefined} aria-describedby={errors.damageType ? "repair-damage-type-error" : undefined}>
+                    <SelectValue>{REPAIR_DAMAGE_TYPE_LABEL[values.damageType]}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {Object.entries(REPAIR_DAMAGE_TYPE_LABEL).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
                 {errors.damageType && <FieldError id="repair-damage-type-error">{errors.damageType}</FieldError>}
               </Field>
 
-              <Field>
+              <Field data-invalid={Boolean(errors.address) || undefined}>
                 <FieldLabel htmlFor="repair-address">Ubicación del daño *</FieldLabel>
-                <input id="repair-address" className={inputClass} value={values.address} onChange={(event) => updateValue("address", event.target.value)} aria-invalid={Boolean(errors.address)} aria-describedby={errors.address ? "repair-address-error" : undefined} />
+                <Input id="repair-address" value={values.address} onChange={(event) => updateValue("address", event.target.value)} aria-invalid={Boolean(errors.address) || undefined} aria-describedby={errors.address ? "repair-address-error" : undefined} />
                 {errors.address ? <FieldError id="repair-address-error">{errors.address}</FieldError> : <FieldDescription>Indique una dirección o referencia legible para M3.</FieldDescription>}
               </Field>
 
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field>
+              <FieldGroup className="grid gap-5 sm:grid-cols-2">
+                <Field data-invalid={Boolean(errors.severity) || undefined}>
                   <FieldLabel htmlFor="repair-severity">Severidad *</FieldLabel>
-                  <select id="repair-severity" className={inputClass} value={values.severity} onChange={(event) => updateValue("severity", event.target.value as RepairSeverity)} aria-invalid={Boolean(errors.severity)} aria-describedby={errors.severity ? "repair-severity-error" : undefined}>
-                    {Object.entries(REPAIR_SEVERITY_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                  </select>
+                  <Select value={values.severity} onValueChange={(value) => updateValue("severity", value as RepairSeverity)}>
+                    <SelectTrigger id="repair-severity" aria-invalid={Boolean(errors.severity) || undefined} aria-describedby={errors.severity ? "repair-severity-error" : undefined}>
+                      <SelectValue>{REPAIR_SEVERITY_LABEL[values.severity]}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {Object.entries(REPAIR_SEVERITY_LABEL).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                   {errors.severity && <FieldError id="repair-severity-error">{errors.severity}</FieldError>}
                 </Field>
 
-                <fieldset aria-describedby={errors.publicSafetyRisk ? "repair-risk-error" : "repair-risk-description"}>
-                  <legend className="text-sm font-semibold">¿Implica riesgo para la seguridad pública? *</legend>
-                  <div className="mt-2 grid gap-2">
-                    {[{ value: "true", label: "Sí, implica riesgo para la seguridad pública" }, { value: "false", label: "No implica riesgo para la seguridad pública" }].map((option) => (
-                      <label key={option.value} className="flex min-h-10 items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 text-sm text-[var(--color-text)]">
-                        <input type="radio" name="repair-public-safety-risk" value={option.value} checked={values.publicSafetyRisk === (option.value === "true")} onChange={() => updateValue("publicSafetyRisk", option.value === "true")} />
-                        {option.label}
-                      </label>
-                    ))}
-                  </div>
+                <FieldSet data-invalid={Boolean(errors.publicSafetyRisk) || undefined}>
+                  <FieldLegend id="repair-risk-label">¿Implica riesgo para la seguridad pública? *</FieldLegend>
+                  <RadioGroup
+                    value={String(values.publicSafetyRisk)}
+                    onValueChange={(value) => updateValue("publicSafetyRisk", value === "true")}
+                    aria-labelledby="repair-risk-label"
+                    aria-describedby={errors.publicSafetyRisk ? "repair-risk-error" : "repair-risk-description"}
+                    aria-invalid={Boolean(errors.publicSafetyRisk) || undefined}
+                  >
+                    <FieldLabel htmlFor="repair-public-safety-risk-true" className="min-h-11 flex-row items-center rounded-lg border px-3">
+                      <RadioGroupItem id="repair-public-safety-risk-true" value="true" />
+                      Sí, implica riesgo para la seguridad pública
+                    </FieldLabel>
+                    <FieldLabel htmlFor="repair-public-safety-risk-false" className="min-h-11 flex-row items-center rounded-lg border px-3">
+                      <RadioGroupItem id="repair-public-safety-risk-false" value="false" />
+                      No implica riesgo para la seguridad pública
+                    </FieldLabel>
+                  </RadioGroup>
                   <FieldDescription id="repair-risk-description">Este dato se registra de forma independiente a la severidad.</FieldDescription>
                   {errors.publicSafetyRisk && <FieldError id="repair-risk-error">{errors.publicSafetyRisk}</FieldError>}
-                </fieldset>
-              </div>
+                </FieldSet>
+              </FieldGroup>
             </FieldGroup>
           </form>
         )}
@@ -477,7 +506,7 @@ export function CreateRepairRequestDialog({
             <Button type="button" onClick={() => handleOpenChange(false)}>Cerrar confirmación</Button>
           ) : (
             <Button type="submit" form={formId} disabled={isSubmitting || outcome === "checking" || Boolean(conflict)}>
-              {(isSubmitting || outcome === "checking") && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+              {(isSubmitting || outcome === "checking") && <Spinner data-icon="inline-start" aria-hidden />}
               {isSubmitting
                 ? "Verificando y enviando..."
                 : outcome === "checking"

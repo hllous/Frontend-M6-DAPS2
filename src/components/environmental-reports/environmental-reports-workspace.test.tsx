@@ -49,10 +49,48 @@ async function chooseTime(user: ReturnType<typeof userEvent.setup>, scope: Retur
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); resetRepairRequestFixtures(); resetServiceFixtures(); window.localStorage.clear(); window.history.replaceState(null, "", "/app?destination=environment"); vi.useRealTimers(); });
+afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); resetRepairRequestFixtures(); resetServiceFixtures(); window.localStorage.clear(); window.history.replaceState(null, "", "/app?destination=environment"); server.events.removeAllListeners("request:start"); vi.useRealTimers(); });
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
+  it("restores a date range from the URL and clears it without clearing other filters", async () => {
+    window.history.replaceState(null, "", "/app?destination=environment&from=2026-09-04&to=2026-09-05&priority=HIGH");
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    expect(within(list).getByRole("button", { name: /ER-1006/ })).toBeVisible();
+    expect(within(list).queryByRole("button", { name: /ER-1001/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Desde" })).toHaveTextContent("04/09/2026");
+    expect(screen.getByRole("button", { name: "Hasta" })).toHaveTextContent("05/09/2026");
+    await user.click(screen.getByRole("button", { name: "Limpiar fechas" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /ER-1001/ })).toBeVisible());
+    expect(window.location.search).toContain("priority=HIGH");
+    expect(window.location.search).not.toMatch(/from=|to=/);
+  });
+
+  it("announces an inverted date range, blocks fetching and recovers when corrected", async () => {
+    window.history.replaceState(null, "", "/app?destination=environment&from=2026-09-07&to=2026-09-06&page=2");
+    const requests: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (new URL(request.url).pathname === "/api/environmental-reports") requests.push(request.url);
+    });
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("La fecha «Desde» no puede ser posterior a «Hasta».");
+    expect(screen.getByRole("button", { name: "Hasta" })).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: "Hasta" })).toHaveAccessibleDescription("La fecha «Desde» no puede ser posterior a «Hasta».");
+    expect(requests).toEqual([]);
+    await chooseDate(user, within(screen.getByRole("group", { name: "Última actualización" })), "Desde", "2026-09-06");
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    expect(requests).toHaveLength(1);
+    expect(new URL(requests[0]).searchParams.get("from")).toBe("2026-09-06");
+    expect(new URL(requests[0]).searchParams.get("to")).toBe("2026-09-06");
+    expect(new URL(requests[0]).searchParams.get("page")).toBe("1");
+    expect(window.location.search).toContain("from=2026-09-06");
+    expect(window.location.search).not.toContain("page=");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("shows an uncorrelated M4 outcome as an Office integration exception", async () => {
     ingestSanctionOutcomeFixture({
       violationNoticeId: "NOTICE-UNKNOWN",
@@ -243,6 +281,61 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Desestimar expediente" })).not.toBeInTheDocument());
     await waitFor(() => expect(within(detail).getByRole("heading", { name: "Expediente ER-1001" })).toHaveFocus());
+  });
+
+  it("asks the neighbour for information, then shows the pending request and hides the decisions the backend would reject", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1002/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1002" });
+    await user.click(within(detail).getByRole("button", { name: "Pedir información al vecino" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Pedir información al vecino" });
+    expect(within(dialog).getByText(/fecha sugerida: M2 fija el vencimiento efectivo/i)).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Pedir información" }));
+    expect(await within(dialog).findByText("Debe indicar qué información se le pide al vecino.")).toBeVisible();
+    await user.type(within(dialog).getByLabelText(/Qué se le pide al vecino/), "Una foto del frente, de noche.");
+    await user.click(within(dialog).getByRole("button", { name: "Pedir información" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Pedir información al vecino" })).not.toBeInTheDocument());
+    const pending = await within(detail).findByRole("status", { name: "Solicitud de información pendiente" });
+    expect(pending).toHaveTextContent("Una foto del frente, de noche.");
+    expect(pending).toHaveTextContent("M2 cancela el reclamo y el expediente pasa a Desestimado");
+    expect(within(detail).queryByRole("button", { name: "Pedir información al vecino" })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("button", { name: "Derivar expediente" })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("button", { name: "Desestimar expediente" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer to ask for information without a ticket or outside review", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1001/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1001" });
+    await user.click(within(detail).getByRole("button", { name: "Iniciar revisión" }));
+    await within(detail).findByRole("button", { name: "Derivar expediente" });
+    expect(within(detail).queryByRole("button", { name: "Pedir información al vecino" })).not.toBeInTheDocument();
+  });
+
+  it("refreshes the report and explains a 409 when a request is already pending", async () => {
+    const user = userEvent.setup();
+    server.use(http.post("*/api/environmental-reports/ER-1002/request-information", () => {
+      updateEnvironmentalReportFixture("ER-1002", { informationRequestPending: true, informationRequestMessage: "Ya pedida", informationRequestedAt: "2026-09-06T12:00:00.000Z" });
+      return HttpResponse.json({ statusCode: 409, message: "pendiente" }, { status: 409 });
+    }));
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1002/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1002" });
+    await user.click(within(detail).getByRole("button", { name: "Pedir información al vecino" }));
+    const dialog = await screen.findByRole("dialog", { name: "Pedir información al vecino" });
+    await user.type(within(dialog).getByLabelText(/Qué se le pide al vecino/), "Otra foto");
+    await user.click(within(dialog).getByRole("button", { name: "Pedir información" }));
+
+    expect(await within(dialog).findByText(/ya hay una solicitud pendiente o el expediente cambió/i)).toBeVisible();
+    // the dialog is still open, so the page behind it is aria-hidden
+    expect(await within(detail).findByRole("status", { name: "Solicitud de información pendiente", hidden: true })).toHaveTextContent("Ya pedida");
   });
 
   it("finds a report by publicId and keeps the technical ticketId in its detail", async () => {
@@ -534,8 +627,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(dialog).getByText("Contexto de origen INS-1012")).toBeVisible();
     expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2450");
     expect(within(dialog).getByRole("link", { name: /Ver inspección fuente/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
-    await user.selectOptions(within(dialog).getByLabelText(/^Severidad/), "LOW");
-    await user.click(within(dialog).getByLabelText(/^Sí,/));
+    await user.click(within(dialog).getByRole("combobox", { name: /^Severidad/ }));
+    await user.click(screen.getByRole("option", { name: "Baja" }));
+    await user.click(within(dialog).getByRole("radio", { name: /^Sí,/ }));
     await user.click(within(dialog).getByRole("button", { name: /Crear deriv.*a M3/ }));
 
     expect(await within(dialog).findByText(/pendiente de respuesta de M3/i)).toBeVisible();

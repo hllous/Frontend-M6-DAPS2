@@ -13,6 +13,7 @@ import {
 import {
   createEnvironmentalReportInputSchema,
   environmentalReportSchema,
+  environmentalReportDateRangeSchema,
   environmentalReportPrioritySchema,
   environmentalReportStatusSchema,
   environmentalReportTypeSchema,
@@ -22,6 +23,7 @@ import {
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
+import { tolerantRecords } from "@/lib/tolerant-records";
 
 
 
@@ -34,6 +36,8 @@ function queryFromUrl(url: URL): EnvironmentalReportQuery {
     priority: environmentalReportPrioritySchema.safeParse(url.searchParams.get("priority")).data,
     publicId: url.searchParams.get("publicId") ?? undefined,
     ticketId: url.searchParams.get("ticketId") ?? undefined,
+    from: url.searchParams.get("from") || undefined,
+    to: url.searchParams.get("to") || undefined,
     search: searchParam(url.searchParams),
     page: pageParam(url.searchParams),
     pageSize: pageSizeParam(url.searchParams),
@@ -56,12 +60,14 @@ function matchesQuery(report: EnvironmentalReport, query: EnvironmentalReportQue
 }
 
 const environmentalReportPageSchema = z.object({
-  data: z.array(environmentalReportSchema),
+  data: tolerantRecords(environmentalReportSchema, "environmental-reports"),
   meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
 }).passthrough();
 
 function backendListQuery(query: EnvironmentalReportQuery, page: number, pageSize: number) {
   const params = new URLSearchParams();
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
   if (query.status) params.set("status", query.status);
   if (query.reportType) params.set("reportType", query.reportType);
   if (query.priority) params.set("priority", query.priority);
@@ -114,6 +120,8 @@ export async function GET(request: Request) {
     authorize(session, { capability: "environmentalReport:view", throwOnError: true });
     const scenario = getScenario(session.scenarioId);
     const query = queryFromUrl(new URL(request.url));
+    const range = environmentalReportDateRangeSchema.safeParse(query);
+    if (!range.success) return errorResponse(400, range.error.issues.map((issue) => issue.message).join(" "), path);
 
     if (backendMode(session)) {
       if (scenario.actor.kind === "FIELD") return listFieldReports(request, query, session.crew?.id, path);

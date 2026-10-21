@@ -33,6 +33,17 @@ describe("treeInterventionsAdapter", () => {
     });
   });
 
+  it("drops an intervention with an unknown status instead of failing the whole list (#638)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [{ ...intervention, treeIds: undefined, id: "new", status: "FROM_THE_FUTURE", trees: [linkedTree] }, { ...intervention, treeIds: undefined, trees: [linkedTree] }],
+      meta: { total: 2, page: 1, pageSize: 10, totalPages: 1 },
+    })));
+
+    const page = await treeInterventionsAdapter.list();
+    expect(page.interventions.map((item) => item.id)).toEqual(["intervention-1"]);
+  });
+
   it("accepts the documented list response with linked trees instead of tree ids", async () => {
     const trees = [linkedTree];
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
@@ -51,13 +62,13 @@ describe("treeInterventionsAdapter", () => {
     );
 
     await expect(
-      treeInterventionsAdapter.list({ interventionType: "SAFETY_PRUNING", status: "REQUESTED", page: 1, pageSize: 10 }),
+      treeInterventionsAdapter.list({ interventionType: "SAFETY_PRUNING", status: "REQUESTED", priority: "HIGH", page: 1, pageSize: 10 }),
     ).resolves.toMatchObject({
       interventions: [{ ...intervention, treeIds: ["tree-2"] }],
       totalPages: 1,
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/tree-interventions?interventionType=SAFETY_PRUNING&status=REQUESTED&page=1&pageSize=10",
+      "/api/tree-interventions?interventionType=SAFETY_PRUNING&status=REQUESTED&priority=HIGH&page=1&pageSize=10",
       expect.objectContaining({ cache: "no-store" }),
     );
   });
