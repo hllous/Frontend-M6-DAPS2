@@ -3,6 +3,7 @@ import { z } from "zod";
 import { externalIdInput } from "@/lib/input-limits";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { tolerantRecords } from "./tolerant-records";
 
 export type RouteQuery = {
   active?: boolean;
@@ -118,7 +119,7 @@ export const routeReferenceReportSchema = z.object({
 export type RouteReferenceReport = z.infer<typeof routeReferenceReportSchema>;
 
 const routesEnvelopeSchema = z.object({
-  data: z.array(routeSchema),
+  data: tolerantRecords(routeSchema, "routes"),
   meta: z.object({
     total: z.number(),
     page: z.number(),
