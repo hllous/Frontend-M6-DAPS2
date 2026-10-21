@@ -20,6 +20,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -381,6 +383,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
         </div>
       </header>
 
+      <LoadingRegion label="Derivaciones" isLoading={loadState.status === "loading"} className="flex flex-1 flex-col">
       {loadState.status === "loading" && <LoadingState />}
       {loadState.status === "error" && (
         <div className="flex flex-1 items-center justify-center p-6">
@@ -428,6 +431,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
           </section>
         </div>
       )}
+      </LoadingRegion>
     </div>
   );
 }
@@ -1064,11 +1068,8 @@ function DateField({ label, value }: { label: string; value: string }) {
 
 function LoadingState() {
   return (
-    <div className="flex flex-1 items-center justify-center p-6" role="status" aria-label="Cargando derivaciones">
-      <div className="w-full max-w-2xl space-y-3">
-        <div className="h-20 animate-pulse rounded-2xl bg-[var(--color-surface-subtle)]" />
-        <div className="h-20 animate-pulse rounded-2xl bg-[var(--color-surface-subtle)]" />
-      </div>
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col p-4 sm:p-6 lg:p-8">
+      <ListItemsSkeleton className="grid min-w-0 grid-cols-1 gap-3" itemCount={5} itemHeight="min-h-32 rounded-xl border bg-card" />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
+import { mockResponseAfter } from "@/mocks/delayed-response";
 import { handlers } from "@/mocks/handlers";
 import { fixtureReferrals } from "@/app/api/referrals/route";
 import { addRepairRequestFixture, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
@@ -24,6 +25,21 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("ReferralsWorkspace", () => {
+  it("shows a busy skeleton region while the referrals response is delayed", async () => {
+    server.use(http.get("*/api/referrals", () => mockResponseAfter(350, () => HttpResponse.json({ data: fixtureReferrals(), meta: { total: fixtureReferrals().length } }))));
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const region = screen.getByRole("region", { name: "Derivaciones" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(region.querySelector("[data-skeleton]")).not.toBeNull();
+    expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByRole("region", { name: "Derivaciones" })).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
+    expect(screen.getByRole("region", { name: "Derivaciones" }).querySelector("[data-skeleton]")).toBeNull();
+    expect(screen.getByRole("list", { name: "Derivaciones" })).toBeVisible();
+  });
+
   it("renders a BFF-scoped Field referral whose source UUID is absent from fixtures", async () => {
     const id = "15c86465-54d3-4e0a-83a5-26a3cc510017";
     const inspectionId = "bd685878-7c96-4e99-9b38-b0368a011fa0";
