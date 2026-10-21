@@ -98,8 +98,8 @@ test.describe("EnvironmentalReport case file", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=environment");
     const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
-    await list.getByRole("button", { name: /ER-1002/ }).click();
-    const detail = page.getByRole("region", { name: "Detalle de ER-1002" });
+    await list.getByRole("button", { name: /ER-1013/ }).click();
+    const detail = page.getByRole("region", { name: "Detalle de ER-1013" });
     await detail.getByRole("button", { name: "Pedir información al vecino" }).click();
     const dialog = page.getByRole("dialog", { name: "Pedir información al vecino" });
     await dialog.getByLabel(/Qué se le pide al vecino/).fill("Una foto del frente, de noche.");

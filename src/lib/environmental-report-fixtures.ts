@@ -34,6 +34,7 @@ const reports: EnvironmentalReport[] = [
 ];
 
 reports.push({ id: "ER-1012", reportType: "AIR_EMISSION", address: "Av. Brasil 2450", lat: -34.636, lng: -58.405, description: "Emisión visible informada en un establecimiento industrial.", status: "INSPECTION_SCHEDULED", priority: "HIGH", ticketId: null, deadlineAt: "2026-09-14T12:00:00.000Z", escalated: false, assignedCrewId: "crew-b", createdAt: "2026-09-06T08:00:00.000Z", updatedAt: "2026-09-06T08:00:00.000Z" });
+reports.push({ id: "ER-1013", reportType: "NOISE", address: "Av. Rivadavia 5100", lat: null, lng: null, description: null, status: "UNDER_REVIEW", priority: "LOW", publicId: "TK-2026-095", ticketId: "550e8400-e29b-41d4-a716-446655440095", deadlineAt: null, escalated: false, assignedCrewId: null, createdAt: "2026-09-03T09:00:00.000Z", updatedAt: "2026-09-03T09:30:00.000Z" });
 
 const initialSanctionOutcome: SanctionOutcome = {
   violationNoticeId: "NOTICE-1010",
