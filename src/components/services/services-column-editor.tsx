@@ -1,20 +1,8 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
-import {
-  columnOrderingFeature,
-  columnResizingFeature,
-  columnSizingFeature,
-  columnVisibilityFeature,
-  tableFeatures,
-  useTable,
-  type ColumnDef,
-  type ReactTable,
-} from "@tanstack/react-table";
+import { useCallback } from "react";
+import { useTablePreferences } from "@/components/ui/use-table-preferences";
+import { useDataTable, type DataTableColumn, type DataTableInstance } from "@/components/ui/data-table";
 
 import { Button } from "@/components/ui/button";
 import type { Service } from "@/lib/services";
@@ -89,16 +77,9 @@ export const SERVICES_COLUMN_DEFINITIONS: readonly ServicesColumnDefinition[] = 
   },
 ] as const;
 
-const SERVICES_TABLE_FEATURES = tableFeatures({
-  columnVisibilityFeature,
-  columnOrderingFeature,
-  columnSizingFeature,
-  columnResizingFeature,
-});
+type ServicesTanStackTable = DataTableInstance<Service>;
 
-type ServicesTanStackTable = ReactTable<typeof SERVICES_TABLE_FEATURES, Service>;
-
-const TANSTACK_SERVICE_COLUMNS: ColumnDef<typeof SERVICES_TABLE_FEATURES, Service>[] = [
+const TANSTACK_SERVICE_COLUMNS: DataTableColumn<Service>[] = [
   {
     id: "ordinal",
     accessorFn: (_service, index) => index + 1,
@@ -265,34 +246,6 @@ export function getServicesColumnStorageKey({
   return `${STORAGE_PREFIX}:${encodeURIComponent(userId)}:${variant}`;
 }
 
-function readPreferences(storageKey: string): ServicesColumnPreferences {
-  try {
-    const saved = window.localStorage.getItem(storageKey);
-    return saved
-      ? sanitizeServicesColumnPreferences(JSON.parse(saved) as unknown)
-      : createDefaultServicesColumnPreferences();
-  } catch {
-    return createDefaultServicesColumnPreferences();
-  }
-}
-
-function writePreferences(
-  storageKey: string,
-  preferences: ServicesColumnPreferences,
-): void {
-  try {
-    window.localStorage.setItem(storageKey, JSON.stringify(preferences));
-  } catch {
-    // Storage can be disabled or full; the current view remains usable in memory.
-  }
-}
-
-interface StoredPreferencesState {
-  storageKey: string;
-  isHydrated: boolean;
-  preferences: ServicesColumnPreferences;
-}
-
 export function useServicesColumnPreferences({
   userId,
   variant,
@@ -300,41 +253,11 @@ export function useServicesColumnPreferences({
   data = [],
 }: UseServicesColumnPreferencesOptions): ServicesColumnPreferencesController {
   const storageKey = getServicesColumnStorageKey({ userId, variant });
-  const [state, setState] = useState<StoredPreferencesState>(() => ({
-    storageKey: "",
-    isHydrated: false,
-    preferences: createDefaultServicesColumnPreferences(),
-  }));
-
-  useEffect(() => {
-    if (!enabled || typeof window === "undefined") return;
-    // Storage is read after hydration so the server and initial client render use the same defaults.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState({
-      storageKey,
-      isHydrated: true,
-      preferences: readPreferences(storageKey),
-    });
-  }, [enabled, storageKey]);
-
-  useEffect(() => {
-    if (!enabled || !state.isHydrated || state.storageKey !== storageKey) return;
-    const timeout = window.setTimeout(() => writePreferences(storageKey, state.preferences), 120);
-    return () => window.clearTimeout(timeout);
-  }, [enabled, state, storageKey]);
-
-  const update = useCallback(
-    (change: (current: ServicesColumnPreferences) => ServicesColumnPreferences) => {
-      setState((current) => {
-        if (!current.isHydrated || current.storageKey !== storageKey) return current;
-        return {
-          ...current,
-          preferences: sanitizeServicesColumnPreferences(change(current.preferences)),
-        };
-      });
-    },
-    [storageKey],
-  );
+  const { preferences, isHydrated, update } = useTablePreferences({
+    storageKey, enabled,
+    defaults: createDefaultServicesColumnPreferences,
+    sanitize: sanitizeServicesColumnPreferences,
+  });
 
   const setVisible = useCallback(
     (key: ServicesColumnKey, visible: boolean) => {
@@ -395,13 +318,10 @@ export function useServicesColumnPreferences({
     update(() => createDefaultServicesColumnPreferences());
   }, [update]);
 
-  const preferences = state.storageKey === storageKey
-    ? state.preferences
-    : createDefaultServicesColumnPreferences();
-  const table = useTable({
-    features: SERVICES_TABLE_FEATURES,
+  const table = useDataTable({
     data,
     columns: TANSTACK_SERVICE_COLUMNS,
+    enableHiding: true,
     enableColumnResizing: true,
     columnResizeMode: "onChange",
     state: {
@@ -441,7 +361,7 @@ export function useServicesColumnPreferences({
 
   return {
     variant,
-    isHydrated: enabled && state.isHydrated && state.storageKey === storageKey,
+    isHydrated,
     preferences,
     table,
     setVisible,

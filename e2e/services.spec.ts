@@ -152,6 +152,30 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(selectedMarker).toHaveAttribute("aria-pressed", "true");
   });
 
+  test("category menu hides and restores each optional Services column", async ({ page }) => {
+    await page.setViewportSize(WIDE_VIEWPORT);
+    await openServices(page);
+
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const categoryTrigger = page.getByRole("button", { name: "Categorías" });
+    await categoryTrigger.click();
+
+    for (const category of ["Estado", "Zona", "Equipo", "Fecha"]) {
+      const header = table.getByRole("columnheader", { name: new RegExp(category) });
+      const menuItem = page.getByRole("menuitemcheckbox", { name: category });
+
+      await expect(header).toBeVisible();
+      await expect(menuItem).toBeVisible();
+      await expect(menuItem).toHaveAttribute("aria-checked", "true");
+      await menuItem.click();
+      await expect(header).toHaveCount(0);
+      await expect(menuItem).toHaveAttribute("aria-checked", "false");
+      await menuItem.click();
+      await expect(header).toBeVisible();
+      await expect(menuItem).toHaveAttribute("aria-checked", "true");
+    }
+  });
+
   test("search input filters services and updates the URL parameter", async ({ page }) => {
     await page.setViewportSize(WIDE_VIEWPORT);
     await openServices(page);
