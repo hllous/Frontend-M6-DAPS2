@@ -9,7 +9,7 @@ npm install -g @playwright/cli@latest
 npx skills add microsoft/playwright-cli@playwright-cli -g -y
 ```
 
-The skill documents every command. Only the parts that are specific to this repo are below.
+The skill documents every command. Only the parts that are specific to this repo are below. To measure what a screenshot cannot show (slowness, memory, Lighthouse audits), see [`browser-diagnostics.md`](browser-diagnostics.md).
 
 ## Run the app
 
