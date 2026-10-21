@@ -90,7 +90,7 @@ function RemoveContainerModalContent({
   }
 
   return (
-    <DialogContent className="max-w-lg overflow-y-auto">
+    <DialogContent className="max-w-lg">
       <DialogHeader>
         <DialogTitle>Retirar contenedor {container.code}</DialogTitle>
         <DialogDescription>
@@ -109,7 +109,7 @@ function RemoveContainerModalContent({
       <form
         id="remove-container-form"
         onSubmit={handleSubmit}
-        className="flex flex-col gap-4"
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain"
       >
         <Alert variant="destructive">
           <AlertDescription>

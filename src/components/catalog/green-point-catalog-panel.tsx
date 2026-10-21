@@ -637,7 +637,7 @@ export function GreenPointCatalogPanel({
       ) : null}
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="overflow-y-auto">
+        <DialogContent className="gap-4">
           <DialogHeader>
             <DialogTitle>
               {editingPoint ? "Editar punto verde" : "Registrar punto verde"}
@@ -657,6 +657,7 @@ export function GreenPointCatalogPanel({
             id="green-point-form"
             onSubmit={(event) => void submitForm(event)}
             noValidate
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
           >
             <FieldGroup>
               <Field data-invalid={Boolean(fieldErrors.code)}>

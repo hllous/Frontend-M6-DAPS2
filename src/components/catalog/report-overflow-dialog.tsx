@@ -98,7 +98,7 @@ function ReportOverflowModalContent({
   };
 
   return (
-    <DialogContent className="max-w-md overflow-y-auto">
+    <DialogContent className="max-w-md">
       <DialogHeader>
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-warning)]">
           <AlertTriangle className="size-4" aria-hidden />
@@ -123,7 +123,7 @@ function ReportOverflowModalContent({
       <form
         id="report-overflow-form"
         onSubmit={handleSubmit}
-        className="flex flex-col gap-4"
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain"
       >
         <Alert role="note">
           <AlertDescription>

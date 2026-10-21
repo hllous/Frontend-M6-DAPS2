@@ -152,7 +152,7 @@ function ReportDamageModalContent({
   };
 
   return (
-    <DialogContent className="max-w-lg overflow-y-auto">
+    <DialogContent className="max-w-lg">
       <DialogHeader>
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-destructive">
           <AlertTriangle className="size-4" aria-hidden />
@@ -176,7 +176,7 @@ function ReportDamageModalContent({
         id="report-damage-form"
         onSubmit={handleSubmit}
         noValidate
-        className="flex flex-col gap-4"
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain"
       >
         <FieldGroup>
           <Field data-invalid={Boolean(fieldErrors.damageType)}>
