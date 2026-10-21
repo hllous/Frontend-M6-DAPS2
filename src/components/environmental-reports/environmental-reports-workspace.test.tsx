@@ -32,20 +32,21 @@ async function chooseDate(user: ReturnType<typeof userEvent.setup>, scope: Retur
   const [year, month, day] = value.split("-").map(Number);
   const offset = (year - currentYear) * 12 + month - 1 - currentMonth;
   await user.click(trigger);
+  const calendar = await screen.findByRole("grid");
   for (let index = 0; index < Math.abs(offset); index += 1) {
-    await user.click(screen.getByRole("button", { name: offset < 0 ? "Mes anterior" : "Mes siguiente" }));
+    await user.click(await screen.findByRole("button", { name: offset < 0 ? "Mes anterior" : "Mes siguiente" }));
   }
   const dateLabel = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, day)));
-  await user.click(screen.getByRole("button", { name: new RegExp(`(?:^|,\\s)${dateLabel}$`, "i") }));
+  await user.click(await within(calendar).findByRole("button", { name: new RegExp(`(?:^|,\\s)${dateLabel}$`, "i") }));
 }
 
 async function chooseTime(user: ReturnType<typeof userEvent.setup>, scope: ReturnType<typeof within>, label: string, value: string) {
   const [hour, minute] = value.split(":");
   const timeGroup = scope.getByRole("group", { name: label });
   await user.click(within(timeGroup).getByRole("combobox", { name: "Hora" }));
-  await user.click(screen.getByRole("option", { name: hour }));
+  await user.click(await screen.findByRole("option", { name: hour }));
   await user.click(within(timeGroup).getByRole("combobox", { name: "Minutos" }));
-  await user.click(screen.getByRole("option", { name: minute }));
+  await user.click(await screen.findByRole("option", { name: minute }));
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
