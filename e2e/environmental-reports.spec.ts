@@ -93,6 +93,23 @@ test.describe("EnvironmentalReport case file", () => {
     await expect(detail.getByText(/Cuadrilla A/)).toBeVisible();
   });
 
+  test("Office asks the neighbour for information and the report waits for the answer", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=environment");
+    const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
+    await list.getByRole("button", { name: /ER-1002/ }).click();
+    const detail = page.getByRole("region", { name: "Detalle de ER-1002" });
+    await detail.getByRole("button", { name: "Pedir información al vecino" }).click();
+    const dialog = page.getByRole("dialog", { name: "Pedir información al vecino" });
+    await dialog.getByLabel(/Qué se le pide al vecino/).fill("Una foto del frente, de noche.");
+    await dialog.getByRole("button", { name: "Pedir información" }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(detail.getByRole("status", { name: "Solicitud de información pendiente" })).toContainText("Una foto del frente, de noche.");
+    await expect(detail.getByRole("button", { name: "Pedir información al vecino" })).toHaveCount(0);
+    await expect(detail.getByRole("button", { name: "Derivar expediente" })).toHaveCount(0);
+  });
+
   test("Field submits a report without exposing M2 reporter data", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginViaApi(page, "field-crew-leader-route");

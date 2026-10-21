@@ -133,6 +133,18 @@ describe("environmental reports adapter", () => {
     expect(bodies).toHaveLength(2);
   });
 
+  it("requests information with trimmed JSON, drops blank optionals and rejects invalid input before the request", async () => {
+    const bodies: unknown[] = [];
+    server.use(http.post("*/api/environmental-reports/ER-1002/request-information", async ({ request }) => { bodies.push(await request.json()); return HttpResponse.json({ ...(await environmentalReportsAdapter.get("ER-1002")), informationRequestPending: true }); }));
+    const updated = await environmentalReportsAdapter.requestInformation("ER-1002", { message: "  Una foto de noche  ", requiredBy: "2099-11-03", internalNote: "  " });
+    expect(updated.informationRequestPending).toBe(true);
+    expect(bodies).toEqual([{ message: "Una foto de noche", requiredBy: "2099-11-03" }]);
+    await expect(environmentalReportsAdapter.requestInformation("ER-1002", { message: "   " })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+    await expect(environmentalReportsAdapter.requestInformation("ER-1002", { message: "x".repeat(501) })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+    await expect(environmentalReportsAdapter.requestInformation("ER-1002", { message: "ok", requiredBy: "03/11/2099" })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+    expect(bodies).toHaveLength(1);
+  });
+
   it("schedules an inspection with the selected checklist version and snapshot", async () => {
     const inspection = await environmentalReportsAdapter.schedule("ER-1002", {
       scheduledDate: "2026-09-10",
