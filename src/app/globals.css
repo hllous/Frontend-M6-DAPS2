@@ -157,5 +157,15 @@
 :focus-visible { outline: 3px solid var(--color-focus) !important; outline-offset: 2px !important; }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-slot^="sheet-"] { transition: none !important; animation: none !important; }
+  [data-slot^="dialog-"],
+  [data-slot^="sheet-"],
+  [data-slot^="drawer-"],
+  [data-slot^="popover-"],
+  [data-slot^="select-"],
+  [data-slot^="dropdown-menu-"],
+  [data-slot^="combobox-"],
+  [data-slot^="calendar"] {
+    transition: none !important;
+    animation: none !important;
+  }
 }
