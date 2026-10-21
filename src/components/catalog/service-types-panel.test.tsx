@@ -2,6 +2,9 @@ import { beforeAll, afterAll, afterEach, describe, expect, it, vi } from "vitest
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
+import { http } from "msw";
+import { GET as listServiceTypes } from "@/app/api/service-types/route";
+import { mockResponseAfter } from "@/mocks/delayed-response";
 
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
@@ -15,6 +18,24 @@ afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
 afterAll(() => server.close());
 
 describe("ServiceTypesPanel", () => {
+  it("keeps the catalog header, seven columns and action blocks while a response is delayed", async () => {
+    server.use(http.get("*/api/service-types", ({ request }) => mockResponseAfter(350, () => {
+      const headers = new Headers(request.headers);
+      headers.set("cookie", createSessionCookie("office-duty-queue", { mode: "mock" }));
+      return listServiceTypes(new Request(request, { headers }));
+    })));
+    const { container } = render(<ServiceTypesPanel scenario={scenarios.officeDutyQueue} />);
+    const loading = screen.getByRole("status", { name: "Cargando tipos de servicio" });
+    expect(loading.querySelectorAll("thead th")).toHaveLength(7);
+    expect(loading.querySelectorAll("tbody tr")).toHaveLength(5);
+    expect(loading.querySelectorAll("tbody tr:first-child td")).toHaveLength(7);
+    expect(loading.querySelectorAll("tbody tr:first-child td:last-child [data-slot=skeleton]")).toHaveLength(2);
+    const widths = Array.from(loading.querySelectorAll("col"), (column) => column.className);
+    await screen.findByRole("row", { name: /WASTE-ROUTE/ }, { timeout: 3000 });
+    expect(screen.queryByRole("status", { name: "Cargando tipos de servicio" })).not.toBeInTheDocument();
+    expect(Array.from(container.querySelectorAll("col"), (column) => column.className)).toEqual(widths);
+    expect(container.querySelectorAll("thead th")).toHaveLength(7);
+  });
   it("lists fixtures, filters them, and keeps locked fields read-only in the edit form", async () => {
     const user = userEvent.setup();
     render(<ServiceTypesPanel scenario={scenarios.officeDutyQueue} />);

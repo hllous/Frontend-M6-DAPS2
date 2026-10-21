@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
 import { formControlClass } from "@/components/ui/form-control";
-import { Skeleton } from "@/components/ui/skeleton";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import {
   serviceTypeCategorySchema,
   serviceTypeModeSchema,
@@ -38,13 +38,15 @@ const modes: Array<{ value: ServiceTypeMode; label: string }> = [
   { value: "POINT", label: "Punto" },
 ];
 
+const tableColumnClasses = ["w-[13%]", "w-[26%]", "w-[15%]", "w-[9%]", "w-[8%]", "w-[8%]", "w-[21%]"] as const;
+
 const initialCreate = { code: "", name: "", category: "WASTE_COLLECTION" as ServiceTypeCategory, mode: "ROUTE" as ServiceTypeMode, requiresVehicle: true };
 
-type LoadState = { status: "loading" } | { status: "ready"; items: ServiceType[] } | { status: "error"; message: string };
+type LoadState = { status: "loading"; rowCount: number } | { status: "ready"; items: ServiceType[] } | { status: "error"; message: string };
 
 export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario }) {
   const canManage = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("serviceType:manage");
-  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [state, setState] = useState<LoadState>({ status: "loading", rowCount: 5 });
   const [search, setSearch] = useState("");
   const [active, setActive] = useState("all");
   const [category, setCategory] = useState<ServiceTypeCategory | "">("");
@@ -63,7 +65,7 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
   useEffect(() => {
     let isCurrent = true;
     async function requestServiceTypes() {
-      setState({ status: "loading" });
+      setState((previous) => ({ status: "loading", rowCount: previous.status === "ready" ? previous.items.length : previous.status === "loading" ? previous.rowCount : 5 }));
       try {
         const result = await serviceTypesAdapter.list({
           search: search || undefined,
@@ -167,13 +169,14 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
         <label className="flex flex-col gap-1 text-sm font-semibold">Modo<select aria-label="Filtrar por modo" className={formControlClass} value={mode} onChange={(event) => setMode(event.target.value as ServiceTypeMode | "")}><option value="">Todos</option>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       </div>
 
-      {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio" className="flex flex-col gap-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : null}
+      {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio"><TableRowsSkeleton rowCount={state.rowCount} rowHeight="" columnClasses={tableColumnClasses} columnWidths={["w-16", "w-40", "w-28", "w-20", "w-8", "w-12", "w-44"]} columnLabels={["Código", "Nombre", "Categoría", "Modo", "Vehículo", "Estado", "Acciones"]} actionColumn actionCount={canManage ? 2 : 0} className={styles.tableWrap} tableClassName={`${styles.table} min-[761px]:table-fixed`} actionsClassName={styles.actions} /></div> : null}
       {state.status === "error" ? <div role="alert" className="rounded-xl border border-destructive/30 bg-card p-5"><p>{state.message}</p><Button type="button" variant="outline" className="mt-3" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></div> : null}
       {state.status === "ready" && state.items.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin tipos de servicio</EmptyTitle><EmptyDescription>No hay resultados para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty> : null}
       {state.status === "ready" && state.items.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
+          <table className={`${styles.table} min-[761px]:table-fixed`}>
             <caption className="sr-only">Tipos de servicio</caption>
+            <colgroup>{tableColumnClasses.map((width, column) => <col key={column} className={width} />)}</colgroup>
             <thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Categoría</th><th scope="col">Modo</th><th scope="col">Vehículo</th><th scope="col">Estado</th><th scope="col"><span className="sr-only">Acciones</span></th></tr></thead>
             <tbody>{state.items.map((item) => (
               <tr key={item.id}>
