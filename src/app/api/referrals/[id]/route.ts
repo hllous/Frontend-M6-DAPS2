@@ -38,9 +38,15 @@ export async function GET(
         } catch {
           return errorResponse(502, "El backend devolvió una respuesta inválida.", path);
         }
-        referral = kind === "repair-requests"
-          ? referralFromBackendRepairRequest(repairRequestSchema.parse(backendPayload))
-          : referralFromStreetClosureRequest(streetClosureRequestSchema.parse(backendPayload));
+        if (kind === "repair-requests") {
+          const parsed = repairRequestSchema.safeParse(backendPayload);
+          if (parsed.success) referral = referralFromBackendRepairRequest(parsed.data);
+          else return contractMismatch(kind, id, parsed.error, path);
+        } else {
+          const parsed = streetClosureRequestSchema.safeParse(backendPayload);
+          if (parsed.success) referral = referralFromStreetClosureRequest(parsed.data);
+          else return contractMismatch(kind, id, parsed.error, path);
+        }
         break;
       }
     }
@@ -59,4 +65,9 @@ export async function GET(
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     return mapSessionError(error, path, "No se pudo cargar la derivación.");
   }
+}
+
+function contractMismatch(kind: string, id: string, error: { issues: { message: string }[] }, path: string) {
+  console.warn(`Derivación ${kind} ${id}: la respuesta del backend no respeta el contrato.`, error.issues.map((issue) => issue.message));
+  return errorResponse(502, "El backend devolvió una derivación con un formato que esta versión no reconoce (por ejemplo, un estado nuevo). Avisá a Backend.", path);
 }

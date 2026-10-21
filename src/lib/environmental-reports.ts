@@ -4,6 +4,7 @@ import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_NOTES_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export const environmentalReportTypeSchema = z.enum([
   "NOISE",
@@ -541,7 +542,7 @@ export const environmentalReportsAdapter = {
   async list(query: EnvironmentalReportQuery = {}): Promise<EnvironmentalReportsPage> {
     const payload = await requestJson(`/api/environmental-reports${queryString(query)}`);
     const parsed = z.object({
-      data: z.array(environmentalReportSchema),
+      data: tolerantRecords(environmentalReportSchema, "environmental-reports"),
       meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
       sanctionOutcomeIntegrationExceptions: z.array(sanctionOutcomeIntegrationExceptionSchema).optional(),
     }).safeParse(payload);

@@ -62,6 +62,16 @@ Each resource gets a typed adapter object. Browser-facing adapters call the same
 - The BFF reads the session cookie, checks the frontend capability for UI-level access, and attaches the server-held bearer token when forwarding to Backend. The raw token is never read from browser storage.
 - **Replacement boundary** (ADR-0003): Backend serves Swagger UI at `/api/docs` and versions a generated [OpenAPI document](https://github.com/hllous/Backend-M6-DAPS2/blob/30d49ea1d56f735a124ae9260cafefff095e07b6/docs/api/openapi.json). The frontend has not adopted a generated client; handwritten Zod schemas remain its runtime boundary and should be reconciled against this published source without weakening validation or changing view-level types unnecessarily.
 
+## Closed backend enums (tolerance policy, #638)
+
+Backend adds enum members often (`EXPIRED` in #321), and frontend enums are hand-written closed `z.enum`s. Policy, applied to every backend-origin enum and not to frontend-owned ones (e.g. UI filters, form-only values):
+
+- **Lists** (`data` of a paginated envelope, via `tolerantRecords` in `src/lib/tolerant-records.ts`): a record whose only problem is an unknown enum value is dropped, logged with `console.warn` and counted as `request_malformed_response` telemetry; the rest of the page renders. Any other violation (missing field, wrong type, non-array `data`, bad `meta`) still fails the whole list. Conservative choice: the unknown record is dropped, not shown with a fallback, because the closed TypeScript unions and status-indexed label maps cannot represent an unknown value without widening every consumer. `meta.total` can therefore exceed the rows shown. `/api/referrals` and the street-closure adapter additionally report the dropped count (`meta.invalid`, #635).
+- **Detail and mutations stay strict**: an unknown value fails with a readable contract error (`/api/referrals/[id]` answers 502 with an explicit message instead of an unhandled crash).
+- **Fields the frontend does not branch on are not enums**: `backendReferralSourceIds` validates only `id`, `crewId`, `origin`, `inspectionId` (origin as a plain string) instead of `serviceSchema.pick`, so a new Service status or origin cannot break Field's `/referrals` scope.
+
+Open question for the PO: whether dropped records should be surfaced in more lists with a visible "Estado desconocido" row (needs widening the status types).
+
 ## Naming conventions
 
 Adapted from Backend's DTO naming, dropping the `Dto` suffix since there's no decorator layer to name:

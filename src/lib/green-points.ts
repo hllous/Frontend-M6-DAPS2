@@ -4,6 +4,7 @@ import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 import { withResponseCoordinates } from "./response-coordinates";
 import { latitudeInput, longitudeInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export const wasteTypeSchema = z.enum(["HOUSEHOLD", "RECYCLABLE", "BULKY", "GREEN", "MIXED"]);
 export type WasteType = z.infer<typeof wasteTypeSchema>;
@@ -86,7 +87,7 @@ export class GreenPointRequestError extends Error {
 }
 
 const pageSchema = z.object({
-  data: z.array(greenPointSchema),
+  data: tolerantRecords(greenPointSchema, "green-points"),
   meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
 });
 

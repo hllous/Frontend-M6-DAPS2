@@ -23,6 +23,7 @@ import {
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
+import { tolerantRecords } from "@/lib/tolerant-records";
 
 
 
@@ -59,7 +60,7 @@ function matchesQuery(report: EnvironmentalReport, query: EnvironmentalReportQue
 }
 
 const environmentalReportPageSchema = z.object({
-  data: z.array(environmentalReportSchema),
+  data: tolerantRecords(environmentalReportSchema, "environmental-reports"),
   meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
 }).passthrough();
 

@@ -5,6 +5,7 @@ import { attachmentSchema, type Attachment, type Service, type ServiceStatus } f
 import { recordTelemetryEvent } from "./telemetry";
 import { withResponseCoordinates } from "./response-coordinates";
 import { MAX_INT32, latitudeInput, longitudeInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export { attachmentSchema, type Attachment };
 
@@ -184,7 +185,7 @@ export const SEVERITY_LABELS: Record<Severity, string> = {
 };
 
 const containersEnvelopeSchema = z.object({
-  data: z.array(containerSchema),
+  data: tolerantRecords(containerSchema, "containers"),
   meta: z.object({
     total: z.number(),
     page: z.number(),

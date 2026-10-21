@@ -4,6 +4,7 @@ import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 import { externalIdListInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export type ZoneQuery = {
   active?: boolean;
@@ -94,7 +95,7 @@ export const zoneReferenceReportSchema = z.object({
 export type ZoneReferenceReport = z.infer<typeof zoneReferenceReportSchema>;
 
 const zonesEnvelopeSchema = z.object({
-  data: z.array(zoneWireSchema),
+  data: tolerantRecords(zoneWireSchema, "zones"),
   meta: z.object({
     total: z.number(),
     page: z.number(),

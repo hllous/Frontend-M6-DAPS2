@@ -10,6 +10,7 @@ import {
   treeInterventionTypeSchema,
 } from "./tree-surveys";
 import { MAX_TREE_DIAMETER_CM, MAX_TREE_HEIGHT_M, boundedDecimalInput, latitudeInput, longitudeInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export const treeLastSurveySchema = z.object({
   surveyedAt: z.string(),
@@ -106,7 +107,7 @@ export class TreeRequestError extends Error {
 }
 
 const pageSchema = z.object({
-  data: z.array(treeSchema),
+  data: tolerantRecords(treeSchema, "trees"),
   meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
 });
 
