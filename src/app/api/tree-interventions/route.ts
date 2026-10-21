@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { addTreeInterventionFixture, createTreeInterventionFixture, filterTreeInterventionFixtures, paginateTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
-import { treeInterventionCreateInputSchema, treeInterventionStatusSchema, treeInterventionTypeSchema, type TreeInterventionQuery } from "@/lib/tree-interventions";
+import { treeInterventionCreateInputSchema, treeInterventionPrioritySchema, treeInterventionStatusSchema, treeInterventionTypeSchema, type TreeInterventionQuery } from "@/lib/tree-interventions";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
@@ -13,6 +13,7 @@ function queryFromUrl(url: URL): TreeInterventionQuery {
   return {
     interventionType: treeInterventionTypeSchema.safeParse(url.searchParams.get("interventionType")).data,
     status: treeInterventionStatusSchema.safeParse(url.searchParams.get("status")).data,
+    priority: treeInterventionPrioritySchema.safeParse(url.searchParams.get("priority")).data,
     page: pageParam(url.searchParams),
     pageSize: pageSizeParam(url.searchParams),
   };
@@ -22,6 +23,7 @@ function queryString(query: TreeInterventionQuery) {
   const params = new URLSearchParams();
   if (query.interventionType !== undefined) params.set("interventionType", String(query.interventionType));
   if (query.status !== undefined) params.set("status", String(query.status));
+  if (query.priority !== undefined) params.set("priority", query.priority);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
   const value = params.toString();

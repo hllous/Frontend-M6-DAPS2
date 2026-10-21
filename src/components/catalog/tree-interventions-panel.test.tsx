@@ -33,6 +33,20 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("TreeInterventionsPanel", () => {
+  it("filters priority on the server and restores all requests", async () => {
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("article", { name: /Poda de seguridad/i });
+    const filter = screen.getByRole("combobox", { name: "Filtrar por prioridad" });
+    await chooseSelectOption(user, filter, "Crítica");
+    expect(await screen.findByRole("article", { name: /Extracción/i })).toBeVisible();
+    expect(screen.queryByRole("article", { name: /Poda de seguridad/i })).not.toBeInTheDocument();
+    await chooseSelectOption(user, filter, "Baja");
+    expect(await screen.findByText("No hay solicitudes para los filtros seleccionados. Quite uno o más filtros para consultar el registro completo.")).toBeVisible();
+    await chooseSelectOption(user, filter, "Todas");
+    expect(await screen.findByRole("article", { name: /Poda de seguridad/i })).toBeVisible();
+  });
+
   it("lists requests, filters by status and shows every linked tree in detail", async () => {
     const user = userEvent.setup();
     render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
