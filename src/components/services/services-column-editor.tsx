@@ -321,6 +321,7 @@ export function useServicesColumnPreferences({
   const table = useDataTable({
     data,
     columns: TANSTACK_SERVICE_COLUMNS,
+    enableHiding: true,
     enableColumnResizing: true,
     columnResizeMode: "onChange",
     state: {
