@@ -2,7 +2,7 @@
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Check, ChevronRight, Pencil, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,14 @@ import {
 } from "@/components/ui/select";
 
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { notifySuccess } from "@/components/ui/feedback";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -147,6 +155,8 @@ export function ServiceFrequenciesPanel({
     useState<ServiceFrequencyCreateInput>(emptyCreateDraft);
   const [editing, setEditing] = useState<EditDraft | null>(null);
   const [closing, setClosing] = useState<ServiceFrequency | null>(null);
+  const [selectedItem, setSelectedItem] = useState<ServiceFrequency | null>(null);
+  const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
   const [closeError, setCloseError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
@@ -217,6 +227,19 @@ export function ServiceFrequenciesPanel({
       isCurrent = false;
     };
   }, [requestVersion, routeId, serviceTypeId, shift, validOn, weekday]);
+
+  useEffect(() => {
+    const media =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(max-width: 760px)")
+        : null;
+    const updateSheetSide = () =>
+      setSheetSide(media?.matches ? "bottom" : "right");
+    updateSheetSide();
+    if (!media) return;
+    media.addEventListener("change", updateSheetSide);
+    return () => media.removeEventListener("change", updateSheetSide);
+  }, []);
 
   function refresh() {
     setRequestVersion((version) => version + 1);
@@ -313,7 +336,7 @@ export function ServiceFrequenciesPanel({
   return (
     <section
       aria-labelledby="service-frequencies-title"
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-6 max-[760px]:pb-[calc(6rem+env(safe-area-inset-bottom))]"
     >
       <CatalogPageHeader
         title="Frecuencias de servicio"
@@ -427,7 +450,7 @@ export function ServiceFrequenciesPanel({
                       }
                     }}
                   >
-                    <SelectTrigger id="frequency-shift">
+                    <SelectTrigger id="frequency-shift" className="bg-card">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -498,7 +521,7 @@ export function ServiceFrequenciesPanel({
 
       <Card>
         <CardContent>
-          <FieldGroup className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_150px_150px_150px]">
+          <FieldGroup className="grid gap-3 md:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,16rem))]">
             <Field>
               <FieldLabel htmlFor="filter-frequency-service-type">
                 Tipo
@@ -518,6 +541,7 @@ export function ServiceFrequenciesPanel({
                 <SelectTrigger
                   id="filter-frequency-service-type"
                   aria-label="Filtrar por tipo"
+                  className="bg-card"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -550,6 +574,7 @@ export function ServiceFrequenciesPanel({
                 <SelectTrigger
                   id="filter-frequency-route"
                   aria-label="Filtrar por ruta"
+                  className="bg-card"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -582,6 +607,7 @@ export function ServiceFrequenciesPanel({
                 <SelectTrigger
                   id="filter-frequency-shift"
                   aria-label="Filtrar por turno"
+                  className="bg-card"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -614,6 +640,7 @@ export function ServiceFrequenciesPanel({
                 <SelectTrigger
                   id="filter-frequency-weekday"
                   aria-label="Filtrar por día"
+                  className="bg-card"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -636,6 +663,7 @@ export function ServiceFrequenciesPanel({
               <DatePicker
                 id="filter-frequency-valid-on"
                 aria-label="Filtrar por fecha de vigencia"
+                className="bg-card"
                 value={validOn}
                 onChange={(value) => setValidOn(value)}
               />
@@ -685,22 +713,118 @@ export function ServiceFrequenciesPanel({
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <caption className="sr-only">Frecuencias de servicio</caption>
-            <thead><tr><th scope="col">Tipo de servicio</th><th scope="col">Recorrido</th><th scope="col">Días</th><th scope="col">Turno</th><th scope="col">Vigencia</th><th scope="col"><span className="sr-only">Acciones</span></th></tr></thead>
+            <thead><tr><th scope="col">Tipo de servicio</th><th scope="col">Recorrido</th><th scope="col">Días</th><th scope="col">Turno</th><th scope="col">Vigencia</th><th scope="col"><span className="sr-only">Ver detalle</span></th></tr></thead>
             <tbody>{state.items.map((item) => (
-              <tr key={item.id}>
-                <th scope="row" data-label="Tipo de servicio">{serviceTypeNames.get(item.serviceTypeId) ?? item.serviceTypeId}</th>
+              <tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
+                <th scope="row" data-label="Tipo de servicio">
+                  <Button
+                    type="button"
+                    variant="link"
+                    aria-label={`Ver detalle de la frecuencia de ${serviceTypeNames.get(item.serviceTypeId) ?? item.serviceTypeId} para ${routeNames.get(item.routeId) ?? item.routeId}`}
+                    onClick={() => setSelectedItem(item)}
+                    className="h-auto min-h-0 justify-start p-0 text-left font-semibold text-foreground no-underline after:absolute after:inset-0 after:z-10 after:content-[''] focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] max-[760px]:focus-visible:after:rounded-2xl"
+                  >
+                    {serviceTypeNames.get(item.serviceTypeId) ?? item.serviceTypeId}
+                  </Button>
+                </th>
                 <td data-label="Recorrido">{routeNames.get(item.routeId) ?? item.routeId}</td>
                 <td data-label="Días">{item.weekdays.map(weekdayLabel).join(", ")}</td>
                 <td data-label="Turno">{shiftLabel(item.shift)}</td>
                 <td data-label="Vigencia"><span className="block">Desde {formatDate(item.validFrom)}</span><span className="text-muted-foreground">Hasta {formatDate(item.validTo)}</span></td>
-                <td className={styles.actions} data-label="Acciones">
-                  {canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => { setEditing({ item, weekdays: item.weekdays, shift: item.shift, validFrom: item.validFrom, validTo: item.validTo ?? "" }); setShowCreate(false); }}>Editar</Button>{item.validTo === null ? <Button type="button" size="sm" variant="destructive" onClick={() => setClosing(item)}>Cerrar vigencia</Button> : null}</> : null}
+                <td data-label="" aria-hidden="true" className="text-right">
+                  <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </td>
               </tr>
             ))}</tbody>
           </table>
         </div>
       ) : null}
+
+      <Sheet
+        open={selectedItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedItem(null);
+        }}
+      >
+        {selectedItem ? (
+          <SheetContent
+            side={sheetSide}
+            className={
+              sheetSide === "bottom"
+                ? "max-h-[88dvh] overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]"
+                : "w-[min(92vw,28rem)] overflow-y-auto"
+            }
+          >
+            <SheetHeader className="border-b border-border pr-12 pb-4">
+              <SheetTitle>Detalle de frecuencia de servicio</SheetTitle>
+              <SheetDescription>
+                Regla configurada para un tipo de servicio y recorrido.
+              </SheetDescription>
+            </SheetHeader>
+            <dl className="grid gap-4 px-4 pt-4 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Tipo de servicio</dt>
+                <dd>{serviceTypeNames.get(selectedItem.serviceTypeId) ?? selectedItem.serviceTypeId}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Recorrido</dt>
+                <dd>{routeNames.get(selectedItem.routeId) ?? selectedItem.routeId}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Días</dt>
+                <dd>{selectedItem.weekdays.map((day) => weekdays.find((weekday) => weekday.value === day)?.label ?? String(day)).join(", ")}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Turno</dt>
+                <dd>{shiftLabel(selectedItem.shift)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Vigencia</dt>
+                <dd>Desde {formatDate(selectedItem.validFrom)}</dd>
+                <dd className="text-muted-foreground">Hasta {formatDate(selectedItem.validTo)}</dd>
+              </div>
+            </dl>
+            {canManage ? (
+              <SheetFooter className="border-t border-border pt-4">
+                <section aria-label="Acciones de la frecuencia" className="grid gap-2">
+                  <h3 className="text-sm font-semibold">Acciones disponibles</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start bg-card"
+                    onClick={() => {
+                      const item = selectedItem;
+                      setSelectedItem(null);
+                      setEditing({ item, weekdays: item.weekdays, shift: item.shift, validFrom: item.validFrom, validTo: item.validTo ?? "" });
+                      setShowCreate(false);
+                      setEditError(null);
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" aria-hidden />
+                    Editar
+                  </Button>
+                  {selectedItem.validTo === null ? (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const item = selectedItem;
+                        setSelectedItem(null);
+                        setClosing(item);
+                        setCloseError(null);
+                      }}
+                    >
+                      <Trash2 data-icon="inline-start" aria-hidden />
+                      Cerrar vigencia
+                    </Button>
+                  ) : null}
+                </section>
+              </SheetFooter>
+            ) : null}
+          </SheetContent>
+        ) : null}
+      </Sheet>
 
       {editing && canManage ? (
         <form onSubmit={submitEdit}>
@@ -750,7 +874,7 @@ export function ServiceFrequenciesPanel({
                       }
                     }}
                   >
-                    <SelectTrigger id="edit-frequency-shift">
+                    <SelectTrigger id="edit-frequency-shift" className="bg-card">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -771,6 +895,7 @@ export function ServiceFrequenciesPanel({
                   <DatePicker
                     id="edit-frequency-valid-from"
                     value={editing.validFrom}
+                    className="bg-card"
                     onChange={(value) =>
                       setEditing({ ...editing, validFrom: value })
                     }
@@ -784,6 +909,7 @@ export function ServiceFrequenciesPanel({
                   <DatePicker
                     id="edit-frequency-valid-to"
                     value={editing.validTo}
+                    className="bg-card"
                     aria-describedby={
                       editError ? "edit-frequency-valid-to-error" : undefined
                     }
@@ -867,10 +993,7 @@ export function ServiceFrequenciesPanel({
               variant="destructive"
               onClick={() => void confirmClose()}
             >
-              Cerrar vigencia de{" "}
-              {closing
-                ? (serviceTypeNames.get(closing.serviceTypeId) ?? "servicio")
-                : "servicio"}
+              Cerrar vigencia
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -908,7 +1031,14 @@ function DayPicker({
         className="flex-wrap"
       >
         {weekdays.map((day) => (
-          <ToggleGroupItem key={day.value} value={String(day.value)}>
+          <ToggleGroupItem
+            key={day.value}
+            value={String(day.value)}
+            className="data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:font-semibold data-[state=on]:text-primary-foreground"
+          >
+            {values.includes(day.value) ? (
+              <Check className="size-4" aria-hidden="true" />
+            ) : null}
             {day.label}
           </ToggleGroupItem>
         ))}

@@ -2,7 +2,7 @@
 import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogPager } from "@/components/catalog/catalog-pager";
@@ -52,6 +52,14 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import styles from "./catalog-panel.module.css";
 import { MAX_DECIMAL_10_2 } from "@/lib/input-limits";
 
@@ -97,6 +105,8 @@ export function VehicleCatalogPanel({
   const [requestVersion, setRequestVersion] = useState(0);
   const [page, setPage] = useState(1);
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<VehicleForm>(emptyForm);
@@ -153,6 +163,19 @@ export function VehicleCatalogPanel({
       isCurrent = false;
     };
   }, [query, requestVersion, page]);
+
+  useEffect(() => {
+    const media =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(max-width: 760px)")
+        : null;
+    const updateSheetSide = () =>
+      setSheetSide(media?.matches ? "bottom" : "right");
+    updateSheetSide();
+    if (!media) return;
+    media.addEventListener("change", updateSheetSide);
+    return () => media.removeEventListener("change", updateSheetSide);
+  }, []);
 
   function openCreate() {
     setEditing(null);
@@ -231,7 +254,10 @@ export function VehicleCatalogPanel({
   }
 
   return (
-    <section aria-labelledby="vehicles-title" className={styles.resourcePanel}>
+    <section
+      aria-labelledby="vehicles-title"
+      className={`${styles.resourcePanel} max-[760px]:pb-[calc(6rem+env(safe-area-inset-bottom))]`}
+    >
       <CatalogPageHeader
         title="Vehículos"
         titleId="vehicles-title"
@@ -248,7 +274,7 @@ export function VehicleCatalogPanel({
 
       <Card aria-label="Filtros de vehículos">
         <CardContent>
-          <FieldGroup className="grid gap-3 md:grid-cols-3">
+          <FieldGroup className="grid max-w-full gap-3 md:w-fit md:grid-cols-[repeat(2,minmax(0,20rem))]">
             <Field>
               <FieldLabel htmlFor="vehicle-active-filter">Estado</FieldLabel>
               <Select
@@ -265,7 +291,7 @@ export function VehicleCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="vehicle-active-filter">
+                <SelectTrigger id="vehicle-active-filter" className="bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -297,7 +323,7 @@ export function VehicleCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="vehicle-type-filter">
+                <SelectTrigger id="vehicle-type-filter" className="bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -346,14 +372,34 @@ export function VehicleCatalogPanel({
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <caption className="sr-only">Vehículos registrados</caption>
-            <thead><tr><th scope="col">Patente</th><th scope="col">Tipo</th><th scope="col">Capacidad (t)</th><th scope="col">Estado</th>{canManage ? <th scope="col"><span className="sr-only">Acciones</span></th> : null}</tr></thead>
+            <thead>
+              <tr>
+                <th scope="col">Patente</th>
+                <th scope="col">Tipo</th>
+                <th scope="col">Capacidad (t)</th>
+                <th scope="col">Estado</th>
+                <th scope="col"><span className="sr-only">Ver detalle</span></th>
+              </tr>
+            </thead>
             <tbody>{state.vehicles.map((vehicle) => (
-              <tr key={vehicle.id}>
-                <th scope="row" data-label="Patente">{vehicle.plate}</th>
+              <tr key={vehicle.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
+                <th scope="row" data-label="Patente">
+                  <Button
+                    type="button"
+                    variant="link"
+                    aria-label={`Ver detalle del vehículo ${vehicle.plate}`}
+                    onClick={() => setSelectedVehicle(vehicle)}
+                    className="h-auto min-h-0 justify-start p-0 text-left font-semibold text-foreground no-underline after:absolute after:inset-0 after:z-10 after:content-[''] focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] max-[760px]:focus-visible:after:rounded-2xl"
+                  >
+                    {vehicle.plate}
+                  </Button>
+                </th>
                 <td data-label="Tipo">{vehicleTypeLabels[vehicle.vehicleType]}</td>
                 <td data-label="Capacidad (t)">{vehicle.capacity === null ? "—" : `${vehicle.capacity.toLocaleString("es-AR")} t`}</td>
                 <td data-label="Estado"><Badge variant={vehicle.active ? "success" : "secondary"}>{vehicle.active ? <Check aria-hidden /> : <X aria-hidden />}{vehicle.active ? "Activo" : "Inactivo"}</Badge></td>
-                {canManage ? <td className={styles.actions} data-label="Acciones"><Button variant="outline" size="sm" onClick={() => openEdit(vehicle)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{vehicle.active ? <Button variant="destructive" size="sm" onClick={() => void deactivate(vehicle)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</td> : null}
+                <td data-label="" aria-hidden="true" className="text-right">
+                  <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                </td>
               </tr>
             ))}</tbody>
           </table>
@@ -371,6 +417,88 @@ export function VehicleCatalogPanel({
         />
       ) : null}
 
+      <Sheet
+        open={selectedVehicle !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedVehicle(null);
+        }}
+      >
+        {selectedVehicle ? (
+          <SheetContent
+            side={sheetSide}
+            className={
+              sheetSide === "bottom"
+                ? "max-h-[88dvh] overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]"
+                : "w-[min(92vw,28rem)] overflow-y-auto"
+            }
+          >
+            <SheetHeader className="border-b border-border pr-12 pb-4">
+              <SheetTitle>Detalle de vehículo</SheetTitle>
+              <SheetDescription>
+                Información operativa del vehículo registrado.
+              </SheetDescription>
+            </SheetHeader>
+            <dl className="grid gap-4 px-4 pt-4 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Patente</dt>
+                <dd className="font-semibold">{selectedVehicle.plate}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Tipo</dt>
+                <dd>{vehicleTypeLabels[selectedVehicle.vehicleType]}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Capacidad</dt>
+                <dd>
+                  {selectedVehicle.capacity === null
+                    ? "Sin capacidad informada"
+                    : `${selectedVehicle.capacity.toLocaleString("es-AR")} t`}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Estado</dt>
+                <dd>{selectedVehicle.active ? "Activo" : "Inactivo"}</dd>
+              </div>
+            </dl>
+            {canManage ? (
+              <SheetFooter className="border-t border-border pt-4">
+                <section aria-label="Acciones del vehículo" className="grid gap-2">
+                  <h3 className="text-sm font-semibold">Acciones disponibles</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start bg-card"
+                    onClick={() => {
+                      const vehicle = selectedVehicle;
+                      setSelectedVehicle(null);
+                      openEdit(vehicle);
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" aria-hidden />
+                    Editar
+                  </Button>
+                  {selectedVehicle.active ? (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const vehicle = selectedVehicle;
+                        setSelectedVehicle(null);
+                        deactivate(vehicle);
+                      }}
+                    >
+                      <Trash2 data-icon="inline-start" aria-hidden />
+                      Dar de baja
+                    </Button>
+                  ) : null}
+                </section>
+              </SheetFooter>
+            ) : null}
+          </SheetContent>
+        ) : null}
+      </Sheet>
+
       <CatalogDeactivationDialog
         open={Boolean(deactivatingVehicle)}
         onOpenChange={(open) => {
@@ -381,8 +509,8 @@ export function VehicleCatalogPanel({
         }}
         title={`Confirmar baja del vehículo ${deactivatingVehicle?.plate ?? ""}`.trim()}
         consequence="El vehículo quedará inactivo y no estará disponible para nuevas asignaciones. Las asignaciones existentes conservarán su referencia."
-        confirmAction={`Dar de baja el vehículo ${deactivatingVehicle?.plate ?? ""}`.trim()}
-        safeAlternative={`Conservar el vehículo ${deactivatingVehicle?.plate ?? ""}`.trim()}
+        confirmAction="Dar de baja"
+        safeAlternative="Conservar vehículo"
         onConfirm={() => void confirmDeactivation()}
         isSubmitting={isSubmittingDeactivate}
       >
@@ -419,6 +547,7 @@ export function VehicleCatalogPanel({
                 <FieldLabel htmlFor="vehicle-plate">Patente</FieldLabel>
                 <Input
                   id="vehicle-plate"
+                  className="bg-card"
                   value={form.plate}
                   onChange={(event) => {
                     setForm({ ...form, plate: event.target.value });
@@ -451,7 +580,7 @@ export function VehicleCatalogPanel({
                     }
                   }}
                 >
-                  <SelectTrigger id="vehicle-type-form">
+                  <SelectTrigger id="vehicle-type-form" className="bg-card">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -471,6 +600,7 @@ export function VehicleCatalogPanel({
                 </FieldLabel>
                 <Input
                   id="vehicle-capacity"
+                  className="bg-card"
                   type="number"
                   min="0.01"
                   max={MAX_DECIMAL_10_2}

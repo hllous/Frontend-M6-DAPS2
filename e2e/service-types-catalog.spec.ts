@@ -19,7 +19,8 @@ test.describe("ServiceType catalog management #102", () => {
     await expect(page.getByText(code)).toBeVisible();
 
     const row = page.getByRole("row", { name: new RegExp(code) });
-    await row.getByRole("button", { name: "Editar" }).click();
+    await row.getByRole("button", { name: `Ver detalle del tipo de servicio ${code}` }).click();
+    await page.getByRole("dialog", { name: "Detalle del tipo de servicio" }).getByRole("button", { name: "Editar" }).click();
     await expect(page.getByRole("textbox", { name: "Código" })).toHaveAttribute("readonly");
     await expect(page.getByRole("textbox", { name: "Categoría" })).toHaveAttribute("readonly");
     await expect(page.getByRole("textbox", { name: "Modo" })).toHaveAttribute("readonly");
@@ -28,13 +29,14 @@ test.describe("ServiceType catalog management #102", () => {
     await expect(page.getByText("Tipo e2e actualizado")).toBeVisible();
 
     const updatedRow = page.getByRole("row", { name: new RegExp(code) });
-    await updatedRow.getByRole("button", { name: "Dar de baja" }).click();
+    await updatedRow.getByRole("button", { name: `Ver detalle del tipo de servicio ${code}` }).click();
+    await page.getByRole("dialog", { name: "Detalle del tipo de servicio" }).getByRole("button", { name: "Dar de baja" }).click();
     const deactivateDialog = page.getByRole("dialog");
     await expect(deactivateDialog.getByRole("heading", { name: `Confirmar baja del tipo de servicio ${code}` })).toBeVisible();
-    await deactivateDialog.getByRole("button", { name: `Dar de baja el tipo de servicio ${code}` }).click();
+    await deactivateDialog.getByRole("button", { name: "Dar de baja", exact: true }).click();
     await expect(page.getByText("Tipo de servicio dado de baja")).toBeVisible();
     await chooseCatalogBOption(page, page.getByRole("combobox", { name: "Filtrar por estado" }), "Inactivos");
     await expect(page.getByText(code)).toBeVisible();
-    await expect(page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: "Eliminar" })).toHaveCount(0);
+    await expect(page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: `Ver detalle del tipo de servicio ${code}` })).toHaveCount(1);
   });
 });

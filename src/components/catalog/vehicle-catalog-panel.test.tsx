@@ -25,7 +25,26 @@ describe("VehicleCatalogPanel", () => {
     expect(screen.getByRole("combobox", { name: "Tipo de vehículo" })).toBeVisible();
     const row = await screen.findByRole("row", { name: /AA 123 AA/ });
     expect(row.querySelector('th[data-label="Patente"]')).not.toBeNull();
-    expect(row.querySelector('td[data-label="Acciones"]')).not.toBeNull();
+    expect(row.querySelector('td[data-label="Acciones"]')).toBeNull();
+  });
+
+  it("opens vehicle details and available actions from the row", async () => {
+    const user = userEvent.setup();
+    render(<VehicleCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    const row = await screen.findByRole("row", { name: /AA 123 AA/ });
+    await user.click(
+      within(row).getByRole("button", {
+        name: "Ver detalle del vehículo AA 123 AA",
+      }),
+    );
+
+    const sheet = await screen.findByRole("dialog", {
+      name: "Detalle de vehículo",
+    });
+    expect(sheet).toHaveTextContent("AA 123 AA");
+    expect(within(sheet).getByRole("button", { name: "Editar" })).toBeVisible();
+    expect(within(sheet).getByRole("button", { name: "Dar de baja" })).toBeVisible();
   });
 
   it("shows capacity in tonnes with es-AR formatting", async () => {
@@ -105,15 +124,17 @@ it("requires a named confirmation before deactivating a vehicle", async () => {
   render(<VehicleCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
   const row = await screen.findByRole("row", { name: /ZZ 999 ZZ/ });
-  await user.click(within(row).getByRole("button", { name: "Dar de baja" }));
+  await user.click(within(row).getByRole("button", { name: "Ver detalle del vehículo ZZ 999 ZZ" }));
+  const sheet = await screen.findByRole("dialog", { name: "Detalle de vehículo" });
+  await user.click(within(sheet).getByRole("button", { name: "Dar de baja" }));
 
   const dialog = screen.getByRole("dialog");
   expect(dialog).toHaveTextContent("ZZ 999 ZZ");
-  expect(within(dialog).getByRole("button", { name: /Conservar el vehículo ZZ 999 ZZ/ })).toBeVisible();
-  expect(within(dialog).getByRole("button", { name: /Dar de baja el vehículo ZZ 999 ZZ/ })).toBeVisible();
+  expect(within(dialog).getByRole("button", { name: "Conservar vehículo" })).toBeVisible();
+  expect(within(dialog).getByRole("button", { name: "Dar de baja" })).toBeVisible();
   expect(remove).not.toHaveBeenCalled();
 
-  await user.click(within(dialog).getByRole("button", { name: /Dar de baja el vehículo ZZ 999 ZZ/ }));
+  await user.click(within(dialog).getByRole("button", { name: "Dar de baja" }));
   await waitFor(() => expect(remove).toHaveBeenCalledWith(vehicle.id));
 });
 
@@ -153,10 +174,13 @@ it("clamps the current page after its last active vehicle is deactivated", async
   await screen.findByText("Página 2 de 3");
   await user.click(screen.getByRole("button", { name: "Siguiente" }));
   await screen.findByText("Página 3 de 3");
-  await user.click(screen.getByRole("button", { name: "Dar de baja" }));
+  const row = screen.getByRole("row", { name: /ZZ 999 ZZ/ });
+  await user.click(within(row).getByRole("button", { name: "Ver detalle del vehículo ZZ 999 ZZ" }));
+  const sheet = await screen.findByRole("dialog", { name: "Detalle de vehículo" });
+  await user.click(within(sheet).getByRole("button", { name: "Dar de baja" }));
   const dialog = screen.getByRole("dialog");
   expect(dialog).toHaveTextContent("ZZ 999 ZZ");
-  await user.click(within(dialog).getByRole("button", { name: /Dar de baja el vehículo ZZ 999 ZZ/ }));
+  await user.click(within(dialog).getByRole("button", { name: "Dar de baja" }));
   expect(await screen.findByText("Página 2 de 2")).toBeVisible();
   await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, active: true })));
 });

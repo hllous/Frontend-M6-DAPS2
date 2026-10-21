@@ -33,9 +33,37 @@ describe("ServiceFrequenciesPanel", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByText(/generar services/i)).not.toBeInTheDocument();
 
-    await user.click(screen.getAllByRole("button", { name: "Editar" })[0]);
+    const row = screen.getByRole("row", { name: /Recorrido Casco Histórico/ });
+    await user.click(
+      within(row).getByRole("button", {
+        name: /Ver detalle de la frecuencia de Recolección domiciliaria para Recorrido Casco Histórico/,
+      }),
+    );
+    const sheet = await screen.findByRole("dialog", {
+      name: "Detalle de frecuencia de servicio",
+    });
+    await user.click(within(sheet).getByRole("button", { name: "Editar" }));
     expect(screen.getByText(/estos vínculos no se pueden modificar/i)).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Turno" })).toBeVisible();
+  });
+
+  it("opens frequency details and available actions from the row", async () => {
+    const user = userEvent.setup();
+    render(<ServiceFrequenciesPanel scenario={scenarios.officeDutyQueue} />);
+
+    const row = await screen.findByRole("row", { name: /Recorrido Casco Histórico/ });
+    await user.click(
+      within(row).getByRole("button", {
+        name: /Ver detalle de la frecuencia de Recolección domiciliaria para Recorrido Casco Histórico/,
+      }),
+    );
+
+    const sheet = await screen.findByRole("dialog", {
+      name: "Detalle de frecuencia de servicio",
+    });
+    expect(sheet).toHaveTextContent("Recorrido Casco Histórico");
+    expect(within(sheet).getByRole("button", { name: "Editar" })).toBeVisible();
+    expect(within(sheet).getByRole("button", { name: "Cerrar vigencia" })).toBeVisible();
   });
 
   it("keeps Cerrar vigencia as a distinct confirmation and never calls the Services endpoint", async () => {
@@ -44,10 +72,17 @@ describe("ServiceFrequenciesPanel", () => {
     render(<ServiceFrequenciesPanel scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("heading", { name: "Frecuencias de servicio" });
-    const closeButton = screen.getAllByRole("button", { name: "Cerrar vigencia" })[0];
-    expect(closeButton).toBeVisible();
     expect(screen.queryByRole("button", { name: /generar/i })).not.toBeInTheDocument();
-    await user.click(closeButton);
+    const row = screen.getByRole("row", { name: /Recorrido Casco Histórico/ });
+    await user.click(
+      within(row).getByRole("button", {
+        name: /Ver detalle de la frecuencia de Recolección domiciliaria para Recorrido Casco Histórico/,
+      }),
+    );
+    const sheet = await screen.findByRole("dialog", {
+      name: "Detalle de frecuencia de servicio",
+    });
+    await user.click(within(sheet).getByRole("button", { name: "Cerrar vigencia" }));
     expect(screen.getByRole("heading", { name: "Confirmar cierre de vigencia" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Conservar vigencia" })).toBeVisible();
     expect(screen.getByText(/servicios ya creados quedan intactos/i)).toBeVisible();
@@ -70,14 +105,21 @@ describe("ServiceFrequenciesPanel", () => {
     const row = screen.getByRole("row", { name: /Recorrido Casco Histórico/ });
     expect(within(row).getByRole("rowheader")).toHaveAttribute("data-label", "Tipo de servicio");
     expect(within(row).getAllByRole("cell")[0]).toHaveAttribute("data-label", "Recorrido");
-    expect(row.querySelector('td[data-label="Acciones"]')).not.toBeNull();
+    expect(row.querySelector('td[data-label="Acciones"]')).toBeNull();
+    expect(
+      within(row).getByRole("button", {
+        name: /Ver detalle de la frecuencia de Recolección domiciliaria para Recorrido Casco Histórico/,
+      }),
+    ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Nueva frecuencia" }));
     const monday = screen.getByRole("button", { name: "Lunes" });
     monday.focus();
     expect(monday).toHaveFocus();
     expect(monday).toHaveAttribute("aria-pressed", "true");
+    expect(monday.querySelector("svg.lucide-check")).not.toBeNull();
     await user.keyboard(" ");
     expect(monday).toHaveAttribute("aria-pressed", "false");
+    expect(monday.querySelector("svg.lucide-check")).toBeNull();
   });
 });

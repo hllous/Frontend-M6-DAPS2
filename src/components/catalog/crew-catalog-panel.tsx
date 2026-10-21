@@ -4,7 +4,8 @@ import { errorMessage } from "@/lib/error-message";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Check,
-  Eye,
+  ChevronRight,
+  ChevronsUpDown,
   Pencil,
   Plus,
   Trash2,
@@ -64,6 +65,23 @@ import {
 } from "@/components/ui/empty";
 import { Combobox } from "@/components/ui/combobox";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import styles from "./catalog-panel.module.css";
 
 const crewTypes = crewTypeSchema.options;
@@ -126,6 +144,8 @@ export function CrewCatalogPanel({
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
   const [memberSelection, setMemberSelection] = useState<string[]>([]);
   const [memberError, setMemberError] = useState<string | null>(null);
+  const [memberPickerOpen, setMemberPickerOpen] = useState(false);
+  const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
 
   const query = useMemo<CrewQuery>(
     () => ({
@@ -187,6 +207,19 @@ export function CrewCatalogPanel({
       current = false;
     };
   }, [query, requestVersion, scenario, page]);
+
+  useEffect(() => {
+    const media =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(max-width: 760px)")
+        : null;
+    const updateSheetSide = () =>
+      setSheetSide(media?.matches ? "bottom" : "right");
+    updateSheetSide();
+    if (!media) return;
+    media.addEventListener("change", updateSheetSide);
+    return () => media.removeEventListener("change", updateSheetSide);
+  }, []);
 
   const userName = (id: string | null) =>
     id === null
@@ -251,6 +284,7 @@ export function CrewCatalogPanel({
       setSelected(await crewsAdapter.get(crew.id));
       setMemberSelection([]);
       setMemberError(null);
+      setMemberPickerOpen(false);
       setActionError(null);
     } catch (caught) {
       setActionError(errorMessage(caught, "No se pudo cargar el detalle."));
@@ -266,6 +300,7 @@ export function CrewCatalogPanel({
     try {
       setSelected(await crewsAdapter.addMembers(selected.id, memberSelection));
       setMemberSelection([]);
+      setMemberPickerOpen(false);
       notifySuccess("Integrantes agregados.");
     } catch (caught) {
       setMemberError(
@@ -305,7 +340,10 @@ export function CrewCatalogPanel({
   }
 
   return (
-    <section aria-labelledby="crews-title" className={styles.resourcePanel}>
+    <section
+      aria-labelledby="crews-title"
+      className={`${styles.resourcePanel} max-[760px]:pb-[calc(6rem+env(safe-area-inset-bottom))]`}
+    >
       <CatalogPageHeader
         title="Cuadrillas"
         titleId="crews-title"
@@ -327,7 +365,7 @@ export function CrewCatalogPanel({
       ) : null}
       <Card aria-label="Filtros de cuadrillas">
         <CardContent>
-          <FieldGroup className="grid gap-3 md:grid-cols-3">
+          <FieldGroup className="grid max-w-full gap-3 md:w-fit md:grid-cols-[repeat(3,minmax(0,16rem))]">
             <Field>
               <FieldLabel htmlFor="crew-active-filter">Estado</FieldLabel>
               <Select
@@ -344,7 +382,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-active-filter">
+                <SelectTrigger id="crew-active-filter" className="bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -373,7 +411,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-type-filter">
+                <SelectTrigger id="crew-type-filter" className="bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -403,7 +441,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-shift-filter">
+                <SelectTrigger id="crew-shift-filter" className="bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -448,7 +486,55 @@ export function CrewCatalogPanel({
         </Empty>
       ) : null}
       {state.status === "ready" && state.crews.length > 0 ? (
-        <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Cuadrillas registradas</caption><thead><tr><th scope="col">Nombre</th><th scope="col">Tipo</th><th scope="col">Responsable</th><th scope="col">Organización</th><th scope="col">Turno</th><th scope="col">Estado</th><th scope="col"><span className="sr-only">Acciones</span></th></tr></thead><tbody>{state.crews.map((crew) => <tr key={crew.id}><th scope="row" data-label="Nombre">{crew.name}</th><td data-label="Tipo">{crewTypeLabels[crew.crewType]}</td><td data-label="Responsable">{userName(crew.leaderUserId)}</td><td data-label="Organización">{organizationName(crew.organizationId)}</td><td data-label="Turno">{shiftLabels[crew.defaultShift]}</td><td data-label="Estado"><Badge variant={crew.active ? "success" : "secondary"}>{crew.active ? <Check aria-hidden /> : <X aria-hidden />}{crew.active ? "Activa" : "Inactiva"}</Badge></td><td className={styles.actions} data-label="Acciones"><Button variant="outline" size="sm" onClick={() => void showDetail(crew)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button>{canManage ? <><Button variant="outline" size="sm" onClick={() => openEdit(crew)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{crew.active ? <Button variant="destructive" size="sm" onClick={() => void deactivate(crew)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</> : null}</td></tr>)}</tbody></table></div>
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <caption className="sr-only">Cuadrillas registradas</caption>
+            <thead>
+              <tr>
+                <th scope="col">Nombre</th>
+                <th scope="col">Tipo</th>
+                <th scope="col">Responsable</th>
+                <th scope="col">Organización</th>
+                <th scope="col">Turno</th>
+                <th scope="col">Estado</th>
+                <th scope="col"><span className="sr-only">Ver detalle</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.crews.map((crew) => (
+                <tr
+                  key={crew.id}
+                  className="group relative cursor-pointer transition-colors hover:bg-muted/40"
+                >
+                  <th scope="row" data-label="Nombre">
+                    <Button
+                      type="button"
+                      variant="link"
+                      aria-label={`Ver detalle de ${crew.name}`}
+                      onClick={() => void showDetail(crew)}
+                      className="h-auto min-h-0 justify-start p-0 text-left font-semibold text-foreground no-underline after:absolute after:inset-0 after:z-10 after:content-[''] focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] max-[760px]:focus-visible:after:rounded-2xl"
+                    >
+                      {crew.name}
+                    </Button>
+                  </th>
+                  <td data-label="Tipo">{crewTypeLabels[crew.crewType]}</td>
+                  <td data-label="Responsable">{userName(crew.leaderUserId)}</td>
+                  <td data-label="Organización">{organizationName(crew.organizationId)}</td>
+                  <td data-label="Turno">{shiftLabels[crew.defaultShift]}</td>
+                  <td data-label="Estado">
+                    <Badge variant={crew.active ? "success" : "secondary"}>
+                      {crew.active ? <Check aria-hidden /> : <X aria-hidden />}
+                      {crew.active ? "Activa" : "Inactiva"}
+                    </Badge>
+                  </td>
+                  <td data-label="" aria-hidden="true" className="text-right">
+                    <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : null}
       {state.status === "ready" ? (
         <CatalogPager
@@ -461,30 +547,56 @@ export function CrewCatalogPanel({
         />
       ) : null}
 
-      <Dialog
+      <Sheet
         open={Boolean(selected)}
         onOpenChange={(open) => {
           if (!open) setSelected(null);
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Detalle de cuadrilla</DialogTitle>
-            <DialogDescription>
-              Las membresías se muestran como referencias de identidad de M1.
-              Office puede administrarlas desde este sub-recurso.
-            </DialogDescription>
-          </DialogHeader>
-          {selected ? (
-            <div className="grid min-h-0 gap-3 overflow-y-auto">
-              <p>
-                <strong>{selected.name}</strong>
-              </p>
-              <p>Responsable: {userName(selected.leaderUserId)}</p>
-              <p>Organización: {organizationName(selected.organizationId)}</p>
-              <p>Turno: {shiftLabels[selected.defaultShift]}</p>
-              <div>
-                <strong>Integrantes</strong>
+        {selected ? (
+          <SheetContent
+            side={sheetSide}
+            className={
+              sheetSide === "bottom"
+                ? "max-h-[88dvh] overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]"
+                : "w-[min(92vw,28rem)] overflow-y-auto"
+            }
+          >
+            <SheetHeader className="border-b border-border pr-12 pb-4">
+              <SheetTitle>Detalle de cuadrilla</SheetTitle>
+              <SheetDescription>
+                Las membresías se muestran como referencias de identidad de M1.
+                Office puede administrarlas desde este sub-recurso.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="grid min-h-0 gap-4 overflow-y-auto px-4 pt-4">
+              <section aria-labelledby="crew-detail-name">
+                <h3 id="crew-detail-name" className="font-semibold">
+                  {selected.name}
+                </h3>
+                <dl className="mt-3 grid gap-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Responsable</dt>
+                    <dd>{userName(selected.leaderUserId)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Organización</dt>
+                    <dd>{organizationName(selected.organizationId)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Turno</dt>
+                    <dd>{shiftLabels[selected.defaultShift]}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Estado</dt>
+                    <dd>{selected.active ? "Activa" : "Inactiva"}</dd>
+                  </div>
+                </dl>
+              </section>
+              <section aria-labelledby="crew-members-heading" className="grid gap-3">
+                <h3 id="crew-members-heading" className="font-semibold">
+                  Integrantes
+                </h3>
                 <ul
                   aria-label="Integrantes de la cuadrilla"
                   className="flex flex-col gap-2"
@@ -510,76 +622,89 @@ export function CrewCatalogPanel({
                     </li>
                   ))}
                 </ul>
-              </div>
-              {canManage ? (
-                <form
-                  className="flex flex-col gap-3"
-                  onSubmit={(event) => void addMembers(event)}
-                >
-                  <Field data-invalid={Boolean(memberError)}>
-                    <FieldLabel htmlFor="crew-members">
-                      Agregar integrantes (M1)
-                    </FieldLabel>
-                    <Select
-                      items={Object.fromEntries([
-                        ...users
+                {canManage ? (
+                  <form
+                    className="flex flex-col gap-3 border-t border-border pt-4"
+                    onSubmit={(event) => void addMembers(event)}
+                  >
+                    <Field data-invalid={Boolean(memberError)}>
+                      <FieldLabel htmlFor="crew-members">
+                        Agregar integrantes (M1)
+                      </FieldLabel>
+                      <CrewMemberMultiSelect
+                        id="crew-members"
+                        open={memberPickerOpen}
+                        onOpenChange={setMemberPickerOpen}
+                        options={users
                           .filter(
                             (user) => !selected.memberUserIds.includes(user.id),
                           )
-                          .map((user) => [user.id, user.displayName]),
-                      ])}
-                      value={memberSelection}
-                      onValueChange={(value) => setMemberSelection(value)}
-                      multiple
-                    >
-                      <SelectTrigger
-                        id="crew-members"
-                        aria-invalid={Boolean(memberError)}
-                        aria-describedby={
+                          .map((user) => ({
+                            value: user.id,
+                            label: user.displayName,
+                          }))}
+                        value={memberSelection}
+                        onChange={setMemberSelection}
+                        invalid={Boolean(memberError)}
+                        describedBy={
                           memberError ? "crew-members-error" : undefined
                         }
-                      >
-                        <SelectValue placeholder="Seleccione integrantes" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {users
-                            .filter(
-                              (user) =>
-                                !selected.memberUserIds.includes(user.id),
-                            )
-                            .map((user) => (
-                              <SelectItem key={user.id} value={user.id}>
-                                {user.displayName}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>
-                      Seleccione uno o más usuarios administrados por M1.
-                    </FieldDescription>
-                  </Field>
-                  {memberError ? (
-                    <Alert id="crew-members-error" variant="destructive">
-                      <AlertDescription>{memberError}</AlertDescription>
-                    </Alert>
-                  ) : null}
-                  <Button type="submit">
-                    <UserPlus data-icon="inline-start" aria-hidden />
-                    Agregar integrantes
-                  </Button>
-                </form>
-              ) : null}
+                      />
+                      <FieldDescription>
+                        Busque nombres disponibles y seleccione uno o más usuarios administrados por M1.
+                      </FieldDescription>
+                    </Field>
+                    {memberError ? (
+                      <Alert id="crew-members-error" variant="destructive">
+                        <AlertDescription>{memberError}</AlertDescription>
+                      </Alert>
+                    ) : null}
+                    <Button type="submit">
+                      <UserPlus data-icon="inline-start" aria-hidden />
+                      Agregar integrantes
+                    </Button>
+                  </form>
+                ) : null}
+              </section>
             </div>
-          ) : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelected(null)}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {canManage ? (
+              <SheetFooter className="border-t border-border pt-4">
+                <section aria-label="Acciones de la cuadrilla" className="grid gap-2">
+                  <h3 className="text-sm font-semibold">Acciones disponibles</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start bg-card"
+                    onClick={() => {
+                      const crew = selected;
+                      setSelected(null);
+                      openEdit(crew);
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" aria-hidden />
+                    Editar
+                  </Button>
+                  {selected.active ? (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const crew = selected;
+                        setSelected(null);
+                        void deactivate(crew);
+                      }}
+                    >
+                      <Trash2 data-icon="inline-start" aria-hidden />
+                      Dar de baja
+                    </Button>
+                  ) : null}
+                </section>
+              </SheetFooter>
+            ) : null}
+          </SheetContent>
+        ) : null}
+      </Sheet>
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent>
           <DialogHeader>
@@ -604,8 +729,9 @@ export function CrewCatalogPanel({
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="crew-name">Nombre</FieldLabel>
-                <Input
+                    <Input
                   id="crew-name"
+                      className="bg-card"
                   value={form.name}
                   onChange={(event) =>
                     setForm({ ...form, name: event.target.value })
@@ -631,6 +757,7 @@ export function CrewCatalogPanel({
                 >
                   <SelectTrigger
                     id="crew-type-form"
+                    className={editing ? undefined : "bg-card"}
                     aria-describedby={editing ? "crew-type-locked" : undefined}
                   >
                     <SelectValue />
@@ -658,6 +785,7 @@ export function CrewCatalogPanel({
                 </FieldLabel>
                 <Combobox
                   id="crew-leader"
+                  className="bg-card"
                   value={form.leaderUserId}
                   onChange={(value) =>
                     setForm({ ...form, leaderUserId: value })
@@ -676,6 +804,7 @@ export function CrewCatalogPanel({
                 </FieldLabel>
                 <Combobox
                   id="crew-organization"
+                  className="bg-card"
                   value={form.organizationId}
                   onChange={(value) =>
                     setForm({ ...form, organizationId: value })
@@ -703,7 +832,7 @@ export function CrewCatalogPanel({
                     }
                   }}
                 >
-                  <SelectTrigger id="crew-shift-form">
+                  <SelectTrigger id="crew-shift-form" className="bg-card">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -747,8 +876,8 @@ export function CrewCatalogPanel({
         }}
         title={`Confirmar baja de la cuadrilla ${deactivating?.name ?? ""}`.trim()}
         consequence="La cuadrilla quedará inactiva y no estará disponible para nuevas asignaciones. Las asignaciones existentes conservarán su referencia."
-        confirmAction={`Dar de baja la cuadrilla ${deactivating?.name ?? ""}`.trim()}
-        safeAlternative={`Conservar la cuadrilla ${deactivating?.name ?? ""}`.trim()}
+        confirmAction="Dar de baja"
+        safeAlternative="Conservar cuadrilla"
         onConfirm={() => void confirmDeactivation()}
         isSubmitting={isSubmittingDeactivate}
       >
@@ -759,5 +888,101 @@ export function CrewCatalogPanel({
         ) : null}
       </CatalogDeactivationDialog>
     </section>
+  );
+}
+
+type CrewMemberOption = { value: string; label: string };
+
+/**
+ * Multi-select behavior composed from the shared Popover and Command primitives;
+ * the shared UI library currently provides only a single-value Combobox.
+ */
+function CrewMemberMultiSelect({
+  id,
+  open,
+  onOpenChange,
+  options,
+  value,
+  onChange,
+  invalid,
+  describedBy,
+}: {
+  id: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  options: CrewMemberOption[];
+  value: string[];
+  onChange: (value: string[]) => void;
+  invalid: boolean;
+  describedBy?: string;
+}) {
+  const summary =
+    value.length === 0
+      ? "0 integrantes seleccionados"
+      : value.length === 1
+        ? "1 integrante seleccionado"
+        : `${value.length} integrantes seleccionados`;
+
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger
+        render={
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-haspopup="listbox"
+            aria-controls={`${id}-options`}
+            aria-invalid={invalid || undefined}
+            aria-describedby={describedBy}
+            aria-label={`Agregar integrantes (M1), ${summary}`}
+            className="w-full justify-between bg-card text-left font-normal"
+          />
+        }
+      >
+        <span className="truncate">{summary}</span>
+        <ChevronsUpDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-(--anchor-width) min-w-56 p-0">
+        <Command>
+          <CommandInput
+            placeholder="Buscar integrantes"
+            aria-label="Buscar integrantes"
+          />
+          <CommandList
+            id={`${id}-options`}
+            aria-label="Integrantes disponibles"
+            aria-multiselectable="true"
+          >
+            <CommandEmpty>No se encontraron integrantes.</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => {
+                const checked = value.includes(option.value);
+                return (
+                  <CommandItem
+                    key={option.value}
+                    value={option.value}
+                    keywords={[option.label]}
+                    data-checked={checked}
+                    aria-label={`${option.label}, ${checked ? "seleccionado" : "no seleccionado"}`}
+                    onSelect={() =>
+                      onChange(
+                        checked
+                          ? value.filter((memberId) => memberId !== option.value)
+                          : [...value, option.value],
+                      )
+                    }
+                  >
+                    {option.label}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

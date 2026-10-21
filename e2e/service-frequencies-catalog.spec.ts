@@ -15,6 +15,7 @@ test.describe("ServiceFrequency rule authoring #112", () => {
     await expect(page.getByRole("button", { name: /generar/i })).toHaveCount(0);
 
     await page.getByRole("button", { name: "Nueva frecuencia" }).click();
+    await expect(page.getByRole("button", { name: "Lunes" })).toHaveAttribute("aria-pressed", "true");
     const typePicker = page.getByRole("combobox", { name: "Tipo de servicio", exact: true });
     await expect(typePicker).toContainText("Seleccione un tipo de recorrido");
     await typePicker.click();
@@ -29,16 +30,18 @@ test.describe("ServiceFrequency rule authoring #112", () => {
     await expect(page.getByText(/Frecuencia creada/)).toBeVisible();
 
     const createdRow = page.getByRole("row").filter({ hasText: "Recolección domiciliaria" }).last();
-    await createdRow.getByRole("button", { name: "Editar" }).click();
+    await createdRow.getByRole("button", { name: /Ver detalle de la frecuencia/ }).click();
+    await page.getByRole("dialog", { name: "Detalle de frecuencia de servicio" }).getByRole("button", { name: "Editar" }).click();
     await chooseCatalogBOption(page, page.getByRole("combobox", { name: "Turno", exact: true }), "Tarde");
     await page.getByRole("button", { name: "Guardar cambios" }).click();
     await expect(page.getByText(/Frecuencia actualizada/)).toBeVisible();
 
     const updatedRow = page.getByRole("row").filter({ hasText: "Recolección domiciliaria" }).last();
-    await updatedRow.getByRole("button", { name: "Cerrar vigencia" }).click();
+    await updatedRow.getByRole("button", { name: /Ver detalle de la frecuencia/ }).click();
+    await page.getByRole("dialog", { name: "Detalle de frecuencia de servicio" }).getByRole("button", { name: "Cerrar vigencia" }).click();
     const closeDialog = page.getByRole("dialog", { name: "Confirmar cierre de vigencia" });
     await expect(closeDialog.getByRole("heading", { name: "Confirmar cierre de vigencia" })).toBeVisible();
-    await closeDialog.getByRole("button", { name: "Cerrar vigencia de Recolección domiciliaria" }).click();
+    await closeDialog.getByRole("button", { name: "Cerrar vigencia" }).click();
     await expect(page.getByText(/Vigencia cerrada/)).toBeVisible();
   });
 });

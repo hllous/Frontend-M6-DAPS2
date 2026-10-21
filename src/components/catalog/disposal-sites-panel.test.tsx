@@ -20,9 +20,28 @@ describe("DisposalSitesPanel", () => {
     expect(screen.getByText("RS-01")).toBeVisible();
     const row = await screen.findByRole("row", { name: /RS-01/ });
     expect(row.querySelector('th[data-label="Código"]')).not.toBeNull();
-    expect(row.querySelector('td[data-label="Acciones"]')).not.toBeNull();
-    expect(screen.getAllByRole("button", { name: "Dar de baja" }).length).toBeGreaterThan(0);
+    expect(row.querySelector('td[data-label="Acciones"]')).toBeNull();
+    expect(screen.queryByRole("button", { name: "Dar de baja" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /eliminar/i })).not.toBeInTheDocument();
+  });
+
+  it("opens disposal site details and available actions from the row", async () => {
+    const user = userEvent.setup();
+    render(<DisposalSitesPanel scenario={scenarios.officeDutyQueue} />);
+
+    const row = await screen.findByRole("row", { name: /RS-01/ });
+    await user.click(
+      within(row).getByRole("button", {
+        name: "Ver detalle del sitio de disposición RS-01",
+      }),
+    );
+
+    const sheet = await screen.findByRole("dialog", {
+      name: "Detalle del sitio de disposición",
+    });
+    expect(sheet).toHaveTextContent("RS-01");
+    expect(within(sheet).getByRole("button", { name: "Editar" })).toBeVisible();
+    expect(within(sheet).getByRole("button", { name: "Dar de baja" })).toBeVisible();
   });
 
   it("hides mutation actions from Field", async () => {
@@ -38,13 +57,15 @@ describe("DisposalSitesPanel", () => {
     render(<DisposalSitesPanel scenario={scenarios.officeDutyQueue} />);
 
     const row = await screen.findByRole("row", { name: /RS-01/ });
-    await user.click(within(row).getByRole("button", { name: "Dar de baja" }));
+    await user.click(within(row).getByRole("button", { name: "Ver detalle del sitio de disposición RS-01" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle del sitio de disposición" });
+    await user.click(within(sheet).getByRole("button", { name: "Dar de baja" }));
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("RS-01");
-    expect(within(dialog).getByRole("button", { name: /Conservar el sitio de disposición RS-01/ })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Conservar sitio" })).toBeVisible();
     expect(remove).not.toHaveBeenCalled();
-    await user.click(within(dialog).getByRole("button", { name: /Dar de baja el sitio de disposición RS-01/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Dar de baja" }));
     await waitFor(() => expect(remove).toHaveBeenCalled());
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo dar de baja el sitio de disposición.");
     expect(screen.queryByRole("status", { name: /No se pudo dar de baja el sitio de disposición/ })).not.toBeInTheDocument();

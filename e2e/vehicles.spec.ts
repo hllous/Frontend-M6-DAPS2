@@ -12,6 +12,8 @@ test.describe("Vehicle catalog @smoke", () => {
     await expect(page).toHaveURL(/\/app\/catalog\/vehicles$/);
     await expect(page.getByRole("heading", { name: "Vehículos" })).toBeVisible();
     await expect(page.getByText("AA 123 AA")).toBeVisible();
+    await page.getByRole("row", { name: /AA 123 AA/ }).getByRole("button", { name: "Ver detalle del vehículo AA 123 AA" }).click();
+    await expect(page.getByRole("dialog", { name: "Detalle de vehículo" })).toContainText("Capacidad");
   });
 
   test("Office can register a vehicle from the catalog", async ({ page }) => {

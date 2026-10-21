@@ -2,6 +2,7 @@
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
@@ -54,6 +55,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import styles from "./catalog-panel.module.css";
 
 const categories: Array<{ value: ServiceTypeCategory; label: string }> = [
@@ -71,13 +80,13 @@ const modes: Array<{ value: ServiceTypeMode; label: string }> = [
 ];
 
 const tableColumnClasses = [
-  "w-[13%]",
-  "w-[26%]",
-  "w-[15%]",
-  "w-[9%]",
-  "w-[8%]",
-  "w-[8%]",
-  "w-[21%]",
+  "w-[16%]",
+  "w-[30%]",
+  "w-[18%]",
+  "w-[10%]",
+  "w-[10%]",
+  "w-[10%]",
+  "w-[6%]",
 ] as const;
 
 const initialCreate = {
@@ -111,6 +120,8 @@ export function ServiceTypesPanel({
   const [mode, setMode] = useState<ServiceTypeMode | "">("");
   const [showCreate, setShowCreate] = useState(false);
   const [createDraft, setCreateDraft] = useState(initialCreate);
+  const [selectedItem, setSelectedItem] = useState<ServiceType | null>(null);
+  const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
   const [editing, setEditing] = useState<ServiceType | null>(null);
   const [deactivating, setDeactivating] = useState<ServiceType | null>(null);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
@@ -156,6 +167,19 @@ export function ServiceTypesPanel({
       isCurrent = false;
     };
   }, [active, category, mode, requestVersion, search]);
+
+  useEffect(() => {
+    const media =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(max-width: 760px)")
+        : null;
+    const updateSheetSide = () =>
+      setSheetSide(media?.matches ? "bottom" : "right");
+    updateSheetSide();
+    if (!media) return;
+    media.addEventListener("change", updateSheetSide);
+    return () => media.removeEventListener("change", updateSheetSide);
+  }, []);
 
   const submitCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -229,7 +253,7 @@ export function ServiceTypesPanel({
   return (
     <section
       aria-labelledby="service-types-title"
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-6 max-[760px]:pb-[calc(6rem+env(safe-area-inset-bottom))]"
     >
       <CatalogPageHeader
         title="Tipos de servicio"
@@ -275,6 +299,7 @@ export function ServiceTypesPanel({
                   <FieldLabel htmlFor="service-type-code">Código</FieldLabel>
                   <Input
                     id="service-type-code"
+                    className="bg-card"
                     required
                     value={createDraft.code}
                     aria-invalid={Boolean(createError)}
@@ -296,6 +321,7 @@ export function ServiceTypesPanel({
                   <FieldLabel htmlFor="service-type-name">Nombre</FieldLabel>
                   <Input
                     id="service-type-name"
+                    className="bg-card"
                     required
                     value={createDraft.name}
                     onChange={(event) =>
@@ -327,7 +353,7 @@ export function ServiceTypesPanel({
                       }
                     }}
                   >
-                    <SelectTrigger id="service-type-category">
+                    <SelectTrigger id="service-type-category" className="bg-card">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -356,7 +382,7 @@ export function ServiceTypesPanel({
                       }
                     }}
                   >
-                    <SelectTrigger id="service-type-mode">
+                    <SelectTrigger id="service-type-mode" className="bg-card">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -403,13 +429,14 @@ export function ServiceTypesPanel({
 
       <Card>
         <CardContent>
-          <FieldGroup className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_160px_190px_150px]">
+          <FieldGroup className="grid max-w-full gap-3 md:w-fit md:grid-cols-[repeat(3,minmax(0,18rem))]">
             <Field>
               <FieldLabel htmlFor="service-types-panel-filter-1">
                 Buscar
               </FieldLabel>
               <Input
                 id="service-types-panel-filter-1"
+                className="bg-card"
                 aria-label="Buscar tipos de servicio"
                 placeholder="Código o nombre"
                 value={search}
@@ -437,6 +464,7 @@ export function ServiceTypesPanel({
                 <SelectTrigger
                   id="service-types-panel-filter-2"
                   aria-label="Filtrar por estado"
+                  className="bg-card"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -468,6 +496,7 @@ export function ServiceTypesPanel({
                 <SelectTrigger
                   id="service-types-panel-filter-3"
                   aria-label="Filtrar por categoría"
+                  className="bg-card"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -502,6 +531,7 @@ export function ServiceTypesPanel({
                 <SelectTrigger
                   id="service-types-panel-filter-4"
                   aria-label="Filtrar por modo"
+                  className="bg-card"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -521,7 +551,7 @@ export function ServiceTypesPanel({
         </CardContent>
       </Card>
 
-      {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio"><TableRowsSkeleton rowCount={state.rowCount} rowHeight="" columnClasses={tableColumnClasses} columnWidths={["w-16", "w-40", "w-28", "w-20", "w-8", "w-12", "w-44"]} columnLabels={["Código", "Nombre", "Categoría", "Modo", "Vehículo", "Estado", "Acciones"]} actionColumn actionCount={canManage ? 2 : 0} className={styles.tableWrap} tableClassName={`${styles.table} min-[761px]:table-fixed`} actionsClassName={styles.actions} /></div> : null}
+      {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio"><TableRowsSkeleton rowCount={state.rowCount} rowHeight="" columnClasses={tableColumnClasses} columnWidths={["w-16", "w-40", "w-28", "w-20", "w-8", "w-12", "w-4"]} columnLabels={["Código", "Nombre", "Categoría", "Modo", "Vehículo", "Estado", "Ver detalle"]} className={styles.tableWrap} tableClassName={`${styles.table} min-[761px]:table-fixed`} /></div> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>
@@ -554,23 +584,133 @@ export function ServiceTypesPanel({
           <table className={`${styles.table} min-[761px]:table-fixed`}>
             <caption className="sr-only">Tipos de servicio</caption>
             <colgroup>{tableColumnClasses.map((width, column) => <col key={column} className={width} />)}</colgroup>
-            <thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Categoría</th><th scope="col">Modo</th><th scope="col">Vehículo</th><th scope="col">Estado</th><th scope="col"><span className="sr-only">Acciones</span></th></tr></thead>
+            <thead>
+              <tr>
+                <th scope="col">Código</th>
+                <th scope="col">Nombre</th>
+                <th scope="col">Categoría</th>
+                <th scope="col">Modo</th>
+                <th scope="col">Vehículo</th>
+                <th scope="col">Estado</th>
+                <th scope="col"><span className="sr-only">Ver detalle</span></th>
+              </tr>
+            </thead>
             <tbody>{state.items.map((item) => (
-              <tr key={item.id}>
-                <th scope="row" data-label="Código">{item.code}</th>
+              <tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
+                <th scope="row" data-label="Código">
+                  <Button
+                    type="button"
+                    variant="link"
+                    aria-label={`Ver detalle del tipo de servicio ${item.code}`}
+                    onClick={() => setSelectedItem(item)}
+                    className="h-auto min-h-0 justify-start p-0 text-left font-semibold text-foreground no-underline after:absolute after:inset-0 after:z-10 after:content-[''] focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] max-[760px]:focus-visible:after:rounded-2xl"
+                  >
+                    {item.code}
+                  </Button>
+                </th>
                 <td data-label="Nombre">{item.name}</td>
                 <td data-label="Categoría">{categories.find((option) => option.value === item.category)?.label ?? item.category}</td>
                 <td data-label="Modo">{item.mode === "ROUTE" ? "Recorrido" : "Punto"}</td>
                 <td data-label="Vehículo">{item.requiresVehicle ? "Sí" : "No"}</td>
                 <td data-label="Estado">{item.active ? "Activo" : "Inactivo"}</td>
-                <td className={styles.actions} data-label="Acciones">
-                  {canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => { setEditing(item); setShowCreate(false); }}>Editar</Button>{item.active ? <Button type="button" size="sm" variant="destructive" onClick={() => deactivate(item)}>Dar de baja</Button> : null}</> : null}
+                <td data-label="" aria-hidden="true" className="text-right">
+                  <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </td>
               </tr>
             ))}</tbody>
           </table>
         </div>
       ) : null}
+
+      <Sheet
+        open={selectedItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedItem(null);
+        }}
+      >
+        {selectedItem ? (
+          <SheetContent
+            side={sheetSide}
+            className={
+              sheetSide === "bottom"
+                ? "max-h-[88dvh] overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]"
+                : "w-[min(92vw,28rem)] overflow-y-auto"
+            }
+          >
+            <SheetHeader className="border-b border-border pr-12 pb-4">
+              <SheetTitle>Detalle del tipo de servicio</SheetTitle>
+              <SheetDescription>
+                Configuración disponible para la planificación de servicios.
+              </SheetDescription>
+            </SheetHeader>
+            <dl className="grid gap-4 px-4 pt-4 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Código</dt>
+                <dd className="font-semibold">{selectedItem.code}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Nombre</dt>
+                <dd>{selectedItem.name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Categoría</dt>
+                <dd>
+                  {categories.find((option) => option.value === selectedItem.category)?.label ?? selectedItem.category}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Modo</dt>
+                <dd>{selectedItem.mode === "ROUTE" ? "Recorrido" : "Punto"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Vehículo</dt>
+                <dd>{selectedItem.requiresVehicle ? "Sí requiere vehículo" : "No requiere vehículo"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Estado</dt>
+                <dd>{selectedItem.active ? "Activo" : "Inactivo"}</dd>
+              </div>
+            </dl>
+            {canManage ? (
+              <SheetFooter className="border-t border-border pt-4">
+                <section aria-label="Acciones del tipo de servicio" className="grid gap-2">
+                  <h3 className="text-sm font-semibold">Acciones disponibles</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start bg-card"
+                    onClick={() => {
+                      const item = selectedItem;
+                      setSelectedItem(null);
+                      setEditing(item);
+                      setShowCreate(false);
+                      setEditError(null);
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" aria-hidden />
+                    Editar
+                  </Button>
+                  {selectedItem.active ? (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const item = selectedItem;
+                        setSelectedItem(null);
+                        deactivate(item);
+                      }}
+                    >
+                      <Trash2 data-icon="inline-start" aria-hidden />
+                      Dar de baja
+                    </Button>
+                  ) : null}
+                </section>
+              </SheetFooter>
+            ) : null}
+          </SheetContent>
+        ) : null}
+      </Sheet>
 
       {editing && canManage ? (
         <form onSubmit={submitEdit}>
@@ -612,6 +752,7 @@ export function ServiceTypesPanel({
                   </FieldLabel>
                   <Input
                     id="edit-service-type-name"
+                    className="bg-card"
                     required
                     value={editing.name}
                     aria-invalid={Boolean(editError)}
@@ -699,8 +840,8 @@ export function ServiceTypesPanel({
         }}
         title={`Confirmar baja del tipo de servicio ${deactivating?.code ?? ""}`.trim()}
         consequence="El tipo de servicio quedará inactivo. Los servicios existentes conservarán la configuración con la que se crearon."
-        confirmAction={`Dar de baja el tipo de servicio ${deactivating?.code ?? ""}`.trim()}
-        safeAlternative={`Conservar el tipo de servicio ${deactivating?.code ?? ""}`.trim()}
+        confirmAction="Dar de baja"
+        safeAlternative="Conservar tipo"
         onConfirm={() => void confirmDeactivation()}
         isSubmitting={isSubmittingDeactivate}
       >

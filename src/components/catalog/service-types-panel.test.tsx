@@ -18,7 +18,7 @@ afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
 afterAll(() => server.close());
 
 describe("ServiceTypesPanel", () => {
-  it("keeps the catalog header, seven columns and action blocks while a response is delayed", async () => {
+  it("keeps the catalog header and seven columns while a response is delayed", async () => {
     server.use(http.get("*/api/service-types", ({ request }) => mockResponseAfter(350, () => {
       const headers = new Headers(request.headers);
       headers.set("cookie", createSessionCookie("office-duty-queue", { mode: "mock" }));
@@ -29,7 +29,7 @@ describe("ServiceTypesPanel", () => {
     expect(loading.querySelectorAll("thead th")).toHaveLength(7);
     expect(loading.querySelectorAll("tbody tr")).toHaveLength(5);
     expect(loading.querySelectorAll("tbody tr:first-child td")).toHaveLength(7);
-    expect(loading.querySelectorAll("tbody tr:first-child td:last-child [data-slot=skeleton]")).toHaveLength(2);
+    expect(loading.querySelectorAll("tbody tr:first-child td:last-child [data-slot=skeleton]")).toHaveLength(1);
     const widths = Array.from(loading.querySelectorAll("col"), (column) => column.className);
     await screen.findByRole("row", { name: /WASTE-ROUTE/ }, { timeout: 3000 });
     expect(screen.queryByRole("status", { name: "Cargando tipos de servicio" })).not.toBeInTheDocument();
@@ -44,13 +44,34 @@ describe("ServiceTypesPanel", () => {
     expect(screen.getByText("WASTE-ROUTE")).toBeVisible();
     const row = await screen.findByRole("row", { name: /WASTE-ROUTE/ });
     expect(row.querySelector('th[data-label="Código"]')).not.toBeNull();
-    expect(row.querySelector('td[data-label="Acciones"]')).not.toBeNull();
+    expect(row.querySelector('td[data-label="Acciones"]')).toBeNull();
 
-    await user.click(screen.getAllByRole("button", { name: "Editar" })[0]);
+    await user.click(within(row).getByRole("button", { name: "Ver detalle del tipo de servicio WASTE-ROUTE" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle del tipo de servicio" });
+    await user.click(within(sheet).getByRole("button", { name: "Editar" }));
     expect(screen.getByRole("textbox", { name: "Código" })).toHaveAttribute("readonly");
     expect(screen.getByRole("textbox", { name: "Categoría" })).toHaveAttribute("readonly");
     expect(screen.getByRole("textbox", { name: "Modo" })).toHaveAttribute("readonly");
     expect(screen.getByRole("textbox", { name: "Nombre" })).not.toHaveAttribute("readonly");
+  });
+
+  it("opens service type details and available actions from the row", async () => {
+    const user = userEvent.setup();
+    render(<ServiceTypesPanel scenario={scenarios.officeDutyQueue} />);
+
+    const row = await screen.findByRole("row", { name: /WASTE-ROUTE/ });
+    await user.click(
+      within(row).getByRole("button", {
+        name: "Ver detalle del tipo de servicio WASTE-ROUTE",
+      }),
+    );
+
+    const sheet = await screen.findByRole("dialog", {
+      name: "Detalle del tipo de servicio",
+    });
+    expect(sheet).toHaveTextContent("WASTE-ROUTE");
+    expect(within(sheet).getByRole("button", { name: "Editar" })).toBeVisible();
+    expect(within(sheet).getByRole("button", { name: "Dar de baja" })).toBeVisible();
   });
 
   it("does not expose management actions to a Field actor", async () => {
@@ -84,14 +105,16 @@ describe("ServiceTypesPanel", () => {
     render(<ServiceTypesPanel scenario={scenarios.officeDutyQueue} />);
 
     const row = await screen.findByRole("row", { name: /WASTE-ROUTE/ });
-    await user.click(within(row).getByRole("button", { name: "Dar de baja" }));
+    await user.click(within(row).getByRole("button", { name: "Ver detalle del tipo de servicio WASTE-ROUTE" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle del tipo de servicio" });
+    await user.click(within(sheet).getByRole("button", { name: "Dar de baja" }));
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("WASTE-ROUTE");
-    expect(within(dialog).getByRole("button", { name: /Conservar el tipo de servicio WASTE-ROUTE/ })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Conservar tipo" })).toBeVisible();
     expect(remove).not.toHaveBeenCalled();
 
-    await user.click(within(dialog).getByRole("button", { name: /Dar de baja el tipo de servicio WASTE-ROUTE/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Dar de baja" }));
     await waitFor(() => expect(remove).toHaveBeenCalled());
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo dar de baja el tipo de servicio.");
     expect(screen.queryByRole("status", { name: /No se pudo guardar el tipo de servicio/ })).not.toBeInTheDocument();

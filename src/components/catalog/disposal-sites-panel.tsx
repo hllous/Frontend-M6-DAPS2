@@ -2,6 +2,7 @@
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
@@ -52,6 +53,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import styles from "./catalog-panel.module.css";
 
 const siteTypes: Array<{ value: DisposalSiteType; label: string }> = [
@@ -84,6 +93,8 @@ export function DisposalSitesPanel({
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [createDraft, setCreateDraft] = useState(initialCreate);
+  const [selectedSite, setSelectedSite] = useState<DisposalSite | null>(null);
+  const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
   const [editing, setEditing] = useState<DisposalSite | null>(null);
   const [deactivating, setDeactivating] = useState<DisposalSite | null>(null);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
@@ -120,6 +131,19 @@ export function DisposalSitesPanel({
       isCurrent = false;
     };
   }, [active, requestVersion, search, siteType]);
+
+  useEffect(() => {
+    const media =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(max-width: 760px)")
+        : null;
+    const updateSheetSide = () =>
+      setSheetSide(media?.matches ? "bottom" : "right");
+    updateSheetSide();
+    if (!media) return;
+    media.addEventListener("change", updateSheetSide);
+    return () => media.removeEventListener("change", updateSheetSide);
+  }, []);
 
   const submitCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -188,7 +212,7 @@ export function DisposalSitesPanel({
   return (
     <section
       aria-labelledby="disposal-sites-title"
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-6 max-[760px]:pb-[calc(6rem+env(safe-area-inset-bottom))]"
     >
       <CatalogPageHeader
         title="Sitios de disposición"
@@ -234,6 +258,7 @@ export function DisposalSitesPanel({
                   <FieldLabel htmlFor="disposal-site-code">Código</FieldLabel>
                   <Input
                     id="disposal-site-code"
+                    className="bg-card"
                     required
                     value={createDraft.code}
                     aria-invalid={Boolean(createError)}
@@ -255,6 +280,7 @@ export function DisposalSitesPanel({
                   <FieldLabel htmlFor="disposal-site-name">Nombre</FieldLabel>
                   <Input
                     id="disposal-site-name"
+                    className="bg-card"
                     required
                     value={createDraft.name}
                     onChange={(event) =>
@@ -283,7 +309,7 @@ export function DisposalSitesPanel({
                       }
                     }}
                   >
-                    <SelectTrigger id="disposal-site-type">
+                    <SelectTrigger id="disposal-site-type" className="bg-card">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -314,13 +340,14 @@ export function DisposalSitesPanel({
       ) : null}
       <Card>
         <CardContent>
-          <FieldGroup className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_190px_160px]">
+          <FieldGroup className="grid max-w-full gap-3 md:w-fit md:grid-cols-[repeat(3,minmax(0,18rem))]">
             <Field>
               <FieldLabel htmlFor="disposal-sites-panel-filter-1">
                 Buscar
               </FieldLabel>
               <Input
                 id="disposal-sites-panel-filter-1"
+                className="bg-card"
                 aria-label="Buscar sitios de disposición"
                 placeholder="Código o nombre"
                 value={search}
@@ -347,6 +374,7 @@ export function DisposalSitesPanel({
                 <SelectTrigger
                   id="disposal-sites-panel-filter-2"
                   aria-label="Filtrar por tipo de sitio"
+                  className="bg-card"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -382,6 +410,7 @@ export function DisposalSitesPanel({
                 <SelectTrigger
                   id="disposal-sites-panel-filter-3"
                   aria-label="Filtrar sitios por estado"
+                  className="bg-card"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -429,19 +458,120 @@ export function DisposalSitesPanel({
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <caption className="sr-only">Sitios de disposición</caption>
-            <thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Tipo</th><th scope="col">Estado</th><th scope="col"><span className="sr-only">Acciones</span></th></tr></thead>
+            <thead>
+              <tr>
+                <th scope="col">Código</th>
+                <th scope="col">Nombre</th>
+                <th scope="col">Tipo</th>
+                <th scope="col">Estado</th>
+                <th scope="col"><span className="sr-only">Ver detalle</span></th>
+              </tr>
+            </thead>
             <tbody>{state.items.map((item) => (
-              <tr key={item.id}>
-                <th scope="row" data-label="Código">{item.code}</th>
+              <tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
+                <th scope="row" data-label="Código">
+                  <Button
+                    type="button"
+                    variant="link"
+                    aria-label={`Ver detalle del sitio de disposición ${item.code}`}
+                    onClick={() => setSelectedSite(item)}
+                    className="h-auto min-h-0 justify-start p-0 text-left font-semibold text-foreground no-underline after:absolute after:inset-0 after:z-10 after:content-[''] focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] max-[760px]:focus-visible:after:rounded-2xl"
+                  >
+                    {item.code}
+                  </Button>
+                </th>
                 <td data-label="Nombre">{item.name}</td>
                 <td data-label="Tipo">{siteTypes.find((option) => option.value === item.siteType)?.label ?? item.siteType}</td>
                 <td data-label="Estado">{item.active ? "Activo" : "Inactivo"}</td>
-                <td className={styles.actions} data-label="Acciones">{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => { setEditing(item); setShowCreate(false); }}>Editar</Button>{item.active ? <Button type="button" size="sm" variant="destructive" onClick={() => deactivate(item)}>Dar de baja</Button> : null}</> : null}</td>
+                <td data-label="" aria-hidden="true" className="text-right">
+                  <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                </td>
               </tr>
             ))}</tbody>
           </table>
         </div>
       ) : null}
+      <Sheet
+        open={selectedSite !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedSite(null);
+        }}
+      >
+        {selectedSite ? (
+          <SheetContent
+            side={sheetSide}
+            className={
+              sheetSide === "bottom"
+                ? "max-h-[88dvh] overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]"
+                : "w-[min(92vw,28rem)] overflow-y-auto"
+            }
+          >
+            <SheetHeader className="border-b border-border pr-12 pb-4">
+              <SheetTitle>Detalle del sitio de disposición</SheetTitle>
+              <SheetDescription>
+                Información del lugar de tratamiento o transferencia.
+              </SheetDescription>
+            </SheetHeader>
+            <dl className="grid gap-4 px-4 pt-4 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Código</dt>
+                <dd className="font-semibold">{selectedSite.code}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Nombre</dt>
+                <dd>{selectedSite.name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Tipo</dt>
+                <dd>
+                  {siteTypes.find((option) => option.value === selectedSite.siteType)?.label ?? selectedSite.siteType}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Estado</dt>
+                <dd>{selectedSite.active ? "Activo" : "Inactivo"}</dd>
+              </div>
+            </dl>
+            {canManage ? (
+              <SheetFooter className="border-t border-border pt-4">
+                <section aria-label="Acciones del sitio de disposición" className="grid gap-2">
+                  <h3 className="text-sm font-semibold">Acciones disponibles</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start bg-card"
+                    onClick={() => {
+                      const site = selectedSite;
+                      setSelectedSite(null);
+                      setEditing(site);
+                      setShowCreate(false);
+                      setEditError(null);
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" aria-hidden />
+                    Editar
+                  </Button>
+                  {selectedSite.active ? (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const site = selectedSite;
+                        setSelectedSite(null);
+                        deactivate(site);
+                      }}
+                    >
+                      <Trash2 data-icon="inline-start" aria-hidden />
+                      Dar de baja
+                    </Button>
+                  ) : null}
+                </section>
+              </SheetFooter>
+            ) : null}
+          </SheetContent>
+        ) : null}
+      </Sheet>
       {editing && canManage ? (
         <form onSubmit={submitEdit}>
           <Card>
@@ -482,6 +612,7 @@ export function DisposalSitesPanel({
                   </FieldLabel>
                   <Input
                     id="edit-disposal-site-name"
+                    className="bg-card"
                     required
                     value={editing.name}
                     aria-invalid={Boolean(editError)}
@@ -513,7 +644,7 @@ export function DisposalSitesPanel({
                       }
                     }}
                   >
-                    <SelectTrigger id="edit-disposal-site-type">
+                    <SelectTrigger id="edit-disposal-site-type" className="bg-card">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -564,8 +695,8 @@ export function DisposalSitesPanel({
         }}
         title={`Confirmar baja del sitio de disposición ${deactivating?.code ?? ""}`.trim()}
         consequence="El sitio quedará inactivo y no se utilizará en nuevas operaciones. Los registros existentes conservarán su referencia."
-        confirmAction={`Dar de baja el sitio de disposición ${deactivating?.code ?? ""}`.trim()}
-        safeAlternative={`Conservar el sitio de disposición ${deactivating?.code ?? ""}`.trim()}
+        confirmAction="Dar de baja"
+        safeAlternative="Conservar sitio"
         onConfirm={() => void confirmDeactivation()}
         isSubmitting={isSubmittingDeactivate}
       >

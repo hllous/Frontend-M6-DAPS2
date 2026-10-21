@@ -19,19 +19,21 @@ test.describe("DisposalSite catalog management #103", () => {
     await expect(page.getByText(code)).toBeVisible();
 
     const row = page.getByRole("row", { name: new RegExp(code) });
-    await row.getByRole("button", { name: "Editar" }).click();
+    await row.getByRole("button", { name: `Ver detalle del sitio de disposición ${code}` }).click();
+    await page.getByRole("dialog", { name: "Detalle del sitio de disposición" }).getByRole("button", { name: "Editar" }).click();
     await expect(page.getByRole("textbox", { name: "Código" })).toHaveAttribute("readonly");
     await page.getByRole("textbox", { name: "Nombre" }).fill("Sitio e2e actualizado");
     await page.getByRole("button", { name: "Guardar cambios" }).click();
     await expect(page.getByText("Sitio e2e actualizado")).toBeVisible();
 
-    await page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: "Dar de baja" }).click();
+    await page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: `Ver detalle del sitio de disposición ${code}` }).click();
+    await page.getByRole("dialog", { name: "Detalle del sitio de disposición" }).getByRole("button", { name: "Dar de baja" }).click();
     const deactivateDialog = page.getByRole("dialog");
     await expect(deactivateDialog.getByRole("heading", { name: `Confirmar baja del sitio de disposición ${code}` })).toBeVisible();
-    await deactivateDialog.getByRole("button", { name: `Dar de baja el sitio de disposición ${code}` }).click();
+    await deactivateDialog.getByRole("button", { name: "Dar de baja", exact: true }).click();
     await expect(page.getByText("Sitio de disposición dado de baja")).toBeVisible();
     await chooseCatalogBOption(page, page.getByRole("combobox", { name: "Filtrar sitios por estado" }), "Inactivos");
     await expect(page.getByText(code)).toBeVisible();
-    await expect(page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: /eliminar/i })).toHaveCount(0);
+    await expect(page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: "Ver detalle del sitio de disposición " + code })).toHaveCount(1);
   });
 });
