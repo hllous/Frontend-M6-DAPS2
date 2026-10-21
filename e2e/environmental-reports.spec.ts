@@ -4,6 +4,32 @@ import { loginViaApi } from "./support/auth";
 import { chooseDate, chooseOption, chooseTime } from "./support/reports-indicators";
 
 test.describe("EnvironmentalReport case file", () => {
+  test("Office filters the queue by several statuses and keeps them in the URL", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app");
+    await page.getByRole("link", { name: "Control Ambiental" }).click();
+    const filters = page.getByRole("region", { name: "Filtros de la cola" });
+    const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
+    const status = filters.getByRole("combobox", { name: "Estado" });
+    const allReportsResponse = await page.request.get("/api/environmental-reports?pageSize=100");
+    expect(allReportsResponse.ok()).toBeTruthy();
+    const allReports = (await allReportsResponse.json()).data as { id: string; status: string }[];
+    const expectedIds = allReports
+      .filter((report) => ["RECEIVED", "UNDER_REVIEW"].includes(report.status))
+      .map((report) => report.id);
+
+    await status.click();
+    await page.getByRole("option", { name: "Recibido" }).click();
+    await page.getByRole("option", { name: "En revisión" }).click();
+
+    await expect(page).toHaveURL(/status=RECEIVED.*status=UNDER_REVIEW/);
+    await expect(status).toContainText("Recibido, En revisión");
+    await expect(list.getByRole("button")).toHaveCount(expectedIds.length);
+    for (const id of expectedIds) {
+      await expect(list.getByRole("button", { name: new RegExp(id) })).toBeVisible();
+    }
+  });
+
   test("Office filters the queue by last update and restores the range from the URL", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=environment");

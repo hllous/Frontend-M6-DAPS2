@@ -365,7 +365,7 @@ export const environmentalReportDateRangeSchema = z.object({
 export type EnvironmentalReportQuery = {
   from?: string;
   to?: string;
-  status?: EnvironmentalReportStatus;
+  status?: EnvironmentalReportStatus | EnvironmentalReportStatus[];
   reportType?: EnvironmentalReportType;
   priority?: EnvironmentalReportPriority;
   publicId?: string;
@@ -445,7 +445,8 @@ function queryString(query: EnvironmentalReportQuery): string {
   const params = new URLSearchParams();
   if (query.from) params.set("from", query.from);
   if (query.to) params.set("to", query.to);
-  if (query.status) params.set("status", query.status);
+  const statuses = Array.isArray(query.status) ? query.status : query.status ? [query.status] : [];
+  for (const status of statuses) params.append("status", status);
   if (query.reportType) params.set("reportType", query.reportType);
   if (query.priority) params.set("priority", query.priority);
   if (query.publicId) params.set("publicId", query.publicId);
