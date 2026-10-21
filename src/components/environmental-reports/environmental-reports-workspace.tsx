@@ -441,8 +441,8 @@ function QueueStatusFilter({ filterStatus, onStatus }: { filterStatus: Environme
         }}
       >
         <SelectTrigger id="environmental-status"><SelectValue>{statusSummary(filterStatus)}</SelectValue></SelectTrigger>
-        <SelectContent align="start" className="min-w-80">
-          <SelectItem value={ALL_STATUSES_OPTION}>Todos los estados</SelectItem>
+        <SelectContent align="start" className="min-w-80 max-h-[min(24rem,calc(var(--available-height)-5rem))] overflow-y-auto overscroll-contain">
+          <SelectItem value={ALL_STATUSES_OPTION} className="sticky top-0 z-10 bg-popover">Todos los estados</SelectItem>
           <SelectSeparator />
           {statusGroups.map((group) => {
             const isSelected = group.statuses.every((status) => filterStatus.includes(status));

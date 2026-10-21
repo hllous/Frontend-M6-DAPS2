@@ -54,6 +54,20 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); re
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
+  it("bounds the Estado options within a vertically scrollable listbox", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+
+    await user.click(screen.getByRole("combobox", { name: "Estado" }));
+    const listbox = await screen.findByRole("listbox");
+    const content = listbox.parentElement;
+
+    expect(content).toHaveAttribute("data-slot", "select-content");
+    expect(content).toHaveClass("max-h-[min(24rem,calc(var(--available-height)-5rem))]");
+    expect(content).toHaveClass("overflow-y-auto");
+  });
+
   it("selects and clears a subsection, summarizes the selection, and clears all statuses", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);

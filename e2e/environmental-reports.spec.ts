@@ -4,6 +4,39 @@ import { loginViaApi } from "./support/auth";
 import { chooseDate, chooseOption, chooseTime } from "./support/reports-indicators";
 
 test.describe("EnvironmentalReport case file", () => {
+  test("Office can reach and select a status in the last group on mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=environment");
+
+    const status = page.getByRole("combobox", { name: "Estado" });
+    await status.click();
+    const listbox = page.getByRole("listbox");
+    const content = page.locator('[data-slot="select-content"]');
+    const allStatuses = page.getByRole("option", { name: "Todos los estados" });
+    const closed = page.getByRole("option", { name: "Cerrado" });
+    const mobileNav = page.getByRole("navigation", { name: "Navegación móvil" });
+
+    await expect(listbox).toBeVisible();
+    const contentBox = await content.boundingBox();
+    const navBox = await mobileNav.boundingBox();
+    expect(contentBox).not.toBeNull();
+    expect(navBox).not.toBeNull();
+    expect(contentBox!.y + contentBox!.height).toBeLessThan(navBox!.y);
+
+    for (let index = 0; index < 20 && !(await closed.evaluate((option) => option === document.activeElement)); index += 1) {
+      await page.keyboard.press("ArrowDown");
+    }
+
+    await expect(closed).toBeFocused();
+    await expect(closed).toBeInViewport();
+    await page.keyboard.press("Enter");
+
+    await expect(closed).toHaveAttribute("aria-selected", "true");
+    await expect(allStatuses).toBeInViewport();
+    await expect(status).toContainText("Cerrado");
+  });
+
   test("Office filters the queue by several statuses and keeps them in the URL", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
