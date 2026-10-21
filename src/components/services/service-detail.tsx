@@ -483,7 +483,7 @@ export function ServiceDetail({
                     variant="link"
                     size="xs"
                     onClick={() => onAssignCrew(service)}
-                    className="text-[11px] font-semibold text-[var(--color-action)]"
+                    className="h-auto min-h-0 min-w-0 px-0 py-0 text-[11px]/[14px] font-semibold text-[var(--color-action)] [@media(max-width:760px)]:min-h-0 [@media(max-width:760px)]:min-w-0"
                   >
                     {service.crewId ? "Reasignar" : "Asignar"}
                   </Button>

@@ -836,7 +836,11 @@ export function ServicesWorkspace({
           items={periodItems}
           onValueChange={(value) => handlePeriodChoiceChange(value as Period)}
         >
-          <SelectTrigger id="services-period" className={cn("w-auto", isNarrow ? "h-10 min-h-10" : "min-h-10")}>
+          <SelectTrigger
+            id="services-period"
+            size={isNarrow ? "sm" : "default"}
+            className={cn("w-auto", isNarrow && "px-2")}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
