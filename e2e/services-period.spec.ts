@@ -1,7 +1,42 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
 import { chooseServicesPeriod, expectServicesPeriod } from "./support/services-627-controls";
+
+async function openServices(page: Page) {
+  await loginViaApi(page, "office-duty-queue");
+  await page.goto("/app?destination=services");
+  await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+}
+
+async function dispatchTouchGesture(
+  page: Page,
+  x: number,
+  startY: number,
+  moveYs: number[],
+  onMove?: (index: number) => Promise<void>,
+) {
+  const session = await page.context().newCDPSession(page);
+  const touchPoint = (y: number) => ({ x, y, radiusX: 8, radiusY: 8, force: 1 });
+
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [touchPoint(startY)],
+  });
+  for (const [index, y] of moveYs.entries()) {
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [touchPoint(y)],
+    });
+    await page.waitForTimeout(60);
+    await onMove?.(index);
+  }
+  await session.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await session.detach();
+}
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   test(`Services period selector changes the window and the URL at ${viewport.width}px`, async ({ page }) => {
@@ -73,5 +108,85 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     expect(await assign.evaluate((element) => element.tagName)).toBe("BUTTON");
     await assign.focus();
     await expect(assign).toBeFocused();
+
+    if (viewport.width === 390) {
+      const period = page.getByRole("combobox", { name: "Período" });
+      const categories = page.getByRole("button", { name: "Categorías" });
+      await expect(period).toHaveCount(0);
+      await expect(categories).toHaveCount(0);
+
+      await page.getByRole("button", { name: "Volver a Servicios" }).click();
+
+      await expect(period).toBeVisible();
+      await expect(categories).toBeVisible();
+    }
   });
 }
+
+test.describe("Services mobile drawer touch", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+
+  test("a touch drag follows the handle between snap points", async ({ page }) => {
+    await openServices(page);
+
+    const handle = page.getByRole("slider", { name: "Altura de la lista" });
+    const popup = page.locator('[data-slot="drawer-popup"]');
+    await expect(handle).toHaveAttribute("aria-valuetext", "media");
+    await page.waitForTimeout(500);
+
+    const initialPopup = await popup.boundingBox();
+    const initialHandle = await handle.boundingBox();
+    expect(initialPopup).not.toBeNull();
+    expect(initialHandle).not.toBeNull();
+
+    const x = initialHandle!.x + initialHandle!.width / 2;
+    const y = initialHandle!.y + initialHandle!.height / 2;
+    await dispatchTouchGesture(page, x, y, Array.from({ length: 9 }, (_, index) => y - (index + 1) * 40), async (index) => {
+      if (index !== 2) return;
+      const movingPopup = await popup.boundingBox();
+      expect(movingPopup).not.toBeNull();
+      expect(movingPopup!.y).toBeLessThan(initialPopup!.y - 20);
+    });
+    const followingPointer = await popup.boundingBox();
+    expect(followingPointer).not.toBeNull();
+    expect(followingPointer!.y).toBeLessThan(initialPopup!.y - 30);
+    await page.waitForTimeout(250);
+    await expect(handle).toHaveAttribute("aria-valuetext", "completa");
+
+    const fullHandle = await handle.boundingBox();
+    const fullPopup = await popup.boundingBox();
+    expect(fullHandle).not.toBeNull();
+    expect(fullPopup).not.toBeNull();
+    const fullX = fullHandle!.x + fullHandle!.width / 2;
+    const fullY = fullHandle!.y + fullHandle!.height / 2;
+    await dispatchTouchGesture(page, fullX, fullY, Array.from({ length: 9 }, (_, index) => fullY + (index + 1) * 20), async (index) => {
+      if (index !== 2) return;
+      const movingPopup = await popup.boundingBox();
+      expect(movingPopup).not.toBeNull();
+      expect(movingPopup!.y).toBeGreaterThan(fullPopup!.y + 10);
+    });
+    await page.waitForTimeout(250);
+    await expect(handle).toHaveAttribute("aria-valuetext", "media");
+  });
+
+  test("a touch tap leaves the snap unchanged and keyboard can resize it", async ({ page }) => {
+    await openServices(page);
+
+    const handle = page.getByRole("slider", { name: "Altura de la lista" });
+    await expect(handle).toHaveAttribute("aria-valuetext", "media");
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+    await page.touchscreen.tap(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await expect(handle).toHaveAttribute("aria-valuetext", "media");
+
+    await handle.focus();
+    await page.keyboard.press("ArrowUp");
+    await expect(handle).toHaveAttribute("aria-valuetext", "completa");
+    await page.keyboard.press("ArrowDown");
+    await expect(handle).toHaveAttribute("aria-valuetext", "media");
+  });
+});
