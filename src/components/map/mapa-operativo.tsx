@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/item";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { ListItemsSkeleton, MapPaneSkeleton } from "@/components/ui/loading-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Toggle } from "@/components/ui/toggle";
@@ -1113,11 +1114,56 @@ function SideLoadingRegion({ label, isLoading, children }: { label: string; isLo
 
 function MapLoading() {
   return (
-    <div className={styles.loading}>
-      <MapPaneSkeleton className={styles.loadingMap} />
-      <div className={styles.loadingPanel}>
-        <ListItemsSkeleton itemCount={6} />
+    <div className={cn(styles.layout, styles.loading, styles.layoutInventory)}>
+      <div className={styles.mapPanel}>
+        <div data-skeleton="map-context-header" aria-hidden="true" className={styles.mapToolbar}>
+          <Skeleton data-skeleton="map-context-title" className="h-[18px] w-36 max-w-full" />
+          <Skeleton data-skeleton="map-context-summary" className="h-[18px] w-20 max-w-full" />
+          <Skeleton data-skeleton="map-context-consulted" className="h-[18px] w-48 max-w-full" />
+        </div>
+        <MapPaneSkeleton className={cn(styles.loadingMap, "min-h-0")} />
       </div>
+      <InventoryMapDrawer
+        ariaLabel="Controles de la vista Inventario"
+        className={styles.sidePanel}
+        expandToViewport
+        summary="Elementos"
+      >
+        <InventoryPanelSkeleton />
+      </InventoryMapDrawer>
     </div>
+  );
+}
+
+function InventoryPanelSkeleton() {
+  return (
+    <>
+      <fieldset aria-hidden="true" data-skeleton="map-layer-controls" className={styles.layers}>
+        <legend><Skeleton className="h-5 w-28" /></legend>
+        {(Object.keys(layerLabels) as LayerId[]).map((layer) => (
+          <div key={layer} data-skeleton="map-layer-control" className={styles.layerControl}>
+            <Skeleton className="size-4 rounded-sm" />
+            <Skeleton className={cn(styles.layerSwatch, "rounded-sm")} />
+            <Skeleton className="h-4 w-24 max-w-full" />
+            <Skeleton className="ml-auto h-4 w-6" />
+          </div>
+        ))}
+      </fieldset>
+
+      <section aria-hidden="true" className={styles.visibleList}>
+        <div className={styles.listHeading}>
+          <Skeleton data-skeleton="map-elements-heading" className="h-5 w-20" />
+          <Skeleton className="h-4 w-8" />
+        </div>
+        <ListItemsSkeleton
+          itemCount={6}
+          itemHeight={styles.visibleItem}
+          avatarSize="size-3"
+          primaryWidth="w-3/4"
+          secondaryWidth="w-1/2"
+          className={styles.visibleItemGroup}
+        />
+      </section>
+    </>
   );
 }

@@ -49,18 +49,28 @@ describe("MapaOperativo", () => {
   });
 
   it("holds the inventory layout with a busy skeleton region while the map data is delayed", async () => {
-    server.use(http.all("*/api/*", () => mockResponseAfter(350, () => undefined)));
+    server.use(http.get("*/api/containers*", () => mockResponseAfter(350, () => HttpResponse.json({
+      data: [],
+      meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 },
+    }))));
     const { container } = render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
     const region = screen.getByRole("region", { name: "Datos del mapa operativo" });
     expect(region).toHaveAttribute("aria-busy", "true");
     expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
     expect(container.querySelector("[data-slot=map-pane-skeleton]")).not.toBeNull();
+    expect(region.querySelector('[data-skeleton="map-context-header"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton^="map-context-"]')).toHaveLength(4);
+    expect(region.querySelector('[data-skeleton="map-layer-controls"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton="map-layer-control"]')).toHaveLength(4);
+    expect(region.querySelector('[data-skeleton="map-elements-heading"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton="list-item"]')).toHaveLength(6);
     expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
 
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
     expect(await screen.findByRole("heading", { name: "Elementos" }, { timeout: 3000 })).toBeVisible();
-    expect(screen.getByRole("region", { name: "Datos del mapa operativo" })).toHaveAttribute("aria-busy", "false");
-    expect(container.querySelector("[data-slot=map-pane-skeleton]")).toBeNull();
+    expect(region.querySelector('[data-skeleton="map-context-header"]')).toBeNull();
+    expect(region.querySelector('[data-skeleton="map-layer-controls"]')).toBeNull();
   });
 
   it.each([

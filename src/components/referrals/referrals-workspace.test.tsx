@@ -27,12 +27,22 @@ afterAll(() => server.close());
 describe("ReferralsWorkspace", () => {
   it("shows a busy skeleton region while the referrals response is delayed", async () => {
     server.use(http.get("*/api/referrals", () => mockResponseAfter(350, () => HttpResponse.json({ data: fixtureReferrals(), meta: { total: fixtureReferrals().length } }))));
-    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const { container } = render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
 
     const region = screen.getByRole("region", { name: "Derivaciones" });
     expect(region).toHaveAttribute("aria-busy", "true");
     expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
-    expect(region.querySelector("[data-skeleton]")).not.toBeNull();
+    expect(container.querySelector('[data-skeleton="referral-count"]')).not.toBeNull();
+    expect(region.querySelector('[data-skeleton="referral-reconciliation-banner"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton="referral-reconciliation-detail"]')).toHaveLength(6);
+    const recordCards = region.querySelectorAll('[data-skeleton="referral-record"]');
+    expect(recordCards).toHaveLength(3);
+    for (const card of recordCards) {
+      expect(card.querySelector('[data-skeleton="referral-record-icon"]')).not.toBeNull();
+      expect(card.querySelector('[data-skeleton="referral-record-title"]')).not.toBeNull();
+      expect(card.querySelectorAll('[data-skeleton="referral-record-detail"]')).toHaveLength(2);
+      expect(card.querySelector('[data-skeleton="referral-record-status"]')).not.toBeNull();
+    }
     expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
 
     await waitFor(() => expect(screen.getByRole("region", { name: "Derivaciones" })).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });

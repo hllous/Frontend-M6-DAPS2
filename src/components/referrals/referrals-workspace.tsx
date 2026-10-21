@@ -21,7 +21,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { LoadingRegion } from "@/components/ui/loading-region";
-import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,6 +35,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemGroup } from "@/components/ui/item";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { referralsAdapter, referralFromRepairRequest, referralFromStreetClosureRequest, type Referral } from "@/lib/referrals";
 import { getReferralAnomalies, type ReferralAnomaly } from "@/lib/referral-anomalies";
@@ -375,11 +375,15 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
                 : "Solicitudes vinculadas exclusivamente a sus Servicios asignados."}
             </p>
           </div>
-          {loadState.status === "ready" && (
+          {loadState.status === "ready" ? (
             <span className="shrink-0 text-xs font-semibold tabular-nums text-[var(--color-text-secondary)]">
               {loadState.referrals.length} {loadState.referrals.length === 1 ? "registro" : "registros"}
             </span>
-          )}
+          ) : loadState.status === "loading" ? (
+            <span aria-hidden="true" className="shrink-0">
+              <Skeleton data-skeleton="referral-count" className="h-4 w-16" />
+            </span>
+          ) : null}
         </div>
       </header>
 
@@ -1068,8 +1072,45 @@ function DateField({ label, value }: { label: string; value: string }) {
 
 function LoadingState() {
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col p-4 sm:p-6 lg:p-8">
-      <ListItemsSkeleton className="grid min-w-0 grid-cols-1 gap-3" itemCount={5} itemHeight="min-h-32 rounded-xl border bg-card" />
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
+      <section aria-hidden="true" data-skeleton="referral-reconciliation-banner" className="flex items-start gap-3 rounded-2xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/55 p-4">
+        <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
+        <div className="min-w-0 flex-1">
+          <Skeleton className="h-5 w-60 max-w-full" />
+          <div className="mt-1 flex flex-col">
+            <Skeleton data-skeleton="referral-reconciliation-detail" className="h-5 w-full" />
+            <Skeleton data-skeleton="referral-reconciliation-detail" className="h-5 w-3/4 max-w-full sm:hidden" />
+          </div>
+          <div className="mt-1 flex flex-col">
+            <Skeleton data-skeleton="referral-reconciliation-detail" className="h-4 w-full" />
+            <Skeleton data-skeleton="referral-reconciliation-detail" className="h-4 w-4/5 max-w-full sm:hidden" />
+            <Skeleton data-skeleton="referral-reconciliation-detail" className="h-4 w-1/2 max-w-full sm:hidden" />
+          </div>
+          <Skeleton data-skeleton="referral-reconciliation-detail" className="mt-2 h-4 w-1/4 max-w-full" />
+        </div>
+      </section>
+      <ItemGroup aria-hidden="true" data-skeleton="referral-records" className="grid min-w-0 grid-cols-1 gap-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Item key={index} variant="interactive" data-skeleton="referral-record" className="min-h-12 w-full items-start gap-3 p-4 text-left sm:items-center">
+            <span data-skeleton="referral-record-icon" className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:mt-0">
+              <Skeleton className="h-9 w-9 rounded-xl" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="mb-2 block"><Skeleton className="h-[26px] w-32 max-w-full rounded-full" /></span>
+              <span data-skeleton="referral-record-title" className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Skeleton className="h-5 w-24 max-w-full" />
+                <Skeleton className="h-4 w-32 max-w-full" />
+              </span>
+              <Skeleton data-skeleton="referral-record-detail" className="mt-1 block h-5 w-72 max-w-full" />
+              <Skeleton data-skeleton="referral-record-detail" className="mt-1 block h-4 w-56 max-w-full" />
+            </span>
+            <ItemActions className="w-full basis-full justify-end sm:ml-auto sm:w-auto sm:basis-auto">
+              <Skeleton data-skeleton="referral-record-status" className="h-7 w-24 rounded-full" />
+              <Skeleton className="h-4 w-4 shrink-0 rounded-sm" />
+            </ItemActions>
+          </Item>
+        ))}
+      </ItemGroup>
     </div>
   );
 }

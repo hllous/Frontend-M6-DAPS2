@@ -540,19 +540,9 @@
   border: 0;
 }
 
-.loadingMap,
-.loadingPanel {
-  min-height: 620px;
-  border-radius: 16px;
-}
-
-.loadingPanel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-16);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+.loadingMap {
+  min-height: 0;
+  border-radius: 0;
 }
 
 @media (max-width: 1024px) {
@@ -621,8 +611,7 @@
   .itemButton { min-height: 48px; }
   .routeStopButton,
   .zoneButton { min-height: 48px; }
-  .loadingMap,
-  .loadingPanel { min-height: 360px; }
+  .loadingMap { min-height: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
