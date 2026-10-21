@@ -839,7 +839,7 @@ export function ServicesWorkspace({
           <SelectTrigger
             id="services-period"
             size={isNarrow ? "sm" : "default"}
-            className={cn("w-auto", isNarrow && "px-2")}
+            className={cn("w-auto", isNarrow && "px-1 [@media(max-width:760px)]:text-sm")}
           >
             <SelectValue />
           </SelectTrigger>

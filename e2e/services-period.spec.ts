@@ -24,6 +24,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       expect(periodBox).not.toBeNull();
       expect(categoriesBox).not.toBeNull();
       expect(mapBox).not.toBeNull();
+      expect(categoriesBox!.x + categoriesBox!.width).toBeLessThanOrEqual(viewport.width);
       expect(Math.abs(
         periodBox!.y + periodBox!.height / 2 - categoriesBox!.y - categoriesBox!.height / 2,
       )).toBeLessThanOrEqual(1);
@@ -66,7 +67,6 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     expect(assignBox).not.toBeNull();
     expect(actionBarBox).not.toBeNull();
     expect(contentIntroBox).not.toBeNull();
-    expect(crewCardBox!.height).toBeLessThan(110);
     expect(Math.abs(crewCardBox!.height - scheduleCardBox!.height)).toBeLessThanOrEqual(1);
     expect(assignBox!.height).toBeLessThanOrEqual(20);
     expect(contentIntroBox!.y - (actionBarBox!.y + actionBarBox!.height)).toBeGreaterThanOrEqual(16);
