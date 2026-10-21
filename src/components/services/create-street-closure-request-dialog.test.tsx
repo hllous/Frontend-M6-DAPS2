@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -51,22 +51,26 @@ function renderTreeDialog(onCreated = vi.fn()) {
   );
 }
 
+function changeValue(element: HTMLElement, value: string) {
+  fireEvent.change(element, { target: { value } });
+}
+
 async function pickDay(user: ReturnType<typeof userEvent.setup>, fieldName: RegExp, day: number, monthsAhead = 0) {
   await user.click(screen.getByRole("button", { name: fieldName }));
-  const calendar = screen.getByRole("grid");
+  const calendar = await screen.findByRole("grid");
   for (let month = 0; month < monthsAhead; month += 1) {
     await user.click(screen.getByRole("button", { name: "Mes siguiente" }));
   }
-  await user.click(within(calendar).getByRole("button", { name: new RegExp(`, ${day} de `) }));
+  await user.click(await within(calendar).findByRole("button", { name: new RegExp(`, ${day} de `) }));
 }
 
 async function setTime(user: ReturnType<typeof userEvent.setup>, groupName: RegExp, value: string) {
   const [hour, minute] = value.split(":");
   const group = screen.getByRole("group", { name: groupName });
   await user.click(within(group).getByRole("combobox", { name: "Hora" }));
-  await user.click(screen.getByRole("option", { name: new RegExp(`^${hour}$`) }));
+  await user.click(await screen.findByRole("option", { name: new RegExp(`^${hour}$`) }));
   await user.click(within(group).getByRole("combobox", { name: "Minutos" }));
-  await user.click(screen.getByRole("option", { name: new RegExp(`^${minute}$`) }));
+  await user.click(await screen.findByRole("option", { name: new RegExp(`^${minute}$`) }));
 }
 
 describe("CreateStreetClosureRequestDialog", () => {
@@ -153,14 +157,14 @@ describe("CreateStreetClosureRequestDialog", () => {
 
     expect(screen.getByLabelText("Motivo *")).toHaveValue("");
     expect(screen.getByText("Av. Mitre 1140")).toBeVisible();
-    await user.type(screen.getByLabelText("Motivo *"), "Corte preventivo durante el tratamiento del arbolado");
+    changeValue(screen.getByLabelText("Motivo *"), "Corte preventivo durante el tratamiento del arbolado");
     await pickDay(user, /Inicio solicitado/, 10);
     await pickDay(user, /Fin solicitado/, 10);
     await setTime(user, /Inicio solicitado/, "09:00");
     await setTime(user, /Fin solicitado/, "11:00");
-    await user.type(screen.getByLabelText("Calle *", { selector: "input" }), "Av. Mitre");
-    await user.type(screen.getByLabelText("Desde calle transversal *"), "Calle 10");
-    await user.type(screen.getByLabelText("Hasta calle transversal *"), "Calle 12");
+    changeValue(screen.getByLabelText("Calle *", { selector: "input" }), "Av. Mitre");
+    changeValue(screen.getByLabelText("Desde calle transversal *"), "Calle 10");
+    changeValue(screen.getByLabelText("Hasta calle transversal *"), "Calle 12");
     await user.click(screen.getByRole("button", { name: "Crear solicitud de corte" }));
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("desde la intervención autorizada"));
@@ -191,14 +195,14 @@ describe("CreateStreetClosureRequestDialog", () => {
     renderTreeDialog();
 
     const reason = screen.getByLabelText("Motivo *");
-    await user.type(reason, "Corte preventivo durante el tratamiento del arbolado");
+    changeValue(reason, "Corte preventivo durante el tratamiento del arbolado");
     await pickDay(user, /Inicio solicitado/, 10);
     await pickDay(user, /Fin solicitado/, 10);
     await setTime(user, /Inicio solicitado/, "09:00");
     await setTime(user, /Fin solicitado/, "11:00");
-    await user.type(screen.getByLabelText("Calle *", { selector: "input" }), "Av. Mitre");
-    await user.type(screen.getByLabelText("Desde calle transversal *"), "Calle 10");
-    await user.type(screen.getByLabelText("Hasta calle transversal *"), "Calle 12");
+    changeValue(screen.getByLabelText("Calle *", { selector: "input" }), "Av. Mitre");
+    changeValue(screen.getByLabelText("Desde calle transversal *"), "Calle 10");
+    changeValue(screen.getByLabelText("Hasta calle transversal *"), "Calle 12");
     await user.click(screen.getByRole("button", { name: "Crear solicitud de corte" }));
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Solicitud sin enviar"));
