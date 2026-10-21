@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseFieldOption, chooseFieldRadio } from "./support/services-608-controls";
 import type { ScenarioId } from "../src/lib/scenarios";
 
 async function openServiceDetail(
@@ -24,9 +25,9 @@ test.describe("RepairRequest Service-sourced workflow", () => {
 
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Referral context: Servicio SVC-1043")).toBeVisible();
-    await dialog.getByLabel("Tipo de daño").selectOption("BROKEN_SIDEWALK");
-    await dialog.getByLabel("Severidad").selectOption("LOW");
-    await dialog.getByLabel("Sí, implica riesgo para la seguridad pública").check();
+    await chooseFieldOption(dialog, "Tipo de daño", "Vereda hundida o rota");
+    await chooseFieldOption(dialog, "Severidad", "Baja");
+    await chooseFieldRadio(dialog, "Sí, implica riesgo para la seguridad pública");
     await dialog.getByLabel("Ubicación del daño").fill("Av. Rivadavia 2200");
     await dialog.getByRole("button", { name: "Crear derivación a M3" }).click();
 

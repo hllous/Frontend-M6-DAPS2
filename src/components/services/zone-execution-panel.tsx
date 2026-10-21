@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  AlertCircle,
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
@@ -15,7 +14,15 @@ import {
   X,
 } from "lucide-react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
+import { notifyError, notifySuccess } from "@/components/ui/feedback";
 import {
   NOT_SERVICED_REASON_LABEL,
   NotServicedReason,
@@ -288,6 +295,8 @@ export function ZoneExecutionPanel({
   const handleRetryUpload = async (item: QueuedEvidenceFile) => {
     if (!selectedZoneResult) return;
     const uploaded = await uploadSingleFile(item, selectedZoneResult.id);
+    if (uploaded) notifySuccess("Evidencia cargada.");
+    else notifyError("No se pudo cargar la evidencia. Puede reintentar la carga.");
     const everyFileUploaded =
       uploaded && queuedFiles.every((file) => file.id === item.id || file.status === "success");
     if (everyFileUploaded) updateQueuedFilesForZone(item.zoneId, () => []);
@@ -369,6 +378,7 @@ export function ZoneExecutionPanel({
 
         if (outcome.kind === "success") {
           setComposedAgainst(null);
+          notifySuccess("Resultado de la zona registrado.");
           await afterZoneResultRecorded(outcome.result);
           return;
         }
@@ -395,6 +405,7 @@ export function ZoneExecutionPanel({
       });
 
       if (outcome.kind === "success") {
+        notifySuccess("Resultado de la zona registrado.");
         await afterZoneResultRecorded(outcome.result);
         return;
       }
@@ -516,28 +527,27 @@ export function ZoneExecutionPanel({
         </div>
 
         {isContainerRelocating && (
-          <fieldset className="mb-4 rounded-xl border border-[var(--color-info-line)] bg-[var(--color-info-fill)]/30 p-4">
-            <legend className="px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-info)]">
+          <FieldSet className="mb-4 rounded-xl border border-[var(--color-info-line)] bg-[var(--color-info-fill)]/30 p-4">
+            <FieldLegend className="px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-info)]">
               Nueva ubicación del contenedor
-            </legend>
+            </FieldLegend>
             <p className="mb-3 text-xs text-[var(--color-text-secondary)]">
               Se enviará junto con la finalización del Servicio. No se requiere una confirmación adicional.
             </p>
-            <div className="grid gap-3">
-              <label className="text-xs font-semibold text-[var(--color-text)]" htmlFor={`container-location-address-${service.id}`}>
-                Nueva dirección
-                <input
+            <FieldGroup className="gap-3">
+              <Field>
+                <FieldLabel htmlFor={`container-location-address-${service.id}`} className="text-xs font-semibold text-[var(--color-text)]">Nueva dirección</FieldLabel>
+                <Input
                   id={`container-location-address-${service.id}`}
                   value={containerLocation.address}
                   onChange={(event) => setContainerLocation((current) => ({ ...current, address: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal"
                   required
                 />
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="text-xs font-semibold text-[var(--color-text)]" htmlFor={`container-location-lat-${service.id}`}>
-                  Latitud
-                  <input
+              </Field>
+              <FieldGroup className="grid gap-3 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor={`container-location-lat-${service.id}`} className="text-xs font-semibold text-[var(--color-text)]">Latitud</FieldLabel>
+                  <Input
                     id={`container-location-lat-${service.id}`}
                     type="number"
                     min="-90"
@@ -545,13 +555,12 @@ export function ZoneExecutionPanel({
                     step="any"
                     value={containerLocation.lat}
                     onChange={(event) => setContainerLocation((current) => ({ ...current, lat: event.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal"
                     required
                   />
-                </label>
-                <label className="text-xs font-semibold text-[var(--color-text)]" htmlFor={`container-location-lng-${service.id}`}>
-                  Longitud
-                  <input
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`container-location-lng-${service.id}`} className="text-xs font-semibold text-[var(--color-text)]">Longitud</FieldLabel>
+                  <Input
                     id={`container-location-lng-${service.id}`}
                     type="number"
                     min="-180"
@@ -559,13 +568,12 @@ export function ZoneExecutionPanel({
                     step="any"
                     value={containerLocation.lng}
                     onChange={(event) => setContainerLocation((current) => ({ ...current, lng: event.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal"
                     required
                   />
-                </label>
-              </div>
-            </div>
-          </fieldset>
+                </Field>
+              </FieldGroup>
+            </FieldGroup>
+          </FieldSet>
         )}
 
         {/* Completion Action Button */}
@@ -592,34 +600,31 @@ export function ZoneExecutionPanel({
       </div>
 
       {completionSuccessMessage && (
-        <div
-          role="status"
-          className="mt-4 flex items-center gap-2 rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)]/40 p-3 text-xs font-semibold text-[var(--color-success)]"
-        >
-          <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
-          <span>{completionSuccessMessage}</span>
-        </div>
+        <Alert variant="success" className="mt-4 text-xs font-semibold" role="status" aria-live="polite">
+          <CheckCircle2 aria-hidden />
+          <AlertTitle>Servicio completado</AlertTitle>
+          <AlertDescription>{completionSuccessMessage}</AlertDescription>
+        </Alert>
       )}
 
       {completionError && (
-        <div
-          role="alert"
-          className="mt-4 flex items-center gap-2 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/40 p-3 text-xs font-semibold text-[var(--color-danger)]"
-        >
-          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
-          <span>{completionError}</span>
-        </div>
+        <Alert variant="danger" className="mt-4 text-xs font-semibold" role="alert">
+          <AlertTriangle aria-hidden />
+          <AlertTitle>No se pudo completar el servicio</AlertTitle>
+          <AlertDescription>{completionError}</AlertDescription>
+        </Alert>
       )}
 
       {/* Mobile Zone Navigation Disclosure */}
       <div className="min-[761px]:hidden mt-4">
-        <button
+        <Button
+          variant="outline"
           type="button"
           ref={mobileToggleRef}
           aria-expanded={isMobileNavOpen}
           aria-controls="mobile-zone-nav"
           onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
-          className="flex w-full items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3.5 py-2.5 text-xs font-semibold text-[var(--color-text)]"
+          className="h-auto min-h-12 w-full justify-between rounded-xl border-[var(--color-border)] bg-[var(--color-canvas)] px-3.5 py-2.5 text-xs font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)]"
         >
           <span className="flex items-center gap-2">
             <span>Zona: {selectedZoneName}</span>
@@ -643,13 +648,13 @@ export function ZoneExecutionPanel({
             }`}
             aria-hidden
           />
-        </button>
+        </Button>
 
         {isMobileNavOpen && (
-          <ul
+          <ItemGroup
             id="mobile-zone-nav"
-            role="list"
-            className="mt-2 space-y-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-2"
+            aria-label="Navegación de zonas del servicio"
+            className="mt-2 gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-2"
           >
             {service.zoneIds.map((zoneId, idx) => {
               const name = service.zoneNames[idx] ?? zoneId;
@@ -657,8 +662,9 @@ export function ZoneExecutionPanel({
               const isCurrent = zoneId === selectedZoneId;
 
               return (
-                <li key={zoneId}>
-                  <button
+                <Item key={zoneId} className="border-0 p-0">
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={() => {
                       handleSelectZone(zoneId);
@@ -666,7 +672,7 @@ export function ZoneExecutionPanel({
                       // Restore focus correctly to the disclosure trigger
                       mobileToggleRef.current?.focus();
                     }}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                    className={`h-auto min-h-12 w-full justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors ${
                       isCurrent
                         ? "bg-[var(--color-action)] text-white"
                         : "text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)]"
@@ -688,11 +694,11 @@ export function ZoneExecutionPanel({
                     >
                       {tag.label}
                     </span>
-                  </button>
-                </li>
+                  </Button>
+                </Item>
               );
             })}
-          </ul>
+          </ItemGroup>
         )}
       </div>
 
@@ -706,19 +712,20 @@ export function ZoneExecutionPanel({
           <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
             Zonas asignadas ({zoneResults.length}/{service.zoneIds.length})
           </p>
-          <ul className="space-y-1.5" role="list">
+          <ItemGroup aria-label="Zonas asignadas" className="gap-1.5">
             {service.zoneIds.map((zoneId, idx) => {
               const name = service.zoneNames[idx] ?? zoneId;
               const tag = getResultTag(zoneId);
               const isCurrent = zoneId === selectedZoneId;
 
               return (
-                <li key={zoneId}>
-                  <button
+                <Item key={zoneId} className="border-0 p-0">
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={() => handleSelectZone(zoneId)}
                     aria-current={isCurrent ? "true" : undefined}
-                    className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-colors ${
+                    className={`h-auto min-h-12 w-full justify-between rounded-xl px-3.5 py-2.5 text-left text-xs font-semibold transition-colors ${
                       isCurrent
                         ? "bg-[var(--color-action)] text-white"
                         : "text-[var(--color-text)] hover:bg-[var(--color-canvas)] border border-transparent hover:border-[var(--color-border)]"
@@ -740,11 +747,11 @@ export function ZoneExecutionPanel({
                     >
                       {tag.label}
                     </span>
-                  </button>
-                </li>
+                  </Button>
+                </Item>
               );
             })}
-          </ul>
+          </ItemGroup>
         </aside>
 
         {/* Zone Result Form or Detail View */}
@@ -831,58 +838,50 @@ export function ZoneExecutionPanel({
                         Evidencia adjunta ({totalCount}):
                       </span>
                       {!currentEvidence && (
-                        <p role="status" className="text-[var(--color-text-secondary)]">Cargando evidencia...</p>
+                        <Alert variant="info" role="status"><AlertTitle>Cargando evidencia…</AlertTitle></Alert>
                       )}
                       {currentEvidence?.error && (
-                        <p role="alert" className="text-[var(--color-danger)]">{currentEvidence.error}</p>
+                        <Alert variant="danger" role="alert"><AlertTitle>No se pudo cargar la evidencia</AlertTitle><AlertDescription>{currentEvidence.error}</AlertDescription></Alert>
                       )}
                       {totalCount === 0 && currentEvidence && !currentEvidence.error ? (
                         <p className="text-[var(--color-text-secondary)] italic">
                           Sin archivos adjuntos.
                         </p>
                       ) : (
-                        <ul className="space-y-1.5" role="list">
+                        <ItemGroup aria-label="Evidencia adjunta" className="gap-1.5">
                           {persistedAttachments.map((att) => (
-                            <li
+                            <Item
                               key={att.id}
-                              className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs"
+                              variant="outline"
+                              className="flex-nowrap border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs"
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Paperclip className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-secondary)]" />
-                                <span className="font-semibold text-[var(--color-text)] truncate">
-                                  {att.filename}
-                                </span>
-                                <span className="text-[10px] text-[var(--color-text-secondary)]">
-                                  ({att.contentType})
-                                </span>
-                              </div>
-                              <span className="text-[10px] text-[var(--color-text-secondary)] shrink-0">
+                              <ItemMedia variant="icon" className="text-[var(--color-text-secondary)]"><Paperclip aria-hidden /></ItemMedia>
+                              <ItemContent className="min-w-0">
+                                <ItemTitle className="max-w-full truncate text-xs font-semibold text-[var(--color-text)]">{att.filename}</ItemTitle>
+                                <ItemDescription className="text-[10px]">{att.contentType}</ItemDescription>
+                              </ItemContent>
+                              <ItemActions className="ml-auto shrink-0 text-[10px] text-[var(--color-text-secondary)]">
                                 {att.uploadedAt.slice(0, 10)}
-                              </span>
-                            </li>
+                              </ItemActions>
+                            </Item>
                           ))}
                           {queuedToDisplay.map((item) => (
-                            <li
+                            <Item
                               key={item.id}
-                              className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs"
+                              variant="outline"
+                              className="flex-nowrap border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs"
                             >
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <Paperclip className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-secondary)]" />
-                                <div className="min-w-0">
-                                  <span className="font-semibold text-[var(--color-text)] truncate block">
+                              <ItemMedia variant="icon" className="text-[var(--color-text-secondary)]"><Paperclip aria-hidden /></ItemMedia>
+                              <ItemContent className="min-w-0">
+                                <ItemTitle className="max-w-full truncate text-xs font-semibold text-[var(--color-text)]">
                                     {item.status === "success" && item.canonicalFilename
                                       ? item.canonicalFilename
                                       : item.localFilename}
-                                  </span>
-                                  {item.status === "error" && (
-                                    <span className="text-[10px] text-[var(--color-danger)] block">
-                                      {item.error}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
+                                </ItemTitle>
+                                {item.status === "error" && <ItemDescription className="text-[10px] text-[var(--color-danger)]">{item.error}</ItemDescription>}
+                              </ItemContent>
 
-                              <div className="flex items-center gap-2 shrink-0">
+                              <ItemActions className="ml-auto shrink-0">
                                 {item.status === "pending" && (
                                   <span className="rounded bg-[var(--color-surface-subtle)] px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
                                     Pendiente
@@ -911,10 +910,10 @@ export function ZoneExecutionPanel({
                                     <span>Reintentar</span>
                                   </Button>
                                 )}
-                              </div>
-                            </li>
+                              </ItemActions>
+                            </Item>
                           ))}
-                        </ul>
+                        </ItemGroup>
                       )}
                     </>
                   );
@@ -950,131 +949,103 @@ export function ZoneExecutionPanel({
             /* Crew Leader uninterrupted Form to record result */
             <form noValidate onSubmit={handleSubmitZoneResult} className="space-y-4 text-xs">
               {composedAgainst && (
-                <div
-                  role="status"
-                  className="flex items-start gap-2 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 p-3 text-xs font-semibold text-[var(--color-warning)]"
-                >
-                  <CloudOff className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-                  <span>
-                    Borrador local pendiente de envío. Los datos se conservaron en este
-                    dispositivo; reenvíelos manualmente cuando recupere la conexión.
-                  </span>
-                </div>
+                <Alert variant="warning" role="status">
+                  <CloudOff aria-hidden />
+                  <AlertTitle>Borrador local pendiente de envío</AlertTitle>
+                  <AlertDescription>Los datos se conservaron en este dispositivo; reenvíelos manualmente cuando recupere la conexión.</AlertDescription>
+                </Alert>
               )}
 
               {formError && (
-                <div
-                  role="alert"
-                  className="flex items-center gap-2 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/40 p-3 text-xs font-semibold text-[var(--color-danger)]"
-                >
-                  <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
-                  <span>{formError}</span>
-                </div>
+                <Alert variant="danger" role="alert">
+                  <AlertTriangle aria-hidden />
+                  <AlertTitle>No se pudo guardar el resultado</AlertTitle>
+                  <AlertDescription>{formError}</AlertDescription>
+                </Alert>
               )}
 
               {/* Status radio selection */}
-              <fieldset className="space-y-2">
-                <legend className="font-bold text-[var(--color-text)]">
+              <FieldSet className="gap-2">
+                <FieldLegend className="font-bold text-[var(--color-text)]">
                   Resultado de la zona *
-                </legend>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <label
+                </FieldLegend>
+                <RadioGroup
+                  aria-label="Resultado de la zona"
+                  required
+                  value={status}
+                  onValueChange={(value) => setStatus(value as ZoneResultStatus)}
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+                >
+                  <FieldLabel
                     className={`flex items-center gap-2 rounded-xl border p-3 cursor-pointer transition-colors ${
                       status === "SERVICED"
                         ? "border-[var(--color-action)] bg-[var(--color-action)]/5 text-[var(--color-action)] font-bold"
                         : "border-[var(--color-border)] bg-[var(--color-canvas)] text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)]"
                     }`}
                   >
-                    <input
-                      type="radio"
-                      name="zone-status"
-                      value="SERVICED"
-                      checked={status === "SERVICED"}
-                      onChange={() => setStatus("SERVICED")}
-                      className="sr-only"
-                    />
+                    <RadioGroupItem value="SERVICED" />
                     <span>Atendida</span>
-                  </label>
+                  </FieldLabel>
 
-                  <label
+                  <FieldLabel
                     className={`flex items-center gap-2 rounded-xl border p-3 cursor-pointer transition-colors ${
                       status === "PARTIAL"
                         ? "border-[var(--color-warning)] bg-[var(--color-warning-fill)]/20 text-[var(--color-warning)] font-bold"
                         : "border-[var(--color-border)] bg-[var(--color-canvas)] text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)]"
                     }`}
                   >
-                    <input
-                      type="radio"
-                      name="zone-status"
-                      value="PARTIAL"
-                      checked={status === "PARTIAL"}
-                      onChange={() => setStatus("PARTIAL")}
-                      className="sr-only"
-                    />
+                    <RadioGroupItem value="PARTIAL" />
                     <span>Parcial</span>
-                  </label>
+                  </FieldLabel>
 
-                  <label
+                  <FieldLabel
                     className={`flex items-center gap-2 rounded-xl border p-3 cursor-pointer transition-colors ${
                       status === "NOT_SERVICED"
                         ? "border-[var(--color-danger)] bg-[var(--color-danger-fill)]/20 text-[var(--color-danger)] font-bold"
                         : "border-[var(--color-border)] bg-[var(--color-canvas)] text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)]"
                     }`}
                   >
-                    <input
-                      type="radio"
-                      name="zone-status"
-                      value="NOT_SERVICED"
-                      checked={status === "NOT_SERVICED"}
-                      onChange={() => setStatus("NOT_SERVICED")}
-                      className="sr-only"
-                    />
+                    <RadioGroupItem value="NOT_SERVICED" />
                     <span>No atendida</span>
-                  </label>
-                </div>
-              </fieldset>
+                  </FieldLabel>
+                </RadioGroup>
+              </FieldSet>
 
               {/* Reason selection: mandatory if PARTIAL or NOT_SERVICED */}
               {status !== "SERVICED" && (
-                <div className="space-y-1.5">
-                  <label
+                <Field>
+                  <FieldLabel
                     htmlFor="zone-reason-select"
-                    className="font-bold text-[var(--color-text)] flex items-center justify-between"
+                    className="w-full items-center justify-between font-bold text-[var(--color-text)]"
                   >
-                    <span>Motivo de la excepción *</span>
-                    <span className="text-[10px] text-[var(--color-warning)]">Obligatorio</span>
-                  </label>
-                  <select
+                    Motivo de la excepción * <span className="text-[10px] text-[var(--color-warning)]">Obligatorio</span>
+                  </FieldLabel>
+                  <Combobox
                     id="zone-reason-select"
                     value={reason}
-                    onChange={(e) => setReason(e.target.value as NotServicedReason)}
-                    required
-                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 py-2 text-xs font-medium text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-action)]"
-                  >
-                    <option value="">Seleccione un motivo...</option>
-                    {(Object.keys(NOT_SERVICED_REASON_LABEL) as NotServicedReason[]).map((r) => (
-                      <option key={r} value={r}>
-                        {NOT_SERVICED_REASON_LABEL[r]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    onChange={(value) => setReason(value as NotServicedReason | "")}
+                    options={(Object.keys(NOT_SERVICED_REASON_LABEL) as NotServicedReason[]).map((value) => ({ value, label: NOT_SERVICED_REASON_LABEL[value] }))}
+                    placeholder="Seleccione un motivo..."
+                    searchPlaceholder="Buscar motivo"
+                    emptyText="No hay motivos coincidentes"
+                    aria-required="true"
+                  />
+                </Field>
               )}
 
               {/* Notes */}
-              <div className="space-y-1.5">
-                <label htmlFor="zone-notes" className="font-bold text-[var(--color-text)]">
+              <Field>
+                <FieldLabel htmlFor="zone-notes" className="font-bold text-[var(--color-text)]">
                   Observaciones operativas (opcional)
-                </label>
-                <textarea
+                </FieldLabel>
+                <Textarea
                   id="zone-notes"
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Detalles sobre el estado de la zona, incidencias o desvíos..."
-                  className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-3 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-action)]"
                 />
-              </div>
+              </Field>
 
               {/* Evidence upload section */}
               <div className="space-y-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4">
@@ -1089,14 +1060,14 @@ export function ZoneExecutionPanel({
                         : "Obligatoria para resultados parciales o no atendidos (fotografía o acta)."}
                     </span>
                   </div>
-                  <label
+                  <FieldLabel
                     htmlFor="evidence-input"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)] cursor-pointer"
+                    className="inline-flex min-h-12 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)]"
                   >
                     <Upload className="h-3.5 w-3.5" aria-hidden />
                     <span>Seleccionar archivo</span>
-                  </label>
-                  <input
+                  </FieldLabel>
+                  <Input
                     id="evidence-input"
                     type="file"
                     multiple
@@ -1107,30 +1078,25 @@ export function ZoneExecutionPanel({
                 </div>
 
                 {queuedFiles.length > 0 && (
-                  <ul className="mt-3 space-y-2" role="list">
+                  <ItemGroup aria-label="Evidencia seleccionada" className="mt-3 gap-2">
                     {queuedFiles.map((item) => (
-                      <li
+                      <Item
                         key={item.id}
-                        className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs"
+                        variant="outline"
+                        className="flex-nowrap border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs"
                       >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <Paperclip className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-secondary)]" />
-                          <div className="min-w-0">
-                            {/* Retain local filename until success, then switch to canonical filename */}
-                            <span className="font-semibold text-[var(--color-text)] truncate block">
+                        <ItemMedia variant="icon" className="text-[var(--color-text-secondary)]"><Paperclip aria-hidden /></ItemMedia>
+                        <ItemContent className="min-w-0">
+                          {/* Retain local filename until success, then switch to canonical filename */}
+                          <ItemTitle className="max-w-full truncate font-semibold text-[var(--color-text)]">
                               {item.status === "success" && item.canonicalFilename
                                 ? item.canonicalFilename
                                 : item.localFilename}
-                            </span>
-                            {item.status === "error" && (
-                              <span className="text-[10px] text-[var(--color-danger)] block">
-                                {item.error}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                          </ItemTitle>
+                          {item.status === "error" && <ItemDescription className="text-[10px] text-[var(--color-danger)]">{item.error}</ItemDescription>}
+                        </ItemContent>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <ItemActions className="ml-auto shrink-0">
                           {item.status === "pending" && (
                             <span className="rounded bg-[var(--color-surface-subtle)] px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
                               Pendiente
@@ -1160,19 +1126,21 @@ export function ZoneExecutionPanel({
                             </Button>
                           )}
                           {item.status !== "uploading" && item.status !== "success" && (
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
                               type="button"
                               onClick={() => handleRemoveFile(item.id)}
                               aria-label={`Eliminar ${item.localFilename}`}
                               className="text-[var(--color-text-secondary)] hover:text-[var(--color-danger)]"
                             >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                              <X className="h-3.5 w-3.5" aria-hidden />
+                            </Button>
                           )}
-                        </div>
-                      </li>
+                        </ItemActions>
+                      </Item>
                     ))}
-                  </ul>
+                  </ItemGroup>
                 )}
               </div>
 

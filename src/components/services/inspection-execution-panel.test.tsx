@@ -65,7 +65,15 @@ function inspectionResponse(overrides: Record<string, unknown> = {}) {
   };
 }
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+async function selectOption(user: ReturnType<typeof userEvent.setup>, fieldName: RegExp, optionName: string) {
+  await user.click(screen.getByRole("combobox", { name: fieldName }));
+  await user.click(await screen.findByRole("option", { name: new RegExp(`^${optionName}$`) }));
+}
+
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+  server.listen({ onUnhandledRequest: "error" });
+});
 afterEach(() => {
   server.resetHandlers();
   localStorage.clear();
@@ -109,6 +117,11 @@ describe("InspectionExecutionPanel", () => {
     render(<InspectionExecutionPanel service={service} canExecute />);
 
     expect(await screen.findByRole("heading", { name: "Ejecución de inspección ambiental" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Fecha y hora de inspección/ })).toHaveAttribute("data-slot", "date-picker");
+    expect(screen.getByRole("group", { name: /Fecha y hora de inspección/ })).toHaveAttribute("data-slot", "time-picker");
+    expect(screen.getByRole("checkbox", { name: /Verificar la fuente observada/ })).toHaveAttribute("data-slot", "checkbox");
+    expect(screen.getByRole("textbox", { name: /Conclus/ })).toHaveAttribute("data-slot", "textarea");
+    expect(screen.getByLabelText(/Seleccionar archivos/)).toHaveAttribute("data-slot", "input");
     await user.click(screen.getByRole("checkbox", { name: /Verificar la fuente observada/ }));
     await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto visible/ }));
     await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "No se constató infracción durante la visita.");
@@ -170,12 +183,13 @@ describe("InspectionExecutionPanel", () => {
     await screen.findByRole("heading", { name: /Ejecuci/ });
     await user.click(screen.getByRole("checkbox", { name: /Verificar la fuente/ }));
     await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto/ }));
-    await user.selectOptions(screen.getByRole("combobox", { name: /Resultado/ }), "VIOLATION_FOUND");
+    await selectOption(user, /Resultado/, "Infracción constatada");
     await user.type(screen.getByRole("textbox", { name: /Hallazgos/ }), "Emisión visible");
-    await user.selectOptions(screen.getByRole("combobox", { name: /Tipo de infracc/ }), "AIR_EMISSION");
-    await user.selectOptions(screen.getByRole("combobox", { name: /Gravedad/ }), "HIGH");
-    await user.selectOptions(screen.getByRole("combobox", { name: /Acc/ }), "FORMAL_NOTICE");
+    await selectOption(user, /Tipo de infracc/, "Emisión al aire");
+    await selectOption(user, /Gravedad/, "Alta");
+    await selectOption(user, /Acc/, "Aviso formal");
     await user.upload(screen.getByLabelText(/Seleccionar archivos/), new File(["evidence"], "chimenea.jpg", { type: "image/jpeg" }));
+    expect(await screen.findByRole("list", { name: "Archivos de evidencia seleccionados" })).toHaveAttribute("data-slot", "item-group");
     await user.click(screen.getByRole("button", { name: /Completar inspecci/ }));
 
     expect(await screen.findByText(/Resultado registrado/)).toBeVisible();
@@ -211,12 +225,12 @@ describe("InspectionExecutionPanel", () => {
     const boxes = screen.getAllByRole("checkbox");
     expect(boxes).toHaveLength(3);
     for (const box of boxes) await user.click(box);
-    await user.selectOptions(screen.getByRole("combobox", { name: /Resultado/ }), "VIOLATION_FOUND");
+    await selectOption(user, /Resultado/, "Infracción constatada");
     await user.type(screen.getByRole("textbox", { name: /Hallazgos/ }), "Emisión visible");
     await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "Humo negro continuo.");
-    await user.selectOptions(screen.getByRole("combobox", { name: /Tipo de infracc/ }), "AIR_EMISSION");
-    await user.selectOptions(screen.getByRole("combobox", { name: /Gravedad/ }), "HIGH");
-    await user.selectOptions(screen.getByRole("combobox", { name: /Acc/ }), "FORMAL_NOTICE");
+    await selectOption(user, /Tipo de infracc/, "Emisión al aire");
+    await selectOption(user, /Gravedad/, "Alta");
+    await selectOption(user, /Acc/, "Aviso formal");
     await user.upload(screen.getByLabelText(/Seleccionar archivos/), new File(["evidence"], "chimenea.jpg", { type: "image/jpeg" }));
     await user.click(screen.getByRole("button", { name: /Completar inspecci/ }));
 
