@@ -572,8 +572,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(dialog).getByText("Contexto de origen INS-1012")).toBeVisible();
     expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2450");
     expect(within(dialog).getByRole("link", { name: /Ver inspección fuente/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
-    await user.selectOptions(within(dialog).getByLabelText(/^Severidad/), "LOW");
-    await user.click(within(dialog).getByLabelText(/^Sí,/));
+    await user.click(within(dialog).getByRole("combobox", { name: /^Severidad/ }));
+    await user.click(screen.getByRole("option", { name: "Baja" }));
+    await user.click(within(dialog).getByRole("radio", { name: /^Sí,/ }));
     await user.click(within(dialog).getByRole("button", { name: /Crear deriv.*a M3/ }));
 
     expect(await within(dialog).findByText(/pendiente de respuesta de M3/i)).toBeVisible();

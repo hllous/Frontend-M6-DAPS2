@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 import { HttpResponse, http } from "msw";
@@ -16,7 +16,10 @@ import type { Service } from "@/lib/services";
 
 const server = setupServer(...handlers);
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+  server.listen({ onUnhandledRequest: "error" });
+});
 beforeEach(() => {
   resetServiceFixtures();
   resetZoneResultFixtures();
@@ -202,9 +205,9 @@ describe("ZoneExecutionPanel component", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "true");
 
     // Select second zone (Zona Norte) from mobile list
-    const mobileList = document.querySelector("#mobile-zone-nav");
-    expect(mobileList).not.toBeNull();
-    const zonaNorteButton = mobileList!.querySelectorAll("button")[1];
+    const mobileList = screen.getByRole("list", { name: "Navegación de zonas del servicio" });
+    expect(mobileList).toHaveAttribute("data-slot", "item-group");
+    const zonaNorteButton = within(mobileList).getByRole("button", { name: /Zona Norte/ });
     await user.click(zonaNorteButton);
 
     // Disclosure collapses
@@ -219,13 +222,18 @@ describe("ZoneExecutionPanel component", () => {
       <ZoneExecutionPanel service={mockRouteService} canExecute={true} />,
     );
 
+    expect(screen.getByRole("radio", { name: "Atendida" })).toHaveAttribute("data-slot", "radio-group-item");
+    expect(screen.getByRole("textbox", { name: /observaciones operativas/i })).toHaveAttribute("data-slot", "textarea");
+    expect(screen.getByLabelText("Seleccionar archivo")).toHaveAttribute("data-slot", "input");
+
     // Select Parcial
-    const partialRadio = screen.getByLabelText("Parcial");
+    const partialRadio = screen.getByRole("radio", { name: "Parcial" });
     await user.click(partialRadio);
 
     // Reason dropdown appears
-    const reasonSelect = screen.getByLabelText(/motivo de la excepción/i);
-    expect(reasonSelect).toBeVisible();
+    const reasonCombobox = screen.getByRole("combobox", { name: /motivo de la excepción/i });
+    expect(reasonCombobox).toBeVisible();
+    expect(reasonCombobox).toHaveAttribute("data-slot", "combobox");
 
     // Try submitting without reason and without evidence
     const submitBtn = screen.getByRole("button", { name: /guardar resultado de zona/i });
@@ -235,7 +243,8 @@ describe("ZoneExecutionPanel component", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/motivo es obligatorio/i);
 
     // Select a reason
-    await user.selectOptions(reasonSelect, "BLOCKED_ACCESS");
+    await user.click(reasonCombobox);
+    await user.click(await screen.findByRole("option", { name: "Acceso bloqueado" }));
 
     // Try submitting with reason but without evidence
     await user.click(submitBtn);
@@ -371,14 +380,15 @@ describe("ZoneExecutionPanel component", () => {
     );
 
     // Select Parcial and reason
-    await user.click(screen.getByLabelText("Parcial"));
-    await user.selectOptions(screen.getByLabelText(/motivo de la excepción/i), "BLOCKED_ACCESS");
+    await user.click(screen.getByRole("radio", { name: "Parcial" }));
+    await user.click(screen.getByRole("combobox", { name: /motivo de la excepción/i }));
+    await user.click(await screen.findByRole("option", { name: "Acceso bloqueado" }));
 
     // Select file with raw local filename
     const file = new File(["dummy-content"], "Foto Calle Bloqueada (Obra).jpg", {
       type: "image/jpeg",
     });
-    const fileInput = document.querySelector("#evidence-input") as HTMLInputElement;
+    const fileInput = screen.getByLabelText("Seleccionar archivo") as HTMLInputElement;
     await user.upload(fileInput, file);
 
     // Displays local filename before upload
@@ -466,9 +476,10 @@ describe("ZoneExecutionPanel component", () => {
     );
 
     render(<ZoneExecutionPanel service={mockRouteService} canExecute />);
-    await user.click(screen.getByLabelText("Parcial"));
-    await user.selectOptions(screen.getByLabelText(/motivo de la excepción/i), "BLOCKED_ACCESS");
-    await user.upload(document.querySelector("#evidence-input") as HTMLInputElement, [
+    await user.click(screen.getByRole("radio", { name: "Parcial" }));
+    await user.click(screen.getByRole("combobox", { name: /motivo de la excepción/i }));
+    await user.click(await screen.findByRole("option", { name: "Acceso bloqueado" }));
+    await user.upload(screen.getByLabelText("Seleccionar archivo") as HTMLInputElement, [
       new File(["primera"], "zona-a-local.jpg", { type: "image/jpeg" }),
       new File(["segunda"], "zona-a-reintentar.jpg", { type: "image/jpeg" }),
     ]);
@@ -599,6 +610,8 @@ describe("ZoneExecutionPanel component", () => {
     await screen.findByText("Todas las zonas registradas. Listo para finalizar.");
     const latitude = await screen.findByLabelText("Latitud");
     const longitude = screen.getByLabelText("Longitud");
+    expect(latitude).toHaveAttribute("data-slot", "input");
+    expect(longitude).toHaveAttribute("data-slot", "input");
     await user.type(latitude, "-34.6037");
     await user.clear(latitude);
     await user.type(longitude, "-58.3816");

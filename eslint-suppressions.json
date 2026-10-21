@@ -79,21 +79,6 @@
       "count": 2
     }
   },
-  "src/components/services/create-repair-request-dialog.tsx": {
-    "no-restricted-syntax": {
-      "count": 6
-    }
-  },
-  "src/components/services/create-street-closure-request-dialog.tsx": {
-    "no-restricted-syntax": {
-      "count": 9
-    }
-  },
-  "src/components/services/inspection-execution-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 12
-    }
-  },
   "src/components/services/map-view.tsx": {
     "no-restricted-syntax": {
       "count": 2
@@ -112,11 +97,6 @@
   "src/components/services/services-workspace.tsx": {
     "no-restricted-syntax": {
       "count": 4
-    }
-  },
-  "src/components/services/zone-execution-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 22
     }
   }
 }
