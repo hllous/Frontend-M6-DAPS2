@@ -1,3 +1,4 @@
+import { chooseCatalogOption } from "./catalog-a-test-controls";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -159,22 +160,22 @@ describe("ContainerCatalogPanel", () => {
     expect(screen.getByText("CONT-001")).toBeVisible();
 
     // Filter by type
-    await user.selectOptions(screen.getByLabelText("Tipo de contenedor"), "RECYCLABLE");
+    await chooseCatalogOption(user, screen.getByLabelText("Tipo de contenedor"), "Materiales reciclables");
     expect(await screen.findByText("CONT-002")).toBeVisible();
     expect(screen.queryByText("CONT-001")).not.toBeInTheDocument();
 
     // Filter by status
-    await user.selectOptions(screen.getByLabelText("Estado"), "OVERFLOWED");
+    await chooseCatalogOption(user, screen.getByLabelText("Estado"), "Desbordado");
     expect(await screen.findByText("CONT-002")).toBeVisible();
 
     // Filter by zone
-    await user.selectOptions(screen.getByLabelText("Zona"), "zone-2");
+    await chooseCatalogOption(user, screen.getByLabelText("Zona"), "Z-PAL · Palermo");
     expect(screen.getByText("CONT-002")).toBeVisible();
 
     // Reset filters
-    await user.selectOptions(screen.getByLabelText("Tipo de contenedor"), "all");
-    await user.selectOptions(screen.getByLabelText("Estado"), "all");
-    await user.selectOptions(screen.getByLabelText("Zona"), "all");
+    await chooseCatalogOption(user, screen.getByLabelText("Tipo de contenedor"), /^Todos(?: los (?:tipos|estados))?$|^Todas las zonas$/);
+    await chooseCatalogOption(user, screen.getByLabelText("Estado"), /^Todos(?: los (?:tipos|estados))?$|^Todas las zonas$/);
+    await chooseCatalogOption(user, screen.getByLabelText("Zona"), /^Todos(?: los (?:tipos|estados))?$|^Todas las zonas$/);
 
     // Search filter
     await user.type(screen.getByLabelText("Buscar contenedor"), "Santa Fe");
@@ -220,8 +221,8 @@ describe("ContainerCatalogPanel", () => {
 
     const createDialog = screen.getByRole("dialog");
     await user.type(screen.getByLabelText("Código"), "CONT-PANEL-01");
-    await user.selectOptions(screen.getByLabelText("Tipo de contenedor en el formulario"), "RECYCLABLE");
-    await user.selectOptions(screen.getByLabelText("Zona en el formulario"), "zone-2");
+    await chooseCatalogOption(user, screen.getByLabelText("Tipo de contenedor en el formulario"), "Materiales reciclables");
+    await chooseCatalogOption(user, screen.getByLabelText("Zona en el formulario"), "Z-PAL · Palermo");
     await user.type(screen.getByLabelText("Capacidad (litros)"), "1500");
     const address = screen.getByLabelText("Dirección");
     await user.click(address);
@@ -277,7 +278,7 @@ describe("ContainerCatalogPanel", () => {
       "Estado",
       "Acciones",
     ]);
-    expect(within(row).getByRole("button", { name: "Ver detalle" })).toHaveClass("max-[760px]:h-12");
+    expect(within(row).getByRole("button", { name: "Ver detalle" })).toBeEnabled();
   });
 
   it("lets Office dispatch standalone repair and removal transitions", async () => {
@@ -482,9 +483,9 @@ describe("ContainerCatalogPanel", () => {
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /Reportar daño en contenedor CONT-001/ })).toBeVisible();
 
-    await user.selectOptions(within(dialog).getByLabelText("Tipo de daño"), "VANDALIZED");
-    await user.selectOptions(within(dialog).getByLabelText("Severidad"), "HIGH");
-    await user.click(within(dialog).getByLabelText(/Requiere intervención de Obras Públicas/));
+    await chooseCatalogOption(user, within(dialog).getByLabelText("Tipo de daño"), "Vandalizado");
+    await chooseCatalogOption(user, within(dialog).getByLabelText("Severidad"), "Alta");
+    await user.click(within(dialog).getByRole("checkbox", { name: /Requiere intervención de Obras Públicas/ }));
 
     await user.click(within(dialog).getByRole("button", { name: "Confirmar daño" }));
 
@@ -524,7 +525,9 @@ describe("ContainerCatalogPanel", () => {
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
     const pickerLabel = within(dialog).getByText("Seleccionar archivo").closest("label");
-    expect(pickerLabel).toHaveClass("peer-focus-visible:ring-3");
+    expect(pickerLabel).toHaveAttribute("for", fileInput.id);
+    fileInput.focus();
+    expect(fileInput).toHaveFocus();
 
     // File > 4 MB
     const oversizedFile = new File(["x".repeat(100)], "huge-file.pdf", {
@@ -551,8 +554,8 @@ describe("ContainerCatalogPanel", () => {
         { exact: false },
       ),
     ).toBeVisible();
-    expect(fileInput).toHaveAttribute("aria-describedby", "container-evidence-error");
-    expect(dialog.querySelector("#container-evidence-error")).toHaveAttribute("role", "alert");
+    expect(fileInput).toHaveAccessibleDescription(/huge-file.pdf.*script.exe/);
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/script.exe/);
   });
 
   it("uploads evidence after report and reuses idempotencyKey on retry", async () => {

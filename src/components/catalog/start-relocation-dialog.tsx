@@ -1,4 +1,5 @@
 "use client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
@@ -13,7 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { containersAdapter, ContainerRequestError, type Container } from "@/lib/containers";
+import {
+  containersAdapter,
+  ContainerRequestError,
+  type Container,
+} from "@/lib/containers";
 
 interface StartRelocationDialogProps {
   open: boolean;
@@ -66,8 +71,10 @@ function StartRelocationModalContent({
     try {
       updated = await containersAdapter.relocate(container.id);
     } catch (err) {
-      const msg =
-        getErrorMessage(err, "No se pudo iniciar la reubicación del contenedor.");
+      const msg = getErrorMessage(
+        err,
+        "No se pudo iniciar la reubicación del contenedor.",
+      );
       setErrorMessage(msg);
       setIsSubmitting(false);
       return;
@@ -79,46 +86,56 @@ function StartRelocationModalContent({
   };
 
   return (
-    <DialogContent className="max-w-md">
+    <DialogContent className="max-w-md overflow-y-auto">
       <DialogHeader>
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-info)]">
           <RotateCcw className="size-4" aria-hidden />
           <span>Despacho de reubicación</span>
         </div>
-        <DialogTitle>Iniciar reubicación de contenedor {container.code}</DialogTitle>
+        <DialogTitle>
+          Iniciar reubicación de contenedor {container.code}
+        </DialogTitle>
         <DialogDescription>
-          Confirme el inicio del proceso de reubicación física del contenedor. El contenedor pasará
-          al estado En reubicación hasta que se confirme su nueva ubicación.
+          Confirme el inicio del proceso de reubicación física del contenedor.
+          El contenedor pasará al estado En reubicación hasta que se confirme su
+          nueva ubicación.
         </DialogDescription>
       </DialogHeader>
 
       {errorMessage && (
-        <div
-          role="alert"
-          className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-        >
-          {errorMessage}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
       )}
 
-      <form id="start-relocation-form" onSubmit={handleSubmit} className="space-y-4">
-        <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs space-y-1">
-          <p className="font-medium text-foreground">Detalles del contenedor:</p>
-          <p className="text-muted-foreground">
-            <span className="font-semibold">Ubicación actual:</span> {container.address ?? "Sin dirección registrada"}
-          </p>
-          <p className="text-muted-foreground">
-            <span className="font-semibold">Capacidad:</span>{" "}
-            {container.capacityLiters.toLocaleString("es-AR")} L
-          </p>
-          <p className="text-muted-foreground">
-            <span className="font-semibold">Estado actual:</span> Activo
-          </p>
-        </div>
+      <form
+        id="start-relocation-form"
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+      >
+        <Alert role="note">
+          <AlertDescription>
+            <p className="font-medium text-foreground">
+              Detalles del contenedor:
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-semibold">Ubicación actual:</span>{" "}
+              {container.address ?? "Sin dirección registrada"}
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-semibold">Capacidad:</span>{" "}
+              {container.capacityLiters.toLocaleString("es-AR")} L
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-semibold">Estado actual:</span> Activo
+            </p>
+          </AlertDescription>
+        </Alert>
 
         <p className="text-xs text-muted-foreground">
-          Al confirmar, el contenedor figurará en estado de tránsito/reubicación y requerirá el registro
-          de su nueva dirección física para volver a operar.
+          Al confirmar, el contenedor figurará en estado de tránsito/reubicación
+          y requerirá el registro de su nueva dirección física para volver a
+          operar.
         </p>
       </form>
 
@@ -135,7 +152,6 @@ function StartRelocationModalContent({
           type="submit"
           form="start-relocation-form"
           disabled={isSubmitting}
-          className="bg-[var(--color-info)] text-white hover:bg-[var(--color-info)]/90"
         >
           {isSubmitting ? "Iniciando…" : "Iniciar reubicación"}
         </Button>

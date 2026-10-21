@@ -1,3 +1,4 @@
+import { chooseCatalogAOption, expectCatalogAMutation } from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
@@ -13,8 +14,8 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await page.getByRole("button", { name: "Registrar contenedor" }).click();
     const createDialog = page.getByRole("dialog");
     await createDialog.locator("#container-code").fill("CONT-E2E-REPAIR");
-    await createDialog.locator("#container-type-form").selectOption("HOUSEHOLD");
-    await createDialog.locator("#container-zone-form").selectOption({ index: 0 });
+    await chooseCatalogAOption(page, createDialog, "Tipo de contenedor en el formulario", "Residuos domiciliarios");
+    await chooseCatalogAOption(page, createDialog, "Zona en el formulario", { index: 0 });
     await createDialog.locator("#container-capacity").fill("1100");
     await createDialog.locator("#container-address").fill("Av. de Mayo 900");
     await createDialog.locator("#container-lat").fill("-34.608");
@@ -29,16 +30,16 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await expect(row).toBeVisible();
     await row.getByRole("button", { name: "Reportar daño" }).click();
     const damageDialog = page.getByRole("dialog");
-    await damageDialog.locator("#damage-type").selectOption("STRUCTURAL");
-    await damageDialog.locator("#damage-severity").selectOption("HIGH");
-    await damageDialog.getByRole("button", { name: "Confirmar daño" }).click();
+    await chooseCatalogAOption(page, damageDialog, "Tipo de daño", "Estructural");
+    await chooseCatalogAOption(page, damageDialog, "Severidad", "Alta");
+    await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "STRUCTURAL", severity: "HIGH", requiresPublicWorks: false }, () => damageDialog.getByRole("button", { name: "Confirmar daño" }).click());
     await expect(row.getByText("Dañado")).toBeVisible();
 
     await row.getByRole("button", { name: "Iniciar reparación independiente" }).click();
 
     const startDialog = page.getByRole("dialog");
     await expect(startDialog.getByRole("heading", { name: /Iniciar reparación independiente/ })).toBeVisible();
-    await startDialog.getByRole("button", { name: "Iniciar reparación" }).click();
+    await expectCatalogAMutation(page, /\/start-repair$/, null, () => startDialog.getByRole("button", { name: "Iniciar reparación" }).click());
     await expect(row.getByText("En reparación")).toBeVisible();
 
     await row.getByRole("button", { name: "Completar reparación independiente" }).click();
@@ -50,7 +51,7 @@ test.describe("Office container repair and removal dispatch #122", () => {
       buffer: Buffer.from("fake-png-content-for-repair"),
     });
     await expect(completeDialog.getByText("repair-report.png")).toBeVisible();
-    await completeDialog.getByRole("button", { name: "Confirmar reparación completa" }).click();
+    await expectCatalogAMutation(page, /\/complete-repair$/, null, () => completeDialog.getByRole("button", { name: "Confirmar reparación completa" }).click());
 
     await expect(page.getByText("Reparación completada con éxito para el contenedor CONT-E2E-REPAIR.")).toBeVisible();
     await expect(completeDialog).not.toBeVisible();
@@ -65,8 +66,8 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await page.getByRole("button", { name: "Registrar contenedor" }).click();
     const createDialog = page.getByRole("dialog");
     await createDialog.locator("#container-code").fill("CONT-E2E-122");
-    await createDialog.locator("#container-type-form").selectOption("HOUSEHOLD");
-    await createDialog.locator("#container-zone-form").selectOption({ index: 0 });
+    await chooseCatalogAOption(page, createDialog, "Tipo de contenedor en el formulario", "Residuos domiciliarios");
+    await chooseCatalogAOption(page, createDialog, "Zona en el formulario", { index: 0 });
     await createDialog.locator("#container-capacity").fill("1100");
     await createDialog.locator("#container-address").fill("Av. de Mayo 122");
     await createDialog.locator("#container-lat").fill("-34.608");
@@ -82,9 +83,9 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await expect(row).toBeVisible();
     await row.getByRole("button", { name: "Reportar daño" }).click();
     const damageDialog = page.getByRole("dialog");
-    await damageDialog.locator("#damage-type").selectOption("STRUCTURAL");
-    await damageDialog.locator("#damage-severity").selectOption("HIGH");
-    await damageDialog.getByRole("button", { name: "Confirmar daño" }).click();
+    await chooseCatalogAOption(page, damageDialog, "Tipo de daño", "Estructural");
+    await chooseCatalogAOption(page, damageDialog, "Severidad", "Alta");
+    await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "STRUCTURAL", severity: "HIGH", requiresPublicWorks: false }, () => damageDialog.getByRole("button", { name: "Confirmar daño" }).click());
     await expect(row.getByText("Dañado")).toBeVisible();
 
     await row.getByRole("button", { name: "Retirar contenedor" }).click();
@@ -95,7 +96,7 @@ test.describe("Office container repair and removal dispatch #122", () => {
       mimeType: "application/pdf",
       buffer: Buffer.from("fake-pdf-content-for-removal"),
     });
-    await removeDialog.getByRole("button", { name: "Confirmar retiro" }).click();
+    await expectCatalogAMutation(page, /\/remove$/, null, () => removeDialog.getByRole("button", { name: "Confirmar retiro" }).click());
 
     await expect(page.getByText("Contenedor CONT-E2E-122 retirado con éxito.")).toBeVisible();
     await expect(removeDialog).not.toBeVisible();

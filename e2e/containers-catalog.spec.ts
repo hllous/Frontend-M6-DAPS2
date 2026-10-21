@@ -1,3 +1,4 @@
+import { chooseCatalogAOption } from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
@@ -27,7 +28,7 @@ test.describe("Container catalog management #120", () => {
 
     // Filter by status
     const statusFilter = page.locator("#container-status-filter");
-    await statusFilter.selectOption("OVERFLOWED");
+    await chooseCatalogAOption(page, page, "Estado", "Desbordado");
     await expect(page.getByText("CONT-002")).toBeVisible();
     await expect(page.getByText("CONT-001")).not.toBeVisible();
   });
@@ -41,8 +42,8 @@ test.describe("Container catalog management #120", () => {
     await expect(dialog.getByRole("heading", { name: "Registrar contenedor" })).toBeVisible();
 
     await dialog.locator("#container-code").fill("CONT-E2E-99");
-    await dialog.locator("#container-type-form").selectOption("RECYCLABLE");
-    await dialog.locator("#container-zone-form").selectOption({ index: 0 });
+    await chooseCatalogAOption(page, dialog, "Tipo de contenedor en el formulario", "Materiales reciclables");
+    await chooseCatalogAOption(page, dialog, "Zona en el formulario", { index: 0 });
     await dialog.locator("#container-capacity").fill("1500");
     await dialog.locator("#container-address").fill("Av. Belgrano 1200");
     await dialog.locator("#container-lat").fill("-34.6120");

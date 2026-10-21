@@ -1,3 +1,4 @@
+import { chooseCatalogAOption, expectCatalogAMutation } from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
 
@@ -27,7 +28,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
       dialog.getByRole("heading", { name: "Reportar desborde de contenedor CONT-008" }),
     ).toBeVisible();
 
-    await dialog.getByRole("button", { name: "Confirmar desborde" }).click();
+    await expectCatalogAMutation(page, /\/report-overflow$/, null, () => dialog.getByRole("button", { name: "Confirmar desborde" }).click());
 
     await expect(
       page.getByText("Desborde reportado con éxito para el contenedor CONT-008."),
@@ -61,9 +62,9 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
       dialog.getByRole("heading", { name: "Reportar daño en contenedor CONT-007" }),
     ).toBeVisible();
 
-    await dialog.locator("#damage-type").selectOption("VANDALIZED");
-    await dialog.locator("#damage-severity").selectOption("HIGH");
-    await dialog.locator("#damage-public-works").check();
+    await chooseCatalogAOption(page, dialog, "Tipo de daño", "Vandalizado");
+    await chooseCatalogAOption(page, dialog, "Severidad", "Alta");
+    await dialog.getByRole("checkbox", { name: /Requiere intervención de Obras Públicas/ }).check();
 
     // Attach sample evidence image
     await dialog.locator('input[type="file"]').setInputFiles({
@@ -74,7 +75,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
 
     await expect(dialog.getByText("container-graffiti.png")).toBeVisible();
 
-    await dialog.getByRole("button", { name: "Confirmar daño" }).click();
+    await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "VANDALIZED", severity: "HIGH", requiresPublicWorks: true }, () => dialog.getByRole("button", { name: "Confirmar daño" }).click());
 
     await expect(
       page.getByText("Reporte de daño registrado con éxito para el contenedor CONT-007."),
@@ -120,8 +121,8 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await page.getByRole("button", { name: "Registrar contenedor" }).click();
     const createDialog = page.getByRole("dialog");
     await createDialog.locator("#container-code").fill("CONT-VAL-01");
-    await createDialog.locator("#container-type-form").selectOption("HOUSEHOLD");
-    await createDialog.locator("#container-zone-form").selectOption({ index: 0 });
+    await chooseCatalogAOption(page, createDialog, "Tipo de contenedor en el formulario", "Residuos domiciliarios");
+    await chooseCatalogAOption(page, createDialog, "Zona en el formulario", { index: 0 });
     await createDialog.locator("#container-capacity").fill("1100");
     await createDialog.locator("#container-address").fill("Av. Corrientes 1000");
     await createDialog.locator("#container-lat").fill("-34.603");

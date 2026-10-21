@@ -1,3 +1,4 @@
+import { chooseCatalogAOption, expectCatalogAMutation } from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
 
@@ -17,8 +18,8 @@ test.describe("Office emptying and relocation dispatch #123", () => {
 
     const code = `CONT-EMP-${Date.now()}`;
     await createDialog.locator("#container-code").fill(code);
-    await createDialog.locator("#container-type-form").selectOption("HOUSEHOLD");
-    await createDialog.locator("#container-zone-form").selectOption({ index: 0 });
+    await chooseCatalogAOption(page, createDialog, "Tipo de contenedor en el formulario", "Residuos domiciliarios");
+    await chooseCatalogAOption(page, createDialog, "Zona en el formulario", { index: 0 });
     await createDialog.locator("#container-capacity").fill("1100");
     await createDialog.locator("#container-address").fill("Av. Paseo Colón 950");
     await createDialog.locator("#container-lat").fill("-34.6180");
@@ -39,7 +40,7 @@ test.describe("Office emptying and relocation dispatch #123", () => {
 
     const overflowDialog = page.getByRole("dialog");
     await expect(overflowDialog).toBeVisible();
-    await overflowDialog.getByRole("button", { name: "Confirmar desborde" }).click();
+    await expectCatalogAMutation(page, /\/report-overflow$/, null, () => overflowDialog.getByRole("button", { name: "Confirmar desborde" }).click());
     await expect(overflowDialog).not.toBeVisible();
     await expect(row.getByText("Desbordado")).toBeVisible();
 
@@ -56,7 +57,7 @@ test.describe("Office emptying and relocation dispatch #123", () => {
       }),
     ).toBeVisible();
 
-    await emptyDialog.getByRole("button", { name: "Confirmar vaciado" }).click();
+    await expectCatalogAMutation(page, /\/empty$/, null, () => emptyDialog.getByRole("button", { name: "Confirmar vaciado" }).click());
 
     await expect(
       page.getByText(`Vaciado registrado con éxito para el contenedor ${code}.`),
@@ -83,8 +84,8 @@ test.describe("Office emptying and relocation dispatch #123", () => {
 
     const code = `CONT-REL-${Date.now()}`;
     await createDialog.locator("#container-code").fill(code);
-    await createDialog.locator("#container-type-form").selectOption("RECYCLABLE");
-    await createDialog.locator("#container-zone-form").selectOption({ index: 0 });
+    await chooseCatalogAOption(page, createDialog, "Tipo de contenedor en el formulario", "Materiales reciclables");
+    await chooseCatalogAOption(page, createDialog, "Zona en el formulario", { index: 0 });
     await createDialog.locator("#container-capacity").fill("2400");
     await createDialog.locator("#container-address").fill("Av. San Juan 1500");
     await createDialog.locator("#container-lat").fill("-34.6210");
@@ -112,7 +113,7 @@ test.describe("Office emptying and relocation dispatch #123", () => {
       }),
     ).toBeVisible();
 
-    await startDialog.getByRole("button", { name: "Iniciar reubicación" }).click();
+    await expectCatalogAMutation(page, /\/relocate$/, null, () => startDialog.getByRole("button", { name: "Iniciar reubicación" }).click());
 
     await expect(
       page.getByText(`Proceso de reubicación iniciado para el contenedor ${code}.`),
@@ -140,7 +141,7 @@ test.describe("Office emptying and relocation dispatch #123", () => {
     await confirmDialog.locator("#relocation-lat").fill("-34.5620");
     await confirmDialog.locator("#relocation-lng").fill("-58.4560");
 
-    await confirmDialog.getByRole("button", { name: "Confirmar ubicación" }).click();
+    await expectCatalogAMutation(page, /\/confirm-relocation$/, { address: "Av. Cabildo 2200", lat: -34.562, lng: -58.456 }, () => confirmDialog.getByRole("button", { name: "Confirmar ubicación" }).click());
 
     await expect(
       page.getByText(`Nueva ubicación confirmada con éxito para el contenedor ${code}.`),

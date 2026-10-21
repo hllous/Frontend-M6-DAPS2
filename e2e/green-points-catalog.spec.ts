@@ -1,3 +1,4 @@
+import { chooseCatalogAOption } from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
@@ -14,8 +15,8 @@ test.describe("Green Point catalog management #124", () => {
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Código").fill(`GP-E2E-${Date.now()}`);
     await dialog.getByLabel("Nombre").fill("Punto verde e2e");
-    await dialog.getByLabel("Zona operativa").selectOption({ index: 1 });
-    await dialog.getByLabel("Domiciliarios").check();
+    await chooseCatalogAOption(page, dialog, "Zona operativa", { index: 1 });
+    await dialog.getByRole("checkbox", { name: "Domiciliarios" }).check();
     await dialog.getByLabel("Dirección").fill("Av. E2E 124");
     await dialog.getByLabel("Latitud").fill("-34.60");
     await dialog.getByLabel("Longitud").fill("-58.38");
@@ -38,7 +39,7 @@ test.describe("Green Point catalog management #124", () => {
     await expect(deactivateDialog.getByRole("heading", { name: new RegExp(`Confirmar baja del punto verde ${code}`) })).toBeVisible();
     await deactivateDialog.getByRole("button", { name: `Dar de baja el punto verde ${code}` }).click();
     await expect(page.getByText("Punto verde dado de baja")).toBeVisible();
-    await page.getByLabel("Filtrar puntos verdes por estado").selectOption("false");
+    await chooseCatalogAOption(page, page, "Filtrar puntos verdes por estado", "Inactivos");
     await expect(page.getByRole("rowheader", { name: code ?? "GP-E2E-" })).toBeVisible();
   });
 

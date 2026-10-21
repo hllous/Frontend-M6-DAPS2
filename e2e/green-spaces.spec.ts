@@ -1,3 +1,4 @@
+import { chooseCatalogAOption } from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
@@ -12,18 +13,18 @@ test.describe("Green Spaces catalog management @smoke", () => {
     await expect(panel.getByRole("heading", { name: "Espacios verdes" })).toBeVisible();
     await expect(panel.getByText("Parque del Bicentenario")).toBeVisible();
 
-    await panel.getByLabel("Tipo de espacio").selectOption("PARK");
+    await chooseCatalogAOption(page, panel, "Tipo de espacio", "Parque");
     await expect(panel.getByText("Parque del Bicentenario")).toBeVisible();
     await expect(panel.getByText("Cantero Central")).not.toBeVisible();
-    await panel.getByLabel("Tipo de espacio").selectOption("all");
+    await chooseCatalogAOption(page, panel, "Tipo de espacio", "Todos los tipos");
 
     const name = "Espacio E2E #108";
     await panel.getByRole("button", { name: "Registrar espacio verde" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Nombre").fill(name);
-    await dialog.getByLabel("Tipo de espacio en el formulario").selectOption("SQUARE");
+    await chooseCatalogAOption(page, dialog, "Tipo de espacio en el formulario", "Plaza");
     await dialog.getByLabel("Superficie (m²)").fill("275");
-    await dialog.getByLabel("Zona en el formulario").selectOption("zone-1");
+    await chooseCatalogAOption(page, dialog, "Zona en el formulario", "Z-BEL · Belgrano");
     await dialog.getByRole("button", { name: "Guardar espacio verde" }).click();
     await expect(dialog).not.toBeVisible();
 

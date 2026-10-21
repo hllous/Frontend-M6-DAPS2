@@ -1,4 +1,5 @@
 "use client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
@@ -13,7 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { containersAdapter, ContainerRequestError, type Container } from "@/lib/containers";
+import {
+  containersAdapter,
+  ContainerRequestError,
+  type Container,
+} from "@/lib/containers";
 
 interface EmptyContainerDialogProps {
   open: boolean;
@@ -66,8 +71,10 @@ function EmptyContainerModalContent({
     try {
       updated = await containersAdapter.empty(container.id);
     } catch (err) {
-      const msg =
-        getErrorMessage(err, "No se pudo registrar el vaciado del contenedor.");
+      const msg = getErrorMessage(
+        err,
+        "No se pudo registrar el vaciado del contenedor.",
+      );
       setErrorMessage(msg);
       setIsSubmitting(false);
       return;
@@ -79,41 +86,50 @@ function EmptyContainerModalContent({
   };
 
   return (
-    <DialogContent className="max-w-md">
+    <DialogContent className="max-w-md overflow-y-auto">
       <DialogHeader>
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-success)]">
           <CheckCircle2 className="size-4" aria-hidden />
           <span>Despacho operativo de vaciado</span>
         </div>
-        <DialogTitle>Registrar vaciado de contenedor {container.code}</DialogTitle>
+        <DialogTitle>
+          Registrar vaciado de contenedor {container.code}
+        </DialogTitle>
         <DialogDescription>
-          Confirme el vaciado del contenedor desbordado para restituirlo a estado Activo.
+          Confirme el vaciado del contenedor desbordado para restituirlo a
+          estado Activo.
         </DialogDescription>
       </DialogHeader>
 
       {errorMessage && (
-        <div
-          role="alert"
-          className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-        >
-          {errorMessage}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
       )}
 
-      <form id="empty-container-form" onSubmit={handleSubmit} className="space-y-4">
-        <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs space-y-1">
-          <p className="font-medium text-foreground">Detalles del contenedor:</p>
-          <p className="text-muted-foreground">
-            <span className="font-semibold">Ubicación:</span> {container.address ?? "Sin dirección registrada"}
-          </p>
-          <p className="text-muted-foreground">
-            <span className="font-semibold">Capacidad:</span>{" "}
-            {container.capacityLiters.toLocaleString("es-AR")} L
-          </p>
-          <p className="text-muted-foreground">
-            <span className="font-semibold">Estado actual:</span> Desbordado
-          </p>
-        </div>
+      <form
+        id="empty-container-form"
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+      >
+        <Alert role="note">
+          <AlertDescription>
+            <p className="font-medium text-foreground">
+              Detalles del contenedor:
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-semibold">Ubicación:</span>{" "}
+              {container.address ?? "Sin dirección registrada"}
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-semibold">Capacidad:</span>{" "}
+              {container.capacityLiters.toLocaleString("es-AR")} L
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-semibold">Estado actual:</span> Desbordado
+            </p>
+          </AlertDescription>
+        </Alert>
       </form>
 
       <DialogFooter>
@@ -129,7 +145,6 @@ function EmptyContainerModalContent({
           type="submit"
           form="empty-container-form"
           disabled={isSubmitting}
-          className="bg-[var(--color-success)] text-white hover:bg-[var(--color-success)]/90"
         >
           {isSubmitting ? "Vaciando…" : "Confirmar vaciado"}
         </Button>
