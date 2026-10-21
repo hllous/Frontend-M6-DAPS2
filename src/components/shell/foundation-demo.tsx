@@ -9,7 +9,7 @@ import { onRemoteLogout } from "@/lib/session-client";
 import { ensureMockWorkerStarted } from "@/mocks/ensure-worker-started";
 
 import { AppShell } from "./app-shell";
-import { ShellError, ShellForbidden, ShellLoading, ShellUnauthenticated } from "./shell-states";
+import { ShellError, ShellForbidden, ShellUnauthenticated } from "./shell-states";
 
 type LoadState =
   | { status: "loading" }
@@ -30,10 +30,12 @@ export function FoundationDemo({
   scenarioId,
   logoutAction,
   children,
+  contentReady = true,
 }: {
   scenarioId: ScenarioId;
   logoutAction?: (formData: FormData) => void | Promise<void>;
   children?: ReactNode;
+  contentReady?: boolean;
 }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [requestVersion, setRequestVersion] = useState(0);
@@ -93,8 +95,7 @@ export function FoundationDemo({
   if (state.status === "unauthenticated") return <main className="p-6"><ShellUnauthenticated /></main>;
   if (state.status === "forbidden") return <main className="p-6"><ShellForbidden /></main>;
   if (state.status === "error") return <main className="p-6"><ShellError onRetry={retry} description={state.description} /></main>;
-  if (state.status === "loading") return <main className="p-6"><ShellLoading /></main>;
   return (
-    <AppShell scenario={state.scenario} logoutAction={logoutAction} routeContent={children} />
+    <AppShell scenario={state.status === "ready" ? state.scenario : undefined} logoutAction={logoutAction} routeContent={children} contentReady={contentReady} />
   );
 }

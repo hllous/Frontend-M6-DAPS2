@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -10,6 +11,17 @@ import { SessionShell } from "./session-shell";
 vi.mock("@/components/ui/feedback", () => ({ notifyError: vi.fn(), notifySuccess: vi.fn() }));
 
 afterEach(() => vi.restoreAllMocks());
+
+it("renders the frame before hydration without mounting Field children for another draft owner", () => {
+  setFieldDraftOwner("actor-b");
+  const readDraft = vi.fn(() => <p>Private Field content</p>);
+  const FieldChild = readDraft;
+  const html = renderToString(<SessionShell actorId="actor-a" scenarioId="office-duty-queue" logoutAction={async () => undefined}><FieldChild /></SessionShell>);
+  expect(html).toContain('aria-label="Módulos"');
+  expect(html).toContain("<header");
+  expect(html).toContain('aria-busy="true"');
+  expect(readDraft).not.toHaveBeenCalled();
+});
 
 it("broadcasts and redirects after the logout action succeeds", async () => {
   const assign = vi.fn();

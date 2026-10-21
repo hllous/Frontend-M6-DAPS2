@@ -58,6 +58,9 @@ import { cn } from "@/lib/utils";
 import type { Capability, OperationalScenario } from "@/lib/scenarios";
 
 import styles from "./app-shell.module.css";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
 import { FieldWorkPanel } from "@/components/services/field-work-panel";
 import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ReferralsWorkspace } from "@/components/referrals/referrals-workspace";
@@ -135,10 +138,12 @@ export function AppShell({
   scenario,
   logoutAction,
   routeContent,
+  contentReady = true,
 }: {
-  scenario: OperationalScenario;
+  scenario?: OperationalScenario;
   logoutAction?: LogoutAction;
   routeContent?: ReactNode;
+  contentReady?: boolean;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -154,7 +159,7 @@ export function AppShell({
   const isTablet = useTabletNavigation();
   const navigationIsIconOnly = isCollapsed || isTablet;
   const [isMoreOpen, setIsMoreOpen] = useState(false);
-  const availableItems = navigation.filter((item) => isAllowed(item, scenario));
+  const availableItems = scenario ? navigation.filter((item) => isAllowed(item, scenario)) : [];
 
   useEffect(() => {
     if (previousDestination.current !== destination) mainRef.current?.focus();
@@ -176,14 +181,22 @@ export function AppShell({
           <span className={styles.brandText}>Ambiente<br />y Servicios</span>
         </div>
         <nav className={styles.moduleNav} aria-label="Módulos">
-          {availableItems.map((item) => (
-            <NavigationLink
-              key={item.id}
-              item={item}
-              selected={destination === item.id}
-              showTooltip={navigationIsIconOnly}
-            />
-          ))}
+          <LoadingRegion label="Navegación" isLoading={!scenario} className="flex flex-col gap-1.5">
+            {!scenario ? navigation.map((item) => (
+              <Button key={item.id} variant="sidebar" className={styles.navigationButton} disabled aria-hidden="true">
+                <Skeleton className="size-4 shrink-0" />
+                {!navigationIsIconOnly ? <Skeleton className="h-5 w-28" /> : null}
+              </Button>
+            )) : null}
+            {availableItems.map((item) => (
+              <NavigationLink
+                key={item.id}
+                item={item}
+                selected={destination === item.id}
+                showTooltip={navigationIsIconOnly}
+              />
+            ))}
+          </LoadingRegion>
         </nav>
         <Button
           className={styles.collapseButton}
@@ -197,10 +210,19 @@ export function AppShell({
       </aside>
 
       <header className={styles.topbar}>
-        <div>
-          <p className={styles.contextLabel}>{actorLabel(scenario)}</p>
-          <p className={styles.actorName}>{scenario.actor.name}</p>
-        </div>
+        <LoadingRegion label="Actor" isLoading={!scenario}>
+          {scenario ? (
+            <>
+              <p className={styles.contextLabel}>{actorLabel(scenario)}</p>
+              <p className={styles.actorName}>{scenario.actor.name}</p>
+            </>
+          ) : (
+            <div className="flex h-10 flex-col justify-center gap-1">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-5 w-36" />
+            </div>
+          )}
+        </LoadingRegion>
         <div className={styles.topbarActions}>
           <Badge variant="status" className={styles.sessionState} aria-label="Estado de sesión">
             <span className="size-2.5 rounded-full bg-[var(--color-success)]" aria-hidden="true" />
@@ -220,7 +242,9 @@ export function AppShell({
         id="contenido-principal"
         tabIndex={-1}
       >
-        {pathname.startsWith("/app/") ? (
+        {!scenario || !contentReady ? (
+          <LoadingRegion label="Contenido"><ListItemsSkeleton /></LoadingRegion>
+        ) : pathname.startsWith("/app/") ? (
           routeContent
         ) : destination === "work" ? (
           <WorkPanel scenario={scenario} />
@@ -248,6 +272,16 @@ export function AppShell({
       </main>
 
       <nav className={styles.mobileNav} aria-label="Navegación móvil">
+        {!scenario ? (
+          <LoadingRegion label="Navegación móvil" className="col-span-4 grid grid-cols-4 gap-1">
+            {[...mobileDestinations, "more"].map((id) => (
+              <Button key={id} variant="ghost" className={styles.mobileNavigationButton} disabled aria-hidden="true">
+                <Skeleton className="size-4" />
+                <Skeleton className="h-4 w-12" />
+              </Button>
+            ))}
+          </LoadingRegion>
+        ) : null}
         {availableItems.filter((item) => mobileDestinations.includes(item.id)).map((item) => (
           <NavigationLink
             key={item.id}
@@ -256,7 +290,7 @@ export function AppShell({
             compact
           />
         ))}
-        <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
+        {scenario ? <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
           <SheetTrigger
             render={
               <Button className={styles.mobileNavigationButton} variant="ghost" aria-label="Más módulos" />
@@ -292,7 +326,7 @@ export function AppShell({
               ))}
             </div>
           </SheetContent>
-        </Sheet>
+        </Sheet> : null}
       </nav>
       <p className="sr-only" aria-live="polite">
         {navigation.find((item) => item.id === destination)?.label} seleccionado
