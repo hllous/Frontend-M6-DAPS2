@@ -8,7 +8,7 @@ Acciones: **cut** (quitar sin reemplazo), **rephrase** (reescribir), **restructu
 
 ## Decisiones para la persona Product Owner
 
-Se aprueban en la revisión de este PR; ninguna se implementa antes.
+Aprobadas por el PO el 2026-10-22 en la revisión de este PR: se adoptan todas las recomendaciones, con la marca como texto (sin isotipo; no hay un sello municipal aprobado).
 
 ### 1. Nombre de negocio para M3 (derivaciones de reparación)
 
@@ -42,12 +42,12 @@ Rompen la regla 2 igual que M3 y M7. Propuesta única para todo el producto:
 | --- | --- | --- |
 | M1 | Cuadrillas ("referencia M1", "Usuario M1 no resuelto"), login | Quitar el código. "Persona" / "Organización" en los selectores; "Persona no encontrada" cuando no se resuelve. |
 | M2 | Reclamo en Servicios y expedientes ambientales | **Atención al Vecino**; cuando se pueda, solo "reclamo". |
-| M4 | Resolución del acta de infracción | **Faltas** ("Resolución de Faltas"). Confirmar el nombre con el Municipio. |
+| M4 | Resolución del acta de infracción | **Faltas** ("Resolución de Faltas"). |
 | M6 | Título de pestaña, metadatos, logo del login, textos de Derivaciones | Dejar de nombrar al sistema; cuando haga falta, "el sistema". Para la marca: "Ambiente e Higiene". |
 
 ### 4. Vocabulario único
 
-Todas las áreas usan el mismo reemplazo para el mismo concepto. Sin objeción del PO, queda así:
+Todas las áreas usan el mismo reemplazo para el mismo concepto:
 
 | Concepto | Texto en pantalla |
 | --- | --- |
@@ -63,10 +63,10 @@ Todas las áreas usan el mismo reemplazo para el mismo concepto. Sin objeción d
 | Baja lógica | "Dar de baja" (acción) y "dado de baja" (estado) |
 | Solo consulta | "Solo consulta" una vez por pantalla, sin frase explicativa |
 
-### 5. Decisiones menores a confirmar
+### 5. Decisiones menores
 
-- **Marca "M6" en el login y en el título de pestaña.** Se propone sustituir el cuadrado "M6" por el isotipo del Municipio y titular las pestañas "Ambiente e Higiene — {pantalla}".
-- **Línea "Sesión operativa" del shell.** Se propone eliminarla (no informa nada que el usuario no sepa).
+- **Marca "M6" en el login y en el título de pestaña.** Se sustituye el cuadrado "M6" por el logotipo de texto "Ambiente e Higiene" (sin isotipo ni sello) y las pestañas se titulan "Ambiente e Higiene — {pantalla}".
+- **Línea "Sesión operativa" del shell.** Se elimina (no informa nada que el usuario no sepa).
 - **Tablas del catálogo con columna Código.** Se mantienen (el código identifica contenedores, puntos verdes, tipos y sitios); solo se quita el código de **zona**.
 
 ## Resumen por área
@@ -102,7 +102,7 @@ Los totales de cada área cuentan las filas de las tablas de copy; las propuesta
 
 | Ubicación | Texto actual | Acción | Propuesta |
 | --- | --- | --- | --- |
-| `login-form.tsx:56` | Cuadrado con "M6" | restructure | Isotipo del Municipio (decorativo, sin texto) |
+| `login-form.tsx:56` | Cuadrado con "M6" | restructure | Logotipo de texto "Ambiente e Higiene" (sin isotipo ni sello) |
 | `login-form.tsx:58` | "Ambiente y servicios" (sobretítulo) | delete | — |
 | `login-form.tsx:60` | "Ingresar al sistema operativo" | rephrase | "Ingresar" |
 | `login-form.tsx:63` | "Seleccione un escenario de trabajo para abrir una sesión protegida." | cut | — (el selector se explica solo) |
