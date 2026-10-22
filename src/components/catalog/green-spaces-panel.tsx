@@ -433,7 +433,7 @@ export function GreenSpacesPanel({
                     size="sm"
                     aria-label={`Ver detalle de ${greenSpace.name}`}
                     onClick={() => openDetail(greenSpace)}
-                    className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)]"
+                    className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none"
                   >
                     {greenSpace.name}
                     <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />

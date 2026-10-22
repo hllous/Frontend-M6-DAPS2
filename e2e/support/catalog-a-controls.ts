@@ -1,8 +1,17 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 export async function openCatalogRowDetail(row: Locator) {
-  await row.getByRole("button", { name: /^Ver detalle de / }).click();
-  return row.page().getByRole("dialog");
+  const page = row.page();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const cell = row.getByRole("cell").nth(1);
+  await cell.scrollIntoViewIfNeeded();
+  const box = await cell.boundingBox();
+  if (!box) throw new Error("The catalog row's second cell is not visible.");
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
 }
 
 export async function clickCatalogRowAction(

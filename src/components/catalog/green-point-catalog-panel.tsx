@@ -561,7 +561,7 @@ export function GreenPointCatalogPanel({
                     size="sm"
                     aria-label={`Ver detalle de ${point.code}`}
                     onClick={() => void openDetail(point)}
-                    className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)]"
+                    className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none"
                   >
                     {point.code}
                   </Button>
@@ -587,7 +587,7 @@ export function GreenPointCatalogPanel({
                       size="sm"
                       aria-label={`Ver detalle de ${point.code}`}
                       onClick={() => void openDetail(point)}
-                      className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)]"
+                      className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none"
                     >
                       {point.code}
                       <ChevronRight data-icon="inline-end" aria-hidden />
