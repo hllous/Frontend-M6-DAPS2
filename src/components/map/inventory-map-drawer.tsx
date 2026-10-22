@@ -170,7 +170,6 @@ export function InventoryMapDrawer({
             aria-valuenow={SNAP_STATES.indexOf(snapState)}
             aria-valuetext={SNAP_LABEL[snapState]}
             className={styles.handle}
-            onClick={cycleSnapState}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();

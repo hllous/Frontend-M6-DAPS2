@@ -19,6 +19,7 @@ import {
   environmentalReportTypeSchema,
   type EnvironmentalReport,
   type EnvironmentalReportQuery,
+  type EnvironmentalReportStatus,
 } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
@@ -29,9 +30,16 @@ import { tolerantRecords } from "@/lib/tolerant-records";
 
 
 
-function queryFromUrl(url: URL): EnvironmentalReportQuery {
+function parseStatuses(searchParams: URLSearchParams): { statuses?: EnvironmentalReportStatus[]; error?: string } {
+  const parsed = z.array(environmentalReportStatusSchema).safeParse(searchParams.getAll("status"));
+  if (!parsed.success) return { error: parsed.error.issues.map((issue) => issue.message).join(" ") };
+  const statuses = [...new Set(parsed.data)];
+  return { statuses: statuses.length > 0 ? statuses : undefined };
+}
+
+function queryFromUrl(url: URL, status?: EnvironmentalReportQuery["status"]): EnvironmentalReportQuery {
   return {
-    status: environmentalReportStatusSchema.safeParse(url.searchParams.get("status")).data,
+    status,
     reportType: environmentalReportTypeSchema.safeParse(url.searchParams.get("reportType")).data,
     priority: environmentalReportPrioritySchema.safeParse(url.searchParams.get("priority")).data,
     publicId: url.searchParams.get("publicId") ?? undefined,
@@ -49,7 +57,8 @@ function visibleToField(report: { assignedCrewId?: string | null }, scenario: Re
 }
 
 function matchesQuery(report: EnvironmentalReport, query: EnvironmentalReportQuery) {
-  if (query.status && report.status !== query.status) return false;
+  const statuses = Array.isArray(query.status) ? query.status : query.status ? [query.status] : [];
+  if (statuses.length > 0 && !statuses.includes(report.status)) return false;
   if (query.reportType && report.reportType !== query.reportType) return false;
   if (query.priority && report.priority !== query.priority) return false;
   if (query.publicId && report.publicId !== query.publicId) return false;
@@ -68,7 +77,8 @@ function backendListQuery(query: EnvironmentalReportQuery, page: number, pageSiz
   const params = new URLSearchParams();
   if (query.from) params.set("from", query.from);
   if (query.to) params.set("to", query.to);
-  if (query.status) params.set("status", query.status);
+  const statuses = Array.isArray(query.status) ? query.status : query.status ? [query.status] : [];
+  for (const status of statuses) params.append("status", status);
   if (query.reportType) params.set("reportType", query.reportType);
   if (query.priority) params.set("priority", query.priority);
   if (query.publicId) params.set("publicId", query.publicId);
@@ -119,13 +129,19 @@ export async function GET(request: Request) {
     const session = getRequiredSession(request);
     authorize(session, { capability: "environmentalReport:view", throwOnError: true });
     const scenario = getScenario(session.scenarioId);
-    const query = queryFromUrl(new URL(request.url));
+    const url = new URL(request.url);
+    const parsedStatuses = parseStatuses(url.searchParams);
+    if (parsedStatuses.error) return errorResponse(400, parsedStatuses.error, path);
+    const query = queryFromUrl(url, parsedStatuses.statuses);
     const range = environmentalReportDateRangeSchema.safeParse(query);
     if (!range.success) return errorResponse(400, range.error.issues.map((issue) => issue.message).join(" "), path);
 
     if (backendMode(session)) {
       if (scenario.actor.kind === "FIELD") return listFieldReports(request, query, session.crew?.id, path);
-      const backendResponse = await fetchBackend(request, `/environmental-reports${new URL(request.url).search}`, "environmentalReport:view");
+      const backendQuery = new URLSearchParams(url.searchParams);
+      backendQuery.delete("status");
+      for (const status of parsedStatuses.statuses ?? []) backendQuery.append("status", status);
+      const backendResponse = await fetchBackend(request, `/environmental-reports?${backendQuery.toString()}`, "environmentalReport:view");
       return forwardResponse(backendResponse);
     }
 

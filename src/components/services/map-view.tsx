@@ -2,8 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { operationalMapAdapter, type OperationalMapData } from "@/lib/operational-map";
 import { operationalZonesAdapter, type OperationalZone } from "@/lib/operational-zones";
 import { resolveServiceMapLocations } from "@/lib/services-map";
@@ -143,7 +144,7 @@ export function MapView({
         </div>
       ) : isLoading ? (
         <div role="status" aria-live="polite" className={cn(styles.stateOverlay, compact && styles.stateOverlayCompact)}>
-          <Loader2 className="h-5 w-5 animate-spin text-[var(--color-action)]" aria-hidden="true" />
+          <Spinner className="size-5 text-[var(--color-action)]" aria-hidden="true" role="presentation" />
           <span>Cargando mapa territorial…</span>
         </div>
       ) : null}
@@ -155,16 +156,19 @@ export function MapView({
           aria-label="Servicios disponibles mientras carga el mapa"
         >
           {services.map((service) => (
-            <button
+            <Button
               key={service.id}
               type="button"
+              variant="outline"
+              size="icon-sm"
+              className="rounded-full font-bold tabular-nums text-[var(--color-action)]"
               tabIndex={isLoading && !hasError ? 0 : -1}
               aria-label={`Parada ${serviceOrdinals.get(service.id)}: ${service.title} (${service.zoneNames.join(", ")})`}
               aria-pressed={service.id === selectedId}
               onClick={() => onSelect(service.id)}
             >
               {serviceOrdinals.get(service.id)}
-            </button>
+            </Button>
           ))}
         </div>
       ) : null}

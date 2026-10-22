@@ -35,7 +35,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, 
 import { Input } from "@/components/ui/input";
 import { Item, ItemGroup } from "@/components/ui/item";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
@@ -92,12 +92,15 @@ const reportTypes = environmentalReportTypeSchema.options;
 const reportPriorities = Object.keys(ENVIRONMENTAL_REPORT_PRIORITY_LABELS) as EnvironmentalReportPriority[];
 const QUEUE_PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
+const reportStatuses = Object.keys(ENVIRONMENTAL_REPORT_STATUS_LABELS) as EnvironmentalReportStatus[];
+const ALL_STATUSES_OPTION = "__environmental-report-all-statuses__";
 
 function initialQueueParams() {
   const params = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
   const page = Number(params.get("page"));
+  const selectedStatuses = params.getAll("status");
   return {
-    status: params.get("status") ?? "",
+    status: reportStatuses.filter((status) => selectedStatuses.includes(status)),
     type: params.get("type") ?? "",
     priority: params.get("priority") ?? "",
     search: params.get("q") ?? "",
@@ -108,7 +111,6 @@ function initialQueueParams() {
 }
 // El backend no guarda versión de checklist (el BFF no la reenvía); sólo la usa el modo mock.
 const INSPECTION_CHECKLIST_VERSION = "ambiental-v2";
-const reportStatuses = Object.keys(ENVIRONMENTAL_REPORT_STATUS_LABELS) as EnvironmentalReport["status"][];
 
 const statusGroups = [
   { label: "Ingreso y revisión", statuses: ["RECEIVED", "UNDER_REVIEW"] as const },
@@ -116,6 +118,13 @@ const statusGroups = [
   { label: "Inspección y resultado", statuses: ["INSPECTION_SCHEDULED", "INSPECTED", "NO_VIOLATION", "VIOLATION_FOUND"] as const },
   { label: "Acta y cierre", statuses: ["NOTICE_ISSUED", "SANCTIONED", "CLOSED"] as const },
 ];
+
+function statusSummary(statuses: EnvironmentalReportStatus[]) {
+  const labels = reportStatuses.filter((status) => statuses.includes(status)).map((status) => ENVIRONMENTAL_REPORT_STATUS_LABELS[status]);
+  if (labels.length === 0) return "Todos los estados";
+  if (labels.length <= 2) return labels.join(", ");
+  return `${labels.length} estados`;
+}
 
 const statusIcon: Record<EnvironmentalReport["status"], typeof Clock3> = {
   RECEIVED: Clock3,
@@ -214,7 +223,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
   const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("inspectionId"));
   const [createOpen, setCreateOpen] = useState(false);
   const [initialParams] = useState(initialQueueParams);
-  const [filterStatus, setFilterStatus] = useState<string>(initialParams.status);
+  const [filterStatus, setFilterStatus] = useState<EnvironmentalReportStatus[]>(initialParams.status);
   const [filterType, setFilterType] = useState<string>(initialParams.type);
   const [filterPriority, setFilterPriority] = useState<string>(initialParams.priority);
   const [filterFrom, setFilterFrom] = useState(initialParams.from);
@@ -236,7 +245,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
     const page = await environmentalReportsAdapter.list({
       page: queuePage,
       pageSize: QUEUE_PAGE_SIZE,
-      status: (filterStatus || undefined) as EnvironmentalReportStatus | undefined,
+      status: filterStatus.length > 0 ? filterStatus : undefined,
       reportType: (filterType || undefined) as EnvironmentalReportType | undefined,
       priority: (filterPriority || undefined) as EnvironmentalReportPriority | undefined,
       search: debouncedSearch || undefined,
@@ -269,7 +278,9 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
     const url = new URL(window.location.href);
     if (selectedId) url.searchParams.set("detail", selectedId); else url.searchParams.delete("detail");
     if (selectedInspectionId) url.searchParams.set("inspectionId", selectedInspectionId); else url.searchParams.delete("inspectionId");
-    const queue: [string, string][] = [["from", filterFrom], ["to", filterTo], ["status", filterStatus], ["type", filterType], ["priority", filterPriority], ["q", debouncedSearch], ["page", queuePage > 1 ? String(queuePage) : ""]];
+    url.searchParams.delete("status");
+    for (const status of filterStatus) url.searchParams.append("status", status);
+    const queue: [string, string][] = [["from", filterFrom], ["to", filterTo], ["type", filterType], ["priority", filterPriority], ["q", debouncedSearch], ["page", queuePage > 1 ? String(queuePage) : ""]];
     for (const [key, value] of queue) { if (value) url.searchParams.set(key, value); else url.searchParams.delete(key); }
     window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`.replace(/\?$/, ""));
   }, [selectedId, selectedInspectionId, filterStatus, filterType, filterPriority, debouncedSearch, queuePage, filterFrom, filterTo]);
@@ -335,7 +346,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
         {loadState.status === "ready" && scenario.actor.kind === "OFFICE" && loadState.sanctionOutcomeIntegrationExceptions.length > 0 && <SanctionOutcomeIntegrationExceptionsPanel exceptions={loadState.sanctionOutcomeIntegrationExceptions} />}
         {!rangeError && loadState.status === "loading" && <LoadingState />}
         {!rangeError && loadState.status === "error" && <ErrorState message={loadState.message} onRetry={loadReports} />}
-        {!rangeError && loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={Boolean(filterStatus || filterType || filterPriority || search || filterFrom || filterTo)} onClear={() => { setFilterStatus(""); setFilterType(""); setFilterPriority(""); setSearch(""); setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}
+        {!rangeError && loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={filterStatus.length > 0 || Boolean(filterType || filterPriority || search || filterFrom || filterTo)} onClear={() => { setFilterStatus([]); setFilterType(""); setFilterPriority(""); setSearch(""); setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}
         {!rangeError && loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"} aria-describedby="environmental-scope-note"><p id="environmental-scope-note" className="sr-only">Seleccione un expediente para consultar su detalle. Los estados representan el ciclo completo del expediente ambiental.</p><ItemGroup className="grid gap-3">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => { setSelectedId(report.id); setSelectedInspectionId(null); }} />)}</ItemGroup></section>}
         {!rangeError && loadState.status === "ready" && loadState.totalPages > 1 && <QueuePagination page={queuePage} totalPages={loadState.totalPages} total={loadState.total} onPage={setQueuePage} />}
       </div>
@@ -351,8 +362,33 @@ function QueuePagination({ page, totalPages, total, onPage }: { page: number; to
   return <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[var(--color-text-secondary)]">Página {page} de {totalPages} · {total} expedientes</p><Pagination aria-label="Paginación de la cola" className="mx-0 w-auto"><PaginationContent><PaginationItem><PaginationPrevious href="#cola" aria-disabled={previousDisabled} tabIndex={previousDisabled ? -1 : undefined} onClick={(event) => { event.preventDefault(); if (!previousDisabled) onPage(page - 1); }} /></PaginationItem><PaginationItem><PaginationLink href="#cola" isActive aria-label={`Página ${page}`} onClick={(event) => event.preventDefault()}>{page}</PaginationLink></PaginationItem><PaginationItem><PaginationNext href="#cola" aria-disabled={nextDisabled} tabIndex={nextDisabled ? -1 : undefined} onClick={(event) => { event.preventDefault(); if (!nextDisabled) onPage(page + 1); }} /></PaginationItem></PaginationContent></Pagination></div>;
 }
 
-function QueueFilters({ from, to, rangeError, onFrom, onTo, onClearDates, filterStatus, filterType, filterPriority, search, onStatus, onType, onPriority, onSearch }: { from: string; to: string; rangeError?: string; onFrom: (value: string) => void; onTo: (value: string) => void; onClearDates: () => void; filterStatus: string; filterType: string; filterPriority: string; search: string; onStatus: (value: string) => void; onType: (value: string) => void; onPriority: (value: string) => void; onSearch: (value: string) => void }) {
-  return <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4" aria-label="Filtros de la cola"><div className="flex flex-col gap-3 lg:flex-row lg:items-end"><Field className="flex-1"><FieldLabel htmlFor="environmental-search">Buscar expediente</FieldLabel><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden /><Input id="environmental-search" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => onSearch(event.target.value)} placeholder="ID, dirección o ticket" className="pl-9" /></div></Field><Field className="lg:w-64"><FieldLabel htmlFor="environmental-status">Estado</FieldLabel><Select value={filterStatus || "all"} onValueChange={(value) => onStatus(value === "all" ? "" : String(value ?? ""))}><SelectTrigger id="environmental-status"><SelectValue>{filterStatus ? ENVIRONMENTAL_REPORT_STATUS_LABELS[filterStatus as EnvironmentalReportStatus] : "Todos los estados"}</SelectValue></SelectTrigger><SelectContent><SelectItem value="all">Todos los estados</SelectItem>{statusGroups.map((group) => <SelectGroup key={group.label} variant="nested"><SelectLabel className="font-semibold text-[var(--color-text)]">{group.label}</SelectLabel>{group.statuses.map((status) => { const Icon = statusIcon[status]; return <SelectItem key={status} value={status}><Icon aria-hidden />{ENVIRONMENTAL_REPORT_STATUS_LABELS[status]}</SelectItem>; })}</SelectGroup>)}</SelectContent></Select></Field><Field className="lg:w-64"><FieldLabel htmlFor="environmental-type">Tipo de hallazgo</FieldLabel><Select value={filterType || "all"} onValueChange={(value) => onType(value === "all" ? "" : String(value ?? ""))}><SelectTrigger id="environmental-type"><SelectValue>{filterType ? ENVIRONMENTAL_REPORT_TYPE_LABELS[filterType as EnvironmentalReportType] : "Todos los tipos"}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">Todos los tipos</SelectItem>{reportTypes.map((type) => <SelectItem key={type} value={type}>{ENVIRONMENTAL_REPORT_TYPE_LABELS[type]}</SelectItem>)}</SelectGroup></SelectContent></Select></Field><Field className="lg:w-48"><FieldLabel htmlFor="environmental-priority">Prioridad</FieldLabel><Select value={filterPriority || "all"} onValueChange={(value) => onPriority(value === "all" ? "" : String(value ?? ""))}><SelectTrigger id="environmental-priority"><SelectValue>{filterPriority ? ENVIRONMENTAL_REPORT_PRIORITY_LABELS[filterPriority as EnvironmentalReportPriority] : "Todas las prioridades"}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">Todas las prioridades</SelectItem>{reportPriorities.map((priority) => <SelectItem key={priority} value={priority}>{ENVIRONMENTAL_REPORT_PRIORITY_LABELS[priority]}</SelectItem>)}</SelectGroup></SelectContent></Select></Field></div>
+function QueueFilters({ from, to, rangeError, onFrom, onTo, onClearDates, filterStatus, filterType, filterPriority, search, onStatus, onType, onPriority, onSearch }: { from: string; to: string; rangeError?: string; onFrom: (value: string) => void; onTo: (value: string) => void; onClearDates: () => void; filterStatus: EnvironmentalReportStatus[]; filterType: string; filterPriority: string; search: string; onStatus: (value: EnvironmentalReportStatus[]) => void; onType: (value: string) => void; onPriority: (value: string) => void; onSearch: (value: string) => void }) {
+  return (
+    <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4" aria-label="Filtros de la cola">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+        <Field className="flex-1">
+          <FieldLabel htmlFor="environmental-search">Buscar expediente</FieldLabel>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden />
+            <Input id="environmental-search" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => onSearch(event.target.value)} placeholder="ID, dirección o ticket" className="pl-9" />
+          </div>
+        </Field>
+        <QueueStatusFilter filterStatus={filterStatus} onStatus={onStatus} />
+        <Field className="lg:w-64">
+          <FieldLabel htmlFor="environmental-type">Tipo de hallazgo</FieldLabel>
+          <Select value={filterType || "all"} onValueChange={(value) => onType(value === "all" ? "" : String(value ?? ""))}>
+            <SelectTrigger id="environmental-type"><SelectValue>{filterType ? ENVIRONMENTAL_REPORT_TYPE_LABELS[filterType as EnvironmentalReportType] : "Todos los tipos"}</SelectValue></SelectTrigger>
+            <SelectContent><SelectGroup><SelectItem value="all">Todos los tipos</SelectItem>{reportTypes.map((type) => <SelectItem key={type} value={type}>{ENVIRONMENTAL_REPORT_TYPE_LABELS[type]}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+        </Field>
+        <Field className="lg:w-48">
+          <FieldLabel htmlFor="environmental-priority">Prioridad</FieldLabel>
+          <Select value={filterPriority || "all"} onValueChange={(value) => onPriority(value === "all" ? "" : String(value ?? ""))}>
+            <SelectTrigger id="environmental-priority"><SelectValue>{filterPriority ? ENVIRONMENTAL_REPORT_PRIORITY_LABELS[filterPriority as EnvironmentalReportPriority] : "Todas las prioridades"}</SelectValue></SelectTrigger>
+            <SelectContent><SelectGroup><SelectItem value="all">Todas las prioridades</SelectItem>{reportPriorities.map((priority) => <SelectItem key={priority} value={priority}>{ENVIRONMENTAL_REPORT_PRIORITY_LABELS[priority]}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+        </Field>
+      </div>
     <FieldSet className="mt-4" aria-describedby={rangeError ? "environmental-range-error" : undefined}>
       <FieldLegend variant="label">Última actualización</FieldLegend>
       <FieldGroup className="grid gap-3 sm:grid-cols-2 lg:max-w-xl">
@@ -368,7 +404,46 @@ function QueueFilters({ from, to, rangeError, onFrom, onTo, onClearDates, filter
       {rangeError && <FieldError id="environmental-range-error">{rangeError}</FieldError>}
       {(from || to) && <Button variant="ghost" size="sm" className="self-start" onClick={onClearDates}>Limpiar fechas</Button>}
     </FieldSet>
-  </section>;
+    </section>
+  );
+}
+
+function QueueStatusFilter({ filterStatus, onStatus }: { filterStatus: EnvironmentalReportStatus[]; onStatus: (value: EnvironmentalReportStatus[]) => void }) {
+  return (
+    <Field className="w-64 max-w-full">
+      <FieldLabel htmlFor="environmental-status">Estado</FieldLabel>
+      <Select
+        modal={false}
+        multiple
+        value={filterStatus}
+        onValueChange={(value) => {
+          const selectedValues: string[] = Array.isArray(value) ? value : value ? [value] : [];
+          if (selectedValues.includes(ALL_STATUSES_OPTION)) {
+            onStatus([]);
+            return;
+          }
+
+          const selectedStatuses = selectedValues.filter((value): value is EnvironmentalReportStatus => reportStatuses.includes(value as EnvironmentalReportStatus));
+          onStatus(reportStatuses.filter((status) => selectedStatuses.includes(status)));
+        }}
+      >
+        <SelectTrigger id="environmental-status" className="min-w-0"><SelectValue className="min-w-0 overflow-hidden"><span className="block truncate">{statusSummary(filterStatus)}</span></SelectValue></SelectTrigger>
+        <SelectContent align="start" className="min-w-80 max-h-[min(24rem,calc(var(--available-height)-5rem))] overflow-y-auto overscroll-contain">
+          <SelectItem value={ALL_STATUSES_OPTION} className="sticky top-0 z-20 bg-popover">Todos los estados</SelectItem>
+          <SelectSeparator />
+          {statusGroups.map((group) => (
+            <SelectGroup key={group.label} variant="nested" className="mx-0 pl-2 before:hidden">
+              <SelectLabel className="sticky top-10 z-10 bg-popover px-0 font-semibold text-[var(--color-text)] [@media(max-width:760px)]:top-12">{group.label}</SelectLabel>
+              {group.statuses.map((status) => {
+                const Icon = statusIcon[status];
+                return <SelectItem key={status} value={status} className="pl-5 before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-[var(--color-border-strong)] before:content-['']"><Icon aria-hidden />{ENVIRONMENTAL_REPORT_STATUS_LABELS[status]}</SelectItem>;
+              })}
+            </SelectGroup>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  );
 }
 
 function ReportRow({ report, onOpen }: { report: EnvironmentalReport; onOpen: () => void }) {

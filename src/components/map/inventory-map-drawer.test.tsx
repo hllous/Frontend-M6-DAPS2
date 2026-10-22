@@ -74,7 +74,7 @@ describe("InventoryMapDrawer", () => {
     });
   });
 
-  it("changes snap when the handle is clicked", async () => {
+  it("does not change snap when the handle is clicked", async () => {
     await withWidth(390, async () => {
       const onSnapStateChange = vi.fn();
       const user = userEvent.setup();
@@ -85,7 +85,7 @@ describe("InventoryMapDrawer", () => {
       );
 
       await user.click(await screen.findByRole("slider", { name: "Altura de la lista" }));
-      expect(onSnapStateChange).toHaveBeenLastCalledWith("full");
+      expect(onSnapStateChange).not.toHaveBeenCalled();
     });
   });
 
