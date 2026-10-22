@@ -73,3 +73,19 @@ describe("environmental report status BFF forwarding", () => {
     expect(query.has("pageSize")).toBe(false);
   });
 });
+
+describe("environmental reports in Field scope (#651)", () => {
+  it("reports through meta.dropped the records it had to drop for an unknown enum value", async () => {
+    restoreEnv = backendEnv();
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const cookie = createSessionCookie("field-crew-leader-route", { mode: "backend-development", crew: { id: "crew-b", name: "Cuadrilla B" } });
+    const { environmentalReportFixtures } = await import("@/lib/environmental-report-fixtures");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({
+      data: [{ ...environmentalReportFixtures[0], assignedCrewId: "crew-b" }, { ...environmentalReportFixtures[1], status: "FUTURE_STATUS" }],
+      meta: { total: 2, page: 1, pageSize: 100, totalPages: 1 },
+    }));
+    const body = await (await GET(new Request("http://localhost/api/environmental-reports", { headers: { cookie } }))).json();
+    expect(body.data).toHaveLength(1);
+    expect(body.meta.dropped).toBe(1);
+  });
+});

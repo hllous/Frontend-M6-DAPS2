@@ -67,6 +67,7 @@ import { createServiceOrdinals, sortServices } from "./service-sorting";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { servicesMobileBreakpoint } from "@/lib/services-layout";
+import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
 import styles from "./services-workspace.module.css";
 import {
   ServicesColumnEditor,
@@ -111,7 +112,7 @@ function writeWorkspaceSplit(storageKey: string, layout: Record<string, number>)
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; services: Service[] };
+  | { status: "ready"; services: Service[]; dropped: number };
 
 export function ServicesWorkspace({
   scenario,
@@ -327,16 +328,18 @@ export function ServicesWorkspace({
         const page = await servicesAdapter.list(query);
         const services = [...page.services];
         let totalPages = page.totalPages;
+        let dropped = page.dropped ?? 0;
         for (let nextPage = 2; nextPage <= Math.min(totalPages, 20); nextPage += 1) {
           if (!isCurrent) return;
           const next = await servicesAdapter.list({ ...query, page: nextPage });
           services.push(...next.services);
+          dropped += next.dropped ?? 0;
           totalPages = next.totalPages;
         }
         if (totalPages > 20) throw new RangeError("El período tiene demasiados servicios; acote el período.");
         if (isCurrent) {
           loadedScopeRef.current = scopeKey;
-          setLoadState({ status: "ready", services });
+          setLoadState({ status: "ready", services, dropped });
           setIsRefreshing(false);
           setRefreshError(null);
         }
@@ -1111,6 +1114,7 @@ export function ServicesWorkspace({
 
       {/* Ready State */}
       {outsideDetail?.error && <p role="alert" className="px-4 py-3 text-sm text-[var(--color-danger)]">{outsideDetail.error}</p>}
+      {loadState.status === "ready" && <DroppedRecordsAlert count={loadState.dropped} className="mx-4 my-2 w-auto" />}
       {loadState.status === "ready" && (
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           <div className="flex min-h-0 flex-1 flex-col">
