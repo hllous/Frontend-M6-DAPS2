@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { clickCatalogRowAction } from "./support/catalog-a-controls";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -8,7 +9,7 @@ test("container edit keeps title and save action visible while the form scrolls"
   await loginViaApi(page, "office-duty-queue");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/app/catalog/containers");
-  await page.getByRole("button", { name: "Editar", exact: true }).first().click();
+  await clickCatalogRowAction(page.locator("tbody tr").first(), /^Editar/);
   const dialog = page.getByRole("dialog", { name: "Editar contenedor" });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(dialog.getByRole("heading")).toBeInViewport({ ratio: 1 });
