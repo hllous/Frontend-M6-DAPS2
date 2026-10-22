@@ -3,7 +3,7 @@ import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
 import { useRevealFirstError } from "./use-reveal-first-error";
-import { AlertCircle, CalendarCheck2, Check, MapPin } from "lucide-react";
+import { AlertCircle, Check, MapPin } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -79,7 +79,7 @@ function ConfirmRescheduleForm({
     setFieldErrors({});
     const input = { scheduledDate, timeWindow: { start: windowStart, end: windowEnd } };
     if (!scheduledDate) {
-      setFieldErrors({ date: "Seleccione la nueva fecha del servicio." });
+      setFieldErrors({ date: "Seleccione la nueva fecha." });
       return;
     }
     const validation = confirmRescheduleInputSchema.safeParse(input);
@@ -101,7 +101,7 @@ function ConfirmRescheduleForm({
       onOpenChange(false);
     } catch (cause) {
       const msg =
-        getErrorMessage(cause, "Ocurrió un error al confirmar la nueva fecha del servicio.");
+        getErrorMessage(cause, "No se pudo confirmar la fecha. Intente nuevamente.");
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
@@ -111,14 +111,9 @@ function ConfirmRescheduleForm({
   return (
     <>
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-action)]">
-          <CalendarCheck2 className="h-4 w-4" aria-hidden />
-          <span>Paso 2 de 2 · Nueva fecha y ventana</span>
-        </div>
-        <DialogTitle>Confirmar reprogramación de {service.title}</DialogTitle>
+        <DialogTitle>Reprogramar {service.title}</DialogTitle>
         <DialogDescription>
-          Motivo registrado: <strong>{service.statusReason ?? "Sin motivo registrado"}</strong>. El
-          servicio volverá a estado Programado con la fecha y ventana horaria que indique aquí.
+          Motivo: <strong>{service.statusReason ?? "Sin motivo registrado"}</strong>
         </DialogDescription>
       </DialogHeader>
 
@@ -134,7 +129,7 @@ function ConfirmRescheduleForm({
           <ItemContent>
             <ItemTitle>
               <MapPin className="size-4 text-primary" aria-hidden />
-              Zonas operativas (snapshot preservado)
+              Zonas
             </ItemTitle>
             <ul className="flex flex-wrap gap-1.5" aria-label="Zonas operativas">
               {service.zoneNames.map((zn) => (

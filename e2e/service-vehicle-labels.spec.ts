@@ -22,9 +22,9 @@ for (const known of [true, false]) {
     await page.goto("/app?destination=services");
     await page.getByRole("region", { name: "Tabla operativa de Servicios" }).locator(`tr[data-service-id="${service.id}"]`).click();
     const preview = page.locator("aside[aria-labelledby='preview-title']");
-    await expect(preview.getByText(known ? "AB123CD" : "No asignado", { exact: true })).toBeVisible();
+    await expect(preview.getByText(known ? "AB123CD" : "Sin vehículo", { exact: true })).toBeVisible();
     await expect(preview.getByText(vehicleId, { exact: false })).toHaveCount(0);
-    await preview.getByRole("button", { name: "Ver detalle completo" }).click();
+    await preview.getByRole("button", { name: "Ver detalle" }).click();
     const detail = page.getByRole("region", { name: `Detalle completo de ${service.title}`, exact: true });
     await expect(detail.getByText(known ? "AB123CD" : "Sin vehículo", { exact: true })).toBeVisible();
     await expect(detail.getByText(vehicleId, { exact: false })).toHaveCount(0);

@@ -63,7 +63,7 @@ function AccessibleServiceMarker({
   onSelect,
 }: AccessibleServiceMarkerProps) {
   const markerRef = useRef<LeafletMarker | null>(null);
-  const locationLabel = location.locationLabel ?? "Ubicación resuelta";
+  const locationLabel = location.locationLabel ?? "Ubicación";
   const greenSpace = isGreenSpaceService(service);
   const accessibleLabel = `Parada ${markerNumber}${greenSpace ? " en espacio verde" : ""}: ${service.title} (${location.zones
     .map((zone) => zone.name)
@@ -266,7 +266,7 @@ export function ServicesMapCanvas({
       zoom={12}
       scrollWheelZoom
       className={compact ? `${styles.map} ${styles.mapCompact}` : styles.map}
-      aria-label="Mapa geográfico de servicios operativos"
+      aria-label="Mapa de servicios"
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
@@ -284,7 +284,7 @@ export function ServicesMapCanvas({
             pathOptions={serviceZonePathOptions(serviceIds.includes(selectedId ?? ""))}
           >
             <Tooltip sticky>
-              <strong>{zone.code}</strong> · {zone.name}
+              <strong>{zone.name}</strong>
               <br />
               {serviceIds.length} servicio{serviceIds.length === 1 ? "" : "s"} en la zona
             </Tooltip>

@@ -15,10 +15,10 @@ describe("service dialog validation associations", () => {
 
     const reason = screen.getByLabelText(/Motivo/);
     expect(reason).toHaveAttribute("data-slot", "textarea");
-    await user.click(screen.getByRole("button", { name: "Cancelar servicio" }));
+    await user.click(screen.getByRole("button", { name: "Confirmar cancelación" }));
 
     expect(reason).toHaveAttribute("aria-invalid", "true");
-    expect(document.getElementById(reason.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent("Debe indicar el motivo de la cancelación.");
+    expect(document.getElementById(reason.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent("Indique el motivo.");
   });
 
   it("associates reschedule reason errors with the reason field", async () => {
@@ -27,9 +27,9 @@ describe("service dialog validation associations", () => {
 
     const reason = screen.getByLabelText(/Motivo/);
     expect(reason).toHaveAttribute("data-slot", "textarea");
-    await user.click(screen.getByRole("button", { name: "Mover a reprogramar" }));
+    await user.click(screen.getByRole("button", { name: "Reprogramar" }));
 
     expect(reason).toHaveAttribute("aria-invalid", "true");
-    expect(document.getElementById(reason.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent("Debe indicar el motivo de la reprogramación.");
+    expect(document.getElementById(reason.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent("Indique el motivo.");
   });
 });

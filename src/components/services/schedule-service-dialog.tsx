@@ -12,14 +12,14 @@ import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
+import { Item, ItemContent, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,11 +60,11 @@ const TARGET_KIND_LABELS: Record<TargetKind, string> = {
   TREE: "Árbol urbano",
   GREEN_SPACE: "Espacio verde",
   GREEN_POINT: "Punto verde",
-  LOCATION: "Ubicación suelta (sin bien del inventario)",
+  LOCATION: "Otra ubicación",
 };
 
 const TARGET_PAGE_SIZE = 20;
-const PAST_DATE_ERROR = "La fecha programada debe ser hoy o una fecha posterior en Argentina.";
+const PAST_DATE_ERROR = "La fecha debe ser hoy o posterior.";
 
 /** Busca bienes del inventario del tipo pedido y los muestra por código o dirección, nunca por UUID. */
 async function searchTargets(type: InventoryTargetType, search: string): Promise<TargetOption[]> {
@@ -276,7 +276,7 @@ export function ScheduleServiceDialog({
     setScheduledDateError(null);
 
     if (catalogs.status !== "ready" || !selectedServiceType) {
-      const message = "No hay un tipo de servicio activo para programar. Cree o active uno en Catálogo > Tipos de servicio.";
+      const message = "No hay tipos de servicio activos. Active uno en Catálogo.";
       if (catalogs.status === "ready") setFieldErrors({ serviceType: message });
       else setErrorMessage(message);
       return;
@@ -298,27 +298,27 @@ export function ScheduleServiceDialog({
     }
 
     if (origin === "TICKET" && !referenceId.trim()) {
-      setFieldErrors({ reference: "Debe indicar el UUID técnico del reclamo." });
+      setFieldErrors({ reference: "Indique el Nº de reclamo." });
       return;
     }
 
     if (origin === "TICKET" && !isUuid(referenceId.trim())) {
-      setFieldErrors({ reference: "El ticketId debe ser un UUID válido. El identificador TK-… es publicId y no reemplaza el UUID técnico." });
+      setFieldErrors({ reference: "El Nº de reclamo no es válido." });
       return;
     }
 
     if (origin === "INSPECTION" && !referenceId.trim()) {
-      setErrorMessage("El identificador de inspección es obligatorio.");
+      setErrorMessage("Indique la inspección.");
       return;
     }
 
     if (origin === "INSPECTION" && !isUuid(referenceId.trim())) {
-      setErrorMessage("El identificador de inspección debe ser el UUID de la inspección.");
+      setErrorMessage("La inspección no es válida.");
       return;
     }
 
     if (origin === "WEATHER_ALERT" && !referenceId.trim()) {
-      setErrorMessage("El identificador de alerta meteorológica es obligatorio.");
+      setErrorMessage("Indique la alerta meteorológica.");
       return;
     }
 
@@ -340,8 +340,8 @@ export function ScheduleServiceDialog({
 
     if (zoneIds.filter(Boolean).length === 0) {
       setFieldErrors(derivedMode === "ROUTE"
-        ? { route: "El recorrido seleccionado no tiene paradas con zona asignada." }
-        : { zone: "Debe seleccionarse al menos una zona para el servicio." });
+        ? { route: "El recorrido no tiene zonas." }
+        : { zone: "Seleccione al menos una zona." });
       setIsSubmitting(false);
       return;
     }
@@ -378,11 +378,11 @@ export function ScheduleServiceDialog({
     }
   }
 
-  const originItems = { MANUAL: "Manual (operación a demanda)", PLANNED: "Planificado (programa regular de servicio)" };
+  const originItems = { MANUAL: "Manual", PLANNED: "Planificado" };
   const serviceTypeItems = Object.fromEntries(serviceTypes.map((t) => [t.id, `${t.name} (${SERVICE_MODE_LABEL[t.mode]})`]));
   const routeItems = Object.fromEntries(routes.map((r) => [r.id, `${r.name} (${r.code})`]));
   const activeZones = zones.filter((z) => z.active);
-  const zoneItems = Object.fromEntries(activeZones.map((z) => [z.id, `${z.name} (${z.code})`]));
+  const zoneItems = Object.fromEntries(activeZones.map((z) => [z.id, z.name]));
   const targetItems = Object.fromEntries(visibleTargetOptions.map((o) => [o.id, o.label]));
 
   return (
@@ -390,13 +390,8 @@ export function ScheduleServiceDialog({
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>
-            {isLinked ? "Programar servicio vinculado" : "Programar nuevo servicio"}
+            Programar servicio
           </DialogTitle>
-          <DialogDescription>
-            {isLinked
-              ? "Programación vinculada a un evento u origen externo. El origen se preserva sin requerir reingreso."
-              : "Defina el tipo de servicio, cobertura territorial y ventana horaria. Nace sin cuadrilla ni vehículo asignados."}
-          </DialogDescription>
         </DialogHeader>
 
         <div ref={scrollRef} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
@@ -410,7 +405,7 @@ export function ScheduleServiceDialog({
           {catalogs.status === "error" && (
             <Alert variant="danger">
               <AlertCircle aria-hidden />
-              <AlertDescription>No se pudieron cargar los tipos de servicio, recorridos y zonas. Cierre este diálogo y vuelva a intentarlo.</AlertDescription>
+              <AlertDescription>No se pudo cargar el formulario. Ciérrelo e intente nuevamente.</AlertDescription>
             </Alert>
           )}
 
@@ -420,23 +415,19 @@ export function ScheduleServiceDialog({
                 <ItemContent>
                   <ItemTitle>
                     <Info className="size-4 text-primary" aria-hidden />
-                    Origen vinculado preservado
+                    Origen: {SERVICE_ORIGIN_LABEL[origin]}
                   </ItemTitle>
-                  <ItemDescription>
-                    Origen: <strong className="text-foreground">{SERVICE_ORIGIN_LABEL[origin]}</strong>
-                  </ItemDescription>
                   {origin === "TICKET" && !hasTrustedTicketContext && (
                     <Field className="mt-2" data-invalid={Boolean(fieldErrors.reference) || undefined}>
-                      <FieldLabel htmlFor="linked-ticket-id">UUID del ticket de M2{" "}<span aria-hidden>*</span></FieldLabel>
+                      <FieldLabel htmlFor="linked-ticket-id">Nº de reclamo{" "}<span aria-hidden>*</span></FieldLabel>
                       <Input
                         id="linked-ticket-id"
                         value={manualTicketId}
                         onChange={(event) => { setManualTicketId(event.target.value); setFieldErrors((prev) => ({ ...prev, reference: undefined })); }}
-                        className="font-mono"
+                        className="font-mono" placeholder="Pegue el Nº de reclamo"
                         aria-invalid={Boolean(fieldErrors.reference)}
-                        aria-describedby={fieldErrors.reference ? "linked-ticket-id-help linked-ticket-id-error" : "linked-ticket-id-help"}
+                        aria-describedby={fieldErrors.reference ? "linked-ticket-id-error" : undefined}
                       />
-                      <FieldDescription id="linked-ticket-id-help">Pegue el UUID técnico del expediente. El formato TK-… es publicId y no sirve para correlacionar eventos.</FieldDescription>
                       {fieldErrors.reference && <FieldError id="linked-ticket-id-error">{fieldErrors.reference}</FieldError>}
                     </Field>
                   )}
@@ -460,9 +451,6 @@ export function ScheduleServiceDialog({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <FieldDescription>
-                  Los servicios planificados corresponden al cronograma habitual; los manuales a intervenciones no rutinarias.
-                </FieldDescription>
               </Field>
             )}
 
@@ -492,7 +480,7 @@ export function ScheduleServiceDialog({
               </Select>
               {fieldErrors.serviceType && <FieldError id="service-type-error">{fieldErrors.serviceType}</FieldError>}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">Modo determinado por el catálogo:</span>
+                
                 <Badge variant="info">
                   {derivedMode === "ROUTE" ? (
                     <>
@@ -502,14 +490,11 @@ export function ScheduleServiceDialog({
                   ) : (
                     <>
                       <MapPin data-icon="inline-start" aria-hidden />
-                      Punto fijo
+                      Puntual
                     </>
                   )}
                 </Badge>
               </div>
-              <FieldDescription>
-                El modo de ejecución no es configurable por el operador; se hereda del tipo de servicio seleccionado.
-              </FieldDescription>
             </Field>
 
             {derivedMode === "ROUTE" ? (
@@ -544,7 +529,7 @@ export function ScheduleServiceDialog({
 
                   {selectedRoute && (
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-sm font-medium text-muted-foreground">Zonas cubiertas (snapshot inmutable):</span>
+                      <span className="text-sm font-medium text-muted-foreground">Zonas:</span>
                       <ul className="flex flex-wrap gap-1.5" aria-label="Zonas cubiertas">
                         {selectedRouteZones.map((zone) => (
                           <li key={zone.id}>
@@ -597,7 +582,7 @@ export function ScheduleServiceDialog({
                         />
                       </Field>
                       <Field data-invalid={Boolean(fieldErrors.target) || undefined}>
-                        <FieldLabel htmlFor="target-id">Bien del inventario{" "}<span aria-hidden>*</span></FieldLabel>
+                        <FieldLabel htmlFor="target-id">Elemento{" "}<span aria-hidden>*</span></FieldLabel>
                         <Select
                           value={selectedTarget?.id ?? null}
                           items={targetItems}
@@ -610,7 +595,7 @@ export function ScheduleServiceDialog({
                             aria-describedby={fieldErrors.target ? "target-id-status target-id-error" : "target-id-status"}
                             aria-busy={targetOptions.status === "loading"}
                           >
-                            <SelectValue placeholder="Seleccione un bien…" />
+                            <SelectValue placeholder="Seleccione un elemento" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectGroup>
@@ -626,16 +611,16 @@ export function ScheduleServiceDialog({
                           {targetOptions.status === "loading" && (
                             <>
                               <Spinner aria-hidden="true" />
-                              Buscando en el inventario…
+                              Buscando…
                             </>
                           )}
-                          {targetOptions.status === "ready" && targetOptions.options.length === 0 && "No hay bienes que coincidan con la búsqueda."}
+                          {targetOptions.status === "ready" && targetOptions.options.length === 0 && "Sin resultados."}
                           {targetOptions.status === "ready" && targetOptions.options.length > 0 &&
-                            (selectedTargetZone ? `Zona derivada del bien: ${selectedTargetZone.name}.` : "La zona del servicio se deriva del bien elegido.")}
+                            (selectedTargetZone ? `Zona: ${selectedTargetZone.name}` : null)}
                         </FieldDescription>
                         {fieldErrors.target && <FieldError id="target-id-error">{fieldErrors.target}</FieldError>}
                         {targetOptions.status === "error" && (
-                          <FieldError>No se pudo consultar el inventario. Cambie la búsqueda para reintentar.</FieldError>
+                          <FieldError>No se pudo buscar. Intente nuevamente.</FieldError>
                         )}
                       </Field>
                     </>
@@ -680,7 +665,6 @@ export function ScheduleServiceDialog({
                           aria-describedby={fieldErrors.targetRef ? "target-ref-error" : undefined}
                         />
                         {fieldErrors.targetRef && <FieldError id="target-ref-error">{fieldErrors.targetRef}</FieldError>}
-                        <FieldDescription>Sin bien del inventario el servicio se ubica por zona; la referencia queda en las notas.</FieldDescription>
                       </Field>
                     </FieldGroup>
                   )}
@@ -718,24 +702,18 @@ export function ScheduleServiceDialog({
             </FieldGroup>
 
             <Field>
-              <FieldLabel htmlFor="service-notes">Notas e instrucciones operativas (opcional)</FieldLabel>
+              <FieldLabel htmlFor="service-notes">Notas (opcional)</FieldLabel>
               <Textarea
                 id="service-notes"
                 rows={2}
                 maxLength={MAX_NOTES_LENGTH}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Instrucciones especiales para la cuadrilla o restricciones de acceso…"
+                placeholder="Indicaciones para la cuadrilla"
                 className="min-h-16 resize-none"
               />
             </Field>
 
-            <Alert variant="info" role="status">
-              <Info aria-hidden />
-              <AlertDescription>
-                El servicio se creará en estado <strong>Programado</strong> sin cuadrilla ni vehículo asignados. La asignación operativa se realiza posteriormente en el despacho.
-              </AlertDescription>
-            </Alert>
           </form>
         </div>
 

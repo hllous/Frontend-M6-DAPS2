@@ -69,14 +69,14 @@ describe("Services workspace period", () => {
     });
 
     render(<ServicesWorkspace />);
-    const map = await screen.findByRole("region", { name: "Mapa territorial de Servicios" });
+    const map = await screen.findByRole("region", { name: "Mapa de servicios" });
     const table = screen.getByRole("region", { name: "Tabla operativa de Servicios" });
     table.scrollTop = 48;
 
     await choosePeriod("Este mes");
 
     expect(await screen.findByText("Servicio del mes")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Mapa territorial de Servicios" })).toBe(map);
+    expect(screen.getByRole("region", { name: "Mapa de servicios" })).toBe(map);
     expect(screen.getByRole("region", { name: "Tabla operativa de Servicios" })).toBe(table);
     expect(table.scrollTop).toBe(48);
     expect(list).toHaveBeenCalledTimes(3);
@@ -88,7 +88,7 @@ describe("Services workspace period", () => {
     vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 240, totalPages: 1, page: 1, pageSize: 100 });
     const get = vi.spyOn(servicesAdapter, "get").mockResolvedValue(service);
     render(<ServicesWorkspace />);
-    expect(await screen.findByText("Este servicio está fuera del período seleccionado.")).toBeInTheDocument();
+    expect(await screen.findByText("Fuera del período elegido.")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: `Detalle completo de ${service.title}` })).toBeInTheDocument();
     expect(get).toHaveBeenCalledWith(service.id);
   });
@@ -103,8 +103,8 @@ describe("Services workspace period", () => {
     }));
     render(<ServicesWorkspace />);
     const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-    expect(await screen.findByText("No hay servicios para mostrar en este período.")).toBeInTheDocument();
-    expect(within(table).getAllByText("No hay servicios para mostrar en este período.")).toHaveLength(1);
+    expect(await screen.findByText("Sin servicios en este período.")).toBeInTheDocument();
+    expect(within(table).getAllByText("Sin servicios en este período.")).toHaveLength(1);
     expect(screen.queryByText("No hay servicios en este período.")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ver todo el período" })).not.toBeInTheDocument();
     expect(list).toHaveBeenCalledWith({ pageSize: 100, scheduledFrom: "2026-10-26", scheduledTo: "2026-11-01" });
@@ -128,7 +128,7 @@ describe("Services workspace period", () => {
     window.history.replaceState(null, "", "/app?periodo=todo");
     const list = vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 2100, totalPages: 21, page: 1, pageSize: 100 });
     render(<ServicesWorkspace />);
-    expect(await screen.findByText("El período tiene demasiados servicios; acote el período.")).toBeInTheDocument();
+    expect(await screen.findByText("Hay demasiados servicios en el período. Elija un período más corto.")).toBeInTheDocument();
     expect(list).toHaveBeenCalledTimes(20); // Twenty result pages; the explicit period needs no count request.
     expect(list).not.toHaveBeenCalledWith(expect.objectContaining({ page: 21 }));
     expect(periodSelect()).toBeEnabled();
@@ -142,7 +142,7 @@ describe("Services workspace period", () => {
     await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
     await waitFor(() => expect(get).toHaveBeenCalledWith("unknown-id"));
     expect(periodSelect()).toHaveTextContent("Todo el período");
-    expect(screen.queryByText("Este servicio está fuera del período seleccionado.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fuera del período elegido.")).not.toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).has("periodo")).toBe(false);
   });
 });

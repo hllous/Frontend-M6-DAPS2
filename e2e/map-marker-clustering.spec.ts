@@ -177,5 +177,5 @@ test("keeps mobile navigation usable while the inventory drawer is open", async 
   await expect.poll(() => panel.evaluate((element) => getComputedStyle(element, "::after").backgroundColor)).toBe("rgba(0, 0, 0, 0)");
   await mobileNavigation.getByRole("link", { name: "Servicios", exact: true }).click();
 
-  await expect(page.getByRole("heading", { name: "Servicios Urbanos", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 });

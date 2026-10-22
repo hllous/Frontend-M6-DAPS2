@@ -6,8 +6,8 @@ import { AlertCircle, CheckCircle2, ExternalLink, Info } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -144,7 +144,7 @@ export function CreateRepairRequestDialog({
     setOutcome(null);
     setErrors({});
     onCreated(request);
-    notifySuccess("La derivación de reparación ya está registrada.");
+    notifySuccess("Ya estaba derivada.");
   }, [onCreated, sourceKey]);
 
   async function verifyLostResponse(payload: RepairRequestDraftPayload) {
@@ -160,7 +160,7 @@ export function CreateRepairRequestDialog({
     } catch {
       setOutcome("verification-failed");
       setErrors({
-        form: "No se pudo verificar si la derivación ya quedó registrada. Verifique el estado antes de volver a enviarla.",
+        form: "No se pudo confirmar el envío. Verifique antes de reenviar.",
       });
     }
   }
@@ -188,7 +188,7 @@ export function CreateRepairRequestDialog({
         if (!isCurrent) return;
         setOutcome("verification-failed");
         setErrors({
-          form: "No se pudo verificar si la derivación ya quedó registrada. Verifique el estado antes de volver a enviarla.",
+          form: "No se pudo confirmar el envío. Verifique antes de reenviar.",
         });
       });
 
@@ -258,7 +258,7 @@ export function CreateRepairRequestDialog({
           } catch {
             setOutcome("verification-failed");
             setErrors({
-              form: "No se pudo verificar si la derivación ya quedó registrada. Verifique el estado antes de volver a enviarla.",
+              form: "No se pudo confirmar el envío. Verifique antes de reenviar.",
             });
             return;
           }
@@ -279,7 +279,7 @@ export function CreateRepairRequestDialog({
             setComposedAgainst(null);
             setCreatedRequest(result.result);
             onCreated(result.result);
-            notifySuccess("Derivación de reparación creada.");
+            notifySuccess("Derivación creada.");
           } else if (result.kind === "conflict") {
             setOutcome("unsent");
             setConflict({ current: result.current, composedAgainst: result.composedAgainst });
@@ -301,7 +301,7 @@ export function CreateRepairRequestDialog({
         if (result.kind === "success") {
           setCreatedRequest(result.result);
           onCreated(result.result);
-          notifySuccess("Derivación de reparación creada.");
+          notifySuccess("Derivación creada.");
         } else if (result.kind === "draft-saved") {
           setValues(result.draft.payload.input);
           setComposedAgainst(result.draft.composedAgainst);
@@ -313,14 +313,14 @@ export function CreateRepairRequestDialog({
         const created = await repairRequestsAdapter.create(parsed.data);
         setCreatedRequest(created);
         onCreated(created);
-        notifySuccess("Derivación de reparación creada.");
+        notifySuccess("Derivación creada.");
       }
     } catch (cause) {
       if (!service && cause instanceof NetworkFailureError) {
         setValues(parsed.data);
         setOutcome("unsent");
       } else {
-        const message = errorMessage(cause, "No se pudo crear la derivación.");
+        const message = errorMessage(cause, "No se pudo derivar. Intente nuevamente.");
         setErrors({ form: message });
         notifyError(message);
       }
@@ -345,25 +345,20 @@ export function CreateRepairRequestDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Crear derivación de reparación</DialogTitle>
-          <DialogDescription>
-            {isInspection
-              ? "Registre el daño de infraestructura observado durante la inspección. La inspección permanece como fuente canónica de la derivación."
-              : "Registre el daño de infraestructura que será referido a M3. La derivación conserva al Servicio como su Referral context."}
-          </DialogDescription>
+          <DialogTitle>Derivar a Obras Públicas</DialogTitle>
         </DialogHeader>
 
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4">
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
             <div className="min-w-0 text-sm">
-              <p className="font-semibold text-[var(--color-text)]">{isInspection ? "Contexto de origen" : "Referral context: Servicio"} {sourceId}</p>
+              <p className="font-semibold text-[var(--color-text)]">{isInspection ? "Contexto de origen" : "Servicio"} {sourceId}</p>
               <p className="mt-1 truncate text-[var(--color-text-secondary)]">{sourceLabel}</p>
               <a
                 className="mt-2 inline-flex items-center gap-1 font-semibold text-[var(--color-action)] hover:underline"
                 href={sourceHref}
               >
-                {isInspection ? "Ver inspección fuente" : "Ver Servicio fuente"} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                {isInspection ? "Ver inspección" : "Ver servicio"} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
               </a>
             </div>
           </div>
@@ -374,22 +369,14 @@ export function CreateRepairRequestDialog({
             <AlertCircle aria-hidden />
             <AlertTitle>
                 {outcome === "checking"
-                  ? "Verificando el estado de la derivación"
+                  ? "Verificando…"
                   : outcome === "verification-failed"
-                    ? "No se pudo verificar el estado"
-                    : isInspection
-                      ? "Derivación sin enviar"
-                      : "Unsent referral"}
+                    ? "No se pudo verificar"
+                    : "Sin enviar"}
             </AlertTitle>
-            <AlertDescription>
-              {outcome === "checking"
-                ? "Comprobando si el Servicio ya tiene una derivación de este tipo."
-                : outcome === "verification-failed"
-                  ? "No vuelva a enviar hasta confirmar si la derivación quedó registrada."
-                  : isInspection
-                    ? "No se recibió confirmación del envío. Los valores quedaron retenidos en este dispositivo."
-                    : "No se recibió confirmación del envío y no se encontró una derivación del mismo tipo creada desde que se preparó el borrador."}
-            </AlertDescription>
+            {outcome !== "checking" && (
+              <AlertDescription>No se pudo confirmar el envío. Verifique antes de reenviar.</AlertDescription>
+            )}
           </Alert>
         )}
 
@@ -398,8 +385,8 @@ export function CreateRepairRequestDialog({
             <CheckCircle2 aria-hidden />
             <AlertTitle>
                 {alreadyRegisteredRequest
-                  ? "Derivación ya registrada."
-                  : "Derivación creada y pendiente de respuesta de M3."}
+                  ? "Ya estaba derivada."
+                  : "Derivada a Obras Públicas."}
             </AlertTitle>
             <AlertDescription>
               Seguimiento {resolvedRequest.id} · {isInspection ? `Inspección ${sourceId}` : `Servicio ${sourceId}`}
@@ -435,7 +422,7 @@ export function CreateRepairRequestDialog({
               <Field data-invalid={Boolean(errors.address) || undefined}>
                 <FieldLabel htmlFor="repair-address">Ubicación del daño *</FieldLabel>
                 <Input id="repair-address" value={values.address} onChange={(event) => updateValue("address", event.target.value)} aria-invalid={Boolean(errors.address) || undefined} aria-describedby={errors.address ? "repair-address-error" : undefined} />
-                {errors.address ? <FieldError id="repair-address-error">{errors.address}</FieldError> : <FieldDescription>Indique una dirección o referencia legible para M3.</FieldDescription>}
+                {errors.address ? <FieldError id="repair-address-error">{errors.address}</FieldError> : null}
               </Field>
 
               <FieldGroup className="grid gap-5 sm:grid-cols-2">
@@ -455,24 +442,23 @@ export function CreateRepairRequestDialog({
                 </Field>
 
                 <FieldSet data-invalid={Boolean(errors.publicSafetyRisk) || undefined}>
-                  <FieldLegend id="repair-risk-label">¿Implica riesgo para la seguridad pública? *</FieldLegend>
+                  <FieldLegend id="repair-risk-label">Riesgo para la seguridad pública *</FieldLegend>
                   <RadioGroup
                     value={String(values.publicSafetyRisk)}
                     onValueChange={(value) => updateValue("publicSafetyRisk", value === "true")}
                     aria-labelledby="repair-risk-label"
-                    aria-describedby={errors.publicSafetyRisk ? "repair-risk-error" : "repair-risk-description"}
+                    aria-describedby={errors.publicSafetyRisk ? "repair-risk-error" : undefined}
                     aria-invalid={Boolean(errors.publicSafetyRisk) || undefined}
                   >
                     <FieldLabel htmlFor="repair-public-safety-risk-true" className="min-h-11 flex-row items-center rounded-lg border px-3">
                       <RadioGroupItem id="repair-public-safety-risk-true" value="true" />
-                      Sí, implica riesgo para la seguridad pública
+                      Sí
                     </FieldLabel>
                     <FieldLabel htmlFor="repair-public-safety-risk-false" className="min-h-11 flex-row items-center rounded-lg border px-3">
                       <RadioGroupItem id="repair-public-safety-risk-false" value="false" />
-                      No implica riesgo para la seguridad pública
+                      No
                     </FieldLabel>
                   </RadioGroup>
-                  <FieldDescription id="repair-risk-description">Este dato se registra de forma independiente a la severidad.</FieldDescription>
                   {errors.publicSafetyRisk && <FieldError id="repair-risk-error">{errors.publicSafetyRisk}</FieldError>}
                 </FieldSet>
               </FieldGroup>
@@ -483,7 +469,7 @@ export function CreateRepairRequestDialog({
         {!resolvedRequest && conflict && (
           <DraftConflictView
             serviceId={sourceId}
-            actionLabel="derivación de reparación"
+            actionLabel="derivación"
             composedAgainst={conflict.composedAgainst}
             current={conflict.current}
             onPreserve={() => {
@@ -503,17 +489,17 @@ export function CreateRepairRequestDialog({
 
         <DialogFooter>
           {resolvedRequest ? (
-            <Button type="button" onClick={() => handleOpenChange(false)}>Cerrar confirmación</Button>
+            <Button type="button" onClick={() => handleOpenChange(false)}>Cerrar</Button>
           ) : (
             <Button type="submit" form={formId} disabled={isSubmitting || outcome === "checking" || Boolean(conflict)}>
               {(isSubmitting || outcome === "checking") && <Spinner data-icon="inline-start" aria-hidden />}
               {isSubmitting
-                ? "Verificando y enviando..."
+                ? "Enviando…"
                 : outcome === "checking"
-                  ? "Verificando estado..."
+                  ? "Verificando…"
                   : composedAgainst
-                    ? "Verificar y reenviar derivación"
-                    : "Crear derivación a M3"}
+                    ? "Verificar y reenviar"
+                    : "Derivar"}
             </Button>
           )}
         </DialogFooter>

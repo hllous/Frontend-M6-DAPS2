@@ -103,12 +103,12 @@ describe("SuspendServiceDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
     expect(reason).toHaveAttribute("aria-invalid", "true");
-    expect(document.getElementById(reason.getAttribute("aria-describedby")!)).toHaveTextContent("Debe seleccionar un motivo de suspensión.");
+    expect(document.getElementById(reason.getAttribute("aria-describedby")!)).toHaveTextContent("Seleccione un motivo.");
 
     await chooseReason(user, "Desperfecto vehicular");
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
     expect(note).toHaveAttribute("aria-invalid", "true");
-    expect(document.getElementById(note.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent("Debe indicar una nota describiendo la suspensión.");
+    expect(document.getElementById(note.getAttribute("aria-describedby")!.split(" ").at(-1)!)).toHaveTextContent("Describa la suspensión.");
   });
 
   it("keeps a suspended service open after an evidence upload fails and closes after retry", async () => {

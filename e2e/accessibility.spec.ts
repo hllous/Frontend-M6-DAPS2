@@ -56,14 +56,14 @@ test.describe("automated WCAG checks @smoke", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
-    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Mapa territorial de Servicios" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Mapa de servicios" })).toBeVisible();
     await expectNoViolations(page);
 
     await page.setViewportSize({ width: 390, height: 844 });
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
-    const map = page.getByRole("region", { name: "Mapa territorial de Servicios" });
+    const map = page.getByRole("region", { name: "Mapa de servicios" });
     await expect(page.getByRole("slider", { name: "Altura de la lista" })).toBeVisible();
     await expect(table).toBeVisible();
     await expect(map).toBeVisible();

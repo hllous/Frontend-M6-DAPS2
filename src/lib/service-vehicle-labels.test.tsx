@@ -65,7 +65,7 @@ describe("patente del vehículo asignado (#317)", () => {
     const service = await servicesAdapter.get(backendService.id);
     expect(service.vehiclePlate).toBe(id === vehicleId ? "AB123CD" : null);
     const { unmount } = render(<ServicePreview service={service} onOpenDetail={() => {}} />);
-    expect(screen.getByText(id === vehicleId ? "AB123CD" : "No asignado")).toBeVisible();
+    expect(screen.getByText(id === vehicleId ? "AB123CD" : "Sin vehículo")).toBeVisible();
     expect(screen.queryByText(new RegExp(id))).not.toBeInTheDocument();
     unmount();
     render(<ServiceDetail service={service} onBack={() => {}} />);

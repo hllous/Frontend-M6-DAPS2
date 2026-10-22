@@ -6,7 +6,7 @@ import { chooseServicesPeriod, expectServicesPeriod } from "./support/services-6
 async function openServices(page: Page) {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=services");
-  await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
 }
 
 async function dispatchTouchGesture(
@@ -43,12 +43,12 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await page.setViewportSize(viewport);
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
-    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
 
     if (viewport.width === 390) {
       const period = page.getByRole("combobox", { name: "Período" });
       const categories = page.getByRole("button", { name: "Categorías" });
-      const map = page.getByRole("region", { name: "Mapa territorial de Servicios" });
+      const map = page.getByRole("region", { name: "Mapa de servicios" });
       await expect(map).toBeVisible();
 
       const [periodBox, categoriesBox, mapBox] = await Promise.all([
@@ -78,13 +78,13 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await page.setViewportSize(viewport);
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
-    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
 
     await page.getByRole("button", { name: "Seleccionar servicio Poda de árbol — Av. Rivadavia 2200" }).click();
-    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+    await page.getByRole("button", { name: "Ver detalle" }).click();
 
     const detail = page.getByRole("region", { name: "Detalle completo de Poda de árbol — Av. Rivadavia 2200" });
-    const crewLabel = detail.getByText("Cuadrilla asignada", { exact: true });
+    const crewLabel = detail.getByText("Cuadrilla", { exact: true }).first();
     await expect(crewLabel).toBeVisible();
 
     const crewCard = crewLabel.locator("xpath=../..");
@@ -95,14 +95,15 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       scheduleCard.boundingBox(),
       assign.boundingBox(),
       detail.locator(":scope > div").first().boundingBox(),
-      detail.getByText("Servicio en Punto", { exact: true }).boundingBox(),
+      detail.getByRole("heading", { level: 1 }).boundingBox(),
     ]);
     expect(crewCardBox).not.toBeNull();
     expect(scheduleCardBox).not.toBeNull();
     expect(assignBox).not.toBeNull();
     expect(actionBarBox).not.toBeNull();
     expect(contentIntroBox).not.toBeNull();
-    expect(Math.abs(crewCardBox!.height - scheduleCardBox!.height)).toBeLessThanOrEqual(1);
+    // Side by side the grid stretches both cards; stacked on a phone the crew card is shorter now that its sub-line is gone.
+    if (viewport.width > 390) expect(Math.abs(crewCardBox!.height - scheduleCardBox!.height)).toBeLessThanOrEqual(1);
     expect(assignBox!.height).toBeLessThanOrEqual(20);
     expect(contentIntroBox!.y - (actionBarBox!.y + actionBarBox!.height)).toBeGreaterThanOrEqual(16);
     expect(await assign.evaluate((element) => element.tagName)).toBe("BUTTON");
@@ -201,7 +202,7 @@ test.describe("Services phone preview replaces the list filters", () => {
   test("a touch tap on a service hides the period and category filters until the preview closes", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
-    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
 
     const period = page.getByRole("combobox", { name: "Período" });
     const categories = page.getByRole("button", { name: "Categorías" });
@@ -223,7 +224,7 @@ test.describe("Services phone preview replaces the list filters", () => {
     await expect(period).toBeHidden();
     await expect(categories).toBeHidden();
 
-    await page.getByRole("button", { name: "Cerrar vista previa" }).click();
+    await page.getByRole("button", { name: "Cerrar", exact: true }).click();
     await expect(period).toBeVisible();
     await expect(categories).toBeVisible();
   });
