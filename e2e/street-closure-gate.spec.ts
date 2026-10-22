@@ -61,15 +61,15 @@ test.describe("StreetClosure dependency gate", () => {
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
     await expect(table.locator('tr[data-service-id="SVC-1054"]')).toBeVisible();
     await table.locator('tr[data-service-id="SVC-1054"]').click();
-    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+    await page.getByRole("button", { name: "Ver detalle" }).click();
 
     const gate = page.getByRole("status", { name: "Corte de calle rechazado" });
-    await expect(gate).toContainText(/decidir explícitamente si reprogramar o cancelar/i);
-    await expect(gate.getByRole("button", { name: "Reprogramar servicio por rechazo de corte" })).toBeVisible();
-    await expect(gate.getByRole("button", { name: "Cancelar servicio por rechazo de corte" })).toBeVisible();
+    await expect(gate).toContainText(/Tránsito rechazó el corte/i);
+    await expect(gate.getByRole("button", { name: "Reprogramar" })).toBeVisible();
+    await expect(gate.getByRole("button", { name: "Cancelar servicio" })).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
-    await gate.getByRole("button", { name: "Reprogramar servicio por rechazo de corte" }).click();
-    await expect(page.getByRole("dialog")).toContainText(/Paso 1 de 2/i);
+    await gate.getByRole("button", { name: "Reprogramar" }).click();
+    await expect(page.getByRole("dialog")).toContainText(/Reprogramar/i);
   });
 });

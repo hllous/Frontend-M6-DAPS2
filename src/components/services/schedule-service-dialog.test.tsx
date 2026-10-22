@@ -44,13 +44,31 @@ describe("ScheduleServiceDialog component", () => {
     );
 
     await catalogsLoaded();
-    expect(screen.getByRole("heading", { name: "Programar nuevo servicio" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: /Origen del servicio/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Programar servicio" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Tipo de servicio/ })).toHaveAttribute("data-slot", "select-trigger");
     expect(screen.getByText("Recorrido", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Recorrido asignado/ })).toBeInTheDocument();
-    expect(screen.getAllByText(/sin cuadrilla ni vehículo asignados/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: "Programar servicio" })).toBeInTheDocument();
+  });
+
+  it("keeps origin and notes inside a collapsed 'Más datos' disclosure", async () => {
+    const user = userEvent.setup();
+    render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+    await catalogsLoaded();
+
+    const trigger = screen.getByRole("button", { name: "Más datos" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveAttribute("data-slot", "collapsible-trigger");
+    expect(screen.queryByRole("combobox", { name: /Origen del servicio/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Notas/)).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /Tipo de servicio/ })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Fecha programada/)).toBeInTheDocument();
+
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("combobox", { name: /Origen del servicio/ })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Notas/)).toBeInTheDocument();
   });
 
   it("defaults to today in Argentina, shown as dd/mm/aaaa, and disables earlier days", async () => {
@@ -105,12 +123,12 @@ describe("ScheduleServiceDialog component", () => {
     await choose(user, /Tipo de servicio/, /Poda de arbolado/);
 
     // Mode is now POINT
-    expect(screen.getByText("Punto fijo", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("Puntual", { exact: true })).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: /Recorrido asignado/ })).not.toBeInTheDocument();
     // Con un bien del inventario la zona se deriva del bien: no se pide.
     expect(screen.queryByRole("combobox", { name: /Zona operativa/ })).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Tipo de objetivo/ })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: /Bien del inventario/ })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /Elemento/ })).toBeInTheDocument();
   });
 
   it("prefills and locks linked context for TICKET origin without retyping", async () => {
@@ -124,9 +142,8 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Programar servicio vinculado" })).toBeInTheDocument();
-    expect(screen.getByText("Origen vinculado preservado")).toBeInTheDocument();
-    expect(screen.getByText("Denuncia ciudadana", { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Programar servicio" })).toBeInTheDocument();
+    expect(screen.getByText("Origen: Denuncia ciudadana")).toBeInTheDocument();
     expect(screen.queryByText(linkedTicketId)).not.toBeInTheDocument();
     // Generic origin select is not rendered in linked mode
     expect(screen.queryByRole("combobox", { name: /Origen del servicio/ })).not.toBeInTheDocument();
@@ -185,7 +202,7 @@ describe("ScheduleServiceDialog component", () => {
     // Busca y elige el contenedor real del inventario (#319)
     const create = vi.spyOn(servicesAdapter, "create");
     await user.type(screen.getByLabelText(/Buscar contenedor/), "CONT-002");
-    await choose(user, /Bien del inventario/, "CONT-002 · Av. Santa Fe 3400");
+    await choose(user, /Elemento/, "CONT-002 · Av. Santa Fe 3400");
 
     // Submit
     const submitBtn = screen.getByRole("button", { name: "Programar servicio" });
@@ -219,7 +236,7 @@ describe("ScheduleServiceDialog component", () => {
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/Debe elegir el árbol urbano/);
-    const target = screen.getByRole("combobox", { name: /Bien del inventario/ });
+    const target = screen.getByRole("combobox", { name: /Elemento/ });
     expect(target).toHaveAttribute("aria-invalid", "true");
     const errorId = target.getAttribute("aria-describedby")?.split(" ").at(-1);
     expect(document.getElementById(errorId!)).toHaveTextContent(/Debe elegir el árbol urbano/);
@@ -233,14 +250,14 @@ describe("ScheduleServiceDialog component", () => {
     await catalogsLoaded();
     await choose(user, /Tipo de servicio/, /Poda de arbolado/);
     await choose(user, /Tipo de objetivo/, "Árbol urbano");
-    await choose(user, /Bien del inventario/, /ARB-00442/);
-    expect(screen.getByRole("combobox", { name: /Bien del inventario/ })).toHaveTextContent(/ARB-00442/);
-    expect(screen.getByText("Zona derivada del bien: Belgrano.")).toBeInTheDocument();
+    await choose(user, /Elemento/, /ARB-00442/);
+    expect(screen.getByRole("combobox", { name: /Elemento/ })).toHaveTextContent(/ARB-00442/);
+    expect(screen.getByText("Zona: Belgrano")).toBeInTheDocument();
 
     await choose(user, /Tipo de objetivo/, "Contenedor");
 
-    expect(screen.getByRole("combobox", { name: /Bien del inventario/ })).toHaveTextContent("Seleccione un bien…");
-    await user.click(screen.getByRole("combobox", { name: /Bien del inventario/ }));
+    expect(screen.getByRole("combobox", { name: /Elemento/ })).toHaveTextContent("Seleccione un elemento");
+    await user.click(screen.getByRole("combobox", { name: /Elemento/ }));
     await screen.findByRole("option", { name: /CONT-001/ });
     expect(screen.queryByRole("option", { name: /ARB-00442/ })).not.toBeInTheDocument();
   });
@@ -254,15 +271,15 @@ describe("ScheduleServiceDialog component", () => {
     await catalogsLoaded();
     await choose(user, /Tipo de servicio/, /Poda de arbolado/);
     await choose(user, /Tipo de objetivo/, "Árbol urbano");
-    await choose(user, /Bien del inventario/, /ARB-00442/);
-    expect(screen.getByRole("combobox", { name: /Bien del inventario/ })).toHaveTextContent(/ARB-00442/);
+    await choose(user, /Elemento/, /ARB-00442/);
+    expect(screen.getByRole("combobox", { name: /Elemento/ })).toHaveTextContent(/ARB-00442/);
 
     rerender(<ScheduleServiceDialog open={false} {...props} />);
     rerender(<ScheduleServiceDialog open={true} {...props} />);
     await screen.findByRole("combobox", { name: /Tipo de objetivo/ });
 
     expect(screen.getByRole("combobox", { name: /Tipo de objetivo/ })).toHaveTextContent("Contenedor");
-    expect(screen.getByRole("combobox", { name: /Bien del inventario/ })).toHaveTextContent("Seleccione un bien…");
+    expect(screen.getByRole("combobox", { name: /Elemento/ })).toHaveTextContent("Seleccione un elemento");
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/Debe elegir el contenedor/);
     expect(create).not.toHaveBeenCalled();
@@ -275,7 +292,7 @@ describe("ScheduleServiceDialog component", () => {
     render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
     await catalogsLoaded();
     await choose(user, /Tipo de servicio/, /Poda de arbolado/);
-    await choose(user, /Tipo de objetivo/, /Ubicación suelta/);
+    await choose(user, /Tipo de objetivo/, /Otra ubicación/);
     await user.type(screen.getByLabelText(/Dirección o referencia/), "Av. Rivadavia 2200");
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
 
@@ -303,7 +320,7 @@ describe("ScheduleServiceDialog component", () => {
     await catalogsLoaded();
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/UUID.*TK-/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Nº de reclamo no es válido/i);
     expect(onCreated).not.toHaveBeenCalled();
   });
 
@@ -377,7 +394,7 @@ describe("ScheduleServiceDialog component", () => {
 
     render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/No se pudieron cargar los tipos de servicio/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/No se pudo cargar el formulario/);
     expect(screen.getByRole("button", { name: "Programar servicio" })).toBeDisabled();
     expect(create).not.toHaveBeenCalled();
   });

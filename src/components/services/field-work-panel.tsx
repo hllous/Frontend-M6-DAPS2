@@ -168,7 +168,7 @@ export function FieldWorkPanel({
         if (isCurrent) setRepairRequests((current) => ({ ...current, [selectedService.id]: page.repairRequests }));
       })
       .catch(() => {
-        if (isCurrent) setRepairRequestsErrors((current) => ({ ...current, [selectedService.id]: "No se pudieron cargar las derivaciones de este Servicio." }));
+        if (isCurrent) setRepairRequestsErrors((current) => ({ ...current, [selectedService.id]: "No se pudieron cargar las derivaciones." }));
       });
 
     return () => {

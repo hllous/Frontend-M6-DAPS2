@@ -175,7 +175,7 @@ function SuspendServiceForm({
       );
       return true;
     } catch (err) {
-      const msg = err instanceof ServiceRequestError ? err.message : "Error al subir el archivo";
+      const msg = err instanceof ServiceRequestError ? err.message : "No se pudo subir el archivo. Intente nuevamente.";
       setQueuedFiles((prev) =>
         prev.map((f) => (f.id === item.id ? { ...f, status: "error", error: msg } : f)),
       );
@@ -255,12 +255,12 @@ function SuspendServiceForm({
 
     if (!reason) {
       setErrorMessage(null);
-      setFieldErrors({ reason: "Debe seleccionar un motivo de suspensión." });
+      setFieldErrors({ reason: "Seleccione un motivo." });
       return;
     }
     if (!note.trim()) {
       setErrorMessage(null);
-      setFieldErrors({ note: "Debe indicar una nota describiendo la suspensión." });
+      setFieldErrors({ note: "Describa la suspensión." });
       return;
     }
 
@@ -291,7 +291,7 @@ function SuspendServiceForm({
       if (outcome.kind === "still-offline") {
         setDraftPending(true);
         setErrorMessage(
-          "Seguimos sin conexión. El borrador se conserva en este dispositivo para reintentar el envío más tarde.",
+          "Sin conexión. Se guardó en este dispositivo; reenvíe cuando vuelva la conexión.",
         );
         setIsSubmitting(false);
         return;
@@ -316,7 +316,7 @@ function SuspendServiceForm({
       setComposedAgainst(outcome.draft.composedAgainst);
       setDraftPending(true);
       setErrorMessage(
-        "No se pudo conectar con el servidor. La suspensión quedó guardada como borrador local: puede reintentar el envío cuando recupere la conexión.",
+        "Sin conexión. Se guardó en este dispositivo; reenvíe cuando vuelva la conexión.",
       );
       setIsSubmitting(false);
       return;
@@ -344,17 +344,13 @@ function SuspendServiceForm({
   return (
     <>
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-warning)]">
-          <Pause className="size-4" aria-hidden />
-          <span>Suspensión de servicio en curso</span>
-        </div>
         <DialogTitle>
           {suspendedService ? `Servicio suspendido · ${service.title}` : `Suspender ${service.title}`}
         </DialogTitle>
         <DialogDescription>
           {suspendedService
-            ? "La suspensión se registró. Revise el estado de la evidencia y reintente las cargas pendientes."
-            : "Registre el motivo de la interrupción. El servicio pasará a estado Suspendido hasta que la persona responsable de la cuadrilla lo reanude."}
+            ? "Suspendido. Reintente los archivos pendientes."
+            : "Registre el motivo. La cuadrilla podrá reanudarlo."}
         </DialogDescription>
       </DialogHeader>
 
@@ -451,7 +447,7 @@ function SuspendServiceForm({
                       required
                       aria-invalid={Boolean(fieldErrors.note)}
                       aria-describedby={fieldErrors.note ? `${formId}-note-help ${formId}-note-error` : `${formId}-note-help`}
-                      placeholder="Describa la causa de la interrupción y cualquier detalle relevante para Oficina…"
+                      placeholder="Describa la causa"
                     />
                     <FieldDescription id={`${formId}-note-help`}>
                       Obligatoria. Se envía junto con el motivo seleccionado; entre ambos no pueden
@@ -464,15 +460,11 @@ function SuspendServiceForm({
 
               <Field>
                 {suspendedService ? (
-                  <FieldTitle>Archivos de evidencia</FieldTitle>
+                  <FieldTitle>Evidencia adjunta</FieldTitle>
                 ) : (
                   <FieldLabel htmlFor={`${formId}-evidence-input`}>Evidencia adjunta</FieldLabel>
                 )}
-                <FieldDescription>
-                  {suspendedService
-                    ? "Los archivos que no se hayan subido conservan su estado y pueden reintentarse."
-                    : "Opcional, cuando sea aplicable (ej. fotografía del desperfecto o del obstáculo)."}
-                </FieldDescription>
+                {!suspendedService && <FieldDescription>Opcional. Foto del problema.</FieldDescription>}
                 {!suspendedService && (
                   <>
                     <Input
@@ -613,7 +605,7 @@ function SuspendServiceForm({
           <DialogHeader>
             <DialogTitle>Descartar archivos pendientes</DialogTitle>
             <DialogDescription>
-              Los archivos pendientes no se enviarán y se quitarán de esta ventana. El servicio ya está suspendido.
+              Los archivos pendientes no se enviarán.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

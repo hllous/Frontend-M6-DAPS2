@@ -3,14 +3,13 @@ import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
 import { useRevealFirstError } from "./use-reveal-first-error";
-import { AlertCircle, Ban } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -69,7 +68,7 @@ function CancelServiceForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!reason.trim()) {
-      setReasonError("Debe indicar el motivo de la cancelación.");
+      setReasonError("Indique el motivo.");
       setErrorMessage(null);
       return;
     }
@@ -83,7 +82,7 @@ function CancelServiceForm({
       onOpenChange(false);
     } catch (cause) {
       const msg =
-        getErrorMessage(cause, "Ocurrió un error al cancelar el servicio.");
+        getErrorMessage(cause, "No se pudo cancelar. Intente nuevamente.");
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
@@ -93,17 +92,7 @@ function CancelServiceForm({
   return (
     <>
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-danger)]">
-          <Ban className="h-4 w-4" aria-hidden />
-          <span>Cancelación de servicio</span>
-        </div>
         <DialogTitle>Cancelar {service.title}</DialogTitle>
-        <DialogDescription>
-          El servicio pasará a estado &quot;Cancelado&quot; de forma definitiva
-          {service.status === "RESCHEDULED"
-            ? "; al estar a reprogramar, se cancela directamente sin requerir una nueva fecha."
-            : "."}
-        </DialogDescription>
       </DialogHeader>
 
       <form ref={formRef} id={formId} noValidate onSubmit={handleSubmit} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
@@ -131,9 +120,9 @@ function CancelServiceForm({
             required
             aria-invalid={Boolean(reasonError)}
             aria-describedby={reasonError ? `${formId}-reason-help ${formId}-reason-error` : `${formId}-reason-help`}
-            placeholder="Ej. Solicitud del cliente, servicio duplicado, ya no es necesario…"
+            placeholder="Ej. Servicio duplicado"
           />
-          <FieldDescription id={`${formId}-reason-help`}>Obligatorio. Esta acción no se puede deshacer.</FieldDescription>
+          <FieldDescription id={`${formId}-reason-help`}>Esta acción no se puede deshacer.</FieldDescription>
           {reasonError && <FieldError id={`${formId}-reason-error`}>{reasonError}</FieldError>}
         </Field>
       </form>
@@ -155,7 +144,7 @@ function CancelServiceForm({
           variant="destructive"
         >
           {isSubmitting && <Spinner data-icon="inline-start" aria-hidden="true" />}
-          <span>Cancelar servicio</span>
+          <span>Confirmar cancelación</span>
         </Button>
       </DialogFooter>
     </>

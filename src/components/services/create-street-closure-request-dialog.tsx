@@ -10,12 +10,11 @@ import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -194,7 +193,6 @@ export function CreateStreetClosureRequestDialog({
       focusSectionIndex.current = current.affectedSections.length;
       return { ...current, affectedSections: [...current.affectedSections, { ...EMPTY_SECTION }] };
     });
-    notifySuccess("Se agregó un tramo afectado.");
   }
 
   function removeSection(index: number) {
@@ -206,7 +204,6 @@ export function CreateStreetClosureRequestDialog({
         affectedSections: current.affectedSections.filter((_, sectionIndex) => sectionIndex !== index),
       };
     });
-    notifySuccess(`Se quitó el tramo afectado ${index + 1}.`);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -229,12 +226,12 @@ export function CreateStreetClosureRequestDialog({
         const created = await streetClosureRequestsAdapter.create(parsed.data);
         setOutcome("pending");
         onCreated?.(created);
-        notifySuccess("Solicitud de corte creada y pendiente de respuesta de M7.");
+        notifySuccess("Solicitud de corte enviada a Tránsito.");
       } catch (cause) {
         if (cause instanceof NetworkFailureError) {
           setOutcome("unsent");
         } else {
-          const message = errorMessage(cause, "No se pudo crear la solicitud.");
+          const message = errorMessage(cause, "No se pudo enviar la solicitud. Intente nuevamente.");
           setErrors({ form: message });
           notifyError(message);
         }
@@ -252,7 +249,7 @@ export function CreateStreetClosureRequestDialog({
     if (result.kind === "success") {
       setOutcome("pending");
       onCreated?.(result.result);
-      notifySuccess("Solicitud de corte creada y pendiente de respuesta de M7.");
+      notifySuccess("Solicitud de corte enviada a Tránsito.");
     } else if (result.kind === "draft-saved") {
       setOutcome("unsent");
     } else {
@@ -271,18 +268,15 @@ export function CreateStreetClosureRequestDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Solicitar corte de calle</DialogTitle>
-          <DialogDescription>
-            Registre el pedido a M7 desde el contexto canónico de la {sourceTypeLabel}. La respuesta externa no se inventa en M6.
-          </DialogDescription>
+          <DialogTitle>Solicitar corte de calle a Tránsito</DialogTitle>
         </DialogHeader>
 
         {outcome === "pending" && source.kind === "SERVICE" && (
           <Alert variant="info" role="status">
             <Info aria-hidden />
-            <AlertTitle>Solicitud pendiente</AlertTitle>
+            <AlertTitle>Solicitud enviada</AlertTitle>
             <AlertDescription>
-              M6 creó el registro. Queda pendiente la respuesta de M7 y el Servicio conserva este contexto.
+              Tránsito debe responder.
             </AlertDescription>
           </Alert>
         )}
@@ -290,9 +284,9 @@ export function CreateStreetClosureRequestDialog({
         {outcome === "pending" && source.kind === "TREE_INTERVENTION" && (
           <Alert variant="info" role="status">
             <Info aria-hidden />
-            <AlertTitle>Solicitud pendiente</AlertTitle>
+            <AlertTitle>Solicitud enviada</AlertTitle>
             <AlertDescription>
-              M6 creó el registro desde la intervención autorizada. Queda pendiente la respuesta de M7.
+              Tránsito debe responder.
             </AlertDescription>
           </Alert>
         )}
@@ -300,23 +294,20 @@ export function CreateStreetClosureRequestDialog({
         {outcome === "unsent" && (
           <Alert variant="warning" role="status">
             <TriangleAlert aria-hidden />
-            <AlertTitle>Solicitud sin enviar</AlertTitle>
+            <AlertTitle>Sin enviar</AlertTitle>
             <AlertDescription>
-              No se creó un registro en M6. Los valores quedaron conservados; reenvíe la solicitud manualmente cuando revise la conexión.
+              Sin conexión. Se guardó en este dispositivo; reenvíe cuando vuelva la conexión.
             </AlertDescription>
           </Alert>
         )}
 
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Contexto de la {sourceTypeLabel}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">{sourceTypeLabel}</p>
           <p className="mt-1 text-sm font-bold text-[var(--color-text)]">{sourceTitle}</p>
           <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
             {source.kind === "SERVICE"
-              ? `${source.record.id} · ${source.record.mode === "ROUTE" ? "Recorrido" : "Punto"} · ${source.record.scheduledDate}`
-              : `${source.record.id} · ${source.record.treeIds.length} ${source.record.treeIds.length === 1 ? "árbol vinculado" : "árboles vinculados"} · Estado autorizada`}
-          </p>
-          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-            Esta {sourceTypeLabel} es la referencia de origen; no se duplica como una nueva fuente.
+              ? `${source.record.id} · ${source.record.mode === "ROUTE" ? "Recorrido" : "Puntual"} · ${source.record.scheduledDate}`
+              : `${source.record.treeIds.length} ${source.record.treeIds.length === 1 ? "árbol" : "árboles"} · Autorizada`}
           </p>
         </div>
 
@@ -345,7 +336,7 @@ export function CreateStreetClosureRequestDialog({
                   aria-invalid={Boolean(errors.reason) || undefined}
                   aria-describedby={errors.reason ? "street-closure-reason-error" : undefined}
                   className="min-h-24"
-                  placeholder={source.kind === "SERVICE" ? "Explique por qué el Servicio necesita el corte" : "Explique por qué la intervención de arbolado necesita el corte"}
+                  placeholder="Motivo del corte"
                 />
                 {errors.reason && <FieldError id="street-closure-reason-error">{errors.reason}</FieldError>}
               </Field>
@@ -363,7 +354,6 @@ export function CreateStreetClosureRequestDialog({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <FieldDescription>El tipo describe la solicitud enviada a M7, no una decisión de M7.</FieldDescription>
               </Field>
 
               <FieldGroup className="grid gap-4 min-[761px]:grid-cols-2">
@@ -416,18 +406,10 @@ export function CreateStreetClosureRequestDialog({
                   {errors.requestedTo && <FieldError id="street-closure-requested-to-error">{errors.requestedTo}</FieldError>}
                 </Field>
               </FieldGroup>
-              <FieldDescription>
-                {source.kind === "SERVICE"
-                  ? "La ventana se prefija desde el Servicio cuando existe, pero debe revisarse y puede editarse antes del envío."
-                  : "Indique la ventana que M6 solicitará a M7. Puede editarla antes del envío."}
-              </FieldDescription>
             </FieldGroup>
 
             <FieldGroup>
-              <div>
-                <h2 className="text-sm font-bold text-[var(--color-text)]">Tramos afectados</h2>
-                <p className="mt-1 text-xs text-[var(--color-text-secondary)]">Agregue al menos un tramo con calle y sus dos calles transversales.</p>
-              </div>
+              <h2 className="text-sm font-bold text-[var(--color-text)]">Tramos afectados</h2>
               {form.affectedSections.map((section, index) => (
                 <fieldset key={index} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4">
                   <legend className="px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Tramo afectado {index + 1}</legend>
@@ -448,7 +430,7 @@ export function CreateStreetClosureRequestDialog({
                     </Field>
                     <FieldGroup className="grid gap-4 min-[761px]:grid-cols-2">
                       <Field data-invalid={Boolean(errors[`affectedSections.${index}.fromCross`]) || undefined}>
-                        <FieldLabel htmlFor={`affected-section-${index}-from`}>Desde calle transversal *</FieldLabel>
+                        <FieldLabel htmlFor={`affected-section-${index}-from`}>Desde calle *</FieldLabel>
                         <Input
                           id={`affected-section-${index}-from`}
                           value={section.fromCross}
@@ -459,7 +441,7 @@ export function CreateStreetClosureRequestDialog({
                         {errors[`affectedSections.${index}.fromCross`] && <FieldError id={`affected-section-${index}-from-error`}>{errors[`affectedSections.${index}.fromCross`]}</FieldError>}
                       </Field>
                       <Field data-invalid={Boolean(errors[`affectedSections.${index}.toCross`]) || undefined}>
-                        <FieldLabel htmlFor={`affected-section-${index}-to`}>Hasta calle transversal *</FieldLabel>
+                        <FieldLabel htmlFor={`affected-section-${index}-to`}>Hasta calle *</FieldLabel>
                         <Input
                           id={`affected-section-${index}-to`}
                           value={section.toCross}
@@ -476,18 +458,18 @@ export function CreateStreetClosureRequestDialog({
                       size="sm"
                       onClick={() => removeSection(index)}
                       disabled={form.affectedSections.length === 1}
-                      aria-label={`Quitar tramo afectado ${index + 1}`}
+                      aria-label={`Quitar tramo ${index + 1}`}
                       className="w-fit gap-1.5 text-[var(--color-danger)]"
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                      Quitar tramo
+                      Quitar
                     </Button>
                   </FieldGroup>
                 </fieldset>
               ))}
               <Button type="button" variant="outline" onClick={addSection} className="w-fit gap-1.5">
                 <Plus className="h-4 w-4" aria-hidden />
-                Agregar tramo afectado
+                Agregar tramo
               </Button>
             </FieldGroup>
           </form>
@@ -499,7 +481,7 @@ export function CreateStreetClosureRequestDialog({
           </Button>
           {!isComplete && (
             <Button type="submit" form="street-closure-request-form" disabled={isSubmitting}>
-              {isSubmitting ? "Creando solicitud…" : "Crear solicitud de corte"}
+              {isSubmitting ? "Enviando solicitud…" : "Enviar solicitud"}
             </Button>
           )}
         </DialogFooter>

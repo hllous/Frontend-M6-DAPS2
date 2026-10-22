@@ -17,7 +17,7 @@ async function openServiceDetail(
   const serviceRow = table.locator(`tr[data-service-id="${serviceId}"]`);
   await expect(serviceRow).toBeVisible();
   await serviceRow.click();
-  await page.getByRole("button", { name: "Ver detalle completo" }).click();
+  await page.getByRole("button", { name: "Ver detalle" }).click();
   await expect(page.getByRole("region", { name: /Detalle completo de/i })).toBeVisible();
 }
 
@@ -42,23 +42,23 @@ test.describe("StreetClosureRequest from Service context", () => {
     await dialog.getByLabel("Motivo *").fill("El Servicio requiere circulación reducida durante el operativo.");
 
     // An empty structured collection is rejected before the request is created.
-    await dialog.getByRole("button", { name: "Crear solicitud de corte" }).click();
+    await dialog.getByRole("button", { name: "Enviar solicitud" }).click();
     await expect(dialog.getByText("Indique el nombre de la calle")).toBeVisible();
 
     await dialog.getByLabel("Calle *", { exact: true }).fill("Bulevar Costero");
-    await dialog.getByLabel("Desde calle transversal *").fill("Av. Belgrano");
-    await dialog.getByLabel("Hasta calle transversal *").fill("Calle 12");
+    await dialog.getByLabel("Desde calle *").fill("Av. Belgrano");
+    await dialog.getByLabel("Hasta calle *").fill("Calle 12");
 
-    await dialog.getByRole("button", { name: "Agregar tramo afectado" }).click();
+    await dialog.getByRole("button", { name: "Agregar tramo" }).click();
     const streets = dialog.getByLabel("Calle *", { exact: true });
     await streets.nth(1).fill("Calle 12");
-    await dialog.getByLabel("Desde calle transversal *").nth(1).fill("Bulevar Costero");
-    await dialog.getByLabel("Hasta calle transversal *").nth(1).fill("Av. Libertad");
+    await dialog.getByLabel("Desde calle *").nth(1).fill("Bulevar Costero");
+    await dialog.getByLabel("Hasta calle *").nth(1).fill("Av. Libertad");
     await expect(streets).toHaveCount(2);
 
-    await dialog.getByRole("button", { name: "Crear solicitud de corte" }).click();
-    await expect(dialog.getByRole("status")).toContainText("Solicitud pendiente");
-    await expect(dialog.getByText(/M6 creó el registro/i)).toBeVisible();
+    await dialog.getByRole("button", { name: "Enviar solicitud" }).click();
+    await expect(dialog.getByRole("status")).toContainText("Solicitud enviada");
+    await expect(dialog.getByText("Tránsito debe responder.")).toBeVisible();
   });
 
   test("Field has no StreetClosureRequest creation entry point", async ({ page }) => {

@@ -16,11 +16,11 @@ test.describe("shared control density", () => {
     ]) {
       await page.setViewportSize({ width, height });
       await page.goto("/app?destination=services");
-      await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
 
       await expect.poll(() => heightOf(page.getByRole("button", { name: "Cerrar sesión" }))).toBe(expected);
-      await expect.poll(() => heightOf(page.getByRole("button", { name: "Programar nuevo servicio" }))).toBe(expected);
-      await expect.poll(() => heightOf(page.getByRole("searchbox", { name: "Buscar servicios por texto libre" }))).toBe(expected);
+      await expect.poll(() => heightOf(page.getByRole("button", { name: "Programar servicio" }))).toBe(expected);
+      await expect.poll(() => heightOf(page.getByRole("searchbox", { name: "Buscar servicios" }))).toBe(expected);
 
       if (width === 760) {
         await page.goto("/app?destination=dashboards");

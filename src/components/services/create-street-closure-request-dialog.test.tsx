@@ -95,12 +95,12 @@ describe("CreateStreetClosureRequestDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.click(screen.getByRole("button", { name: "Agregar tramo afectado" }));
+    await user.click(screen.getByRole("button", { name: "Agregar tramo" }));
     const sectionStreets = screen.getAllByLabelText("Calle *", { selector: "input" });
     expect(sectionStreets).toHaveLength(2);
     expect(document.activeElement).toBe(sectionStreets[1]);
 
-    await user.click(screen.getByRole("button", { name: "Quitar tramo afectado 2" }));
+    await user.click(screen.getByRole("button", { name: "Quitar tramo 2" }));
     await waitFor(() => expect(document.activeElement).toBe(sectionStreets[0]));
     expect(screen.getAllByLabelText("Calle *", { selector: "input" })).toHaveLength(1);
   });
@@ -109,7 +109,7 @@ describe("CreateStreetClosureRequestDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.click(screen.getByRole("button", { name: "Crear solicitud de corte" }));
+    await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
     expect(screen.getByText("El motivo es obligatorio")).toBeInTheDocument();
     expect(screen.getByText("Indique el nombre de la calle")).toBeInTheDocument();
@@ -126,12 +126,12 @@ describe("CreateStreetClosureRequestDialog", () => {
 
     await user.type(screen.getByLabelText("Motivo *"), "Trabajo operativo con circulación reducida");
     await user.type(screen.getByLabelText("Calle *", { selector: "input" }), "Bulevar Costero");
-    await user.type(screen.getByLabelText("Desde calle transversal *"), "Av. Belgrano");
-    await user.type(screen.getByLabelText("Hasta calle transversal *"), "Calle 12");
-    await user.click(screen.getByRole("button", { name: "Crear solicitud de corte" }));
+    await user.type(screen.getByLabelText("Desde calle *"), "Av. Belgrano");
+    await user.type(screen.getByLabelText("Hasta calle *"), "Calle 12");
+    await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Solicitud pendiente"));
-    expect(screen.getByText(/M6 creó el registro/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Solicitud enviada"));
+    expect(screen.getByText("Tránsito debe responder.")).toBeInTheDocument();
   });
 
   it("retains entered values and presents an unsent state after a network failure", async () => {
@@ -142,11 +142,11 @@ describe("CreateStreetClosureRequestDialog", () => {
     const reason = screen.getByLabelText("Motivo *");
     await user.type(reason, "Corte necesario para el operativo");
     await user.type(screen.getByLabelText("Calle *", { selector: "input" }), "Calle 12");
-    await user.type(screen.getByLabelText("Desde calle transversal *"), "Av. Belgrano");
-    await user.type(screen.getByLabelText("Hasta calle transversal *"), "Av. Libertad");
-    await user.click(screen.getByRole("button", { name: "Crear solicitud de corte" }));
+    await user.type(screen.getByLabelText("Desde calle *"), "Av. Belgrano");
+    await user.type(screen.getByLabelText("Hasta calle *"), "Av. Libertad");
+    await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Solicitud sin enviar"));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Sin enviar"));
     expect(reason).toHaveValue("Corte necesario para el operativo");
   });
 
@@ -163,11 +163,11 @@ describe("CreateStreetClosureRequestDialog", () => {
     await setTime(user, /Inicio solicitado/, "09:00");
     await setTime(user, /Fin solicitado/, "11:00");
     changeValue(screen.getByLabelText("Calle *", { selector: "input" }), "Av. Mitre");
-    changeValue(screen.getByLabelText("Desde calle transversal *"), "Calle 10");
-    changeValue(screen.getByLabelText("Hasta calle transversal *"), "Calle 12");
-    await user.click(screen.getByRole("button", { name: "Crear solicitud de corte" }));
+    changeValue(screen.getByLabelText("Desde calle *"), "Calle 10");
+    changeValue(screen.getByLabelText("Hasta calle *"), "Calle 12");
+    await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("desde la intervención autorizada"));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Tránsito debe responder."));
     expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({
       sourceType: "TREE_INTERVENTION",
       sourceId: "intervention-2",
@@ -201,12 +201,12 @@ describe("CreateStreetClosureRequestDialog", () => {
     await setTime(user, /Inicio solicitado/, "09:00");
     await setTime(user, /Fin solicitado/, "11:00");
     changeValue(screen.getByLabelText("Calle *", { selector: "input" }), "Av. Mitre");
-    changeValue(screen.getByLabelText("Desde calle transversal *"), "Calle 10");
-    changeValue(screen.getByLabelText("Hasta calle transversal *"), "Calle 12");
-    await user.click(screen.getByRole("button", { name: "Crear solicitud de corte" }));
+    changeValue(screen.getByLabelText("Desde calle *"), "Calle 10");
+    changeValue(screen.getByLabelText("Hasta calle *"), "Calle 12");
+    await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Solicitud sin enviar"));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Sin enviar"));
     expect(reason).toHaveValue("Corte preventivo durante el tratamiento del arbolado");
-    expect(screen.getByText(/No se creó un registro en M6/)).toBeVisible();
+    expect(screen.getByText(/Sin conexión/)).toBeVisible();
   });
 });

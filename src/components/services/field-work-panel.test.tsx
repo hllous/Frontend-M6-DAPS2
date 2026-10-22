@@ -232,16 +232,16 @@ describe("FieldWorkPanel component", () => {
     const detailButtons = await screen.findAllByRole("button", { name: "Ver detalle" });
     await user.click(detailButtons[0]);
 
-    expect(await screen.findByRole("heading", { name: "Derivaciones de reparación" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Derivaciones" })).toBeVisible();
     expect(screen.getByText("RR-1001")).toBeVisible();
     expect(screen.getByRole("button", { name: "Crear derivación de reparación" })).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Crear derivación de reparación" }));
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText(/^Ubicación del daño/), "Calle 12 y Bulevar Costero");
-    await user.click(within(dialog).getByRole("button", { name: /Crear derivación a M3/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Derivar" }));
 
-    await waitFor(() => expect(within(dialog).getByText(/pendiente de respuesta de M3/i)).toBeVisible());
+    await waitFor(() => expect(within(dialog).getByText(/Derivada a Obras Públicas/i)).toBeVisible());
     expect(dialog).toHaveTextContent("SVC-1050");
   });
 

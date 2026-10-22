@@ -148,7 +148,7 @@ describe("MapView", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo cargar el mapa");
 
-    await user.click(screen.getByRole("button", { name: "Reintentar mapa" }));
+    await user.click(screen.getByRole("button", { name: "Reintentar" }));
 
     expect(onRetry).toHaveBeenCalledOnce();
     await waitFor(() => expect(mapLoad).toHaveBeenCalledTimes(2));

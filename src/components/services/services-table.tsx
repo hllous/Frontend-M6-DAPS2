@@ -565,7 +565,7 @@ export function ServicesTable({
           container={false}
           ref={tableRef}
           className="min-w-full table-fixed border-collapse bg-[var(--color-surface)] text-left text-xs"
-          aria-label="Servicios operativos"
+          aria-label="Servicios"
           style={{
             width: tablePixelWidth,
             minWidth: "max(100%, var(--column-resize-width-floor, 0px))",
@@ -573,7 +573,7 @@ export function ServicesTable({
           bodyClassName="divide-y divide-[var(--color-border)]"
           renderHeader={() => (<thead data-slot="table-header" className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)] font-semibold">
             <tr data-slot="table-row">
-              <th data-slot="table-head" scope="col" data-column-key="ordinal" aria-label="Número de parada" className="sticky left-0 top-0 z-20 bg-[var(--color-surface-subtle)] px-1 py-3 text-center">#</th>
+              <th data-slot="table-head" scope="col" data-column-key="ordinal" aria-label="Orden" className="sticky left-0 top-0 z-20 bg-[var(--color-surface-subtle)] px-1 py-3 text-center">#</th>
               {currentColumns.map((col) => {
                 const isSorted = sortKey === col.key;
                 const isCompactDateSort = compactColumns && col.key === "service" && sortKey === "scheduled";
@@ -589,7 +589,7 @@ export function ServicesTable({
                     scope="col"
                     aria-sort={ariaSort}
                     aria-label={activeColumnPreferences
-                      ? `${col.label}. Arrastre para reordenar. Use Alt y las flechas izquierda o derecha para mover.`
+                      ? col.label
                       : undefined}
                     aria-keyshortcuts={activeColumnPreferences ? "Alt+ArrowLeft Alt+ArrowRight" : undefined}
                     tabIndex={activeColumnPreferences ? 0 : undefined}
@@ -894,8 +894,8 @@ export function ServicesTable({
                     <EmptyHeader>
                       <EmptyTitle>
                         {hasActiveFilters
-                          ? "No hay servicios que coincidan con los filtros aplicados."
-                          : "No hay servicios para mostrar en este período."}
+                          ? "Sin servicios con esos filtros."
+                          : "Sin servicios en este período."}
                       </EmptyTitle>
                     </EmptyHeader>
                     {hasActiveFilters && onClearFilters && (

@@ -49,9 +49,9 @@ describe("ConfirmRescheduleDialog", () => {
     server.use(http.post("*/api/services/:id/confirm-reschedule", () => { posts += 1; return HttpResponse.json({}, { status: 500 }); }));
     const { dateInput } = renderDialog();
     await userEvent.click(screen.getByRole("button", { name: "Confirmar nueva fecha" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Seleccione la nueva fecha del servicio.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Seleccione la nueva fecha.");
     expect(dateInput).toHaveAttribute("aria-invalid", "true");
-    expect(document.getElementById(dateInput.getAttribute("aria-describedby")!)).toHaveTextContent("Seleccione la nueva fecha del servicio.");
+    expect(document.getElementById(dateInput.getAttribute("aria-describedby")!)).toHaveTextContent("Seleccione la nueva fecha.");
     expect(posts).toBe(0);
   });
 

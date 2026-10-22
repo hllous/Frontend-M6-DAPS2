@@ -144,7 +144,7 @@ describe("TreeInterventionsPanel", () => {
 
     const closureDialog = await screen.findByRole("dialog", { name: /Solicitar corte de calle/ });
     expect(within(closureDialog).getByText("Av. Mitre 1140")).toBeVisible();
-    expect(within(closureDialog).getByText(/intervention-2/)).toBeVisible();
+    expect(within(closureDialog).getByText(/Autorizada/)).toBeVisible();
     expect(within(closureDialog).getByLabelText("Motivo *")).toHaveValue("");
   });
 

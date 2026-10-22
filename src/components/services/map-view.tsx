@@ -18,8 +18,8 @@ const ServicesMapCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className={styles.mapLoading} role="status" aria-label="Preparando mapa geográfico">
-        Preparando mapa geográfico
+      <div className={styles.mapLoading} role="status" aria-label="Cargando mapa…">
+        Cargando mapa…
       </div>
     ),
   },
@@ -72,7 +72,7 @@ export function MapView({
           setReferenceData({
             status: "error",
             message:
-              "No se pudo cargar la información territorial. Revise la conexión e intente nuevamente.",
+              "No se pudo cargar el mapa. Intente nuevamente.",
           });
         }
       });
@@ -106,7 +106,7 @@ export function MapView({
         compact && styles.mapCompact,
       )}
       role="region"
-      aria-label="Mapa territorial de Servicios"
+      aria-label="Mapa de servicios"
     >
       {!hasError && referenceData.status === "ready" ? (
         <div className={cn(styles.mapLayer, compact && styles.mapLayerCompact)}>
@@ -129,23 +129,19 @@ export function MapView({
           </div>
           <div>
             <h3>No se pudo cargar el mapa</h3>
-            <p>
-              {hasReferenceDataError && referenceData.status === "error"
-                ? referenceData.message
-                : "La tabla de servicios permanece completamente disponible y operativa. El mapa es una vista complementaria."}
-            </p>
+            {hasReferenceDataError && referenceData.status === "error" ? <p>{referenceData.message}</p> : null}
           </div>
           {onRetry ? (
             <Button variant="outline" size="sm" onClick={handleRetry}>
               <RefreshCw data-icon="inline-start" aria-hidden="true" />
-              Reintentar mapa
+              Reintentar
             </Button>
           ) : null}
         </div>
       ) : isLoading ? (
         <div role="status" aria-live="polite" className={cn(styles.stateOverlay, compact && styles.stateOverlayCompact)}>
           <Spinner className="size-5 text-[var(--color-action)]" aria-hidden="true" role="presentation" />
-          <span>Cargando mapa territorial…</span>
+          <span>Cargando mapa…</span>
         </div>
       ) : null}
 
@@ -153,7 +149,6 @@ export function MapView({
         <div
           className={cn(styles.loadingIndex, (!isLoading || hasError) && styles.loadingIndexHidden)}
           aria-hidden={!isLoading || hasError}
-          aria-label="Servicios disponibles mientras carga el mapa"
         >
           {services.map((service) => (
             <Button

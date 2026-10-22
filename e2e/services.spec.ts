@@ -10,7 +10,7 @@ const WIDE_VIEWPORT = { width: 1280, height: 900 };
 async function openServices(page: import("@playwright/test").Page) {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=services");
-  await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
 }
 
 async function expectTablePaneScrollingToKeepPageAndOrdinalVisible(
@@ -54,7 +54,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
 
     // Verify presence of table region and map region
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
-    const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
+    const map = page.getByRole("region", { name: /mapa de servicios/i });
     await expect(table).toBeVisible();
     await expect(map).toBeVisible();
     await expectTablePaneScrollingToKeepPageAndOrdinalVisible(table, page);
@@ -76,7 +76,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const previewTitle = preview.getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200" });
     await expect(previewTitle).toBeVisible();
     await expect(preview.locator("xpath=..")).toHaveCSS("opacity", "1");
-    await expect(preview.getByRole("button", { name: "Ver detalle completo" })).toBeVisible();
+    await expect(preview.getByRole("button", { name: "Ver detalle" })).toBeVisible();
     await expectTablePaneScrollingToKeepPageAndOrdinalVisible(table, page);
 
     // Assert the visible Leaflet pin itself, not the off-screen loading index.
@@ -94,7 +94,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     expect(selectedMarkerZIndex).toBeGreaterThan(marker18ZIndex);
 
     // Close preview to test map interaction directly
-    await preview.getByRole("button", { name: "Cerrar vista previa" }).click();
+    await preview.getByRole("button", { name: "Cerrar", exact: true }).click();
     await expect(preview).not.toBeVisible();
     await expect(firstServiceRow.locator("button[data-service-select]")).toBeFocused();
 
@@ -144,7 +144,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const descendingTitles = await serviceTitles();
     expect(descendingTitles).toEqual([...descendingTitles].sort((a, b) => b.localeCompare(a)));
 
-    const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
+    const map = page.getByRole("region", { name: /mapa de servicios/i });
     const selectedRow = table.locator('tr[data-service-id="SVC-1043"]');
     await selectedRow.click();
     const selectedOrdinal = (await selectedRow.locator("td").first().innerText()).trim();
@@ -181,7 +181,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await page.setViewportSize(WIDE_VIEWPORT);
     await openServices(page);
 
-    const searchInput = page.getByRole("searchbox", { name: "Buscar servicios por texto libre" });
+    const searchInput = page.getByRole("searchbox", { name: "Buscar servicios" });
     await searchInput.fill("Poda");
 
     // Table filters to matching services
@@ -206,17 +206,16 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const row = table.locator('tr[data-service-id="SVC-1043"]');
     await row.click();
 
-    // Click explicit action "Ver detalle completo"
-    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+    // Click explicit action "Ver detalle"
+    await page.getByRole("button", { name: "Ver detalle" }).click();
 
     // Full detail view is active
     await expect(page.getByRole("region", { name: /Detalle completo de Poda de árbol — Av\. Rivadavia 2200/i })).toBeVisible();
-    await expect(page.getByText("Detalle operativo", { exact: true })).toBeVisible();
     await expect(page.locator("main")).toHaveCount(1);
 
     // Return back to services workspace
     await page.getByRole("button", { name: "Volver a Servicios" }).click();
-    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
     await expect(table).toBeVisible();
     await expect(page.locator("main")).toHaveCount(1);
     await expect(row.locator("button[data-service-select]")).toBeFocused();
@@ -226,8 +225,8 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     // Opening the dialog on a wide viewport and narrowing remounts the list drawer after the dialog portal.
     await page.setViewportSize(WIDE_VIEWPORT);
     await openServices(page);
-    await page.getByRole("button", { name: "Programar nuevo servicio" }).click();
-    const dialog = page.getByRole("dialog", { name: "Programar nuevo servicio" });
+    await page.getByRole("button", { name: "Programar servicio" }).click();
+    const dialog = page.getByRole("dialog", { name: "Programar servicio" });
     await expect(dialog).toBeVisible();
     await page.setViewportSize(NARROW_VIEWPORT);
 
@@ -253,7 +252,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const content = page.locator("#contenido-principal");
     await expect(content).toHaveCSS("overflow-y", "hidden");
     await expect(
-      content.getByRole("button", { name: "Programar nuevo servicio" }).getByText("Programar", { exact: true }),
+      content.getByRole("button", { name: "Programar servicio" }).getByText("Programar", { exact: true }),
     ).toBeVisible();
     await expect(content.getByRole("button", { name: "Lista", exact: true })).toHaveCount(0);
     await expect(content.getByRole("button", { name: "Mapa", exact: true })).toHaveCount(0);
@@ -262,9 +261,9 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(table).toBeVisible();
     await expectTablePaneScrollingToKeepPageAndOrdinalVisible(table, page);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(1);
-    const map = page.getByRole("region", { name: /mapa territorial de servicios/i });
+    const map = page.getByRole("region", { name: /mapa de servicios/i });
     await expect(map).toBeVisible();
-    const mapFrame = content.locator('[role="region"][aria-label="Mapa territorial de Servicios"]');
+    const mapFrame = content.locator('[role="region"][aria-label="Mapa de servicios"]');
     const mapElement = await mapFrame.elementHandle();
     const listDrawer = page.getByRole("complementary", { name: "Lista de servicios" });
     const listDrawerElement = content.locator('aside[aria-label="Lista de servicios"]');
@@ -329,7 +328,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(preview.getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Poda de árbol — Av. Rivadavia 2200", exact: true })).toHaveCount(1);
     await expect(preview.locator("xpath=..")).toHaveCSS("opacity", "1");
-    await expect(preview.getByRole("button", { name: "Cerrar vista previa" })).toBeFocused();
+    await expect(preview.getByRole("button", { name: "Cerrar", exact: true })).toBeFocused();
     await expect(preview.locator(".overflow-y-auto")).toHaveCount(1);
     await expect(preview.locator(".overflow-y-auto")).toHaveCSS("overflow-y", "auto");
     expect(await mapElement?.evaluate((element) => element.isConnected)).toBe(true);
@@ -351,7 +350,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     }, { intervals: [200], timeout: 5000 }).toBeGreaterThanOrEqual(2);
     const collapsedMapSize = await getMapSize();
     await expect.poll(getMapSize).toEqual(collapsedMapSize);
-    await preview.getByRole("button", { name: "Cerrar vista previa" }).click();
+    await preview.getByRole("button", { name: "Cerrar", exact: true }).click();
     await expect(preview.locator("xpath=..")).toHaveAttribute("aria-hidden", "true");
     await expect(table.locator('tr[data-service-id="SVC-1043"] button[data-service-select]')).toBeFocused();
   });
@@ -361,17 +360,18 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await openServices(page);
 
     // Open scheduling dialog
-    await page.getByRole("button", { name: "Programar nuevo servicio" }).click();
+    await page.getByRole("button", { name: "Programar servicio" }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("heading", { name: "Programar nuevo servicio" })).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Programar servicio" })).toBeVisible();
 
     // Verify derived mode indication is present
     await expect(dialog.getByText("Recorrido", { exact: true }).first()).toBeVisible();
 
-    // Enter notes
-    const notesInput = dialog.getByLabel(/Notas e instrucciones operativas/i);
+    // Enter notes (inside the "Más datos" disclosure)
+    await dialog.getByRole("button", { name: "Más datos" }).click();
+    const notesInput = dialog.getByLabel(/^Notas/i);
     await notesInput.fill("Prueba E2E servicio no asignado");
 
     // Submit the form
@@ -399,19 +399,19 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("heading", { name: "Programar servicio vinculado" })).toBeVisible();
-    await expect(dialog.getByText("Origen vinculado preservado")).toBeVisible();
-    await expect(dialog.getByText("Denuncia ciudadana", { exact: true })).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Programar servicio" })).toBeVisible();
+    await expect(dialog.getByText(/^Origen: /)).toBeVisible();
+    await expect(dialog.getByText("Origen: Denuncia ciudadana")).toBeVisible();
     await expect(dialog).not.toContainText(linkedTicketId);
 
     // Select a POINT service type
     await chooseDialogOption(dialog, /Tipo de servicio/i, "Mantenimiento de contenedores (Punto)");
-    await expect(dialog.getByText("Punto fijo", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Puntual", { exact: true })).toBeVisible();
 
     // Pick the real container from the inventory (#319)
     await expect(dialog.getByRole("combobox", { name: /Tipo de objetivo/i })).toContainText("Contenedor");
     await dialog.getByLabel(/Buscar contenedor/i).fill("CONT-002");
-    await chooseDialogOption(dialog, /Bien del inventario/i, "CONT-002 · Av. Santa Fe 3400");
+    await chooseDialogOption(dialog, /Elemento/i, "CONT-002 · Av. Santa Fe 3400");
 
     // Submit
     await dialog.getByRole("button", { name: "Programar servicio" }).click();
@@ -491,16 +491,16 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     // Submitting without vehicle is rejected
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
     await expect(
-      dialog.getByText("El tipo de servicio requiere la asignación obligatoria de un vehículo operativo."),
+      dialog.getByText("Seleccione un vehículo."),
     ).toBeVisible();
 
     // Select vehicle AA 123 AA (assigned to SVC-1042 at 09:00-13:00 on the same date)
     await chooseDialogOption(dialog, /Vehículo operativo/i, "AA 123 AA");
 
     // Double-booking warning appears and asks for a justification (backend: overrideNote)
-    await expect(dialog.getByText(/^Aviso de superposición horaria$/i)).toBeVisible();
+    await expect(dialog.getByText(/^Se superpone con otro servicio$/i)).toBeVisible();
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
-    await expect(dialog.getByText(/justifique la asignación en al menos 10 caracteres/i)).toBeVisible();
+    await expect(dialog.getByText(/Escriba al menos 10 caracteres/i)).toBeVisible();
 
     await dialog.getByLabel(/Justificación del solapamiento/i).fill("SVC-1042 libera el camión antes de las 11:30.");
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
@@ -601,7 +601,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
 
-    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
 
     // Select row for SVC-1096 in table
@@ -824,38 +824,23 @@ test.describe("Office two-step Service reschedule flow @smoke", () => {
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
     const row = table.locator('tr[data-service-id="SVC-1062"]');
     await row.click();
-    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+    await page.getByRole("button", { name: "Ver detalle" }).click();
 
     const detailRegion = page.getByRole("region", { name: /Detalle completo de/ });
     await expect(detailRegion).toBeVisible();
     await expect(detailRegion.getByText("Zona Sur").first()).toBeVisible();
 
-    // Step 1: reason moves SCHEDULED -> RESCHEDULED
+    // One dialog: reason and new date together
     await detailRegion.getByRole("button", { name: "Reprogramar" }).click();
     const reasonDialog = page.getByRole("dialog");
     await expect(reasonDialog).toBeVisible();
-    await expect(reasonDialog.getByText(/Paso 1 de 2/i)).toBeVisible();
+    await expect(reasonDialog.getByText(/Paso \d de 2/i)).toHaveCount(0);
     await reasonDialog.getByLabel(/^Motivo/i).fill("Alerta meteorológica: vientos fuertes previstos.");
-    await reasonDialog.getByRole("button", { name: "Mover a reprogramar" }).click();
-    await expect(reasonDialog).not.toBeVisible();
 
-    // Intermediate RESCHEDULED state is visible in the workspace, not collapsed into one interaction
-    await expect(detailRegion.getByText("A reprogramar").first()).toBeVisible();
-    await expect(detailRegion.getByText(/vientos fuertes previstos/i)).toBeVisible();
-    await expect(detailRegion.getByRole("button", { name: "Reprogramar" })).toHaveCount(0);
-
-    // Step 2: a separate call supplies the new date/window
-    await detailRegion.getByRole("button", { name: "Confirmar nueva fecha" }).click();
-    const confirmDialog = page.getByRole("dialog");
-    await expect(confirmDialog).toBeVisible();
-    await expect(confirmDialog.getByText(/Paso 2 de 2/i)).toBeVisible();
-    // zoneIds snapshot is shown untouched ahead of confirming
-    await expect(confirmDialog.getByText("Zona Sur")).toBeVisible();
-
-    const pickedLabel = await pickDialogDay(confirmDialog, /^Nueva fecha/i, { monthsAhead: 1, day: 13 });
+    const pickedLabel = await pickDialogDay(reasonDialog, /^Nueva fecha/i, { monthsAhead: 1, day: 13 });
     const pickedYear = pickedLabel.slice(-4);
-    await confirmDialog.getByRole("button", { name: "Confirmar nueva fecha" }).click();
-    await expect(confirmDialog).not.toBeVisible();
+    await reasonDialog.getByRole("button", { name: "Reprogramar" }).click();
+    await expect(reasonDialog).not.toBeVisible();
 
     // Back to SCHEDULED with the new date, zones preserved verbatim
     await expect(detailRegion.getByText("Programado").first()).toBeVisible();
@@ -883,7 +868,7 @@ test.describe("Office cancels a Service @smoke", () => {
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
     const row = table.locator('tr[data-service-id="SVC-1090"]');
     await row.click();
-    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+    await page.getByRole("button", { name: "Ver detalle" }).click();
 
     const detailRegion = page.getByRole("region", { name: /Detalle completo de/ });
     await expect(detailRegion).toBeVisible();
@@ -894,11 +879,11 @@ test.describe("Office cancels a Service @smoke", () => {
     await expect(dialog.getByRole("heading", { name: "Cancelar Relevamiento de contenedor — Sector 20" })).toBeVisible();
 
     // Empty reason is rejected client-side
-    await dialog.getByRole("button", { name: "Cancelar servicio" }).click();
-    await expect(dialog.getByText(/motivo de la cancelación/i)).toBeVisible();
+    await dialog.getByRole("button", { name: "Confirmar cancelación" }).click();
+    await expect(dialog.getByText("Indique el motivo.")).toBeVisible();
 
     await dialog.getByLabel(/^Motivo/i).fill("El vecino desistió del reclamo.");
-    await dialog.getByRole("button", { name: "Cancelar servicio" }).click();
+    await dialog.getByRole("button", { name: "Confirmar cancelación" }).click();
     await expect(dialog).not.toBeVisible();
 
     await expect(detailRegion.getByText("Cancelado").first()).toBeVisible();
@@ -912,7 +897,7 @@ test.describe("Office cancels a Service @smoke", () => {
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
     const row = table.locator('tr[data-service-id="SVC-1091"]');
     await row.click();
-    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+    await page.getByRole("button", { name: "Ver detalle" }).click();
 
     const detailRegion = page.getByRole("region", { name: /Detalle completo de/ });
     await expect(detailRegion).toBeVisible();
@@ -925,7 +910,7 @@ test.describe("Office cancels a Service @smoke", () => {
     await expect(dialog.getByRole("button", { name: /fecha/i })).toHaveCount(0);
 
     await dialog.getByLabel(/^Motivo/i).fill("Ya no se requiere el servicio.");
-    await dialog.getByRole("button", { name: "Cancelar servicio" }).click();
+    await dialog.getByRole("button", { name: "Confirmar cancelación" }).click();
     await expect(dialog).not.toBeVisible();
 
     await expect(detailRegion.getByText("Cancelado").first()).toBeVisible();
@@ -940,7 +925,7 @@ test.describe("Office cancels a Service @smoke", () => {
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
     const row = table.locator('tr[data-service-id="SVC-1092"]');
     await row.click();
-    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+    await page.getByRole("button", { name: "Ver detalle" }).click();
 
     const detailRegion = page.getByRole("region", { name: /Detalle completo de/ });
     await expect(detailRegion).toBeVisible();
@@ -949,7 +934,7 @@ test.describe("Office cancels a Service @smoke", () => {
     await detailRegion.getByRole("button", { name: "Cancelar servicio" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel(/^Motivo/i).fill("Contenedor reemplazado por otra vía.");
-    await dialog.getByRole("button", { name: "Cancelar servicio" }).click();
+    await dialog.getByRole("button", { name: "Confirmar cancelación" }).click();
     await expect(dialog).not.toBeVisible();
 
     await expect(detailRegion.getByText("Cancelado").first()).toBeVisible();
@@ -962,7 +947,7 @@ test.describe("Office cancels a Service @smoke", () => {
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
     const row = table.locator('tr[data-service-id="SVC-1093"]');
     await row.click();
-    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+    await page.getByRole("button", { name: "Ver detalle" }).click();
 
     const detailRegion = page.getByRole("region", { name: /Detalle completo de/ });
     await expect(detailRegion).toBeVisible();

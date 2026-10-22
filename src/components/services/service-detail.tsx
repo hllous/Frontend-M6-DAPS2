@@ -9,11 +9,9 @@ import {
   Clock,
   CloudOff,
   FileText,
-  MapPin,
   Pause,
   Play,
   PlayCircle,
-  Route,
   Siren,
   Truck,
   Users,
@@ -229,29 +227,13 @@ export function ServiceDetail({
               Solo consulta
             </span>
           )}
-          <span className="text-xs font-medium text-[var(--color-text-secondary)]">
-            Detalle operativo
-          </span>
         </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <section aria-labelledby="service-detail-content-heading" className="flex-1 overflow-y-auto p-6 min-[761px]:p-8 space-y-6">
-          <h2 id="service-detail-content-heading" className="sr-only">Detalle operativo del servicio</h2>
+        <section aria-label="Servicio" className="flex-1 overflow-y-auto p-6 min-[761px]:p-8 space-y-6">
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-              {service.mode === "ROUTE" ? (
-                <span className="inline-flex items-center gap-1.5 text-[var(--color-action)]">
-                  <Route className="h-4 w-4" aria-hidden />
-                  Servicio en Recorrido
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-[var(--color-action)]">
-                  <MapPin className="h-4 w-4" aria-hidden />
-                  Servicio en Punto
-                </span>
-              )}
-              <span>·</span>
               <span>{service.serviceTypeName}</span>
             </div>
 
@@ -270,7 +252,7 @@ export function ServiceDetail({
           {service.statusReason && (
             <div className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4">
               <h3 className="text-xs font-bold text-[var(--color-warning)] uppercase tracking-wide">
-                Motivo de estado
+                Motivo
               </h3>
               <p className="mt-1 text-sm text-[var(--color-warning)]">
                 {service.statusReason}
@@ -281,10 +263,10 @@ export function ServiceDetail({
           {streetClosureDependencyLoading && (
             <div
               role="status"
-              aria-label="Verificando dependencia de corte de calle"
+              aria-label="Verificando el corte de calle…"
               className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-4 text-sm text-[var(--color-text-secondary)]"
             >
-              Verificando la respuesta de M7 antes de habilitar la ejecución…
+              Verificando el corte de calle…
             </div>
           )}
 
@@ -307,12 +289,8 @@ export function ServiceDetail({
             >
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-warning)]">
                 <Siren className="h-4 w-4" aria-hidden />
-                Corte de calle pendiente
+                Corte de calle pendiente de Tránsito
               </div>
-              <p className="mt-1 text-sm text-[var(--color-warning)]">
-                El inicio de todo el Servicio está bloqueado hasta recibir la respuesta de M7; un
-                Servicio en Recorrido no puede ejecutarse parcialmente.
-              </p>
             </Alert>
           )}
 
@@ -323,8 +301,7 @@ export function ServiceDetail({
               aria-label="Corte de calle aprobado"
               className="p-4 text-sm text-[var(--color-success)]"
             >
-              <p className="font-bold">Corte de calle aprobado por M7</p>
-              <p className="mt-1">El Servicio puede iniciar. Su estado permanece sin cambios hasta ejecutar la acción.</p>
+              <p className="font-bold">Corte de calle aprobado</p>
             </Alert>
           )}
 
@@ -336,7 +313,6 @@ export function ServiceDetail({
               className="p-4 text-sm text-[var(--color-success)]"
             >
               <p className="font-bold">Corte de calle finalizado</p>
-              <p className="mt-1">La dependencia quedó liberada; el estado del Servicio no se reabre ni se modifica.</p>
             </Alert>
           )}
 
@@ -352,7 +328,7 @@ export function ServiceDetail({
                 Corte de calle vencido
               </div>
               <p className="mt-1 text-sm text-[var(--color-warning)]">
-                El corte aprobado venció sin activarse. Si el Servicio no había iniciado, quedó para reprogramar.
+                El corte venció sin usarse.
               </p>
             </Alert>
           )}
@@ -369,18 +345,18 @@ export function ServiceDetail({
                 Corte de calle rechazado
               </div>
               <p className="mt-1 text-sm text-[var(--color-danger)]">
-                M7 rechazó la solicitud. Oficina debe decidir explícitamente si reprogramar o cancelar el Servicio.
+                Tránsito rechazó el corte. Reprograme o cancele el servicio.
               </p>
               {(onRejectedClosureReschedule || onRejectedClosureCancel) && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {onRejectedClosureReschedule && (
                     <Button variant="outline" size="sm" onClick={() => onRejectedClosureReschedule(service)}>
-                      Reprogramar servicio por rechazo de corte
+                      Reprogramar
                     </Button>
                   )}
                   {onRejectedClosureCancel && (
                     <Button variant="outline" size="sm" onClick={() => onRejectedClosureCancel(service)}>
-                      Cancelar servicio por rechazo de corte
+                      Cancelar servicio
                     </Button>
                   )}
                 </div>
@@ -415,8 +391,7 @@ export function ServiceDetail({
                 Borrador local pendiente
               </div>
               <p className="mt-1 text-sm text-[var(--color-warning)]">
-                No se pudo conectar con el servidor al iniciar el servicio. La acción se conservó en
-                este dispositivo; reenvíela manualmente cuando recupere la conexión.
+                Sin conexión. Se guardó en este dispositivo; reenvíe cuando vuelva la conexión.
               </p>
             </Alert>
           )}
@@ -429,7 +404,7 @@ export function ServiceDetail({
             >
               <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-danger)] uppercase tracking-wide">
                 <AlertTriangle className="h-4 w-4" aria-hidden />
-                Error al iniciar servicio
+                No se pudo iniciar el servicio.
               </div>
               <p className="mt-1 text-sm text-[var(--color-danger)]">
                 {startError}
@@ -448,8 +423,7 @@ export function ServiceDetail({
                 Borrador local pendiente
               </div>
               <p className="mt-1 text-sm text-[var(--color-warning)]">
-                No se pudo conectar con el servidor al reanudar el servicio. La acción se conservó en
-                este dispositivo; reenvíela manualmente cuando recupere la conexión.
+                Sin conexión. Se guardó en este dispositivo; reenvíe cuando vuelva la conexión.
               </p>
             </Alert>
           )}
@@ -462,7 +436,7 @@ export function ServiceDetail({
             >
               <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-danger)] uppercase tracking-wide">
                 <AlertTriangle className="h-4 w-4" aria-hidden />
-                Error al reanudar servicio
+                No se pudo reanudar el servicio.
               </div>
               <p className="mt-1 text-sm text-[var(--color-danger)]">
                 {resumeError}
@@ -475,7 +449,7 @@ export function ServiceDetail({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">
                   <Users className="h-4 w-4 text-[var(--color-action)]" aria-hidden />
-                  Cuadrilla asignada
+                  Cuadrilla
                 </div>
                 {onAssignCrew && (service.status === "SCHEDULED" || service.status === "RESCHEDULED") && (
                   <Button
@@ -492,9 +466,6 @@ export function ServiceDetail({
               <div className="mt-2 text-sm font-bold text-[var(--color-text)]">
                 {service.crewName ?? "Sin asignar"}
               </div>
-              <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                {service.crewId ? "Asignación vigente" : "Pendiente de coordinación"}
-              </div>
             </div>
 
             <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-canvas)]">
@@ -507,31 +478,27 @@ export function ServiceDetail({
               </div>
               <div className="mt-1 flex items-center gap-1 text-xs text-[var(--color-text-secondary)] tabular-nums">
                 <Clock className="h-3.5 w-3.5" aria-hidden />
-                Ventana: {service.windowFrom ? `${service.windowFrom} – ${service.windowTo ?? ""}` : "No establecida"}
+                Horario: {service.windowFrom ? `${service.windowFrom} – ${service.windowTo ?? ""}` : "sin definir"}
               </div>
             </div>
 
             <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-canvas)]">
               <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">
                 <Truck className="h-4 w-4 text-[var(--color-action)]" aria-hidden />
-                Vehículo operativo
+                Vehículo
               </div>
               <div className="mt-2 text-sm font-bold text-[var(--color-text)]">
                 {service.vehiclePlate ?? "Sin vehículo"}
-              </div>
-              <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                {service.vehicleId ? (service.vehiclePlate ? "Vehículo asignado" : "Patente no disponible") : "Sin requerimiento especial"}
               </div>
             </div>
           </div>
 
           <div className="rounded-xl border border-[var(--color-border)] p-5 space-y-4">
             <h3 className="text-sm font-bold text-[var(--color-text)] uppercase tracking-wide">
-              Alcance y delimitación territorial
+              Zonas
             </h3>
             <div className="grid gap-3 sm:grid-cols-2 text-xs">
               <div>
-                <span className="font-semibold text-[var(--color-text-secondary)]">Zonas operativas:</span>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {service.zoneNames.map((zn) => (
                     <span key={zn} className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2 py-0.5 font-medium text-[var(--color-text)]">
@@ -542,19 +509,19 @@ export function ServiceDetail({
               </div>
               {service.routeName && (
                 <div>
-                  <span className="font-semibold text-[var(--color-text-secondary)]">Recorrido asignado:</span>
+                  <span className="font-semibold text-[var(--color-text-secondary)]">Recorrido:</span>
                   <p className="mt-1 font-medium text-[var(--color-text)]">{service.routeName}</p>
                 </div>
               )}
               {service.targetRef && (
                 <div>
-                  <span className="font-semibold text-[var(--color-text-secondary)]">Bien de inventario / Objetivo:</span>
+                  <span className="font-semibold text-[var(--color-text-secondary)]">Objetivo:</span>
                   <p className="mt-1 font-medium text-[var(--color-text)]">{service.targetRef} ({serviceTargetTypeLabel(service.targetType)})</p>
                 </div>
               )}
               {service.ticketId && (
                 <div>
-                  <span className="font-semibold text-[var(--color-text-secondary)]">Reclamo ciudadano (M2):</span>
+                  <span className="font-semibold text-[var(--color-text-secondary)]">Reclamo:</span>
                   <p className="mt-1 font-medium text-[var(--color-text)]">{service.ticketId}</p>
                 </div>
               )}
@@ -565,7 +532,7 @@ export function ServiceDetail({
             <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-surface-subtle)]">
               <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wide">
                 <FileText className="h-4 w-4" aria-hidden />
-                Notas operativas de despacho
+                Notas
               </div>
               <p className="mt-2 text-sm text-[var(--color-text)]">
                 {service.notes}
@@ -581,11 +548,8 @@ export function ServiceDetail({
               <div>
                 <h2 id="service-repair-requests-title" className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-[var(--color-text)]">
                   <Wrench className="h-4 w-4 text-[var(--color-action)]" aria-hidden />
-                  Derivaciones de reparación
+                  Derivaciones
                 </h2>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  Seguimiento de daños referidos a M3 desde este Servicio.
-                </p>
               </div>
 
               {repairRequestsLoading ? (
@@ -593,9 +557,9 @@ export function ServiceDetail({
               ) : repairRequestsError ? (
                 <p role="alert" className="text-sm text-[var(--color-danger)]">{repairRequestsError}</p>
               ) : repairRequests.length === 0 ? (
-                <p className="text-sm text-[var(--color-text-secondary)]">Este Servicio todavía no tiene derivaciones de reparación.</p>
+                <p className="text-sm text-[var(--color-text-secondary)]">Sin derivaciones.</p>
               ) : (
-                <ul className="space-y-3" aria-label="Derivaciones de reparación del Servicio">
+                <ul className="space-y-3" aria-label="Derivaciones">
                   {repairRequests.map((request) => (
                     <li key={request.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
                       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -605,10 +569,10 @@ export function ServiceDetail({
                         </span>
                       </div>
                       <div className="mt-2 grid gap-1 text-xs text-[var(--color-text-secondary)] sm:grid-cols-2">
-                        <span>Daño: <strong className="text-[var(--color-text)]">{REPAIR_DAMAGE_TYPE_LABEL[request.damageType]}</strong></span>
-                        <span>Severidad: <strong className="text-[var(--color-text)]">{REPAIR_SEVERITY_LABEL[request.severity]}</strong></span>
-                        <span>Ubicación: <strong className="text-[var(--color-text)]">{request.address}</strong></span>
-                        <span>Riesgo público: <strong className="text-[var(--color-text)]">{request.publicSafetyRisk ? "Sí" : "No"}</strong></span>
+                        <span><strong className="text-[var(--color-text)]">{REPAIR_DAMAGE_TYPE_LABEL[request.damageType]}</strong></span>
+                        <span><strong className="text-[var(--color-text)]">{REPAIR_SEVERITY_LABEL[request.severity]}</strong></span>
+                        <span><strong className="text-[var(--color-text)]">{request.address}</strong></span>
+                        {request.publicSafetyRisk ? <span><strong className="text-[var(--color-text)]">Riesgo</strong></span> : null}
                       </div>
                     </li>
                   ))}
@@ -642,7 +606,7 @@ export function ServiceDetail({
         {/* Persistent Related items panel (per ADR and UI architecture) */}
         <aside className="hidden w-72 shrink-0 border-l border-[var(--color-border)] bg-[var(--color-canvas)] p-5 min-[761px]:block overflow-y-auto" aria-label="Elementos relacionados">
           <h3 className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">
-            Contexto relacionado
+            Relacionado
           </h3>
           <ul className="mt-3 space-y-3 text-xs">
             <li className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
@@ -652,7 +616,7 @@ export function ServiceDetail({
             {service.targetRef ? (
               <li className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
                 <span className="text-[var(--color-text-secondary)] block font-medium">
-                  {service.targetType === "TREE" ? "Árboles vinculados" : "Objetivo"}
+                  {service.targetType === "TREE" ? "Árboles" : "Objetivo"}
                 </span>
                 <span className="font-bold text-[var(--color-text)] mt-0.5 block">{service.targetRef}</span>
               </li>

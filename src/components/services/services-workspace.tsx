@@ -333,7 +333,7 @@ export function ServicesWorkspace({
           services.push(...next.services);
           totalPages = next.totalPages;
         }
-        if (totalPages > 20) throw new RangeError("El período tiene demasiados servicios; acote el período.");
+        if (totalPages > 20) throw new RangeError("Hay demasiados servicios en el período. Elija un período más corto.");
         if (isCurrent) {
           loadedScopeRef.current = scopeKey;
           setLoadState({ status: "ready", services });
@@ -344,8 +344,8 @@ export function ServicesWorkspace({
         if (!isCurrent) return;
         const msg =
           cause instanceof RangeError ? cause.message : cause instanceof ServiceRequestError
-            ? `Error del servidor (${cause.status}): ${cause.message}`
-            : "No se pudieron cargar los servicios operativos.";
+            ? "No se pudieron cargar los servicios. Intente nuevamente."
+            : "No se pudieron cargar los servicios. Intente nuevamente.";
         if (keepCurrentWorkspace) {
           setIsRefreshing(false);
           setRefreshError(msg);
@@ -532,7 +532,7 @@ export function ServicesWorkspace({
       if (!isCurrent) return;
       setResolvedDetail({
         id: detailId, service: null,
-        error: cause instanceof ServiceRequestError && cause.status === 404 ? undefined : "No se pudo cargar el detalle del servicio.",
+        error: cause instanceof ServiceRequestError && cause.status === 404 ? undefined : "No se pudo cargar el servicio. Intente nuevamente.",
       });
     });
     return () => { isCurrent = false; };
@@ -556,7 +556,7 @@ export function ServicesWorkspace({
         if (isCurrent) setRepairRequests((current) => ({ ...current, [detailService.id]: page.repairRequests }));
       })
       .catch(() => {
-        if (isCurrent) setRepairRequestsErrors((current) => ({ ...current, [detailService.id]: "No se pudieron cargar las derivaciones de este Servicio." }));
+        if (isCurrent) setRepairRequestsErrors((current) => ({ ...current, [detailService.id]: "No se pudieron cargar las derivaciones." }));
       });
 
     return () => {
@@ -679,7 +679,7 @@ export function ServicesWorkspace({
         setStreetClosureDependencyState({
           serviceId: detailId,
           dependency: null,
-          error: errorMessage(cause, "No se pudo consultar la respuesta de M7."),
+          error: errorMessage(cause, "No se pudo consultar el estado del corte. Intente nuevamente."),
         });
       });
 
@@ -870,7 +870,7 @@ export function ServicesWorkspace({
     return (
       <>
         {!windowDetailService && (
-          <p role="status" className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">Este servicio está fuera del período seleccionado.</p>
+          <p role="status" className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">Fuera del período elegido.</p>
         )}
         <ServiceDetail
           service={detailService}
@@ -1010,7 +1010,7 @@ export function ServicesWorkspace({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-lg font-bold tracking-tight text-[var(--color-text)]">
-              Servicios Urbanos
+              Servicios
             </h1>
           </div>
 
@@ -1025,7 +1025,7 @@ export function ServicesWorkspace({
                 maxLength={MAX_SEARCH_LENGTH}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={isNarrow ? "Buscar" : "Buscar servicio, zona o cuadrilla…"}
-                aria-label="Buscar servicios por texto libre"
+                aria-label="Buscar servicios"
                 className="rounded-xl pl-8 pr-8 text-xs"
               />
               {search && (
@@ -1048,7 +1048,7 @@ export function ServicesWorkspace({
                 size="sm"
                 onClick={handleClearFilters}
                 className="text-xs text-[var(--color-action)] font-semibold"
-                aria-label="Limpiar todos los filtros aplicados"
+                aria-label="Limpiar filtros"
               >
                 <FilterX data-icon="inline-start" aria-hidden />
                 <span>Limpiar filtros</span>
@@ -1065,7 +1065,7 @@ export function ServicesWorkspace({
                   setIsScheduleOpen(true);
                 }}
                 className={cn("text-xs font-semibold gap-1.5 shrink-0", isNarrow && "h-12 px-3")}
-                aria-label="Programar nuevo servicio"
+                aria-label="Programar servicio"
               >
                 <Plus className="h-3.5 w-3.5" aria-hidden />
                 <span>{isNarrow ? "Programar" : "Programar servicio"}</span>
@@ -1127,7 +1127,7 @@ export function ServicesWorkspace({
               {periodBar}
               {refreshError && (
                 <p role="alert" className={cn("px-4 py-1.5 text-xs text-[var(--color-danger)]", isNarrow && "basis-full")}>
-                  No se pudieron actualizar los servicios. Se mantienen los resultados anteriores.
+                  No se pudo actualizar. Se muestran los datos anteriores.
                 </p>
               )}
               <ServicesColumnEditor controller={columnPreferences} />
@@ -1175,7 +1175,7 @@ export function ServicesWorkspace({
                 <ResizableHandle
                   withHandle={false}
                   disabled={isNarrow}
-                  aria-label="Ajustar ancho entre mapa y tabla"
+                  aria-label="Ajustar ancho del mapa"
                   className={cn(styles.mobileResizeHandle, isNarrow && "hidden")}
                 />
 

@@ -598,13 +598,11 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(await within(detail).findByRole("button", { name: "Reprogramar inspección" }));
     const reasonDialog = await screen.findByRole("dialog", { name: /^Reprogramar/ });
     await user.type(within(reasonDialog).getByLabelText(/Motivo/), "Alerta meteorológica");
-    await user.click(within(reasonDialog).getByRole("button", { name: "Mover a reprogramar" }));
 
-    const confirmDialog = await screen.findByRole("dialog", { name: /^Confirmar reprogramación de/ });
-    await user.click(within(confirmDialog).getByRole("button", { name: /^Nueva fecha/ }));
+    await user.click(within(reasonDialog).getByRole("button", { name: /^Nueva fecha/ }));
     await user.click(await screen.findByRole("button", { name: "Mes siguiente" }));
     await user.click(within(await screen.findByRole("grid")).getByRole("button", { name: /, 15 de / }));
-    await user.click(within(confirmDialog).getByRole("button", { name: "Confirmar nueva fecha" }));
+    await user.click(within(reasonDialog).getByRole("button", { name: "Reprogramar" }));
 
     await waitFor(() => expect(confirmReschedule).toHaveBeenCalledWith("SVC-1072", { scheduledDate: expect.stringMatching(/^\d{4}-\d{2}-15$/), timeWindow: { start: "13:00", end: "16:00" } }));
     expect(reschedule).toHaveBeenCalledWith("SVC-1072", { reason: "Alerta meteorológica" });
@@ -730,13 +728,13 @@ describe("EnvironmentalReportsWorkspace", () => {
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("Contexto de origen INS-1012")).toBeVisible();
     expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2450");
-    expect(within(dialog).getByRole("link", { name: /Ver inspección fuente/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
+    expect(within(dialog).getByRole("link", { name: /Ver inspección/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
     await user.click(within(dialog).getByRole("combobox", { name: /^Severidad/ }));
     await user.click(screen.getByRole("option", { name: "Baja" }));
-    await user.click(within(dialog).getByRole("radio", { name: /^Sí,/ }));
-    await user.click(within(dialog).getByRole("button", { name: /Crear deriv.*a M3/ }));
+    await user.click(within(dialog).getByRole("radio", { name: "Sí" }));
+    await user.click(within(dialog).getByRole("button", { name: "Derivar" }));
 
-    expect(await within(dialog).findByText(/pendiente de respuesta de M3/i)).toBeVisible();
+    expect(await within(dialog).findByText(/Derivada a Obras Públicas/i)).toBeVisible();
     const created = await repairRequestsAdapter.list({ detectedInId: "INS-1012" });
     expect(created.repairRequests).toHaveLength(1);
     expect(created.repairRequests[0]).toMatchObject({
@@ -767,9 +765,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1012" });
     await user.click(await within(detail).findByRole("button", { name: "Crear derivación de reparación" }));
     const dialog = screen.getByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: /Crear deriv.*a M3/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Derivar" }));
 
-    expect(await within(dialog).findByText(/Derivación sin enviar/i)).toBeVisible();
+    expect(await within(dialog).findByText("Sin enviar")).toBeVisible();
     expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2450");
     const notCreated = await repairRequestsAdapter.list({ detectedInId: "INS-1012" });
     expect(notCreated.repairRequests).toHaveLength(0);

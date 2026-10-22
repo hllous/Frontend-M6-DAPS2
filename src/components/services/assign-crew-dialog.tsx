@@ -13,7 +13,6 @@ import {
   RefreshCw,
   Route,
   Truck,
-  Users,
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -22,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -133,7 +131,7 @@ function AssignCrewForm({
         if (active) {
           setResources({
             status: "error",
-            message: getErrorMessage(cause, "No se pudieron cargar los datos de la asignación."),
+            message: getErrorMessage(cause, "No se pudo cargar el formulario. Intente nuevamente."),
           });
         }
       });
@@ -164,19 +162,19 @@ function AssignCrewForm({
 
     if (!crewId) {
       setErrorMessage(null);
-      setFieldErrors({ crew: "Debe seleccionar una cuadrilla asignada." });
+      setFieldErrors({ crew: "Seleccione una cuadrilla." });
       return;
     }
 
     if (requiresVehicle && (!vehicleId || !vehicleId.trim())) {
       setErrorMessage(null);
-      setFieldErrors({ vehicle: "El tipo de servicio requiere la asignación obligatoria de un vehículo operativo." });
+      setFieldErrors({ vehicle: "Seleccione un vehículo." });
       return;
     }
 
     if (needsOverrideNote && overrideNote.trim().length < OVERRIDE_NOTE_MIN) {
       setErrorMessage(null);
-      setFieldErrors({ overrideNote: `Hay un solapamiento: justifique la asignación en al menos ${OVERRIDE_NOTE_MIN} caracteres.` });
+      setFieldErrors({ overrideNote: `Escriba al menos ${OVERRIDE_NOTE_MIN} caracteres.` });
       return;
     }
 
@@ -196,17 +194,17 @@ function AssignCrewForm({
       if (cause instanceof ServiceRequestError && cause.status === 409) {
         const hasAdvisoryOverlap = Boolean(conflicts.crewConflict || conflicts.vehicleConflict);
         if (hasAdvisoryOverlap) {
-          setBackendConflict(cause.message);
+          setBackendConflict("Otra asignación ocupa esa cuadrilla en el mismo horario.");
         } else {
           setBackendConflict(null);
           setErrorMessage(
-            "El servicio cambió desde que abrió esta ventana. Actualice la lista e intente de nuevo.",
+            "El servicio cambió. Actualice la lista e intente nuevamente.",
           );
         }
         return;
       }
       const msg =
-        getErrorMessage(cause, "Ocurrió un error al procesar la asignación de recursos.");
+        getErrorMessage(cause, "No se pudo asignar. Intente nuevamente.");
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
@@ -229,14 +227,7 @@ function AssignCrewForm({
   return (
     <>
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          <Users className="size-4 text-primary" aria-hidden />
-          <span>Despacho y asignación operativa</span>
-        </div>
         <DialogTitle>Asignar cuadrilla y vehículo</DialogTitle>
-        <DialogDescription>
-          Asigne la cuadrilla operativa y los recursos vehiculares requeridos para la ejecución territorial del servicio.
-        </DialogDescription>
       </DialogHeader>
 
       <div ref={scrollRef} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
@@ -295,7 +286,7 @@ function AssignCrewForm({
         {resources.status === "loading" && (
           <Alert variant="info" role="status">
             <Spinner aria-hidden="true" />
-            <AlertDescription>Cargando cuadrillas, vehículos y requisitos del tipo de servicio…</AlertDescription>
+            <AlertDescription>Cargando…</AlertDescription>
           </Alert>
         )}
 
@@ -341,7 +332,7 @@ function AssignCrewForm({
                   id={`${formId}-crew`}
                   aria-required="true"
                   aria-invalid={Boolean(fieldErrors.crew) || undefined}
-                  aria-describedby={fieldErrors.crew ? `${formId}-crew-desc ${formId}-crew-error` : `${formId}-crew-desc`}
+                  aria-describedby={fieldErrors.crew ? `${formId}-crew-error` : undefined}
                 >
                   <SelectValue placeholder="Seleccione una cuadrilla…" />
                 </SelectTrigger>
@@ -355,9 +346,6 @@ function AssignCrewForm({
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              <FieldDescription id={`${formId}-crew-desc`}>
-                Equipo municipal o de cooperativa responsable de la ejecución del servicio.
-              </FieldDescription>
               {fieldErrors.crew && <FieldError id={`${formId}-crew-error`}>{fieldErrors.crew}</FieldError>}
             </Field>
 
@@ -385,7 +373,7 @@ function AssignCrewForm({
                   id={`${formId}-vehicle`}
                   aria-required={requiresVehicle || undefined}
                   aria-invalid={Boolean(fieldErrors.vehicle) || undefined}
-                  aria-describedby={fieldErrors.vehicle ? `${formId}-vehicle-desc ${formId}-vehicle-error` : `${formId}-vehicle-desc`}
+                  aria-describedby={fieldErrors.vehicle ? `${formId}-vehicle-error` : undefined}
                 >
                   <SelectValue placeholder={requiresVehicle ? "Seleccione un vehículo requerido…" : "Sin vehículo asignado"} />
                 </SelectTrigger>
@@ -400,11 +388,6 @@ function AssignCrewForm({
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              <FieldDescription id={`${formId}-vehicle-desc`}>
-                {requiresVehicle
-                  ? "Requerido por la especificación técnica del tipo de servicio (ej. recolección o barrido mecánico)."
-                  : "Opcional según los requerimientos operativos de la cuadrilla para este tipo de servicio."}
-              </FieldDescription>
               {fieldErrors.vehicle && <FieldError id={`${formId}-vehicle-error`}>{fieldErrors.vehicle}</FieldError>}
             </Field>
           </FieldGroup>
@@ -412,7 +395,7 @@ function AssignCrewForm({
           {needsOverrideNote && (
             <Alert variant="warning" role="alert">
               <AlertTriangle aria-hidden />
-              <AlertTitle className="font-semibold uppercase tracking-wider">Aviso de superposición horaria</AlertTitle>
+              <AlertTitle className="font-semibold uppercase tracking-wider">Se superpone con otro servicio</AlertTitle>
               <AlertDescription className="flex flex-col gap-2">
                 {conflicts.crewConflict && (
                   <p>
@@ -436,7 +419,7 @@ function AssignCrewForm({
 
                 <p className="flex items-center gap-1.5 border-t border-[var(--color-warning-line)] pt-2 text-xs font-medium">
                   <Info className="size-3.5 shrink-0" aria-hidden />
-                  Se puede asignar igual, pero hay que justificar por qué: la justificación queda registrada con la asignación.
+                  Justifique la asignación.
                 </p>
               </AlertDescription>
             </Alert>

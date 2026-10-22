@@ -28,7 +28,7 @@ describe("CreateRepairRequestDialog", () => {
     render(<CreateRepairRequestDialog open service={service} onOpenChange={() => undefined} onCreated={() => undefined} />);
     const dialog = screen.getByRole("dialog");
 
-    await user.click(screen.getByRole("button", { name: /Crear deriv.*a M3/ }));
+    await user.click(screen.getByRole("button", { name: "Derivar" }));
     expect(screen.getByText("Debe indicar la ubicación del daño.")).toBeVisible();
 
     const damageType = screen.getByRole("combobox", { name: /Tipo de daño/ });
@@ -38,23 +38,23 @@ describe("CreateRepairRequestDialog", () => {
     expect(address).toHaveAttribute("data-slot", "input");
     await user.click(severity);
     await user.click(await screen.findByRole("option", { name: "Baja" }));
-    await user.click(screen.getByRole("radio", { name: /^Sí,/ }));
+    await user.click(screen.getByRole("radio", { name: "Sí" }));
     await user.type(screen.getByLabelText(/^Ubic/), "Av. Rivadavia 2200");
-    await user.click(screen.getByRole("button", { name: /Crear deriv.*a M3/ }));
+    await user.click(screen.getByRole("button", { name: "Derivar" }));
 
-    await waitFor(() => expect(screen.getByText(/pendiente de respuesta de M3/i)).toBeVisible());
+    await waitFor(() => expect(screen.getByText(/Derivada a Obras Públicas/i)).toBeVisible());
     expect(dialog).toHaveTextContent("SVC-1043");
   });
 
-  it("shows an Unsent referral and retains entered values after a network failure", async () => {
+  it("shows an unsent referral and retains entered values after a network failure", async () => {
     server.use(http.post("*/api/repair-requests", () => HttpResponse.error()));
     const user = userEvent.setup();
     render(<CreateRepairRequestDialog open service={service} onOpenChange={() => undefined} onCreated={() => undefined} />);
 
     await user.type(screen.getByLabelText(/^Ubic/), "Av. Rivadavia 2200");
-    await user.click(screen.getByRole("button", { name: /Crear deriv.*a M3/ }));
+    await user.click(screen.getByRole("button", { name: "Derivar" }));
 
-    await waitFor(() => expect(screen.getByText(/Unsent referral/i)).toBeVisible());
+    await waitFor(() => expect(screen.getByText("Sin enviar")).toBeVisible());
     expect(screen.getByLabelText(/^Ubic/)).toHaveValue("Av. Rivadavia 2200");
     expect(window.localStorage.length).toBe(1);
   });
@@ -98,10 +98,10 @@ describe("CreateRepairRequestDialog", () => {
 
     render(<CreateRepairRequestDialog open service={service} onOpenChange={() => undefined} onCreated={() => undefined} />);
 
-    expect(await screen.findByText("Unsent referral")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Verificar y reenviar derivación" }));
+    expect(await screen.findByText("Sin enviar")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Verificar y reenviar" }));
 
-    expect(await screen.findByText(/cambió mientras su borrador de derivación de reparación/i)).toBeVisible();
+    expect(await screen.findByText(/cambió mientras su borrador de derivación/i)).toBeVisible();
     expect(listQueries).toEqual([
       `?detectedInId=${service.id}`,
       `?detectedInId=${service.id}`,
@@ -144,14 +144,14 @@ describe("CreateRepairRequestDialog", () => {
 
     render(<CreateRepairRequestDialog open service={service} onOpenChange={() => undefined} onCreated={onCreated} />);
     await user.type(screen.getByLabelText(/^Ubic/), "Av. Rivadavia 2200");
-    await user.click(screen.getByRole("button", { name: /Crear deriv.*a M3/ }));
+    await user.click(screen.getByRole("button", { name: "Derivar" }));
 
-    expect(await screen.findByText("Derivación ya registrada.")).toBeVisible();
+    expect(await screen.findByText("Ya estaba derivada.")).toBeVisible();
     expect(screen.getByText("Seguimiento RR-LOST-RESPONSE · Servicio SVC-1043")).toBeVisible();
     expect(createRequests).toBe(1);
     expect(listQueries).toEqual([`?detectedInId=${service.id}`]);
     expect(onCreated).toHaveBeenCalledWith(existingRequest);
-    expect(screen.queryByRole("button", { name: /Verificar y reenviar derivación/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Verificar y reenviar/ })).not.toBeInTheDocument();
     expect(window.localStorage.length).toBe(0);
   });
 });
