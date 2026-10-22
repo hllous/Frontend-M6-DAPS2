@@ -2,7 +2,7 @@
 
 ## Backend context
 
-[`docs/backend-context/`](docs/backend-context/) mirrors Backend's domain model, API standard and endpoint catalogue (Swagger at `/api/docs`). It is read-only: fix differences in Backend, then re-copy from its `develop`. `CONTRACTS.md` reads endpoint shapes off it; `hypothesis` there means Backend has not confirmed the shape (capability names, M1's JWT claims, client-side-only rules).
+[`docs/backend-context/`](docs/backend-context/) mirrors Backend's domain model, API standard and endpoint catalogue (Swagger at `/api/docs`). It is read-only: fix differences in Backend, then re-copy from its `develop`.
 
 ## Git Flow
 
@@ -23,11 +23,12 @@ Read the one whose trigger applies:
 - Diagnosing slowness, memory growth, Lighthouse audits or runtime errors in the browser (`chrome-devtools` CLI): [`docs/agents/browser-diagnostics.md`](docs/agents/browser-diagnostics.md)
 - Adding or changing a `src/mocks` handler, or testing a BFF route: [`docs/agents/msw-bff-tests.md`](docs/agents/msw-bff-tests.md)
 - Editing the Orca worktree setup script: [`docs/agents/orca-worktree-setup.md`](docs/agents/orca-worktree-setup.md)
-- Changing any `.md`: run `pnpm dlx markdownlint-cli2@0.23.3` and `lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'`; CI runs both. Details: [`docs/README.md`](docs/README.md)
+- Editing overlays (dialogs, sheets, popovers, tooltips) or `eslint-suppressions.json` entries: [`docs/agents/ui-components.md`](docs/agents/ui-components.md)
+- Changing any `.md`: run the markdownlint and lychee checks in [`docs/README.md`](docs/README.md); CI runs both.
 
 ## Cross-repo changes
 
-When work here surfaces something Backend must fix, add, or confirm — a gap, a contract question, a stale doc — file a GitHub issue in `hllous/Backend-M6-DAPS2` rather than only noting it locally (e.g. as a `CONTRACTS.md` "gap identified" row), and link back to the ticket that surfaced it. The same applies in reverse.
+Anything Backend must fix, add or confirm gets an issue in `hllous/Backend-M6-DAPS2`, not just a local note, linked back to the ticket that surfaced it. The same applies in reverse.
 
 ## Domain
 
@@ -39,9 +40,7 @@ Build each UI element from its shadcn equivalent in `src/components/ui/`. A cust
 
 Adapt in order: app-wide visuals through theme tokens in `src/app/globals.css`, project variants in `src/components/ui/`, then shared project compositions there. Screens import from `src/components/ui/` and add layout only. Keep shadcn structure, `data-slot` attributes, and accessibility behavior intact. Use CSS Modules for layout only; style appearance through theme tokens or UI variants.
 
-Shared overlay paint rule: keep translucent flat backdrops static without backdrop blur; animate panels with opacity and transform/translate only, and popups with opacity only; keep shadows static; scope `will-change` to an active transition; disable overlay motion independently for reduced-motion users and detected software renderers; keep resize work event-driven and out of per-frame layout loops.
-
-`eslint-suppressions.json` is a ratchet: it only shrinks. Run `pnpm exec eslint . --prune-suppressions` after fixing violations; new entries need PO approval. Tables belong to #520 and skeletons to #525.
+`eslint-suppressions.json` is a ratchet: it only shrinks. Run `pnpm exec eslint . --prune-suppressions` after fixing violations; new entries need PO approval.
 
 Format dates and times for `es-AR`, with Monday-first weeks, `dd/mm/aaaa`, and 24-hour time; preserve API value formats.
 

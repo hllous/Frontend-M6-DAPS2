@@ -10,4 +10,5 @@ Estas guías amplían las instrucciones de [`AGENTS.md`](../../AGENTS.md), que s
 - [Diagnóstico en el navegador](browser-diagnostics.md): cómo medir rendimiento, memoria, auditorías Lighthouse y errores de runtime con el CLI `chrome-devtools`.
 - [Setup de worktrees en Orca](orca-worktree-setup.md): script de setup que Orca corre en Windows.
 - [Domain docs](domain.md): cómo consultar y mantener contexto y decisiones del dominio.
+- [Componentes UI](ui-components.md): regla de pintado de overlays y dueños de las supresiones de ESLint.
 - [MSW y rutas BFF](msw-bff-tests.md): cómo probar rutas reales desde handlers Node y mantener el worker del navegador sin imports server-only.
