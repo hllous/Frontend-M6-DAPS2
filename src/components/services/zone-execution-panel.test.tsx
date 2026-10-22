@@ -108,7 +108,7 @@ describe("ZoneExecutionPanel component", () => {
       http.get("*/api/evidence", () => HttpResponse.json([])),
     );
     render(<ZoneExecutionPanel service={mockPointService} />);
-    expect(await screen.findByText("Sin archivos adjuntos.")).toBeVisible();
+    expect(await screen.findByText("Sin archivos.")).toBeVisible();
     expect(screen.getByText("Evidencia adjunta (0):")).toBeVisible();
   });
 
@@ -142,7 +142,7 @@ describe("ZoneExecutionPanel component", () => {
     );
     render(<ZoneExecutionPanel service={mockPointService} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo cargar la evidencia.");
-    expect(screen.queryByText("Sin archivos adjuntos.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sin archivos.")).not.toBeInTheDocument();
   });
 
   it("fetches the newly selected result without showing evidence from the previous zone", async () => {
@@ -165,7 +165,7 @@ describe("ZoneExecutionPanel component", () => {
     render(<ZoneExecutionPanel service={mockRouteService} />);
     expect(await screen.findByText("centro.jpg")).toBeVisible();
     await user.click(screen.getAllByRole("button", { name: /zona norte/i })[0]);
-    expect(await screen.findByText("Sin archivos adjuntos.")).toBeVisible();
+    expect(await screen.findByText("Sin archivos.")).toBeVisible();
     expect(screen.queryByText("centro.jpg")).not.toBeInTheDocument();
     expect(owners).toEqual(["ZR-CENTRO-316", "ZR-NORTE-316"]);
   });
@@ -175,10 +175,10 @@ describe("ZoneExecutionPanel component", () => {
       <ZoneExecutionPanel service={mockRouteService} canExecute={true} />,
     );
 
-    expect(screen.getByRole("heading", { name: "Registro de ejecución de zonas" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Zonas" })).toBeVisible();
 
     // Check desktop zone navigation list items
-    const nav = screen.getByRole("region", { name: /registro de ejecución de zonas/i });
+    const nav = screen.getByRole("region", { name: /^zonas$/i });
     expect(nav).toBeVisible();
 
     // Both zones are listed with initial "Pendiente" tags
@@ -187,7 +187,7 @@ describe("ZoneExecutionPanel component", () => {
 
     // Initial selected zone is shown in form header
     expect(screen.getByRole("heading", { name: "Zona Centro" })).toBeVisible();
-    expect(screen.getByText("Resultado de la zona *")).toBeVisible();
+    expect(screen.getByText("Resultado *")).toBeVisible();
   });
 
   it("supports mobile disclosure toggle and restores focus to toggle button on zone selection", async () => {
@@ -205,7 +205,7 @@ describe("ZoneExecutionPanel component", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "true");
 
     // Select second zone (Zona Norte) from mobile list
-    const mobileList = screen.getByRole("list", { name: "Navegación de zonas del servicio" });
+    const mobileList = screen.getByRole("list", { name: "Zonas" });
     expect(mobileList).toHaveAttribute("data-slot", "item-group");
     const zonaNorteButton = within(mobileList).getByRole("button", { name: /Zona Norte/ });
     await user.click(zonaNorteButton);
@@ -231,16 +231,16 @@ describe("ZoneExecutionPanel component", () => {
     await user.click(partialRadio);
 
     // Reason dropdown appears
-    const reasonCombobox = screen.getByRole("combobox", { name: /motivo de la excepción/i });
+    const reasonCombobox = screen.getByRole("combobox", { name: /^motivo/i });
     expect(reasonCombobox).toBeVisible();
     expect(reasonCombobox).toHaveAttribute("data-slot", "combobox");
 
     // Try submitting without reason and without evidence
-    const submitBtn = screen.getByRole("button", { name: /guardar resultado de zona/i });
+    const submitBtn = screen.getByRole("button", { name: /guardar zona/i });
     await user.click(submitBtn);
 
     // Validation alert surfaces required reason
-    expect(screen.getByRole("alert")).toHaveTextContent(/motivo es obligatorio/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/indique el motivo/i);
 
     // Select a reason
     await user.click(reasonCombobox);
@@ -248,7 +248,7 @@ describe("ZoneExecutionPanel component", () => {
 
     // Try submitting with reason but without evidence
     await user.click(submitBtn);
-    expect(screen.getByRole("alert")).toHaveTextContent(/se requiere adjuntar evidencia/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/adjunte una foto o un acta/i);
   });
 
   it("submits a clean SERVICED result for ROUTE zone in any order and updates result tag", async () => {
@@ -286,11 +286,11 @@ describe("ZoneExecutionPanel component", () => {
     await user.click(zonaNorteButtons[0]);
 
     // Fill notes
-    const notesInput = screen.getByPlaceholderText(/detalles sobre el estado/i);
+    const notesInput = screen.getByPlaceholderText(/detalle \(opcional\)/i);
     await user.type(notesInput, "Barrido completado en Zona Norte");
 
     // Submit clean SERVICED result
-    const submitBtn = screen.getByRole("button", { name: /guardar resultado de zona/i });
+    const submitBtn = screen.getByRole("button", { name: /guardar zona/i });
     await user.click(submitBtn);
 
     // Result tag updates to "Atendida"
@@ -381,7 +381,7 @@ describe("ZoneExecutionPanel component", () => {
 
     // Select Parcial and reason
     await user.click(screen.getByRole("radio", { name: "Parcial" }));
-    await user.click(screen.getByRole("combobox", { name: /motivo de la excepción/i }));
+    await user.click(screen.getByRole("combobox", { name: /^motivo/i }));
     await user.click(await screen.findByRole("option", { name: "Acceso bloqueado" }));
 
     // Select file with raw local filename
@@ -396,7 +396,7 @@ describe("ZoneExecutionPanel component", () => {
     expect(screen.getAllByText("Pendiente").length).toBeGreaterThanOrEqual(1);
 
     // Submit form (first attempt fails in mock handler)
-    const submitBtn = screen.getByRole("button", { name: /guardar resultado de zona/i });
+    const submitBtn = screen.getByRole("button", { name: /guardar zona/i });
     await user.click(submitBtn);
 
     // Retry button appears for that file
@@ -477,13 +477,13 @@ describe("ZoneExecutionPanel component", () => {
 
     render(<ZoneExecutionPanel service={mockRouteService} canExecute />);
     await user.click(screen.getByRole("radio", { name: "Parcial" }));
-    await user.click(screen.getByRole("combobox", { name: /motivo de la excepción/i }));
+    await user.click(screen.getByRole("combobox", { name: /^motivo/i }));
     await user.click(await screen.findByRole("option", { name: "Acceso bloqueado" }));
     await user.upload(screen.getByLabelText("Seleccionar archivo") as HTMLInputElement, [
       new File(["primera"], "zona-a-local.jpg", { type: "image/jpeg" }),
       new File(["segunda"], "zona-a-reintentar.jpg", { type: "image/jpeg" }),
     ]);
-    await user.click(screen.getByRole("button", { name: /guardar resultado de zona/i }));
+    await user.click(screen.getByRole("button", { name: /guardar zona/i }));
 
     expect(await screen.findByRole("button", { name: "Reintentar" })).toBeVisible();
     expect(await screen.findByText("zona-a-subida.jpg")).toBeVisible();
@@ -555,7 +555,7 @@ describe("ZoneExecutionPanel component", () => {
 
     // All zones are recorded (2 of 2)
     await waitFor(() => {
-      expect(screen.getByText("Todas las zonas registradas. Listo para finalizar.")).toBeVisible();
+      expect(screen.getByText("Falta solo completar el servicio.")).toBeVisible();
     });
 
     const completeBtn = screen.getByRole("button", { name: "Completar servicio" });
@@ -575,7 +575,7 @@ describe("ZoneExecutionPanel component", () => {
     );
 
     // Rendered result matches exactly what backend returned
-    expect(screen.getByText(/Servicio finalizado con estado: Parcial/i)).toBeVisible();
+    expect(screen.getByText(/Servicio parcial/i)).toBeVisible();
   });
 
   it("rejects a cleared relocation coordinate before completing the service", async () => {
@@ -607,7 +607,7 @@ describe("ZoneExecutionPanel component", () => {
 
     render(<ZoneExecutionPanel service={relocationService} canExecute />);
 
-    await screen.findByText("Todas las zonas registradas. Listo para finalizar.");
+    await screen.findByText("Falta solo completar el servicio.");
     const latitude = await screen.findByLabelText("Latitud");
     const longitude = screen.getByLabelText("Longitud");
     expect(latitude).toHaveAttribute("data-slot", "input");
@@ -618,7 +618,7 @@ describe("ZoneExecutionPanel component", () => {
     await user.click(screen.getByRole("button", { name: "Completar servicio" }));
 
     expect(
-      await screen.findByText("La latitud es obligatoria para completar la reubicación."),
+      await screen.findByText("Complete la latitud para finalizar."),
     ).toBeVisible();
     expect(completionRequests).toBe(0);
   });
@@ -630,10 +630,9 @@ describe("ZoneExecutionPanel component", () => {
       <ZoneExecutionPanel service={mockPointService} canExecute={true} />,
     );
 
-    expect(screen.getByText(/Servicio puntual: registre el resultado de la zona/i)).toBeVisible();
     // Only single zone is listed
     expect(screen.getAllByText("Zona Centro").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole("button", { name: /guardar resultado de zona/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /guardar zona/i })).toBeVisible();
   });
 
   it("saves a ZoneResult draft on a network failure, then resolves a drift as an explicit conflict rather than applying it", async () => {
@@ -658,32 +657,32 @@ describe("ZoneExecutionPanel component", () => {
 
     render(<ZoneExecutionPanel service={mockRouteService} canExecute={true} />);
 
-    const notesInput = screen.getByPlaceholderText(/detalles sobre el estado/i);
+    const notesInput = screen.getByPlaceholderText(/detalle \(opcional\)/i);
     await user.type(notesInput, "Zona Centro completada normalmente");
 
-    await user.click(screen.getByRole("button", { name: /guardar resultado de zona/i }));
+    await user.click(screen.getByRole("button", { name: /guardar zona/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("status")).toHaveTextContent(/borrador local pendiente/i);
+      expect(screen.getByRole("status")).toHaveTextContent(/Sin conexión\. Se guardó en este dispositivo/i);
     });
     expect(submitAttempts).toBe(1);
 
-    const retryButton = await screen.findByRole("button", { name: "Reintentar envío" });
+    const retryButton = await screen.findByRole("button", { name: "Reenviar" });
     await user.click(retryButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/cambió mientras/i)).toBeVisible();
+      expect(screen.getByText(/Compare y elija qué hacer con lo que cargó/i)).toBeVisible();
     });
     expect(screen.getByText("Cuadrilla C · Ibáñez")).toBeVisible();
     // The draft was never silently applied: no second POST attempt was made
     expect(submitAttempts).toBe(1);
 
-    await user.click(screen.getByRole("button", { name: "Descartar borrador" }));
+    await user.click(screen.getByRole("button", { name: "Descartar lo cargado" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: /guardar resultado de zona/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /guardar zona/i })).toBeVisible();
   });
 
   it("shows read-only view with no state-changing actions for Crew Member (canExecute = false)", () => {
@@ -692,13 +691,10 @@ describe("ZoneExecutionPanel component", () => {
     );
 
     // Explanatory guidance
-    expect(screen.getByText("Resultado pendiente de registro")).toBeVisible();
-    expect(
-      screen.getByText("La persona responsable de la cuadrilla registrará el resultado de esta zona."),
-    ).toBeVisible();
+    expect(screen.getAllByText("Pendiente").length).toBeGreaterThan(1);
 
     // No submit or complete buttons
-    expect(screen.queryByRole("button", { name: /guardar resultado de zona/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /guardar zona/i })).toBeNull();
     expect(screen.queryByRole("button", { name: "Completar servicio" })).toBeNull();
   });
 });

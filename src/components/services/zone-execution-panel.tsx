@@ -48,6 +48,7 @@ import {
   type FieldDraftServiceSnapshot,
 } from "@/lib/field-drafts";
 import { DraftConflictView } from "./draft-conflict-view";
+import { OFFLINE_DRAFT_MESSAGE, OfflineDraftNotice } from "./offline-draft-notice";
 
 interface QueuedEvidenceFile {
   id: string; // client id
@@ -207,7 +208,7 @@ export function ZoneExecutionPanel({
       .catch(() => {
         if (isCurrent) setEvidence({
           ownerId, attachments: [],
-          error: "No se pudo cargar la evidencia. Recargue el servicio para reintentar.",
+          error: "No se pudo cargar la evidencia. Intente nuevamente.",
         });
       });
     return () => { isCurrent = false; };
@@ -284,7 +285,7 @@ export function ZoneExecutionPanel({
       );
       return true;
     } catch (err) {
-      const msg = err instanceof ServiceRequestError ? err.message : "Error al subir el archivo";
+      const msg = err instanceof ServiceRequestError ? err.message : "No se pudo subir el archivo. Intente nuevamente.";
       updateQueuedFilesForZone(item.zoneId, (prev) =>
         prev.map((f) => (f.id === item.id ? { ...f, status: "error", error: msg } : f)),
       );
@@ -296,7 +297,7 @@ export function ZoneExecutionPanel({
     if (!selectedZoneResult) return;
     const uploaded = await uploadSingleFile(item, selectedZoneResult.id);
     if (uploaded) notifySuccess("Evidencia cargada.");
-    else notifyError("No se pudo cargar la evidencia. Puede reintentar la carga.");
+    else notifyError("No se pudo subir la evidencia.");
     const everyFileUploaded =
       uploaded && queuedFiles.every((file) => file.id === item.id || file.status === "success");
     if (everyFileUploaded) updateQueuedFilesForZone(item.zoneId, () => []);
@@ -342,14 +343,12 @@ export function ZoneExecutionPanel({
 
     // Validation
     if (status !== "SERVICED" && !reason) {
-      setFormError("El motivo es obligatorio para resultados parciales o no atendidos.");
+      setFormError("Indique el motivo.");
       return;
     }
 
     if (status !== "SERVICED" && queuedFiles.length === 0) {
-      setFormError(
-        "Se requiere adjuntar evidencia documental o fotográfica para resultados parciales o no atendidos.",
-      );
+      setFormError("Adjunte una foto o un acta.");
       return;
     }
 
@@ -378,7 +377,7 @@ export function ZoneExecutionPanel({
 
         if (outcome.kind === "success") {
           setComposedAgainst(null);
-          notifySuccess("Resultado de la zona registrado.");
+          notifySuccess("Zona registrada.");
           await afterZoneResultRecorded(outcome.result);
           return;
         }
@@ -387,9 +386,7 @@ export function ZoneExecutionPanel({
           return;
         }
         if (outcome.kind === "still-offline") {
-          setFormError(
-            "Seguimos sin conexión. El borrador se conserva en este dispositivo para reintentar el envío más tarde.",
-          );
+          setFormError(OFFLINE_DRAFT_MESSAGE);
           return;
         }
         setFormError(outcome.message);
@@ -405,15 +402,13 @@ export function ZoneExecutionPanel({
       });
 
       if (outcome.kind === "success") {
-        notifySuccess("Resultado de la zona registrado.");
+        notifySuccess("Zona registrada.");
         await afterZoneResultRecorded(outcome.result);
         return;
       }
       if (outcome.kind === "draft-saved") {
         setComposedAgainst(outcome.draft.composedAgainst);
-        setFormError(
-          "No se pudo conectar con el servidor. El resultado quedó guardado como borrador local: puede reintentar el envío cuando recupere la conexión.",
-        );
+        setFormError(OFFLINE_DRAFT_MESSAGE);
         return;
       }
       setFormError(outcome.message);
@@ -455,8 +450,7 @@ export function ZoneExecutionPanel({
       ];
       if (missingCoordinates.length > 0) {
         const missingLabel = missingCoordinates.join(" y la ");
-        const verb = missingCoordinates.length === 1 ? "es obligatoria" : "son obligatorias";
-        setCompletionError(`La ${missingLabel} ${verb} para completar la reubicación.`);
+                setCompletionError(`Complete la ${missingLabel} para finalizar.`);
         return;
       }
 
@@ -479,13 +473,13 @@ export function ZoneExecutionPanel({
         onServiceUpdated(updated);
       }
       setCompletionSuccessMessage(
-        `Servicio finalizado con estado: ${STATUS_LABEL[updated.status]} (${updated.status})`,
+        `Servicio ${STATUS_LABEL[updated.status].toLowerCase()}`,
       );
     } catch (err) {
       const msg =
         err instanceof ServiceRequestError
           ? err.message
-          : "Error al completar el servicio en el servidor.";
+          : "No se pudo completar el servicio. Intente nuevamente.";
       setCompletionError(msg);
     } finally {
       setIsCompleting(false);
@@ -517,23 +511,15 @@ export function ZoneExecutionPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-[var(--color-border)] pb-4">
         <div>
           <h2 id="zone-execution-heading" className="text-lg font-bold text-[var(--color-text)]">
-            Registro de ejecución de zonas
+            Zonas
           </h2>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            {service.mode === "ROUTE"
-              ? "Recorrido por zonas: registre el resultado de cada zona en cualquier orden."
-              : "Servicio puntual: registre el resultado de la zona correspondiente."}
-          </p>
         </div>
 
         {isContainerRelocating && (
           <FieldSet className="mb-4 rounded-xl border border-[var(--color-info-line)] bg-[var(--color-info-fill)]/30 p-4">
             <FieldLegend className="px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-info)]">
-              Nueva ubicación del contenedor
+              Nueva ubicación
             </FieldLegend>
-            <p className="mb-3 text-xs text-[var(--color-text-secondary)]">
-              Se enviará junto con la finalización del Servicio. No se requiere una confirmación adicional.
-            </p>
             <FieldGroup className="gap-3">
               <Field>
                 <FieldLabel htmlFor={`container-location-address-${service.id}`} className="text-xs font-semibold text-[var(--color-text)]">Nueva dirección</FieldLabel>
@@ -592,7 +578,7 @@ export function ZoneExecutionPanel({
             </Button>
             <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">
               {allZonesRecorded
-                ? "Todas las zonas registradas. Listo para finalizar."
+                ? "Falta solo completar el servicio."
                 : `Pendiente: ${service.zoneIds.length - zoneResults.length} de ${service.zoneIds.length} zona(s)`}
             </span>
           </div>
@@ -653,7 +639,7 @@ export function ZoneExecutionPanel({
         {isMobileNavOpen && (
           <ItemGroup
             id="mobile-zone-nav"
-            aria-label="Navegación de zonas del servicio"
+            aria-label="Zonas"
             className="mt-2 gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-2"
           >
             {service.zoneIds.map((zoneId, idx) => {
@@ -706,7 +692,7 @@ export function ZoneExecutionPanel({
       <div className="mt-5 grid grid-cols-1 min-[761px]:grid-cols-12 gap-6">
         {/* Desktop Zone Navigation */}
         <aside
-          aria-label="Navegación de zonas del servicio"
+          aria-label="Zonas"
           className="hidden min-[761px]:block min-[761px]:col-span-4 border-r border-[var(--color-border)] pr-4"
         >
           <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
@@ -758,9 +744,6 @@ export function ZoneExecutionPanel({
         <div className="min-[761px]:col-span-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                Zona seleccionada
-              </span>
               <h3 className="text-base font-bold text-[var(--color-text)]">
                 {selectedZoneName}
               </h3>
@@ -800,7 +783,7 @@ export function ZoneExecutionPanel({
                 {selectedZoneResult.reason && (
                   <div>
                     <span className="font-semibold text-[var(--color-text-secondary)] block">
-                      Motivo de excepción:
+                      Motivo:
                     </span>
                     <span className="font-bold text-[var(--color-warning)] mt-0.5 block">
                       {NOT_SERVICED_REASON_LABEL[selectedZoneResult.reason]}
@@ -845,7 +828,7 @@ export function ZoneExecutionPanel({
                       )}
                       {totalCount === 0 && currentEvidence && !currentEvidence.error ? (
                         <p className="text-[var(--color-text-secondary)] italic">
-                          Sin archivos adjuntos.
+                          Sin archivos.
                         </p>
                       ) : (
                         <ItemGroup aria-label="Evidencia adjunta" className="gap-1.5">
@@ -923,12 +906,7 @@ export function ZoneExecutionPanel({
           ) : !canExecute ? (
             /* Read-only Member view when not recorded */
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-6 text-center text-xs text-[var(--color-text-secondary)]">
-              <p className="font-semibold text-[var(--color-text)]">
-                Resultado pendiente de registro
-              </p>
-              <p className="mt-1">
-                La persona responsable de la cuadrilla registrará el resultado de esta zona.
-              </p>
+              <p className="font-semibold text-[var(--color-text)]">Pendiente</p>
             </div>
           ) : isCompletedService ? (
             /* Service is already completed */
@@ -938,8 +916,6 @@ export function ZoneExecutionPanel({
             </div>
           ) : conflict ? (
             <DraftConflictView
-              serviceId={service.id}
-              actionLabel="resultado de zona"
               composedAgainst={conflict.composedAgainst}
               current={conflict.current}
               onPreserve={handlePreserveDraft}
@@ -949,17 +925,13 @@ export function ZoneExecutionPanel({
             /* Crew Leader uninterrupted Form to record result */
             <form noValidate onSubmit={handleSubmitZoneResult} className="space-y-4 text-xs">
               {composedAgainst && (
-                <Alert variant="warning" role="status">
-                  <CloudOff aria-hidden />
-                  <AlertTitle>Borrador local pendiente de envío</AlertTitle>
-                  <AlertDescription>Los datos se conservaron en este dispositivo; reenvíelos manualmente cuando recupere la conexión.</AlertDescription>
-                </Alert>
+                <OfflineDraftNotice />
               )}
 
               {formError && (
                 <Alert variant="danger" role="alert">
                   <AlertTriangle aria-hidden />
-                  <AlertTitle>No se pudo guardar el resultado</AlertTitle>
+                  <AlertTitle>No se pudo guardar. Intente nuevamente.</AlertTitle>
                   <AlertDescription>{formError}</AlertDescription>
                 </Alert>
               )}
@@ -967,10 +939,10 @@ export function ZoneExecutionPanel({
               {/* Status radio selection */}
               <FieldSet className="gap-2">
                 <FieldLegend className="font-bold text-[var(--color-text)]">
-                  Resultado de la zona *
+                  Resultado *
                 </FieldLegend>
                 <RadioGroup
-                  aria-label="Resultado de la zona"
+                  aria-label="Resultado"
                   required
                   value={status}
                   onValueChange={(value) => setStatus(value as ZoneResultStatus)}
@@ -1018,14 +990,14 @@ export function ZoneExecutionPanel({
                     htmlFor="zone-reason-select"
                     className="w-full items-center justify-between font-bold text-[var(--color-text)]"
                   >
-                    Motivo de la excepción * <span className="text-[10px] text-[var(--color-warning)]">Obligatorio</span>
+                    Motivo *
                   </FieldLabel>
                   <Combobox
                     id="zone-reason-select"
                     value={reason}
                     onChange={(value) => setReason(value as NotServicedReason | "")}
                     options={(Object.keys(NOT_SERVICED_REASON_LABEL) as NotServicedReason[]).map((value) => ({ value, label: NOT_SERVICED_REASON_LABEL[value] }))}
-                    placeholder="Seleccione un motivo..."
+                    placeholder="Seleccione un motivo"
                     searchPlaceholder="Buscar motivo"
                     emptyText="No hay motivos coincidentes"
                     aria-required="true"
@@ -1043,7 +1015,7 @@ export function ZoneExecutionPanel({
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Detalles sobre el estado de la zona, incidencias o desvíos..."
+                  placeholder="Detalle (opcional)"
                 />
               </Field>
 
@@ -1052,13 +1024,13 @@ export function ZoneExecutionPanel({
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="font-bold text-[var(--color-text)] block">
-                      Evidencia adjunta
+                      Evidencia
                     </span>
-                    <span className="text-[11px] text-[var(--color-text-secondary)]">
-                      {status === "SERVICED"
-                        ? "Opcional en caso de finalización completa."
-                        : "Obligatoria para resultados parciales o no atendidos (fotografía o acta)."}
-                    </span>
+                    {status !== "SERVICED" && (
+                      <span className="text-[11px] text-[var(--color-text-secondary)]">
+                        Obligatoria si es parcial o no atendida.
+                      </span>
+                    )}
                   </div>
                   <FieldLabel
                     htmlFor="evidence-input"
@@ -1154,10 +1126,10 @@ export function ZoneExecutionPanel({
                   <FileCheck className="h-3.5 w-3.5" aria-hidden />
                   <span>
                     {isSubmitting
-                      ? "Guardando resultado..."
+                      ? "Guardando…"
                       : composedAgainst
-                      ? "Reintentar envío"
-                      : "Guardar resultado de zona"}
+                      ? "Reenviar"
+                      : "Guardar zona"}
                   </span>
                 </Button>
               </div>

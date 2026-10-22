@@ -89,13 +89,13 @@ describe("InspectionExecutionPanel", () => {
     const user = userEvent.setup();
     server.use(http.get("*/api/environmental-inspections/INS-TEST-1", () => HttpResponse.json(inspectionResponse())));
     render(<InspectionExecutionPanel service={service} canExecute />);
-    await screen.findByRole("heading", { name: /Ejecuci/ });
+    await screen.findByRole("heading", { name: "Inspección ambiental" });
 
     await user.upload(screen.getByLabelText(/Seleccionar archivos/), new File([new Uint8Array(4 * 1024 * 1024 + 1)], "large.jpg", { type: "image/jpeg" }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent('"large.jpg" supera el tamaño máximo permitido de 4 MB.');
+    expect(screen.getByRole("alert")).toHaveTextContent('"large.jpg" pesa más de 4 MB.');
     expect(screen.queryByRole("list", { name: "Archivos de evidencia seleccionados" })).not.toBeInTheDocument();
-    expect(screen.getByText(/JPEG, PNG, WebP y PDF hasta 4 MB por archivo/)).toBeVisible();
+    expect(screen.getByText(/Fotos o PDF, hasta 4 MB por archivo/)).toBeVisible();
   });
 
   it("lets a Crew Leader complete a clean inspection and renders the returned next step", async () => {
@@ -116,7 +116,7 @@ describe("InspectionExecutionPanel", () => {
 
     render(<InspectionExecutionPanel service={service} canExecute />);
 
-    expect(await screen.findByRole("heading", { name: "Ejecución de inspección ambiental" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Inspección ambiental" })).toBeVisible();
     expect(screen.getByRole("button", { name: /Fecha y hora de inspección/ })).toHaveAttribute("data-slot", "date-picker");
     expect(screen.getByRole("group", { name: /Fecha y hora de inspección/ })).toHaveAttribute("data-slot", "time-picker");
     expect(screen.getByRole("checkbox", { name: /Verificar la fuente observada/ })).toHaveAttribute("data-slot", "checkbox");
@@ -146,7 +146,6 @@ describe("InspectionExecutionPanel", () => {
     render(<InspectionExecutionPanel service={service} />);
 
     expect(await screen.findByText("Solo consulta")).toBeVisible();
-    expect(screen.getByText("La persona responsable de la cuadrilla registra el resultado y la evidencia de esta inspección.")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Completar inspección" })).not.toBeInTheDocument();
     expect(screen.getByText("Verificar la fuente observada")).toBeVisible();
   });
@@ -156,7 +155,7 @@ describe("InspectionExecutionPanel", () => {
 
     render(<InspectionExecutionPanel service={{ ...service, status: "SCHEDULED", scheduledDate: "2026-12-07" }} waitingForStart />);
 
-    expect(await screen.findByText("El servicio todavía no está en curso")).toBeVisible();
+    expect(await screen.findByText("Inicie el servicio para registrar la inspección.")).toBeVisible();
     expect(screen.queryByText(/solo consulta/i)).not.toBeInTheDocument();
     expect(screen.getByText(/SVC-INS-1 · 7 dic 2026 · 09:00–11:00/)).toBeVisible();
     expect(screen.queryByText(/Checklist ambiental-v1|Checklist —/)).not.toBeInTheDocument();
@@ -180,7 +179,7 @@ describe("InspectionExecutionPanel", () => {
     );
 
     render(<InspectionExecutionPanel service={service} canExecute />);
-    await screen.findByRole("heading", { name: /Ejecuci/ });
+    await screen.findByRole("heading", { name: "Inspección ambiental" });
     await user.click(screen.getByRole("checkbox", { name: /Verificar la fuente/ }));
     await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto/ }));
     await selectOption(user, /Resultado/, "Infracción constatada");
@@ -221,7 +220,7 @@ describe("InspectionExecutionPanel", () => {
     );
 
     render(<InspectionExecutionPanel service={service} canExecute />);
-    await screen.findByRole("heading", { name: /Ejecuci/ });
+    await screen.findByRole("heading", { name: "Inspección ambiental" });
     const boxes = screen.getAllByRole("checkbox");
     expect(boxes).toHaveLength(3);
     for (const box of boxes) await user.click(box);
@@ -272,9 +271,9 @@ describe("InspectionExecutionPanel", () => {
 
     render(<Harness />);
 
-    expect(await screen.findByRole("status", { name: "El servicio sigue abierto" })).toHaveTextContent("Registre el resultado de la zona y complete el servicio para cerrarlo.");
-    expect(screen.getByRole("heading", { name: "Registro de ejecución de zonas" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Guardar resultado de zona" }));
+    expect(await screen.findByRole("status", { name: "El servicio sigue abierto" })).toHaveTextContent("Falta registrar la zona y completar el servicio.");
+    expect(screen.getByRole("heading", { name: "Zonas" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Guardar zona" }));
     const completeButton = screen.getByRole("button", { name: "Completar servicio" });
     await waitFor(() => expect(completeButton).toBeEnabled());
     await user.click(completeButton);
@@ -290,7 +289,7 @@ describe("InspectionExecutionPanel", () => {
 
     expect(await screen.findByRole("button", { name: "Completar inspección" })).toBeVisible();
     expect(screen.queryByRole("status", { name: "El servicio sigue abierto" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Registro de ejecución de zonas" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Zonas" })).not.toBeInTheDocument();
   });
 
   it("saves an offline draft and blocks resubmission when the service has drifted", async () => {
@@ -306,14 +305,14 @@ describe("InspectionExecutionPanel", () => {
     );
 
     render(<InspectionExecutionPanel service={service} canExecute />);
-    await screen.findByRole("heading", { name: /Ejecuci/ });
+    await screen.findByRole("heading", { name: "Inspección ambiental" });
     await user.click(screen.getByRole("checkbox", { name: /Verificar la fuente/ }));
     await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto/ }));
     await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "Sin infracción constatada.");
     await user.click(screen.getByRole("button", { name: /Completar inspecci/ }));
 
-    expect(await screen.findByText(/Borrador local pendiente/)).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /Reintentar env/ }));
+    expect(await screen.findByText(/Sin enviar\. Reenvíe cuando vuelva la conexión/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /Reenviar/ }));
     expect(await screen.findByRole("dialog")).toBeVisible();
     expect(screen.getByRole("dialog")).toHaveTextContent(/cambi/);
     expect(completionAttempts).toBe(1);

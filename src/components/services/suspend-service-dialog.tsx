@@ -1,10 +1,10 @@
 "use client";
 
+import { OfflineDraftNotice } from "./offline-draft-notice";
 import { useId, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
-  CloudOff,
   Pause,
   Paperclip,
   RefreshCw,
@@ -357,8 +357,6 @@ function SuspendServiceForm({
       <div ref={scrollRef} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
         {conflict ? (
           <DraftConflictView
-            serviceId={service.id}
-            actionLabel="suspensión"
             composedAgainst={conflict.composedAgainst}
             current={conflict.current}
             onPreserve={handlePreserveDraft}
@@ -378,13 +376,7 @@ function SuspendServiceForm({
             )}
 
             {draftPending && (
-              <Alert variant="warning" role="status">
-                <CloudOff aria-hidden />
-                <AlertDescription>
-                  Borrador local pendiente de envío. Los datos se conservaron en este dispositivo;
-                  reenvíelos manualmente cuando recupere la conexión.
-                </AlertDescription>
-              </Alert>
+              <OfflineDraftNotice />
             )}
 
             {errorMessage && (
@@ -593,7 +585,7 @@ function SuspendServiceForm({
                 ) : (
                   <Pause data-icon="inline-start" aria-hidden />
                 )}
-                <span>{draftPending ? "Reintentar envío" : "Suspender servicio"}</span>
+                <span>{draftPending ? "Reenviar" : "Suspender servicio"}</span>
               </Button>
             </>
           )}

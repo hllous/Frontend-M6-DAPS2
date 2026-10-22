@@ -794,7 +794,7 @@ describe("ServicesWorkspace component", () => {
     await user.click(row);
     await user.click(await screen.findByRole("button", { name: /Ver detalle/ }));
 
-    expect(await screen.findByRole("heading", { name: "Ejecución de inspección ambiental" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Inspección ambiental" })).toBeInTheDocument();
   });
 
   it("reflects the closed POINT service in the detail after the crew completes it from the inspection guide (#295)", async () => {
@@ -808,7 +808,7 @@ describe("ServicesWorkspace component", () => {
       render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
 
       expect(await screen.findByRole("status", { name: "El servicio sigue abierto" })).toBeVisible();
-      await user.click(screen.getByRole("button", { name: "Guardar resultado de zona" }));
+      await user.click(screen.getByRole("button", { name: "Guardar zona" }));
       const completeButton = screen.getByRole("button", { name: "Completar servicio" });
       await waitFor(() => expect(completeButton).toBeEnabled());
       await user.click(completeButton);
