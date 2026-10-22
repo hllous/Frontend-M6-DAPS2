@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { fetchMeWithToken } from "@/lib/me";
 import { getSessionMutationRejection } from "@/lib/session-request";
 import { getScenario, isScenarioId, type ScenarioCrew } from "@/lib/scenarios";
 import {
   AUTH_COOKIE_NAME,
   AuthUnavailableError,
   BackendUnavailableError,
+  CitizenForbiddenError,
+  InvalidSessionError,
   createSession,
   getAuthMode,
   publicSession,
@@ -21,7 +24,7 @@ class CrewResolutionError extends Error {}
  * El escenario guarda el nombre (Crew no tiene código) y acá se busca el id real.
  */
 async function resolveBackendCrew(session: Session, origin: string | undefined): Promise<ScenarioCrew | undefined> {
-  const crewName = getScenario(session.scenarioId).actor.backendCrewName;
+  const crewName = getScenario(session).actor.backendCrewName;
   if (session.mode !== "backend-development" || !crewName || !origin) return undefined;
 
   const unavailable = `No se pudo resolver la cuadrilla «${crewName}» del escenario de Campo contra el backend.`;
@@ -63,11 +66,13 @@ export async function POST(request: Request) {
 
   try {
     const backendOrigin = process.env.M6_BACKEND_ORIGIN;
-    const created = createSession(body.scenarioId, {
-      mode: getAuthMode(),
-      devJwt: process.env.M6_DEV_JWT,
-      backendOrigin,
-    });
+    const mode = getAuthMode();
+    const devJwt = process.env.M6_DEV_JWT;
+    // En modo backend los roles de M6 salen de GET /me, no del escenario elegido ni del token.
+    const me = mode === "backend-development" && backendOrigin && devJwt
+      ? await fetchMeWithToken(backendOrigin, devJwt)
+      : undefined;
+    const created = createSession(body.scenarioId, { mode, devJwt, backendOrigin, roles: me?.roles });
     const crew = await resolveBackendCrew(created, backendOrigin);
     const session = crew ? { ...created, crew } : created;
     const response = NextResponse.json({ session: publicSession(session) });
@@ -78,6 +83,12 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (error) {
+    if (error instanceof CitizenForbiddenError) {
+      return NextResponse.json({ message: error.message }, { status: 403 });
+    }
+    if (error instanceof InvalidSessionError) {
+      return NextResponse.json({ message: "El servicio rechazó la sesión de desarrollo. Renueve el token." }, { status: 401 });
+    }
     if (error instanceof AuthUnavailableError || error instanceof CrewResolutionError || error instanceof BackendUnavailableError) {
       return NextResponse.json({ message: error.message }, { status: 503 });
     }

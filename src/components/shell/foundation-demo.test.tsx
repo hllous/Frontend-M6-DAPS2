@@ -1,12 +1,13 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 import { HttpResponse, http } from "msw";
 
 import { handlers } from "@/mocks/handlers";
 import { mockResponseAfter } from "@/mocks/delayed-response";
-import { scenarios } from "@/lib/scenarios";
+import { ROLES_STALE_EVENT } from "@/lib/authenticated-fetch";
+import { scenarioForRoles, scenarios } from "@/lib/scenarios";
 import { FoundationDemo } from "./foundation-demo";
 
 const server = setupServer(...handlers);
@@ -66,6 +67,44 @@ describe("FoundationDemo", () => {
 
     expect(await screen.findByText("Acceso no disponible")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Reintentar carga" })).not.toBeInTheDocument();
+  });
+
+  it("explains the Backend message on a 403 without a code (a citizen token), not a generic error", async () => {
+    server.use(
+      http.get("*/api/mock/scenarios/office-duty-queue", () =>
+        HttpResponse.json(documentedError(403, "Este sistema es solo para personal municipal."), { status: 403 })),
+    );
+
+    render(<FoundationDemo scenarioId="office-duty-queue" />);
+
+    expect(await screen.findByText("Acceso no disponible")).toBeVisible();
+    expect(screen.getByText("Este sistema es solo para personal municipal.")).toBeVisible();
+  });
+
+  it("says the user has no M6 role yet instead of showing an error or an empty shell", async () => {
+    server.use(http.get("*/api/mock/scenarios/office-duty-queue", () =>
+      HttpResponse.json(scenarioForRoles(scenarios.officeDutyQueue, []))));
+
+    render(<FoundationDemo scenarioId="office-duty-queue" />);
+
+    expect(await screen.findByText("Sin rol asignado")).toBeVisible();
+    expect(screen.getByText(/todavía no tiene un rol asignado en Ambiente/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Reintentar carga" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Servicios" })).not.toBeInTheDocument();
+  });
+
+  it("re-reads the roles after a ROLE_REQUIRED 403 and recomputes the actor without reloading", async () => {
+    server.use(
+      http.get("*/api/mock/scenarios/office-duty-queue", () => HttpResponse.json(scenarios.officeDutyQueue)),
+      http.get("*/api/me", () => HttpResponse.json({ userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles: ["M6_CAMPO_CUADRILLA"] })),
+    );
+    render(<FoundationDemo scenarioId="office-duty-queue" />);
+    expect(await screen.findAllByText("Oficina")).not.toHaveLength(0);
+
+    act(() => { window.dispatchEvent(new Event(ROLES_STALE_EVENT)); });
+
+    expect(await screen.findAllByText("Integrante de cuadrilla")).not.toHaveLength(0);
+    expect(screen.queryByText("Oficina")).not.toBeInTheDocument();
   });
 
   it("recovers to the normal shell after a retryable network failure", async () => {

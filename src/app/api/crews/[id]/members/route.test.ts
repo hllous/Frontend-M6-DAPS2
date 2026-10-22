@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { POST } from "./route";
 import { DELETE } from "./[userId]/route";
-import { loginAs } from "@/test/session";
+import { loginAs, loginWithMe as login } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;

@@ -94,9 +94,9 @@ describe("POST /api/evidence BFF route", () => {
 
   it("scopes authorized container retries to the actor and crew", async () => {
     const field = await loginAs("field-crew-leader-route", { mode: "mock" });
-    const office = await loginAs("office-duty-queue", { mode: "mock" });
+    const otherCrewMember = await loginAs("field-crew-member-route", { mode: "mock" });
     expect((await POST(evidenceRequest(field, "CONTAINER", "cont-1", "actor-key"))).status).toBe(201);
-    expect((await POST(evidenceRequest(office, "CONTAINER", "cont-1", "actor-key"))).status).toBe(201);
+    expect((await POST(evidenceRequest(otherCrewMember, "CONTAINER", "cont-1", "actor-key"))).status).toBe(201);
     expect((await POST(evidenceRequest(field, "CONTAINER", "cont-1", "actor-key"))).status).toBe(200);
   });
 
@@ -622,7 +622,7 @@ describe("POST /api/evidence BFF route", () => {
       });
     });
 
-    it("allows Office to upload evidence for a container", async () => {
+    it("denies Office uploading evidence for a container: only the crew does (Backend #161)", async () => {
       const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const formData = new FormData();
       const file = new File(["img-data"], "dano.webp", { type: "image/webp" });
@@ -639,9 +639,8 @@ describe("POST /api/evidence BFF route", () => {
         }),
       );
 
-      expect(response.status).toBe(201);
-      const body = await response.json();
-      expect(body.filename).toBe("dano.webp");
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "ROLE_REQUIRED" });
     });
 
     it("blocks actors without container:report from uploading container evidence", async () => {
@@ -687,7 +686,7 @@ describe("POST /api/evidence BFF route", () => {
     });
 
     it("retrieves flat list of container attachments via GET /api/evidence", async () => {
-      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+      const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
       // First upload an attachment
       const formData = new FormData();
       const file = new File(["img-data"], "vista.jpg", { type: "image/jpeg" });

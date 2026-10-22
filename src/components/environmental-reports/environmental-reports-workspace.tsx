@@ -224,6 +224,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
   const [selectedId, setSelectedId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("detail"));
   const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("inspectionId"));
   const [createOpen, setCreateOpen] = useState(false);
+  const canCreateReport = scenario.actor.kind === "FIELD" && scenario.capabilities.includes("environmentalReport:create");
   const [initialParams] = useState(initialQueueParams);
   const [filterStatus, setFilterStatus] = useState<EnvironmentalReportStatus[]>(initialParams.status);
   const [filterType, setFilterType] = useState<string>(initialParams.type);
@@ -337,7 +338,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Control ambiental</h1>
           </div>
-          {scenario.capabilities.includes("environmentalReport:create") && <Button className="gap-2" onClick={() => setCreateOpen(true)}><FilePlus2 className="h-4 w-4" aria-hidden />Abrir reporte</Button>}
+          {canCreateReport && <Button className="gap-2" onClick={() => setCreateOpen(true)}><FilePlus2 className="h-4 w-4" aria-hidden />Abrir reporte</Button>}
         </div>
       </header>
 
@@ -347,8 +348,8 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
         {loadState.status === "ready" && scenario.actor.kind === "OFFICE" && loadState.sanctionOutcomeIntegrationExceptions.length > 0 && <SanctionOutcomeIntegrationExceptionsPanel exceptions={loadState.sanctionOutcomeIntegrationExceptions} />}
         {!rangeError && loadState.status === "loading" && <LoadingState />}
         {!rangeError && loadState.status === "error" && <ErrorState message={loadState.message} onRetry={loadReports} />}
-        {!rangeError && loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={filterStatus.length > 0 || Boolean(filterType || filterPriority || search || filterFrom || filterTo)} onClear={() => { setFilterStatus([]); setFilterType(""); setFilterPriority(""); setSearch(""); setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}
-        {!rangeError && loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"}><ItemGroup className="grid gap-3">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => { setSelectedId(report.id); setSelectedInspectionId(null); }} />)}</ItemGroup></section>}
+        {!rangeError && loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={filterStatus.length > 0 || Boolean(filterType || filterPriority || search || filterFrom || filterTo)} onClear={() => { setFilterStatus([]); setFilterType(""); setFilterPriority(""); setSearch(""); setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} canCreate={canCreateReport} onCreate={() => setCreateOpen(true)} />}
+        {!rangeError && loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"} aria-describedby="environmental-scope-note"><p id="environmental-scope-note" className="sr-only">Seleccione un expediente para consultar su detalle. Los estados representan el ciclo completo del expediente ambiental.</p><ItemGroup className="grid gap-3">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => { setSelectedId(report.id); setSelectedInspectionId(null); }} />)}</ItemGroup></section>}
         {!rangeError && loadState.status === "ready" && loadState.totalPages > 1 && <QueuePagination page={queuePage} totalPages={loadState.totalPages} total={loadState.total} onPage={setQueuePage} />}
       </div>
 

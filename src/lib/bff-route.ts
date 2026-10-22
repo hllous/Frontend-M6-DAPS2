@@ -8,6 +8,7 @@ import { bffPathForResponse } from "./bff-response-path";
 import {
   AuthUnavailableError,
   BackendUnavailableError,
+  CitizenForbiddenError,
   ForbiddenSessionError,
   InvalidSessionError,
   getRequiredSession,
@@ -141,7 +142,7 @@ export async function requireCrewScope(
     if (scenario.actor.kind === "OFFICE") return undefined;
     const crewId = useBackend ? session.crew?.id : scenario.actor.crewId;
     if (scenario.actor.kind !== "FIELD" || !crewId) {
-      return errorResponse(403, "El servicio no pertenece a la cuadrilla asignada a este usuario.", path);
+      return errorResponse(403, "El servicio no pertenece a la cuadrilla asignada a este usuario.", path, FORBIDDEN_CODES.notAssigned);
     }
 
     let service: CrewScopedService;
@@ -161,7 +162,7 @@ export async function requireCrewScope(
       service = fixture;
     }
     if (service.crewId !== crewId) {
-      return errorResponse(403, "El servicio no pertenece a la cuadrilla asignada a este usuario.", path);
+      return errorResponse(403, "El servicio no pertenece a la cuadrilla asignada a este usuario.", path, FORBIDDEN_CODES.notAssigned);
     }
     return service;
   } catch (error) {
@@ -177,12 +178,16 @@ export function backendMode(session: Pick<Session, "mode">): boolean {
   return true;
 }
 
-export function errorResponse(status: number, message: string, path: string): NextResponse {
+/** Códigos estables de un 403 (cuerpo `code`): lo que permite al cliente distinguir una denegación de otra. */
+export const FORBIDDEN_CODES = { roleRequired: "ROLE_REQUIRED", notAssigned: "NOT_ASSIGNED" } as const;
+
+export function errorResponse(status: number, message: string, path: string, code?: string): NextResponse {
   return NextResponse.json(
     {
       statusCode: status,
       message,
       error: ERROR_LABELS[status] ?? "Error",
+      ...(code ? { code } : {}),
       timestamp: new Date().toISOString(),
       path,
     },
@@ -194,8 +199,11 @@ export function mapSessionError(error: unknown, path: string, fallbackMessage: s
   if (error instanceof InvalidSessionError) {
     return errorResponse(401, "La sesión no está activa.", path);
   }
-  if (error instanceof ForbiddenSessionError) {
+  if (error instanceof CitizenForbiddenError) {
     return errorResponse(403, error.message, path);
+  }
+  if (error instanceof ForbiddenSessionError) {
+    return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
   }
   if (error instanceof AuthUnavailableError) {
     return errorResponse(503, error.message, path);

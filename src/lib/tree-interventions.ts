@@ -53,11 +53,6 @@ export const treeInterventionCreateInputSchema = z.object({
 });
 export type TreeInterventionCreateInput = z.infer<typeof treeInterventionCreateInputSchema>;
 
-export const treeInterventionAuthorizeInputSchema = z.object({
-  authorizedByUserId: externalIdInput("No se pudo identificar a la persona autorizante."),
-});
-export type TreeInterventionAuthorizeInput = z.infer<typeof treeInterventionAuthorizeInputSchema>;
-
 export const treeInterventionAssignServiceInputSchema = z.object({
   serviceId: z.string().trim().min(1, "Debe indicar el servicio que ejecutará la intervención."),
 });
@@ -177,15 +172,10 @@ export const treeInterventionsAdapter = {
     );
   },
 
-  async authorize(id: string, input: TreeInterventionAuthorizeInput): Promise<TreeInterventionDetail> {
-    const parsedInput = treeInterventionAuthorizeInputSchema.safeParse(input);
-    if (!parsedInput.success) throw new TreeInterventionContractError("La identidad de autorización es inválida.", { cause: parsedInput.error });
+  /** Quién autoriza lo toma el backend del token; el cliente ya no manda `authorizedByUserId` (deprecado, se ignora). */
+  async authorize(id: string): Promise<TreeInterventionDetail> {
     return parseIntervention(
-      await request(`/api/tree-interventions/${encodeURIComponent(id)}/authorize`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsedInput.data),
-      }),
+      await request(`/api/tree-interventions/${encodeURIComponent(id)}/authorize`, { method: "POST" }),
       "La respuesta de autorización no respeta el contrato esperado.",
     );
   },

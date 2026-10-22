@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     return mapSessionError(error, path, "No se pudo crear la intervención de arbolado.");
   }

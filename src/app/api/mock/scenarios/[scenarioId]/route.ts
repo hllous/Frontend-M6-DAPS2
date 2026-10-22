@@ -2,9 +2,11 @@ import { errorResponse, mapSessionError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { loadAuthorizedScenario } from "@/lib/bff-data";
+import { sealRolesIfChanged } from "@/lib/me";
 import {
   AuthUnavailableError,
   BackendUnavailableError,
+  CitizenForbiddenError,
   ForbiddenSessionError,
   InvalidSessionError,
 } from "@/lib/session";
@@ -26,11 +28,18 @@ export async function GET(
   }
 
   try {
-    return NextResponse.json(await loadAuthorizedScenario(request, scenarioId));
+    const { session, roles, scenario } = await loadAuthorizedScenario(request, scenarioId);
+    const response = NextResponse.json(scenario);
+    sealRolesIfChanged(response, session, roles);
+    return response;
   } catch (error) {
     if (error instanceof InvalidSessionError) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa.", path);
+    }
+    if (error instanceof CitizenForbiddenError) {
+      recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
+      return errorResponse(403, error.message, path);
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });

@@ -83,58 +83,15 @@ describe("repair request BFF collection routes", () => {
       expect(backendFetch).toHaveBeenCalledTimes(1);
     });
 
-    it("Campo sin cuadrilla en la sesión no crea la derivación", async () => {
+    it("Campo no crea derivaciones: el rol de Campo no alcanza y no se consulta el origen (Backend #161)", async () => {
       const cookie = createSessionCookie("field-crew-leader-route", { mode: "backend-development" });
-      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ crewId }));
+      const backendFetch = vi.spyOn(globalThis, "fetch");
       const response = await POST(createRequest(cookie, body));
 
       expect(response.status).toBe(403);
-      expect((await response.json()).message).toBe("Solo puede crear derivaciones desde trabajo de su cuadrilla.");
-      expect(backendFetch).toHaveBeenCalledTimes(1);
+      expect(await response.json()).toMatchObject({ code: "ROLE_REQUIRED" });
+      expect(backendFetch).not.toHaveBeenCalled();
     });
-
-    it("Campo resuelve la cuadrilla de una inspección mediante su servicio real", async () => {
-      const backendFetch = vi.spyOn(globalThis, "fetch")
-        .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: "Cuadrilla Belgrano — Recolección" }] }));
-      const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
-      backendFetch.mockClear();
-      backendFetch.mockResolvedValueOnce(Response.json({ serviceId }))
-        .mockResolvedValueOnce(Response.json({ crewId }))
-        .mockResolvedValueOnce(Response.json({ id: "derivacion-real" }, { status: 201 }));
-
-      const response = await POST(createRequest(cookie, { ...body, detectedInType: "INSPECTION", detectedInId: inspectionId }));
-
-      expect(response.status).toBe(201);
-      expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual([
-        [`https://backend.internal/environmental-inspections/${inspectionId}`, "GET"],
-        [`https://backend.internal/services/${serviceId}`, "GET"],
-        ["https://backend.internal/repair-requests", "POST"],
-      ]);
-    });
-
-    it.each([crewId, "901159c1-3230-440a-ba3d-d7baf55fab24", null])(
-      "Campo solo crea desde servicios de su cuadrilla (%s)", async (sourceCrewId) => {
-        const backendFetch = vi.spyOn(globalThis, "fetch")
-          .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: "Cuadrilla Belgrano — Recolección" }] }));
-        const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
-        backendFetch.mockClear();
-        backendFetch.mockResolvedValueOnce(Response.json({ crewId: sourceCrewId }))
-          .mockResolvedValueOnce(Response.json({ id: "derivacion-real" }, { status: 201 }));
-
-        const response = await POST(createRequest(cookie, body));
-
-        expect(response.status).toBe(sourceCrewId === crewId ? 201 : 403);
-        if (sourceCrewId !== crewId) {
-          expect((await response.json()).message).toBe("Solo puede crear derivaciones desde trabajo de su cuadrilla.");
-        }
-        expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual(
-          sourceCrewId === crewId ? [
-            [`https://backend.internal/services/${serviceId}`, "GET"],
-            ["https://backend.internal/repair-requests", "POST"],
-          ] : [[`https://backend.internal/services/${serviceId}`, "GET"]],
-        );
-      },
-    );
   });
 
   it("Oficina crea una derivación desde un servicio real tras consultar su origen", async () => {
@@ -248,7 +205,7 @@ describe("repair request BFF collection routes", () => {
     expect(response.status).toBe(401);
   });
 
-  it("scopes Field list and create to the actor's assigned crew", async () => {
+  it("scopes the Field list to the actor's assigned crew and denies creating", async () => {
     const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const assigned = await GET(new Request("http://localhost/api/repair-requests?detectedInId=SVC-1050", { headers: { cookie: fieldCookie } }));
     expect(assigned.status).toBe(200);
@@ -262,6 +219,7 @@ describe("repair request BFF collection routes", () => {
     const unscoped = await GET(new Request("http://localhost/api/repair-requests", { headers: { cookie: fieldCookie } }));
     expect(unscoped.status).toBe(403);
 
+
     const created = await POST(createRequest(fieldCookie, {
       damageType: "BROKEN_SIDEWALK",
       address: "Av. Rivadavia 2200",
@@ -270,17 +228,8 @@ describe("repair request BFF collection routes", () => {
       detectedInType: "SERVICE",
       detectedInId: "SVC-1050",
     }));
-    expect(created.status).toBe(201);
-
-    const forbiddenCreate = await POST(createRequest(fieldCookie, {
-      damageType: "BROKEN_SIDEWALK",
-      address: "Calle 1",
-      severity: "LOW",
-      publicSafetyRisk: false,
-      detectedInType: "SERVICE",
-      detectedInId: "SVC-1042",
-    }));
-    expect(forbiddenCreate.status).toBe(403);
+    expect(created.status).toBe(403);
+    expect(await created.json()).toMatchObject({ code: "ROLE_REQUIRED" });
   });
 
   it("lists fixtures and creates a pending Service-sourced referral", async () => {
@@ -323,9 +272,9 @@ describe("repair request BFF collection routes", () => {
     });
   });
 
-  it("scopes Field inspection referrals to the linked Service crew", async () => {
+  it("Campo no crea derivaciones desde una inspección: solo Oficina de Operaciones o Admin", async () => {
     const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
-    const created = await POST(createRequest(cookie, {
+    const denied = await POST(createRequest(cookie, {
       damageType: "BLOCKED_DRAIN",
       address: "Av. Brasil 2450",
       severity: "LOW",
@@ -333,16 +282,7 @@ describe("repair request BFF collection routes", () => {
       detectedInType: "INSPECTION",
       detectedInId: "INS-1012",
     }));
-    expect(created.status).toBe(201);
-
-    const forbidden = await POST(createRequest(cookie, {
-      damageType: "BLOCKED_DRAIN",
-      address: "Av. Costanera km 3",
-      severity: "HIGH",
-      publicSafetyRisk: true,
-      detectedInType: "INSPECTION",
-      detectedInId: "INS-1005",
-    }));
-    expect(forbidden.status).toBe(403);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ code: "ROLE_REQUIRED" });
   });
 });

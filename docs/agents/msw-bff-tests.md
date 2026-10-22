@@ -31,6 +31,8 @@ Here, `server` is the suite's existing `setupServer(...handlers)` instance. Use 
 
 The `fallbackCookie` (signed, from `src/test/session.ts`) is the actor of a domain's handler set and is added only when the request has no session cookie. Pass a Field crew cookie to build a Field-crew set. A request's own cookie always wins, which is how authorization tests send their actor.
 
+M6 roles: a scenario's `roles` are the fixture of `GET /me` and its capabilities derive from them (`src/lib/m6-roles.ts`). In `backend-development` the login handler calls `GET /me` first, so tests that log in through the handler use `loginAs` or `loginWithMe` from `src/test/session.ts`: they answer `/me` on the side with the scenario's roles (or the `roles` option) and leave the rest of the test's fetch mock queue untouched. `createSessionCookie` seals a session without any call.
+
 ## Adding or changing a domain
 
 1. Add the route to the domain's `*-route-handlers.ts` (or create the module and compose it in `handlers.ts`).

@@ -1,3 +1,4 @@
+import { meSchema, type M6Role } from "./m6-roles";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import type { OperationalScenario, ScenarioId } from "./scenarios";
 import { recordTelemetryEvent } from "./telemetry";
@@ -28,4 +29,14 @@ export async function loadScenario(id: ScenarioId): Promise<OperationalScenario>
     throw new ScenarioRequestError(response.status, body?.message ?? "Scenario request failed");
   }
   return response.json() as Promise<OperationalScenario>;
+}
+
+/** Releé los roles de M6 (GET /me vía el BFF); la UI recalcula capacidades sin recargar. */
+export async function loadRoles(): Promise<M6Role[]> {
+  const response = await authenticatedFetch("/api/me");
+  if (!response.ok) {
+    const body = (await response.json().catch(() => undefined)) as { message?: string } | undefined;
+    throw new ScenarioRequestError(response.status, body?.message ?? "Roles request failed");
+  }
+  return meSchema.parse(await response.json()).roles;
 }

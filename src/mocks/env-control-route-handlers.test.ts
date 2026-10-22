@@ -11,7 +11,7 @@ const server = setupServer(...handlers);
 
 const officeCookie = createSessionCookie("office-duty-queue", { mode: "mock" });
 const crewCookie = createSessionCookie("field-crew-leader-route", { mode: "mock" });
-const limitedOfficeCookie = createSessionCookie("office-limited-intake", { mode: "mock" });
+const noRolesCookie = createSessionCookie("office-limited-intake", { mode: "mock", roles: [] });
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); });
@@ -106,8 +106,8 @@ describe("environmental control handlers delegate to the real BFF routes", () =>
     expect(response.status).toBe(403);
   });
 
-  it("rejects an Office session without the capability on the indicator dashboards with the real 403", async () => {
-    const response = await call("GET", "/api/indicators/coverage", limitedOfficeCookie);
+  it("rejects a session with no M6 role on the indicator dashboards with the real 403", async () => {
+    const response = await call("GET", "/api/indicators/coverage", noRolesCookie);
 
     expect(response.status).toBe(403);
   });

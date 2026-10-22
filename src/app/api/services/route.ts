@@ -193,7 +193,7 @@ export async function POST(request: Request) {
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
     return mapSessionError(error, path, "No se pudo programar el servicio.");
   }
 }

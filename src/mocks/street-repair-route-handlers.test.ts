@@ -77,11 +77,13 @@ describe("repair request handlers delegate to the real BFF routes", () => {
     expect(denied.status).toBe(403);
   });
 
-  it("lets a Field crew create a repair request from its own service and rejects another crew's with the real 403", async () => {
-    const body = { damageType: "BROKEN_SIDEWALK", address: "Av. Rivadavia 2200", severity: "LOW", publicSafetyRisk: false, detectedInType: "SERVICE" };
+  it("rejects a Field crew creating a repair request with the real ROLE_REQUIRED 403, and lets the default Office actor create it", async () => {
+    const body = { damageType: "BROKEN_SIDEWALK", address: "Av. Rivadavia 2200", severity: "LOW", publicSafetyRisk: false, detectedInType: "SERVICE", detectedInId: "SVC-1050" };
 
-    expect((await call("POST", "/api/repair-requests", crewCookie, { ...body, detectedInId: "SVC-1050" })).status).toBe(201);
-    expect((await call("POST", "/api/repair-requests", crewCookie, { ...body, detectedInId: "SVC-1042" })).status).toBe(403);
+    const denied = await call("POST", "/api/repair-requests", crewCookie, body);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ code: "ROLE_REQUIRED" });
+    expect((await call("POST", "/api/repair-requests", undefined, body)).status).toBe(201);
   });
 
   it("returns the real 404 for an unknown repair request", async () => {

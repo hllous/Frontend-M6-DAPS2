@@ -1,4 +1,4 @@
-import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, requireCrewScope, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -83,8 +83,8 @@ export async function POST(request: Request) {
   try {
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede crear solicitudes de corte de calle.", path);
+    if (!scenario.capabilities.includes("streetClosureRequest:create")) {
+      return errorResponse(403, "Su rol no permite crear solicitudes de corte de calle.", path, FORBIDDEN_CODES.roleRequired);
     }
     let body: unknown;
     try {

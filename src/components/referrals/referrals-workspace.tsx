@@ -336,7 +336,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
         anomaly={anomalies.get(selectedReferral.id) ?? { isStale: false, duplicateReferralIds: [], sourceChanges: [] }}
         sourceUnavailable={loadState.status === "ready" && selectedReferral.sourceServiceId ? loadState.sourceErrors.get(selectedReferral.sourceServiceId) : undefined}
         onBack={() => setSelectedId(null)}
-        canRecover={scenario.actor.kind === "OFFICE"}
+        canRecover={scenario.capabilities.includes("referral:reconcile")}
         onRecovered={handleReferralRecovered}
       />
     );

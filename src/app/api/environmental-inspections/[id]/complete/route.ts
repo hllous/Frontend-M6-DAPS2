@@ -33,7 +33,7 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     authorize(session, { capability: "environmentalInspection:execute", capabilityMessage: "Solo la persona responsable de la cuadrilla puede completar la inspección.", throwOnError: true });
 
     const requestBody = await request.text();

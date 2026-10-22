@@ -181,6 +181,7 @@ export function ContainerCatalogPanel({
     scenario.actor.kind === "OFFICE" &&
     scenario.capabilities.includes("container:manage");
   const canReport = scenario.capabilities.includes("container:report");
+  const canEmpty = scenario.capabilities.includes("container:empty");
 
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [zones, setZones] = useState<Zone[]>([]);
@@ -1158,6 +1159,7 @@ export function ContainerCatalogPanel({
               ) : null}
 
               {((canReport && detailContainer.status === "ACTIVE") ||
+                (canEmpty && detailContainer.status === "OVERFLOWED") ||
                 (canManage &&
                   ["OVERFLOWED", "ACTIVE", "RELOCATING"].includes(
                     detailContainer.status,
@@ -1196,7 +1198,7 @@ export function ContainerCatalogPanel({
                       </Button>
                     </>
                   ) : null}
-                  {canManage && detailContainer.status === "OVERFLOWED" ? (
+                  {canEmpty && detailContainer.status === "OVERFLOWED" ? (
                     detailInFlight ? (
                       <Badge variant="info" className="w-fit max-w-full">
                         <Clock data-icon="inline-start" aria-hidden />

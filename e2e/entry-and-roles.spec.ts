@@ -44,3 +44,30 @@ test.describe("Crew Leader versus Crew Member presentation @smoke", () => {
     await expect(page.getByText("Solo consulta").first()).toBeVisible();
   });
 });
+
+test.describe("M6 roles from GET /me @smoke", () => {
+  test("an employee with no M6 role gets an explanation, not an error", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.route("**/api/mock/scenarios/office-duty-queue", async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...(await response.json()), roles: [], capabilities: [] } });
+    });
+    await page.goto("/app");
+
+    await expect(page.getByText("Sin rol asignado")).toBeVisible();
+    await expect(page.getByText(/todavía no tiene un rol asignado en Ambiente/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reintentar carga" })).toHaveCount(0);
+  });
+
+  test("a citizen token is told the system is for municipal staff only", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.route("**/api/mock/scenarios/office-duty-queue", (route) => route.fulfill({
+      status: 403,
+      json: { statusCode: 403, message: "Este sistema es solo para personal municipal.", error: "Forbidden", timestamp: new Date().toISOString(), path: "/api/mock/scenarios/office-duty-queue" },
+    }));
+    await page.goto("/app");
+
+    await expect(page.getByText("Acceso no disponible")).toBeVisible();
+    await expect(page.getByText("Este sistema es solo para personal municipal.")).toBeVisible();
+  });
+});

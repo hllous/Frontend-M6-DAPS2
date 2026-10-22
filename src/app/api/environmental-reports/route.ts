@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -128,7 +128,7 @@ export async function GET(request: Request) {
   try {
     const session = getRequiredSession(request);
     authorize(session, { capability: "environmentalReport:view", throwOnError: true });
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     const url = new URL(request.url);
     const parsedStatuses = parseStatuses(url.searchParams);
     if (parsedStatuses.error) return errorResponse(400, parsedStatuses.error, path);
@@ -151,7 +151,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene acceso al control ambiental.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene acceso al control ambiental.", path, FORBIDDEN_CODES.roleRequired);
     return mapSessionError(error, path, "No se pudieron cargar los expedientes ambientales.");
   }
 }
@@ -161,7 +161,7 @@ export async function POST(request: Request) {
   try {
     const session = getRequiredSession(request);
     authorize(session, { capability: "environmentalReport:create", throwOnError: true });
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "FIELD" && scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina o Campo puede abrir expedientes.", path);
     const body = await request.json().catch(() => undefined);
     const parsed = createEnvironmentalReportInputSchema.safeParse(body);
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para abrir expedientes.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para abrir expedientes.", path, FORBIDDEN_CODES.roleRequired);
     return mapSessionError(error, path, "No se pudo abrir el expediente ambiental.");
   }
 }

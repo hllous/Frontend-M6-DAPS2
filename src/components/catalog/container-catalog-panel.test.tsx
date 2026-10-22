@@ -508,7 +508,7 @@ describe("ContainerCatalogPanel", () => {
 
   it("allows reporting container damage with damageType, severity, and requiresPublicWorks", async () => {
     const user = userEvent.setup({ delay: null });
-    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
 
     expect(await screen.findByText("CONT-001")).toBeVisible();
 
@@ -685,7 +685,7 @@ describe("ContainerCatalogPanel", () => {
       ),
     );
 
-    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
 
     expect(await screen.findByText("CONT-001")).toBeVisible();
     const row = screen.getByRole("row", { name: /CONT-001/ });

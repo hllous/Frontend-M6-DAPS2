@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { POST } from "./route";
-import { loginAs } from "@/test/session";
+import { createSessionCookie, loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetContainerFixtures();
@@ -43,6 +43,21 @@ describe("POST /api/containers/[id]/report-overflow BFF route", () => {
     expect(body.message).toMatch(/permisos/i);
   });
 
+  it("denies the Administrator: reporting is Field work and Office does not mix with it", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const response = await POST(
+      new Request("http://localhost/api/containers/cont-1/report-overflow", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      { params: Promise.resolve({ id: "cont-1" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "ROLE_REQUIRED" });
+  });
+
   it("allows Field crew member to report overflow without service assignment", async () => {
     const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await POST(
@@ -61,8 +76,8 @@ describe("POST /api/containers/[id]/report-overflow BFF route", () => {
     });
   });
 
-  it("allows Office duty queue actor to report overflow", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+  it("allows the crew leader to report overflow", async () => {
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-1/report-overflow", {
         method: "POST",
@@ -94,7 +109,7 @@ describe("POST /api/containers/[id]/report-overflow BFF route", () => {
   });
 
   it("returns 404 for non-existent container", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-non-existent/report-overflow", {
         method: "POST",
@@ -109,7 +124,7 @@ describe("POST /api/containers/[id]/report-overflow BFF route", () => {
   it("forwards an authorized backend overflow report with its id and method", async () => {
     const id = "container_42.3~";
     const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", {
+    const cookie = createSessionCookie("field-crew-leader-route", {
       mode: "backend-development",
       devJwt,
       backendOrigin: "https://backend.internal",

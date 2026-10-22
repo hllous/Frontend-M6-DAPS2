@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { authorize, backendMode, errorResponse, forwardResponse, mapSessionError } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, forwardResponse, mapSessionError, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalReportFixture, updateEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
 import { requestInformationInputSchema } from "@/lib/environmental-reports";
@@ -15,7 +15,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     const session = getRequiredSession(request);
     authorize(session, { capability: CAPABILITY, throwOnError: true });
-    if (getScenario(session.scenarioId).actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede pedir información al vecino.", path);
+    if (getScenario(session).actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede pedir información al vecino.", path);
 
     let body: unknown;
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
@@ -43,7 +43,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para pedir información.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para pedir información.", path, FORBIDDEN_CODES.roleRequired);
     return mapSessionError(error, path, "No se pudo pedir la información al vecino.");
   }
 }

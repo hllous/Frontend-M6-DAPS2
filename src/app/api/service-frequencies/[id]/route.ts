@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { serviceFrequencyResponseFixture, closeServiceFrequencyFixture, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
@@ -41,7 +41,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return updated ? NextResponse.json(serviceFrequencyResponseFixture(updated)) : errorResponse(404, "Frecuencia no encontrada.", path);
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     return mapSessionError(error, path, "No se pudo actualizar la frecuencia de servicio.");
   }
@@ -57,7 +57,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     return updated ? NextResponse.json(serviceFrequencyResponseFixture(updated)) : errorResponse(404, "Frecuencia no encontrada.", path);
   } catch (error) {
     if (error instanceof InvalidSessionError) { recordTelemetryEvent({ name: "auth_session_expired", status: 401 }); return errorResponse(401, "La sesión no está activa.", path); }
-    if (error instanceof ForbiddenSessionError) { recordTelemetryEvent({ name: "auth_forbidden", status: 403 }); return errorResponse(403, error.message, path); }
+    if (error instanceof ForbiddenSessionError) { recordTelemetryEvent({ name: "auth_forbidden", status: 403 }); return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired); }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     return mapSessionError(error, path, "No se pudo cerrar la vigencia de la frecuencia.");
   }

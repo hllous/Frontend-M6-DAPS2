@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { addCrewMembersInputSchema, createCrewInputSchema, updateCrewInputSchema } from "./crews";
 import { cancelServiceInputSchema, createServiceInputSchema, rescheduleServiceInputSchema } from "./services";
-import { treeInterventionAuthorizeInputSchema, treeInterventionCreateInputSchema } from "./tree-interventions";
+import { treeInterventionCreateInputSchema } from "./tree-interventions";
 import { assignNeighborhoodsInputSchema } from "./zones";
 
 const ids = (count: number, length = 5) => Array.from({ length: count }, (_, index) => `${index}`.padStart(length, "x"));
@@ -59,11 +59,9 @@ describe("ids and arrays (#251)", () => {
     expect(assignNeighborhoodsInputSchema.safeParse({ neighborhoodIds: ["b".repeat(101)] }).success).toBe(false);
   });
 
-  it("arboles de una intervencion y persona autorizante", () => {
+  it("arboles de una intervencion", () => {
     const intervention = { interventionType: "SAFETY_PRUNING", address: "Calle 1", requiresStreetClosure: false, priority: "MEDIUM" };
     expect(treeInterventionCreateInputSchema.safeParse({ ...intervention, treeIds: ids(100) }).success).toBe(true);
     expect(treeInterventionCreateInputSchema.safeParse({ ...intervention, treeIds: ids(101) }).success).toBe(false);
-    expect(treeInterventionAuthorizeInputSchema.safeParse({ authorizedByUserId: "a".repeat(100) }).success).toBe(true);
-    expect(treeInterventionAuthorizeInputSchema.safeParse({ authorizedByUserId: "a".repeat(101) }).success).toBe(false);
   });
 });
