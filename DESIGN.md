@@ -211,6 +211,19 @@ Use the approved **Institucional clara** voice throughout Office and Field inter
 - Use sentence case, complete translatable messages, and visible labels that align with accessible names. Do not rely on punctuation, color, or iconography to convey tone or meaning.
 - Prefer role-based, gender-inclusive wording such as `persona supervisora` when referring to an unknown individual.
 
+### UX copy
+
+Spanish UX writing sets the voice; these rules set how much text a screen carries. They apply to every user-visible string: headings, subtitles, body text, labels, placeholders, empty states, toasts, dialogs, validation and errors, page titles, buttons, `aria-label`, `title` and screen-reader-only text.
+
+1. **Decide or act.** Keep a string only if it helps the Office or Field user decide or act on that screen. Office screens may be dense with data, not with prose. Field screens are stricter.
+2. **No internal vocabulary.** Never show module codes (M1, M3, M6, M7), API field names (`workOrderId`, `closureId`) or developer terms (“backend”, “versión”, “módulo de origen”, “registro M6”, “fuente canónica”). Name external areas by what they do. “M6” becomes “el sistema” or is dropped. `GLOSSARY.md`, docs, code identifiers and tests keep the codes.
+3. **Zones by name.** Show a zone by its name only (“Belgrano”) in the map, lists, tables, filters and selects. The zone code appears only in the zone catalog's create and edit form, where it is the field being edited.
+4. **No subtitles by default.** A subtitle under a heading survives only if it carries information not visible elsewhere on the screen, such as a date or data freshness.
+5. **Accessibility without narration.** Keep the behavior (labels, keyboard, colour plus text cues); remove sentences that explain it (“El color no es el único indicador…”).
+6. **No disclaimers.** Cut statements about what the system does not do. Where one prevents a costly mistake, reduce it to one short sentence next to the relevant action.
+7. **Errors say what and what next.** State what happened and what the user can do. Never name the layer, team or version that failed.
+8. **Structure before prose.** When density comes from layout, collapse secondary information into a disclosure, merge redundant fields or delete elements that are irrelevant or obvious, instead of rewording them.
+
 ### Operational statuses
 
 Use the approved **Etiqueta semántica** treatment in tables, lists, cards, and detail views: a compact pill with soft semantic background, status-specific icon, and visible text label.
