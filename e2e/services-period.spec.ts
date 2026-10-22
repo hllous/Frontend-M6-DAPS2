@@ -190,3 +190,41 @@ test.describe("Services mobile drawer touch", () => {
     await expect(handle).toHaveAttribute("aria-valuetext", "media");
   });
 });
+
+test.describe("Services phone preview replaces the list filters", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+
+  test("a touch tap on a service hides the period and category filters until the preview closes", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=services");
+    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+
+    const period = page.getByRole("combobox", { name: "Período" });
+    const categories = page.getByRole("button", { name: "Categorías" });
+    await expect(period).toBeVisible();
+    await expect(categories).toBeVisible();
+
+    const serviceCell = page.locator('tr[data-service-id="SVC-1043"]').getByRole("cell").nth(1);
+    await serviceCell.scrollIntoViewIfNeeded();
+    const box = await serviceCell.boundingBox();
+    expect(box).not.toBeNull();
+    const tapX = box!.x + box!.width / 2;
+    const tapY = box!.y + box!.height / 2;
+    await expect
+      .poll(() => page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest("tr")?.dataset.serviceId, [tapX, tapY]))
+      .toBe("SVC-1043");
+    await page.touchscreen.tap(tapX, tapY);
+
+    await expect(page).toHaveURL(/selected=SVC-1043/);
+    await expect(period).toBeHidden();
+    await expect(categories).toBeHidden();
+
+    await page.getByRole("button", { name: "Cerrar vista previa" }).click();
+    await expect(period).toBeVisible();
+    await expect(categories).toBeVisible();
+  });
+});

@@ -876,7 +876,9 @@ export function ServicesWorkspace({
           service={detailService}
           onBack={() => {
             setDetailId(null);
-            focusSelectedServiceAction();
+            // On phones going back also closes the preview, so the filters it hid come back.
+            if (isNarrow) closePreview();
+            else focusSelectedServiceAction();
           }}
           onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
           onStartService={canExecuteService ? handleStartService : undefined}
@@ -1112,7 +1114,12 @@ export function ServicesWorkspace({
       {loadState.status === "ready" && (
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           <div className="flex min-h-0 flex-1 flex-col">
-            <div data-services-filter-toolbar className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]">
+            {/* On phones the preview covers the list the filters apply to, so the filters go with it. */}
+            <div
+              data-services-filter-toolbar
+              hidden={isNarrow && Boolean(selectedService)}
+              className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]"
+            >
               {periodBar}
               {refreshError && (
                 <p role="alert" className="px-4 py-1.5 text-xs text-[var(--color-danger)]">
