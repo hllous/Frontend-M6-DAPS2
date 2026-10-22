@@ -20,6 +20,14 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import {
   serviceTypeCategorySchema,
@@ -48,12 +56,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
-  CardAction,
   CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Sheet,
@@ -123,6 +126,7 @@ export function ServiceTypesPanel({
   const [selectedItem, setSelectedItem] = useState<ServiceType | null>(null);
   const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
   const [editing, setEditing] = useState<ServiceType | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [deactivating, setDeactivating] = useState<ServiceType | null>(null);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
@@ -211,7 +215,7 @@ export function ServiceTypesPanel({
         requiresVehicle: editing.requiresVehicle,
         active: editing.active,
       });
-      setEditing(null);
+      setEditOpen(false);
       notifySuccess("Tipo de servicio actualizado.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
@@ -264,11 +268,11 @@ export function ServiceTypesPanel({
             <Button
               type="button"
               onClick={() => {
-                setShowCreate((value) => !value);
-                setEditing(null);
+                setShowCreate(true);
+                setEditOpen(false);
               }}
             >
-              {showCreate ? "Cerrar alta" : "Nuevo tipo de servicio"}
+              Nuevo tipo de servicio
             </Button>
           ) : null
         }
@@ -282,19 +286,20 @@ export function ServiceTypesPanel({
         </Alert>
       ) : null}
 
-      {showCreate && canManage ? (
-        <form onSubmit={submitCreate}>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Alta de tipo de servicio</h2>
-              </CardTitle>
-              <CardDescription>
+      <Dialog open={showCreate && canManage} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Alta de tipo de servicio</DialogTitle>
+            <DialogDescription>
                 Código, categoría y modo quedan fijos al crear el tipo.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup className="grid gap-4 md:grid-cols-2">
+              </DialogDescription>
+          </DialogHeader>
+          <form
+            id="service-type-create-form"
+            className="-mx-1 -my-1 min-h-0 overflow-y-auto px-1 py-1"
+            onSubmit={submitCreate}
+          >
+              <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field data-invalid={Boolean(createError)}>
                   <FieldLabel htmlFor="service-type-code">Código</FieldLabel>
                   <Input
@@ -412,8 +417,8 @@ export function ServiceTypesPanel({
                   </FieldLabel>
                 </Field>
               </FieldGroup>
-            </CardContent>
-            <CardFooter className="justify-end gap-2">
+          </form>
+          <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -421,11 +426,10 @@ export function ServiceTypesPanel({
               >
                 Cancelar
               </Button>
-              <Button type="submit">Crear tipo</Button>
-            </CardFooter>
-          </Card>
-        </form>
-      ) : null}
+              <Button type="submit" form="service-type-create-form">Crear tipo</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent>
@@ -683,6 +687,7 @@ export function ServiceTypesPanel({
                       const item = selectedItem;
                       setSelectedItem(null);
                       setEditing(item);
+                      setEditOpen(true);
                       setShowCreate(false);
                       setEditError(null);
                     }}
@@ -712,29 +717,23 @@ export function ServiceTypesPanel({
         ) : null}
       </Sheet>
 
-      {editing && canManage ? (
-        <form onSubmit={submitEdit}>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Editar tipo de servicio</h2>
-              </CardTitle>
-              <CardDescription>
+      <Dialog open={editOpen && canManage} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl">
+          {editing ? (
+            <>
+          <DialogHeader>
+            <DialogTitle>Editar tipo de servicio</DialogTitle>
+            <DialogDescription>
                 El código, la categoría y el modo son de solo lectura porque ya
                 pueden estar copiados en servicios programados.
-              </CardDescription>
-              <CardAction>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setEditing(null)}
-                >
-                  Cerrar
-                </Button>
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup className="grid gap-4 md:grid-cols-2">
+              </DialogDescription>
+          </DialogHeader>
+          <form
+            id="service-type-edit-form"
+            className="-mx-1 -my-1 min-h-0 overflow-y-auto px-1 py-1"
+            onSubmit={submitEdit}
+          >
+              <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field>
                   <FieldLabel htmlFor="edit-service-type-code">
                     Código
@@ -815,20 +814,21 @@ export function ServiceTypesPanel({
                   </FieldLabel>
                 </Field>
               </FieldGroup>
-            </CardContent>
-            <CardFooter className="justify-end gap-2">
+          </form>
+          <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setEditing(null)}
+                onClick={() => setEditOpen(false)}
               >
                 Cancelar
               </Button>
-              <Button type="submit">Guardar cambios</Button>
-            </CardFooter>
-          </Card>
-        </form>
-      ) : null}
+              <Button type="submit" form="service-type-edit-form">Guardar cambios</Button>
+          </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <CatalogDeactivationDialog
         open={deactivating !== null}

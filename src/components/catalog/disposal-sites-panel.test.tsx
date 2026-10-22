@@ -44,6 +44,28 @@ describe("DisposalSitesPanel", () => {
     expect(within(sheet).getByRole("button", { name: "Dar de baja" })).toBeVisible();
   });
 
+  it("opens create and edit forms in a dialog and returns focus to the trigger on close", async () => {
+    const user = userEvent.setup();
+    render(<DisposalSitesPanel scenario={scenarios.officeDutyQueue} />);
+
+    const newButton = await screen.findByRole("button", { name: "Nuevo sitio de disposición" });
+    await user.click(newButton);
+    const createDialog = await screen.findByRole("dialog", { name: "Alta de sitio de disposición" });
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(within(createDialog).getByRole("button", { name: "Crear sitio" })).toBeVisible();
+    await user.click(within(createDialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(newButton).toHaveFocus();
+
+    const row = await screen.findByRole("row", { name: /RS-01/ });
+    await user.click(within(row).getByRole("button", { name: "Ver detalle del sitio de disposición RS-01" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle del sitio de disposición" });
+    await user.click(within(sheet).getByRole("button", { name: "Editar" }));
+    const editDialog = await screen.findByRole("dialog", { name: "Editar sitio de disposición" });
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(within(editDialog).getByRole("button", { name: "Guardar cambios" })).toBeVisible();
+  });
+
   it("hides mutation actions from Field", async () => {
     render(<DisposalSitesPanel scenario={scenarios.fieldCrewLeader} />);
     expect(await screen.findByRole("heading", { name: "Sitios de disposición" })).toBeVisible();

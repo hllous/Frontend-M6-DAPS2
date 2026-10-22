@@ -66,12 +66,7 @@ import { notifySuccess } from "@/components/ui/feedback";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
-  CardAction,
   CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import styles from "./catalog-panel.module.css";
@@ -154,6 +149,7 @@ export function ServiceFrequenciesPanel({
   const [createDraft, setCreateDraft] =
     useState<ServiceFrequencyCreateInput>(emptyCreateDraft);
   const [editing, setEditing] = useState<EditDraft | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [closing, setClosing] = useState<ServiceFrequency | null>(null);
   const [selectedItem, setSelectedItem] = useState<ServiceFrequency | null>(null);
   const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
@@ -303,7 +299,7 @@ export function ServiceFrequenciesPanel({
         validFrom: editing.validFrom,
         validTo: editing.validTo || null,
       });
-      setEditing(null);
+      setEditOpen(false);
       notifySuccess(
         "Frecuencia actualizada. Los servicios ya creados no se modifican.",
       );
@@ -347,11 +343,11 @@ export function ServiceFrequenciesPanel({
             <Button
               type="button"
               onClick={() => {
-                setShowCreate((value) => !value);
-                setEditing(null);
+                setShowCreate(true);
+                setEditOpen(false);
               }}
             >
-              {showCreate ? "Cerrar alta" : "Nueva frecuencia"}
+              Nueva frecuencia
             </Button>
           ) : null
         }
@@ -371,20 +367,21 @@ export function ServiceFrequenciesPanel({
         </Alert>
       ) : null}
 
-      {showCreate && canManage ? (
-        <form onSubmit={submitCreate}>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Nueva frecuencia</h2>
-              </CardTitle>
-              <CardDescription>
+      <Dialog open={showCreate && canManage} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nueva frecuencia</DialogTitle>
+            <DialogDescription>
                 Solo se muestran tipos de servicio de modo Recorrido. El tipo y
                 el recorrido quedan inmutables después de crear la regla.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup className="grid gap-4 md:grid-cols-2">
+              </DialogDescription>
+          </DialogHeader>
+          <form
+            id="frequency-create-form"
+            className="-mx-1 -my-1 min-h-0 overflow-y-auto px-1 py-1"
+            onSubmit={submitCreate}
+          >
+              <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field data-invalid={Boolean(createError)}>
                   <FieldLabel htmlFor="frequency-service-type">
                     Tipo de servicio
@@ -504,8 +501,8 @@ export function ServiceFrequenciesPanel({
                   ) : null}
                 </Field>
               </FieldGroup>
-            </CardContent>
-            <CardFooter className="justify-end gap-2">
+          </form>
+          <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -513,11 +510,10 @@ export function ServiceFrequenciesPanel({
               >
                 Cancelar
               </Button>
-              <Button type="submit">Crear frecuencia</Button>
-            </CardFooter>
-          </Card>
-        </form>
-      ) : null}
+              <Button type="submit" form="frequency-create-form">Crear frecuencia</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent>
@@ -796,6 +792,7 @@ export function ServiceFrequenciesPanel({
                       const item = selectedItem;
                       setSelectedItem(null);
                       setEditing({ item, weekdays: item.weekdays, shift: item.shift, validFrom: item.validFrom, validTo: item.validTo ?? "" });
+                      setEditOpen(true);
                       setShowCreate(false);
                       setEditError(null);
                     }}
@@ -826,33 +823,27 @@ export function ServiceFrequenciesPanel({
         ) : null}
       </Sheet>
 
-      {editing && canManage ? (
-        <form onSubmit={submitEdit}>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Editar frecuencia</h2>
-              </CardTitle>
-              <CardDescription>
+      <Dialog open={editOpen && canManage} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl">
+          {editing ? (
+            <>
+          <DialogHeader>
+            <DialogTitle>Editar frecuencia</DialogTitle>
+            <DialogDescription>
                 Tipo de servicio:{" "}
                 {serviceTypeNames.get(editing.item.serviceTypeId) ??
                   editing.item.serviceTypeId}
                 . Recorrido:{" "}
                 {routeNames.get(editing.item.routeId) ?? editing.item.routeId}.
                 Estos vínculos no se pueden modificar.
-              </CardDescription>
-              <CardAction>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setEditing(null)}
-                >
-                  Cerrar
-                </Button>
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup className="grid gap-4 md:grid-cols-2">
+              </DialogDescription>
+          </DialogHeader>
+          <form
+            id="frequency-edit-form"
+            className="-mx-1 -my-1 min-h-0 overflow-y-auto px-1 py-1"
+            onSubmit={submitEdit}
+          >
+              <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <DayPicker
                   idPrefix="edit-frequency"
                   values={editing.weekdays}
@@ -932,20 +923,21 @@ export function ServiceFrequenciesPanel({
                   </FieldError>
                 </Field>
               </FieldGroup>
-            </CardContent>
-            <CardFooter className="justify-end gap-2">
+          </form>
+          <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setEditing(null)}
+                onClick={() => setEditOpen(false)}
               >
                 Cancelar
               </Button>
-              <Button type="submit">Guardar cambios</Button>
-            </CardFooter>
-          </Card>
-        </form>
-      ) : null}
+              <Button type="submit" form="frequency-edit-form">Guardar cambios</Button>
+          </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={closing !== null}

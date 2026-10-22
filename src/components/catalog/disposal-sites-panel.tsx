@@ -20,6 +20,14 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   disposalSiteTypeSchema,
@@ -46,12 +54,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
-  CardAction,
   CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Sheet,
@@ -96,6 +99,7 @@ export function DisposalSitesPanel({
   const [selectedSite, setSelectedSite] = useState<DisposalSite | null>(null);
   const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
   const [editing, setEditing] = useState<DisposalSite | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [deactivating, setDeactivating] = useState<DisposalSite | null>(null);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
@@ -172,7 +176,7 @@ export function DisposalSitesPanel({
         siteType: editing.siteType,
         active: editing.active,
       });
-      setEditing(null);
+      setEditOpen(false);
       notifySuccess("Sitio de disposición actualizado.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
@@ -223,11 +227,11 @@ export function DisposalSitesPanel({
             <Button
               type="button"
               onClick={() => {
-                setShowCreate((value) => !value);
-                setEditing(null);
+                setShowCreate(true);
+                setEditOpen(false);
               }}
             >
-              {showCreate ? "Cerrar alta" : "Nuevo sitio de disposición"}
+              Nuevo sitio de disposición
             </Button>
           ) : null
         }
@@ -240,20 +244,21 @@ export function DisposalSitesPanel({
         </Alert>
       ) : null}
 
-      {showCreate && canManage ? (
-        <form onSubmit={submitCreate}>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Alta de sitio de disposición</h2>
-              </CardTitle>
-              <CardDescription>
+      <Dialog open={showCreate && canManage} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Alta de sitio de disposición</DialogTitle>
+            <DialogDescription>
                 El sitio podrá ser referenciado por registros de recolección
                 existentes y futuros.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup className="grid gap-4 md:grid-cols-3">
+              </DialogDescription>
+          </DialogHeader>
+          <form
+            id="disposal-site-create-form"
+            className="-mx-1 -my-1 min-h-0 overflow-y-auto px-1 py-1"
+            onSubmit={submitCreate}
+          >
+              <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field data-invalid={Boolean(createError)}>
                   <FieldLabel htmlFor="disposal-site-code">Código</FieldLabel>
                   <Input
@@ -324,8 +329,8 @@ export function DisposalSitesPanel({
                   </Select>
                 </Field>
               </FieldGroup>
-            </CardContent>
-            <CardFooter className="justify-end gap-2">
+          </form>
+          <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -333,11 +338,10 @@ export function DisposalSitesPanel({
               >
                 Cancelar
               </Button>
-              <Button type="submit">Crear sitio</Button>
-            </CardFooter>
-          </Card>
-        </form>
-      ) : null}
+              <Button type="submit" form="disposal-site-create-form">Crear sitio</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Card>
         <CardContent>
           <FieldGroup className="grid max-w-full gap-3 md:w-fit md:grid-cols-[repeat(3,minmax(0,18rem))]">
@@ -544,6 +548,7 @@ export function DisposalSitesPanel({
                       const site = selectedSite;
                       setSelectedSite(null);
                       setEditing(site);
+                      setEditOpen(true);
                       setShowCreate(false);
                       setEditError(null);
                     }}
@@ -572,29 +577,23 @@ export function DisposalSitesPanel({
           </SheetContent>
         ) : null}
       </Sheet>
-      {editing && canManage ? (
-        <form onSubmit={submitEdit}>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Editar sitio de disposición</h2>
-              </CardTitle>
-              <CardDescription>
+      <Dialog open={editOpen && canManage} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl">
+          {editing ? (
+            <>
+          <DialogHeader>
+            <DialogTitle>Editar sitio de disposición</DialogTitle>
+            <DialogDescription>
                 La baja siempre es lógica para preservar las referencias de los
                 registros de recolección.
-              </CardDescription>
-              <CardAction>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setEditing(null)}
-                >
-                  Cerrar
-                </Button>
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup className="grid gap-4 md:grid-cols-3">
+              </DialogDescription>
+          </DialogHeader>
+          <form
+            id="disposal-site-edit-form"
+            className="-mx-1 -my-1 min-h-0 overflow-y-auto px-1 py-1"
+            onSubmit={submitEdit}
+          >
+              <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field>
                   <FieldLabel htmlFor="edit-disposal-site-code">
                     Código
@@ -671,20 +670,21 @@ export function DisposalSitesPanel({
                   </FieldLabel>
                 </Field>
               </FieldGroup>
-            </CardContent>
-            <CardFooter className="justify-end gap-2">
+          </form>
+          <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setEditing(null)}
+                onClick={() => setEditOpen(false)}
               >
                 Cancelar
               </Button>
-              <Button type="submit">Guardar cambios</Button>
-            </CardFooter>
-          </Card>
-        </form>
-      ) : null}
+              <Button type="submit" form="disposal-site-edit-form">Guardar cambios</Button>
+          </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
       <CatalogDeactivationDialog
         open={Boolean(deactivating)}
         onOpenChange={(open) => {

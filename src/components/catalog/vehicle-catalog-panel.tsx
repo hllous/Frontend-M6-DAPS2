@@ -538,7 +538,7 @@ export function VehicleCatalogPanel({
             </Alert>
           ) : null}
           <form
-            className="min-h-0 overflow-y-auto"
+            className="-mx-1 -my-1 min-h-0 overflow-y-auto px-1 py-1"
             id="vehicle-form"
             onSubmit={(event) => void save(event)}
           >

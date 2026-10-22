@@ -12,19 +12,27 @@ test.describe("DisposalSite catalog management #103", () => {
     await expect(page).toHaveURL(/\/app\/catalog\/disposal-sites$/);
 
     const code = `E2E-103-${Date.now()}`;
-    await page.getByRole("button", { name: "Nuevo sitio de disposición" }).click();
-    await page.getByLabel("Código", { exact: true }).fill(code);
-    await page.getByLabel("Nombre", { exact: true }).fill("Sitio e2e de prueba");
-    await page.getByRole("button", { name: "Crear sitio" }).click();
+    const newButton = page.getByRole("button", { name: "Nuevo sitio de disposición" });
+    await newButton.click();
+    const createDialog = page.getByRole("dialog", { name: "Alta de sitio de disposición" });
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+    await createDialog.getByLabel("Código", { exact: true }).fill(code);
+    await createDialog.getByLabel("Nombre", { exact: true }).fill("Sitio e2e de prueba");
+    await createDialog.getByRole("button", { name: "Crear sitio" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(newButton).toBeFocused();
     await expect(page.getByText(code)).toBeVisible();
 
     const row = page.getByRole("row", { name: new RegExp(code) });
     await openCatalogBRowDetail(row);
     await page.getByRole("dialog", { name: "Detalle del sitio de disposición" }).getByRole("button", { name: "Editar" }).click();
-    await expect(page.getByRole("textbox", { name: "Código" })).toHaveAttribute("readonly");
-    await page.getByRole("textbox", { name: "Nombre" }).fill("Sitio e2e actualizado");
-    await page.getByRole("button", { name: "Guardar cambios" }).click();
-    await expect(page.getByText("Sitio e2e actualizado")).toBeVisible();
+    const editDialog = page.getByRole("dialog", { name: "Editar sitio de disposición" });
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+    await expect(editDialog.getByRole("textbox", { name: "Código" })).toHaveAttribute("readonly");
+    await editDialog.getByRole("textbox", { name: "Nombre" }).fill("Sitio e2e actualizado");
+    await editDialog.getByRole("button", { name: "Guardar cambios" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("row", { name: new RegExp(code) })).toContainText("Sitio e2e actualizado");
 
     await openCatalogBRowDetail(page.getByRole("row", { name: new RegExp(code) }));
     await page.getByRole("dialog", { name: "Detalle del sitio de disposición" }).getByRole("button", { name: "Dar de baja" }).click();

@@ -49,10 +49,26 @@ describe("ServiceTypesPanel", () => {
     await user.click(within(row).getByRole("button", { name: "Ver detalle del tipo de servicio WASTE-ROUTE" }));
     const sheet = await screen.findByRole("dialog", { name: "Detalle del tipo de servicio" });
     await user.click(within(sheet).getByRole("button", { name: "Editar" }));
-    expect(screen.getByRole("textbox", { name: "Código" })).toHaveAttribute("readonly");
-    expect(screen.getByRole("textbox", { name: "Categoría" })).toHaveAttribute("readonly");
-    expect(screen.getByRole("textbox", { name: "Modo" })).toHaveAttribute("readonly");
-    expect(screen.getByRole("textbox", { name: "Nombre" })).not.toHaveAttribute("readonly");
+    const editDialog = await screen.findByRole("dialog", { name: "Editar tipo de servicio" });
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(within(editDialog).getByRole("textbox", { name: "Código" })).toHaveAttribute("readonly");
+    expect(within(editDialog).getByRole("textbox", { name: "Categoría" })).toHaveAttribute("readonly");
+    expect(within(editDialog).getByRole("textbox", { name: "Modo" })).toHaveAttribute("readonly");
+    expect(within(editDialog).getByRole("textbox", { name: "Nombre" })).not.toHaveAttribute("readonly");
+  });
+
+  it("opens the creation form in a dialog and returns focus to its trigger on close", async () => {
+    const user = userEvent.setup();
+    render(<ServiceTypesPanel scenario={scenarios.officeDutyQueue} />);
+
+    const newButton = await screen.findByRole("button", { name: "Nuevo tipo de servicio" });
+    await user.click(newButton);
+    const createDialog = await screen.findByRole("dialog", { name: "Alta de tipo de servicio" });
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(within(createDialog).getByRole("button", { name: "Crear tipo" })).toBeVisible();
+    await user.click(within(createDialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(newButton).toHaveFocus();
   });
 
   it("opens service type details and available actions from the row", async () => {

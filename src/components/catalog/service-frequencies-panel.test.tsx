@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 import { HttpResponse, http } from "msw";
@@ -24,14 +24,20 @@ describe("ServiceFrequenciesPanel", () => {
 
     expect(await screen.findByRole("heading", { name: "Frecuencias de servicio" })).toBeVisible();
     expect(screen.getAllByText("Recolección domiciliaria")[0]).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Nueva frecuencia" }));
+    const newButton = screen.getByRole("button", { name: "Nueva frecuencia" });
+    await user.click(newButton);
+    const createDialog = await screen.findByRole("dialog", { name: "Nueva frecuencia" });
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
 
-    const serviceTypeSelect = screen.getByRole("combobox", { name: "Tipo de servicio" });
+    const serviceTypeSelect = within(createDialog).getByRole("combobox", { name: "Tipo de servicio" });
     await user.click(serviceTypeSelect);
     expect(screen.getByRole("option", { name: "Recolección domiciliaria · WASTE-ROUTE" })).toBeVisible();
     expect(screen.queryByRole("option", { name: /Mantenimiento de contenedores/ })).not.toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(screen.queryByText(/generar services/i)).not.toBeInTheDocument();
+    await user.click(within(createDialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(newButton).toHaveFocus();
 
     const row = screen.getByRole("row", { name: /Recorrido Casco Histórico/ });
     await user.click(
@@ -43,8 +49,10 @@ describe("ServiceFrequenciesPanel", () => {
       name: "Detalle de frecuencia de servicio",
     });
     await user.click(within(sheet).getByRole("button", { name: "Editar" }));
-    expect(screen.getByText(/estos vínculos no se pueden modificar/i)).toBeVisible();
-    expect(screen.getByRole("combobox", { name: "Turno" })).toBeVisible();
+    const editDialog = await screen.findByRole("dialog", { name: "Editar frecuencia" });
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(within(editDialog).getByText(/estos vínculos no se pueden modificar/i)).toBeVisible();
+    expect(within(editDialog).getByRole("combobox", { name: "Turno" })).toBeVisible();
   });
 
   it("opens frequency details and available actions from the row", async () => {
@@ -113,7 +121,7 @@ describe("ServiceFrequenciesPanel", () => {
     ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Nueva frecuencia" }));
-    const monday = screen.getByRole("button", { name: "Lunes" });
+    const monday = within(await screen.findByRole("dialog", { name: "Nueva frecuencia" })).getByRole("button", { name: "Lunes" });
     monday.focus();
     expect(monday).toHaveFocus();
     expect(monday).toHaveAttribute("aria-pressed", "true");
