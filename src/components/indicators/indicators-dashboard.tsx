@@ -11,11 +11,13 @@ import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Item, ItemGroup } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TableCaption, TableCell, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime } from "@/lib/argentina-date";
@@ -63,6 +65,20 @@ type TraceRecord = {
   zone: string;
   status: string;
 };
+
+const traceRecordColumns: DataTableColumn<TraceRecord>[] = [
+  {
+    id: "record",
+    accessorFn: (record) => record.title,
+    header: "Registro",
+    enableSorting: false,
+    cell: ({ row }) => <><Link className={styles.recordsLink} href={row.original.href}>{row.original.title}</Link><span className={styles.note}>{row.original.detail}</span></>,
+  },
+  { accessorKey: "zone", header: "Zona operativa", enableSorting: false },
+  { accessorKey: "status", header: "Estado", enableSorting: false },
+];
+
+const traceRecordRowId = (record: TraceRecord) => record.id;
 
 const familyMeta: Record<FamilyKey, { label: string; icon: typeof Activity; description: string }> = {
   coverage: { label: "Cobertura", icon: Activity, description: "Objetivos atendidos" },
@@ -545,7 +561,14 @@ function AccessibleRecords({ family, plan, selection, breakdown, point, records,
 }
 
 function TraceRecordsTable({ plan, records }: { plan: TracePlan; records: TraceRecord[] }) {
-  return <div className={styles.recordsTableWrap}><table className={styles.recordsTable}><caption>Registros accesibles de {plan.title}</caption><thead><tr><th scope="col">Registro</th><th scope="col">Zona operativa</th><th scope="col">Estado</th></tr></thead><tbody>{records.length > 0 ? records.map((record) => <tr key={record.id}><td><Link className={styles.recordsLink} href={record.href}>{record.title}</Link><span className={styles.note}>{record.detail}</span></td><td>{record.zone}</td><td>{record.status}</td></tr>) : <tr><td colSpan={3}>No hay registros accesibles para este filtro.</td></tr>}</tbody></table></div>;
+  const table = useDataTable({ data: records, columns: traceRecordColumns, getRowId: traceRecordRowId });
+
+  return <div className={styles.recordsTableWrap}><DataTable
+    table={table}
+    container={false}
+    className={styles.recordsTable}
+    renderEmpty={() => <TableRow><TableCell colSpan={3}>No hay registros accesibles para este filtro.</TableCell></TableRow>}
+  ><TableCaption>Registros accesibles de {plan.title}</TableCaption></DataTable></div>;
 }
 
 function BreakdownView({ breakdown, viewMode, selectedId: controlledSelectedId, onSelect }: { breakdown: IndicatorBreakdown; viewMode: ViewMode; selectedId?: string; onSelect: (pointId: string) => void }) {
@@ -628,12 +651,45 @@ function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoi
 }
 
 function TableView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
-  const detailLabels = [...new Set(points.flatMap((point) => point.details?.map((detail) => detail.label) ?? []))];
+  const detailLabels = useMemo(() => [...new Set(points.flatMap((point) => point.details?.map((detail) => detail.label) ?? []))], [points]);
   const valueHeading = tableValueHeading(points[0]?.unit);
-  return <div className={styles.tableWrap}><table className={styles.table}><caption>Valores exactos de {title.toLowerCase()}</caption><thead><tr><th scope="col">Categoría</th>{detailLabels.map((label) => <th key={label} scope="col">{label}</th>)}<th scope="col">{valueHeading}</th></tr></thead><tbody>{points.map((point) => {
-    const isSelected = selectedId === point.id;
-    return <tr key={point.id}><td><Button type="button" variant={isSelected ? "secondary" : "ghost"} size="sm" className={styles.rowButton} aria-pressed={isSelected} onClick={() => onSelect(point.id)}>{point.label}{point.note ? <span className={styles.note}>{point.note}</span> : null}</Button></td>{detailLabels.map((label) => { const detail = point.details?.find((item) => item.label === label); return <td key={label} className={styles.value}>{detail ? metricText(detail) : ""}</td>; })}<td className={styles.value}>{metricText(point)}</td></tr>;
-  })}</tbody></table></div>;
+  const columns = useMemo<DataTableColumn<IndicatorPoint>[]>(() => [
+    {
+      id: "category",
+      accessorFn: (point) => point.label,
+      header: "Categoría",
+      enableSorting: false,
+    },
+    ...detailLabels.map((label, index) => ({
+      id: `detail-${index}`,
+      accessorFn: (point: IndicatorPoint) => point.details?.find((detail) => detail.label === label)?.value ?? null,
+      header: label,
+      enableSorting: false,
+      cell: ({ row }: { row: { original: IndicatorPoint } }) => {
+        const detail = row.original.details?.find((item) => item.label === label);
+        return detail ? metricText(detail) : "";
+      },
+    })),
+    {
+      id: "value",
+      accessorFn: (point) => point.value,
+      header: valueHeading,
+      enableSorting: false,
+      cell: ({ row }) => metricText(row.original),
+    },
+  ], [detailLabels, valueHeading]);
+  const table = useDataTable({ data: points, columns });
+
+  return <div className={styles.tableWrap}><DataTable
+    table={table}
+    container={false}
+    className={styles.table}
+    renderEmpty={() => null}
+    renderRow={(row) => <TableRow key={row.id}>{row.getVisibleCells().map((cell) => {
+      const point = row.original;
+      return <TableCell key={cell.id} className={cell.column.id === "category" ? styles.categoryCell : styles.value}>{cell.column.id === "category" ? <Button type="button" variant={selectedId === point.id ? "secondary" : "ghost"} size="sm" className={styles.rowButton} aria-pressed={selectedId === point.id} onClick={() => onSelect(point.id)}>{point.label}{point.note ? <span className={styles.note}>{point.note}</span> : null}</Button> : <table.FlexRender cell={cell} />}</TableCell>;
+    })}</TableRow>}
+  ><TableCaption>Valores exactos de {title.toLowerCase()}</TableCaption></DataTable></div>;
 }
 
 function tableValueHeading(unit?: string) {

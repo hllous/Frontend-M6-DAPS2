@@ -39,6 +39,8 @@ Build each UI element from its shadcn equivalent in `src/components/ui/`. A cust
 
 Adapt in order: app-wide visuals through theme tokens in `src/app/globals.css`, project variants in `src/components/ui/`, then shared project compositions there. Screens import from `src/components/ui/` and add layout only. Keep shadcn structure, `data-slot` attributes, and accessibility behavior intact. Use CSS Modules for layout only; style appearance through theme tokens or UI variants.
 
+Shared overlay paint rule: keep translucent flat backdrops static without backdrop blur; animate panels with opacity and transform/translate only, and popups with opacity only; keep shadows static; scope `will-change` to an active transition; disable overlay motion independently for reduced-motion users and detected software renderers; keep resize work event-driven and out of per-frame layout loops.
+
 `eslint-suppressions.json` is a ratchet: it only shrinks. Run `pnpm exec eslint . --prune-suppressions` after fixing violations; new entries need PO approval. Tables belong to #520 and skeletons to #525.
 
 Format dates and times for `es-AR`, with Monday-first weeks, `dd/mm/aaaa`, and 24-hour time; preserve API value formats.
