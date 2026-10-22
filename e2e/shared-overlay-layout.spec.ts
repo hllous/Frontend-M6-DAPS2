@@ -25,7 +25,7 @@ test("container edit keeps title and save action visible while the form scrolls"
 test("catalog confirmation actions fit on mobile with the primary action first", async ({ page }) => {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app/catalog/vehicles");
-  const detail = await openCatalogBRowDetail(page.locator("tbody tr").filter({ hasText: /bActivob/ }).first());
+  const detail = await openCatalogBRowDetail(page.locator("tbody tr").filter({ hasText: /Activo/ }).first());
   await detail.getByRole("button", { name: "Dar de baja", exact: true }).click();
   const footer = page.getByRole("dialog", { name: /^Confirmar baja del vehículo/ }).locator('[data-slot="dialog-footer"]');
   const actions = footer.getByRole("button");
