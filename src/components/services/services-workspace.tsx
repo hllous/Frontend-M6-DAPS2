@@ -21,6 +21,9 @@ import {
 
 import { InventoryMapDrawer, type InventoryMapDrawerSnapState } from "@/components/map/inventory-map-drawer";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { FormControl } from "@/components/ui/form-control";
 import {
   ResizableHandle,
@@ -71,6 +74,12 @@ import {
 } from "./services-column-editor";
 
 type Period = "semana" | "mes" | "todo";
+
+const periodItems: Record<Period, string> = {
+  semana: "Esta semana",
+  mes: "Este mes",
+  todo: "Todo el período",
+};
 
 function getWorkspaceSplitStorageKey(userId: string): string {
   return `m6:services-workspace-split:v1:${encodeURIComponent(userId)}`;
@@ -817,24 +826,32 @@ export function ServicesWorkspace({
 
   const periodBar = (
     <div className={cn(
-      "flex flex-wrap items-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
-      isNarrow ? "gap-2 px-2 py-1 text-xs" : "gap-3 px-4 py-2 text-sm",
+      "flex items-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
+      isNarrow ? "min-w-0 flex-1 flex-nowrap gap-2 px-2 py-1 text-xs" : "flex-wrap gap-3 px-4 py-2 text-sm",
     )} aria-busy={isRefreshing}>
-      <label className="flex items-center gap-2">
-        <span>Período</span>
-        <select
+      <div className="flex min-w-0 items-center gap-2">
+        <Label htmlFor="services-period">Período</Label>
+        <Select
           value={activePeriod}
-          onChange={(event) => handlePeriodChoiceChange(event.target.value as Period)}
-          className={cn(
-            "rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 text-sm",
-            isNarrow ? "h-10 min-h-10" : "min-h-10",
-          )}
+          items={periodItems}
+          onValueChange={(value) => handlePeriodChoiceChange(value as Period)}
         >
-          <option value="semana">Esta semana</option>
-          <option value="mes">Este mes</option>
-          <option value="todo">Todo el período</option>
-        </select>
-      </label>
+          <SelectTrigger
+            id="services-period"
+            size={isNarrow ? "sm" : "default"}
+            className={cn("w-auto", isNarrow && "min-w-0 px-1 [@media(max-width:760px)]:text-sm")}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="semana">{periodItems.semana}</SelectItem>
+              <SelectItem value="mes">{periodItems.mes}</SelectItem>
+              <SelectItem value="todo">{periodItems.todo}</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
       <span
         className="inline-flex size-6 items-center justify-center"
         role="status"
@@ -842,7 +859,7 @@ export function ServicesWorkspace({
         aria-label={isRefreshing ? "Actualizando servicios" : refreshError ? "No se pudieron actualizar los servicios" : undefined}
         title={refreshError ?? undefined}
       >
-        {isRefreshing ? <RefreshCw className="size-4 animate-spin" aria-hidden="true" /> : null}
+        {isRefreshing ? <Spinner aria-hidden="true" role="presentation" /> : null}
         {refreshError ? <span aria-hidden="true" className="font-bold text-[var(--color-danger)]">!</span> : null}
       </span>
     </div>
@@ -859,7 +876,9 @@ export function ServicesWorkspace({
           service={detailService}
           onBack={() => {
             setDetailId(null);
-            focusSelectedServiceAction();
+            // On phones going back also closes the preview, so the filters it hid come back.
+            if (isNarrow) closePreview();
+            else focusSelectedServiceAction();
           }}
           onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
           onStartService={canExecuteService ? handleStartService : undefined}
@@ -1010,14 +1029,16 @@ export function ServicesWorkspace({
                 className="rounded-xl pl-8 pr-8 text-xs"
               />
               {search && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={() => setSearch("")}
                   aria-label="Borrar búsqueda"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               )}
             </div>
 
@@ -1093,10 +1114,19 @@ export function ServicesWorkspace({
       {loadState.status === "ready" && (
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           <div className="flex min-h-0 flex-1 flex-col">
-            <div data-services-filter-toolbar className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]">
+            {/* On phones the preview covers the list the filters apply to, so the filters go with it. */}
+            <div
+              data-services-filter-toolbar
+              hidden={isNarrow && Boolean(selectedService)}
+              className={cn(
+                "flex flex-wrap items-center border-b border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 text-xs text-[var(--color-text-secondary)]",
+                // On phones the period selector shrinks so it never pushes «Categorías» onto a second row.
+                isNarrow ? "gap-2 px-2" : "gap-3 px-4",
+              )}
+            >
               {periodBar}
               {refreshError && (
-                <p role="alert" className="px-4 py-1.5 text-xs text-[var(--color-danger)]">
+                <p role="alert" className={cn("px-4 py-1.5 text-xs text-[var(--color-danger)]", isNarrow && "basis-full")}>
                   No se pudieron actualizar los servicios. Se mantienen los resultados anteriores.
                 </p>
               )}

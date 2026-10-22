@@ -177,26 +177,6 @@
   transform: none;
 }
 
-.loadingIndex button {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 50%;
-  background: var(--color-surface);
-  color: var(--color-action);
-  font-size: 0.75rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.loadingIndex button:hover,
-.loadingIndex button[aria-pressed="true"] {
-  border-color: var(--color-action);
-  background: var(--color-info-fill);
-}
-
 /*
  * Leaflet's attribution control sits bottom-right of the map and can overlap
  * markers that fit-bounds positions near that corner, silently swallowing

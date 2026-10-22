@@ -1,11 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { ServiceRequestError, servicesAdapter } from "@/lib/services";
 import { scenarios } from "@/lib/scenarios";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { ServicesWorkspace } from "./services-workspace";
+import { choosePeriod, periodSelect } from "./services-period-test-helpers";
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -27,7 +28,7 @@ describe("Services workspace period", () => {
     }));
     render(<ServicesWorkspace />);
     expect(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
-    expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("todo");
+    expect(periodSelect()).toHaveTextContent("Todo el período");
     expect(list.mock.calls).toEqual([[{ pageSize: 1 }], [{ pageSize: 100 }]]);
   });
 
@@ -43,10 +44,10 @@ describe("Services workspace period", () => {
     }));
     render(<ServicesWorkspace />);
     expect(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
-    expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("semana");
+    expect(periodSelect()).toHaveTextContent("Esta semana");
     expect(list).toHaveBeenCalledWith({ pageSize: 100, scheduledFrom: "2026-10-26", scheduledTo: "2026-11-01" });
     expect(list).toHaveBeenCalledWith({ pageSize: 100, page: 2, scheduledFrom: "2026-10-26", scheduledTo: "2026-11-01" });
-    fireEvent.change(screen.getByRole("combobox", { name: "Período" }), { target: { value: "mes" } });
+    await choosePeriod("Este mes");
     await waitFor(() => expect(list).toHaveBeenCalledWith({ pageSize: 100, scheduledFrom: "2026-11-01", scheduledTo: "2026-11-30" }));
     expect(new URLSearchParams(window.location.search).get("periodo")).toBe("mes");
   });
@@ -72,7 +73,7 @@ describe("Services workspace period", () => {
     const table = screen.getByRole("region", { name: "Tabla operativa de Servicios" });
     table.scrollTop = 48;
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Período" }), { target: { value: "mes" } });
+    await choosePeriod("Este mes");
 
     expect(await screen.findByText("Servicio del mes")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Mapa territorial de Servicios" })).toBe(map);
@@ -115,7 +116,7 @@ describe("Services workspace period", () => {
     const list = vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services: [], total: 240, totalPages: 3, page: 1, pageSize: 100 });
     render(<ServicesWorkspace scenario={scenarios.fieldCrewLeader} />);
     await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-    expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("todo");
+    expect(periodSelect()).toHaveTextContent("Todo el período");
     expect(list.mock.calls).toEqual([
       [{ crewId: "crew-b", pageSize: 100 }],
       [{ crewId: "crew-b", pageSize: 100, page: 2 }],
@@ -130,7 +131,7 @@ describe("Services workspace period", () => {
     expect(await screen.findByText("El período tiene demasiados servicios; acote el período.")).toBeInTheDocument();
     expect(list).toHaveBeenCalledTimes(20); // Twenty result pages; the explicit period needs no count request.
     expect(list).not.toHaveBeenCalledWith(expect.objectContaining({ page: 21 }));
-    expect(screen.getByRole("combobox", { name: "Período" })).toBeEnabled();
+    expect(periodSelect()).toBeEnabled();
   });
 
   it("ignores an unknown URL period and keeps the list for a genuinely unknown detail", async () => {
@@ -140,7 +141,7 @@ describe("Services workspace period", () => {
     render(<ServicesWorkspace />);
     await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
     await waitFor(() => expect(get).toHaveBeenCalledWith("unknown-id"));
-    expect(screen.getByRole("combobox", { name: "Período" })).toHaveValue("todo");
+    expect(periodSelect()).toHaveTextContent("Todo el período");
     expect(screen.queryByText("Este servicio está fuera del período seleccionado.")).not.toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).has("periodo")).toBe(false);
   });

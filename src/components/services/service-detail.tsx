@@ -20,6 +20,7 @@ import {
   Wrench,
 } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   REPAIR_DAMAGE_TYPE_LABEL,
@@ -288,19 +289,21 @@ export function ServiceDetail({
           )}
 
           {streetClosureDependencyError && (
-            <div
+            <Alert
+              variant="danger"
               role="alert"
-              className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/50 p-4 text-sm text-[var(--color-danger)]"
+              className="p-4 text-sm text-[var(--color-danger)]"
             >
               No se pudo consultar la dependencia de corte de calle: {streetClosureDependencyError}
-            </div>
+            </Alert>
           )}
 
           {streetClosureDependency?.outcome === "blocked" && (
-            <div
+            <Alert
+              variant="warning"
               role="status"
               aria-label="Corte de calle pendiente"
-              className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4"
+              className="p-4"
             >
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-warning)]">
                 <Siren className="h-4 w-4" aria-hidden />
@@ -310,36 +313,39 @@ export function ServiceDetail({
                 El inicio de todo el Servicio está bloqueado hasta recibir la respuesta de M7; un
                 Servicio en Recorrido no puede ejecutarse parcialmente.
               </p>
-            </div>
+            </Alert>
           )}
 
           {streetClosureDependency?.outcome === "allowed" && (
-            <div
+            <Alert
+              variant="success"
               role="status"
               aria-label="Corte de calle aprobado"
-              className="rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)]/40 p-4 text-sm text-[var(--color-success)]"
+              className="p-4 text-sm text-[var(--color-success)]"
             >
               <p className="font-bold">Corte de calle aprobado por M7</p>
               <p className="mt-1">El Servicio puede iniciar. Su estado permanece sin cambios hasta ejecutar la acción.</p>
-            </div>
+            </Alert>
           )}
 
           {streetClosureDependency?.outcome === "released" && (
-            <div
+            <Alert
+              variant="success"
               role="status"
               aria-label="Corte de calle finalizado"
-              className="rounded-xl border border-[var(--color-success-line)] bg-[var(--color-success-fill)]/40 p-4 text-sm text-[var(--color-success)]"
+              className="p-4 text-sm text-[var(--color-success)]"
             >
               <p className="font-bold">Corte de calle finalizado</p>
               <p className="mt-1">La dependencia quedó liberada; el estado del Servicio no se reabre ni se modifica.</p>
-            </div>
+            </Alert>
           )}
 
           {streetClosureDependency?.outcome === "expired" && (
-            <div
+            <Alert
+              variant="warning"
               role="status"
               aria-label="Corte de calle vencido"
-              className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4"
+              className="p-4"
             >
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-warning)]">
                 <Siren className="h-4 w-4" aria-hidden />
@@ -348,14 +354,15 @@ export function ServiceDetail({
               <p className="mt-1 text-sm text-[var(--color-warning)]">
                 El corte aprobado venció sin activarse. Si el Servicio no había iniciado, quedó para reprogramar.
               </p>
-            </div>
+            </Alert>
           )}
 
           {streetClosureDependency?.outcome === "rejected" && (
-            <div
+            <Alert
+              variant="danger"
               role="status"
               aria-label="Corte de calle rechazado"
-              className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/50 p-4"
+              className="p-4"
             >
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-danger)]">
                 <Siren className="h-4 w-4" aria-hidden />
@@ -378,13 +385,14 @@ export function ServiceDetail({
                   )}
                 </div>
               )}
-            </div>
+            </Alert>
           )}
 
           {service.status === "SCHEDULED" && canStartService && windowTiming.isOutside && (
-            <div
+            <Alert
+              variant="warning"
               role="status"
-              className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4"
+              className="p-4"
             >
               <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-warning)] uppercase tracking-wide">
                 <AlertTriangle className="h-4 w-4" aria-hidden />
@@ -393,13 +401,14 @@ export function ServiceDetail({
               <p className="mt-1 text-sm text-[var(--color-warning)]">
                 {windowTiming.message}
               </p>
-            </div>
+            </Alert>
           )}
 
           {startDraftPending && (
-            <div
+            <Alert
+              variant="warning"
               role="status"
-              className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4"
+              className="p-4"
             >
               <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-warning)] uppercase tracking-wide">
                 <CloudOff className="h-4 w-4" aria-hidden />
@@ -409,13 +418,14 @@ export function ServiceDetail({
                 No se pudo conectar con el servidor al iniciar el servicio. La acción se conservó en
                 este dispositivo; reenvíela manualmente cuando recupere la conexión.
               </p>
-            </div>
+            </Alert>
           )}
 
           {startError && (
-            <div
+            <Alert
+              variant="danger"
               role="alert"
-              className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/50 p-4"
+              className="p-4"
             >
               <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-danger)] uppercase tracking-wide">
                 <AlertTriangle className="h-4 w-4" aria-hidden />
@@ -424,13 +434,14 @@ export function ServiceDetail({
               <p className="mt-1 text-sm text-[var(--color-danger)]">
                 {startError}
               </p>
-            </div>
+            </Alert>
           )}
 
           {resumeDraftPending && (
-            <div
+            <Alert
+              variant="warning"
               role="status"
-              className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-4"
+              className="p-4"
             >
               <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-warning)] uppercase tracking-wide">
                 <CloudOff className="h-4 w-4" aria-hidden />
@@ -440,13 +451,14 @@ export function ServiceDetail({
                 No se pudo conectar con el servidor al reanudar el servicio. La acción se conservó en
                 este dispositivo; reenvíela manualmente cuando recupere la conexión.
               </p>
-            </div>
+            </Alert>
           )}
 
           {resumeError && (
-            <div
+            <Alert
+              variant="danger"
               role="alert"
-              className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)]/50 p-4"
+              className="p-4"
             >
               <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-danger)] uppercase tracking-wide">
                 <AlertTriangle className="h-4 w-4" aria-hidden />
@@ -455,7 +467,7 @@ export function ServiceDetail({
               <p className="mt-1 text-sm text-[var(--color-danger)]">
                 {resumeError}
               </p>
-            </div>
+            </Alert>
           )}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -466,13 +478,15 @@ export function ServiceDetail({
                   Cuadrilla asignada
                 </div>
                 {onAssignCrew && (service.status === "SCHEDULED" || service.status === "RESCHEDULED") && (
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
+                    size="xs"
                     onClick={() => onAssignCrew(service)}
-                    className="text-[11px] font-semibold text-[var(--color-action)] hover:underline focus:outline-none"
+                    className="h-auto min-h-0 min-w-0 px-0 py-0 text-[11px]/[14px] font-semibold text-[var(--color-action)] [@media(max-width:760px)]:min-h-0 [@media(max-width:760px)]:min-w-0"
                   >
                     {service.crewId ? "Reasignar" : "Asignar"}
-                  </button>
+                  </Button>
                 )}
               </div>
               <div className="mt-2 text-sm font-bold text-[var(--color-text)]">

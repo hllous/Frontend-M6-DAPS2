@@ -217,6 +217,31 @@ describe("ServicesWorkspace component", () => {
     }
   });
 
+  it("hides the period and category filters while a phone service preview is open", async () => {
+    const originalWidth = window.innerWidth;
+    const user = userEvent.setup();
+    try {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+      render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+      await screen.findByRole("region", { name: "Mapa territorial de Servicios" });
+      expect(screen.getByRole("combobox", { name: "Período" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Categorías" })).toBeVisible();
+
+      await user.click(screen.getByRole("row", { name: /Poda de árbol — Av\. Rivadavia 2200/ }));
+      const preview = await screen.findByRole("complementary", { name: "Poda de árbol — Av. Rivadavia 2200" });
+      expect(screen.queryByRole("combobox", { name: "Período" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Categorías" })).not.toBeInTheDocument();
+      expect(screen.getByRole("searchbox", { name: "Buscar servicios por texto libre" })).toBeVisible();
+
+      await user.click(within(preview).getByRole("button", { name: "Cerrar vista previa" }));
+      expect(await screen.findByRole("combobox", { name: "Período" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Categorías" })).toBeVisible();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+      fireEvent(window, new Event("resize"));
+    }
+  });
+
   it("synchronizes map marker selection with table and opens preview", async () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
