@@ -68,7 +68,7 @@ describe("ReferralsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: new RegExp(id) }));
     const detail = await screen.findByRole("region", { name: `Detalle de ${id}` });
-    expect(within(detail).getByRole("link", { name: /Ver inspección fuente/ })).toHaveAttribute(
+    expect(within(detail).getByRole("link", { name: /Ver inspección/ })).toHaveAttribute(
       "href", `/app?destination=environment&inspectionId=${inspectionId}`,
     );
   });
@@ -80,8 +80,8 @@ describe("ReferralsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     expect(within(list).getByRole("button", { name: /RR-1001/ })).toBeVisible();
     expect(within(list).getByRole("button", { name: /SCR-1001/ })).toBeVisible();
-    expect(within(list).getByText("M3 · Reparaciones")).toBeVisible();
-    expect(within(list).getAllByText("M7 · Cortes de calle")).toHaveLength(2);
+    expect(within(list).getByText("Obras Públicas · Reparación")).toBeVisible();
+    expect(within(list).getAllByText("Tránsito · Corte de calle")).toHaveLength(2);
     expect(within(list).getByRole("button", { name: /SCR-1002/ })).toBeVisible();
 
     await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
@@ -89,11 +89,11 @@ describe("ReferralsWorkspace", () => {
     expect(within(detail).getByRole("status", { name: "Estado: Solicitada" })).toBeVisible();
     expect(within(detail).getByText("05/09/2026 08:00")).toBeVisible();
     expect(within(detail).getByText("05/09/2026 12:00")).toBeVisible();
-    expect(within(detail).getByRole("link", { name: /Ver Servicio de origen/ })).toHaveAttribute(
+    expect(within(detail).getByRole("link", { name: /Ver servicio/ })).toHaveAttribute(
       "href",
       "/app?destination=services&detail=SVC-1050",
     );
-    expect(within(detail).getByText("La información del Servicio se consulta en su módulo de origen.")).toBeVisible();
+    expect(within(detail).queryByText(/módulo de origen/)).not.toBeInTheDocument();
   });
 
   it("exposes an EnvironmentalInspection source and keeps the RepairRequest pending", async () => {
@@ -120,10 +120,10 @@ describe("ReferralsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /RR-INS-1012/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de RR-INS-1012" });
-    expect(within(detail).getByRole("heading", { name: "Inspección de origen" })).toBeVisible();
-    expect(within(detail).getByRole("link", { name: /Ver inspección fuente/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
+    expect(within(detail).getByRole("heading", { name: "Inspección" })).toBeVisible();
+    expect(within(detail).getByRole("link", { name: /Ver inspección/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
     expect(within(detail).getByRole("status", { name: "Estado: Pendiente" })).toBeVisible();
-    expect(within(detail).getByText(/M3 todavía no informó un identificador/)).toBeVisible();
+    expect(within(detail).queryByText("Nº de orden de trabajo")).not.toBeInTheDocument();
   });
 
   it("navigates TreeIntervention referrals to their catalog source", async () => {
@@ -134,8 +134,8 @@ describe("ReferralsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: /SCR-1002/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de SCR-1002" });
 
-    expect(within(detail).getByRole("heading", { name: "Intervención de arbolado de origen" })).toBeVisible();
-    expect(within(detail).getByRole("link", { name: /Ver intervención de origen/ })).toHaveAttribute(
+    expect(within(detail).getByRole("heading", { name: "Intervención" })).toBeVisible();
+    expect(within(detail).getByRole("link", { name: /Ver intervención/ })).toHaveAttribute(
       "href",
       "/app/catalog/tree-interventions?detail=intervention-2",
     );
@@ -156,14 +156,13 @@ describe("ReferralsWorkspace", () => {
     render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
 
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
-    expect(within(list).getAllByText("Derivación externa vencida")).toHaveLength(2);
-    expect(within(list).getAllByText("Candidata a duplicada")).toHaveLength(2);
-    expect(screen.getByRole("region", { name: "Resumen de conciliación" })).toHaveTextContent("M6 no cambia estados");
+    expect(within(list).getAllByText("Vencida")).toHaveLength(2);
+    expect(within(list).getAllByText("Posible duplicada")).toHaveLength(2);
+    expect(screen.getByRole("region", { name: "Alertas" })).toHaveTextContent("2 vencidas");
 
     await user.click(within(list).getByRole("button", { name: /RR-118-STALE/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de RR-118-STALE" });
-    expect(within(detail).getByRole("heading", { name: "Derivación externa vencida" })).toBeVisible();
-    expect(within(detail).getByText("No se crea un estado nuevo, no se reintenta el envío y no se modifica el Servicio automáticamente.")).toBeVisible();
+    expect(within(detail).getByRole("region", { name: "Alertas" })).toHaveTextContent("Vencida: Obras Públicas no respondió a tiempo.");
     expect(within(detail).getByRole("status", { name: "Estado: Pendiente" })).toBeVisible();
   });
 
@@ -186,12 +185,11 @@ describe("ReferralsWorkspace", () => {
     const user = userEvent.setup();
     render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
-    expect(within(list).getByText("Origen actualizado")).toBeVisible();
+    expect(within(list).getByText("Cambió el servicio")).toBeVisible();
 
     await user.click(within(list).getByRole("button", { name: /SCR-118-CHANGED-SOURCE/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de SCR-118-CHANGED-SOURCE" });
-    expect(within(detail).getByRole("heading", { name: "El Servicio de origen cambió" })).toBeVisible();
-    expect(within(detail).getByText("La derivación conserva el contexto original. Compare antes de resolver la conciliación.")).toBeVisible();
+    expect(within(detail).getByText("El servicio cambió desde que se derivó.")).toBeVisible();
     expect(within(detail).getByText(/Antes: 2026-09-07/)).toBeVisible();
   });
 
@@ -239,30 +237,30 @@ describe("ReferralsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /RR-1001/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
-    await user.click(within(detail).getByRole("button", { name: "Registrar inicio de reparación" }));
+    await user.click(within(detail).getByRole("button", { name: "Registrar inicio" }));
 
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText(/acción solo registra un hecho externo ya confirmado/i)).toBeVisible();
-    await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
-    expect(within(dialog).getByRole("alert")).toHaveTextContent(/identificador externo de m3/i);
-    const recoveryIdentifier = within(dialog).getByLabelText(/Identificador externo de M3/);
+    expect(within(dialog).getByText("Obras Públicas ya asignó la orden.")).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar" }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/nº de orden de trabajo/i);
+    const recoveryIdentifier = within(dialog).getByLabelText(/Nº de orden de trabajo/);
     const recoveryAlert = within(dialog).getByRole("alert");
     const describedByIds = recoveryIdentifier.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
     expect(recoveryIdentifier).toHaveAttribute("aria-invalid", "true");
     expect(recoveryAlert.getAttribute("id")).toBeTruthy();
     expect(describedByIds).toContain(recoveryAlert.getAttribute("id"));
 
-    await user.type(within(dialog).getByLabelText(/Identificador externo de M3/), "M3-OT-2048");
-    await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
+    await user.type(within(dialog).getByLabelText(/Nº de orden de trabajo/), "OT-2048");
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(within(detail).getByText("En curso")).toBeVisible();
-    expect(within(detail).getByText("M3-OT-2048")).toBeVisible();
+    expect(within(detail).getByText("OT-2048")).toBeVisible();
 
-    await user.click(within(detail).getByRole("button", { name: "Registrar cierre de reparación" }));
+    await user.click(within(detail).getByRole("button", { name: "Registrar cierre" }));
     const closeDialog = screen.getByRole("dialog");
-    await user.type(within(closeDialog).getByLabelText(/Identificador externo de M3/), "M3-OT-2048");
-    await user.click(within(closeDialog).getByRole("button", { name: "Confirmar recuperación" }));
+    await user.type(within(closeDialog).getByLabelText(/Nº de orden de trabajo/), "OT-2048");
+    await user.click(within(closeDialog).getByRole("button", { name: "Confirmar" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(within(detail).getByText("Cerrada")).toBeVisible();
   });
@@ -275,7 +273,7 @@ describe("ReferralsWorkspace", () => {
     const refreshedRequest = {
       ...base.request,
       status: "CLOSED" as const,
-      workOrderId: "M3-OT-2048",
+      workOrderId: "OT-2048",
       updatedAt: "2026-09-19T12:00:00.000Z",
     };
     server.use(
@@ -299,11 +297,11 @@ describe("ReferralsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /RR-1001/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
-    await user.click(within(detail).getByRole("button", { name: "Registrar inicio de reparación" }));
+    await user.click(within(detail).getByRole("button", { name: "Registrar inicio" }));
 
     const dialog = screen.getByRole("dialog");
-    await user.type(within(dialog).getByLabelText(/Identificador externo de M3/), "M3-OT-2048");
-    await user.click(within(dialog).getByRole("button", { name: /Confirmar recuper/ }));
+    await user.type(within(dialog).getByLabelText(/Nº de orden de trabajo/), "OT-2048");
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar" }));
 
     await waitFor(() => {
       expect(screen.getByRole("status", { name: "Estado: Cerrada", hidden: true })).toBeVisible();
@@ -315,7 +313,7 @@ describe("ReferralsWorkspace", () => {
 
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Volver" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(screen.queryByRole("button", { name: "Registrar inicio de reparación" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Registrar inicio" })).not.toBeInTheDocument();
   });
 
   it("keeps manual recovery unavailable to Field", async () => {
@@ -325,7 +323,7 @@ describe("ReferralsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /RR-1001/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
-    expect(within(detail).queryByText("Recuperación manual")).not.toBeInTheDocument();
+    expect(within(detail).queryByText("Registrar respuesta")).not.toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: /Registrar/ })).not.toBeInTheDocument();
   });
 
@@ -336,21 +334,21 @@ describe("ReferralsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de SCR-1001" });
-    await user.click(within(detail).getByRole("button", { name: "Registrar aprobación de M7" }));
+    await user.click(within(detail).getByRole("button", { name: "Registrar aprobación" }));
 
     const dialog = screen.getByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
-    expect(within(dialog).getByRole("alert")).toHaveTextContent(/identificador externo de m7/i);
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar" }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/nº de corte/i);
 
-    await user.type(within(dialog).getByLabelText(/Identificador externo de M7/), "M7-C-882");
-    await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
+    await user.type(within(dialog).getByLabelText(/Nº de corte/), "C-882");
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(within(detail).getByText("Aprobada")).toBeVisible();
-    expect(within(detail).getByText("M7-C-882")).toBeVisible();
+    expect(within(detail).getByText("C-882")).toBeVisible();
 
-    await user.click(within(detail).getByRole("button", { name: "Registrar finalización de M7" }));
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Confirmar recuperación" }));
+    await user.click(within(detail).getByRole("button", { name: "Registrar finalización" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Confirmar" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(within(detail).getByText("Finalizada")).toBeVisible();
   });
@@ -362,11 +360,11 @@ describe("ReferralsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de SCR-1001" });
-    await user.click(within(detail).getByRole("button", { name: "Registrar rechazo de M7" }));
+    await user.click(within(detail).getByRole("button", { name: "Registrar rechazo" }));
 
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).queryByLabelText(/Identificador externo de M7/)).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Confirmar recuperación" }));
+    expect(within(dialog).queryByLabelText(/Nº de corte/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(within(detail).getByText("Rechazada")).toBeVisible();
   });
@@ -376,7 +374,7 @@ describe("ReferralsWorkspace", () => {
       http.get("*/api/referrals", () => HttpResponse.json({ data: [], meta: { total: 0 } })),
     );
     render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
-    expect(await screen.findByText("No hay derivaciones para esta sesión")).toBeVisible();
+    expect(await screen.findByText("Sin derivaciones")).toBeVisible();
 
     server.resetHandlers();
     server.use(http.get("*/api/referrals", () => HttpResponse.json({ message: "Servidor no disponible" }, { status: 503 })));
