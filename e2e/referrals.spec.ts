@@ -12,8 +12,8 @@ test.describe("Referral workspace", () => {
     await expect(list).toBeVisible();
     await expect(list.getByRole("button", { name: /RR-1001/ })).toBeVisible();
     await expect(list.getByRole("button", { name: /SCR-1001/ })).toBeVisible();
-    await expect(list.getByText("M3 · Reparaciones")).toBeVisible();
-    await expect(list.getByText("M7 · Cortes de calle").first()).toBeVisible();
+    await expect(list.getByText("Obras Públicas · Reparación")).toBeVisible();
+    await expect(list.getByText("Tránsito · Corte de calle").first()).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
     await list.getByRole("button", { name: /SCR-1001/ }).click();
@@ -27,7 +27,7 @@ test.describe("Referral workspace", () => {
     await page.setViewportSize({ width: 761, height: 844 });
     await expect.poll(async () => (await backButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(40);
     await expect(detail.getByRole("status", { name: "Estado: Solicitada" })).toBeVisible();
-    await expect(detail.getByRole("link", { name: /Ver Servicio de origen/ })).toHaveAttribute(
+    await expect(detail.getByRole("link", { name: /Ver servicio/ })).toHaveAttribute(
       "href",
       /destination=services&detail=SVC-1050/,
     );
@@ -55,7 +55,7 @@ test.describe("Referral workspace", () => {
       await route.fulfill({ json: { data: [], meta: { total: 0 } } });
     });
     await page.goto("/app?destination=referrals");
-    await expect(page.getByText("No hay derivaciones para esta sesión")).toBeVisible();
+    await expect(page.getByText("Sin derivaciones")).toBeVisible();
 
     await page.unroute("**/api/referrals");
     await page.route("**/api/referrals", async (route) => route.abort());
