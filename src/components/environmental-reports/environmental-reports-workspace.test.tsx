@@ -54,6 +54,15 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); re
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
+  it("shows the queue without explanatory subtitles or notes", async () => {
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const queue = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+
+    expect(screen.queryByText("Cola de expedientes para clasificar y derivar.")).not.toBeInTheDocument();
+    expect(queue).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByText(/ciclo completo del expediente/i)).not.toBeInTheDocument();
+  });
+
   it("bounds the Estado options within a vertically scrollable listbox", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
