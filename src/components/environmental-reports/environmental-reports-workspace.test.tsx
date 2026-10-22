@@ -195,7 +195,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("shows an uncorrelated M4 outcome as an Office integration exception", async () => {
+  it("shows an uncorrelated Faltas outcome as a resolution without an acta", async () => {
     ingestSanctionOutcomeFixture({
       violationNoticeId: "NOTICE-UNKNOWN",
       decision: "CLOSURE_ORDERED",
@@ -204,27 +204,27 @@ describe("EnvironmentalReportsWorkspace", () => {
     });
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
 
-    const exceptionPanel = await screen.findByRole("region", { name: "Excepciones de integración M4" });
+    const exceptionPanel = await screen.findByRole("region", { name: "Resoluciones sin acta" });
     expect(within(exceptionPanel).getByText("NOTICE-UNKNOWN")).toBeVisible();
     expect(within(exceptionPanel).getByText("M4-CLOSURE-UNKNOWN")).toBeVisible();
-    expect(within(exceptionPanel).getByText(/no pudo correlacionarse/i)).toBeVisible();
+    expect(within(exceptionPanel).getByText("No coinciden con ningún acta.")).toBeVisible();
   });
 
-  it("shows the M4 SanctionOutcome as read-only in the Office detail", async () => {
+  it("shows the Faltas SanctionOutcome as read-only in the Office detail", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: /ER-1010/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1010" });
 
-    expect(within(detail).getByRole("region", { name: "Resolución de M4" })).toBeVisible();
+    expect(within(detail).getByRole("region", { name: "Resolución de Faltas" })).toBeVisible();
     expect(within(detail).getByText("Multa emitida")).toBeVisible();
     expect(within(detail).getByText("M4-FINE-1010")).toBeVisible();
-    expect(within(detail).getByText(/solo lectura/i)).toBeVisible();
+    expect(within(detail).queryByText(/solo lectura|M6 no edita/i)).not.toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: /Editar|Eliminar|Modificar/ })).not.toBeInTheDocument();
   });
 
-  it("does not expose M4 sanction detail to Field even when the report is assigned", async () => {
+  it("does not expose Faltas sanction detail to Field even when the report is assigned", async () => {
     updateEnvironmentalReportFixture("ER-1010", { assignedCrewId: "crew-b" });
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
@@ -232,11 +232,11 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: /ER-1010/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1010" });
 
-    expect(within(detail).queryByRole("region", { name: "Resolución de M4" })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("region", { name: "Resolución de Faltas" })).not.toBeInTheDocument();
     expect(within(detail).queryByText("M4-FINE-1010")).not.toBeInTheDocument();
   });
 
-  it("shows the active M4 deadline as a waiting state without an automatic-close CTA", async () => {
+  it("shows the active Faltas deadline as a waiting state without an automatic-close CTA", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-09-10T10:00:00.000Z"));
     const user = userEvent.setup();
@@ -245,8 +245,8 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: /ER-1009/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1009" });
 
-    expect(within(detail).getByRole("region", { name: "Estado de cierre" })).toHaveTextContent("Esperando resolución de M4");
-    expect(within(detail).getByText(/permanece abierto/i)).toBeVisible();
+    expect(within(detail).getByRole("region", { name: "Cierre" })).toHaveTextContent("Esperando resolución de Faltas");
+    expect(within(detail).getByText(/Faltas debe resolver antes del/)).toBeVisible();
     expect(within(detail).queryByRole("button", { name: "Cerrar expediente" })).not.toBeInTheDocument();
   });
 
@@ -257,13 +257,13 @@ describe("EnvironmentalReportsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: /ER-1009/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1009" });
-    expect(within(detail).getByRole("region", { name: "Estado de cierre" })).toHaveTextContent("Cierre automático por vencimiento");
+    expect(within(detail).getByRole("region", { name: "Cierre" })).toHaveTextContent("Cierre automático por vencimiento");
 
     await user.click(within(detail).getByRole("button", { name: "Volver a expedientes" }));
     const nextList = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(nextList).getByRole("button", { name: /ER-1011/ }));
     const localDetail = await screen.findByRole("region", { name: "Detalle de ER-1011" });
-    expect(within(localDetail).getByRole("region", { name: "Estado de cierre" })).toHaveTextContent("Cierre local");
+    expect(within(localDetail).getByRole("region", { name: "Cierre" })).toHaveTextContent("Cierre local");
   });
 
   it("shows Office's complete queue and exposes only valid actions", async () => {
@@ -354,12 +354,12 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Derivar expediente" });
     await user.click(within(dialog).getByRole("button", { name: "Derivar expediente" }));
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Debe indicar el motivo.");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Indique el motivo.");
     const reason = within(dialog).getByLabelText(/Motivo/);
     expect(reason).toHaveAttribute("aria-invalid", "true");
     const describedBy = reason.getAttribute("aria-describedby");
     expect(describedBy).toBeTruthy();
-    expect(document.getElementById(describedBy!)).toHaveTextContent("Debe indicar el motivo.");
+    expect(document.getElementById(describedBy!)).toHaveTextContent("Indique el motivo.");
     expect(forward).not.toHaveBeenCalled();
 
     await user.type(within(dialog).getByLabelText(/Motivo/), "Corresponde a otra dependencia");
@@ -396,16 +396,17 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(detail).getByRole("button", { name: "Pedir información al vecino" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Pedir información al vecino" });
-    expect(within(dialog).getByText(/fecha sugerida: M2 fija el vencimiento efectivo/i)).toBeVisible();
+    expect(within(dialog).getByText("Opcional. Si vence sin respuesta, el expediente se desestima.")).toBeVisible();
+    expect(within(dialog).getByText("Nota interna (el vecino no la ve)")).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Pedir información" }));
-    expect(await within(dialog).findByText("Debe indicar qué información se le pide al vecino.")).toBeVisible();
-    await user.type(within(dialog).getByLabelText(/Qué se le pide al vecino/), "Una foto del frente, de noche.");
+    expect(await within(dialog).findByText("Indique qué información pide.")).toBeVisible();
+    await user.type(within(dialog).getByLabelText(/Qué información necesita/), "Una foto del frente, de noche.");
     await user.click(within(dialog).getByRole("button", { name: "Pedir información" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Pedir información al vecino" })).not.toBeInTheDocument());
-    const pending = await within(detail).findByRole("status", { name: "Solicitud de información pendiente" });
+    const pending = await within(detail).findByRole("status", { name: "Información pedida" });
     expect(pending).toHaveTextContent("Una foto del frente, de noche.");
-    expect(pending).toHaveTextContent("M2 cancela el reclamo y el expediente pasa a Desestimado");
+    expect(pending).toHaveTextContent("Si vence, el expediente se desestima.");
     expect(within(detail).queryByRole("button", { name: "Pedir información al vecino" })).not.toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: "Derivar expediente" })).not.toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: "Desestimar expediente" })).not.toBeInTheDocument();
@@ -434,15 +435,15 @@ describe("EnvironmentalReportsWorkspace", () => {
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1002" });
     await user.click(within(detail).getByRole("button", { name: "Pedir información al vecino" }));
     const dialog = await screen.findByRole("dialog", { name: "Pedir información al vecino" });
-    await user.type(within(dialog).getByLabelText(/Qué se le pide al vecino/), "Otra foto");
+    await user.type(within(dialog).getByLabelText(/Qué información necesita/), "Otra foto");
     await user.click(within(dialog).getByRole("button", { name: "Pedir información" }));
 
-    expect(await within(dialog).findByText(/ya hay una solicitud pendiente o el expediente cambió/i)).toBeVisible();
+    expect(await within(dialog).findByText("Ya hay una solicitud pendiente.")).toBeVisible();
     // the dialog is still open, so the page behind it is aria-hidden
-    expect(await within(detail).findByRole("status", { name: "Solicitud de información pendiente", hidden: true })).toHaveTextContent("Ya pedida");
+    expect(await within(detail).findByRole("status", { name: "Información pedida", hidden: true })).toHaveTextContent("Ya pedida");
   });
 
-  it("finds a report by publicId and keeps the technical ticketId in its detail", async () => {
+  it("finds a report by publicId and shows it as the claim number in its detail", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const search = await screen.findByLabelText("Buscar expediente");
@@ -456,7 +457,8 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: /ER-1002/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1002" });
     expect(within(detail).getByText("TK-2026-091")).toBeVisible();
-    expect(within(detail).getByText("550e8400-e29b-41d4-a716-446655440091")).toBeVisible();
+    expect(within(detail).getByText(/^Reclamo:/)).toBeVisible();
+    expect(within(detail).queryByText("550e8400-e29b-41d4-a716-446655440091")).not.toBeInTheDocument();
   });
 
   it("keeps Field scoped and submits an own-initiative report", async () => {
@@ -530,11 +532,11 @@ describe("EnvironmentalReportsWorkspace", () => {
     await chooseOption(user, within(dialog), "Cuadrilla", /Cuadrilla A/);
     await user.click(within(dialog).getByRole("button", { name: "Programar inspección" }));
 
-    expect(await within(detail).findByText(/La inspección quedó programada, pero no se pudo crear el Servicio POINT/)).toBeVisible();
+    expect(await within(detail).findByText("Inspección programada, pero no se creó el servicio. Use «Programar servicio».")).toBeVisible();
     expect(await within(detail).findByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: "Programar inspección" })).not.toBeInTheDocument();
-    expect(within(detail).getByText(/quedó registrada sin Servicio POINT/)).toBeVisible();
+    expect(within(detail).getByText("Falta fecha y cuadrilla.")).toBeVisible();
 
     await user.click(within(detail).getByRole("button", { name: "Programar servicio" }));
     const retry = await screen.findByRole("dialog", { name: "Programar servicio" });
@@ -572,9 +574,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     await chooseOption(user, within(dialog), "Cuadrilla", /Cuadrilla A/);
     await user.click(within(dialog).getByRole("button", { name: "Programar servicio" }));
 
-    const note = await within(dialog).findByRole("textbox", { name: /Justificación del solapamiento/ });
+    const note = await within(dialog).findByRole("textbox", { name: /Justificación/ });
     expect(note).toHaveAttribute("aria-required", "true");
-    expect(note.parentElement).toHaveTextContent("Justificación del solapamiento *");
+    expect(note.parentElement).toHaveTextContent("Justificación *");
     expect(within(dialog).getByText(/La cuadrilla ya está tomada en esa franja/)).toBeVisible();
     await user.type(note, "La otra parada termina antes.");
     await user.click(within(dialog).getByRole("button", { name: "Programar servicio" }));
@@ -637,17 +639,17 @@ describe("EnvironmentalReportsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: /ER-1008/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
-    await user.click(within(detail).getByRole("button", { name: "Emitir aviso de infracción" }));
+    await user.click(within(detail).getByRole("button", { name: "Emitir acta" }));
 
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getByLabelText(/Buscar establecimiento/), "EST-BOEDO-1880");
     await user.click(within(dialog).getByRole("button", { name: "Buscar establecimiento" }));
     expect(await within(dialog).findByText(/Planta de tratamiento Boedo/)).toBeVisible();
-    await user.click(within(dialog).getByRole("button", { name: "Emitir aviso de infracción" }));
+    await user.click(within(dialog).getByRole("button", { name: "Emitir acta" }));
 
     expect(await within(detail).findByText("ACTA-2026-0001")).toBeVisible();
-    expect(within(detail).getByText("Acta inmutable")).toBeVisible();
-    expect(within(detail).getByText("Actas previas del establecimiento")).toBeVisible();
+    expect(within(detail).getByText("Acta emitida. No se puede modificar.")).toBeVisible();
+    expect(within(detail).getByText("Actas previas")).toBeVisible();
     expect(within(detail).queryByRole("button", { name: /Editar acta|Eliminar acta/ })).not.toBeInTheDocument();
     await waitFor(() => expect(within(detail).getByRole("heading", { name: "Expediente ER-1008" })).toHaveFocus());
   });
@@ -660,27 +662,26 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: /ER-1008/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
 
-    const issueButton = await within(detail).findByRole("button", { name: "Emitir aviso de infracción" });
+    const issueButton = await within(detail).findByRole("button", { name: "Emitir acta" });
     expect(issueButton).toBeDisabled();
-    expect(within(detail).getByText(/evidencia.*antes de emitir/i)).toBeVisible();
+    expect(within(detail).getByText("Agregue evidencia a la inspección para emitir el acta.")).toBeVisible();
   });
 
-  it("records an explicit non-forwarded notice without claiming an M4 sanction", async () => {
+  it("records an explicit non-forwarded notice without claiming a Faltas sanction", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: /ER-1008/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
-    await user.click(within(detail).getByRole("button", { name: "Emitir aviso de infracción" }));
+    await user.click(within(detail).getByRole("button", { name: "Emitir acta" }));
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getByLabelText(/Buscar establecimiento/), "referencia inexistente");
     await user.click(within(dialog).getByRole("button", { name: "Buscar establecimiento" }));
     await user.click(await within(dialog).findByRole("button", { name: "Continuar sin establecimiento" }));
-    await user.click(within(dialog).getByRole("button", { name: "Registrar aviso no derivado" }));
+    await user.click(within(dialog).getByRole("button", { name: "Emitir sin establecimiento" }));
 
-    expect(await within(detail).findByRole("status", { name: "Aviso no derivado" })).toBeVisible();
-    expect(within(detail).getByText("M4 no fue contactado")).toBeVisible();
-    expect(within(detail).getByText(/cerrado localmente/i)).toBeVisible();
+    expect(await within(detail).findByRole("status", { name: "Acta no enviada a Faltas" })).toBeVisible();
+    expect(within(detail).getByText("El expediente se cerró sin resolución de Faltas.")).toBeVisible();
     expect(within(detail).getByRole("status", { name: "Estado: Cerrado" })).toBeVisible();
   });
 
@@ -697,13 +698,13 @@ describe("EnvironmentalReportsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: /ER-1008/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
-    await user.click(within(detail).getByRole("button", { name: "Emitir aviso de infracción" }));
+    await user.click(within(detail).getByRole("button", { name: "Emitir acta" }));
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getByLabelText(/Buscar establecimiento/), "EST-BOEDO-1880");
     await user.click(within(dialog).getByRole("button", { name: "Buscar establecimiento" }));
-    await user.click(within(dialog).getByRole("button", { name: "Emitir aviso de infracción" }));
+    await user.click(within(dialog).getByRole("button", { name: "Emitir acta" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/conflicto/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo emitir el acta. Intente nuevamente.");
   });
 
   it("does not expose issuance to a limited Office session", async () => {
@@ -713,7 +714,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: /ER-1008/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
 
-    expect(within(detail).queryByRole("button", { name: "Emitir aviso de infracción" })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("button", { name: "Emitir acta" })).not.toBeInTheDocument();
   });
 
   it("lets Office create a pending RepairRequest from an inspection without deriving safety risk", async () => {

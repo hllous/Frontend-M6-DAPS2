@@ -165,7 +165,7 @@ test.describe("EnvironmentalReport case file", () => {
     const reason = decisionDialog.getByLabel(/Motivo/);
     await decisionDialog.getByRole("button", { name: "Derivar expediente" }).click();
     await expect(reason).toHaveAttribute("aria-invalid", "true");
-    await expect(reason).toHaveAccessibleDescription("Debe indicar el motivo.");
+    await expect(reason).toHaveAccessibleDescription("Indique el motivo.");
     await reason.fill("Corresponde a otra dependencia.");
     await decisionDialog.getByRole("button", { name: "Derivar expediente" }).click();
     await expect(decisionDialog).not.toBeVisible();
@@ -176,12 +176,12 @@ test.describe("EnvironmentalReport case file", () => {
     await updatedList.getByRole("button", { name: /ER-1008/ }).click();
     const noticeDetail = page.getByRole("region", { name: "Detalle de ER-1008" });
     const noticeHeading = noticeDetail.getByRole("heading", { name: "Expediente ER-1008" });
-    await noticeDetail.getByRole("button", { name: "Emitir aviso de infracción" }).click();
-    const noticeDialog = page.getByRole("dialog", { name: "Emitir aviso de infracción" });
+    await noticeDetail.getByRole("button", { name: "Emitir acta" }).click();
+    const noticeDialog = page.getByRole("dialog", { name: "Emitir acta" });
     await noticeDialog.getByLabel(/Buscar establecimiento/).fill("EST-BOEDO-1880");
     await noticeDialog.getByRole("button", { name: "Buscar establecimiento" }).click();
     await expect(noticeDialog.getByText(/Planta de tratamiento Boedo/)).toBeVisible();
-    await noticeDialog.getByRole("button", { name: "Emitir aviso de infracción" }).click();
+    await noticeDialog.getByRole("button", { name: "Emitir acta" }).click();
     await expect(noticeDialog).not.toBeVisible();
     await expect(noticeHeading).toBeFocused();
   });
@@ -215,10 +215,10 @@ test.describe("EnvironmentalReport case file", () => {
     const detail = page.getByRole("region", { name: "Detalle de ER-1013" });
     await detail.getByRole("button", { name: "Pedir información al vecino" }).click();
     const dialog = page.getByRole("dialog", { name: "Pedir información al vecino" });
-    await dialog.getByLabel(/Qué se le pide al vecino/).fill("Una foto del frente, de noche.");
+    await dialog.getByLabel(/Qué información necesita/).fill("Una foto del frente, de noche.");
     await dialog.getByRole("button", { name: "Pedir información" }).click();
     await expect(dialog).not.toBeVisible();
-    await expect(detail.getByRole("status", { name: "Solicitud de información pendiente" })).toContainText("Una foto del frente, de noche.");
+    await expect(detail.getByRole("status", { name: "Información pedida" })).toContainText("Una foto del frente, de noche.");
     await expect(detail.getByRole("button", { name: "Pedir información al vecino" })).toHaveCount(0);
     await expect(detail.getByRole("button", { name: "Derivar expediente" })).toHaveCount(0);
   });
