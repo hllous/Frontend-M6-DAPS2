@@ -86,11 +86,11 @@ type MapViewOption = {
 };
 
 const mapViews: MapViewOption[] = [
-  { id: "inventory", label: "Inventario", title: "Contexto territorial" },
-  { id: "zones", label: "Zonas", title: "Zonas operativas" },
+  { id: "inventory", label: "Inventario", title: "Inventario" },
+  { id: "zones", label: "Zonas", title: "Zonas" },
   { id: "coverage", label: "Cobertura", title: "Cobertura por zona" },
-  { id: "route", label: "Recorrido", title: "Recorrido operativo" },
-  { id: "today", label: "Atención hoy", title: "Zonas atendidas hoy" },
+  { id: "route", label: "Recorrido", title: "Recorrido" },
+  { id: "today", label: "Hoy", title: "Hoy" },
 ];
 
 const OperationalMapCanvas = dynamic(
@@ -98,7 +98,7 @@ const OperationalMapCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <LoadingRegion label="Mapa geográfico" className={styles.mapPlaceholder}>
+      <LoadingRegion label="Mapa" className={styles.mapPlaceholder}>
         <MapPaneSkeleton className="min-h-0" />
       </LoadingRegion>
     ),
@@ -119,8 +119,8 @@ const initialLayers: Record<LayerId, boolean> = {
   trees: true,
 };
 
-const mapLoadError = "No se pudo cargar la información territorial. Revise la conexión e intente nuevamente.";
-const viewLoadError = "No se pudo cargar esta vista territorial. Intente nuevamente.";
+const mapLoadError = "No se pudo cargar el mapa. Intente nuevamente.";
+const viewLoadError = "No se pudo cargar esta vista. Intente nuevamente.";
 
 const wasteTypeLabels = {
   HOUSEHOLD: "Domiciliarios",
@@ -207,7 +207,7 @@ function toListItems(data: OperationalMapData): MapListItem[] {
       id: item.id,
       layer: "greenPoints" as const,
       title: item.name,
-      description: `${item.address ?? "Sin dirección informada"} · ${item.wasteTypes.map((type) => wasteTypeLabels[type]).join(", ")}`,
+      description: `${item.address ?? "Sin dirección"} · ${item.wasteTypes.map((type) => wasteTypeLabels[type]).join(", ")}`,
       lat: item.lat,
       lng: item.lng,
       markerSymbol: "P",
@@ -217,7 +217,7 @@ function toListItems(data: OperationalMapData): MapListItem[] {
       id: item.id,
       layer: "greenSpaces" as const,
       title: item.name,
-      description: item.areaM2 === null ? `${greenSpaceTypeLabels[item.spaceType]} · superficie no registrada` : `${greenSpaceTypeLabels[item.spaceType]} · ${Math.round(item.areaM2).toLocaleString("es-AR")} m²`,
+      description: item.areaM2 === null ? `${greenSpaceTypeLabels[item.spaceType]} · sin superficie` : `${greenSpaceTypeLabels[item.spaceType]} · ${Math.round(item.areaM2).toLocaleString("es-AR")} m²`,
       lat: item.lat,
       lng: item.lng,
       markerSymbol: "E",
@@ -227,7 +227,7 @@ function toListItems(data: OperationalMapData): MapListItem[] {
       id: item.id,
       layer: "trees" as const,
       title: item.surveyCode,
-      description: `${item.species} · ${item.address ?? "Sin dirección informada"} · ${item.lastSurvey ? treeRiskLabels[item.lastSurvey.riskLevel] : "Sin relevamiento"}`,
+      description: `${item.species} · ${item.address ?? "Sin dirección"} · ${item.lastSurvey ? treeRiskLabels[item.lastSurvey.riskLevel] : "Sin relevamiento"}`,
       lat: item.lat,
       lng: item.lng,
       markerSymbol: item.lastSurvey ? "A" : "?",
@@ -560,7 +560,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                     variant="outline"
                     size="icon"
                     type="button"
-                    aria-label="Actualizar datos"
+                    aria-label="Actualizar"
                     onClick={() => void load()}
                     disabled={isLoading}
                   >
@@ -568,7 +568,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                   </Button>
                 }
               />
-              <TooltipContent>Actualizar datos</TooltipContent>
+              <TooltipContent>Actualizar</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </header>
@@ -578,7 +578,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
           activateOnFocus
           className={styles.viewSwitcher}
           variant="line"
-          aria-label="Vistas del mapa operativo"
+          aria-label="Vistas"
         >
           {availableMapViews.map((option) => (
             <TabsTrigger key={option.id} value={option.id} className={styles.viewTab}>
@@ -590,7 +590,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
         {error ? (
           <Alert variant="destructive">
             <AlertTriangle aria-hidden />
-            <AlertTitle>El mapa no está disponible</AlertTitle>
+            <AlertTitle>No se pudo cargar el mapa</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
             <Button variant="outline" size="sm" onClick={() => void load()}>
               Reintentar
@@ -602,7 +602,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
           {viewError ? (
             <Alert variant="destructive">
               <AlertTriangle aria-hidden />
-              <AlertTitle>La vista no está disponible</AlertTitle>
+              <AlertTitle>No se pudo cargar la vista</AlertTitle>
               <AlertDescription>{viewError}</AlertDescription>
               <Button variant="outline" size="sm" onClick={() => {
                 setViewError(null);
@@ -615,12 +615,12 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                   setCoverageLoaded(false);
                 }
               }}>
-                Reintentar vista
+                Reintentar
               </Button>
             </Alert>
           ) : null}
 
-          <LoadingRegion label="Datos del mapa operativo" isLoading={isLoading}>
+          <LoadingRegion label="Mapa" isLoading={isLoading}>
           {isLoading ? <MapLoading /> : data ? (
             <div className={cn(styles.layout, view === "inventory" && styles.layoutInventory)}>
               <div className={styles.mapPanel}>
@@ -647,7 +647,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
 
               {view === "inventory" ? (
                 <InventoryMapDrawer
-                  ariaLabel={`Controles de la vista ${currentView.label}`}
+                  ariaLabel="Controles"
                   className={styles.sidePanel}
                   expandToViewport
                   summary="Elementos"
@@ -665,11 +665,11 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                   />
                 </InventoryMapDrawer>
               ) : (
-                <aside className={styles.sidePanel} aria-label={`Controles de la vista ${currentView.label}`}>
+                <aside className={styles.sidePanel} aria-label="Controles">
                   {view === "zones" ? (
                     <ZonesMapPanel zones={zones} selectedZoneCode={selectedZoneCode} onSelectZone={setSelectedZoneCode} />
                   ) : view === "route" ? (
-                    <SideLoadingRegion label="Carga de recorridos" isLoading={isViewLoading}>
+                    <SideLoadingRegion label="Cargando" isLoading={isViewLoading}>
                     <RouteMapPanel
                       routes={routes}
                       selectedRouteId={selectedRouteId}
@@ -681,7 +681,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                     />
                     </SideLoadingRegion>
                   ) : view === "coverage" ? (
-                    <SideLoadingRegion label="Carga de cobertura" isLoading={isViewLoading}>
+                    <SideLoadingRegion label="Cargando" isLoading={isViewLoading}>
                     <CoverageMapPanel
                       coverage={coverage}
                       zones={coverageZoneOverlays}
@@ -690,7 +690,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                     />
                     </SideLoadingRegion>
                   ) : (
-                    <SideLoadingRegion label="Carga de atención de hoy" isLoading={isViewLoading}>
+                    <SideLoadingRegion label="Cargando" isLoading={isViewLoading}>
                     <TodayMapPanel
                       services={todayServices}
                       zones={todayZoneCoverage}
@@ -717,13 +717,13 @@ function mapToolbarSummary(
   coverageZones: CoverageZoneOverlay[],
 ) {
   if (view === "inventory") return `${locatedCount} ubicados`;
-  if (view === "zones") return `${zones.length} zonas operativas`;
+  if (view === "zones") return `${zones.length} zonas`;
   if (view === "route") return `${routeStopCount} paradas`;
   if (view === "coverage") {
     const withData = coverageZones.filter((zone) => zone.rate !== null).length;
-    return `${withData} de ${coverageZones.length} zonas con datos`;
+    return `${withData} de ${coverageZones.length} con datos`;
   }
-  return `${todayServiceCount} servicio${todayServiceCount === 1 ? "" : "s"} de atención`;
+  return `${todayServiceCount} servicio${todayServiceCount === 1 ? "" : "s"}`;
 }
 
 function InventoryPanel({
@@ -746,7 +746,7 @@ function InventoryPanel({
   return (
     <>
       <fieldset className={styles.layers}>
-        <legend>Capas visibles</legend>
+        <legend>Capas</legend>
         {(Object.keys(layerLabels) as LayerId[]).map((layer) => {
           const count = items.filter((item) => item.layer === layer && item.lat !== null && item.lng !== null).length;
           return (
@@ -806,8 +806,8 @@ function InventoryPanel({
           <Empty className={styles.emptyState}>
             <EmptyHeader>
               <EmptyMedia variant="icon"><Boxes aria-hidden /></EmptyMedia>
-              <EmptyTitle>No hay elementos visibles</EmptyTitle>
-              <EmptyDescription>Active al menos una capa con recursos ubicados.</EmptyDescription>
+              <EmptyTitle>Sin elementos</EmptyTitle>
+              <EmptyDescription>Active una capa.</EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
@@ -830,9 +830,8 @@ function ZonesMapPanel({
       <div className={styles.panelIntro}>
         <div className={styles.panelTitleRow}>
           <MapPinned aria-hidden />
-          <h2 id="zones-view-title">Zonas operativas</h2>
+          <h2 id="zones-view-title">Zonas</h2>
         </div>
-        <p>Cuatro polígonos oficiales unidos al catálogo por el código estable de zona.</p>
       </div>
       <ItemGroup className={styles.zoneList} aria-labelledby="zones-view-title">
         {zones.map((zone) => (
@@ -852,13 +851,11 @@ function ZonesMapPanel({
               <span className={`${styles.zoneSwatch} ${styles[zone.code.toLowerCase().replace("-", "")]}`} aria-hidden />
             </ItemMedia>
             <ItemContent>
-              <ItemTitle>{zone.code}</ItemTitle>
-              <ItemDescription>{zone.name}</ItemDescription>
+              <ItemTitle>{zone.name}</ItemTitle>
             </ItemContent>
           </Item>
         ))}
       </ItemGroup>
-      <p className={styles.mapHint}>Seleccione una zona para destacarla en el mapa. El color no es el único indicador: cada zona conserva su código y nombre.</p>
     </section>
   );
 }
@@ -885,10 +882,10 @@ function CoverageMapPanel({
           <h2 id="coverage-view-title">Cobertura por zona</h2>
         </div>
         <p>
-          Objetivos atendidos sobre programados. Período: {coverage ? formatCoveragePeriod(coverage.period) : "no disponible"}.
+          {coverage ? formatCoveragePeriod(coverage.period) : "Sin período"}
         </p>
       </div>
-      <div className={styles.coverageLegend} role="group" aria-label="Escala semántica de cobertura">
+      <div className={styles.coverageLegend} role="group" aria-label="Escala de cobertura">
         {legendBands.map((band) => (
           <span className={styles.coverageLegendItem} key={band}>
             <span className={`${styles.coverageLegendSwatch} ${styles[coverageBandSwatchClass[band]]}`} aria-hidden />
@@ -897,7 +894,7 @@ function CoverageMapPanel({
         ))}
       </div>
       <p className={styles.coverageSummary}>
-        {zonesWithData} de {zones.length} zonas con datos
+        {zonesWithData} de {zones.length} con datos
         {coverage ? ` · Actualizado ${formatCoverageFreshness(coverage.freshness.updatedAt)}` : ""}
       </p>
       <ItemGroup className={styles.coverageZoneList} aria-labelledby="coverage-view-title">
@@ -919,7 +916,7 @@ function CoverageMapPanel({
             </ItemMedia>
             <ItemContent className={styles.coverageZoneCopy}>
               <ItemTitle>{zone.zoneName}</ItemTitle>
-              <ItemDescription>{zone.zoneCode} · {zone.note}</ItemDescription>
+              {zone.note ? <ItemDescription>{zone.note}</ItemDescription> : null}
             </ItemContent>
             <span className={COVERAGE_BAND_CLASSES[zone.band]}>
               {COVERAGE_BAND_LABELS[zone.band]} · {formatCoverageRate(zone.rate)}
@@ -927,9 +924,6 @@ function CoverageMapPanel({
           </Item>
         ))}
       </ItemGroup>
-      <p className={styles.mapHint}>
-        Seleccione una zona para destacarla. El color se acompaña con la tasa, el código y el detalle atendido/programado.
-      </p>
     </section>
   );
 }
@@ -956,18 +950,17 @@ function RouteMapPanel({
       <div className={styles.panelIntro}>
         <div className={styles.panelTitleRow}>
           <RouteIcon aria-hidden />
-          <h2 id="route-view-title">{selectedRoute?.name ?? "Recorrido operativo"}</h2>
+          <h2 id="route-view-title">{selectedRoute?.name ?? "Recorrido"}</h2>
         </div>
-        <p>Las paradas se leen en orden y cada zona queda resaltada en el mapa.</p>
       </div>
       <Field className={styles.fieldGroup}>
-        <FieldLabel htmlFor="map-route-select">Recorrido a visualizar</FieldLabel>
+        <FieldLabel htmlFor="map-route-select">Recorrido</FieldLabel>
         <NativeSelect
           id="map-route-select"
           value={selectedRouteId}
           onChange={(event) => onRouteChange(event.target.value)}
         >
-          {routes.length === 0 ? <NativeSelectOption value="">No hay recorridos activos</NativeSelectOption> : null}
+          {routes.length === 0 ? <NativeSelectOption value="">Sin recorridos activos</NativeSelectOption> : null}
           {routes.map((route) => <NativeSelectOption key={route.id} value={route.id}>{route.code} · {route.name}</NativeSelectOption>)}
         </NativeSelect>
       </Field>
@@ -975,7 +968,7 @@ function RouteMapPanel({
         <>
           <div className={styles.routeSummary}>
             <strong>{selectedRoute.name}</strong>
-            <span>{routeStops.length} paradas · {totalRouteDuration(routeStops)} min estimados</span>
+            <span>{routeStops.length} paradas · {totalRouteDuration(routeStops)} min</span>
           </div>
           <ItemGroup className={styles.routeStopList} aria-label="Paradas del recorrido">
             {routeStops.map((stop) => (
@@ -994,10 +987,10 @@ function RouteMapPanel({
                 <ItemMedia className={styles.sequenceBadge} aria-hidden>{stop.sequence}</ItemMedia>
                 <ItemContent className={styles.routeStopCopy}>
                   <ItemTitle>Parada {stop.sequence}</ItemTitle>
-                  <ItemDescription>{stop.zoneCode} · {stop.zoneName}</ItemDescription>
+                  <ItemDescription>{stop.zoneName}</ItemDescription>
                 </ItemContent>
                 <ItemActions className={styles.duration}>
-                  <ItemDescription>{stop.estimatedDurationMin !== null ? `${stop.estimatedDurationMin} min estimados` : "Sin duración"}</ItemDescription>
+                  <ItemDescription>{stop.estimatedDurationMin !== null ? `${stop.estimatedDurationMin} min` : "—"}</ItemDescription>
                 </ItemActions>
               </Item>
             ))}
@@ -1007,8 +1000,8 @@ function RouteMapPanel({
         <Empty className={styles.emptyState}>
           <EmptyHeader>
             <EmptyMedia variant="icon"><RouteIcon aria-hidden /></EmptyMedia>
-            <EmptyTitle>No hay paradas para mostrar</EmptyTitle>
-            <EmptyDescription>Seleccione un recorrido activo con zonas configuradas.</EmptyDescription>
+            <EmptyTitle>Sin paradas</EmptyTitle>
+            <EmptyDescription>Elija otro recorrido.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       )}
@@ -1028,13 +1021,15 @@ function TodayMapPanel({
       <div className={styles.panelIntro}>
         <div className={styles.panelTitleRow}>
           <MapPinned aria-hidden />
-          <h2 id="today-view-title">Zonas atendidas hoy</h2>
+          <h2 id="today-view-title">Hoy</h2>
         </div>
-        <p>{formatTodayDate(todayInArgentina())}. La cobertura se actualiza desde los resultados registrados por zona.</p>
+        <p>{formatTodayDate(todayInArgentina())}</p>
       </div>
-      <p className={styles.todaySummary}>
-        {services.length} servicio{services.length === 1 ? "" : "s"} programado{services.length === 1 ? "" : "s"} hoy
-      </p>
+      {services.length > 0 ? (
+        <p className={styles.todaySummary}>
+          {services.length} servicio{services.length === 1 ? "" : "s"} hoy
+        </p>
+      ) : null}
       {zones.length > 0 ? (
         <ItemGroup className={styles.todayZoneList} aria-labelledby="today-view-title">
           {zones.map((zone) => (
@@ -1044,7 +1039,7 @@ function TodayMapPanel({
               </ItemMedia>
               <ItemContent>
                 <ItemTitle>{zone.zoneName}</ItemTitle>
-                <ItemDescription>{zone.zoneCode} · {zone.resultCount}/{zone.serviceCount} resultados registrados</ItemDescription>
+                <ItemDescription>{zone.resultCount}/{zone.serviceCount} resultados registrados</ItemDescription>
               </ItemContent>
               <span className={`${styles.statusLabel} ${styles[zone.status.toLowerCase()]}`}>
                 {todayStatusLabels[zone.status]}
@@ -1056,20 +1051,19 @@ function TodayMapPanel({
         <Empty className={styles.emptyState}>
           <EmptyHeader>
             <EmptyMedia variant="icon"><MapPinned aria-hidden /></EmptyMedia>
-            <EmptyTitle>No hay servicios programados hoy</EmptyTitle>
-            <EmptyDescription>Cuando exista atención para la fecha actual, cada zona aparecerá con su resultado operativo.</EmptyDescription>
+            <EmptyTitle>Sin servicios hoy</EmptyTitle>
           </EmptyHeader>
         </Empty>
       )}
       {services.length > 0 ? (
         <div className={styles.todayServiceList}>
-          <h3 id="today-service-list-title">Servicios incluidos</h3>
+          <h3 id="today-service-list-title">Servicios</h3>
           <ItemGroup className={styles.todayServiceItems} aria-labelledby="today-service-list-title">
             {services.map(({ service, zoneResults }) => (
               <Item key={service.id} variant="outline" size="xs">
                 <ItemContent>
                   <ItemTitle>{service.title}</ItemTitle>
-                  <ItemDescription>{service.id} · {service.windowFrom ?? "Horario no informado"}–{service.windowTo ?? ""}</ItemDescription>
+                  <ItemDescription>{service.id} · {service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "sin horario"}</ItemDescription>
                   <ItemDescription>{service.zoneIds.map((zoneId) => {
                     const result = zoneResults.find((candidate) => candidate.zoneId === zoneId);
                     return `${service.zoneNames[service.zoneIds.indexOf(zoneId)] ?? zoneId}: ${result ? ZONE_RESULT_STATUS_LABEL[result.status] : "Pendiente"}`;
@@ -1081,7 +1075,6 @@ function TodayMapPanel({
           </ItemGroup>
         </div>
       ) : null}
-      <p className={styles.mapHint}>La vista consulta el detalle de cada servicio del día para no confundir una zona asignada con una zona efectivamente atendida.</p>
     </section>
   );
 }
@@ -1092,7 +1085,7 @@ function totalRouteDuration(stops: ReturnType<typeof routeToStopOverlays>) {
 
 function formatCoverageRate(rate: number | null) {
   return rate === null
-    ? "Sin valor"
+    ? "—"
     : `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(rate)} %`;
 }
 
@@ -1124,7 +1117,7 @@ function MapLoading() {
         <MapPaneSkeleton className={cn(styles.loadingMap, "min-h-0")} />
       </div>
       <InventoryMapDrawer
-        ariaLabel="Controles de la vista Inventario"
+        ariaLabel="Controles"
         className={styles.sidePanel}
         expandToViewport
         summary="Elementos"

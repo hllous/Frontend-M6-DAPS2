@@ -121,13 +121,13 @@ describe("OperationalMapCanvas inventory clusters", () => {
   it("names clusters for the inventory layer", async () => {
     render(<OperationalMapCanvas view="inventory" markers={[]} />);
 
-    expect(await screen.findByRole("button", { name: "3 elementos de inventario; acercar para verlos" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: "3 elementos; acerque el mapa" })).toBeVisible();
   });
 
   it("zooms cluster bounds with Enter and Space without scrolling the page", async () => {
     const user = userEvent.setup();
     render(<OperationalMapCanvas view="inventory" markers={[]} />);
-    const cluster = await screen.findByRole("button", { name: /elementos de inventario/ });
+    const cluster = await screen.findByRole("button", { name: /elementos; acerque el mapa/ });
 
     cluster.focus();
     await user.keyboard("{Enter}");

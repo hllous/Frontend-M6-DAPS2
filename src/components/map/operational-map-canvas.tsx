@@ -93,7 +93,7 @@ function routeStopIcon(sequence: number, selected: boolean) {
 }
 
 function clusterAccessibleLabel(count: number) {
-  return `${count} elementos de inventario; acercar para verlos`;
+  return `${count} elementos; acerque el mapa`;
 }
 
 function inventoryClusterIcon(cluster: MarkerCluster) {
@@ -185,14 +185,14 @@ export function OperationalMapCanvas({
 
   const mapLabel =
     view === "zones"
-      ? "Mapa geográfico de zonas operativas"
+      ? "Mapa de zonas"
       : view === "coverage"
-        ? "Mapa geográfico de cobertura por zona"
+        ? "Mapa de cobertura"
       : view === "route"
-        ? "Mapa geográfico del recorrido"
+        ? "Mapa del recorrido"
         : view === "today"
-          ? "Mapa geográfico de zonas atendidas hoy"
-          : "Mapa geográfico del inventario urbano";
+          ? "Mapa de hoy"
+          : "Mapa de inventario";
 
   return (
     <MapContainer
@@ -256,7 +256,7 @@ export function OperationalMapCanvas({
                 eventHandlers={onSelectZone ? { click: () => onSelectZone(zone.code) } : undefined}
               >
                 <Tooltip sticky>
-                  <strong>{zone.code}</strong> · {zone.name}
+                  <strong>{zone.name}</strong>
                 </Tooltip>
               </Polygon>
             )),
@@ -292,8 +292,8 @@ export function OperationalMapCanvas({
                     <strong>Parada {stop.sequence} · {stop.zoneName}</strong>
                     <span className={styles.popupDescription}>
                       {stop.estimatedDurationMin !== null
-                        ? `${stop.estimatedDurationMin} min estimados`
-                        : "Duración estimada no informada"}
+                        ? `${stop.estimatedDurationMin} min`
+                        : "—"}
                     </span>
                   </Popup>
                 </Marker>
@@ -332,14 +332,14 @@ export function OperationalMapCanvas({
                 <Tooltip sticky>
                   <strong>{zone.zoneName}</strong>
                   <br />
-                  {zone.rate === null ? "Sin datos para el período" : `Cobertura: ${formatCoverageRate(zone.rate)}`}
+                  {zone.rate === null ? "Sin datos" : formatCoverageRate(zone.rate)}
                   <br />
                   {zone.note}
                 </Tooltip>
                 <Popup>
-                  <strong>{zone.zoneCode} · {zone.zoneName}</strong>
+                  <strong>{zone.zoneName}</strong>
                   <span className={styles.popupDescription}>
-                    {zone.rate === null ? "Sin datos para el período" : `Cobertura ${formatCoverageRate(zone.rate)} · ${zone.note}`}
+                    {zone.rate === null ? "Sin datos" : `${formatCoverageRate(zone.rate)} · ${zone.note}`}
                   </span>
                 </Popup>
               </Polygon>
