@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
 import { clickCatalogRowAction } from "./support/catalog-a-controls";
+import { openCatalogBRowDetail } from "./support/catalog-612-controls";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -24,8 +25,9 @@ test("container edit keeps title and save action visible while the form scrolls"
 test("catalog confirmation actions fit on mobile with the primary action first", async ({ page }) => {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app/catalog/vehicles");
-  await page.getByRole("button", { name: "Dar de baja", exact: true }).first().click();
-  const footer = page.locator('[data-slot="dialog-footer"]');
+  const detail = await openCatalogBRowDetail(page.locator("tbody tr").filter({ hasText: "AA 123 AA" }).first());
+  await detail.getByRole("button", { name: "Dar de baja", exact: true }).click();
+  const footer = page.getByRole("dialog", { name: /^Confirmar baja del vehículo/ }).locator('[data-slot="dialog-footer"]');
   const actions = footer.getByRole("button");
   await expect(actions).toHaveCount(2);
   const secondary = await actions.nth(0).boundingBox();

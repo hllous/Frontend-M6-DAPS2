@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { LoaderCircle } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -74,7 +74,7 @@ export function CatalogDeactivationDialog({
             aria-busy={isSubmitting || undefined}
             data-testid={confirmDataTestId}
           >
-            {isSubmitting ? <LoaderCircle data-icon="inline-start" aria-hidden className="animate-spin" /> : null}
+            {isSubmitting ? <Spinner data-icon="inline-start" aria-hidden /> : null}
             {confirmAction}
           </Button>
         </DialogFooter>
