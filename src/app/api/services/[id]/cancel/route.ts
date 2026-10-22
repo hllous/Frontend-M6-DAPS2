@@ -79,6 +79,7 @@ export async function POST(
     const updated = updateServiceFixture(service.id, {
       status: "CANCELLED",
       statusReason: input.reason,
+      statusNote: null,
       history: [
         ...service.history,
         {

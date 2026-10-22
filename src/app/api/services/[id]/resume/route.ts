@@ -64,6 +64,7 @@ export async function POST(
     const updated = updateServiceFixture(service.id, {
       status: "IN_PROGRESS",
       statusReason: null,
+      statusNote: null,
       history: [
         ...service.history,
         {

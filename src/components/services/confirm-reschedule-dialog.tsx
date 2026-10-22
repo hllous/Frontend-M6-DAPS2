@@ -113,7 +113,8 @@ function ConfirmRescheduleForm({
       <DialogHeader>
         <DialogTitle>Reprogramar {service.title}</DialogTitle>
         <DialogDescription>
-          Motivo: <strong>{service.statusReason ?? "Sin motivo registrado"}</strong>
+          Motivo registrado: <strong>{service.statusReason ?? "Sin motivo registrado"}</strong>.{service.statusNote && <> Nota: <strong>{service.statusNote}</strong>.</>} El
+          servicio volverá a estado Programado con la fecha y ventana horaria que indique aquí.
         </DialogDescription>
       </DialogHeader>
 

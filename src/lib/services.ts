@@ -96,6 +96,7 @@ export const serviceSchema = z.object({
   mode: serviceModeSchema,
   status: serviceStatusSchema,
   statusReason: z.string().nullable().optional(),
+  statusNote: z.string().nullable().optional(),
   origin: serviceOriginSchema,
   zoneIds: z.array(z.string()).min(1),
   zoneNames: z.array(z.string()).optional().default([]),
@@ -322,15 +323,12 @@ export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
 
 export const suspendServiceInputSchema = z.object({
   reason: notServicedReasonSchema,
-  note: z.string().trim().min(1, "La nota es obligatoria para suspender el servicio"),
-}).refine((input) => toSuspendServiceBackendInput(input).reason.length <= 500, {
-  path: ["note"],
-  message: "El motivo y la nota de suspensión no pueden superar los 500 caracteres.",
+  note: z.string().trim().min(1, "La nota es obligatoria para suspender el servicio").max(500, "La nota de suspensión no puede superar los 500 caracteres."),
 });
 export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
 
 export function toSuspendServiceBackendInput(input: { reason: NotServicedReason; note: string }) {
-  return { reason: `${NOT_SERVICED_REASON_LABEL[input.reason]}: ${input.note}` };
+  return { reason: NOT_SERVICED_REASON_LABEL[input.reason], note: input.note };
 }
 
 export const rescheduleServiceInputSchema = z.object({

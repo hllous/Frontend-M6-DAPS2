@@ -127,8 +127,8 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.status).toBe("SUSPENDED");
-    expect(body.statusReason).toMatch(/desperfecto vehicular/i);
-    expect(body.statusReason).toMatch(/no arranca/i);
+    expect(body.statusReason).toBe("Desperfecto vehicular");
+    expect(body.statusNote).toBe("El camión no arranca.");
     expect(body.history).toEqual(
       expect.arrayContaining([expect.objectContaining({ label: "Suspendido", done: true })]),
     );
@@ -165,7 +165,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     const actionCall = backendFetch.mock.calls.find(([, init]) => init?.method === "POST");
     const requestInit = actionCall?.[1] as RequestInit;
     expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
-    expect(JSON.parse(String(requestInit.body))).toEqual({ reason: "Desperfecto vehicular: El camión no arranca." });
+    expect(JSON.parse(String(requestInit.body))).toEqual({ reason: "Desperfecto vehicular", note: "El camión no arranca." });
   });
 });
 

@@ -257,6 +257,16 @@ export function ServiceDetail({
               <p className="mt-1 text-sm text-[var(--color-warning)]">
                 {service.statusReason}
               </p>
+              {service.statusNote && (
+                <>
+                  <h3 className="mt-3 text-xs font-bold text-[var(--color-warning)] uppercase tracking-wide">
+                    Nota de la cuadrilla
+                  </h3>
+                  <p className="mt-1 text-sm text-[var(--color-warning)]">
+                    {service.statusNote}
+                  </p>
+                </>
+              )}
             </div>
           )}
 

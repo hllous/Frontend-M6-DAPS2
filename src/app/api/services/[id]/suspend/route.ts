@@ -85,11 +85,12 @@ export async function POST(
       );
     }
 
-    const statusReason = toSuspendServiceBackendInput(input).reason;
+    const { reason: statusReason, note: statusNote } = toSuspendServiceBackendInput(input);
 
     const updated = updateServiceFixture(service.id, {
       status: "SUSPENDED",
       statusReason,
+      statusNote,
       history: [
         ...service.history,
         {

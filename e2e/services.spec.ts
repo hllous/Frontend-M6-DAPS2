@@ -782,6 +782,8 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(detailRegion.getByText("Suspendido").first()).toBeVisible();
     await expect(detailRegion.getByText(/desperfecto vehicular/i)).toBeVisible();
     await expect(detailRegion.getByText(/el camión no arranca, se solicitó grúa/i)).toBeVisible();
+    await expect(detailRegion.getByText("Nota de la cuadrilla")).toBeVisible();
+    await expect(detailRegion.getByText("Desperfecto vehicular", { exact: true })).toBeVisible();
 
     // 3. Crew Leader resumes it — clears the prior reason, no Office intervention needed
     await detailRegion.getByRole("button", { name: "Reanudar servicio" }).click();
