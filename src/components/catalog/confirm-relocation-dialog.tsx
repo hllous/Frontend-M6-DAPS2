@@ -1,11 +1,12 @@
 "use client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
 import { MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { formControlClass } from "@/components/ui/form-control";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/legacy-field";
+} from "@/components/ui/field";
 import {
   containersAdapter,
   ContainerRequestError,
@@ -108,8 +109,10 @@ function ConfirmRelocationModalContent({
         lng: lngResult.value ?? 0,
       });
     } catch (err) {
-      const msg =
-        getErrorMessage(err, "No se pudo confirmar la reubicación del contenedor.");
+      const msg = getErrorMessage(
+        err,
+        "No se pudo confirmar la reubicación del contenedor.",
+      );
       setErrorMessage(msg);
       setIsSubmitting(false);
       return;
@@ -121,38 +124,50 @@ function ConfirmRelocationModalContent({
   };
 
   return (
-    <DialogContent className="max-w-lg">
+    <DialogContent className="max-w-lg overflow-y-auto">
       <DialogHeader>
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
           <MapPin className="size-4" aria-hidden />
           <span>Confirmación de nueva ubicación</span>
         </div>
-        <DialogTitle>Confirmar nueva ubicación de contenedor {container.code}</DialogTitle>
+        <DialogTitle>
+          Confirmar nueva ubicación de contenedor {container.code}
+        </DialogTitle>
         <DialogDescription>
-          Indique la nueva dirección y coordenadas geográficas donde ha sido instalado el contenedor
-          para restituirlo a estado Activo.
+          Indique la nueva dirección y coordenadas geográficas donde ha sido
+          instalado el contenedor para restituirlo a estado Activo.
         </DialogDescription>
       </DialogHeader>
 
       {errorMessage && (
-        <div
-          role="alert"
-          className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-        >
-          {errorMessage}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
       )}
 
-      <form id="confirm-relocation-form" onSubmit={handleSubmit} noValidate className="space-y-4">
-        <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs space-y-1">
-          <p className="font-medium text-foreground">Ubicación anterior registrada:</p>
-          <p className="text-muted-foreground">{container.address ?? "Sin dirección registrada"}</p>
-        </div>
+      <form
+        id="confirm-relocation-form"
+        onSubmit={handleSubmit}
+        noValidate
+        className="flex flex-col gap-4"
+      >
+        <Alert role="note">
+          <AlertDescription className="grid gap-2">
+            <p className="font-medium text-foreground">
+              Ubicación anterior registrada:
+            </p>
+            <p className="text-muted-foreground">
+              {container.address ?? "Sin dirección registrada"}
+            </p>
+          </AlertDescription>
+        </Alert>
 
         <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="relocation-address">Nueva dirección</FieldLabel>
-            <input
+          <Field data-invalid={Boolean(fieldErrors.address)}>
+            <FieldLabel htmlFor="relocation-address">
+              Nueva dirección
+            </FieldLabel>
+            <Input
               id="relocation-address"
               value={address}
               onChange={(e) => {
@@ -162,21 +177,24 @@ function ConfirmRelocationModalContent({
                 }
               }}
               placeholder="Ej: Av. Córdoba 2300"
-              className={formControlClass}
               required
               aria-invalid={Boolean(fieldErrors.address)}
-              aria-describedby={fieldErrors.address ? "relocation-address-error" : undefined}
+              aria-describedby={
+                fieldErrors.address ? "relocation-address-error" : undefined
+              }
               disabled={isSubmitting}
             />
             {fieldErrors.address && (
-              <FieldError id="relocation-address-error">{fieldErrors.address}</FieldError>
+              <FieldError id="relocation-address-error">
+                {fieldErrors.address}
+              </FieldError>
             )}
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field>
+            <Field data-invalid={Boolean(fieldErrors.lat)}>
               <FieldLabel htmlFor="relocation-lat">Latitud</FieldLabel>
-              <input
+              <Input
                 id="relocation-lat"
                 type="number"
                 min="-90"
@@ -190,20 +208,23 @@ function ConfirmRelocationModalContent({
                   }
                 }}
                 placeholder="-34.6037"
-                className={formControlClass}
                 required
                 aria-invalid={Boolean(fieldErrors.lat)}
-                aria-describedby={fieldErrors.lat ? "relocation-lat-error" : undefined}
+                aria-describedby={
+                  fieldErrors.lat ? "relocation-lat-error" : undefined
+                }
                 disabled={isSubmitting}
               />
               {fieldErrors.lat && (
-                <FieldError id="relocation-lat-error">{fieldErrors.lat}</FieldError>
+                <FieldError id="relocation-lat-error">
+                  {fieldErrors.lat}
+                </FieldError>
               )}
             </Field>
 
-            <Field>
+            <Field data-invalid={Boolean(fieldErrors.lng)}>
               <FieldLabel htmlFor="relocation-lng">Longitud</FieldLabel>
-              <input
+              <Input
                 id="relocation-lng"
                 type="number"
                 min="-180"
@@ -217,14 +238,17 @@ function ConfirmRelocationModalContent({
                   }
                 }}
                 placeholder="-58.3816"
-                className={formControlClass}
                 required
                 aria-invalid={Boolean(fieldErrors.lng)}
-                aria-describedby={fieldErrors.lng ? "relocation-lng-error" : undefined}
+                aria-describedby={
+                  fieldErrors.lng ? "relocation-lng-error" : undefined
+                }
                 disabled={isSubmitting}
               />
               {fieldErrors.lng && (
-                <FieldError id="relocation-lng-error">{fieldErrors.lng}</FieldError>
+                <FieldError id="relocation-lng-error">
+                  {fieldErrors.lng}
+                </FieldError>
               )}
             </Field>
           </div>

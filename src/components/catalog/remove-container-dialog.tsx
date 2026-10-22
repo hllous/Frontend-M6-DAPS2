@@ -1,4 +1,5 @@
 "use client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
@@ -13,8 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { containersAdapter, ContainerRequestError, type Container } from "@/lib/containers";
-import { EvidenceQueueView, useEvidenceQueue } from "./container-evidence-queue";
+import {
+  containersAdapter,
+  ContainerRequestError,
+  type Container,
+} from "@/lib/containers";
+import {
+  EvidenceQueueView,
+  useEvidenceQueue,
+} from "./container-evidence-queue";
 
 interface RemoveContainerDialogProps {
   open: boolean;
@@ -86,25 +94,31 @@ function RemoveContainerModalContent({
       <DialogHeader>
         <DialogTitle>Retirar contenedor {container.code}</DialogTitle>
         <DialogDescription>
-          Esta acción terminal de Oficina cambiará el contenedor dañado a Retirado. No podrá
-          iniciar otra transición de ciclo de vida después del retiro. Puede adjuntar evidencia
-          plana al contenedor.
+          Esta acción terminal de Oficina cambiará el contenedor dañado a
+          Retirado. No podrá iniciar otra transición de ciclo de vida después
+          del retiro. Puede adjuntar evidencia plana al contenedor.
         </DialogDescription>
       </DialogHeader>
 
       {errorMessage && (
-        <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {errorMessage}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
       )}
 
-      <form id="remove-container-form" onSubmit={handleSubmit} className="space-y-4">
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
-          <p className="font-semibold text-destructive">Confirmación de retiro</p>
-          <p className="mt-1 text-muted-foreground">
-            Verifique que el contenedor {container.code} no volverá a operar.
-          </p>
-        </div>
+      <form
+        id="remove-container-form"
+        onSubmit={handleSubmit}
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain"
+      >
+        <Alert variant="destructive">
+          <AlertDescription>
+            <AlertTitle>Confirmación de retiro</AlertTitle>
+            <p className="mt-1 text-muted-foreground">
+              Verifique que el contenedor {container.code} no volverá a operar.
+            </p>
+          </AlertDescription>
+        </Alert>
         <EvidenceQueueView
           queuedFiles={evidenceQueue.queuedFiles}
           fileValidationError={evidenceQueue.fileValidationError}
@@ -115,11 +129,21 @@ function RemoveContainerModalContent({
         />
       </form>
 
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+      <DialogFooter className="flex-col items-stretch [&>button]:whitespace-normal">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onOpenChange(false)}
+          disabled={isSubmitting}
+        >
           Conservar contenedor {container.code}
         </Button>
-        <Button type="submit" form="remove-container-form" variant="destructive" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          form="remove-container-form"
+          variant="destructive-solid"
+          disabled={isSubmitting}
+        >
           <ArchiveX data-icon="inline-start" aria-hidden />
           {isSubmitting ? "Retirando…" : "Confirmar retiro"}
         </Button>

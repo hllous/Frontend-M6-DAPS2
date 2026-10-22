@@ -1,4 +1,14 @@
 "use client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -7,8 +17,8 @@ import {
   ArchiveX,
   Check,
   CheckCircle2,
+  ChevronRight,
   Clock,
-  Eye,
   FileText,
   MapPin,
   Pencil,
@@ -21,6 +31,22 @@ import {
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import styles from "@/components/catalog/catalog-panel.module.css";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+  ItemDescription,
+} from "@/components/ui/item";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,10 +56,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/legacy-field";
-import { formControlClass } from "@/components/ui/form-control";
 import {
-  CONTAINER_STATUS_CLASSES,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import {
   CONTAINER_STATUS_LABELS,
   CONTAINER_TYPE_LABELS,
   containerStatusSchema,
@@ -59,7 +97,11 @@ import { StartRelocationDialog } from "./start-relocation-dialog";
 import { CompleteRepairDialog } from "./complete-repair-dialog";
 import { RemoveContainerDialog } from "./remove-container-dialog";
 import { StartRepairDialog } from "./start-repair-dialog";
-import { MAX_INT32, MAX_SEARCH_LENGTH, parseCoordinateField } from "@/lib/input-limits";
+import {
+  MAX_INT32,
+  MAX_SEARCH_LENGTH,
+  parseCoordinateField,
+} from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -98,34 +140,48 @@ const emptyForm: ContainerForm = {
 
 const containerTypes = containerTypeSchema.options;
 const containerStatuses = containerStatusSchema.options;
-const serviceLookupFailure = "No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.";
+const serviceLookupFailure =
+  "No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.";
 
 function StatusBadge({ status }: { status: ContainerStatus }) {
   const label = CONTAINER_STATUS_LABELS[status];
-  const style = CONTAINER_STATUS_CLASSES[status];
-
+  const variants = {
+    ACTIVE: "success",
+    DAMAGED: "danger",
+    REMOVED: "neutral",
+    OVERFLOWED: "warning",
+    UNDER_REPAIR: "warning",
+    RELOCATING: "info",
+  } as const;
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${style}`}
+    <Badge
+      variant={variants[status]}
       role="status"
       aria-label={`Estado: ${label}`}
     >
-      {status === "ACTIVE" && <Check className="size-3.5 shrink-0" aria-hidden />}
+      {status === "ACTIVE" && <Check data-icon="inline-start" aria-hidden />}
       {(status === "DAMAGED" || status === "REMOVED") && (
-        <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
+        <AlertTriangle data-icon="inline-start" aria-hidden />
       )}
       {(status === "OVERFLOWED" || status === "UNDER_REPAIR") && (
-        <Clock className="size-3.5 shrink-0" aria-hidden />
+        <Clock data-icon="inline-start" aria-hidden />
       )}
-      {status === "RELOCATING" && <RotateCcw className="size-3.5 shrink-0" aria-hidden />}
-      <span>{label}</span>
-    </span>
+      {status === "RELOCATING" && (
+        <RotateCcw data-icon="inline-start" aria-hidden />
+      )}
+      {label}
+    </Badge>
   );
 }
 
-export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScenario }) {
+export function ContainerCatalogPanel({
+  scenario,
+}: {
+  scenario: OperationalScenario;
+}) {
   const canManage =
-    scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("container:manage");
+    scenario.actor.kind === "OFFICE" &&
+    scenario.capabilities.includes("container:manage");
   const canReport = scenario.capabilities.includes("container:report");
 
   const [state, setState] = useState<LoadState>({ status: "loading" });
@@ -133,35 +189,63 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
   const [requestVersion, setRequestVersion] = useState(0);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<ContainerStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<ContainerStatus | "all">(
+    "all",
+  );
   const [typeFilter, setTypeFilter] = useState<ContainerType | "all">("all");
   const [zoneFilter, setZoneFilter] = useState("all");
   const [search, setSearch] = useState("");
 
   // Modals
   const [formOpen, setFormOpen] = useState(false);
-  const [editingContainer, setEditingContainer] = useState<Container | null>(null);
+  const [editingContainer, setEditingContainer] = useState<Container | null>(
+    null,
+  );
   const [form, setForm] = useState<ContainerForm>(emptyForm);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [detailContainer, setDetailContainer] = useState<Container | null>(null);
+  const [detailContainer, setDetailContainer] = useState<Container | null>(
+    null,
+  );
+  const [detailSheetSide, setDetailSheetSide] = useState<"right" | "bottom">(
+    "right",
+  );
   const [detailEvidence, setDetailEvidence] = useState<Attachment[]>([]);
   const [isLoadingEvidence, setIsLoadingEvidence] = useState(false);
 
-  const [reportingOverflowContainer, setReportingOverflowContainer] = useState<Container | null>(null);
-  const [reportingDamageContainer, setReportingDamageContainer] = useState<Container | null>(null);
+  const [reportingOverflowContainer, setReportingOverflowContainer] =
+    useState<Container | null>(null);
+  const [reportingDamageContainer, setReportingDamageContainer] =
+    useState<Container | null>(null);
   const [emptyContainer, setEmptyContainer] = useState<Container | null>(null);
-  const [startRelocatingContainer, setStartRelocatingContainer] = useState<Container | null>(null);
-  const [confirmRelocatingContainer, setConfirmRelocatingContainer] = useState<Container | null>(null);
+  const [startRelocatingContainer, setStartRelocatingContainer] =
+    useState<Container | null>(null);
+  const [confirmRelocatingContainer, setConfirmRelocatingContainer] =
+    useState<Container | null>(null);
   const [services, setServices] = useState<Service[]>([]);
-  const [servicesStatus, setServicesStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [servicesStatus, setServicesStatus] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
   const [serviceLookupVersion, setServiceLookupVersion] = useState(0);
-  const [startingRepairContainer, setStartingRepairContainer] = useState<Container | null>(null);
+  const [startingRepairContainer, setStartingRepairContainer] =
+    useState<Container | null>(null);
   const pendingRepairFocusId = useRef<string | null>(null);
-  const [completingRepairContainer, setCompletingRepairContainer] = useState<Container | null>(null);
-  const [removingContainer, setRemovingContainer] = useState<Container | null>(null);
+  const [completingRepairContainer, setCompletingRepairContainer] =
+    useState<Container | null>(null);
+  const [removingContainer, setRemovingContainer] = useState<Container | null>(
+    null,
+  );
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(max-width: 760px)");
+    const updateSide = () => setDetailSheetSide(media.matches ? "bottom" : "right");
+    updateSide();
+    media.addEventListener("change", updateSide);
+    return () => media.removeEventListener("change", updateSide);
+  }, []);
 
   useEffect(() => {
     if (startingRepairContainer || !pendingRepairFocusId.current) return;
@@ -187,7 +271,8 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         total = result.total;
         page += 1;
       } while (page <= totalPages && page <= 20);
-      if (totalPages >= 20 || services.length < total) throw new Error(serviceLookupFailure);
+      if (totalPages >= 20 || services.length < total)
+        throw new Error(serviceLookupFailure);
       setServices(services);
       setServicesStatus("ready");
     }
@@ -248,13 +333,16 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       setState({ status: "loading" });
       try {
         const page = await containersAdapter.list(query);
-        if (isCurrent) setState({ status: "ready", containers: page.containers });
+        if (isCurrent)
+          setState({ status: "ready", containers: page.containers });
       } catch (caught) {
         if (isCurrent) {
           setState({
             status: "error",
-            message:
-              errorMessage(caught, "No se pudieron cargar los contenedores."),
+            message: errorMessage(
+              caught,
+              "No se pudieron cargar los contenedores.",
+            ),
           });
         }
       }
@@ -350,7 +438,8 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
 
     const capacityNum = Number(form.capacityLiters);
     if (!Number.isInteger(capacityNum) || capacityNum <= 0) {
-      errors.capacityLiters = "La capacidad debe ser un número entero mayor a 0 litros.";
+      errors.capacityLiters =
+        "La capacidad debe ser un número entero mayor a 0 litros.";
     } else if (capacityNum > MAX_INT32) {
       errors.capacityLiters = `La capacidad no puede superar ${MAX_INT32.toLocaleString("es-AR")} litros.`;
     }
@@ -387,8 +476,10 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       setRequestVersion((v) => v + 1);
     } catch (caught) {
       setFormErrors({
-        general:
-          errorMessage(caught, "No se pudo completar la operación solicitada."),
+        general: errorMessage(
+          caught,
+          "No se pudo completar la operación solicitada.",
+        ),
       });
     } finally {
       setIsSubmitting(false);
@@ -400,7 +491,9 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
       prev.status === "ready"
         ? {
             ...prev,
-            containers: prev.containers.map((c) => (c.id === updated.id ? updated : c)),
+            containers: prev.containers.map((c) =>
+              c.id === updated.id ? updated : c,
+            ),
           }
         : prev,
     );
@@ -417,28 +510,32 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         title="Contenedores"
         titleId="containers-title"
         description="Inventario urbano de contenedores de vía pública para recolección diferenciada y mantenimiento."
-        actions={canManage ? (
-          <Button onClick={openCreate}>
-            <Plus data-icon="inline-start" aria-hidden />
-            Registrar contenedor
-          </Button>
-        ) : null}
+        actions={
+          canManage ? (
+            <Button onClick={openCreate}>
+              <Plus data-icon="inline-start" aria-hidden />
+              Registrar contenedor
+            </Button>
+          ) : null
+        }
       />
 
       {notice && (
-        <p
-          className="text-sm font-medium text-[var(--color-success)]"
-          role="status"
-          aria-live="polite"
-        >
-          {notice}
-        </p>
+        <Alert role="status" aria-live="polite">
+          <AlertDescription>{notice}</AlertDescription>
+        </Alert>
       )}
 
-      {servicesStatus === "error" && !detailContainer ? <div role="status" className="text-sm text-[var(--color-warning)]">
-        <p>{serviceLookupFailure}</p>
-        <Button variant="outline" onClick={refreshServiceLookup}>Reintentar</Button>
-      </div> : null}
+      {servicesStatus === "error" && !detailContainer ? (
+        <Alert role="status">
+          <AlertDescription>
+            <p>{serviceLookupFailure}</p>
+            <Button variant="outline" onClick={refreshServiceLookup}>
+              Reintentar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {/* Filter panel */}
       <div
@@ -446,89 +543,129 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         aria-label="Filtros del catálogo de contenedores"
       >
         <Field>
-          <FieldLabel htmlFor="container-search-filter">Buscar contenedor</FieldLabel>
-          <input
+          <FieldLabel htmlFor="container-search-filter">
+            Buscar contenedor
+          </FieldLabel>
+          <Input
             id="container-search-filter"
             type="search"
             placeholder="Código o dirección…"
             value={search}
             maxLength={MAX_SEARCH_LENGTH}
             onChange={(e) => setSearch(e.target.value)}
-            className={formControlClass}
           />
         </Field>
         <Field>
           <FieldLabel htmlFor="container-status-filter">Estado</FieldLabel>
-          <select
-            id="container-status-filter"
+          <Select
+            items={{ all: "Todos los estados", ...CONTAINER_STATUS_LABELS }}
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as ContainerStatus | "all")}
-            className={formControlClass}
+            onValueChange={(value) =>
+              setStatusFilter((value ?? "") as ContainerStatus | "all")
+            }
           >
-            <option value="all">Todos los estados</option>
-            {containerStatuses.map((st) => (
-              <option key={st} value={st}>
-                {CONTAINER_STATUS_LABELS[st]}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="container-status-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                {containerStatuses.map((st) => (
+                  <SelectItem key={st} value={st}>
+                    {CONTAINER_STATUS_LABELS[st]}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </Field>
         <Field>
-          <FieldLabel htmlFor="container-type-filter">Tipo de contenedor</FieldLabel>
-          <select
-            id="container-type-filter"
+          <FieldLabel htmlFor="container-type-filter">
+            Tipo de contenedor
+          </FieldLabel>
+          <Select
+            items={{ all: "Todos los tipos", ...CONTAINER_TYPE_LABELS }}
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as ContainerType | "all")}
-            className={formControlClass}
+            onValueChange={(value) =>
+              setTypeFilter((value ?? "") as ContainerType | "all")
+            }
           >
-            <option value="all">Todos los tipos</option>
-            {containerTypes.map((t) => (
-              <option key={t} value={t}>
-                {CONTAINER_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="container-type-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">Todos los tipos</SelectItem>
+                {containerTypes.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {CONTAINER_TYPE_LABELS[t]}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </Field>
         <Field>
           <FieldLabel htmlFor="container-zone-filter">Zona</FieldLabel>
-          <select
-            id="container-zone-filter"
+          <Select
+            items={{
+              all: "Todas las zonas",
+              ...Object.fromEntries(
+                zones.map((zone) => [zone.id, `${zone.code} · ${zone.name}`]),
+              ),
+            }}
             value={zoneFilter}
-            onChange={(e) => setZoneFilter(e.target.value)}
-            className={formControlClass}
+            onValueChange={(value) => setZoneFilter(value ?? "")}
           >
-            <option value="all">Todas las zonas</option>
-            {zones.map((zone) => (
-              <option key={zone.id} value={zone.id}>
-                {zone.code} · {zone.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="container-zone-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">Todas las zonas</SelectItem>
+                {zones.map((zone) => (
+                  <SelectItem key={zone.id} value={zone.id}>
+                    {zone.code} · {zone.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </Field>
       </div>
 
       {state.status === "loading" && (
-        <p aria-label="Cargando contenedores" className="text-sm text-muted-foreground">
+        <p
+          aria-label="Cargando contenedores"
+          className="text-sm text-muted-foreground"
+        >
           Cargando inventario de contenedores…
         </p>
       )}
 
       {state.status === "error" && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm"
-        >
-          <span>{state.message}</span>
-          <Button variant="outline" onClick={() => setRequestVersion((v) => v + 1)}>
-            Reintentar carga
-          </Button>
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>
+            <span>{state.message}</span>
+            <Button
+              variant="outline"
+              onClick={() => setRequestVersion((v) => v + 1)}
+            >
+              Reintentar carga
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
       {state.status === "ready" && state.containers.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
-          No hay contenedores registrados que coincidan con los filtros de búsqueda.
-        </p>
+        <Empty>
+          <EmptyHeader>
+            <EmptyDescription>
+              No hay contenedores registrados que coincidan con los filtros de
+              búsqueda.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
 
       {state.status === "ready" && state.containers.length > 0 && (
@@ -543,19 +680,27 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                 <th scope="col" className="px-4 py-3">Dirección</th>
                 <th scope="col" className="px-4 py-3">Capacidad</th>
                 <th scope="col" className="px-4 py-3">Estado</th>
-                <th scope="col" className="px-4 py-3">
-                  <span className="sr-only">Acciones</span>
-                </th>
+                <th scope="col" className="sr-only">Abrir detalle</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {state.containers.map((container) => {
                 const zone = zones.find((z) => z.id === container.zoneId);
-                const inFlight = findInFlightServiceForContainer(container, services);
                 return (
-                  <tr key={container.id}>
+                  <tr key={container.id} className={styles.catalogRow}>
                     <th scope="row" data-label="Código" className="px-4 py-3 font-semibold text-foreground">
-                      {container.code}
+                      <Button
+                        id={`container-detail-${container.id}`}
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Ver detalle de ${container.code}`}
+                        onClick={() => openDetail(container)}
+                        className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none"
+                      >
+                        {container.code}
+                        <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
+                      </Button>
                     </th>
                     <td data-label="Tipo" className="px-4 py-3">{CONTAINER_TYPE_LABELS[container.containerType]}</td>
                     <td data-label="Zona" className="px-4 py-3">
@@ -566,169 +711,8 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                     <td data-label="Estado" className="px-4 py-3">
                       <StatusBadge status={container.status} />
                     </td>
-                    <td data-label="Acciones" className={`${styles.actions} px-4 py-3`}>
-                      <Button
-                        id={`container-detail-${container.id}`}
-                        variant="outline"
-                        size="sm"
-                        className="h-10 max-[760px]:h-12"
-                        onClick={() => openDetail(container)}
-                      >
-                        <Eye data-icon="inline-start" aria-hidden />
-                        Ver detalle
-                      </Button>
-                      <div className="flex flex-wrap gap-2 max-[760px]:hidden">
-                      {canManage && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEdit(container)}
-                        >
-                          <Pencil data-icon="inline-start" aria-hidden />
-                          Editar
-                        </Button>
-                      )}
-                      {canReport && container.status === "ACTIVE" && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setReportingOverflowContainer(container)}
-                            className="text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
-                          >
-                            <AlertTriangle data-icon="inline-start" aria-hidden />
-                            Reportar desborde
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setReportingDamageContainer(container)}
-                            className="text-destructive hover:bg-destructive/10"
-                          >
-                            <AlertTriangle data-icon="inline-start" aria-hidden />
-                            Reportar daño
-                          </Button>
-                        </>
-                      )}
-                      {canManage && container.status === "OVERFLOWED" && (
-                        inFlight ? (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2 py-1 text-xs font-medium text-[var(--color-warning)]"
-                            title={`Servicio en curso vinculado: ${inFlight.id}`}
-                            data-testid={`in-flight-badge-${container.id}`}
-                          >
-                            <Clock className="size-3.5 shrink-0" aria-hidden />
-                            <span>Servicio en curso ({inFlight.id})</span>
-                          </span>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={servicesStatus !== "ready"}
-                            onClick={() => setEmptyContainer(container)}
-                            className="text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
-                          >
-                            <Check data-icon="inline-start" aria-hidden />
-                            Vaciar contenedor
-                          </Button>
-                        )
-                      )}
-                      {canManage && container.status === "ACTIVE" && (
-                        inFlight ? (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-info-line)] bg-[var(--color-info-fill)] px-2 py-1 text-xs font-medium text-[var(--color-info)]"
-                            title={`Servicio en curso vinculado: ${inFlight.id}`}
-                            data-testid={`in-flight-badge-${container.id}`}
-                          >
-                            <Clock className="size-3.5 shrink-0" aria-hidden />
-                            <span>Servicio en curso ({inFlight.id})</span>
-                          </span>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={servicesStatus !== "ready"}
-                            onClick={() => setStartRelocatingContainer(container)}
-                            className="text-[var(--color-info)] hover:bg-[var(--color-info)]/10"
-                          >
-                            <RotateCcw data-icon="inline-start" aria-hidden />
-                            Reubicar
-                          </Button>
-                        )
-                      )}
-                      {canManage && container.status === "RELOCATING" && (
-                        inFlight ? (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-info-line)] bg-[var(--color-info-fill)] px-2 py-1 text-xs font-medium text-[var(--color-info)]"
-                            title={`Servicio en curso vinculado: ${inFlight.id}`}
-                            data-testid={`in-flight-badge-${container.id}`}
-                          >
-                            <Clock className="size-3.5 shrink-0" aria-hidden />
-                            <span>Servicio en curso ({inFlight.id})</span>
-                          </span>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={servicesStatus !== "ready"}
-                            onClick={() => setConfirmRelocatingContainer(container)}
-                            className="text-[var(--color-info)] hover:bg-[var(--color-info)]/10"
-                          >
-                            <MapPin data-icon="inline-start" aria-hidden />
-                            Confirmar ubicación
-                          </Button>
-                        )
-                      )}
-                      {canManage && container.status === "DAMAGED" && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              pendingRepairFocusId.current = container.id;
-                              setStartingRepairContainer(container);
-                            }}
-                            className="text-[var(--color-action)]"
-                          >
-                            <Wrench data-icon="inline-start" aria-hidden />
-                            Iniciar reparación independiente
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={servicesStatus !== "ready" || Boolean(inFlight)}
-                            onClick={() => setRemovingContainer(container)}
-                            className="text-destructive hover:bg-destructive/10"
-                          >
-                            <ArchiveX data-icon="inline-start" aria-hidden />
-                            Retirar contenedor
-                          </Button>
-                        </>
-                      )}
-                      {canManage && container.status === "UNDER_REPAIR" && (
-                        inFlight ? (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2 py-1 text-xs font-medium text-[var(--color-warning)]"
-                            title={`Servicio en curso vinculado: ${inFlight.id}`}
-                            data-testid={`in-flight-badge-${container.id}`}
-                          >
-                            <Clock className="size-3.5 shrink-0" aria-hidden />
-                            <span>Servicio en curso ({inFlight.id})</span>
-                          </span>
-                        ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={servicesStatus !== "ready"}
-                          onClick={() => setCompletingRepairContainer(container)}
-                          className="text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
-                        >
-                          <CheckCircle2 data-icon="inline-start" aria-hidden />
-                          Completar reparación independiente
-                        </Button>
-                        )
-                      )}
-                      </div>
+                    <td className={`${styles.rowChevron} px-4 py-3`} aria-hidden="true">
+                      <ChevronRight className="ml-auto size-4 text-muted-foreground" />
                     </td>
                   </tr>
                 );
@@ -740,7 +724,7 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
 
       {/* Create / Edit Dialog */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent>
+        <DialogContent className="overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingContainer ? "Editar contenedor" : "Registrar contenedor"}
@@ -753,24 +737,25 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
           </DialogHeader>
 
           {formErrors.general && (
-            <p role="alert" className="text-sm text-destructive">
-              {formErrors.general}
-            </p>
+            <Alert variant="destructive">
+              <AlertDescription>{formErrors.general}</AlertDescription>
+            </Alert>
           )}
 
           <form id="container-form" onSubmit={(e) => void handleSave(e)}>
             <FieldGroup>
-              <Field>
+              <Field data-invalid={Boolean(formErrors.code)}>
                 <FieldLabel htmlFor="container-code">Código</FieldLabel>
-                <input
+                <Input
                   id="container-code"
                   value={form.code}
                   disabled={Boolean(editingContainer)}
                   onChange={(e) => setForm({ ...form, code: e.target.value })}
-                  className={formControlClass}
                   required={!editingContainer}
                   aria-invalid={Boolean(formErrors.code)}
-                  aria-describedby={formErrors.code ? "container-code-error" : undefined}
+                  aria-describedby={
+                    formErrors.code ? "container-code-error" : undefined
+                  }
                 />
                 {formErrors.code && (
                   <FieldError id="container-code-error" role="none">
@@ -778,7 +763,9 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   </FieldError>
                 )}
                 {editingContainer && (
-                  <FieldDescription>Identificador inmutable asignado al alta.</FieldDescription>
+                  <FieldDescription>
+                    Identificador inmutable asignado al alta.
+                  </FieldDescription>
                 )}
               </Field>
 
@@ -786,43 +773,74 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                 <FieldLabel htmlFor="container-type-form">
                   Tipo de contenedor en el formulario
                 </FieldLabel>
-                <select
-                  id="container-type-form"
+                <Select
+                  items={CONTAINER_TYPE_LABELS}
                   value={form.containerType}
                   disabled={Boolean(editingContainer)}
-                  onChange={(e) =>
-                    setForm({ ...form, containerType: e.target.value as ContainerType })
+                  onValueChange={(value) =>
+                    setForm({
+                      ...form,
+                      containerType: (value ?? "") as ContainerType,
+                    })
                   }
-                  className={formControlClass}
                 >
-                  {containerTypes.map((t) => (
-                    <option key={t} value={t}>
-                      {CONTAINER_TYPE_LABELS[t]}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="container-type-form">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {containerTypes.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {CONTAINER_TYPE_LABELS[t]}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
                 {editingContainer && (
-                  <FieldDescription>Categoría de residuo inmutable tras el registro.</FieldDescription>
+                  <FieldDescription>
+                    Categoría de residuo inmutable tras el registro.
+                  </FieldDescription>
                 )}
               </Field>
 
-              <Field>
-                <FieldLabel htmlFor="container-zone-form">Zona en el formulario</FieldLabel>
-                <select
-                  id="container-zone-form"
+              <Field data-invalid={Boolean(formErrors.zoneId)}>
+                <FieldLabel htmlFor="container-zone-form">
+                  Zona en el formulario
+                </FieldLabel>
+                <Select
+                  items={Object.fromEntries(
+                    zones.map((zone) => [
+                      zone.id,
+                      `${zone.code} · ${zone.name}`,
+                    ]),
+                  )}
                   value={form.zoneId}
-                  onChange={(e) => setForm({ ...form, zoneId: e.target.value })}
-                  className={formControlClass}
+                  onValueChange={(value) =>
+                    setForm({ ...form, zoneId: value ?? "" })
+                  }
                   required
-                  aria-invalid={Boolean(formErrors.zoneId)}
-                  aria-describedby={formErrors.zoneId ? "container-zone-error" : undefined}
                 >
-                  {zones.map((z) => (
-                    <option key={z.id} value={z.id}>
-                      {z.code} · {z.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    id="container-zone-form"
+                    aria-required="true"
+                    aria-invalid={Boolean(formErrors.zoneId)}
+                    aria-describedby={
+                      formErrors.zoneId ? "container-zone-error" : undefined
+                    }
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {zones.map((z) => (
+                        <SelectItem key={z.id} value={z.id}>
+                          {z.code} · {z.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
                 {formErrors.zoneId && (
                   <FieldError id="container-zone-error" role="none">
                     {formErrors.zoneId}
@@ -830,20 +848,27 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                 )}
               </Field>
 
-              <Field>
-                <FieldLabel htmlFor="container-capacity">Capacidad (litros)</FieldLabel>
-                <input
+              <Field data-invalid={Boolean(formErrors.capacityLiters)}>
+                <FieldLabel htmlFor="container-capacity">
+                  Capacidad (litros)
+                </FieldLabel>
+                <Input
                   id="container-capacity"
                   type="number"
                   min="1"
                   max={MAX_INT32}
                   step="1"
                   value={form.capacityLiters}
-                  onChange={(e) => setForm({ ...form, capacityLiters: e.target.value })}
-                  className={formControlClass}
+                  onChange={(e) =>
+                    setForm({ ...form, capacityLiters: e.target.value })
+                  }
                   required
                   aria-invalid={Boolean(formErrors.capacityLiters)}
-                  aria-describedby={formErrors.capacityLiters ? "container-capacity-error" : undefined}
+                  aria-describedby={
+                    formErrors.capacityLiters
+                      ? "container-capacity-error"
+                      : undefined
+                  }
                 />
                 {formErrors.capacityLiters && (
                   <FieldError id="container-capacity-error" role="none">
@@ -852,16 +877,19 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                 )}
               </Field>
 
-              <Field>
+              <Field data-invalid={Boolean(formErrors.address)}>
                 <FieldLabel htmlFor="container-address">Dirección</FieldLabel>
-                <input
+                <Input
                   id="container-address"
                   value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  className={formControlClass}
+                  onChange={(e) =>
+                    setForm({ ...form, address: e.target.value })
+                  }
                   required
                   aria-invalid={Boolean(formErrors.address)}
-                  aria-describedby={formErrors.address ? "container-address-error" : undefined}
+                  aria-describedby={
+                    formErrors.address ? "container-address-error" : undefined
+                  }
                 />
                 {formErrors.address && (
                   <FieldError id="container-address-error" role="none">
@@ -871,9 +899,9 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
               </Field>
 
               <div className="grid grid-cols-2 gap-3">
-                <Field>
+                <Field data-invalid={Boolean(formErrors.lat)}>
                   <FieldLabel htmlFor="container-lat">Latitud</FieldLabel>
-                  <input
+                  <Input
                     id="container-lat"
                     type="number"
                     min="-90"
@@ -881,10 +909,11 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                     step="any"
                     value={form.lat}
                     onChange={(e) => setForm({ ...form, lat: e.target.value })}
-                    className={formControlClass}
                     required
                     aria-invalid={Boolean(formErrors.lat)}
-                    aria-describedby={formErrors.lat ? "container-lat-error" : undefined}
+                    aria-describedby={
+                      formErrors.lat ? "container-lat-error" : undefined
+                    }
                   />
                   {formErrors.lat && (
                     <FieldError id="container-lat-error" role="none">
@@ -893,9 +922,9 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   )}
                 </Field>
 
-                <Field>
+                <Field data-invalid={Boolean(formErrors.lng)}>
                   <FieldLabel htmlFor="container-lng">Longitud</FieldLabel>
-                  <input
+                  <Input
                     id="container-lng"
                     type="number"
                     min="-180"
@@ -903,10 +932,11 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                     step="any"
                     value={form.lng}
                     onChange={(e) => setForm({ ...form, lng: e.target.value })}
-                    className={formControlClass}
                     required
                     aria-invalid={Boolean(formErrors.lng)}
-                    aria-describedby={formErrors.lng ? "container-lng-error" : undefined}
+                    aria-describedby={
+                      formErrors.lng ? "container-lng-error" : undefined
+                    }
                   />
                   {formErrors.lng && (
                     <FieldError id="container-lng-error" role="none">
@@ -934,21 +964,34 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         </DialogContent>
       </Dialog>
 
-      {/* Detail Dialog */}
-      <Dialog open={Boolean(detailContainer)} onOpenChange={(open) => !open && closeDetail()}>
+      {/* Detail Sheet */}
+      <Sheet
+        open={Boolean(detailContainer)}
+        onOpenChange={(open) => !open && closeDetail()}
+      >
         {detailContainer && (
-          <DialogContent>
-            <DialogHeader>
-              <div className="flex items-center justify-between gap-2">
-                <DialogTitle>Detalle del contenedor {detailContainer.code}</DialogTitle>
+          <SheetContent
+            side={detailSheetSide}
+            className={
+              detailSheetSide === "bottom"
+                ? "max-h-[88dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)]"
+                : "w-[min(92vw,28rem)] overflow-y-auto"
+            }
+          >
+            <SheetHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2 pr-8">
+                <SheetTitle>
+                  Detalle del contenedor {detailContainer.code}
+                </SheetTitle>
                 <StatusBadge status={detailContainer.status} />
               </div>
-              <DialogDescription>
-                Información técnica y geográfica registrada en el inventario urbano.
-              </DialogDescription>
-            </DialogHeader>
+              <SheetDescription>
+                Información técnica y geográfica registrada en el inventario
+                urbano.
+              </SheetDescription>
+            </SheetHeader>
 
-            <dl className="grid grid-cols-2 gap-4 text-sm">
+            <dl className="grid grid-cols-2 gap-4 px-4 text-sm">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Tipo
@@ -963,7 +1006,8 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   Capacidad
                 </dt>
                 <dd className="mt-0.5 font-medium text-foreground">
-                  {detailContainer.capacityLiters.toLocaleString("es-AR")} litros
+                  {detailContainer.capacityLiters.toLocaleString("es-AR")}{" "}
+                  litros
                 </dd>
               </div>
 
@@ -983,7 +1027,9 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                   Coordenadas
                 </dt>
                 <dd className="mt-0.5 font-medium text-foreground">
-                  {detailContainer.lat === null || detailContainer.lng === null ? "—" : `${detailContainer.lat}, ${detailContainer.lng}`}
+                  {detailContainer.lat === null || detailContainer.lng === null
+                    ? "—"
+                    : `${detailContainer.lat}, ${detailContainer.lng}`}
                 </dd>
               </div>
 
@@ -997,28 +1043,46 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
               </div>
 
               {detailContainer.status === "DAMAGED" && (
-                <div className="col-span-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-                  <p className="font-semibold text-destructive">Diagnóstico de daño</p>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-muted-foreground">Tipo de daño: </span>
-                      <span className="font-medium text-foreground">
-                        {detailContainer.damageType ? DAMAGE_TYPE_LABELS[detailContainer.damageType] : "No especificado"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Severidad: </span>
-                      <span className="font-medium text-foreground">
-                        {detailContainer.severity ? SEVERITY_LABELS[detailContainer.severity] : "No especificada"}
-                      </span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">Obras Públicas requeridas: </span>
-                      <span className="font-medium text-foreground">
-                        {detailContainer.requiresPublicWorks ? "Sí (notificación a M3)" : "No"}
-                      </span>
-                    </div>
-                  </div>
+                <div className="col-span-2">
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      <p className="font-semibold text-destructive">
+                        Diagnóstico de daño
+                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">
+                            Tipo de daño:{" "}
+                          </span>
+                          <span className="font-medium text-foreground">
+                            {detailContainer.damageType
+                              ? DAMAGE_TYPE_LABELS[detailContainer.damageType]
+                              : "No especificado"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            Severidad:{" "}
+                          </span>
+                          <span className="font-medium text-foreground">
+                            {detailContainer.severity
+                              ? SEVERITY_LABELS[detailContainer.severity]
+                              : "No especificada"}
+                          </span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground">
+                            Obras Públicas requeridas:{" "}
+                          </span>
+                          <span className="font-medium text-foreground">
+                            {detailContainer.requiresPublicWorks
+                              ? "Sí (notificación a M3)"
+                              : "No"}
+                          </span>
+                        </div>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
                 </div>
               )}
               <div className="col-span-2">
@@ -1027,60 +1091,109 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                 </dt>
                 <dd className="mt-1">
                   {isLoadingEvidence ? (
-                    <p className="text-xs text-muted-foreground">Cargando evidencias…</p>
+                    <p className="text-xs text-muted-foreground">
+                      Cargando evidencias…
+                    </p>
                   ) : detailEvidence.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No registra evidencias adjuntas.</p>
+                    <p className="text-xs text-muted-foreground">
+                      No registra evidencias adjuntas.
+                    </p>
                   ) : (
-                    <ul className="space-y-1.5" role="list">
+                    <ItemGroup
+                      aria-label="Evidencias adjuntas"
+                      className="gap-2"
+                    >
                       {detailEvidence.map((att) => (
-                        <li
+                        <Item
                           key={att.id}
-                          className="flex items-center justify-between rounded-lg border border-border bg-card p-2 text-xs"
+                          variant="outline"
+                          size="sm"
+                          className="flex-wrap"
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                            <div className="truncate">
-                              <span className="font-medium text-foreground">{att.filename}</span>
-                              <span className="ml-2 text-[11px] text-muted-foreground">
-                                ({att.contentType})
-                              </span>
-                            </div>
-                          </div>
-                          <a
-                            href={att.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-primary hover:underline shrink-0"
-                          >
-                            Ver archivo
-                          </a>
-                        </li>
+                          <ItemMedia variant="icon">
+                            <FileText aria-hidden />
+                          </ItemMedia>
+                          <ItemContent className="min-w-0">
+                            <ItemTitle className="break-all">
+                              {att.filename}
+                            </ItemTitle>
+                            <ItemDescription>{att.contentType}</ItemDescription>
+                          </ItemContent>
+                          <ItemActions>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              render={
+                                <a
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                />
+                              }
+                            >
+                              Ver archivo
+                            </Button>
+                          </ItemActions>
+                        </Item>
                       ))}
-                    </ul>
+                    </ItemGroup>
                   )}
                 </dd>
               </div>
             </dl>
 
-            <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
-              {(canReport && detailContainer.status === "ACTIVE") ||
-              (canManage &&
-                ["DAMAGED", "UNDER_REPAIR", "OVERFLOWED", "ACTIVE", "RELOCATING"].includes(
-                  detailContainer.status,
-                )) ? (
-                <div className="flex flex-wrap gap-2">
-                  {canReport && detailContainer.status === "ACTIVE" && (
+            <SheetFooter className="gap-4 pt-0">
+              {canManage && servicesStatus === "error" ? (
+                <Alert role="status">
+                  <AlertDescription>
+                    <p>{serviceLookupFailure}</p>
+                    <Button variant="outline" onClick={refreshServiceLookup}>
+                      Reintentar
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              {canManage ? (
+                <section aria-label="Gestión" className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Gestión
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      const target = detailContainer;
+                      closeDetail();
+                      openEdit(target);
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" aria-hidden />
+                    Editar
+                  </Button>
+                </section>
+              ) : null}
+
+              {((canReport && detailContainer.status === "ACTIVE") ||
+                (canManage &&
+                  ["OVERFLOWED", "ACTIVE", "RELOCATING"].includes(
+                    detailContainer.status,
+                  ))) && (
+                <section aria-label="Operación" className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Operación
+                  </h3>
+                  {canReport && detailContainer.status === "ACTIVE" ? (
                     <>
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
+                        className="w-full justify-start"
                         onClick={() => {
                           const target = detailContainer;
                           closeDetail();
                           setReportingOverflowContainer(target);
                         }}
-                        className="text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
                       >
                         <AlertTriangle data-icon="inline-start" aria-hidden />
                         Reportar desborde
@@ -1088,183 +1201,161 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
+                        className="w-full justify-start"
                         onClick={() => {
                           const target = detailContainer;
                           closeDetail();
                           setReportingDamageContainer(target);
                         }}
-                        className="text-destructive hover:bg-destructive/10"
                       >
                         <AlertTriangle data-icon="inline-start" aria-hidden />
                         Reportar daño
                       </Button>
                     </>
-                  )}
-                  {servicesStatus === "error" ? <div role="status" className="text-sm text-[var(--color-warning)]">
-                    <p>{serviceLookupFailure}</p>
-                    <Button variant="outline" onClick={refreshServiceLookup}>Reintentar</Button>
-                  </div> : null}
-                  {(() => {
-                    const detailInFlight = findInFlightServiceForContainer(detailContainer, services);
-                    return (
-                      <>
-                        {canManage && detailContainer.status === "OVERFLOWED" && (
-                          detailInFlight ? (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2 py-1 text-xs font-medium text-[var(--color-warning)]"
-                              title={`Servicio en curso vinculado: ${detailInFlight.id}`}
-                            >
-                              <Clock className="size-3.5 shrink-0" aria-hidden />
-                              <span>Servicio en curso ({detailInFlight.id})</span>
-                            </span>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={servicesStatus !== "ready"}
-                              onClick={() => {
-                                const target = detailContainer;
-                                closeDetail();
-                                setEmptyContainer(target);
-                              }}
-                              className="text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
-                            >
-                              <Check data-icon="inline-start" aria-hidden />
-                              Vaciar contenedor
-                            </Button>
-                          )
-                        )}
-                        {canManage && detailContainer.status === "ACTIVE" && (
-                          detailInFlight ? (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-md border border-[var(--color-info-line)] bg-[var(--color-info-fill)] px-2 py-1 text-xs font-medium text-[var(--color-info)]"
-                              title={`Servicio en curso vinculado: ${detailInFlight.id}`}
-                            >
-                              <Clock className="size-3.5 shrink-0" aria-hidden />
-                              <span>Servicio en curso ({detailInFlight.id})</span>
-                            </span>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={servicesStatus !== "ready"}
-                              onClick={() => {
-                                const target = detailContainer;
-                                closeDetail();
-                                setStartRelocatingContainer(target);
-                              }}
-                              className="text-[var(--color-info)] hover:bg-[var(--color-info)]/10"
-                            >
-                              <RotateCcw data-icon="inline-start" aria-hidden />
-                              Reubicar
-                            </Button>
-                          )
-                        )}
-                        {canManage && detailContainer.status === "RELOCATING" && (
-                          detailInFlight ? (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-md border border-[var(--color-info-line)] bg-[var(--color-info-fill)] px-2 py-1 text-xs font-medium text-[var(--color-info)]"
-                              title={`Servicio en curso vinculado: ${detailInFlight.id}`}
-                            >
-                              <Clock className="size-3.5 shrink-0" aria-hidden />
-                              <span>Servicio en curso ({detailInFlight.id})</span>
-                            </span>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={servicesStatus !== "ready"}
-                              onClick={() => {
-                                const target = detailContainer;
-                                closeDetail();
-                                setConfirmRelocatingContainer(target);
-                              }}
-                              className="text-[var(--color-info)] hover:bg-[var(--color-info)]/10"
-                            >
-                              <MapPin data-icon="inline-start" aria-hidden />
-                              Confirmar ubicación
-                            </Button>
-                          )
-                        )}
-                      </>
-                    );
-                  })()}
-                  {canManage && detailContainer.status === "DAMAGED" && (
-                    <>
+                  ) : null}
+                  {canManage && detailContainer.status === "OVERFLOWED" ? (
+                    detailInFlight ? (
+                      <Badge variant="info" className="w-fit max-w-full">
+                        <Clock data-icon="inline-start" aria-hidden />
+                        Servicio en curso ({detailInFlight.id})
+                      </Badge>
+                    ) : (
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
+                        className="w-full justify-start"
+                        disabled={servicesStatus !== "ready"}
                         onClick={() => {
                           const target = detailContainer;
-                          pendingRepairFocusId.current = target.id;
                           closeDetail();
-                          setStartingRepairContainer(target);
+                          setEmptyContainer(target);
                         }}
-                        className="text-[var(--color-action)]"
                       >
-                        <Wrench data-icon="inline-start" aria-hidden />
-                        Iniciar reparación independiente
+                        <Check data-icon="inline-start" aria-hidden />
+                        Vaciar contenedor
                       </Button>
+                    )
+                  ) : null}
+                  {canManage && detailContainer.status === "ACTIVE" ? (
+                    detailInFlight ? (
+                      <Badge variant="info" className="w-fit max-w-full">
+                        <Clock data-icon="inline-start" aria-hidden />
+                        Servicio en curso ({detailInFlight.id})
+                      </Badge>
+                    ) : (
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
-                        disabled={servicesStatus !== "ready" || Boolean(detailInFlight)}
+                        className="w-full justify-start"
+                        disabled={servicesStatus !== "ready"}
                         onClick={() => {
                           const target = detailContainer;
                           closeDetail();
-                          setRemovingContainer(target);
+                          setStartRelocatingContainer(target);
                         }}
-                        className="text-destructive hover:bg-destructive/10"
                       >
-                        <ArchiveX data-icon="inline-start" aria-hidden />
-                        Retirar contenedor
+                        <RotateCcw data-icon="inline-start" aria-hidden />
+                        Reubicar
                       </Button>
-                    </>
-                  )}
-                  {canManage && detailContainer.status === "UNDER_REPAIR" && detailInFlight && (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-md border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] px-2 py-1 text-xs font-medium text-[var(--color-warning)]"
-                      title={`Servicio en curso vinculado: ${detailInFlight.id}`}
-                      data-testid={`in-flight-badge-${detailContainer.id}`}
-                    >
-                      <Clock className="size-3.5 shrink-0" aria-hidden />
-                      <span>Servicio en curso ({detailInFlight.id})</span>
-                    </span>
-                  )}
-                  {canManage && detailContainer.status === "UNDER_REPAIR" && !detailInFlight && (
+                    )
+                  ) : null}
+                  {canManage && detailContainer.status === "RELOCATING" ? (
+                    detailInFlight ? (
+                      <Badge variant="info" className="w-fit max-w-full">
+                        <Clock data-icon="inline-start" aria-hidden />
+                        Servicio en curso ({detailInFlight.id})
+                      </Badge>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-start"
+                        disabled={servicesStatus !== "ready"}
+                        onClick={() => {
+                          const target = detailContainer;
+                          closeDetail();
+                          setConfirmRelocatingContainer(target);
+                        }}
+                      >
+                        <MapPin data-icon="inline-start" aria-hidden />
+                        Confirmar ubicación
+                      </Button>
+                    )
+                  ) : null}
+                </section>
+              )}
+
+              {canManage &&
+              (detailContainer.status === "DAMAGED" ||
+                detailContainer.status === "UNDER_REPAIR") ? (
+                <section aria-label="Mantenimiento" className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Mantenimiento
+                  </h3>
+                  {detailContainer.status === "DAMAGED" ? (
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const target = detailContainer;
+                        pendingRepairFocusId.current = target.id;
+                        closeDetail();
+                        setStartingRepairContainer(target);
+                      }}
+                    >
+                      <Wrench data-icon="inline-start" aria-hidden />
+                      Iniciar reparación independiente
+                    </Button>
+                  ) : detailInFlight ? (
+                    <Badge variant="info" className="w-fit max-w-full">
+                      <Clock data-icon="inline-start" aria-hidden />
+                      Servicio en curso ({detailInFlight.id})
+                    </Badge>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start"
                       disabled={servicesStatus !== "ready"}
                       onClick={() => {
                         const target = detailContainer;
                         closeDetail();
                         setCompletingRepairContainer(target);
                       }}
-                      className="text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
                     >
                       <CheckCircle2 data-icon="inline-start" aria-hidden />
                       Completar reparación independiente
                     </Button>
                   )}
-                </div>
-              ) : (
-                <div />
-              )}
-              <Button type="button" variant="outline" onClick={closeDetail}>
-                Cerrar detalle
-              </Button>
-            </DialogFooter>
-          </DialogContent>
+                </section>
+              ) : null}
+
+              {canManage && detailContainer.status === "DAMAGED" ? (
+                <section aria-label="Destructivas" className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Destructivas
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="w-full justify-start"
+                    disabled={servicesStatus !== "ready" || Boolean(detailInFlight)}
+                    onClick={() => {
+                      const target = detailContainer;
+                      closeDetail();
+                      setRemovingContainer(target);
+                    }}
+                  >
+                    <ArchiveX data-icon="inline-start" aria-hidden />
+                    Retirar contenedor
+                  </Button>
+                </section>
+              ) : null}
+            </SheetFooter>
+          </SheetContent>
         )}
-      </Dialog>
+      </Sheet>
 
       {/* Report Overflow Dialog */}
       <ReportOverflowDialog
@@ -1277,14 +1368,18 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
             prev.status === "ready"
               ? {
                   ...prev,
-                  containers: prev.containers.map((c) => (c.id === updated.id ? updated : c)),
+                  containers: prev.containers.map((c) =>
+                    c.id === updated.id ? updated : c,
+                  ),
                 }
               : prev,
           );
           if (detailContainer?.id === updated.id) {
             setDetailContainer(updated);
           }
-          setNotice(`Desborde reportado con éxito para el contenedor ${updated.code}.`);
+          setNotice(
+            `Desborde reportado con éxito para el contenedor ${updated.code}.`,
+          );
         }}
       />
 
@@ -1296,7 +1391,9 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         onSuccess={(updated) => {
           refreshServiceLookup();
           applyUpdatedContainer(updated);
-          setNotice(`Reporte de daño registrado con éxito para el contenedor ${updated.code}.`);
+          setNotice(
+            `Reporte de daño registrado con éxito para el contenedor ${updated.code}.`,
+          );
         }}
       />
 
@@ -1311,14 +1408,18 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
             prev.status === "ready"
               ? {
                   ...prev,
-                  containers: prev.containers.map((c) => (c.id === updated.id ? updated : c)),
+                  containers: prev.containers.map((c) =>
+                    c.id === updated.id ? updated : c,
+                  ),
                 }
               : prev,
           );
           if (detailContainer?.id === updated.id) {
             setDetailContainer(updated);
           }
-          setNotice(`Vaciado registrado con éxito para el contenedor ${updated.code}.`);
+          setNotice(
+            `Vaciado registrado con éxito para el contenedor ${updated.code}.`,
+          );
         }}
       />
 
@@ -1333,14 +1434,18 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
             prev.status === "ready"
               ? {
                   ...prev,
-                  containers: prev.containers.map((c) => (c.id === updated.id ? updated : c)),
+                  containers: prev.containers.map((c) =>
+                    c.id === updated.id ? updated : c,
+                  ),
                 }
               : prev,
           );
           if (detailContainer?.id === updated.id) {
             setDetailContainer(updated);
           }
-          setNotice(`Proceso de reubicación iniciado para el contenedor ${updated.code}.`);
+          setNotice(
+            `Proceso de reubicación iniciado para el contenedor ${updated.code}.`,
+          );
         }}
       />
 
@@ -1355,14 +1460,18 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
             prev.status === "ready"
               ? {
                   ...prev,
-                  containers: prev.containers.map((c) => (c.id === updated.id ? updated : c)),
+                  containers: prev.containers.map((c) =>
+                    c.id === updated.id ? updated : c,
+                  ),
                 }
               : prev,
           );
           if (detailContainer?.id === updated.id) {
             setDetailContainer(updated);
           }
-          setNotice(`Nueva ubicación confirmada con éxito para el contenedor ${updated.code}.`);
+          setNotice(
+            `Nueva ubicación confirmada con éxito para el contenedor ${updated.code}.`,
+          );
         }}
       />
 
@@ -1384,7 +1493,9 @@ export function ContainerCatalogPanel({ scenario }: { scenario: OperationalScena
         onSuccess={(updated) => {
           refreshServiceLookup();
           applyUpdatedContainer(updated);
-          setNotice(`Reparación completada con éxito para el contenedor ${updated.code}.`);
+          setNotice(
+            `Reparación completada con éxito para el contenedor ${updated.code}.`,
+          );
         }}
       />
 

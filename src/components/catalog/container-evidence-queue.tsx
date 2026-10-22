@@ -2,10 +2,32 @@
 import { errorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
-import { AlertTriangle, CheckCircle2, Paperclip, RefreshCw, Upload, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Paperclip,
+  RefreshCw,
+  X,
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Field, FieldDescription } from "@/components/ui/field";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { EVIDENCE_FILE_SIZE_LABEL, MAX_EVIDENCE_FILE_SIZE_BYTES } from "@/lib/evidence-limits";
+import {
+  EVIDENCE_FILE_SIZE_LABEL,
+  MAX_EVIDENCE_FILE_SIZE_BYTES,
+} from "@/lib/evidence-limits";
 import { containersAdapter, ContainerRequestError } from "@/lib/containers";
+import { EvidenceUploadField } from "./evidence-upload-field";
 
 export interface QueuedEvidenceFile {
   id: string;
@@ -24,11 +46,14 @@ export const ALLOWED_MIME_TYPES = new Set([
   "image/webp",
   "application/pdf",
 ]);
-export const ACCEPTED_FILE_TYPES = "image/jpeg,image/png,image/webp,application/pdf";
+export const ACCEPTED_FILE_TYPES =
+  "image/jpeg,image/png,image/webp,application/pdf";
 
 export function useEvidenceQueue() {
   const [queuedFiles, setQueuedFiles] = useState<QueuedEvidenceFile[]>([]);
-  const [fileValidationError, setFileValidationError] = useState<string | null>(null);
+  const [fileValidationError, setFileValidationError] = useState<string | null>(
+    null,
+  );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -82,7 +107,9 @@ export function useEvidenceQueue() {
     item: QueuedEvidenceFile,
   ): Promise<boolean> => {
     setQueuedFiles((prev) =>
-      prev.map((f) => (f.id === item.id ? { ...f, status: "uploading", error: undefined } : f)),
+      prev.map((f) =>
+        f.id === item.id ? { ...f, status: "uploading", error: undefined } : f,
+      ),
     );
     try {
       const att = await containersAdapter.uploadEvidence({
@@ -92,15 +119,18 @@ export function useEvidenceQueue() {
       });
       setQueuedFiles((prev) =>
         prev.map((f) =>
-          f.id === item.id ? { ...f, status: "success", canonicalFilename: att.filename } : f,
+          f.id === item.id
+            ? { ...f, status: "success", canonicalFilename: att.filename }
+            : f,
         ),
       );
       return true;
     } catch (err) {
-      const msg =
-        errorMessage(err, "Error al subir el archivo");
+      const msg = errorMessage(err, "Error al subir el archivo");
       setQueuedFiles((prev) =>
-        prev.map((f) => (f.id === item.id ? { ...f, status: "error", error: msg } : f)),
+        prev.map((f) =>
+          f.id === item.id ? { ...f, status: "error", error: msg } : f,
+        ),
       );
       return false;
     }
@@ -151,119 +181,101 @@ export function EvidenceQueueView({
 }: EvidenceQueueViewProps) {
   const inputId = useId();
 
+  const errorId = `${inputId}-error`;
+
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-card p-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <span className="block text-xs font-semibold text-foreground">
-            Evidencia adjunta
-          </span>
-          <span className="text-[11px] text-muted-foreground">
-            Opcional. Formatos JPEG, PNG, WebP o PDF hasta {EVIDENCE_FILE_SIZE_LABEL}.
-          </span>
-        </div>
-        <input
-          id={inputId}
-          type="file"
-          multiple
-          accept={ACCEPTED_FILE_TYPES}
-          onChange={onFileSelect}
-          disabled={disabled}
-          aria-invalid={Boolean(fileValidationError)}
-          aria-describedby={fileValidationError ? "container-evidence-error" : undefined}
-          className="peer sr-only"
-        />
-        <label
-          htmlFor={inputId}
-          className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--color-border-strong)] bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors peer-focus-visible:ring-3 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-[var(--color-focus)] max-[760px]:min-h-12 ${
-            disabled
-              ? "opacity-50 cursor-not-allowed"
-              : "hover:bg-muted cursor-pointer"
-          }`}
-        >
-          <Upload className="size-3.5" aria-hidden />
-          <span>Seleccionar archivo</span>
-        </label>
-      </div>
-
+    <Field data-invalid={Boolean(fileValidationError)} data-disabled={disabled}>
+      <p className="text-sm font-medium text-foreground">Evidencia adjunta</p>
+      <FieldDescription id={`${inputId}-help`}>
+        Formatos JPEG, PNG, WebP o PDF hasta {EVIDENCE_FILE_SIZE_LABEL}.
+      </FieldDescription>
+      <EvidenceUploadField
+        id={inputId}
+        accept={ACCEPTED_FILE_TYPES}
+        describedBy={`${inputId}-help${fileValidationError ? ` ${errorId}` : ""}`}
+        multiple
+        onChange={onFileSelect}
+        disabled={disabled}
+        invalid={Boolean(fileValidationError)}
+      />
       {fileValidationError && (
-        <div
-          id="container-evidence-error"
-          role="alert"
-          className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive"
-        >
-          <AlertTriangle className="size-4 shrink-0 mt-0.5" aria-hidden />
-          <span>{fileValidationError}</span>
-        </div>
+        <Alert id={errorId} variant="destructive">
+          <AlertTriangle aria-hidden />
+          <AlertDescription>{fileValidationError}</AlertDescription>
+        </Alert>
       )}
-
       {queuedFiles.length > 0 && (
-        <ul className="space-y-2" role="list" aria-label="Archivos adjuntos seleccionados">
+        <ItemGroup
+          aria-label="Archivos adjuntos seleccionados"
+          className="gap-2"
+        >
           {queuedFiles.map((item) => (
-            <li
+            <Item
               key={item.id}
-              className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background p-2.5 text-xs"
+              variant="outline"
+              size="sm"
+              className="flex-wrap"
             >
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <Paperclip className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                <div className="min-w-0">
-                  <span className="block font-medium text-foreground truncate">
-                    {item.status === "success" && item.canonicalFilename
-                      ? item.canonicalFilename
-                      : item.localFilename}
-                  </span>
-                  {item.status === "error" && (
-                    <span className="block text-[11px] text-destructive">
-                      {item.error}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
+              <ItemMedia variant="icon">
+                <Paperclip aria-hidden />
+              </ItemMedia>
+              <ItemContent className="min-w-0">
+                <ItemTitle className="break-all">
+                  {item.status === "success" && item.canonicalFilename
+                    ? item.canonicalFilename
+                    : item.localFilename}
+                </ItemTitle>
+                {item.status === "error" && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{item.error}</AlertDescription>
+                  </Alert>
+                )}
+              </ItemContent>
+              <ItemActions className="flex-wrap">
                 {item.status === "pending" && (
-                  <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground font-medium">
-                    Pendiente
-                  </span>
+                  <Badge variant="secondary">Pendiente</Badge>
                 )}
                 {item.status === "uploading" && (
-                  <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] text-primary font-medium">
+                  <Badge variant="info">
+                    <Spinner data-icon="inline-start" />
                     Subiendo…
-                  </span>
+                  </Badge>
                 )}
                 {item.status === "success" && (
-                  <span className="flex items-center gap-1 rounded bg-[var(--color-success)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-success)]">
-                    <CheckCircle2 className="size-3" aria-hidden />
+                  <Badge variant="success">
+                    <CheckCircle2 data-icon="inline-start" aria-hidden />
                     Subido
-                  </span>
+                  </Badge>
                 )}
                 {item.status === "error" && onRetryFile && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    disabled={disabled}
                     onClick={() => onRetryFile(item)}
-                    className="h-6 gap-1 px-2 text-[10px] text-destructive hover:bg-destructive/10"
                   >
-                    <RefreshCw className="size-3" aria-hidden />
-                    <span>Reintentar</span>
+                    <RefreshCw data-icon="inline-start" aria-hidden />
+                    Reintentar
                   </Button>
                 )}
                 {item.status !== "uploading" && item.status !== "success" && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={disabled}
                     onClick={() => onRemoveFile(item.id)}
                     aria-label={`Eliminar ${item.localFilename}`}
-                    className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
                   >
-                    <X className="size-3.5" />
-                  </button>
+                    <X aria-hidden />
+                  </Button>
                 )}
-              </div>
-            </li>
+              </ItemActions>
+            </Item>
           ))}
-        </ul>
+        </ItemGroup>
       )}
-    </div>
+    </Field>
   );
 }
