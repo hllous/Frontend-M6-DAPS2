@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
+import { mockResponseAfter } from "@/mocks/delayed-response";
 import { handlers } from "@/mocks/handlers";
 import { fixtureReferrals } from "@/app/api/referrals/route";
 import { addRepairRequestFixture, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
@@ -24,6 +25,31 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("ReferralsWorkspace", () => {
+  it("shows a busy skeleton region while the referrals response is delayed", async () => {
+    server.use(http.get("*/api/referrals", () => mockResponseAfter(350, () => HttpResponse.json({ data: fixtureReferrals(), meta: { total: fixtureReferrals().length } }))));
+    const { container } = render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const region = screen.getByRole("region", { name: "Derivaciones" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(container.querySelector('[data-skeleton="referral-count"]')).not.toBeNull();
+    expect(region.querySelector('[data-skeleton="referral-reconciliation-banner"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton="referral-reconciliation-detail"]')).toHaveLength(6);
+    const recordCards = region.querySelectorAll('[data-skeleton="referral-record"]');
+    expect(recordCards).toHaveLength(3);
+    for (const card of recordCards) {
+      expect(card.querySelector('[data-skeleton="referral-record-icon"]')).not.toBeNull();
+      expect(card.querySelector('[data-skeleton="referral-record-title"]')).not.toBeNull();
+      expect(card.querySelectorAll('[data-skeleton="referral-record-detail"]')).toHaveLength(2);
+      expect(card.querySelector('[data-skeleton="referral-record-status"]')).not.toBeNull();
+    }
+    expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByRole("region", { name: "Derivaciones" })).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
+    expect(screen.getByRole("region", { name: "Derivaciones" }).querySelector("[data-skeleton]")).toBeNull();
+    expect(screen.getByRole("list", { name: "Derivaciones" })).toBeVisible();
+  });
+
   it("renders a BFF-scoped Field referral whose source UUID is absent from fixtures", async () => {
     const id = "15c86465-54d3-4e0a-83a5-26a3cc510017";
     const inspectionId = "bd685878-7c96-4e99-9b38-b0368a011fa0";
