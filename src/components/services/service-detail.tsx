@@ -123,7 +123,7 @@ export function ServiceDetail({
             >
               <Play className="h-3.5 w-3.5" aria-hidden />
               <span>
-                {isStarting ? "Iniciando..." : startDraftPending ? "Reintentar envío" : "Iniciar servicio"}
+                {isStarting ? "Iniciando..." : startDraftPending ? "Reenviar" : "Iniciar servicio"}
               </span>
             </Button>
           )}
@@ -148,7 +148,7 @@ export function ServiceDetail({
             >
               <PlayCircle className="h-3.5 w-3.5" aria-hidden />
               <span>
-                {isResuming ? "Reanudando..." : resumeDraftPending ? "Reintentar envío" : "Reanudar servicio"}
+                {isResuming ? "Reanudando..." : resumeDraftPending ? "Reenviar" : "Reanudar servicio"}
               </span>
             </Button>
           )}

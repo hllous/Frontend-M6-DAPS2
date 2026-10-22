@@ -468,8 +468,6 @@ export function CreateRepairRequestDialog({
 
         {!resolvedRequest && conflict && (
           <DraftConflictView
-            serviceId={sourceId}
-            actionLabel="derivación"
             composedAgainst={conflict.composedAgainst}
             current={conflict.current}
             onPreserve={() => {

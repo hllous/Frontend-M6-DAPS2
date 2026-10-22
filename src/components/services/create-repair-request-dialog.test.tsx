@@ -101,7 +101,7 @@ describe("CreateRepairRequestDialog", () => {
     expect(await screen.findByText("Sin enviar")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Verificar y reenviar" }));
 
-    expect(await screen.findByText(/cambió mientras su borrador de derivación/i)).toBeVisible();
+    expect(await screen.findByText(/Compare y elija qué hacer con lo que cargó/i)).toBeVisible();
     expect(listQueries).toEqual([
       `?detectedInId=${service.id}`,
       `?detectedInId=${service.id}`,
