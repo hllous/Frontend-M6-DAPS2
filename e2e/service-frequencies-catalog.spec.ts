@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
-import { chooseCatalogBDate, chooseCatalogBOption } from "./support/catalog-612-controls";
+import { chooseCatalogBDate, chooseCatalogBOption, openCatalogBRowDetail } from "./support/catalog-612-controls";
 
 test.describe("ServiceFrequency rule authoring #112", () => {
   test("Office creates, edits, and closes a rule without a generation action", async ({ page }) => {
@@ -30,14 +30,14 @@ test.describe("ServiceFrequency rule authoring #112", () => {
     await expect(page.getByText(/Frecuencia creada/)).toBeVisible();
 
     const createdRow = page.getByRole("row").filter({ hasText: "Recolección domiciliaria" }).last();
-    await createdRow.getByRole("button", { name: /Ver detalle de la frecuencia/ }).click();
+    await openCatalogBRowDetail(createdRow);
     await page.getByRole("dialog", { name: "Detalle de frecuencia de servicio" }).getByRole("button", { name: "Editar" }).click();
     await chooseCatalogBOption(page, page.getByRole("combobox", { name: "Turno", exact: true }), "Tarde");
     await page.getByRole("button", { name: "Guardar cambios" }).click();
     await expect(page.getByText(/Frecuencia actualizada/)).toBeVisible();
 
     const updatedRow = page.getByRole("row").filter({ hasText: "Recolección domiciliaria" }).last();
-    await updatedRow.getByRole("button", { name: /Ver detalle de la frecuencia/ }).click();
+    await openCatalogBRowDetail(updatedRow);
     await page.getByRole("dialog", { name: "Detalle de frecuencia de servicio" }).getByRole("button", { name: "Cerrar vigencia" }).click();
     const closeDialog = page.getByRole("dialog", { name: "Confirmar cierre de vigencia" });
     await expect(closeDialog.getByRole("heading", { name: "Confirmar cierre de vigencia" })).toBeVisible();

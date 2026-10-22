@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
-import { chooseCatalogBOption } from "./support/catalog-612-controls";
+import { chooseCatalogBOption, openCatalogBRowDetail } from "./support/catalog-612-controls";
 
 test.describe("Crew catalog @smoke", () => {
   test("Office registers and edits a crew with M1 labels and unchanged request values", async ({ page }) => {
@@ -18,8 +18,7 @@ test.describe("Crew catalog @smoke", () => {
     await createDialog.getByRole("button", { name: "Guardar cuadrilla" }).click();
     expect((await creation).postDataJSON()).toEqual({ name, crewType: "MUNICIPAL", leaderUserId: "user-carlos", organizationId: "org-municipal", defaultShift: "AFTERNOON" });
     const row = page.getByRole("row", { name: new RegExp(name) });
-    const detailsButton = row.getByRole("button", { name: `Ver detalle de ${name}`, exact: true });
-    await detailsButton.click();
+    await openCatalogBRowDetail(row);
     const sheet = page.getByRole("dialog", { name: "Detalle de cuadrilla" });
     await sheet.getByRole("button", { name: "Editar", exact: true }).click();
     const editDialog = page.getByRole("dialog", { name: "Editar cuadrilla" });
@@ -27,8 +26,8 @@ test.describe("Crew catalog @smoke", () => {
     await editDialog.getByRole("textbox", { name: "Nombre", exact: true }).fill(`${name} editada`);
     await editDialog.getByRole("button", { name: "Guardar cuadrilla" }).click();
     await expect(row).toContainText(`${name} editada`);
-    const updatedDetailsButton = page.getByRole("row", { name: new RegExp(`${name} editada`) }).getByRole("button", { name: `Ver detalle de ${name} editada`, exact: true });
-    await updatedDetailsButton.click();
+    const updatedRow = page.getByRole("row", { name: new RegExp(`${name} editada`) });
+    await openCatalogBRowDetail(updatedRow);
     await page.getByRole("dialog", { name: "Detalle de cuadrilla" }).getByRole("button", { name: "Dar de baja", exact: true }).click();
     const deactivateDialog = page.getByRole("dialog", { name: `Confirmar baja de la cuadrilla ${name} editada` });
     await page.keyboard.press("Tab");
@@ -36,8 +35,9 @@ test.describe("Crew catalog @smoke", () => {
     await expect(deactivateDialog.locator(":focus")).toHaveCount(1);
     await page.keyboard.press("Escape");
     await expect(deactivateDialog).toBeHidden();
+    const updatedDetailsButton = updatedRow.getByRole("button", { name: `Ver detalle de ${name} editada`, exact: true });
     await expect(updatedDetailsButton).toBeFocused();
-    await updatedDetailsButton.click();
+    await openCatalogBRowDetail(updatedRow);
     await page.getByRole("dialog", { name: "Detalle de cuadrilla" }).getByRole("button", { name: "Dar de baja", exact: true }).click();
     await page.getByRole("dialog", { name: `Confirmar baja de la cuadrilla ${name} editada` }).getByRole("button", { name: "Dar de baja", exact: true }).click();
     await expect(row).toContainText("Inactiva");
@@ -60,7 +60,7 @@ test.describe("Crew catalog @smoke", () => {
 
     await expect(page.getByText("Cuadrilla B · Fernández")).toBeVisible();
     await expect(page.getByText("Cuadrilla A · López")).not.toBeVisible();
-    await page.getByRole("button", { name: "Ver detalle de Cuadrilla B · Fernández" }).click();
+    await openCatalogBRowDetail(page.getByRole("row", { name: /Cuadrilla B · Fernández/ }));
     await expect(page.getByRole("dialog", { name: "Detalle de cuadrilla" })).toContainText("Integrantes");
   });
 });

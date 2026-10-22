@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { openCatalogBRowDetail } from "./support/catalog-612-controls";
 
 test.describe("Vehicle catalog @smoke", () => {
   test("lists vehicles from the catalog landing", async ({ page }) => {
@@ -12,7 +13,7 @@ test.describe("Vehicle catalog @smoke", () => {
     await expect(page).toHaveURL(/\/app\/catalog\/vehicles$/);
     await expect(page.getByRole("heading", { name: "Vehículos" })).toBeVisible();
     await expect(page.getByText("AA 123 AA")).toBeVisible();
-    await page.getByRole("row", { name: /AA 123 AA/ }).getByRole("button", { name: "Ver detalle del vehículo AA 123 AA" }).click();
+    await openCatalogBRowDetail(page.getByRole("row", { name: /AA 123 AA/ }));
     await expect(page.getByRole("dialog", { name: "Detalle de vehículo" })).toContainText("Capacidad");
   });
 

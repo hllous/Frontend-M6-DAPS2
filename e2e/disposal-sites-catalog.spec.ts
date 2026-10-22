@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
-import { chooseCatalogBOption } from "./support/catalog-612-controls";
+import { chooseCatalogBOption, openCatalogBRowDetail } from "./support/catalog-612-controls";
 
 test.describe("DisposalSite catalog management #103", () => {
   test("Office can create, edit, and logically deactivate a disposal site", async ({ page }) => {
@@ -19,14 +19,14 @@ test.describe("DisposalSite catalog management #103", () => {
     await expect(page.getByText(code)).toBeVisible();
 
     const row = page.getByRole("row", { name: new RegExp(code) });
-    await row.getByRole("button", { name: `Ver detalle del sitio de disposición ${code}` }).click();
+    await openCatalogBRowDetail(row);
     await page.getByRole("dialog", { name: "Detalle del sitio de disposición" }).getByRole("button", { name: "Editar" }).click();
     await expect(page.getByRole("textbox", { name: "Código" })).toHaveAttribute("readonly");
     await page.getByRole("textbox", { name: "Nombre" }).fill("Sitio e2e actualizado");
     await page.getByRole("button", { name: "Guardar cambios" }).click();
     await expect(page.getByText("Sitio e2e actualizado")).toBeVisible();
 
-    await page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: `Ver detalle del sitio de disposición ${code}` }).click();
+    await openCatalogBRowDetail(page.getByRole("row", { name: new RegExp(code) }));
     await page.getByRole("dialog", { name: "Detalle del sitio de disposición" }).getByRole("button", { name: "Dar de baja" }).click();
     const deactivateDialog = page.getByRole("dialog");
     await expect(deactivateDialog.getByRole("heading", { name: `Confirmar baja del sitio de disposición ${code}` })).toBeVisible();

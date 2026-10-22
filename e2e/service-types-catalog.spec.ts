@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
-import { chooseCatalogBOption } from "./support/catalog-612-controls";
+import { chooseCatalogBOption, openCatalogBRowDetail } from "./support/catalog-612-controls";
 
 test.describe("ServiceType catalog management #102", () => {
   test("Office can create, edit, and logically deactivate a ServiceType while locked fields stay read-only", async ({ page }) => {
@@ -19,7 +19,7 @@ test.describe("ServiceType catalog management #102", () => {
     await expect(page.getByText(code)).toBeVisible();
 
     const row = page.getByRole("row", { name: new RegExp(code) });
-    await row.getByRole("button", { name: `Ver detalle del tipo de servicio ${code}` }).click();
+    await openCatalogBRowDetail(row);
     await page.getByRole("dialog", { name: "Detalle del tipo de servicio" }).getByRole("button", { name: "Editar" }).click();
     await expect(page.getByRole("textbox", { name: "Código" })).toHaveAttribute("readonly");
     await expect(page.getByRole("textbox", { name: "Categoría" })).toHaveAttribute("readonly");
@@ -29,7 +29,7 @@ test.describe("ServiceType catalog management #102", () => {
     await expect(page.getByText("Tipo e2e actualizado")).toBeVisible();
 
     const updatedRow = page.getByRole("row", { name: new RegExp(code) });
-    await updatedRow.getByRole("button", { name: `Ver detalle del tipo de servicio ${code}` }).click();
+    await openCatalogBRowDetail(updatedRow);
     await page.getByRole("dialog", { name: "Detalle del tipo de servicio" }).getByRole("button", { name: "Dar de baja" }).click();
     const deactivateDialog = page.getByRole("dialog");
     await expect(deactivateDialog.getByRole("heading", { name: `Confirmar baja del tipo de servicio ${code}` })).toBeVisible();

@@ -25,3 +25,17 @@ export async function chooseCatalogBDate(page: Page, control: Locator, isoDate: 
   const accessibleDay = new Intl.DateTimeFormat("es", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date);
   await page.getByRole("button", { name: new RegExp(`^${accessibleDay}`) }).click();
 }
+
+export async function openCatalogBRowDetail(row: Locator) {
+  const page = row.page();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const cell = row.getByRole("cell").nth(1);
+  await cell.scrollIntoViewIfNeeded();
+  const box = await cell.boundingBox();
+  if (!box) throw new Error("The catalog row's second cell is not visible.");
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
