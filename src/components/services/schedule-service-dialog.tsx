@@ -2,12 +2,13 @@
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useId, useMemo, useState } from "react";
-import { AlertCircle, Check, Info, MapPin, Route as RouteIcon } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Info, MapPin, Route as RouteIcon } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
@@ -165,6 +166,9 @@ export function ScheduleServiceDialog({
   const [scheduledDate, setScheduledDate] = useState<string>(() => today);
   const [windowStart, setWindowStart] = useState<string>("08:00");
   const [windowEnd, setWindowEnd] = useState<string>("12:00");
+
+  // "Más datos" disclosure
+  const [moreOpen, setMoreOpen] = useState(false);
 
   // Notes
   const [notes, setNotes] = useState<string>("");
@@ -410,7 +414,7 @@ export function ScheduleServiceDialog({
           )}
 
           <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4" aria-busy={catalogs.status === "loading"}>
-            {isLinked ? (
+            {isLinked && (
               <Item variant="muted">
                 <ItemContent>
                   <ItemTitle>
@@ -433,25 +437,6 @@ export function ScheduleServiceDialog({
                   )}
                 </ItemContent>
               </Item>
-            ) : (
-              <Field>
-                <FieldLabel htmlFor="service-origin">Origen del servicio{" "}<span aria-hidden>*</span></FieldLabel>
-                <Select
-                  value={genericOrigin}
-                  items={originItems}
-                  onValueChange={(value) => setGenericOrigin(value as ServiceOrigin)}
-                >
-                  <SelectTrigger id="service-origin">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="MANUAL">{originItems.MANUAL}</SelectItem>
-                      <SelectItem value="PLANNED">{originItems.PLANNED}</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
             )}
 
             <Field data-invalid={Boolean(fieldErrors.serviceType) || undefined}>
@@ -701,18 +686,46 @@ export function ScheduleServiceDialog({
               </Field>
             </FieldGroup>
 
-            <Field>
-              <FieldLabel htmlFor="service-notes">Notas (opcional)</FieldLabel>
-              <Textarea
-                id="service-notes"
-                rows={2}
-                maxLength={MAX_NOTES_LENGTH}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Indicaciones para la cuadrilla"
-                className="min-h-16 resize-none"
-              />
-            </Field>
+            <Collapsible open={moreOpen} onOpenChange={setMoreOpen} className="flex flex-col gap-4">
+              <CollapsibleTrigger className="inline-flex w-fit items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&[data-panel-open]>svg]:rotate-180">
+                Más datos
+                <ChevronDown className="size-4 transition-transform" aria-hidden />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="flex flex-col gap-4">
+                {!isLinked && (
+                  <Field>
+                    <FieldLabel htmlFor="service-origin">Origen del servicio{" "}<span aria-hidden>*</span></FieldLabel>
+                    <Select
+                      value={genericOrigin}
+                      items={originItems}
+                      onValueChange={(value) => setGenericOrigin(value as ServiceOrigin)}
+                    >
+                      <SelectTrigger id="service-origin">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="MANUAL">{originItems.MANUAL}</SelectItem>
+                          <SelectItem value="PLANNED">{originItems.PLANNED}</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                )}
+              <Field>
+                <FieldLabel htmlFor="service-notes">Notas (opcional)</FieldLabel>
+                <Textarea
+                  id="service-notes"
+                  rows={2}
+                  maxLength={MAX_NOTES_LENGTH}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Indicaciones para la cuadrilla"
+                  className="min-h-16 resize-none"
+                />
+              </Field>
+              </CollapsibleContent>
+            </Collapsible>
 
           </form>
         </div>

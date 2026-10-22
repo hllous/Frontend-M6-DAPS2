@@ -45,11 +45,30 @@ describe("ScheduleServiceDialog component", () => {
 
     await catalogsLoaded();
     expect(screen.getByRole("heading", { name: "Programar servicio" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: /Origen del servicio/ })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Tipo de servicio/ })).toHaveAttribute("data-slot", "select-trigger");
     expect(screen.getByText("Recorrido", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Recorrido asignado/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Programar servicio" })).toBeInTheDocument();
+  });
+
+  it("keeps origin and notes inside a collapsed 'Más datos' disclosure", async () => {
+    const user = userEvent.setup();
+    render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+    await catalogsLoaded();
+
+    const trigger = screen.getByRole("button", { name: "Más datos" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveAttribute("data-slot", "collapsible-trigger");
+    expect(screen.queryByRole("combobox", { name: /Origen del servicio/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Notas/)).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /Tipo de servicio/ })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Fecha programada/)).toBeInTheDocument();
+
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("combobox", { name: /Origen del servicio/ })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Notas/)).toBeInTheDocument();
   });
 
   it("defaults to today in Argentina, shown as dd/mm/aaaa, and disables earlier days", async () => {

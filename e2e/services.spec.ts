@@ -369,7 +369,8 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     // Verify derived mode indication is present
     await expect(dialog.getByText("Recorrido", { exact: true }).first()).toBeVisible();
 
-    // Enter notes
+    // Enter notes (inside the "Más datos" disclosure)
+    await dialog.getByRole("button", { name: "Más datos" }).click();
     const notesInput = dialog.getByLabel(/^Notas/i);
     await notesInput.fill("Prueba E2E servicio no asignado");
 
