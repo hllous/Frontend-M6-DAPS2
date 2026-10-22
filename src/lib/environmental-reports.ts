@@ -4,7 +4,7 @@ import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_NOTES_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
-import { tolerantRecords } from "./tolerant-records";
+import { droppedRecords, tolerantRecords } from "./tolerant-records";
 
 export const environmentalReportTypeSchema = z.enum([
   "NOISE",
@@ -377,6 +377,8 @@ export type EnvironmentalReportQuery = {
 
 export type EnvironmentalReportsPage = {
   environmentalReports: EnvironmentalReport[];
+  /** Records of this page dropped for an unknown enum value (not the same as `total` exceeding the rows shown). */
+  dropped?: number;
   page: number;
   pageSize: number;
   total: number;
@@ -544,12 +546,14 @@ export const environmentalReportsAdapter = {
     const payload = await requestJson(`/api/environmental-reports${queryString(query)}`);
     const parsed = z.object({
       data: tolerantRecords(environmentalReportSchema, "environmental-reports"),
-      meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
+      // `meta.dropped`: what the Field BFF already dropped while scoping to the crew.
+      meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number(), dropped: z.number().int().nonnegative().optional() }),
       sanctionOutcomeIntegrationExceptions: z.array(sanctionOutcomeIntegrationExceptionSchema).optional(),
     }).safeParse(payload);
     if (!parsed.success) throw new EnvironmentalReportContractError("La lista de expedientes no respeta el contrato esperado.", { cause: parsed.error });
     return {
       environmentalReports: parsed.data.data,
+      dropped: droppedRecords(parsed.data.data) + (parsed.data.meta.dropped ?? 0),
       page: parsed.data.meta.page,
       pageSize: parsed.data.meta.pageSize,
       total: parsed.data.meta.total,

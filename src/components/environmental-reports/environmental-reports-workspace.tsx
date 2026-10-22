@@ -25,6 +25,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -87,7 +88,7 @@ import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; reports: EnvironmentalReport[]; total: number; totalPages: number; sanctionOutcomeIntegrationExceptions: SanctionOutcomeIntegrationException[] };
+  | { status: "ready"; reports: EnvironmentalReport[]; dropped: number; total: number; totalPages: number; sanctionOutcomeIntegrationExceptions: SanctionOutcomeIntegrationException[] };
 
 type Action = "start-review" | "forward" | "dismiss" | "close";
 
@@ -256,6 +257,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
     });
     return {
       reports: page.environmentalReports.filter((report) => visibleToScenario(report, scenario)),
+      dropped: page.dropped ?? 0,
       total: page.total,
       totalPages: page.totalPages,
       sanctionOutcomeIntegrationExceptions: page.sanctionOutcomeIntegrationExceptions,
@@ -345,6 +347,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
         <div role="status" className="sr-only">{announcement}</div>
         {scenario.actor.kind === "OFFICE" && <QueueFilters from={filterFrom} to={filterTo} rangeError={rangeError} onFrom={(value) => { setFilterFrom(value); setQueuePage(1); }} onTo={(value) => { setFilterTo(value); setQueuePage(1); }} onClearDates={() => { setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} filterStatus={filterStatus} filterType={filterType} filterPriority={filterPriority} search={search} onStatus={(value) => { setFilterStatus(value); setQueuePage(1); }} onType={(value) => { setFilterType(value); setQueuePage(1); }} onPriority={(value) => { setFilterPriority(value); setQueuePage(1); }} onSearch={(value) => { setSearch(value); setQueuePage(1); }} />}
         {loadState.status === "ready" && scenario.actor.kind === "OFFICE" && loadState.sanctionOutcomeIntegrationExceptions.length > 0 && <SanctionOutcomeIntegrationExceptionsPanel exceptions={loadState.sanctionOutcomeIntegrationExceptions} />}
+        {!rangeError && loadState.status === "ready" && <DroppedRecordsAlert count={loadState.dropped} />}
         {!rangeError && loadState.status === "loading" && <LoadingState />}
         {!rangeError && loadState.status === "error" && <ErrorState message={loadState.message} onRetry={loadReports} />}
         {!rangeError && loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={filterStatus.length > 0 || Boolean(filterType || filterPriority || search || filterFrom || filterTo)} onClear={() => { setFilterStatus([]); setFilterType(""); setFilterPriority(""); setSearch(""); setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}

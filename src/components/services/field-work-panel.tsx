@@ -23,6 +23,7 @@ import {
 } from "@/lib/field-drafts";
 import styles from "@/components/shell/app-shell.module.css";
 import { DraftConflictDialog } from "./draft-conflict-view";
+import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
 import { ServiceDetail } from "./service-detail";
 import { StatusBadge } from "./status-badge";
 import { SuspendServiceDialog } from "./suspend-service-dialog";
@@ -41,6 +42,7 @@ export function FieldWorkPanel({
   );
   const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [dropped, setDropped] = useState(0);
   const [startingId, setStartingId] = useState<string | null>(null);
   const [startErrors, setStartErrors] = useState<Record<string, string>>({});
   const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
@@ -64,6 +66,7 @@ export function FieldWorkPanel({
         const page = await servicesAdapter.list({ crewId, pageSize: 50 });
         if (isCurrent) {
           setServices(page.services);
+          setDropped(page.dropped ?? 0);
           setLoadError(null);
         }
       } catch {
@@ -270,6 +273,8 @@ export function FieldWorkPanel({
           {loadError}
         </div>
       )}
+
+      <DroppedRecordsAlert count={dropped} />
 
       {services.length === 0 && !loadError ? (
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-center text-sm text-[var(--color-text-secondary)]">
