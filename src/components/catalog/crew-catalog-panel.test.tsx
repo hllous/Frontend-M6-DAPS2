@@ -86,6 +86,17 @@ describe("CrewCatalogPanel", () => {
     expect(within(members).queryByText("Pedro Ruiz")).not.toBeInTheDocument();
   });
 
+  it("reserves the scrollbar gutter on the detail body so adding a member does not shift the layout", async () => {
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /Cuadrilla E - Membresia/ });
+    await user.click(within(row).getByRole("button", { name: "Ver detalle de Cuadrilla E - Membresia" }));
+
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    const body = within(sheet).getByRole("list", { name: "Integrantes de la cuadrilla" }).closest("div.overflow-y-auto");
+    expect(body).toHaveClass("[scrollbar-gutter:stable]");
+  });
+
   it("searches available crew members and exposes the selected count and checked option", async () => {
     const user = userEvent.setup();
     render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);

@@ -569,7 +569,7 @@ export function CrewCatalogPanel({
                 Office puede administrarlas desde este sub-recurso.
               </SheetDescription>
             </SheetHeader>
-            <div className="grid min-h-0 gap-4 overflow-y-auto px-4 pt-4">
+            <div className="grid min-h-0 gap-4 overflow-y-auto px-4 pt-4 [scrollbar-gutter:stable]">
               <section aria-labelledby="crew-detail-name">
                 <h3 id="crew-detail-name" className="font-semibold">
                   {selected.name}
