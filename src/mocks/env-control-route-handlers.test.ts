@@ -60,6 +60,16 @@ describe("environmental control handlers delegate to the real BFF routes", () =>
     expect(second.data.map((report: { id: string }) => report.id)).toEqual(["ER-1003"]);
   });
 
+  it("filters by several statuses as OR before pagination", async () => {
+    const first = await call("GET", "/api/environmental-reports?status=RECEIVED&status=UNDER_REVIEW&pageSize=2", officeCookie);
+    const payload = await first.json();
+    expect(payload.data.map((report: { id: string }) => report.id)).toEqual(["ER-1001", "ER-1002"]);
+    expect(payload.meta).toMatchObject({ total: 3, pageSize: 2, totalPages: 2 });
+
+    const second = await call("GET", "/api/environmental-reports?status=RECEIVED&status=UNDER_REVIEW&pageSize=2&page=2", officeCookie);
+    expect((await second.json()).data.map((report: { id: string }) => report.id)).toEqual(["ER-1013"]);
+  });
+
   it("lists reports for Office with the M4 integration exceptions, and not for a crew session", async () => {
     ingestSanctionOutcomeFixture({
       violationNoticeId: "NOTICE-UNKNOWN",

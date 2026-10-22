@@ -341,7 +341,8 @@ export function filterEnvironmentalReportFixtures(query: EnvironmentalReportQuer
     const day = argentinaDay(report.updatedAt);
     if (query.from && (!day || day < query.from)) return false;
     if (query.to && (!day || day > query.to)) return false;
-    if (query.status && report.status !== query.status) return false;
+    const statuses = Array.isArray(query.status) ? query.status : query.status ? [query.status] : [];
+    if (statuses.length > 0 && !statuses.includes(report.status)) return false;
     if (query.reportType && report.reportType !== query.reportType) return false;
     if (query.priority && report.priority !== query.priority) return false;
     if (query.publicId && report.publicId !== query.publicId) return false;

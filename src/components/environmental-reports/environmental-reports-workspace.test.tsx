@@ -54,6 +54,109 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); re
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
+  it("bounds the Estado options within a vertically scrollable listbox", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+
+    await user.click(screen.getByRole("combobox", { name: "Estado" }));
+    const listbox = await screen.findByRole("listbox");
+    const content = listbox.parentElement;
+
+    expect(content).toHaveAttribute("data-slot", "select-content");
+    expect(content).toHaveClass("max-h-[min(24rem,calc(var(--available-height)-5rem))]");
+    expect(content).toHaveClass("overflow-y-auto");
+  });
+
+  it("keeps subsection bulk actions out of the Estado options", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    const trigger = screen.getByRole("combobox", { name: "Estado" });
+    expect(trigger).toHaveTextContent("Todos los estados");
+
+    await user.click(trigger);
+    const listbox = await screen.findByRole("listbox");
+    expect(within(listbox).queryAllByRole("option", { name: /Seleccionar todos en|Limpiar subsección de/ })).toHaveLength(0);
+    expect(within(listbox).getByRole("option", { name: "Todos los estados" })).toBeVisible();
+    expect(within(listbox).getByRole("option", { name: "Recibido" })).toBeVisible();
+    expect(within(listbox).getByRole("option", { name: "En revisión" })).toBeVisible();
+
+    await user.click(within(listbox).getByRole("option", { name: "Recibido" }));
+    await user.click(within(listbox).getByRole("option", { name: "Derivado" }));
+    await user.click(within(listbox).getByRole("option", { name: "Desestimado" }));
+    expect(trigger).toHaveTextContent("3 estados");
+    await user.click(within(listbox).getByRole("option", { name: "Todos los estados" }));
+    expect(trigger).toHaveTextContent("Todos los estados");
+    expect(new URLSearchParams(window.location.search).getAll("status")).toEqual([]);
+  });
+
+  it("keeps subsection titles sticky within the Estado list", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+
+    await user.click(screen.getByRole("combobox", { name: "Estado" }));
+    const listbox = await screen.findByRole("listbox");
+    const group = await screen.findByRole("group", { name: "Ingreso y revisión" });
+    const title = within(group).getByText("Ingreso y revisión");
+    expect(title).toHaveClass("sticky", "top-10", "bg-popover", "px-0");
+    expect(within(listbox).getByRole("option", { name: "Todos los estados" })).toHaveClass("pl-2");
+    expect(group).toHaveClass("mx-0", "pl-2", "before:hidden");
+    expect(within(group).getByRole("option", { name: "Recibido" })).toHaveClass("pl-5", "before:absolute", "before:inset-y-0");
+  });
+
+  it("toggles a status from the keyboard and exposes its selected state", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    const trigger = screen.getByRole("combobox", { name: "Estado" });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    const listbox = await screen.findByRole("listbox");
+    await user.keyboard("r{Enter}");
+
+    expect(within(listbox).getByRole("option", { name: "Recibido" })).toHaveAttribute("aria-selected", "true");
+    expect(trigger).toHaveTextContent("Recibido");
+    expect(new URLSearchParams(window.location.search).getAll("status")).toEqual(["RECEIVED"]);
+  });
+
+  it("restores repeated statuses, drops unknown values, and resets the page after a change", async () => {
+    window.history.replaceState(null, "", "/app?destination=environment&page=2&priority=HIGH&status=RECEIVED&status=UNDER_REVIEW&status=UNKNOWN");
+    const requests: URLSearchParams[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (new URL(request.url).pathname === "/api/environmental-reports") requests.push(new URL(request.url).searchParams);
+    });
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Filtros de la cola" });
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0].getAll("status")).toEqual(["RECEIVED", "UNDER_REVIEW"]);
+    expect(requests[0].get("page")).toBe("2");
+    expect(requests[0].get("priority")).toBe("HIGH");
+    await waitFor(() => expect(new URLSearchParams(window.location.search).getAll("status")).toEqual(["RECEIVED", "UNDER_REVIEW"]));
+
+    const trigger = screen.getByRole("combobox", { name: "Estado" });
+    await user.click(trigger);
+    const listbox = await screen.findByRole("listbox");
+    await user.click(within(listbox).getByRole("option", { name: "En revisión" }));
+    await waitFor(() => expect(requests.at(-1)?.get("page")).toBe("1"));
+    expect(new URLSearchParams(window.location.search).getAll("status")).toEqual(["RECEIVED"]);
+    expect(new URLSearchParams(window.location.search).get("priority")).toBe("HIGH");
+    expect(new URLSearchParams(window.location.search).has("page")).toBe(false);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    expect(within(list).getByRole("button", { name: /ER-1001/ })).toBeVisible();
+  });
+
+  it("restores a legacy single status from the URL", async () => {
+    window.history.replaceState(null, "", "/app?destination=environment&status=UNDER_REVIEW");
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    expect(within(list).getByRole("button", { name: /ER-1002/ })).toBeVisible();
+    expect(within(list).getByRole("button", { name: /ER-1013/ })).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Estado" })).toHaveTextContent("En revisión");
+  });
+
   it("restores a date range from the URL and clears it without clearing other filters", async () => {
     window.history.replaceState(null, "", "/app?destination=environment&from=2026-09-04&to=2026-09-05&priority=HIGH");
     const user = userEvent.setup();

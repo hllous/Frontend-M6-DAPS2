@@ -8,6 +8,8 @@ Esta carpeta contiene un espejo de referencia del contrato HTTP y del modelo de 
 
 ## Contenido
 
+**Sincronización parcial (21/10/2026):** se actualizó la fila de `GET /environmental-reports` en [`api/endpoints.md`](api/endpoints.md) desde Backend `develop`, commit `e6153f903bba5af7f576252bad2cb4df2c9a3f12`, tras [Backend PR #357](https://github.com/hllous/Backend-M6-DAPS2/pull/357). El filtro `status` acepta varios valores y el formato canónico usa parámetros repetidos.
+
 - [`api/endpoints.md`](api/endpoints.md): catálogo de rutas, filtros y semántica.
 - [`api/estandar-swagger.md`](api/estandar-swagger.md): formato y convenciones de la API.
 - [`entidades/`](entidades/): recursos y sus estados.
