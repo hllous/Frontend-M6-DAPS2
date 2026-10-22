@@ -46,7 +46,7 @@ function RequestInformationForm({ reportId, onOpenChange, onConfirm }: Pick<Requ
     event.preventDefault();
     if (!message.trim()) {
       setMessageInvalid(true);
-      setErrorMessage("Debe indicar qué información se le pide al vecino.");
+      setErrorMessage("Indique qué información pide.");
       return;
     }
     setSubmitting(true);
@@ -66,7 +66,7 @@ function RequestInformationForm({ reportId, onOpenChange, onConfirm }: Pick<Requ
     <>
       <DialogHeader>
         <DialogTitle>Pedir información al vecino</DialogTitle>
-        <DialogDescription>El pedido le llega al vecino a través de M2 y el expediente sigue en revisión hasta que responda. Expediente {reportId}.</DialogDescription>
+        <DialogDescription>El expediente sigue en revisión hasta que responda. Expediente {reportId}.</DialogDescription>
       </DialogHeader>
       <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4 py-2">
         {errorMessage && (
@@ -76,7 +76,7 @@ function RequestInformationForm({ reportId, onOpenChange, onConfirm }: Pick<Requ
           </Alert>
         )}
         <Field>
-          <FieldLabel htmlFor={`${formId}-message`}>Qué se le pide al vecino <span aria-hidden="true">*</span></FieldLabel>
+          <FieldLabel htmlFor={`${formId}-message`}>Qué información necesita <span aria-hidden="true">*</span></FieldLabel>
           <Textarea
             id={`${formId}-message`}
             rows={3}
@@ -93,10 +93,10 @@ function RequestInformationForm({ reportId, onOpenChange, onConfirm }: Pick<Requ
         <Field>
           <FieldLabel htmlFor={`${formId}-required-by`}>Fecha sugerida para responder</FieldLabel>
           <DatePicker id={`${formId}-required-by`} value={requiredBy} onChange={setRequiredBy} min={format(new Date(), "yyyy-MM-dd")} disabled={submitting} aria-describedby={`${formId}-required-by-help`} />
-          <FieldDescription id={`${formId}-required-by-help`}>Opcional. Es una fecha sugerida: M2 fija el vencimiento efectivo. Si vence sin respuesta, M2 cancela el reclamo y el expediente se desestima.</FieldDescription>
+          <FieldDescription id={`${formId}-required-by-help`}>Opcional. Si vence sin respuesta, el expediente se desestima.</FieldDescription>
         </Field>
         <Field>
-          <FieldLabel htmlFor={`${formId}-note`}>Nota interna</FieldLabel>
+          <FieldLabel htmlFor={`${formId}-note`}>Nota interna (el vecino no la ve)</FieldLabel>
           <Textarea
             id={`${formId}-note`}
             rows={2}
@@ -106,11 +106,10 @@ function RequestInformationForm({ reportId, onOpenChange, onConfirm }: Pick<Requ
             onChange={(event) => setInternalNote(event.target.value)}
             className="resize-y"
           />
-          <FieldDescription>Opcional. Para el equipo: el vecino no la ve.</FieldDescription>
         </Field>
       </form>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Volver al expediente</Button>
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button>
         <Button type="submit" form={formId} disabled={submitting} className="gap-2">
           {submitting && <Spinner data-icon="inline-start" aria-hidden />}
           {submitting ? "Enviando…" : "Pedir información"}

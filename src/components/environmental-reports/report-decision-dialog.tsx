@@ -16,13 +16,13 @@ export type ReportDecision = "forward" | "dismiss";
 const COPY: Record<ReportDecision, { title: string; description: string; submit: string; submitting: string }> = {
   forward: {
     title: "Derivar expediente",
-    description: "Indique por qué corresponde derivar este expediente. El motivo queda registrado en el historial.",
+    description: "Indique el motivo. Queda en el historial.",
     submit: "Derivar expediente",
     submitting: "Derivando…",
   },
   dismiss: {
     title: "Desestimar expediente",
-    description: "Indique por qué se desestima este expediente. El motivo queda registrado en el historial.",
+    description: "Indique el motivo. Queda en el historial.",
     submit: "Desestimar expediente",
     submitting: "Desestimando…",
   },
@@ -59,7 +59,7 @@ function ReportDecisionForm({ decision, reportId, onOpenChange, onConfirm }: { d
     event.preventDefault();
     if (!reason.trim()) {
       setReasonInvalid(true);
-      setErrorMessage("Debe indicar el motivo.");
+      setErrorMessage("Indique el motivo.");
       return;
     }
     setSubmitting(true);
@@ -101,7 +101,7 @@ function ReportDecisionForm({ decision, reportId, onOpenChange, onConfirm }: { d
         </Field>
       </form>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Volver al expediente</Button>
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button>
         <Button type="submit" form={formId} disabled={submitting} className="gap-2">
           {submitting && <Spinner data-icon="inline-start" aria-hidden />}
           {submitting ? copy.submitting : copy.submit}
