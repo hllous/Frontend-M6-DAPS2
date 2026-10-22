@@ -536,12 +536,9 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     // Crew Member sees no state-changing start buttons
     await expect(page.getByRole("button", { name: "Iniciar servicio" })).toHaveCount(0);
     await expect(page.getByText("Solo consulta").first()).toBeVisible();
-    await expect(
-      page.getByText("La persona responsable de la cuadrilla registra los cambios de estado del servicio."),
-    ).toBeVisible();
 
     // Crew Member can open detail view for assigned service
-    const firstDetailButton = page.getByRole("button", { name: "Ver detalle" }).first();
+    const firstDetailButton = page.getByRole("button", { name: "Abrir" }).first();
     await firstDetailButton.click();
 
     // Detail view is open and read-only
@@ -551,7 +548,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(page.getByRole("button", { name: /asignar cuadrilla/i })).toHaveCount(0);
 
     // Can return back to assigned services list
-    await page.getByRole("button", { name: "Volver a Servicios asignados" }).click();
+    await page.getByRole("button", { name: "Volver" }).click();
     await expect(page.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
   });
 
@@ -568,7 +565,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(page.getByText("Reparación de contenedor CT-0112")).toBeVisible();
 
     // Out of window warning is rendered (08:00 - 12:00 window)
-    await expect(page.getByText(/Inicio fuera de ventana horaria/i).first()).toBeVisible();
+    await expect(page.getByText(/Fuera del horario/i).first()).toBeVisible();
 
     // 2. Reject starting service missing a required vehicle (SVC-1054)
     const card1054 = page.locator('li[data-service-id="SVC-1054"]');
@@ -589,7 +586,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(card1096.getByText("En curso")).toBeVisible();
 
     // 4. Open detail view and verify IN_PROGRESS reflection
-    await card1096.getByRole("button", { name: "Ver detalle" }).click();
+    await card1096.getByRole("button", { name: "Abrir" }).click();
 
     await expect(page.getByRole("region", { name: /Detalle completo de/ })).toBeVisible();
     // In detail view, StatusBadge shows "En curso"
@@ -631,12 +628,12 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(card1055.getByText("En curso")).toBeVisible();
 
     // 2. Open detail view
-    await card1055.getByRole("button", { name: "Ver detalle" }).click();
+    await card1055.getByRole("button", { name: "Abrir" }).click();
     const detailRegion = page.getByRole("region", { name: /Detalle completo de/ });
     await expect(detailRegion).toBeVisible();
 
     // Zone execution panel is rendered
-    const zonePanel = page.getByRole("region", { name: "Registro de ejecución de zonas" });
+    const zonePanel = page.getByRole("region", { name: "Zonas" });
     await expect(zonePanel).toBeVisible();
 
     // Completion button is initially disabled because 0/2 zones are recorded
@@ -645,7 +642,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(zonePanel.getByText("Pendiente: 2 de 2 zona(s)")).toBeVisible();
 
     // 3. Desktop multi-zone navigation: record ROUTE zones in ANY order (record Zona Norte first!)
-    const navAside = zonePanel.getByRole("complementary", { name: "Navegación de zonas del servicio" });
+    const navAside = zonePanel.getByRole("complementary", { name: "Zonas" });
     await expect(navAside).toBeVisible();
 
     // Click Zona Norte in sidebar
@@ -656,7 +653,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await notesInput.fill("Barrido completado en calzada norte sin novedades.");
 
     // Submit zone result
-    await zonePanel.getByRole("button", { name: "Guardar resultado de zona" }).click();
+    await zonePanel.getByRole("button", { name: "Guardar zona" }).click();
 
     // Zona Norte is recorded as Atendida
     await expect(navAside.getByRole("listitem").filter({ hasText: "Zona Norte" }).getByText("Atendida")).toBeVisible();
@@ -671,9 +668,9 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await chooseFieldRadio(zonePanel, "Parcial");
 
     // Select required exception reason
-    const reasonCombobox = zonePanel.getByRole("combobox", { name: /Motivo de la excepción/ });
+    const reasonCombobox = zonePanel.getByRole("combobox", { name: /^Motivo/ });
     await expect(reasonCombobox).toBeVisible();
-    await chooseFieldOption(zonePanel, /Motivo de la excepción/, "Acceso bloqueado");
+    await chooseFieldOption(zonePanel, /^Motivo/, "Acceso bloqueado");
 
     // Add operational notes
     await notesInput.fill("Corte total por obras de repavimentación en Bulevar.");
@@ -690,20 +687,20 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(zonePanel.getByText("Foto Corte Repavimentacion (Obra).jpg")).toBeVisible();
 
     // Submit zone result
-    await zonePanel.getByRole("button", { name: "Guardar resultado de zona" }).click();
+    await zonePanel.getByRole("button", { name: "Guardar zona" }).click();
 
     // Evidence file switches to Backend's sanitized canonical filename
     await expect(zonePanel.getByText("foto_corte_repavimentacion_obra.jpg")).toBeVisible();
 
     // Both zones are now recorded
-    await expect(zonePanel.getByText("Todas las zonas registradas. Listo para finalizar.")).toBeVisible();
+    await expect(zonePanel.getByText("Falta solo completar el servicio.")).toBeVisible();
     await expect(completeButton).toBeEnabled();
 
     // 5. Invoke completion action (sent with no body) and verify Backend-computed PARTIALLY_COMPLETED
     await completeButton.click();
 
     // Backend-computed status is rendered as-is (Parcial)
-    await expect(zonePanel.getByText(/Servicio finalizado con estado: Parcial \(PARTIALLY_COMPLETED\)/i)).toBeVisible();
+    await expect(zonePanel.getByText(/Servicio parcial/i)).toBeVisible();
     // Header badge updates to Parcial
     await expect(detailRegion.getByText("Parcial").first()).toBeVisible();
 
@@ -716,7 +713,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     // Click to open mobile navigation
     await mobileToggle.click();
     await expect(mobileToggle).toHaveAttribute("aria-expanded", "true");
-    const mobileNavList = zonePanel.getByRole("list", { name: "Navegación de zonas del servicio" });
+    const mobileNavList = zonePanel.getByRole("list", { name: "Zonas" });
     await expect(mobileNavList).toBeVisible();
 
     // Click again to close and verify focus returns to mobileToggle
@@ -755,7 +752,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await expect(card1080.getByText("En curso")).toBeVisible();
 
     // 2. Open detail view and suspend it
-    await card1080.getByRole("button", { name: "Ver detalle" }).click();
+    await card1080.getByRole("button", { name: "Abrir" }).click();
     const detailRegion = page.getByRole("region", { name: /Detalle completo de/ });
     await expect(detailRegion).toBeVisible();
 
@@ -807,7 +804,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
 
     // Whatever status SVC-1080 is in, a Crew Member never gets state-changing controls in its detail view.
     const card1080 = page.locator('li[data-service-id="SVC-1080"]');
-    await card1080.getByRole("button", { name: "Ver detalle" }).click();
+    await card1080.getByRole("button", { name: "Abrir" }).click();
 
     const detailRegion = page.getByRole("region", { name: /Detalle completo de/ });
     await expect(detailRegion).toBeVisible();
@@ -853,7 +850,7 @@ test.describe("Office two-step Service reschedule flow @smoke", () => {
     await page.goto("/app");
 
     const card1050 = page.locator('li[data-service-id="SVC-1050"]');
-    await card1050.getByRole("button", { name: "Ver detalle" }).click();
+    await card1050.getByRole("button", { name: "Abrir" }).click();
 
     await expect(page.getByRole("button", { name: "Reprogramar" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Confirmar nueva fecha" })).toHaveCount(0);
@@ -967,7 +964,7 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await page.goto("/app");
 
     const card = page.locator('li[data-service-id="SVC-1094"]');
-    await card.getByRole("button", { name: "Ver detalle" }).click();
+    await card.getByRole("button", { name: "Abrir" }).click();
     const detailRegion = page.getByRole("region", { name: /Detalle completo de/ });
     await expect(detailRegion).toBeVisible();
 
@@ -981,8 +978,8 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await page.route("**/api/services/*/suspend", (route) => route.abort("failed"));
     await dialog.getByRole("button", { name: "Suspender servicio" }).click();
 
-    await expect(dialog.getByRole("status")).toContainText(/borrador local pendiente/i);
-    await expect(dialog.getByRole("button", { name: "Reintentar envío" })).toBeVisible();
+    await expect(dialog.getByRole("status")).toContainText(/Sin conexión\. Se guardó en este dispositivo/i);
+    await expect(dialog.getByRole("button", { name: "Reenviar" })).toBeVisible();
 
     // Close and reload: the draft is kept on-device (localStorage), not in memory only
     await dialog.getByRole("button", { name: "Cancelar" }).click();
@@ -990,7 +987,7 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await page.reload();
 
     const cardAfterReload = page.locator('li[data-service-id="SVC-1094"]');
-    await cardAfterReload.getByRole("button", { name: "Ver detalle" }).click();
+    await cardAfterReload.getByRole("button", { name: "Abrir" }).click();
     await detailRegion.getByRole("button", { name: "Suspender servicio" }).click();
     const reopenedDialog = page.getByRole("dialog");
     await expect(reopenedDialog).toBeVisible();
@@ -998,7 +995,7 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await expect(reopenedDialog.getByLabel(/^Nota/i)).toHaveValue(
       "El camión no arranca, se solicitó grúa.",
     );
-    await expect(reopenedDialog.getByRole("status")).toContainText(/borrador local pendiente/i);
+    await expect(reopenedDialog.getByRole("status")).toContainText(/Sin conexión\. Se guardó en este dispositivo/i);
 
     // Out-of-band server-side change while the draft was pending: a second device (its own
     // browser context — separate localStorage from the first tab's pending draft) successfully
@@ -1008,7 +1005,7 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await loginViaApi(secondTab, "field-crew-leader-route");
     await secondTab.goto("/app");
     const secondCard = secondTab.locator('li[data-service-id="SVC-1094"]');
-    await secondCard.getByRole("button", { name: "Ver detalle" }).click();
+    await secondCard.getByRole("button", { name: "Abrir" }).click();
     const secondDetailRegion = secondTab.getByRole("region", { name: /Detalle completo de/ });
     await secondDetailRegion.getByRole("button", { name: "Suspender servicio" }).click();
     const secondDialog = secondTab.getByRole("dialog");
@@ -1021,16 +1018,16 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
 
     // Manual resubmission fetches current state first — a mismatch is an explicit conflict,
     // comparing the stale "En curso" the draft was composed against with the current "Suspendido"
-    await reopenedDialog.getByRole("button", { name: "Reintentar envío" }).click();
-    await expect(reopenedDialog.getByText(/cambió mientras/i)).toBeVisible();
-    const comparisonTable = reopenedDialog.getByRole("table", { name: /comparación de versiones/i });
+    await reopenedDialog.getByRole("button", { name: "Reenviar" }).click();
+    await expect(reopenedDialog.getByText(/Compare y elija qué hacer con lo que cargó/i)).toBeVisible();
+    const comparisonTable = reopenedDialog.getByRole("table", { name: /^comparación$/i });
     await expect(comparisonTable.getByText("En curso")).toBeVisible();
     await expect(comparisonTable.getByText("Suspendido")).toBeVisible();
 
     // Preserving keeps the draft pending on-device for a later retry — the dialog returns
     // to the form view (still showing the pending-draft banner), never applying the draft
-    await reopenedDialog.getByRole("button", { name: "Conservar borrador" }).click();
-    await expect(reopenedDialog.getByRole("status")).toContainText(/borrador local pendiente/i);
+    await reopenedDialog.getByRole("button", { name: "Conservar para después" }).click();
+    await expect(reopenedDialog.getByRole("status")).toContainText(/Sin conexión\. Se guardó en este dispositivo/i);
     await expect(reopenedDialog.getByLabel(/^Nota/i)).toHaveValue(
       "El camión no arranca, se solicitó grúa.",
     );
@@ -1048,8 +1045,8 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await page.route("**/api/services/*/start", (route) => route.abort("failed"));
     await card.getByRole("button", { name: "Iniciar servicio" }).click();
 
-    await expect(card.getByText(/Borrador local pendiente de envío/i)).toBeVisible();
-    const retryButton = card.getByRole("button", { name: "Reintentar envío" });
+    await expect(card.getByText(/Sin enviar \(sin conexión\)/i)).toBeVisible();
+    const retryButton = card.getByRole("button", { name: "Reenviar" });
     await expect(retryButton).toBeVisible();
 
     // Reconnects: the Service did not change server-side, so the draft resubmits normally
@@ -1057,6 +1054,6 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await retryButton.click();
 
     await expect(card.getByText("En curso")).toBeVisible();
-    await expect(card.getByText(/Borrador local pendiente de envío/i)).toHaveCount(0);
+    await expect(card.getByText(/Sin enviar \(sin conexión\)/i)).toHaveCount(0);
   });
 });

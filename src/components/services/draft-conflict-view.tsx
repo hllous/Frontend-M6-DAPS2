@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -18,15 +17,11 @@ function formatWindow(from: string | null | undefined, to: string | null | undef
 }
 
 export function DraftConflictView({
-  serviceId,
-  actionLabel,
   composedAgainst,
   current,
   onPreserve,
   onDiscard,
 }: {
-  serviceId: string;
-  actionLabel: string;
   composedAgainst: FieldDraftServiceSnapshot;
   current: Service;
   onPreserve: () => void;
@@ -67,20 +62,12 @@ export function DraftConflictView({
         className="flex items-start gap-2.5 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-3 text-xs text-[var(--color-warning)]"
       >
         <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-        <div>
-          <p className="font-bold">
-            El servicio {serviceId} cambió mientras su borrador de {actionLabel} estaba sin enviar.
-          </p>
-          <p className="mt-1">
-            Compare ambas versiones antes de decidir si conserva el borrador local para reintentar
-            más tarde o lo descarta. Nunca se aplica automáticamente.
-          </p>
-        </div>
+        <p className="font-bold">Compare y elija qué hacer con lo que cargó.</p>
       </div>
 
       <div
         role="table"
-        aria-label="Comparación de versiones del servicio"
+        aria-label="Comparación"
         className="rounded-xl border border-[var(--color-border)] overflow-hidden text-xs"
       >
         <div
@@ -88,8 +75,8 @@ export function DraftConflictView({
           className="grid grid-cols-3 gap-2 bg-[var(--color-canvas)] font-bold text-[var(--color-text-secondary)] uppercase tracking-wide px-3 py-2"
         >
           <span>Campo</span>
-          <span>Su borrador</span>
-          <span>Versión actual del servidor</span>
+          <span>Lo que cargó</span>
+          <span>Estado actual</span>
         </div>
         {rows.map((row) => (
           <div
@@ -120,10 +107,10 @@ export function DraftConflictView({
           onClick={onDiscard}
           className="text-xs font-semibold text-[var(--color-danger)] border-[var(--color-danger-line)] hover:bg-[var(--color-danger-fill)]/40"
         >
-          Descartar borrador
+          Descartar lo cargado
         </Button>
         <Button type="button" variant="default" size="sm" onClick={onPreserve} className="text-xs font-semibold">
-          Conservar borrador
+          Conservar para después
         </Button>
       </div>
     </div>
@@ -133,8 +120,6 @@ export function DraftConflictView({
 export function DraftConflictDialog({
   open,
   onOpenChange,
-  serviceId,
-  actionLabel,
   composedAgainst,
   current,
   onPreserve,
@@ -142,8 +127,6 @@ export function DraftConflictDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  serviceId: string;
-  actionLabel: string;
   composedAgainst: FieldDraftServiceSnapshot | null;
   current: Service | null;
   onPreserve: () => void;
@@ -155,14 +138,9 @@ export function DraftConflictDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg border-[var(--color-border)] bg-[var(--color-surface)]">
         <DialogHeader>
-          <DialogTitle>Conflicto de sincronización</DialogTitle>
-          <DialogDescription>
-            No se aplicó el borrador local automáticamente.
-          </DialogDescription>
+          <DialogTitle>El servicio cambió</DialogTitle>
         </DialogHeader>
         <DraftConflictView
-          serviceId={serviceId}
-          actionLabel={actionLabel}
           composedAgainst={composedAgainst}
           current={current}
           onPreserve={() => {

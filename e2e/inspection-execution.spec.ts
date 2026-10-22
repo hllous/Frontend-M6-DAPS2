@@ -10,11 +10,11 @@ test.describe.serial("Environmental inspection execution #134", () => {
 
     const serviceCard = page.locator('[data-service-id="SVC-1112"]');
     await expect(serviceCard).toBeVisible();
-    await serviceCard.getByRole("button", { name: "Ver detalle" }).click();
+    await serviceCard.getByRole("button", { name: "Abrir" }).click();
 
-    const inspection = page.getByRole("region", { name: /Ejecuci/ });
+    const inspection = page.getByRole("region", { name: "Inspección ambiental" });
     await expect(inspection).toBeVisible();
-    await expect(inspection.getByText(/La persona responsable de la cuadrilla registra el resultado/)).toBeVisible();
+    await expect(inspection.getByText("Solo consulta")).toBeVisible();
     await expect(inspection.getByRole("button", { name: /Completar inspecci/ })).toHaveCount(0);
   });
 
@@ -26,10 +26,11 @@ test.describe.serial("Environmental inspection execution #134", () => {
     await expect(serviceCard).toBeVisible();
     await serviceCard.getByRole("button", { name: "Iniciar servicio" }).click();
     await expect(serviceCard.getByText("En curso")).toBeVisible();
-    await serviceCard.getByRole("button", { name: "Ver detalle" }).click();
+    await serviceCard.getByRole("button", { name: "Abrir" }).click();
 
-    const inspection = page.getByRole("region", { name: /Ejecuci/ });
+    const inspection = page.getByRole("region", { name: "Inspección ambiental" });
     await expect(inspection).toBeVisible();
+    await expect(inspection.getByRole("checkbox").first()).toBeVisible();
     await inspection.getByRole("checkbox").all().then(async (checkboxes) => {
       for (const checkbox of checkboxes) await checkbox.check();
     });

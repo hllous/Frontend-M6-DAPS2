@@ -19,7 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,9 +52,10 @@ import {
   type FieldDraftServiceSnapshot,
 } from "@/lib/field-drafts";
 import { servicesAdapter, ServiceRequestError, type Service } from "@/lib/services";
+import { OFFLINE_DRAFT_MESSAGE, OfflineDraftNotice } from "./offline-draft-notice";
 import { DraftConflictView } from "./draft-conflict-view";
 import { ZoneExecutionPanel } from "./zone-execution-panel";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type QueuedEvidenceFile = {
   id: string;
@@ -202,11 +203,11 @@ export function InspectionExecutionPanel({
     const accepted: QueuedEvidenceFile[] = [];
     for (const file of Array.from(files)) {
       if (file.size > MAX_EVIDENCE_FILE_SIZE_BYTES) {
-        errors.push(`\"${file.name}\" supera el tamaño máximo permitido de ${EVIDENCE_FILE_SIZE_LABEL}.`);
+        errors.push(`\"${file.name}\" pesa más de ${EVIDENCE_FILE_SIZE_LABEL}.`);
         continue;
       }
       if (!ALLOWED_MIME_TYPES.has(file.type)) {
-        errors.push(`\"${file.name}\" tiene un formato no permitido. Formatos admitidos: JPEG, PNG, WebP o PDF.`);
+        errors.push(`\"${file.name}\" no es una foto ni un PDF.`);
         continue;
       }
       accepted.push({ id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, file, localFilename: file.name, idempotencyKey: randomIdempotencyKey(), status: "pending" });
@@ -225,7 +226,7 @@ export function InspectionExecutionPanel({
       setInspection((current) => current ? { ...current, attachments: [...(current.attachments ?? []).filter((file) => file.id !== attachment.id), attachment] } : current);
       return true;
     } catch (error: unknown) {
-      const message = errorMessage(error, "No se pudo subir el archivo.");
+      const message = errorMessage(error, "No se pudo subir el archivo. Intente nuevamente.");
       setQueuedFiles((current) => current.map((file) => file.id === item.id ? { ...file, status: "error", error: message } : file));
       if (error instanceof NetworkFailureError) throw error;
       return false;
@@ -272,19 +273,19 @@ export function InspectionExecutionPanel({
       if (action.kind === "success") {
         setInspection(action.result);
         setComposedAgainst(null);
-        setSuccessMessage(`Inspección registrada: ${ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS[action.result.outcome ?? "INCONCLUSIVE"]}. Siguiente paso: ${action.result.nextStep ? NEXT_STEP_LABELS[action.result.nextStep] : "pendiente de confirmación"}.`);
+        setSuccessMessage(`Siguiente paso: ${action.result.nextStep ? NEXT_STEP_LABELS[action.result.nextStep] : "pendiente de confirmación"}.`);
         notifySuccess("Inspección completada.");
         const updatedService = await servicesAdapter.get(service.id).catch(() => null);
         if (updatedService) onServiceUpdated?.(updatedService);
       } else if (action.kind === "draft-saved") {
         setComposedAgainst(action.draft.composedAgainst);
-        const message = "No se pudo conectar con el servidor. El resultado quedó guardado como borrador local; reintente el envío cuando recupere la conexión.";
+        const message = OFFLINE_DRAFT_MESSAGE;
         setFormError(message);
         notifyError(message);
       } else if (action.kind === "conflict") {
         setConflict({ current: action.current, composedAgainst: action.composedAgainst });
       } else if (action.kind === "still-offline") {
-        const message = "Seguimos sin conexión. El borrador se conserva en este dispositivo para reintentar el envío más tarde.";
+        const message = OFFLINE_DRAFT_MESSAGE;
         setFormError(message);
         notifyError(message);
       } else {
@@ -312,7 +313,7 @@ export function InspectionExecutionPanel({
   };
 
   if (loadError || !inspectionId) {
-    return <Alert variant="destructive" className="mt-6" role="alert"><AlertTriangle aria-hidden /><AlertTitle>No se pudo cargar la inspección</AlertTitle><AlertDescription>{loadError ?? "El servicio no tiene una inspección ambiental vinculada."}</AlertDescription></Alert>;
+    return <Alert variant="destructive" className="mt-6" role="alert"><AlertTriangle aria-hidden /><AlertTitle>No se pudo cargar la inspección</AlertTitle><AlertDescription>{loadError ?? "Este servicio no tiene inspección."}</AlertDescription></Alert>;
   }
 
   if (!inspection) {
@@ -328,15 +329,15 @@ export function InspectionExecutionPanel({
       <div className="flex flex-col gap-3 border-b border-[var(--color-border)] pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-action)]"><FileCheck aria-hidden />Control ambiental</div>
-          <h2 id={`inspection-execution-heading-${inputId}`} className="mt-1 text-lg font-bold text-[var(--color-text)]">Ejecución de inspección ambiental</h2>
+          <h2 id={`inspection-execution-heading-${inputId}`} className="mt-1 text-lg font-bold text-[var(--color-text)]">Inspección ambiental</h2>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · {formatCalendarDay(service.scheduledDate)} · {service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "—"}</p>
         </div>
         <span className="rounded-lg bg-[var(--color-info-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-info)]">Punto asignado</span>
       </div>
 
       {!canExecute && !completed && (waitingForStart
-        ? <Alert className="mt-4" role="status"><AlertTriangle aria-hidden /><AlertTitle>El servicio todavía no está en curso</AlertTitle><AlertDescription>El resultado y la evidencia de la inspección se registran con el servicio en curso. Inícielo para habilitar el formulario.</AlertDescription></Alert>
-        : <Alert className="mt-4" role="status"><CloudOff aria-hidden /><AlertTitle>Solo consulta</AlertTitle><AlertDescription>La persona responsable de la cuadrilla registra el resultado y la evidencia de esta inspección.</AlertDescription></Alert>
+        ? <Alert className="mt-4" role="status"><AlertTriangle aria-hidden /><AlertTitle>Inicie el servicio para registrar la inspección.</AlertTitle></Alert>
+        : <Alert className="mt-4" role="status"><CloudOff aria-hidden /><AlertTitle>Solo consulta</AlertTitle></Alert>
       )}
 
       {!canExecute && !completed ? (
@@ -345,7 +346,7 @@ export function InspectionExecutionPanel({
         <InspectionResult inspection={inspection} />
       ) : (
         <form className="mt-5 flex flex-col gap-5" onSubmit={handleSubmit}>
-          {hasDraft && <Alert role="status"><CloudOff aria-hidden /><AlertTitle>Borrador local pendiente</AlertTitle><AlertDescription>El resultado se conserva en este dispositivo y requiere un reenvío manual cuando vuelva la conexión.</AlertDescription></Alert>}
+          {hasDraft && <OfflineDraftNotice>Sin enviar. Reenvíe cuando vuelva la conexión.</OfflineDraftNotice>}
 
           <FieldGroup>
             <Field data-invalid={!inspectedAt || undefined}>
@@ -359,7 +360,6 @@ export function InspectionExecutionPanel({
                   invalid={!inspectedAt}
                   aria-required
                   aria-labelledby={`${inputId}-inspected-at-label`}
-                  aria-describedby={`${inputId}-inspected-at-help`}
                 />
                 <TimePicker
                   id={`${inputId}-inspected-at-time`}
@@ -369,15 +369,13 @@ export function InspectionExecutionPanel({
                   invalid={!inspectedAt}
                   required
                   aria-labelledby={`${inputId}-inspected-at-label`}
-                  aria-describedby={`${inputId}-inspected-at-help`}
                 />
               </div>
-              <FieldDescription id={`${inputId}-inspected-at-help`}>Indique cuándo se realizó la visita. Se admite una tolerancia de cinco minutos por diferencias de reloj.</FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor={`${inputId}-outcome`}>Resultado de la inspección <span aria-hidden="true">*</span></FieldLabel>
               <Select value={outcome} onValueChange={(value) => { if (value) setOutcome(environmentalInspectionOutcomeSchema.parse(value)); }} disabled={!canExecute || isSubmitting}>
-                <SelectTrigger id={`${inputId}-outcome`} aria-required aria-describedby={`${inputId}-outcome-help`}>
+                <SelectTrigger id={`${inputId}-outcome`} aria-required>
                   <SelectValue>{ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS[outcome]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -386,12 +384,10 @@ export function InspectionExecutionPanel({
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              <FieldDescription id={`${inputId}-outcome-help`}>Seleccione el resultado que refleja la visita realizada.</FieldDescription>
             </Field>
 
             <FieldSet className="gap-3 rounded-xl border border-[var(--color-border)] p-4" data-invalid={!checklistComplete || undefined}>
               <FieldLegend>Checklist de inspección <span aria-hidden="true">*</span></FieldLegend>
-              <FieldDescription>Marque cada control realizado antes de registrar el resultado.</FieldDescription>
               <FieldGroup>
               {inspectionChecklist(inspection).map((item) => {
                 const checkboxId = `${inputId}-check-${item.id}`;
@@ -409,12 +405,11 @@ export function InspectionExecutionPanel({
             {/* El backend guarda la conclusión con cualquier resultado; sólo es obligatoria sin infracción o inconclusa. */}
             <Field>
               <FieldLabel htmlFor={`${inputId}-conclusion`}>{outcome === "NO_VIOLATION" ? "Conclusión" : outcome === "INCONCLUSIVE" ? "Explicación de la inspección inconclusa" : "Conclusión (opcional)"} {outcome !== "VIOLATION_FOUND" && <span aria-hidden="true">*</span>}</FieldLabel>
-              <Textarea id={`${inputId}-conclusion`} value={conclusion} onChange={(event) => setConclusion(event.target.value)} disabled={!canExecute || isSubmitting} className="min-h-28" aria-describedby={`${inputId}-conclusion-help`} />
-              <FieldDescription id={`${inputId}-conclusion-help`}>{outcome === "INCONCLUSIVE" ? "Explique qué impidió confirmar el resultado." : "Describa brevemente la conclusión de la visita."}</FieldDescription>
+              <Textarea id={`${inputId}-conclusion`} value={conclusion} onChange={(event) => setConclusion(event.target.value)} disabled={!canExecute || isSubmitting} className="min-h-28" />
             </Field>
 
             {outcome === "VIOLATION_FOUND" && <>
-              <Field><FieldLabel>Próximo paso</FieldLabel><p className="rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 py-2 text-sm">{NEXT_STEP_LABELS.NOTICE_TO_BE_ISSUED}</p><FieldDescription>Se informa al backend el paso requerido para continuar el expediente.</FieldDescription></Field>
+              <Field><FieldLabel>Próximo paso</FieldLabel><p className="rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 py-2 text-sm">{NEXT_STEP_LABELS.NOTICE_TO_BE_ISSUED}</p></Field>
               <Field>
                 <FieldLabel htmlFor={`${inputId}-findings`}>Hallazgos <span aria-hidden="true">*</span></FieldLabel>
                 <Textarea id={`${inputId}-findings`} value={findings} onChange={(event) => setFindings(event.target.value)} disabled={!canExecute || isSubmitting} className="min-h-28" />
@@ -460,15 +455,14 @@ export function InspectionExecutionPanel({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <FieldDescription>La decisión final corresponde a Oficina y no se determina en este formulario.</FieldDescription>
               </Field>
             </>}
           </FieldGroup>
 
-          <EvidenceQueue queuedFiles={queuedFiles} fileValidationError={fileValidationError} onFileSelect={handleFileSelect} onRemoveFile={(id) => setQueuedFiles((current) => current.filter((file) => file.id !== id))} onRetryFile={(file) => void uploadSingleFile(file)} disabled={!canExecute || isSubmitting} existingCount={inspection.attachments?.length ?? 0} />
+          <EvidenceQueue queuedFiles={queuedFiles} fileValidationError={fileValidationError} onFileSelect={handleFileSelect} onRemoveFile={(id) => setQueuedFiles((current) => current.filter((file) => file.id !== id))} onRetryFile={(file) => void uploadSingleFile(file)} disabled={!canExecute || isSubmitting} />
 
           {formError && <Alert variant="danger"><AlertTriangle aria-hidden /><AlertDescription id={`${inputId}-form-error`}>{formError}</AlertDescription></Alert>}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end"><Button type="submit" disabled={!canExecute || isSubmitting} className="gap-2"><FileCheck data-icon="inline-start" aria-hidden />{isSubmitting ? "Registrando inspección…" : hasDraft ? "Reintentar envío" : "Completar inspección"}</Button></div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end"><Button type="submit" disabled={!canExecute || isSubmitting} className="gap-2"><FileCheck data-icon="inline-start" aria-hidden />{isSubmitting ? "Registrando inspección…" : hasDraft ? "Reenviar" : "Completar inspección"}</Button></div>
         </form>
       )}
 
@@ -478,8 +472,8 @@ export function InspectionExecutionPanel({
 
       <Dialog open={Boolean(conflict)} onOpenChange={(open) => { if (!open) setConflict(null); }}>
         <DialogContent className="max-w-lg border-[var(--color-border)] bg-[var(--color-surface)]">
-          <DialogHeader><DialogTitle>Conflicto de sincronización</DialogTitle><DialogDescription>No se aplicó el borrador local automáticamente.</DialogDescription></DialogHeader>
-          {conflict && <DraftConflictView serviceId={service.id} actionLabel="completado de inspección" composedAgainst={conflict.composedAgainst} current={conflict.current} onPreserve={() => { setConflict(null); }} onDiscard={() => { discardDraft(); }} />}
+          <DialogHeader><DialogTitle>El servicio cambió</DialogTitle></DialogHeader>
+          {conflict && <DraftConflictView composedAgainst={conflict.composedAgainst} current={conflict.current} onPreserve={() => { setConflict(null); }} onDiscard={() => { discardDraft(); }} />}
         </DialogContent>
       </Dialog>
     </section>
@@ -488,7 +482,7 @@ export function InspectionExecutionPanel({
 
 function InspectionResult({ inspection }: { inspection: EnvironmentalInspection }) {
   const outcome = inspection.outcome ?? "INCONCLUSIVE";
-  return <div className="mt-5 flex flex-col gap-4"><Alert role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Resultado registrado: {ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS[outcome]}</AlertTitle><AlertDescription>El servidor registró la inspección. Siguiente paso: {inspection.nextStep ? NEXT_STEP_LABELS[inspection.nextStep] : "pendiente de confirmación"}.</AlertDescription></Alert><dl className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Checklist</dt><dd className="mt-1 text-[var(--color-text)]">{inspectionChecklist(inspection).length} controles registrados</dd></div>{inspection.conclusion && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Conclusión</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.conclusion}</dd></div>}{inspection.findings && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Hallazgos registrados</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.findings}</dd></div>}{inspection.violationType && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Tipo de infracción</dt><dd className="mt-1 text-[var(--color-text)]">{VIOLATION_TYPE_LABELS[inspection.violationType]}</dd></div>}{inspection.severity && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Gravedad</dt><dd className="mt-1 text-[var(--color-text)]">{SEVERITY_LABELS[inspection.severity]}</dd></div>}{inspection.suggestedAction && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Acción sugerida</dt><dd className="mt-1 text-[var(--color-text)]">{SUGGESTED_ACTION_LABELS[inspection.suggestedAction]}</dd></div>}{inspection.attachments && inspection.attachments.length > 0 && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Evidencia</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.attachments.length} archivo(s) asociado(s)</dd></div>}</dl></div>;
+  return <div className="mt-5 flex flex-col gap-4"><Alert role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Resultado registrado: {ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS[outcome]}</AlertTitle><AlertDescription>Siguiente paso: {inspection.nextStep ? NEXT_STEP_LABELS[inspection.nextStep] : "pendiente de confirmación"}.</AlertDescription></Alert><dl className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Checklist</dt><dd className="mt-1 text-[var(--color-text)]">{inspectionChecklist(inspection).length} controles registrados</dd></div>{inspection.conclusion && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Conclusión</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.conclusion}</dd></div>}{inspection.findings && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Hallazgos registrados</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.findings}</dd></div>}{inspection.violationType && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Tipo de infracción</dt><dd className="mt-1 text-[var(--color-text)]">{VIOLATION_TYPE_LABELS[inspection.violationType]}</dd></div>}{inspection.severity && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Gravedad</dt><dd className="mt-1 text-[var(--color-text)]">{SEVERITY_LABELS[inspection.severity]}</dd></div>}{inspection.suggestedAction && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Acción sugerida</dt><dd className="mt-1 text-[var(--color-text)]">{SUGGESTED_ACTION_LABELS[inspection.suggestedAction]}</dd></div>}{inspection.attachments && inspection.attachments.length > 0 && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Evidencia</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.attachments.length} archivo(s) asociado(s)</dd></div>}</dl></div>;
 }
 
 /**
@@ -500,7 +494,7 @@ function ServiceClosureGuide({ service, canExecute, onServiceUpdated }: { servic
   if (service.status !== "IN_PROGRESS" && service.status !== "COMPLETED" && service.status !== "PARTIALLY_COMPLETED") return null;
   const open = service.status === "IN_PROGRESS";
   return <>
-    <Alert className="mt-4" role="status" aria-label={open ? "El servicio sigue abierto" : "Servicio cerrado"}>{open ? <AlertTriangle aria-hidden /> : <CheckCircle2 aria-hidden />}<AlertTitle>{open ? "El servicio sigue abierto" : "Servicio cerrado"}</AlertTitle><AlertDescription>{open ? `La inspección quedó registrada, pero ${service.id} sigue en curso. ${canExecute ? "Registre el resultado de la zona y complete el servicio para cerrarlo." : "La cuadrilla asignada tiene que registrar el resultado de la zona y completarlo."}` : `${service.id} quedó cerrado con el resultado por zona.`}</AlertDescription></Alert>
+    <Alert className="mt-4" role="status" aria-label={open ? "El servicio sigue abierto" : "Servicio cerrado"}>{open ? <AlertTriangle aria-hidden /> : <CheckCircle2 aria-hidden />}<AlertTitle>{open ? "El servicio sigue abierto" : "Servicio cerrado"}</AlertTitle><AlertDescription>{open ? canExecute ? "Falta registrar la zona y completar el servicio." : "La cuadrilla asignada tiene que registrar la zona y completar el servicio." : `${service.id} quedó cerrado con el resultado por zona.`}</AlertDescription></Alert>
     <ZoneExecutionPanel service={service} canExecute={canExecute} onServiceUpdated={onServiceUpdated} />
   </>;
 }
@@ -509,13 +503,13 @@ function ReadOnlyInspection({ inspection }: { inspection: EnvironmentalInspectio
   return <div className="mt-5 flex flex-col gap-4"><h3 className="text-sm font-bold text-[var(--color-text)]">Checklist asignado</h3><ItemGroup aria-label="Checklist asignado" className="gap-2">{inspectionChecklist(inspection).map((item) => <Item key={item.id} variant="outline" className="min-h-12 flex-nowrap border-[var(--color-border)] bg-[var(--color-canvas)] px-3 text-sm text-[var(--color-text)]"><ItemMedia className="size-3 rounded-full border border-[var(--color-border-strong)]" aria-hidden="true" /><ItemContent><ItemTitle className="text-sm">{item.label}</ItemTitle></ItemContent>{item.required ? <ItemDescription className="w-fit text-xs">(obligatorio)</ItemDescription> : null}</Item>)}</ItemGroup></div>;
 }
 
-function EvidenceQueue({ queuedFiles, fileValidationError, onFileSelect, onRemoveFile, onRetryFile, disabled, existingCount }: { queuedFiles: QueuedEvidenceFile[]; fileValidationError: string | null; onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void; onRemoveFile: (id: string) => void; onRetryFile: (file: QueuedEvidenceFile) => void; disabled: boolean; existingCount: number }) {
+function EvidenceQueue({ queuedFiles, fileValidationError, onFileSelect, onRemoveFile, onRetryFile, disabled }: { queuedFiles: QueuedEvidenceFile[]; fileValidationError: string | null; onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void; onRemoveFile: (id: string) => void; onRetryFile: (file: QueuedEvidenceFile) => void; disabled: boolean }) {
   const inputId = useId();
   return (
     <Card className="rounded-2xl border-[var(--color-border)] bg-[var(--color-surface)] ring-0">
       <CardHeader className="border-b border-[var(--color-border)]">
         <CardTitle className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)]"><Paperclip aria-hidden />Evidencia de la inspección</CardTitle>
-        <CardDescription>{existingCount > 0 ? `${existingCount} archivo(s) ya asociado(s). ` : ""}Puede agregar fotografías o documentos. Se admiten JPEG, PNG, WebP y PDF hasta {EVIDENCE_FILE_SIZE_LABEL} por archivo.</CardDescription>
+        <CardDescription>Fotos o PDF, hasta {EVIDENCE_FILE_SIZE_LABEL} por archivo.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 pt-4">
         <div className="flex flex-wrap items-center gap-3">

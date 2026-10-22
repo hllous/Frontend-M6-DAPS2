@@ -229,7 +229,7 @@ describe("FieldWorkPanel component", () => {
     const user = userEvent.setup();
     render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
 
-    const detailButtons = await screen.findAllByRole("button", { name: "Ver detalle" });
+    const detailButtons = await screen.findAllByRole("button", { name: "Abrir" });
     await user.click(detailButtons[0]);
 
     expect(await screen.findByRole("heading", { name: "Derivaciones" })).toBeVisible();
@@ -261,7 +261,7 @@ describe("FieldWorkPanel component", () => {
 
     render(<FieldWorkPanel scenario={scenario} />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/No se pudieron cargar los servicios de la cuadrilla/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/No se pudieron cargar los servicios/);
     expect(screen.queryByText(/No hay servicios asignados/)).not.toBeInTheDocument();
     expect(requested).toEqual([realCrewId]);
   });
@@ -289,10 +289,10 @@ describe("FieldWorkPanel component", () => {
     // Shows heading and member indicators
     expect(screen.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
-    expect(screen.getByText("La persona responsable de la cuadrilla registra los cambios de estado del servicio.")).toBeVisible();
+    expect(screen.getByText("Solo consulta")).toBeVisible();
 
-    // Click "Ver detalle" on the first service
-    const detailButtons = await screen.findAllByRole("button", { name: "Ver detalle" });
+    // Click "Abrir" on the first service
+    const detailButtons = await screen.findAllByRole("button", { name: "Abrir" });
     await user.click(detailButtons[0]);
 
     // Detail view opens
@@ -304,7 +304,7 @@ describe("FieldWorkPanel component", () => {
     expect(screen.queryByRole("button", { name: /corte de calle/i })).not.toBeInTheDocument();
 
     // Return back to assigned list
-    await user.click(screen.getByRole("button", { name: "Volver a Servicios asignados" }));
+    await user.click(screen.getByRole("button", { name: "Volver" }));
     expect(screen.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
   });
 
@@ -317,7 +317,7 @@ describe("FieldWorkPanel component", () => {
     });
 
     // Window for SVC-1050 is 08:00 - 12:00. If current time is outside, warning appears
-    const warnings = screen.queryAllByText(/Inicio fuera de ventana horaria/i);
+    const warnings = screen.queryAllByText(/Fuera del horario/i);
     expect(warnings.length).toBeGreaterThan(0);
     // Start button remains enabled
     const startButtons = screen.getAllByRole("button", { name: "Iniciar servicio" });
@@ -386,9 +386,9 @@ describe("FieldWorkPanel component", () => {
     await user.click(startButtons[0]);
 
     await waitFor(() => {
-      expect(screen.getByText(/Borrador local pendiente de envío/i)).toBeVisible();
+      expect(screen.getByText(/Sin enviar \(sin conexión\)/i)).toBeVisible();
     });
-    const retryButton = await screen.findByRole("button", { name: "Reintentar envío" });
+    const retryButton = await screen.findByRole("button", { name: "Reenviar" });
 
     await user.click(retryButton);
 
@@ -396,14 +396,14 @@ describe("FieldWorkPanel component", () => {
       expect(screen.getByRole("dialog")).toBeVisible();
     });
     const conflictDialog = screen.getByRole("dialog");
-    expect(within(conflictDialog).getByText(/cambió mientras/i)).toBeVisible();
+    expect(within(conflictDialog).getByText(/El servicio cambió/i)).toBeVisible();
     expect(within(conflictDialog).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
     expect(startAttempts).toBe(1);
 
-    await user.click(within(conflictDialog).getByRole("button", { name: "Descartar borrador" }));
+    await user.click(within(conflictDialog).getByRole("button", { name: "Descartar lo cargado" }));
 
     await waitFor(() => {
-      expect(screen.queryByText(/Borrador local pendiente de envío/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Sin enviar \(sin conexión\)/i)).not.toBeInTheDocument();
     });
     expect(screen.getAllByRole("button", { name: "Iniciar servicio" })[0]).toBeVisible();
   });
@@ -434,7 +434,7 @@ describe("FieldWorkPanel component", () => {
       expect(screen.getByText("Barrido mecánico — Recorrido en curso")).toBeVisible();
     });
 
-    const detailButtons = screen.getAllByRole("button", { name: "Ver detalle" });
+    const detailButtons = screen.getAllByRole("button", { name: "Abrir" });
     // SVC-1060 is the third item rendered
     await user.click(detailButtons[2]);
 
@@ -524,7 +524,7 @@ describe("FieldWorkPanel component", () => {
       expect(screen.getByText("Barrido mecánico — Recorrido en curso")).toBeVisible();
     });
 
-    const detailButtons = screen.getAllByRole("button", { name: "Ver detalle" });
+    const detailButtons = screen.getAllByRole("button", { name: "Abrir" });
     await user.click(detailButtons[2]);
 
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
@@ -536,9 +536,9 @@ describe("FieldWorkPanel component", () => {
 
     // Real network failure: draft saved locally, dialog stays open with a pending-draft banner
     await waitFor(() => {
-      expect(within(dialog).getByRole("status")).toHaveTextContent(/borrador local pendiente/i);
+      expect(within(dialog).getByRole("status")).toHaveTextContent(/Sin conexión\. Se guardó en este dispositivo/i);
     });
-    expect(within(dialog).getByRole("button", { name: "Reintentar envío" })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Reenviar" })).toBeVisible();
 
     // Close and reopen: the draft's fields are restored from the on-device copy
     await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
@@ -550,19 +550,19 @@ describe("FieldWorkPanel component", () => {
       "Desperfecto vehicular",
     );
     expect(within(reopenedDialog).getByLabelText(/^Nota/i)).toHaveValue("El camión no arranca.");
-    expect(within(reopenedDialog).getByRole("status")).toHaveTextContent(/borrador local pendiente/i);
+    expect(within(reopenedDialog).getByRole("status")).toHaveTextContent(/Sin conexión\. Se guardó en este dispositivo/i);
 
     // Manual resubmit: the Service drifted server-side (reassigned) -> explicit conflict, never silently applied
-    await user.click(within(reopenedDialog).getByRole("button", { name: "Reintentar envío" }));
+    await user.click(within(reopenedDialog).getByRole("button", { name: "Reenviar" }));
 
     await waitFor(() => {
-      expect(within(reopenedDialog).getByText(/cambió mientras/i)).toBeVisible();
+      expect(within(reopenedDialog).getByText(/Compare y elija qué hacer con lo que cargó/i)).toBeVisible();
     });
     expect(within(reopenedDialog).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
     expect(suspendAttempts).toBe(1);
 
     // Discard clears the on-device draft and resets the form
-    await user.click(within(reopenedDialog).getByRole("button", { name: "Descartar borrador" }));
+    await user.click(within(reopenedDialog).getByRole("button", { name: "Descartar lo cargado" }));
     await waitFor(() => {
       expect(within(reopenedDialog).queryByRole("status")).not.toBeInTheDocument();
     });
@@ -577,7 +577,7 @@ describe("FieldWorkPanel component", () => {
       expect(screen.getByText("Barrido mecánico — Recorrido en curso")).toBeVisible();
     });
 
-    const detailButtons = screen.getAllByRole("button", { name: "Ver detalle" });
+    const detailButtons = screen.getAllByRole("button", { name: "Abrir" });
     await user.click(detailButtons[2]);
 
     expect(screen.queryByRole("button", { name: "Suspender servicio" })).not.toBeInTheDocument();

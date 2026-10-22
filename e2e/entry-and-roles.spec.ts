@@ -41,8 +41,5 @@ test.describe("Crew Leader versus Crew Member presentation @smoke", () => {
     await expect(page.getByText("Integrante de cuadrilla")).toBeVisible();
     await expect(page.getByRole("button", { name: "Iniciar servicio" })).toHaveCount(0);
     await expect(page.getByText("Solo consulta").first()).toBeVisible();
-    await expect(
-      page.getByText("La persona responsable de la cuadrilla registra los cambios de estado del servicio."),
-    ).toBeVisible();
   });
 });
