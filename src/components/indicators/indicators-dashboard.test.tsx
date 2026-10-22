@@ -182,6 +182,9 @@ describe("IndicatorsDashboard", () => {
 
     await user.click(screen.getByRole("button", { name: "Tabla" }));
     const coverageTable = screen.getByRole("region", { name: "Tabla de datos de Cobertura" });
+    const categoryHeader = within(coverageTable).getAllByRole("columnheader", { name: "Categoría" })[0];
+    expect(categoryHeader).toHaveAttribute("aria-sort", "none");
+    expect(within(categoryHeader).queryByRole("button")).not.toBeInTheDocument();
     expect(within(coverageTable).getAllByRole("columnheader", { name: "Atendidos" })[0]).toBeVisible();
     expect(within(coverageTable).getAllByRole("columnheader", { name: "Programados" })[0]).toBeVisible();
     expect(within(coverageTable).getAllByText("140 objetivos")[0]).toBeVisible();
@@ -286,6 +289,10 @@ describe("IndicatorsDashboard", () => {
     await user.click(await screen.findByRole("button", { name: /Centro.*89,7/i }));
 
     const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
+    const recordsTable = within(recordsRegion).getByRole("table", { name: "Registros accesibles de Servicios" });
+    const recordHeader = within(recordsTable).getByRole("columnheader", { name: "Registro" });
+    expect(recordHeader).toHaveAttribute("aria-sort", "none");
+    expect(within(recordHeader).queryByRole("button")).not.toBeInTheDocument();
     // La fila se nombra con el título del servicio, no con su identificador.
     const serviceLink = () => within(recordsRegion).getAllByRole("link", { name: "Recolección de residuos — Recorrido 4" }).find((link) => link.getAttribute("href") === "/app?destination=services&detail=SVC-1042");
     expect(serviceLink()).toBeVisible();

@@ -33,6 +33,7 @@ test.describe("operational indicator dashboard #138", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=dashboards");
+    await expect(page.getByRole("button", { name: "Cobertura: seleccionar familia" })).toContainText("82,2 %", { timeout: 15_000 });
 
     const viewToggle = page.getByRole("group", { name: "Visualización de indicadores" });
     await expect(viewToggle.getByRole("button", { name: "Barras" })).toHaveAttribute("aria-pressed", "true");
