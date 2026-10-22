@@ -4,7 +4,7 @@ import { Activity, AlertTriangle, Boxes, MapPinned, RefreshCw, Route as RouteIco
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -26,6 +26,8 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { ListItemsSkeleton, MapPaneSkeleton } from "@/components/ui/loading-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -96,9 +98,9 @@ const OperationalMapCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className={styles.mapPlaceholder} role="status" aria-label="Preparando mapa geográfico">
-        Preparando mapa geográfico
-      </div>
+      <LoadingRegion label="Mapa geográfico" className={styles.mapPlaceholder}>
+        <MapPaneSkeleton className="min-h-0" />
+      </LoadingRegion>
     ),
   },
 );
@@ -618,6 +620,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
             </Alert>
           ) : null}
 
+          <LoadingRegion label="Datos del mapa operativo" isLoading={isLoading}>
           {isLoading ? <MapLoading /> : data ? (
             <div className={cn(styles.layout, view === "inventory" && styles.layoutInventory)}>
               <div className={styles.mapPanel}>
@@ -666,6 +669,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                   {view === "zones" ? (
                     <ZonesMapPanel zones={zones} selectedZoneCode={selectedZoneCode} onSelectZone={setSelectedZoneCode} />
                   ) : view === "route" ? (
+                    <SideLoadingRegion label="Carga de recorridos" isLoading={isViewLoading}>
                     <RouteMapPanel
                       routes={routes}
                       selectedRouteId={selectedRouteId}
@@ -674,27 +678,30 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                       onRouteChange={handleRouteChange}
                       selectedStopSequence={selectedStopSequence}
                       onSelectStop={setSelectedStopSequence}
-                      loading={isViewLoading}
                     />
+                    </SideLoadingRegion>
                   ) : view === "coverage" ? (
+                    <SideLoadingRegion label="Carga de cobertura" isLoading={isViewLoading}>
                     <CoverageMapPanel
                       coverage={coverage}
                       zones={coverageZoneOverlays}
-                      loading={isViewLoading}
                       selectedZoneCode={selectedZoneCode}
                       onSelectZone={setSelectedZoneCode}
                     />
+                    </SideLoadingRegion>
                   ) : (
+                    <SideLoadingRegion label="Carga de atención de hoy" isLoading={isViewLoading}>
                     <TodayMapPanel
                       services={todayServices}
                       zones={todayZoneCoverage}
-                      loading={isViewLoading}
                     />
+                    </SideLoadingRegion>
                   )}
                 </aside>
               )}
             </div>
           ) : null}
+          </LoadingRegion>
         </TabsContent>
       </Tabs>
     </section>
@@ -859,18 +866,14 @@ function ZonesMapPanel({
 function CoverageMapPanel({
   coverage,
   zones,
-  loading,
   selectedZoneCode,
   onSelectZone,
 }: {
   coverage: CoverageIndicator | null;
   zones: CoverageZoneOverlay[];
-  loading: boolean;
   selectedZoneCode: string | null;
   onSelectZone: (code: string) => void;
 }) {
-  if (loading) return <MapSideLoading label="Cargando cobertura por zona" />;
-
   const zonesWithData = zones.filter((zone) => zone.rate !== null).length;
   const legendBands = ["no-data", "low", "partial", "good", "high"] as const;
 
@@ -939,7 +942,6 @@ function RouteMapPanel({
   onRouteChange,
   selectedStopSequence,
   onSelectStop,
-  loading,
 }: {
   routes: Route[];
   selectedRouteId: string;
@@ -948,10 +950,7 @@ function RouteMapPanel({
   onRouteChange: (id: string) => void;
   selectedStopSequence: number | null;
   onSelectStop: (sequence: number) => void;
-  loading: boolean;
 }) {
-  if (loading) return <MapSideLoading label="Cargando recorridos" />;
-
   return (
     <section className={styles.viewPanel} aria-labelledby="route-view-title">
       <div className={styles.panelIntro}>
@@ -1020,14 +1019,10 @@ function RouteMapPanel({
 function TodayMapPanel({
   services,
   zones,
-  loading,
 }: {
   services: TodayServiceCoverage[];
   zones: ReturnType<typeof buildTodayZoneCoverage>;
-  loading: boolean;
 }) {
-  if (loading) return <MapSideLoading label="Cargando atención de hoy" />;
-
   return (
     <section className={styles.viewPanel} aria-labelledby="today-view-title">
       <div className={styles.panelIntro}>
@@ -1109,27 +1104,66 @@ function formatCoverageFreshness(updatedAt: string) {
   return formatMapDateTime(updatedAt);
 }
 
-function MapSideLoading({ label }: { label: string }) {
+function SideLoadingRegion({ label, isLoading, children }: { label: string; isLoading: boolean; children: ReactNode }) {
   return (
-    <div className={styles.sideLoading} role="status" aria-label={label}>
-      <Skeleton />
-      <Skeleton />
-      <Skeleton />
-      <span className="sr-only">{label}</span>
-    </div>
+    <LoadingRegion label={label} isLoading={isLoading} className={styles.sideRegion}>
+      {isLoading ? <ListItemsSkeleton itemCount={6} className={styles.sideLoading} /> : children}
+    </LoadingRegion>
   );
 }
 
 function MapLoading() {
   return (
-    <div className={styles.loading} role="status" aria-label="Cargando mapa operativo">
-      <Skeleton className={styles.loadingMap} />
-      <div className={styles.loadingPanel}>
-        <Skeleton />
-        <Skeleton />
-        <Skeleton />
-        <span className="sr-only">Cargando mapa operativo</span>
+    <div className={cn(styles.layout, styles.loading, styles.layoutInventory)}>
+      <div className={styles.mapPanel}>
+        <div data-skeleton="map-context-header" aria-hidden="true" className={styles.mapToolbar}>
+          <Skeleton data-skeleton="map-context-title" className="h-[18px] w-36 max-w-full" />
+          <Skeleton data-skeleton="map-context-summary" className="h-[18px] w-20 max-w-full" />
+          <Skeleton data-skeleton="map-context-consulted" className="h-[18px] w-48 max-w-full" />
+        </div>
+        <MapPaneSkeleton className={cn(styles.loadingMap, "min-h-0")} />
       </div>
+      <InventoryMapDrawer
+        ariaLabel="Controles de la vista Inventario"
+        className={styles.sidePanel}
+        expandToViewport
+        summary="Elementos"
+      >
+        <InventoryPanelSkeleton />
+      </InventoryMapDrawer>
     </div>
+  );
+}
+
+function InventoryPanelSkeleton() {
+  return (
+    <>
+      <fieldset aria-hidden="true" data-skeleton="map-layer-controls" className={styles.layers}>
+        <legend><Skeleton className="h-5 w-28" /></legend>
+        {(Object.keys(layerLabels) as LayerId[]).map((layer) => (
+          <div key={layer} data-skeleton="map-layer-control" className={styles.layerControl}>
+            <Skeleton className="size-4 rounded-sm" />
+            <Skeleton className={cn(styles.layerSwatch, "rounded-sm")} />
+            <Skeleton className="h-4 w-24 max-w-full" />
+            <Skeleton className="ml-auto h-4 w-6" />
+          </div>
+        ))}
+      </fieldset>
+
+      <section aria-hidden="true" className={styles.visibleList}>
+        <div className={styles.listHeading}>
+          <Skeleton data-skeleton="map-elements-heading" className="h-5 w-20" />
+          <Skeleton className="h-4 w-8" />
+        </div>
+        <ListItemsSkeleton
+          itemCount={6}
+          itemHeight={styles.visibleItem}
+          avatarSize="size-3"
+          primaryWidth="w-3/4"
+          secondaryWidth="w-1/2"
+          className={styles.visibleItemGroup}
+        />
+      </section>
+    </>
   );
 }

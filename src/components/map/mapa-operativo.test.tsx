@@ -1,11 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import * as argentinaDate from "@/lib/argentina-date";
 import { scenarios } from "@/lib/scenarios";
+import { mockResponseAfter } from "@/mocks/delayed-response";
 import { handlers } from "@/mocks/handlers";
 import { MapaOperativo } from "./mapa-operativo";
 
@@ -47,6 +48,53 @@ describe("MapaOperativo", () => {
     expect(refresh).toHaveAttribute("aria-label", "Actualizar datos");
   });
 
+  it("holds the inventory layout with a busy skeleton region while the map data is delayed", async () => {
+    server.use(http.get("*/api/containers*", () => mockResponseAfter(350, () => HttpResponse.json({
+      data: [],
+      meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 },
+    }))));
+    const { container } = render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    const region = screen.getByRole("region", { name: "Datos del mapa operativo" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(container.querySelector("[data-slot=map-pane-skeleton]")).not.toBeNull();
+    expect(region.querySelector('[data-skeleton="map-context-header"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton^="map-context-"]')).toHaveLength(4);
+    expect(region.querySelector('[data-skeleton="map-layer-controls"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton="map-layer-control"]')).toHaveLength(4);
+    expect(region.querySelector('[data-skeleton="map-elements-heading"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton="list-item"]')).toHaveLength(6);
+    expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
+
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
+    expect(await screen.findByRole("heading", { name: "Elementos" }, { timeout: 3000 })).toBeVisible();
+    expect(region.querySelector('[data-skeleton="map-context-header"]')).toBeNull();
+    expect(region.querySelector('[data-skeleton="map-layer-controls"]')).toBeNull();
+  });
+
+  it.each([
+    ["Cobertura", "Carga de cobertura"],
+    ["Recorrido", "Carga de recorridos"],
+    ["Atención hoy", "Carga de atención de hoy"],
+  ])("shows a busy skeleton in the %s side panel while its data is delayed", async (tab, label) => {
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Elementos" });
+
+    server.use(http.all("*/api/*", () => mockResponseAfter(350, () => undefined)));
+    await user.click(screen.getByRole("tab", { name: tab }));
+
+    const region = screen.getByRole("region", { name: label });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(region.querySelector("[data-skeleton=list]")).not.toBeNull();
+    expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByRole("region", { name: label })).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
+    expect(screen.getByRole("region", { name: label }).querySelector("[data-skeleton=list]")).toBeNull();
+  });
+
   it("changes map views with keyboard-operable tabs", async () => {
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
@@ -62,7 +110,7 @@ describe("MapaOperativo", () => {
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    expect(screen.getByRole("status", { name: "Cargando mapa operativo" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Datos del mapa operativo" })).toHaveAttribute("aria-busy", "true");
     expect(await screen.findByRole("heading", { name: "Elementos" })).toBeInTheDocument();
     const inventoryList = screen.getByRole("list", { name: "Elementos visibles" });
     expect(within(inventoryList).getAllByRole("listitem").length).toBeGreaterThan(0);

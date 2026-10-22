@@ -74,11 +74,6 @@
       "count": 1
     }
   },
-  "src/components/indicators/indicators-dashboard.tsx": {
-    "no-restricted-syntax": {
-      "count": 2
-    }
-  },
   "src/components/services/map-view.tsx": {
     "no-restricted-syntax": {
       "count": 2

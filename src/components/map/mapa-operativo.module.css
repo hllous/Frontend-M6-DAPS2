@@ -401,16 +401,16 @@
   gap: var(--space-4);
 }
 
-.sideLoading {
+.sideRegion {
   display: flex;
-  min-height: 300px;
+  min-height: 0;
+  flex: 1;
   flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-14);
 }
 
-.sideLoading > div {
-  height: 48px;
+.sideLoading {
+  min-height: 300px;
+  padding: var(--space-14);
 }
 
 .layers {
@@ -540,23 +540,9 @@
   border: 0;
 }
 
-.loadingMap,
-.loadingPanel {
-  min-height: 620px;
-  border-radius: 16px;
-}
-
-.loadingPanel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-16);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.loadingPanel > div {
-  height: 44px;
+.loadingMap {
+  min-height: 0;
+  border-radius: 0;
 }
 
 @media (max-width: 1024px) {
@@ -625,8 +611,7 @@
   .itemButton { min-height: 48px; }
   .routeStopButton,
   .zoneButton { min-height: 48px; }
-  .loadingMap,
-  .loadingPanel { min-height: 360px; }
+  .loadingMap { min-height: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

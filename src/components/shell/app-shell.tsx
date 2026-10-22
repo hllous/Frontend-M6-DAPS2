@@ -1,5 +1,7 @@
 "use client";
 
+import { OverlayMotionPreference } from "./overlay-motion";
+
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -172,6 +174,7 @@ export function AppShell({
       isCollapsed && styles.collapsed,
       destination === "services" && styles.servicesShell,
     )}>
+      <OverlayMotionPreference />
       <a className={styles.skipLink} href="#contenido-principal">
         Saltar al contenido principal
       </a>
