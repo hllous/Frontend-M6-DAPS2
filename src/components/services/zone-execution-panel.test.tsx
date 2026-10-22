@@ -241,6 +241,8 @@ describe("ZoneExecutionPanel component", () => {
 
     // Validation alert surfaces required reason
     expect(screen.getByRole("alert")).toHaveTextContent(/indique el motivo/i);
+    // A validation problem is not a failed save: don't tell the user to retry.
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/no se pudo guardar/i);
 
     // Select a reason
     await user.click(reasonCombobox);
@@ -665,6 +667,8 @@ describe("ZoneExecutionPanel component", () => {
     await waitFor(() => {
       expect(screen.getByRole("status")).toHaveTextContent(/Sin conexión\. Se guardó en este dispositivo/i);
     });
+    // The draft notice is the only message: no contradictory "failed to save" alert.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(submitAttempts).toBe(1);
 
     const retryButton = await screen.findByRole("button", { name: "Reenviar" });

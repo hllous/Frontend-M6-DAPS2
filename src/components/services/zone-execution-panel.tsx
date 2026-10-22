@@ -48,7 +48,7 @@ import {
   type FieldDraftServiceSnapshot,
 } from "@/lib/field-drafts";
 import { DraftConflictView } from "./draft-conflict-view";
-import { OFFLINE_DRAFT_MESSAGE, OfflineDraftNotice } from "./offline-draft-notice";
+import { OfflineDraftNotice } from "./offline-draft-notice";
 
 interface QueuedEvidenceFile {
   id: string; // client id
@@ -385,10 +385,8 @@ export function ZoneExecutionPanel({
           setConflict({ current: outcome.current, composedAgainst: outcome.composedAgainst });
           return;
         }
-        if (outcome.kind === "still-offline") {
-          setFormError(OFFLINE_DRAFT_MESSAGE);
-          return;
-        }
+        // The draft notice already tells the user it was kept on this device.
+        if (outcome.kind === "still-offline") return;
         setFormError(outcome.message);
         return;
       }
@@ -408,7 +406,6 @@ export function ZoneExecutionPanel({
       }
       if (outcome.kind === "draft-saved") {
         setComposedAgainst(outcome.draft.composedAgainst);
-        setFormError(OFFLINE_DRAFT_MESSAGE);
         return;
       }
       setFormError(outcome.message);
@@ -931,8 +928,7 @@ export function ZoneExecutionPanel({
               {formError && (
                 <Alert variant="danger" role="alert">
                   <AlertTriangle aria-hidden />
-                  <AlertTitle>No se pudo guardar. Intente nuevamente.</AlertTitle>
-                  <AlertDescription>{formError}</AlertDescription>
+                  <AlertTitle>{formError}</AlertTitle>
                 </Alert>
               )}
 
