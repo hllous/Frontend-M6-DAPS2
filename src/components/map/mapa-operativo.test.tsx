@@ -43,9 +43,9 @@ describe("MapaOperativo", () => {
     expect(await screen.findByRole("heading", { name: "Mapa operativo" })).toBeVisible();
     expect(await screen.findByRole("heading", { name: "Elementos" })).toBeVisible();
     expect(screen.queryByText(/Supervise el inventario urbano/)).not.toBeInTheDocument();
-    const refresh = screen.getByRole("button", { name: "Actualizar datos" });
+    const refresh = screen.getByRole("button", { name: "Actualizar" });
     expect(refresh).toBeEnabled();
-    expect(refresh).toHaveAttribute("aria-label", "Actualizar datos");
+    expect(refresh).toHaveAttribute("aria-label", "Actualizar");
   });
 
   it("holds the inventory layout with a busy skeleton region while the map data is delayed", async () => {
@@ -55,7 +55,7 @@ describe("MapaOperativo", () => {
     }))));
     const { container } = render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    const region = screen.getByRole("region", { name: "Datos del mapa operativo" });
+    const region = screen.getByRole("region", { name: "Mapa" });
     expect(region).toHaveAttribute("aria-busy", "true");
     expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
     expect(container.querySelector("[data-slot=map-pane-skeleton]")).not.toBeNull();
@@ -74,9 +74,9 @@ describe("MapaOperativo", () => {
   });
 
   it.each([
-    ["Cobertura", "Carga de cobertura"],
-    ["Recorrido", "Carga de recorridos"],
-    ["Atención hoy", "Carga de atención de hoy"],
+    ["Cobertura", "Cargando"],
+    ["Recorrido", "Cargando"],
+    ["Hoy", "Cargando"],
   ])("shows a busy skeleton in the %s side panel while its data is delayed", async (tab, label) => {
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
@@ -110,7 +110,7 @@ describe("MapaOperativo", () => {
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    expect(screen.getByRole("region", { name: "Datos del mapa operativo" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("region", { name: "Mapa" })).toHaveAttribute("aria-busy", "true");
     expect(await screen.findByRole("heading", { name: "Elementos" })).toBeInTheDocument();
     const inventoryList = screen.getByRole("list", { name: "Elementos visibles" });
     expect(within(inventoryList).getAllByRole("listitem").length).toBeGreaterThan(0);
@@ -147,7 +147,7 @@ describe("MapaOperativo", () => {
     await screen.findByRole("heading", { name: "Elementos" });
     expect(screen.getByText(/Consultado/)).toBeVisible();
 
-    for (const view of ["Zonas", "Cobertura", "Recorrido", "Atención hoy"]) {
+    for (const view of ["Zonas", "Cobertura", "Recorrido", "Hoy"]) {
       await user.click(screen.getByRole("tab", { name: view }));
       expect(await screen.findByText(/Consultado/)).toBeVisible();
     }
@@ -192,8 +192,8 @@ describe("MapaOperativo", () => {
 
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    expect(await screen.findByText("El mapa no está disponible")).toBeVisible();
-    expect(screen.getByText(/Revise la conexión e intente nuevamente/)).toBeVisible();
+    expect(await screen.findByText("No se pudo cargar el mapa")).toBeVisible();
+    expect(screen.getByText("No se pudo cargar el mapa. Intente nuevamente.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeVisible();
   });
 
@@ -207,18 +207,14 @@ describe("MapaOperativo", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Zonas" }));
 
-    expect(await screen.findByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    expect(screen.getByRole("list", { name: "Zonas operativas" })).toBeVisible();
-    expect(screen.getByText("Z-BEL")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Zonas" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "Zonas" })).toBeVisible();
     expect(screen.getByText("Belgrano")).toBeVisible();
-    expect(screen.getByText("Z-PAL")).toBeVisible();
     expect(screen.getByText("Palermo")).toBeVisible();
-    expect(screen.getByText("Z-REC")).toBeVisible();
     expect(screen.getByText("Recoleta")).toBeVisible();
-    expect(screen.getByText("Z-RET")).toBeVisible();
     expect(screen.getByText("Retiro")).toBeVisible();
-    for (const code of ["Z-COL", "Z-SNI", "Z-PMA", "Z-MON"]) expect(screen.getByText(code)).toBeVisible();
-    expect(screen.getByText(/8 zonas operativas/)).toBeVisible();
+    for (const name of ["Colegiales", "San Nicolás", "Puerto Madero", "Montserrat"]) expect(screen.getByText(name)).toBeVisible();
+    expect(screen.getByText(/8 zonas/)).toBeVisible();
   });
 
   it("shows coverage rates with a semantic legend and exact zone values", async () => {
@@ -249,7 +245,7 @@ describe("MapaOperativo", () => {
     expect(screen.getByText(/92,5/)).toBeVisible();
     expect(screen.getByText(/148 de 160 objetivos/)).toBeVisible();
     expect(screen.getByText("Cobertura alta")).toBeVisible();
-    expect(screen.getByText("4 de 8 zonas con datos")).toBeVisible();
+    expect(screen.getByText("4 de 8 con datos")).toBeVisible();
     expect(screen.getByText("Recoleta")).toBeVisible();
     expect(screen.getByText("Cobertura parcial")).toBeVisible();
   });
@@ -309,8 +305,8 @@ describe("MapaOperativo", () => {
     expect(screen.getByText("Parada 1")).toBeVisible();
     expect(screen.getByText("Parada 2")).toBeVisible();
     expect(screen.getByText("Parada 3")).toBeVisible();
-    expect(screen.getByText("35 min estimados")).toBeVisible();
-    expect(screen.getByText("Z-PAL · Palermo")).toBeVisible();
+    expect(screen.getByText("35 min")).toBeVisible();
+    expect(screen.getByText("Palermo")).toBeVisible();
   });
 
   it("offers active routes from every paginated result in the picker", async () => {
@@ -340,7 +336,7 @@ describe("MapaOperativo", () => {
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
     await user.click(await screen.findByRole("tab", { name: "Recorrido" }));
 
-    const picker = await screen.findByLabelText("Recorrido a visualizar");
+    const picker = await screen.findByRole("combobox", { name: "Recorrido" });
     expect(within(picker).getByRole("option", { name: "R-101 · Recorrido posterior" })).toBeInTheDocument();
     expect(requestedPages.sort()).toEqual([1, 2]);
   });
@@ -404,17 +400,17 @@ describe("MapaOperativo", () => {
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    await user.click(await screen.findByRole("tab", { name: "Atención hoy" }));
+    await user.click(await screen.findByRole("tab", { name: "Hoy" }));
 
-    expect(await screen.findByRole("heading", { name: "Zonas atendidas hoy" })).toBeVisible();
-    expect(screen.getByRole("list", { name: "Zonas atendidas hoy" })).toBeVisible();
-    const serviceList = screen.getByRole("list", { name: "Servicios incluidos" });
+    expect(await screen.findByRole("heading", { name: "Hoy" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "Hoy" })).toBeVisible();
+    const serviceList = screen.getByRole("list", { name: "Servicios" });
     expect(within(serviceList).getByRole("listitem")).toBeVisible();
     expect(screen.getByText("Belgrano")).toBeVisible();
     expect(screen.getByText("Atendida")).toBeVisible();
     expect(screen.getByText("Palermo")).toBeVisible();
     expect(screen.getByText("Parcial")).toBeVisible();
-    expect(screen.getByText(/1 servicio programado hoy/)).toBeVisible();
+    expect(screen.getByText(/1 servicio hoy/)).toBeVisible();
     expect(todaySpy).toHaveBeenCalled();
     expect(serviceListUrls.at(-1)?.searchParams.get("scheduledFrom")).toBe("2026-09-10");
     expect(serviceListUrls.at(-1)?.searchParams.get("scheduledTo")).toBe("2026-09-10");

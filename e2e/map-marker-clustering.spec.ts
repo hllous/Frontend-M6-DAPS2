@@ -16,7 +16,7 @@ test("groups inventory markers and progressively reveals numbered pins #215", as
   const clusters = page.locator('[class*="markerCluster"]:visible');
   const mapPane = page.locator(".leaflet-map-pane");
   await expect(clusters.first()).toBeVisible();
-  await expect(clusters.first()).toHaveAttribute("aria-label", /elementos de inventario; acercar para verlos/);
+  await expect(clusters.first()).toHaveAttribute("aria-label", /elementos; acerque el mapa/);
 
   for (let attempt = 0; attempt < 4 && await clusters.count() > 0; attempt += 1) {
     await clusters.first().click();
@@ -43,7 +43,7 @@ test("keeps the mobile map visible with a keyboard accessible inventory drawer #
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
 
-  const drawer = page.getByRole("complementary", { name: "Controles de la vista Inventario" });
+  const drawer = page.getByRole("complementary", { name: "Controles" });
   const map = page.locator(".leaflet-container");
   const trigger = page.getByRole("slider", { name: "Altura de la lista" });
 
@@ -71,8 +71,8 @@ test("keeps map tabs on one scrollable row and reveals the keyboard-selected tab
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
 
-  const tablist = page.getByRole("tablist", { name: "Vistas del mapa operativo" });
-  const lastTab = tablist.getByRole("tab", { name: "Atención hoy" });
+  const tablist = page.getByRole("tablist", { name: "Vistas" });
+  const lastTab = tablist.getByRole("tab", { name: "Hoy" });
   await expect(page.getByRole("heading", { name: "Mapa operativo" })).toBeVisible();
   await expect(lastTab).toBeVisible();
   await expect(tablist).toHaveCSS("flex-wrap", "nowrap");
@@ -136,7 +136,7 @@ test("keeps the mobile refresh action compact and keyboard accessible #423", asy
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
 
-  const refresh = page.getByRole("button", { name: "Actualizar datos" });
+  const refresh = page.getByRole("button", { name: "Actualizar" });
   await expect(refresh).toBeVisible();
   await expect(refresh).toBeEnabled();
   const box = await refresh.boundingBox();
@@ -152,7 +152,7 @@ test("keeps the mobile refresh action compact and keyboard accessible #423", asy
   await refresh.hover();
   const tooltip = page.getByRole("tooltip");
   await expect(tooltip).toBeVisible();
-  await expect(tooltip).toHaveText("Actualizar datos");
+  await expect(tooltip).toHaveText("Actualizar");
 });
 
 test("keeps mobile navigation usable while the inventory drawer is open", async ({ page }) => {
@@ -160,7 +160,7 @@ test("keeps mobile navigation usable while the inventory drawer is open", async 
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=map", { waitUntil: "domcontentloaded" });
 
-  const drawer = page.getByRole("complementary", { name: "Controles de la vista Inventario" });
+  const drawer = page.getByRole("complementary", { name: "Controles" });
   await page.getByRole("slider", { name: "Altura de la lista" }).press("Enter");
   const panel = page.getByRole("dialog", { name: "Elementos" });
   await expect(panel).toBeVisible();
