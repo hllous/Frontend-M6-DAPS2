@@ -4,6 +4,119 @@ import { loginViaApi } from "./support/auth";
 import { chooseDate, chooseOption, chooseTime } from "./support/reports-indicators";
 
 test.describe("EnvironmentalReport case file", () => {
+  test("keeps the heading and Estado filter x positions fixed while selecting statuses at desktop and mobile sizes", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/app?destination=environment");
+
+      const heading = page.getByRole("heading", { name: "Control ambiental" });
+      const status = page.getByRole("combobox", { name: "Estado" });
+      await expect(heading).toBeVisible();
+      await expect(status).toBeVisible();
+
+      const positions = async () => {
+        const headingBox = await heading.boundingBox();
+        const statusBox = await status.boundingBox();
+        expect(headingBox).not.toBeNull();
+        expect(statusBox).not.toBeNull();
+        return { headingX: headingBox!.x, statusX: statusBox!.x, statusWidth: statusBox!.width };
+      };
+
+      const bodyOverflowBefore = await page.evaluate(() => getComputedStyle(document.body).overflow);
+      const before = await positions();
+      await status.click();
+      await expect(page.getByRole("listbox")).toBeVisible();
+      const firstGroup = page.getByRole("group", { name: "Ingreso y revisión" });
+      const alignedContentStarts = await firstGroup.evaluate((group) => {
+        const title = group.querySelector<HTMLElement>('[data-slot="select-label"]');
+        const all = document.querySelector<HTMLElement>('[data-slot="select-content"] [data-slot="select-item"]');
+        if (!title || !all) return null;
+        const contentStart = (element: HTMLElement) => element.getBoundingClientRect().x + Number.parseFloat(getComputedStyle(element).paddingLeft);
+        return {
+          title: group.getBoundingClientRect().x + Number.parseFloat(getComputedStyle(group).paddingLeft) + Number.parseFloat(getComputedStyle(title).paddingLeft),
+          all: contentStart(all),
+        };
+      });
+      expect(alignedContentStarts?.title).toBe(alignedContentStarts?.all);
+      const bodyOverflowOpen = await page.evaluate(() => getComputedStyle(document.body).overflow);
+      const open = await positions();
+      await page.getByRole("option", { name: "Recibido" }).click();
+      await expect(status).toContainText("Recibido");
+      const oneStatus = await positions();
+      await page.getByRole("option", { name: "En revisión" }).click();
+      await expect(status).toContainText("Recibido, En revisión");
+      const twoStatuses = await positions();
+
+      console.log(`Estado filter x positions at ${viewport.width}: ${JSON.stringify({ before, open, oneStatus, twoStatuses })}`);
+      expect(bodyOverflowOpen).toBe(bodyOverflowBefore);
+      expect(open).toEqual(before);
+      expect(oneStatus).toEqual(before);
+      expect(twoStatuses).toEqual(before);
+      await page.keyboard.press("Escape");
+    }
+  });
+
+  test("Office can reach and select a status in the last group on mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=environment");
+
+    const status = page.getByRole("combobox", { name: "Estado" });
+    await status.click();
+    const listbox = page.getByRole("listbox");
+    const content = page.locator('[data-slot="select-content"]');
+    const allStatuses = page.getByRole("option", { name: "Todos los estados" });
+    const closed = page.getByRole("option", { name: "Cerrado" });
+    const mobileNav = page.getByRole("navigation", { name: "Navegación móvil" });
+
+    await expect(listbox).toBeVisible();
+    const contentBox = await content.boundingBox();
+    const navBox = await mobileNav.boundingBox();
+    expect(contentBox).not.toBeNull();
+    expect(navBox).not.toBeNull();
+    expect(contentBox!.y + contentBox!.height).toBeLessThan(navBox!.y);
+
+    for (let index = 0; index < 20 && !(await closed.evaluate((option) => option === document.activeElement)); index += 1) {
+      await page.keyboard.press("ArrowDown");
+    }
+
+    await expect(closed).toBeFocused();
+    await expect(closed).toBeInViewport();
+    await page.keyboard.press("Enter");
+
+    await expect(closed).toHaveAttribute("aria-selected", "true");
+    await expect(allStatuses).toBeInViewport();
+    await expect(status).toContainText("Cerrado");
+  });
+
+  test("Office filters the queue by several statuses and keeps them in the URL", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app");
+    await page.getByRole("link", { name: "Control Ambiental" }).click();
+    const filters = page.getByRole("region", { name: "Filtros de la cola" });
+    const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
+    const status = filters.getByRole("combobox", { name: "Estado" });
+    const allReportsResponse = await page.request.get("/api/environmental-reports?pageSize=100");
+    expect(allReportsResponse.ok()).toBeTruthy();
+    const allReports = (await allReportsResponse.json()).data as { id: string; status: string }[];
+    const expectedIds = allReports
+      .filter((report) => ["RECEIVED", "UNDER_REVIEW"].includes(report.status))
+      .map((report) => report.id);
+
+    await status.click();
+    await page.getByRole("option", { name: "Recibido" }).click();
+    await page.getByRole("option", { name: "En revisión" }).click();
+
+    await expect(page).toHaveURL(/status=RECEIVED.*status=UNDER_REVIEW/);
+    await expect(status).toContainText("Recibido, En revisión");
+    await expect(list.getByRole("button")).toHaveCount(expectedIds.length);
+    for (const id of expectedIds) {
+      await expect(list.getByRole("button", { name: new RegExp(id) })).toBeVisible();
+    }
+  });
+
   test("Office filters the queue by last update and restores the range from the URL", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=environment");
