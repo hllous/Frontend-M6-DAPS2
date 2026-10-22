@@ -826,10 +826,10 @@ export function ServicesWorkspace({
 
   const periodBar = (
     <div className={cn(
-      "flex flex-wrap items-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
-      isNarrow ? "gap-2 px-2 py-1 text-xs" : "gap-3 px-4 py-2 text-sm",
+      "flex items-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
+      isNarrow ? "min-w-0 flex-1 flex-nowrap gap-2 px-2 py-1 text-xs" : "flex-wrap gap-3 px-4 py-2 text-sm",
     )} aria-busy={isRefreshing}>
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         <Label htmlFor="services-period">Período</Label>
         <Select
           value={activePeriod}
@@ -839,7 +839,7 @@ export function ServicesWorkspace({
           <SelectTrigger
             id="services-period"
             size={isNarrow ? "sm" : "default"}
-            className={cn("w-auto", isNarrow && "px-1 [@media(max-width:760px)]:text-sm")}
+            className={cn("w-auto", isNarrow && "min-w-0 px-1 [@media(max-width:760px)]:text-sm")}
           >
             <SelectValue />
           </SelectTrigger>
@@ -1118,11 +1118,15 @@ export function ServicesWorkspace({
             <div
               data-services-filter-toolbar
               hidden={isNarrow && Boolean(selectedService)}
-              className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]"
+              className={cn(
+                "flex flex-wrap items-center border-b border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 text-xs text-[var(--color-text-secondary)]",
+                // On phones the period selector shrinks so it never pushes «Categorías» onto a second row.
+                isNarrow ? "gap-2 px-2" : "gap-3 px-4",
+              )}
             >
               {periodBar}
               {refreshError && (
-                <p role="alert" className="px-4 py-1.5 text-xs text-[var(--color-danger)]">
+                <p role="alert" className={cn("px-4 py-1.5 text-xs text-[var(--color-danger)]", isNarrow && "basis-full")}>
                   No se pudieron actualizar los servicios. Se mantienen los resultados anteriores.
                 </p>
               )}
