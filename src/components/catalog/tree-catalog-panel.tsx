@@ -252,10 +252,10 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
     try {
       if (editingTree) {
         await treesAdapter.update(editingTree.id, parsed.data as TreeUpdateInput);
-        setNotice("Árbol actualizado con éxito.");
+        setNotice("Árbol actualizado.");
       } else {
         await treesAdapter.create(parsed.data as TreeCreateInput);
-        setNotice("Árbol creado con éxito.");
+        setNotice("Árbol creado.");
       }
       setFormOpen(false);
       setRequestVersion((version) => version + 1);
@@ -272,7 +272,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
     try {
       await treesAdapter.remove(tree.id);
       setDeactivateTarget(null);
-      setNotice("Árbol dado de baja. Se conserva su referencia histórica.");
+      setNotice("Árbol dado de baja.");
       setRequestVersion((version) => version + 1);
     } catch (caught) {
       setDeactivateError(caught instanceof TreeRequestError ? caught.message : "No se pudo dar de baja el árbol.");
@@ -286,11 +286,10 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
       <CatalogPageHeader
         title="Árboles"
         titleId="trees-title"
-        description="Censo de arbolado urbano, ubicación y medidas registradas para cada ejemplar."
         actions={canManage ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar árbol</Button> : null}
       />
 
-      {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Esta sesión puede consultar el censo, pero no administrarlo.</p> : null}
+      {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Solo consulta</p> : null}
       {notice ? <Alert role="status"><AlertDescription>{notice}</AlertDescription></Alert> : null}
 
       <FieldGroup className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[minmax(240px,1fr)_200px_160px]">
@@ -300,11 +299,11 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
         </Field>
         <Field>
           <FieldLabel htmlFor="tree-zone-filter">Zona</FieldLabel>
-          <Select items={{ all: "Todas", ...Object.fromEntries(zones.map((zone) => [zone.id, `${zone.code} · ${zone.name}`])) }} value={zoneFilter} onValueChange={(value) => setParams({ zone: value === "all" ? null : String(value) })}>
+          <Select items={{ all: "Todas", ...Object.fromEntries(zones.map((zone) => [zone.id, zone.name])) }} value={zoneFilter} onValueChange={(value) => setParams({ zone: value === "all" ? null : String(value) })}>
             <SelectTrigger id="tree-zone-filter" aria-label="Filtrar árboles por zona"><SelectValue /></SelectTrigger>
             <SelectContent><SelectGroup>
               <SelectItem value="all">Todas</SelectItem>
-              {zones.map((zone) => <SelectItem key={zone.id} value={zone.id}>{zone.code} · {zone.name}</SelectItem>)}
+              {zones.map((zone) => <SelectItem key={zone.id} value={zone.id}>{zone.name}</SelectItem>)}
             </SelectGroup></SelectContent>
           </Select>
         </Field>
@@ -369,7 +368,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
           }
         }}
         title={`Confirmar baja del árbol ${deactivateTarget?.surveyCode ?? ""}`.trim()}
-        consequence="El árbol quedará inactivo y se conservará su referencia histórica."
+        consequence="El árbol quedará inactivo."
         confirmAction={`Dar de baja el árbol ${deactivateTarget?.surveyCode ?? ""}`.trim()}
         safeAlternative={`Conservar árbol ${deactivateTarget?.surveyCode ?? ""}`.trim()}
         footerClassName="flex-col items-stretch sm:flex-row"
@@ -389,11 +388,11 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
               <Field><FieldLabel htmlFor="tree-species">Especie</FieldLabel><Input id="tree-species" value={form.species} onChange={(event) => setForm({ ...form, species: event.target.value })} required /></Field>
               <Field data-invalid={Boolean(zoneError)}>
                 <FieldLabel htmlFor="tree-zone">Zona operativa <span aria-hidden="true">(obligatorio)</span></FieldLabel>
-                <Select items={Object.fromEntries(zones.map((zone) => [zone.id, `${zone.code} · ${zone.name}`]))} value={form.zoneId || null} onValueChange={(value) => { setForm({ ...form, zoneId: String(value ?? "") }); setZoneError(null); }}>
-                  <SelectTrigger id="tree-zone" aria-label="Zona operativa" aria-required="true" aria-invalid={Boolean(zoneError)} aria-describedby={zoneError ? "tree-zone-help tree-zone-error" : "tree-zone-help"}><SelectValue placeholder="Seleccione una zona" /></SelectTrigger>
-                  <SelectContent><SelectGroup>{zones.map((zone) => <SelectItem key={zone.id} value={zone.id}>{zone.code} · {zone.name}</SelectItem>)}</SelectGroup></SelectContent>
+                <Select items={Object.fromEntries(zones.map((zone) => [zone.id, zone.name]))} value={form.zoneId || null} onValueChange={(value) => { setForm({ ...form, zoneId: String(value ?? "") }); setZoneError(null); }}>
+                  <SelectTrigger id="tree-zone" aria-label="Zona operativa" aria-required="true" aria-invalid={Boolean(zoneError)} aria-describedby={zoneError ? "tree-zone-error" : undefined}><SelectValue placeholder="Seleccione una zona" /></SelectTrigger>
+                  <SelectContent><SelectGroup>{zones.map((zone) => <SelectItem key={zone.id} value={zone.id}>{zone.name}</SelectItem>)}</SelectGroup></SelectContent>
                 </Select>
-                <FieldDescription id="tree-zone-help">Seleccione la zona que corresponde al árbol.</FieldDescription>
+                
                 {zoneError ? <FieldError id="tree-zone-error">{zoneError}</FieldError> : null}
               </Field>
               <Field><FieldLabel htmlFor="tree-address">Dirección</FieldLabel><Input id="tree-address" value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /><FieldDescription className="text-xs leading-4">Opcional. Se utiliza junto con la especie en la búsqueda.</FieldDescription></Field>
@@ -414,7 +413,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
       <Dialog open={Boolean(detailId)} onOpenChange={(open) => !open && closeDetail()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Detalle del árbol {detailTree?.surveyCode ?? ""}</DialogTitle><DialogDescription>Información del ejemplar, su historial de relevamientos y el trabajo relacionado.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Detalle del árbol {detailTree?.surveyCode ?? ""}</DialogTitle></DialogHeader>
           {detail.status === "loading" ? <Alert role="status"><AlertDescription>Cargando detalle…</AlertDescription></Alert> : null}
           {detail.status === "error" ? <Alert variant="destructive"><AlertDescription>{detail.message}</AlertDescription></Alert> : null}
           {detail.status === "ready" ? <TreeDetailBody tree={detail.tree} surveys={detail.surveys} zoneText={zoneLabel(zones, detail.tree.zoneId, zonesLoaded)} onOpenSurveys={() => openSurveyHistory(detail.tree)} /> : null}
@@ -446,7 +445,6 @@ function TreeDetailBody({ tree, surveys, zoneText, onOpenSurveys }: { tree: Tree
       <h3 id="tree-detail-work" className="text-sm font-semibold">Intervenciones y servicios</h3>
       {/* ponytail: el backend no filtra GET /tree-interventions ni GET /services por árbol; hasta que lo haga,
           la ficha deriva a la cola en vez de traer todas las intervenciones y filtrarlas en el cliente. */}
-      <p className="text-sm text-muted-foreground">Las intervenciones que incluyen este árbol, y los servicios vinculados a cada una, se consultan en la cola de intervenciones de arbolado.</p>
       <Link className="self-start text-sm font-semibold text-[var(--color-action)] underline" href={TREE_INTERVENTIONS_HREF}>Ir a intervenciones de arbolado</Link>
     </section>
   </div>;

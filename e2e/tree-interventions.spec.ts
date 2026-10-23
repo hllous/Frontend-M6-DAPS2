@@ -77,6 +77,6 @@ test.describe("TreeIntervention requests #128", () => {
     await page.goto("/app/catalog/tree-interventions");
     await expect(page.getByRole("heading", { name: "Intervenciones de arbolado" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Solicitar intervención" })).not.toBeVisible();
-    await expect(page.getByText(/puede consultar las solicitudes/i)).toBeVisible();
+    await expect(page.getByText("Solo consulta")).toBeVisible();
   });
 });

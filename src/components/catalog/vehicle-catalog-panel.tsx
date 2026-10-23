@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -55,7 +54,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -261,7 +259,6 @@ export function VehicleCatalogPanel({
       <CatalogPageHeader
         title="Vehículos"
         titleId="vehicles-title"
-        description="Registre los vehículos disponibles para la asignación de servicios."
         actions={
           canManage ? (
             <Button onClick={openCreate}>
@@ -434,9 +431,6 @@ export function VehicleCatalogPanel({
           >
             <SheetHeader className="border-b border-border pr-12 pb-4">
               <SheetTitle>Detalle de vehículo</SheetTitle>
-              <SheetDescription>
-                Información operativa del vehículo registrado.
-              </SheetDescription>
             </SheetHeader>
             <dl className="grid gap-4 px-4 pt-4 text-sm">
               <div>
@@ -508,7 +502,7 @@ export function VehicleCatalogPanel({
           }
         }}
         title={`Confirmar baja del vehículo ${deactivatingVehicle?.plate ?? ""}`.trim()}
-        consequence="El vehículo quedará inactivo y no estará disponible para nuevas asignaciones. Las asignaciones existentes conservarán su referencia."
+        consequence="El vehículo quedará inactivo."
         confirmAction="Dar de baja"
         safeAlternative="Conservar vehículo"
         onConfirm={() => void confirmDeactivation()}
@@ -527,10 +521,6 @@ export function VehicleCatalogPanel({
             <DialogTitle>
               {editing ? "Editar vehículo" : "Registrar vehículo"}
             </DialogTitle>
-            <DialogDescription>
-              Complete los datos del recurso operativo. La baja se realiza de
-              forma lógica.
-            </DialogDescription>
           </DialogHeader>
           {formError ? (
             <Alert variant="destructive">
@@ -621,8 +611,7 @@ export function VehicleCatalogPanel({
                   {capacityError}
                 </FieldError>
                 <FieldDescription>
-                  Capacidad operativa declarada, en toneladas. Admite hasta dos
-                  decimales.
+                  En toneladas
                 </FieldDescription>
               </Field>
             </FieldGroup>

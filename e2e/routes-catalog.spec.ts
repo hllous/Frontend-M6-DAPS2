@@ -17,7 +17,7 @@ test.describe("Route catalog management #107", () => {
     await expect(page.getByText("Recorrido Casco Histórico")).toBeVisible();
     await expect(page.getByText("REC-002")).toBeVisible();
 
-    await chooseCatalogOption(page, "Estado:", "Solo activos");
+    await chooseCatalogOption(page, "Estado:", "Activos");
     await expect(page.getByText("REC-003")).not.toBeVisible();
     await chooseCatalogOption(page, "Estado:", "Todos");
     await expect(page.getByText("REC-003")).toBeVisible();
@@ -33,7 +33,7 @@ test.describe("Route catalog management #107", () => {
     await expect(page.getByText("Recorrido Casco Histórico")).toBeVisible();
 
     // Filter by zone
-    await chooseCatalogOption(page, "Zona:", "Belgrano (Z-BEL)");
+    await chooseCatalogOption(page, "Zona:", "Belgrano");
     await expect(page.getByText("REC-001")).toBeVisible();
     await expect(page.getByText("REC-002")).not.toBeVisible();
   });
@@ -44,8 +44,8 @@ test.describe("Route catalog management #107", () => {
     await page.getByRole("button", { name: "Nuevo recorrido" }).click();
     await expect(page.getByRole("heading", { name: "Nuevo recorrido" })).toBeVisible();
 
-    await page.getByRole("textbox", { name: "Código del recorrido" }).fill("REC-050");
-    await page.getByRole("textbox", { name: "Nombre descriptivo" }).fill("Recorrido Circunvalación");
+    await page.getByRole("textbox", { name: "Código" }).fill("REC-050");
+    await page.getByRole("textbox", { name: "Nombre" }).fill("Recorrido Circunvalación");
 
     await page.getByRole("button", { name: "Crear recorrido" }).click();
 
@@ -58,7 +58,7 @@ test.describe("Route catalog management #107", () => {
     // Verify empty stops section and CTA
     const emptyStops = detailView.getByTestId("empty-stops-section");
     await expect(emptyStops).toBeVisible();
-    await expect(emptyStops.getByText("Este recorrido no tiene paradas configuradas")).toBeVisible();
+    await expect(emptyStops.getByText("Sin paradas")).toBeVisible();
     await expect(detailView.getByTestId("add-stops-cta")).toBeVisible();
     await expect(detailView.getByTestId("add-stops-cta")).toContainText("Agregar paradas");
   });
@@ -79,7 +79,7 @@ test.describe("Route catalog management #107", () => {
     await expect(codeInput).toHaveValue("REC-002");
 
     // Edit name
-    const nameInput = page.getByRole("textbox", { name: "Nombre descriptivo" });
+    const nameInput = page.getByRole("textbox", { name: "Nombre" });
     await nameInput.fill("Recorrido Costanera Modificado");
 
     await page.getByTestId("submit-edit-route").click();
@@ -97,15 +97,15 @@ test.describe("Route catalog management #107", () => {
     await row.getByTestId("deactivate-route-route-1").click();
 
     // Confirmation warning dialog appears
-    const dialog = page.getByRole("dialog", { name: "Confirmar baja del recorrido REC-001" });
+    const dialog = page.getByRole("dialog", { name: "Dar de baja el recorrido Recorrido Casco Histórico" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("heading", { name: "Confirmar baja del recorrido REC-001" })).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Dar de baja el recorrido Recorrido Casco Histórico" })).toBeVisible();
     await expect(dialog.getByTestId("references-warning-dialog")).toBeVisible();
-    await expect(dialog.getByText(/Advertencia: El recorrido está asignado a frecuencias de servicio activas/i)).toBeVisible();
+    await expect(dialog.getByText("El recorrido tiene frecuencias activas.")).toBeVisible();
     await expect(dialog.getByText(/Recolección Domiciliaria/i)).toBeVisible();
 
     // Confirm deactivation
-    await dialog.getByRole("button", { name: "Dar de baja el recorrido REC-001" }).click();
+    await dialog.getByRole("button", { name: "Dar de baja el recorrido Recorrido Casco Histórico", exact: true }).click();
 
     await expect(dialog).not.toBeVisible();
     await expect(row.getByText("Inactivo")).toBeVisible();

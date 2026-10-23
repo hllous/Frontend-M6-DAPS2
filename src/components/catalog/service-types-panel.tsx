@@ -61,7 +61,6 @@ import {
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -240,7 +239,7 @@ export function ServiceTypesPanel({
       await serviceTypesAdapter.remove(deactivating.id);
       setDeactivating(null);
       notifySuccess(
-        "Tipo de servicio dado de baja. Los servicios existentes conservan su configuración.",
+        "Tipo de servicio dado de baja.",
       );
       setRequestVersion((version) => version + 1);
     } catch (error) {
@@ -262,7 +261,6 @@ export function ServiceTypesPanel({
       <CatalogPageHeader
         title="Tipos de servicio"
         titleId="service-types-title"
-        description="Defina cómo se programan y ejecutan los servicios urbanos."
         actions={
           canManage ? (
             <Button
@@ -281,7 +279,7 @@ export function ServiceTypesPanel({
       {!canManage ? (
         <Alert role="status">
           <AlertDescription>
-            Esta sesión puede consultar el catálogo, pero no administrarlo.
+            Solo consulta
           </AlertDescription>
         </Alert>
       ) : null}
@@ -291,7 +289,7 @@ export function ServiceTypesPanel({
           <DialogHeader>
             <DialogTitle>Alta de tipo de servicio</DialogTitle>
             <DialogDescription>
-                Código, categoría y modo quedan fijos al crear el tipo.
+                No se pueden cambiar después.
               </DialogDescription>
           </DialogHeader>
           <form
@@ -643,9 +641,6 @@ export function ServiceTypesPanel({
           >
             <SheetHeader className="border-b border-border pr-12 pb-4">
               <SheetTitle>Detalle del tipo de servicio</SheetTitle>
-              <SheetDescription>
-                Configuración disponible para la planificación de servicios.
-              </SheetDescription>
             </SheetHeader>
             <dl className="grid gap-4 px-4 pt-4 text-sm">
               <div>
@@ -668,7 +663,7 @@ export function ServiceTypesPanel({
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Vehículo</dt>
-                <dd>{selectedItem.requiresVehicle ? "Sí requiere vehículo" : "No requiere vehículo"}</dd>
+                <dd>{selectedItem.requiresVehicle ? "Sí" : "No"}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Estado</dt>
@@ -724,8 +719,7 @@ export function ServiceTypesPanel({
           <DialogHeader>
             <DialogTitle>Editar tipo de servicio</DialogTitle>
             <DialogDescription>
-                El código, la categoría y el modo son de solo lectura porque ya
-                pueden estar copiados en servicios programados.
+                No se pueden cambiar después.
               </DialogDescription>
           </DialogHeader>
           <form

@@ -96,12 +96,10 @@ function CompleteRepairModalContent({
     <DialogContent className="max-w-lg overflow-y-auto">
       <DialogHeader>
         <DialogTitle>
-          Completar reparación independiente · {container.code}
+          Completar reparación · {container.code}
         </DialogTitle>
         <DialogDescription>
-          Acción independiente de Oficina para restituir el contenedor a estado
-          Activo. No corresponde al completado de un Servicio vinculado. Puede
-          adjuntar evidencia plana al contenedor.
+          El contenedor vuelve a Activo.
         </DialogDescription>
       </DialogHeader>
 
@@ -119,7 +117,7 @@ function CompleteRepairModalContent({
         <Alert role="note">
           <AlertDescription>
             <p className="font-medium text-foreground">
-              Estado actual: En reparación
+              Estado: En reparación
             </p>
             <p className="mt-1 text-muted-foreground">Nuevo estado: Activo</p>
           </AlertDescription>
@@ -149,7 +147,7 @@ function CompleteRepairModalContent({
           disabled={isSubmitting}
         >
           <CheckCircle2 data-icon="inline-start" aria-hidden />
-          {isSubmitting ? "Completando…" : "Confirmar reparación completa"}
+          {isSubmitting ? "Completando…" : "Confirmar reparación"}
         </Button>
       </DialogFooter>
     </DialogContent>

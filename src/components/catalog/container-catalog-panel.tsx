@@ -59,14 +59,12 @@ import {
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -141,7 +139,7 @@ const emptyForm: ContainerForm = {
 const containerTypes = containerTypeSchema.options;
 const containerStatuses = containerStatusSchema.options;
 const serviceLookupFailure =
-  "No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.";
+  "No se pudo verificar. Intente nuevamente.";
 
 function StatusBadge({ status }: { status: ContainerStatus }) {
   const label = CONTAINER_STATUS_LABELS[status];
@@ -459,7 +457,7 @@ export function ContainerCatalogPanel({
           lng: lngNum,
           capacityLiters: capacityNum,
         });
-        setNotice("Contenedor actualizado con éxito.");
+        setNotice("Contenedor actualizado.");
       } else {
         await containersAdapter.create({
           code: form.code.trim(),
@@ -470,7 +468,7 @@ export function ContainerCatalogPanel({
           lng: lngNum,
           capacityLiters: capacityNum,
         });
-        setNotice("Contenedor registrado con éxito.");
+        setNotice("Contenedor registrado.");
       }
       setFormOpen(false);
       setRequestVersion((v) => v + 1);
@@ -509,7 +507,6 @@ export function ContainerCatalogPanel({
       <CatalogPageHeader
         title="Contenedores"
         titleId="containers-title"
-        description="Inventario urbano de contenedores de vía pública para recolección diferenciada y mantenimiento."
         actions={
           canManage ? (
             <Button onClick={openCreate}>
@@ -611,7 +608,7 @@ export function ContainerCatalogPanel({
             items={{
               all: "Todas las zonas",
               ...Object.fromEntries(
-                zones.map((zone) => [zone.id, `${zone.code} · ${zone.name}`]),
+                zones.map((zone) => [zone.id, zone.name]),
               ),
             }}
             value={zoneFilter}
@@ -625,7 +622,7 @@ export function ContainerCatalogPanel({
                 <SelectItem value="all">Todas las zonas</SelectItem>
                 {zones.map((zone) => (
                   <SelectItem key={zone.id} value={zone.id}>
-                    {zone.code} · {zone.name}
+                    {zone.name}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -639,7 +636,7 @@ export function ContainerCatalogPanel({
           aria-label="Cargando contenedores"
           className="text-sm text-muted-foreground"
         >
-          Cargando inventario de contenedores…
+          Cargando contenedores…
         </p>
       )}
 
@@ -704,7 +701,7 @@ export function ContainerCatalogPanel({
                     </th>
                     <td data-label="Tipo" className="px-4 py-3">{CONTAINER_TYPE_LABELS[container.containerType]}</td>
                     <td data-label="Zona" className="px-4 py-3">
-                      {zone ? `${zone.code} · ${zone.name}` : container.zoneId}
+                      {zone ? zone.name : container.zoneId}
                     </td>
                     <td data-label="Dirección" className="px-4 py-3">{container.address ?? "—"}</td>
                     <td data-label="Capacidad" className="px-4 py-3">{container.capacityLiters.toLocaleString("es-AR")} L</td>
@@ -729,11 +726,11 @@ export function ContainerCatalogPanel({
             <DialogTitle>
               {editingContainer ? "Editar contenedor" : "Registrar contenedor"}
             </DialogTitle>
-            <DialogDescription>
-              {editingContainer
-                ? "Actualice los datos operativos del contenedor. El código y el tipo son inmutables tras su registro."
-                : "Complete los datos del nuevo contenedor para incorporarlo al inventario en estado Activo."}
-            </DialogDescription>
+            {editingContainer ? (
+              <DialogDescription>
+                El código y el tipo no se pueden cambiar después.
+              </DialogDescription>
+            ) : null}
           </DialogHeader>
 
           {formErrors.general && (
@@ -761,11 +758,6 @@ export function ContainerCatalogPanel({
                   <FieldError id="container-code-error" role="none">
                     {formErrors.code}
                   </FieldError>
-                )}
-                {editingContainer && (
-                  <FieldDescription>
-                    Identificador inmutable asignado al alta.
-                  </FieldDescription>
                 )}
               </Field>
 
@@ -797,11 +789,6 @@ export function ContainerCatalogPanel({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                {editingContainer && (
-                  <FieldDescription>
-                    Categoría de residuo inmutable tras el registro.
-                  </FieldDescription>
-                )}
               </Field>
 
               <Field data-invalid={Boolean(formErrors.zoneId)}>
@@ -812,7 +799,7 @@ export function ContainerCatalogPanel({
                   items={Object.fromEntries(
                     zones.map((zone) => [
                       zone.id,
-                      `${zone.code} · ${zone.name}`,
+                      zone.name,
                     ]),
                   )}
                   value={form.zoneId}
@@ -835,7 +822,7 @@ export function ContainerCatalogPanel({
                     <SelectGroup>
                       {zones.map((z) => (
                         <SelectItem key={z.id} value={z.id}>
-                          {z.code} · {z.name}
+                          {z.name}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -985,10 +972,6 @@ export function ContainerCatalogPanel({
                 </SheetTitle>
                 <StatusBadge status={detailContainer.status} />
               </div>
-              <SheetDescription>
-                Información técnica y geográfica registrada en el inventario
-                urbano.
-              </SheetDescription>
             </SheetHeader>
 
             <dl className="grid grid-cols-2 gap-4 px-4 text-sm">
@@ -1017,7 +1000,7 @@ export function ContainerCatalogPanel({
                 </dt>
                 <dd className="mt-0.5 font-medium text-foreground">
                   {zones.find((z) => z.id === detailContainer.zoneId)
-                    ? `${zones.find((z) => z.id === detailContainer.zoneId)!.code} · ${zones.find((z) => z.id === detailContainer.zoneId)!.name}`
+                    ? zones.find((z) => z.id === detailContainer.zoneId)!.name
                     : detailContainer.zoneId}
                 </dd>
               </div>
@@ -1047,7 +1030,7 @@ export function ContainerCatalogPanel({
                   <Alert variant="destructive">
                     <AlertDescription>
                       <p className="font-semibold text-destructive">
-                        Diagnóstico de daño
+                        Daño
                       </p>
                       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                         <div>
@@ -1076,7 +1059,7 @@ export function ContainerCatalogPanel({
                           </span>
                           <span className="font-medium text-foreground">
                             {detailContainer.requiresPublicWorks
-                              ? "Sí (notificación a M3)"
+                              ? "Sí (avisa a Obras Públicas)"
                               : "No"}
                           </span>
                         </div>
@@ -1305,7 +1288,7 @@ export function ContainerCatalogPanel({
                       }}
                     >
                       <Wrench data-icon="inline-start" aria-hidden />
-                      Iniciar reparación independiente
+                      Iniciar reparación
                     </Button>
                   ) : detailInFlight ? (
                     <Badge variant="info" className="w-fit max-w-full">
@@ -1325,7 +1308,7 @@ export function ContainerCatalogPanel({
                       }}
                     >
                       <CheckCircle2 data-icon="inline-start" aria-hidden />
-                      Completar reparación independiente
+                      Completar reparación
                     </Button>
                   )}
                 </section>
@@ -1378,7 +1361,7 @@ export function ContainerCatalogPanel({
             setDetailContainer(updated);
           }
           setNotice(
-            `Desborde reportado con éxito para el contenedor ${updated.code}.`,
+            `Desborde reportado: ${updated.code}.`,
           );
         }}
       />
@@ -1392,7 +1375,7 @@ export function ContainerCatalogPanel({
           refreshServiceLookup();
           applyUpdatedContainer(updated);
           setNotice(
-            `Reporte de daño registrado con éxito para el contenedor ${updated.code}.`,
+            `Daño registrado: ${updated.code}.`,
           );
         }}
       />
@@ -1418,7 +1401,7 @@ export function ContainerCatalogPanel({
             setDetailContainer(updated);
           }
           setNotice(
-            `Vaciado registrado con éxito para el contenedor ${updated.code}.`,
+            `Vaciado registrado: ${updated.code}.`,
           );
         }}
       />
@@ -1470,7 +1453,7 @@ export function ContainerCatalogPanel({
             setDetailContainer(updated);
           }
           setNotice(
-            `Nueva ubicación confirmada con éxito para el contenedor ${updated.code}.`,
+            `Nueva ubicación confirmada: ${updated.code}.`,
           );
         }}
       />
@@ -1494,7 +1477,7 @@ export function ContainerCatalogPanel({
           refreshServiceLookup();
           applyUpdatedContainer(updated);
           setNotice(
-            `Reparación completada con éxito para el contenedor ${updated.code}.`,
+            `Reparación completada: ${updated.code}.`,
           );
         }}
       />
@@ -1506,7 +1489,7 @@ export function ContainerCatalogPanel({
         onSuccess={(updated) => {
           refreshServiceLookup();
           applyUpdatedContainer(updated);
-          setNotice(`Contenedor ${updated.code} retirado con éxito.`);
+          setNotice(`Contenedor retirado: ${updated.code}.`);
         }}
       />
     </section>

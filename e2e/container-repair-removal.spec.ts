@@ -40,29 +40,29 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "STRUCTURAL", severity: "HIGH", requiresPublicWorks: false }, () => damageDialog.getByRole("button", { name: "Confirmar daño" }).click());
     await expect(row.getByText("Dañado")).toBeVisible();
 
-    await clickCatalogRowAction(row, "Iniciar reparación independiente");
+    await clickCatalogRowAction(row, "Iniciar reparación");
 
     const startDialog = page.getByRole("dialog");
-    await expect(startDialog.getByRole("heading", { name: /Iniciar reparación independiente/ })).toBeVisible();
+    await expect(startDialog.getByRole("heading", { name: /Iniciar reparación/ })).toBeVisible();
     await expectCatalogAMutation(page, /\/start-repair$/, null, () => startDialog.getByRole("button", { name: "Iniciar reparación" }).click());
     await expect(row.getByText("En reparación")).toBeVisible();
 
-    await clickCatalogRowAction(row, "Completar reparación independiente");
+    await clickCatalogRowAction(row, "Completar reparación");
     const completeDialog = page.getByRole("dialog");
-    await expect(completeDialog.getByText(/no corresponde al completado de un Servicio/i)).toBeVisible();
+    await expect(completeDialog.getByText("El contenedor vuelve a Activo.")).toBeVisible();
     await completeDialog.locator('input[type="file"]').setInputFiles({
       name: "repair-report.png",
       mimeType: "image/png",
       buffer: Buffer.from("fake-png-content-for-repair"),
     });
     await expect(completeDialog.getByText("repair-report.png")).toBeVisible();
-    await expectCatalogAMutation(page, /\/complete-repair$/, null, () => completeDialog.getByRole("button", { name: "Confirmar reparación completa" }).click());
+    await expectCatalogAMutation(page, /\/complete-repair$/, null, () => completeDialog.getByRole("button", { name: "Confirmar reparación" }).click());
 
-    await expect(page.getByText("Reparación completada con éxito para el contenedor CONT-E2E-REPAIR.")).toBeVisible();
+    await expect(page.getByText("Reparación completada: CONT-E2E-REPAIR.")).toBeVisible();
     await expect(completeDialog).not.toBeVisible();
     await expect(row.getByText("Activo")).toBeVisible();
     const activeDetail = await openCatalogRowDetail(row);
-    await expect(activeDetail.getByRole("button", { name: /reparación independiente|Retirar contenedor/i })).toHaveCount(0);
+    await expect(activeDetail.getByRole("button", { name: /reparación|Retirar contenedor/i })).toHaveCount(0);
   });
 
   test("Office removes a damaged container with evidence and keeps removal terminal", async ({ page }) => {
@@ -104,11 +104,11 @@ test.describe("Office container repair and removal dispatch #122", () => {
     });
     await expectCatalogAMutation(page, /\/remove$/, null, () => removeDialog.getByRole("button", { name: "Confirmar retiro" }).click());
 
-    await expect(page.getByText("Contenedor CONT-E2E-122 retirado con éxito.")).toBeVisible();
+    await expect(page.getByText("Contenedor retirado: CONT-E2E-122.")).toBeVisible();
     await expect(removeDialog).not.toBeVisible();
     await expect(row.getByText("Retirado")).toBeVisible();
     const removedDetail = await openCatalogRowDetail(row);
-    await expect(removedDetail.getByRole("button", { name: /reparación independiente|Retirar contenedor/i })).toHaveCount(0);
+    await expect(removedDetail.getByRole("button", { name: /reparación|Retirar contenedor/i })).toHaveCount(0);
   });
 
   test("Field cannot access Office lifecycle dispatch controls", async ({ page }) => {
@@ -117,7 +117,7 @@ test.describe("Office container repair and removal dispatch #122", () => {
 
     await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
     const damagedDetail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-003/ }));
-    await expect(damagedDetail.getByRole("button", { name: /reparación independiente/i })).toHaveCount(0);
+    await expect(damagedDetail.getByRole("button", { name: /reparación/i })).toHaveCount(0);
     await expect(damagedDetail.getByRole("button", { name: "Retirar contenedor" })).toHaveCount(0);
   });
 });

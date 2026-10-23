@@ -81,11 +81,10 @@ function StartRepairModalContent({
     <DialogContent className="max-w-md overflow-y-auto">
       <DialogHeader>
         <DialogTitle>
-          Iniciar reparación independiente · {container.code}
+          Iniciar reparación · {container.code}
         </DialogTitle>
         <DialogDescription>
-          Acción independiente de Oficina para enviar el contenedor dañado a
-          reparación. No corresponde al completado de un Servicio vinculado.
+          El contenedor pasa a En reparación.
         </DialogDescription>
       </DialogHeader>
 
@@ -103,8 +102,7 @@ function StartRepairModalContent({
         <Alert role="note">
           <AlertDescription className="grid gap-2">
             <p className="font-medium text-foreground">{container.code}</p>
-            <p className="mt-1 text-muted-foreground">Estado actual: Dañado</p>
-            <p className="text-muted-foreground">Nuevo estado: En reparación</p>
+            <p className="mt-1 text-muted-foreground">Dañado → En reparación</p>
           </AlertDescription>
         </Alert>
       </form>

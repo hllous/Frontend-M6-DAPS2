@@ -189,13 +189,13 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Solicitar intervención</DialogTitle>
-          <DialogDescription>Registre qué intervención requiere uno o más árboles. La solicitud comenzará en estado solicitada.</DialogDescription>
+          
         </DialogHeader>
         {formError && fieldHasError("form") ? <Alert variant="destructive"><AlertDescription>{formError}</AlertDescription></Alert> : null}
         <form id="tree-intervention-form" className="flex min-h-0 flex-1 flex-col" onSubmit={(event) => void submit(event)} noValidate>
           <FieldGroup className="gap-4">
             <Field data-invalid={fieldHasError("interventionType")}>
-              <FieldLabel htmlFor="intervention-type">Tipo de intervención <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+              <FieldLabel htmlFor="intervention-type">Tipo de intervención <span aria-hidden="true">*</span></FieldLabel>
               <Select items={TREE_INTERVENTION_LABELS} value={form.interventionType || null} onValueChange={(value) => setForm({ ...form, interventionType: String(value ?? "") as RequestForm["interventionType"] })}>
               <SelectTrigger id="intervention-type" aria-label="Tipo de intervención" aria-required="true" aria-invalid={fieldHasError("interventionType")} aria-describedby={fieldHasError("interventionType") ? "intervention-type-error" : undefined}><SelectValue placeholder="Seleccione un tipo" /></SelectTrigger>
                 <SelectContent><SelectGroup>{Object.entries(TREE_INTERVENTION_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
@@ -203,7 +203,7 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
               {fieldHasError("interventionType") ? <FieldError id="intervention-type-error">{formError}</FieldError> : null}
             </Field>
             <Field data-invalid={fieldHasError("treeIds")}>
-              <FieldLabel htmlFor="intervention-trees">Árboles a intervenir <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+              <FieldLabel htmlFor="intervention-trees">Árboles a intervenir <span aria-hidden="true">*</span></FieldLabel>
               <Select
                 items={Object.fromEntries(props.trees.map((tree) => [tree.id, `${treeName(tree)} · ${tree.address ?? "Sin dirección"}`]))}
                 multiple
@@ -214,21 +214,21 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
                   setForm((current) => ({ ...current, treeIds, address: current.address || props.trees.find((tree) => tree.id === firstSelectedTreeId)?.address || "" }));
                 }}
               >
-                <SelectTrigger id="intervention-trees" aria-label="Árboles a intervenir" aria-required="true" aria-invalid={fieldHasError("treeIds")} aria-describedby={fieldHasError("treeIds") ? "intervention-trees-help intervention-trees-error" : "intervention-trees-help"}>
+                <SelectTrigger id="intervention-trees" aria-label="Árboles a intervenir" aria-required="true" aria-invalid={fieldHasError("treeIds")} aria-describedby={fieldHasError("treeIds") ? "intervention-trees-error" : undefined}>
                   <SelectValue placeholder="Seleccione uno o más árboles" />
                 </SelectTrigger>
                 <SelectContent><SelectGroup>{props.trees.map((tree) => <SelectItem key={tree.id} value={tree.id}>{treeName(tree)} · {tree.address ?? "Sin dirección"}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
-              <FieldDescription className="text-xs leading-4" id="intervention-trees-help">Seleccione uno o más ejemplares; puede elegir varios árboles.</FieldDescription>
+              
               {fieldHasError("treeIds") ? <FieldError id="intervention-trees-error">{formError}</FieldError> : null}
             </Field>
             <Field data-invalid={fieldHasError("address")}>
-              <FieldLabel htmlFor="intervention-address">Dirección <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+              <FieldLabel htmlFor="intervention-address">Dirección <span aria-hidden="true">*</span></FieldLabel>
               <Input id="intervention-address" value={form.address} aria-invalid={fieldHasError("address")} aria-describedby={fieldHasError("address") ? "intervention-address-error" : undefined} onChange={(event) => setForm({ ...form, address: event.target.value })} required />
               {fieldHasError("address") ? <FieldError id="intervention-address-error">{formError}</FieldError> : null}
             </Field>
             <Field>
-              <FieldLabel htmlFor="intervention-priority">Prioridad <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+              <FieldLabel htmlFor="intervention-priority">Prioridad <span aria-hidden="true">*</span></FieldLabel>
               <Select items={PRIORITY_LABELS} value={form.priority} onValueChange={(value) => setForm({ ...form, priority: String(value) as RequestForm["priority"] })}>
                 <SelectTrigger id="intervention-priority" aria-label="Prioridad" aria-required="true"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectGroup>{Object.entries(PRIORITY_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
@@ -241,7 +241,7 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
             <Field data-invalid={fieldHasError("justification")}>
               <FieldLabel htmlFor="intervention-justification">Justificación{form.interventionType === "REMOVAL" ? <span> (obligatorio para extracción)</span> : null}</FieldLabel>
               <Textarea id="intervention-justification" value={form.justification} required={form.interventionType === "REMOVAL"} aria-invalid={fieldHasError("justification")} aria-describedby={fieldHasError("justification") ? "intervention-justification-help intervention-justification-error" : "intervention-justification-help"} onChange={(event) => setForm({ ...form, justification: event.target.value })} />
-              <FieldDescription className="text-xs leading-4" id="intervention-justification-help">Es obligatoria para solicitar una extracción. No se adjuntan evidencias en esta etapa.</FieldDescription>
+              <FieldDescription className="text-xs leading-4" id="intervention-justification-help">Obligatoria para extracción.</FieldDescription>
               {fieldHasError("justification") ? <FieldError id="intervention-justification-error">{formError}</FieldError> : null}
             </Field>
           </FieldGroup>
@@ -435,7 +435,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       setDetail(updated);
       setScheduleOpen(false);
       setRequestVersion((version) => version + 1);
-      setNotice(action === "submit" ? "La extracción fue enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
+      setNotice(action === "submit" ? "Extracción enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
       if (action === "reject") setRejectConfirmOpen(false);
     } catch (caught) {
       setActionError(errorMessage(caught, "No se pudo actualizar la intervención."));
@@ -455,7 +455,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   };
   const linkNotice = (serviceId: string, linkedTo: string) => linkedTo === serviceId
     ? `Intervención programada. Servicio ${serviceId} vinculado correctamente.`
-    : `La intervención ya estaba vinculada al servicio ${linkedTo}. El servicio ${serviceId} quedó creado sin vincular: cancélelo desde Servicios.`;
+    : `Ya estaba vinculada al servicio ${linkedTo}. Cancele el servicio ${serviceId} desde Servicios.`;
 
   const retryServiceLink = async () => {
     if (!detail || !unsyncedService) return;
@@ -480,10 +480,9 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       <CatalogPageHeader
         title="Intervenciones de arbolado"
         titleId="tree-interventions-title"
-        description="Solicitudes de poda, extracción, plantación o tratamiento con su estado y decisión registrada."
         actions={canRequest ? <Button type="button" onClick={() => openRequest()}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención</Button> : null}
       />
-      {!canRequest ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription>Esta sesión puede consultar las solicitudes, pero no crear intervenciones de arbolado.</AlertDescription></Alert> : null}
+      {!canRequest ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription>Solo consulta</AlertDescription></Alert> : null}
       {notice ? <Alert><CheckCircle2 data-icon="inline-start" aria-hidden /><AlertDescription>{notice}</AlertDescription></Alert> : null}
       <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-3">
         <Field>
@@ -576,7 +575,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
             if (!open) setStreetClosureIntervention(null);
           }}
           onCreated={() => {
-            setNotice("Solicitud de corte creada y pendiente de respuesta de M7.");
+            setNotice("Solicitud de corte enviada a Tránsito.");
             setStreetClosureIntervention(null);
             setRequestVersion((version) => version + 1);
           }}
@@ -584,7 +583,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       ) : null}
       <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { serviceLookupRequest.current += 1; setDetail(null); setUnsyncedService(null); setServiceLookupStatus("idle"); setRejectConfirmOpen(false); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle><DialogDescription>Consulte los datos de la solicitud y, según su estado y permisos, registre una decisión de autorización.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle></DialogHeader>
           {detailLoading ? <Alert role="status"><AlertDescription>Cargando detalle…</AlertDescription></Alert> : null}
           {detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}
           {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <Item key={tree?.id ?? detail.treeIds[index]} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</Item>)}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
@@ -621,20 +620,20 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                       void runAction("schedule", scheduleForm);
                     }}
                   >
-                    <p className="text-sm font-semibold">Servicio puntual de ejecución</p>
+                    <p className="text-sm font-semibold">Servicio</p>
                     <FieldGroup className="grid gap-3 sm:grid-cols-3">
                       <Field data-invalid={scheduleFieldErrors.includes("scheduledDate")}>
-                        <FieldLabel htmlFor="tree-service-date">Fecha programada <span>(obligatorio)</span></FieldLabel>
+                        <FieldLabel htmlFor="tree-service-date">Fecha programada <span aria-hidden="true">*</span></FieldLabel>
                         <DatePicker id="tree-service-date" value={scheduleForm.scheduledDate} invalid={scheduleFieldErrors.includes("scheduledDate")} aria-describedby={scheduleFieldErrors.includes("scheduledDate") ? "tree-service-date-error" : undefined} onChange={(scheduledDate) => { setScheduleForm({ ...scheduleForm, scheduledDate }); setScheduleFieldErrors((errors) => errors.filter((field) => field !== "scheduledDate")); setActionError((error) => error === SCHEDULE_REQUIRED_ERROR ? null : error); }} />
                         {scheduleFieldErrors.includes("scheduledDate") ? <FieldError id="tree-service-date-error">{SCHEDULE_FIELD_ERRORS.scheduledDate}</FieldError> : null}
                       </Field>
                       <Field data-invalid={scheduleFieldErrors.includes("windowFrom")}>
-                        <FieldLabel id="tree-service-from-label" htmlFor="tree-service-from">Desde <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+                        <FieldLabel id="tree-service-from-label" htmlFor="tree-service-from">Desde <span aria-hidden="true">*</span></FieldLabel>
                         <TimePicker id="tree-service-from" aria-labelledby="tree-service-from-label" aria-label="Desde" required invalid={scheduleFieldErrors.includes("windowFrom")} aria-describedby={scheduleFieldErrors.includes("windowFrom") ? "tree-service-from-error" : undefined} value={scheduleForm.windowFrom} onChange={(windowFrom) => { setScheduleForm({ ...scheduleForm, windowFrom }); setScheduleFieldErrors((errors) => errors.filter((field) => field !== "windowFrom")); setActionError((error) => error === SCHEDULE_REQUIRED_ERROR ? null : error); }} />
                         {scheduleFieldErrors.includes("windowFrom") ? <FieldError id="tree-service-from-error">{SCHEDULE_FIELD_ERRORS.windowFrom}</FieldError> : null}
                       </Field>
                       <Field data-invalid={scheduleFieldErrors.includes("windowTo")}>
-                        <FieldLabel id="tree-service-to-label" htmlFor="tree-service-to">Hasta <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+                        <FieldLabel id="tree-service-to-label" htmlFor="tree-service-to">Hasta <span aria-hidden="true">*</span></FieldLabel>
                         <TimePicker id="tree-service-to" aria-labelledby="tree-service-to-label" aria-label="Hasta" required invalid={scheduleFieldErrors.includes("windowTo")} aria-describedby={scheduleFieldErrors.includes("windowTo") ? "tree-service-to-error" : undefined} value={scheduleForm.windowTo} onChange={(windowTo) => { setScheduleForm({ ...scheduleForm, windowTo }); setScheduleFieldErrors((errors) => errors.filter((field) => field !== "windowTo")); setActionError((error) => error === SCHEDULE_REQUIRED_ERROR ? null : error); }} />
                         {scheduleFieldErrors.includes("windowTo") ? <FieldError id="tree-service-to-error">{SCHEDULE_FIELD_ERRORS.windowTo}</FieldError> : null}
                       </Field>
@@ -653,7 +652,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                           <SelectTrigger id="tree-service-vehicle" aria-label="Vehículo (opcional)"><SelectValue /></SelectTrigger>
                           <SelectContent><SelectGroup><SelectItem value="__none__">Sin asignar</SelectItem>{resources && resources !== "error" ? resources.vehicles.map((vehicle) => <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.plate}</SelectItem>) : null}</SelectGroup></SelectContent>
                         </Select>
-                        {resources === "error" ? <FieldDescription className="text-xs leading-4">No se pudieron cargar cuadrillas y vehículos; puede asignarlos después desde Servicios.</FieldDescription> : null}
+                        {resources === "error" ? <FieldDescription className="text-xs leading-4">No se pudieron cargar. Asigne luego desde Servicios.</FieldDescription> : null}
                       </Field>
                     </FieldGroup>
                     <p className="text-xs text-muted-foreground">{"Se crear\u00e1 un servicio de punto, con el primer \u00e1rbol como objetivo t\u00e9cnico y el listado completo de \u00e1rboles como contexto relacionado."}</p>
@@ -663,7 +662,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                     </div>
                   </form>
                 ) : null}
-                {detail.status === "REJECTED" && canRequest ? <p className="text-sm text-muted-foreground">Esta decisión es terminal. Puede registrar una nueva solicitud con los datos de esta extracción.</p> : null}
+                {detail.status === "REJECTED" && canRequest ? <p className="text-sm text-muted-foreground">Extracción rechazada. Puede crear otra solicitud.</p> : null}
               </div>
             </>
           ) : null}
@@ -684,7 +683,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       </Dialog>
       <Dialog open={rejectConfirmOpen} onOpenChange={(open) => { if (!activeAction) setRejectConfirmOpen(open); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Confirmar rechazo</DialogTitle><DialogDescription>La extracción quedará rechazada y no podrá reabrirse desde esta solicitud.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Confirmar rechazo</DialogTitle><DialogDescription>La extracción quedará rechazada. No se puede deshacer.</DialogDescription></DialogHeader>
           {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
           <DialogFooter><Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(false)}>Conservar solicitud</Button><Button type="button" variant="destructive" disabled={activeAction !== null} aria-busy={activeAction === "reject"} onClick={() => void runAction("reject")}>{activeAction === "reject" ? "Rechazando intervención…" : "Confirmar rechazo de intervención"}</Button></DialogFooter>
         </DialogContent>

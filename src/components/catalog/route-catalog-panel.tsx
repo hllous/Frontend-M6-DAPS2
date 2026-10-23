@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
-  CheckCircle2,
   Clock,
   Eye,
   MapPin,
@@ -346,22 +345,22 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
   function handleAddStop() {
     setStopEditorError(null);
     if (!newStopZoneId) {
-      setStopEditorError("Debe seleccionar una zona para la parada.");
+      setStopEditorError("Seleccione una zona.");
       return;
     }
     const zone = availableZones.find((z) => z.id === newStopZoneId);
     if (!zone) {
-      setStopEditorError("La zona seleccionada no es válida.");
+      setStopEditorError("Zona no válida.");
       return;
     }
     // Client-side duplicate check (acceptance criterion 2)
     if (draftStops.some((s) => s.zoneId === newStopZoneId)) {
-      setStopEditorError(`Una zona no puede repetirse en el mismo recorrido: ${zone.name}.`);
+      setStopEditorError(`${zone.name} ya está en el recorrido.`);
       return;
     }
     const duration = Number(newStopDuration);
     if (isNaN(duration) || duration < 1 || duration > 1440) {
-      setStopEditorError("La duración estimada debe ser un número entero entre 1 y 1440 minutos.");
+      setStopEditorError("La duración debe ser de 1 a 1440 minutos.");
       return;
     }
 
@@ -423,7 +422,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         stop.estimatedDurationMin > 1440
       ) {
         setStopEditorError(
-          "Cada parada debe tener una duración estimada válida entre 1 y 1440 minutos.",
+          "La duración debe ser de 1 a 1440 minutos.",
         );
         return;
       }
@@ -431,7 +430,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     const zoneIds = draftStops.map((s) => s.zoneId);
     const duplicates = zoneIds.filter((z, i) => zoneIds.indexOf(z) !== i);
     if (duplicates.length > 0) {
-      setStopEditorError("Una zona no puede repetirse en el mismo recorrido.");
+      setStopEditorError("Hay zonas repetidas en el recorrido.");
       return;
     }
 
@@ -496,7 +495,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     <div className="space-y-6">
       <CatalogPageHeader
         title="Recorridos"
-        description="Gestione los recorridos operativos para la planificación y ejecución de servicios."
         actions={canManage ? (
           <Button
             onClick={() => setShowCreate(true)}
@@ -599,10 +597,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                       <EmptyMedia variant="icon">
                         <MapPin aria-hidden="true" />
                       </EmptyMedia>
-                      <EmptyTitle>Este recorrido no tiene paradas configuradas</EmptyTitle>
-                      <EmptyDescription>
-                        Los recorridos nuevos nacen sin paradas. Para diagramar y ordenar la secuencia de paradas operativas, utilice el generador de secuencias.
-                      </EmptyDescription>
+                      <EmptyTitle>Sin paradas</EmptyTitle>
                     </EmptyHeader>
                     <EmptyContent>
                       {canManage ? (
@@ -618,7 +613,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                         </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          Modo lectura: se requieren permisos de oficina para configurar paradas.
+                          Solo consulta
                         </span>
                       )}
                     </EmptyContent>
@@ -637,9 +632,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                           <div>
                             <div className="font-medium text-foreground">
                               {stop.zoneName}
-                            </div>
-                            <div className="text-xs text-muted-foreground font-mono">
-                              {stop.zoneCode}
                             </div>
                           </div>
                         </div>
@@ -660,11 +652,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   <div>
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                       <RouteIcon className="h-4 w-4 text-primary" />
-                      Editor de secuencia de paradas
+                      Paradas
                     </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Configure el orden y la duración de cada parada. Al guardar, se reemplazará la secuencia de forma atómica.
-                    </p>
                   </div>
                   <Button
                     variant="ghost"
@@ -686,14 +675,10 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
                 {/* Ordered sequence list */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-foreground">
-                    Secuencia ordenada ({draftStops.length} {draftStops.length === 1 ? "parada" : "paradas"})
-                  </div>
-
                   {draftStops.length === 0 ? (
                     <Empty className="border p-4" data-testid="builder-empty-stops">
                       <EmptyDescription>
-                        No hay paradas en la secuencia. Puede guardar el recorrido sin paradas o agregar zonas debajo.
+                        Sin paradas.
                       </EmptyDescription>
                     </Empty>
                   ) : (
@@ -712,11 +697,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                               <div className="font-medium text-foreground">
                                 {stop.zoneName}
                               </div>
-                              {stop.zoneCode && (
-                                <div className="text-xs text-muted-foreground font-mono">
-                                  {stop.zoneCode}
-                                </div>
-                              )}
                             </div>
                           </div>
                           <div className="flex flex-wrap items-center justify-between gap-2 self-stretch sm:flex-nowrap sm:self-auto">
@@ -725,7 +705,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                                 htmlFor={`duration-${idx}`}
                                 className="text-xs text-muted-foreground whitespace-nowrap"
                               >
-                                Duración:
+                                Duración (min)
                               </FieldLabel>
                               <Input
                                 id={`duration-${idx}`}
@@ -737,7 +717,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                                 className="h-10 w-20 px-2 text-right text-xs"
                                 data-testid={`stop-duration-input-${idx}`}
                               />
-                              <span className="text-xs text-muted-foreground">min</span>
                             </div>
                             <div className="flex items-center gap-1 sm:ml-2">
                               <Tooltip>
@@ -801,7 +780,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 {/* Add stop form */}
                 <div className="rounded-md border p-3 bg-muted/20 space-y-2">
                   <div className="text-xs font-medium text-foreground">
-                    Agregar parada operativa al recorrido
+                    Agregar parada
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <Field className="flex-1">
@@ -815,7 +794,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                             .filter((zone) => zone.active)
                             .map((zone) => [
                               zone.id,
-                              `${zone.code} — ${zone.name}${draftStops.some((stop) => stop.zoneId === zone.id) ? " (Ya en recorrido)" : ""}`,
+                              `${zone.name}${draftStops.some((stop) => stop.zoneId === zone.id) ? " (ya en el recorrido)" : ""}`,
                             ]),
                         )}
                         onValueChange={(value) => {
@@ -824,7 +803,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                         }}
                       >
                         <SelectTrigger id="stop-zone-select" aria-label="Zona operativa" aria-invalid={stopEditorError ? true : undefined} aria-describedby={stopEditorError ? "stop-editor-error" : undefined} data-testid="stop-zone-select" className="text-xs">
-                          <SelectValue placeholder="Seleccione una zona operativa activa..." />
+                          <SelectValue placeholder="Seleccione una zona" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
@@ -834,7 +813,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                                 const isAlreadyAdded = draftStops.some((s) => s.zoneId === z.id);
                                 return (
                                   <SelectItem key={z.id} value={z.id}>
-                                    {z.code} — {z.name}{isAlreadyAdded ? " (Ya en recorrido)" : ""}
+                                    {z.name}{isAlreadyAdded ? " (ya en el recorrido)" : ""}
                                   </SelectItem>
                                 );
                               })}
@@ -847,7 +826,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                         htmlFor="new-stop-duration"
                         className="text-xs text-muted-foreground whitespace-nowrap"
                       >
-                        Duración est.:
+                        Duración (min)
                       </FieldLabel>
                       <Input
                         id="new-stop-duration"
@@ -864,7 +843,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                         className="h-10 w-20 px-2 text-right text-xs"
                         data-testid="stop-duration-input"
                       />
-                      <span className="text-xs text-muted-foreground">min</span>
                     </div>
                     <Button
                       type="button"
@@ -884,8 +862,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 <div className="flex items-center justify-between pt-3 border-t">
                   <div className="text-xs text-muted-foreground">
                     {draftStops.length === 0
-                      ? "Guardar dejará el recorrido sin paradas."
-                      : `${draftStops.length} ${draftStops.length === 1 ? "parada lista" : "paradas listas"} para guardar.`}
+                      ? null
+                      : `${draftStops.length} ${draftStops.length === 1 ? "parada" : "paradas"} · ${draftStops.reduce((total, stop) => total + (Number(stop.estimatedDurationMin) || 0), 0)} min`}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -934,7 +912,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               <Input
                 id="search-routes-input"
                 type="text"
-                placeholder="Buscar por código o nombre..."
+                placeholder="Buscar recorrido"
                 value={search}
                 maxLength={MAX_SEARCH_LENGTH}
                 onChange={(e) => setSearch(e.target.value)}
@@ -951,7 +929,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
             </FieldLabel>
             <Select
               value={activeFilter}
-              items={{ all: "Todos", true: "Solo activos", false: "Solo inactivos" }}
+              items={{ all: "Todos", true: "Activos", false: "Inactivos" }}
               onValueChange={(value) => setActiveFilter(value as "all" | "true" | "false")}
             >
               <SelectTrigger id="route-active-filter" aria-label="Estado:" data-testid="active-filter-select" className="sm:w-[140px]">
@@ -960,8 +938,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               <SelectContent>
                 <SelectGroup>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="true">Solo activos</SelectItem>
-                  <SelectItem value="false">Solo inactivos</SelectItem>
+                  <SelectItem value="true">Activos</SelectItem>
+                  <SelectItem value="false">Inactivos</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -976,7 +954,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               value={zoneFilter}
               items={Object.fromEntries([
                 ["all", "Todas las zonas"],
-                ...availableZones.map((zone) => [zone.id, `${zone.name} (${zone.code})`]),
+                ...availableZones.map((zone) => [zone.id, zone.name]),
               ])}
               onValueChange={(value) => setZoneFilter(value ?? "all")}
             >
@@ -988,7 +966,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   <SelectItem value="all">Todas las zonas</SelectItem>
                   {availableZones.map((z) => (
                     <SelectItem key={z.id} value={z.id}>
-                      {z.name} ({z.code})
+                      {z.name}
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -1022,7 +1000,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         {state.status === "error" && (
           <Alert variant="destructive" className="rounded-none border-0">
             <AlertTriangle aria-hidden="true" />
-            <AlertTitle>Error al cargar recorridos</AlertTitle>
+            <AlertTitle>No se pudieron cargar los recorridos.</AlertTitle>
             <AlertDescription>
               {state.message}
               <Button
@@ -1041,12 +1019,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
           <div className="p-8 text-center" data-testid="empty-routes-state">
             <Empty>
               <EmptyHeader>
-                <EmptyTitle>No se encontraron recorridos</EmptyTitle>
-                <EmptyDescription>
-                  {search || activeFilter !== "all" || zoneFilter !== "all"
-                    ? "No hay recorridos que coincidan con los filtros seleccionados."
-                    : "No hay recorridos registrados en el catálogo."}
-                </EmptyDescription>
+                <EmptyTitle>Sin recorridos</EmptyTitle>
               </EmptyHeader>
               {canManage && (
                 <Button
@@ -1055,7 +1028,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   className="mt-4 inline-flex items-center gap-1.5"
                 >
                   <Plus className="h-4 w-4" />
-                  Crear primer recorrido
+                  Nuevo recorrido
                 </Button>
               )}
             </Empty>
@@ -1171,9 +1144,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
           <form onSubmit={handleCreateSubmit} className="space-y-4">
             <DialogHeader>
               <DialogTitle>Nuevo recorrido</DialogTitle>
-              <DialogDescription>
-                Registre un recorrido operativo. El código asignado será inmutable tras la creación.
-              </DialogDescription>
             </DialogHeader>
 
             {createErrors.form && (
@@ -1184,7 +1154,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
             <FieldGroup className="space-y-3">
               <Field>
-                <FieldLabel htmlFor="create-route-code">Código del recorrido</FieldLabel>
+                <FieldLabel htmlFor="create-route-code">Código</FieldLabel>
                 <Input
                   id="create-route-code"
                   type="text"
@@ -1205,16 +1175,16 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   </FieldError>
                 )}
                 <FieldDescription id="create-route-code-help">
-                  Identificador único (inmutable tras la creación).
+                  El código no se puede cambiar después.
                 </FieldDescription>
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="create-route-name">Nombre descriptivo</FieldLabel>
+                <FieldLabel htmlFor="create-route-name">Nombre</FieldLabel>
                 <Input
                   id="create-route-name"
                   type="text"
-                  placeholder="Ej: Recorrido Nocturno San Telmo"
+                  placeholder="Ej. Nocturno San Telmo"
                   value={createDraft.name}
                   onChange={(e) => {
                     setCreateDraft((d) => ({ ...d, name: e.target.value }));
@@ -1265,9 +1235,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <DialogHeader>
               <DialogTitle>Editar recorrido</DialogTitle>
-              <DialogDescription>
-                Modifique los datos operativos del recorrido.
-              </DialogDescription>
             </DialogHeader>
 
             {editErrors.form && (
@@ -1291,12 +1258,12 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                   data-testid="edit-route-code-readonly"
                 />
                 <FieldDescription id="edit-route-code-help">
-                  El código es inmutable tras la creación.
+                  El código no se puede cambiar después.
                 </FieldDescription>
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="edit-route-name">Nombre descriptivo</FieldLabel>
+                <FieldLabel htmlFor="edit-route-name">Nombre</FieldLabel>
                 <Input
                   id="edit-route-name"
                   type="text"
@@ -1360,10 +1327,10 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
             setDeactivateError(null);
           }
         }}
-        title={`Confirmar baja del recorrido ${deactivatingRoute?.code ?? ""}`.trim()}
-        consequence={`El recorrido ${deactivatingRoute?.code ?? ""} — ${deactivatingRoute?.name ?? ""} quedará inactivo. Las frecuencias existentes conservarán su referencia.`.trim()}
-        confirmAction={`Dar de baja el recorrido ${deactivatingRoute?.code ?? ""}`.trim()}
-        safeAlternative={`Conservar recorrido ${deactivatingRoute?.code ?? ""}`.trim()}
+        title={`Dar de baja el recorrido ${deactivatingRoute?.name ?? ""}`.trim()}
+        consequence={`El recorrido ${deactivatingRoute?.name ?? ""} quedará inactivo.`.trim()}
+        confirmAction={`Dar de baja el recorrido ${deactivatingRoute?.name ?? ""}`.trim()}
+        safeAlternative={`Conservar recorrido ${deactivatingRoute?.name ?? ""}`.trim()}
         confirmDisabled={isLoadingReferences || (referencesUnavailable && !referencesAcknowledged)}
         isSubmitting={isSubmittingDeactivate}
         onConfirm={() => void handleConfirmDeactivate()}
@@ -1378,20 +1345,20 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         {isLoadingReferences ? (
           <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
             <Spinner aria-hidden="true" />
-            Verificando referencias a frecuencias de servicio...
+            Verificando…
           </div>
         ) : referencesUnavailable ? (
           <div className="flex flex-col gap-3">
             <Alert variant="warning">
               <AlertTriangle aria-hidden="true" />
               <AlertDescription>
-                No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
+                No se pudo verificar si el recorrido está en uso.
               </AlertDescription>
             </Alert>
             <Field>
               <FieldLabel className="flex min-h-10 cursor-pointer items-center gap-3 [@media(max-width:760px)]:min-h-12">
                 <Checkbox checked={referencesAcknowledged} onCheckedChange={setReferencesAcknowledged} disabled={isSubmittingDeactivate} />
-                Entiendo que no se verificaron las referencias
+                Dar de baja de todos modos
               </FieldLabel>
             </Field>
           </div>
@@ -1400,9 +1367,9 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
             <div className="space-y-3">
               <Alert variant="warning" data-testid="references-warning-dialog">
                 <AlertTriangle aria-hidden="true" />
-                <AlertTitle>Advertencia: el recorrido está asignado a frecuencias de servicio activas</AlertTitle>
+                <AlertTitle>El recorrido tiene frecuencias activas.</AlertTitle>
                 <AlertDescription>
-                  <p>El backend no realiza control referencial automático. Desactivar este recorrido mantendrá las frecuencias existentes pero podría impactar en la programación operativa futura.</p>
+                  <p>Seguirán vigentes tras la baja.</p>
                   <div className="mt-2 space-y-1">
                     <div className="text-xs font-medium">Frecuencias activas ({referencesReport.activeServiceFrequencies.length}):</div>
                     <ItemGroup className="gap-1">
@@ -1420,12 +1387,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                 </AlertDescription>
               </Alert>
             </div>
-          ) : (
-            <div className="flex items-center gap-2 rounded-md bg-[var(--color-success-fill)] p-2.5 text-xs text-[var(--color-success)]">
-              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-              No se detectaron frecuencias de servicio activas referenciando este recorrido.
-            </div>
-          )
+          ) : null
         ) : null}
       </CatalogDeactivationDialog>
 
@@ -1442,19 +1404,19 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
             <DialogTitle className="text-center">
               {stalenessWarningReason === "unavailable"
                 ? "No se pudo verificar el recorrido"
-                : "Aviso de concurrencia en el recorrido"}
+                : "El recorrido cambió"}
             </DialogTitle>
             <DialogDescription className="text-center space-y-2 text-xs">
               <span className="block text-foreground text-sm font-medium">
                 {stalenessWarningReason === "unavailable"
-                  ? "No se pudo comprobar si el recorrido fue modificado en el servidor."
-                  : "El recorrido fue modificado en el servidor después de que abrió este editor."}
+                  ? "No se pudo comprobar si otra persona lo modificó."
+                  : "Otra persona lo modificó mientras editaba."}
               </span>
             </DialogDescription>
               <Alert variant="warning" className="text-left">
                 <AlertDescription>{stalenessWarningReason === "unavailable"
-                  ? "Aviso informativo: no fue posible verificar la secuencia actual. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."
-                  : "Aviso informativo (no autoritativo): El backend no posee control de concurrencia ni bloqueo optimista para paradas. Si continúa, la secuencia completa reemplazará los cambios existentes en el servidor de forma atómica."}</AlertDescription>
+                  ? "Si guarda, reemplaza las paradas actuales."
+                  : "Si guarda, reemplaza las paradas actuales."}</AlertDescription>
               </Alert>
           </DialogHeader>
           <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">

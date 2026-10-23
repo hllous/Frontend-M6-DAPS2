@@ -11,7 +11,7 @@ test.describe("Crew membership management @smoke", () => {
     const dialog = page.getByRole("dialog", { name: "Detalle de cuadrilla" });
     const members = dialog.getByRole("list", { name: "Integrantes de la cuadrilla" });
     await expect(members).toContainText("Ana Morales");
-    const memberPicker = dialog.getByRole("combobox", { name: /Agregar integrantes \(M1\)/ });
+    const memberPicker = dialog.getByRole("combobox", { name: /Agregar integrantes/ });
     await memberPicker.click();
     const memberSearch = page.getByRole("combobox", { name: "Buscar integrantes" });
     await memberSearch.fill("Pedro Ruiz");

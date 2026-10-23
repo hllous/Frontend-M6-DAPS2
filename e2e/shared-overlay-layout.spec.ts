@@ -12,7 +12,8 @@ test("container edit keeps title and save action visible while the form scrolls"
   await page.goto("/app/catalog/containers");
   await clickCatalogRowAction(page.locator("tbody tr").first(), /^Editar/);
   const dialog = page.getByRole("dialog", { name: "Editar contenedor" });
-  await page.setViewportSize({ width: 390, height: 844 });
+  // A short phone viewport guarantees the form overflows, so the sticky title and save action are exercised.
+  await page.setViewportSize({ width: 390, height: 600 });
   await expect(dialog.getByRole("heading")).toBeInViewport({ ratio: 1 });
   await expect(dialog.getByRole("button", { name: "Guardar contenedor", exact: true })).toBeInViewport({ ratio: 1 });
   const form = dialog.locator("form");

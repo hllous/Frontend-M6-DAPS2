@@ -3,7 +3,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -88,16 +87,11 @@ function EmptyContainerModalContent({
   return (
     <DialogContent className="max-w-md overflow-y-auto">
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-success)]">
-          <CheckCircle2 className="size-4" aria-hidden />
-          <span>Despacho operativo de vaciado</span>
-        </div>
         <DialogTitle>
           Registrar vaciado de contenedor {container.code}
         </DialogTitle>
         <DialogDescription>
-          Confirme el vaciado del contenedor desbordado para restituirlo a
-          estado Activo.
+          El contenedor vuelve a Activo.
         </DialogDescription>
       </DialogHeader>
 
@@ -112,24 +106,6 @@ function EmptyContainerModalContent({
         onSubmit={handleSubmit}
         className="flex flex-col gap-4"
       >
-        <Alert role="note">
-          <AlertDescription className="grid gap-2">
-            <p className="font-medium text-foreground">
-              Detalles del contenedor:
-            </p>
-            <p className="text-muted-foreground">
-              <span className="font-semibold">Ubicación:</span>{" "}
-              {container.address ?? "Sin dirección registrada"}
-            </p>
-            <p className="text-muted-foreground">
-              <span className="font-semibold">Capacidad:</span>{" "}
-              {container.capacityLiters.toLocaleString("es-AR")} L
-            </p>
-            <p className="text-muted-foreground">
-              <span className="font-semibold">Estado actual:</span> Desbordado
-            </p>
-          </AlertDescription>
-        </Alert>
       </form>
 
       <DialogFooter>

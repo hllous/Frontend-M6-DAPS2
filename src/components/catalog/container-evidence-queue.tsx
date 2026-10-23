@@ -66,13 +66,13 @@ export function useEvidenceQueue() {
     for (const file of Array.from(files)) {
       if (file.size > MAX_FILE_SIZE) {
         rejectedErrors.push(
-          `"${file.name}" supera el tamaño máximo permitido de ${EVIDENCE_FILE_SIZE_LABEL}.`,
+          `"${file.name}" pesa más de ${EVIDENCE_FILE_SIZE_LABEL}.`,
         );
         continue;
       }
       if (!ALLOWED_MIME_TYPES.has(file.type)) {
         rejectedErrors.push(
-          `"${file.name}" tiene un formato no permitido (${file.type || "desconocido"}). Formatos admitidos: JPEG, PNG, WebP, PDF.`,
+          `"${file.name}" no es una foto ni un PDF.`,
         );
         continue;
       }
@@ -126,7 +126,7 @@ export function useEvidenceQueue() {
       );
       return true;
     } catch (err) {
-      const msg = errorMessage(err, "Error al subir el archivo");
+      const msg = errorMessage(err, "No se pudo subir el archivo. Intente nuevamente.");
       setQueuedFiles((prev) =>
         prev.map((f) =>
           f.id === item.id ? { ...f, status: "error", error: msg } : f,

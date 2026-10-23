@@ -3,7 +3,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
-import { RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -88,17 +87,11 @@ function StartRelocationModalContent({
   return (
     <DialogContent className="max-w-md overflow-y-auto">
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-info)]">
-          <RotateCcw className="size-4" aria-hidden />
-          <span>Despacho de reubicación</span>
-        </div>
         <DialogTitle>
           Iniciar reubicación de contenedor {container.code}
         </DialogTitle>
         <DialogDescription>
-          Confirme el inicio del proceso de reubicación física del contenedor.
-          El contenedor pasará al estado En reubicación hasta que se confirme su
-          nueva ubicación.
+          El contenedor pasa a En reubicación hasta confirmar su nueva ubicación.
         </DialogDescription>
       </DialogHeader>
 
@@ -113,30 +106,6 @@ function StartRelocationModalContent({
         onSubmit={handleSubmit}
         className="flex flex-col gap-4"
       >
-        <Alert role="note">
-          <AlertDescription className="grid gap-2">
-            <p className="font-medium text-foreground">
-              Detalles del contenedor:
-            </p>
-            <p className="text-muted-foreground">
-              <span className="font-semibold">Ubicación actual:</span>{" "}
-              {container.address ?? "Sin dirección registrada"}
-            </p>
-            <p className="text-muted-foreground">
-              <span className="font-semibold">Capacidad:</span>{" "}
-              {container.capacityLiters.toLocaleString("es-AR")} L
-            </p>
-            <p className="text-muted-foreground">
-              <span className="font-semibold">Estado actual:</span> Activo
-            </p>
-          </AlertDescription>
-        </Alert>
-
-        <p className="text-xs text-muted-foreground">
-          Al confirmar, el contenedor figurará en estado de tránsito/reubicación
-          y requerirá el registro de su nueva dirección física para volver a
-          operar.
-        </p>
       </form>
 
       <DialogFooter>

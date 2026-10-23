@@ -3,7 +3,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -100,17 +99,11 @@ function ReportOverflowModalContent({
   return (
     <DialogContent className="max-w-md">
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-warning)]">
-          <AlertTriangle className="size-4" aria-hidden />
-          <span>Novedad operativa en vía pública</span>
-        </div>
         <DialogTitle>
           Reportar desborde de contenedor {container.code}
         </DialogTitle>
         <DialogDescription>
-          Confirme que el contenedor ha superado su capacidad física o presenta
-          acumulación de residuos perimetral. Esta acción transicionará el
-          estado a Desbordado.
+          El contenedor pasa a Desbordado.
         </DialogDescription>
       </DialogHeader>
 
@@ -125,22 +118,6 @@ function ReportOverflowModalContent({
         onSubmit={handleSubmit}
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain"
       >
-        <Alert role="note">
-          <AlertDescription>
-            <p className="font-medium text-foreground">
-              Detalles del contenedor:
-            </p>
-            <p className="mt-1 text-muted-foreground">
-              <span className="font-semibold">Ubicación:</span>{" "}
-              {container.address ?? "Sin dirección registrada"}
-            </p>
-            <p className="text-muted-foreground">
-              <span className="font-semibold">Capacidad:</span>{" "}
-              {container.capacityLiters.toLocaleString("es-AR")} L
-            </p>
-          </AlertDescription>
-        </Alert>
-
         <EvidenceQueueView
           queuedFiles={evidenceQueue.queuedFiles}
           fileValidationError={evidenceQueue.fileValidationError}

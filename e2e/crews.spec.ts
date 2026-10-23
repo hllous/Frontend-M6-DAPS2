@@ -4,15 +4,15 @@ import { loginViaApi } from "./support/auth";
 import { chooseCatalogBOption, openCatalogBRowDetail } from "./support/catalog-612-controls";
 
 test.describe("Crew catalog @smoke", () => {
-  test("Office registers and edits a crew with M1 labels and unchanged request values", async ({ page }) => {
+  test("Office registers and edits a crew with person labels and unchanged request values", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/catalog/crews");
     const name = `Cuadrilla e2e 612 ${Date.now()}`;
     await page.getByRole("button", { name: "Registrar cuadrilla", exact: true }).click();
     const createDialog = page.getByRole("dialog", { name: "Registrar cuadrilla" });
     await createDialog.getByRole("textbox", { name: "Nombre", exact: true }).fill(name);
-    await chooseCatalogBOption(page, createDialog.getByRole("combobox", { name: "Responsable de cuadrilla (M1)" }), "Carlos López");
-    await chooseCatalogBOption(page, createDialog.getByRole("combobox", { name: "Organización (M1)" }), "Municipalidad");
+    await chooseCatalogBOption(page, createDialog.getByRole("combobox", { name: "Responsable de cuadrilla" }), "Carlos López");
+    await chooseCatalogBOption(page, createDialog.getByRole("combobox", { name: "Organización" }), "Municipalidad");
     await chooseCatalogBOption(page, createDialog.getByRole("combobox", { name: "Turno predeterminado" }), "Tarde");
     const creation = page.waitForRequest(request => request.url().endsWith("/api/crews") && request.method() === "POST");
     await createDialog.getByRole("button", { name: "Guardar cuadrilla" }).click();

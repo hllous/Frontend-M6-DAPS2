@@ -35,7 +35,7 @@ describe("TreeCatalogPanel", () => {
 
     expect(await within(dialog).findByText("La zona operativa es obligatoria.")).toBeVisible();
     expect(zone).toHaveAttribute("aria-invalid", "true");
-    expect(zone).toHaveAttribute("aria-describedby", "tree-zone-help tree-zone-error");
+    expect(zone).toHaveAttribute("aria-describedby", "tree-zone-error");
   });
 
   it("lists trees for any authenticated actor and opens detail without management actions", async () => {
@@ -55,7 +55,7 @@ describe("TreeCatalogPanel", () => {
     expect(within(dialog).getByLabelText("Código de relevamiento")).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText("Altura (m)"), { target: { value: "15" } });
     await within(dialog).getByRole("button", { name: "Guardar árbol" }).click();
-    expect(await screen.findByText("Árbol actualizado con éxito.")).toBeVisible();
+    expect(await screen.findByText("Árbol actualizado.")).toBeVisible();
     const refreshedRow = await screen.findByRole("row", { name: /ARB-00442/ });
     await within(refreshedRow).getByRole("button", { name: "Dar de baja" }).click();
     const deactivateDialog = await screen.findByRole("dialog");
@@ -66,7 +66,7 @@ describe("TreeCatalogPanel", () => {
   it("shows the zone name in the Zona column and never the raw zone id", async () => {
     render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /ARB-00442/ });
-    expect(await within(row).findByText("Z-BEL · Belgrano")).toBeVisible();
+    expect(await within(row).findByText("Belgrano")).toBeVisible();
     expect(within(row).queryByText("zone-1")).not.toBeInTheDocument();
   });
 
@@ -132,7 +132,7 @@ describe("TreeCatalogPanel", () => {
     expect(await screen.findByLabelText("Buscar árbol")).toHaveValue("Jacar");
     expect(screen.getByRole("combobox", { name: "Filtrar árboles por estado" })).toHaveTextContent("Activos");
     await screen.findByRole("row", { name: /ARB-00442/ });
-    await chooseSelectOption(user, screen.getByRole("combobox", { name: "Filtrar árboles por zona" }), "Z-BEL · Belgrano");
+    await chooseSelectOption(user, screen.getByRole("combobox", { name: "Filtrar árboles por zona" }), "Belgrano");
     const params = new URLSearchParams(window.location.search);
     expect(params.get("zone")).toBe("zone-1");
     expect(params.get("active")).toBe("true");

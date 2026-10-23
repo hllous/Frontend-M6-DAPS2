@@ -56,7 +56,7 @@ test.describe("Container catalog management #120", () => {
     await dialog.getByRole("button", { name: "Guardar contenedor" }).click();
 
     await expect(dialog).not.toBeVisible();
-    await expect(page.getByText("Contenedor registrado con éxito.")).toBeVisible();
+    await expect(page.getByText("Contenedor registrado.")).toBeVisible();
 
     // The catalog's default page only shows the first page of results, and other
     // e2e specs permanently add containers of their own — search to make sure the
@@ -87,7 +87,7 @@ test.describe("Container catalog management #120", () => {
     await dialog.getByRole("button", { name: "Guardar contenedor" }).click();
 
     await expect(dialog).not.toBeVisible();
-    await expect(page.getByText("Contenedor actualizado con éxito.")).toBeVisible();
+    await expect(page.getByText("Contenedor actualizado.")).toBeVisible();
     await expect(page.getByText("Av. Rivadavia 2050")).toBeVisible();
   });
 
@@ -108,7 +108,7 @@ test.describe("Container catalog management #120", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("heading", { name: "Detalle del contenedor CONT-003" })).toBeVisible();
-    await expect(dialog.getByText("Diagnóstico de daño")).toBeVisible();
+    await expect(dialog.getByText("Daño", { exact: true })).toBeVisible();
     await expect(dialog.getByText("Tapa rota")).toBeVisible();
 
     await dialog.getByRole("button", { name: "Cerrar" }).click();
@@ -122,7 +122,6 @@ test.describe("Container catalog management #120", () => {
     await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
     const containerCard = page.locator("li", { hasText: "Contenedores" });
     await expect(containerCard).toBeVisible();
-    await expect(containerCard.getByText("Inventario de contenedores en vía pública")).toBeVisible();
 
     await containerCard.getByRole("link", { name: "Abrir catálogo" }).click();
     await expect(page).toHaveURL(/\/app\/catalog\/containers/);

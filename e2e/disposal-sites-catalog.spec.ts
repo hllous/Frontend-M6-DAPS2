@@ -39,7 +39,7 @@ test.describe("DisposalSite catalog management #103", () => {
     const deactivateDialog = page.getByRole("dialog");
     await expect(deactivateDialog.getByRole("heading", { name: `Confirmar baja del sitio de disposición ${code}` })).toBeVisible();
     await deactivateDialog.getByRole("button", { name: "Dar de baja", exact: true }).click();
-    await expect(page.getByText("Sitio de disposición dado de baja")).toBeVisible();
+    await expect(page.getByText("Sitio dado de baja")).toBeVisible();
     await chooseCatalogBOption(page, page.getByRole("combobox", { name: "Filtrar sitios por estado" }), "Inactivos");
     await expect(page.getByText(code)).toBeVisible();
     await expect(page.getByRole("row", { name: new RegExp(code) }).getByRole("button", { name: "Ver detalle del sitio de disposición " + code })).toHaveCount(1);

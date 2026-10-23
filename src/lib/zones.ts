@@ -53,7 +53,7 @@ export type Zone = z.infer<typeof zoneSchema>;
 /** Etiqueta de zona para tablas y detalles: nunca expone el id crudo. */
 export function zoneLabel(zones: Zone[], zoneId: string, loaded: boolean): string {
   const zone = zones.find((candidate) => candidate.id === zoneId);
-  if (zone) return `${zone.code} · ${zone.name}`;
+  if (zone) return zone.name;
   return loaded ? "Zona no disponible" : "Cargando zona…";
 }
 

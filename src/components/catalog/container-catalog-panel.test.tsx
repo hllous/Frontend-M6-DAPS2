@@ -62,7 +62,7 @@ describe("Container Service lookup", () => {
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
-    expect(await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.")).toBeVisible();
+    expect(await within(dialog).findByText("No se pudo verificar. Intente nuevamente.")).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeDisabled();
     failing = false;
     await user.click(within(dialog).getByRole("button", { name: "Reintentar" }));
@@ -108,7 +108,7 @@ describe("Container Service lookup", () => {
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
-    expect(await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.")).toBeVisible();
+    expect(await within(dialog).findByText("No se pudo verificar. Intente nuevamente.")).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeDisabled();
     expect(requestedPages.slice(-20)).toEqual(Array.from({ length: 20 }, (_, index) => index + 1));
     expect(requestedPages).not.toContain(21);
@@ -123,7 +123,7 @@ describe("Container Service lookup", () => {
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
-    expect(await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.")).toBeVisible();
+    expect(await within(dialog).findByText("No se pudo verificar. Intente nuevamente.")).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "Vaciar contenedor" })).toBeDisabled();
   });
 
@@ -146,7 +146,7 @@ describe("Container Service lookup", () => {
 
   it.each<[ContainerStatus, string]>([
     ["OVERFLOWED", "Vaciar contenedor"],
-    ["UNDER_REPAIR", "Completar reparación independiente"],
+    ["UNDER_REPAIR", "Completar reparación"],
     ["RELOCATING", "Confirmar ubicación"],
     ["DAMAGED", "Retirar contenedor"],
   ])("disables the %s standalone transition when verification fails", async (status, action) => {
@@ -162,7 +162,7 @@ describe("Container Service lookup", () => {
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
-    await within(dialog).findByText("No se pudo verificar si hay un servicio en curso para este contenedor. Reintente para habilitar las acciones.");
+    await within(dialog).findByText("No se pudo verificar. Intente nuevamente.");
     expect(within(dialog).getByRole("button", { name: action })).toBeDisabled();
   });
 });
@@ -185,7 +185,7 @@ describe("ContainerCatalogPanel", () => {
     expect(await screen.findByText("CONT-002")).toBeVisible();
 
     // Filter by zone
-    await chooseCatalogOption(user, screen.getByLabelText("Zona"), "Z-PAL · Palermo");
+    await chooseCatalogOption(user, screen.getByLabelText("Zona"), "Palermo");
     expect(screen.getByText("CONT-002")).toBeVisible();
 
     // Reset filters
@@ -256,7 +256,7 @@ describe("ContainerCatalogPanel", () => {
     const createDialog = screen.getByRole("dialog");
     await user.type(screen.getByLabelText("Código"), "CONT-PANEL-01");
     await chooseCatalogOption(user, screen.getByLabelText("Tipo de contenedor en el formulario"), "Materiales reciclables");
-    await chooseCatalogOption(user, screen.getByLabelText("Zona en el formulario"), "Z-PAL · Palermo");
+    await chooseCatalogOption(user, screen.getByLabelText("Zona en el formulario"), "Palermo");
     await user.type(screen.getByLabelText("Capacidad (litros)"), "1500");
     const address = screen.getByLabelText("Dirección");
     await user.click(address);
@@ -266,7 +266,7 @@ describe("ContainerCatalogPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Guardar contenedor" }));
 
-    expect(await screen.findByText("Contenedor registrado con éxito.")).toBeVisible();
+    expect(await screen.findByText("Contenedor registrado.")).toBeVisible();
     expect(createDialog).not.toBeVisible();
     expect(await screen.findByText("CONT-PANEL-01")).toBeVisible();
 
@@ -282,7 +282,7 @@ describe("ContainerCatalogPanel", () => {
     await user.paste("Av. Paseo Colón 900");
     await user.click(screen.getByRole("button", { name: "Guardar contenedor" }));
 
-    expect(await screen.findByText("Contenedor actualizado con éxito.")).toBeVisible();
+    expect(await screen.findByText("Contenedor actualizado.")).toBeVisible();
     expect(editDialog).not.toBeVisible();
     expect(screen.getByText("Av. Paseo Colón 900")).toBeVisible();
   });
@@ -321,17 +321,17 @@ describe("ContainerCatalogPanel", () => {
     expect(await screen.findByText("CONT-003")).toBeVisible();
     const damagedRow = screen.getByRole("row", { name: /CONT-003/ });
 
-    await clickContainerAction(user, damagedRow, "Iniciar reparación independiente");
+    await clickContainerAction(user, damagedRow, "Iniciar reparación");
     const startDialog = screen.getByRole("dialog");
-    expect(within(startDialog).getByText(/acción independiente de Oficina/i)).toBeVisible();
+    expect(within(startDialog).getByText("El contenedor pasa a En reparación.")).toBeVisible();
     await user.click(within(startDialog).getByRole("button", { name: "Iniciar reparación" }));
 
     const repairRow = screen.getByRole("row", { name: /CONT-003/ });
     expect(within(repairRow).getByText("En reparación")).toBeVisible();
-    await clickContainerAction(user, repairRow, "Completar reparación independiente");
+    await clickContainerAction(user, repairRow, "Completar reparación");
     const completeDialog = await screen.findByRole("dialog");
-    expect(within(completeDialog).getByText(/no corresponde al completado de un Servicio/i)).toBeVisible();
-    await user.click(within(completeDialog).getByRole("button", { name: "Confirmar reparación completa" }));
+    expect(within(completeDialog).getByText("El contenedor vuelve a Activo.")).toBeVisible();
+    await user.click(within(completeDialog).getByRole("button", { name: "Confirmar reparación" }));
 
     const activeRow = screen.getByRole("row", { name: /CONT-003/ });
     expect(within(activeRow).getByText("Activo")).toBeVisible();
@@ -360,9 +360,9 @@ describe("ContainerCatalogPanel", () => {
     const detailButton = within(row).getByRole("button", { name: "Ver detalle de CONT-003" });
     await user.click(detailButton);
     const detailDialog = screen.getByRole("dialog", { name: /Detalle del contenedor CONT-003/ });
-    await user.click(within(detailDialog).getByRole("button", { name: "Iniciar reparación independiente" }));
+    await user.click(within(detailDialog).getByRole("button", { name: "Iniciar reparación" }));
 
-    const repairDialog = screen.getByRole("dialog", { name: /Iniciar reparación independiente · CONT-003/ });
+    const repairDialog = screen.getByRole("dialog", { name: /Iniciar reparación · CONT-003/ });
     const repairButton = within(repairDialog).getByRole("button", { name: "Iniciar reparación" });
     await user.click(repairButton);
     expect(repairButton).toHaveAttribute("aria-busy", "true");
@@ -412,13 +412,13 @@ describe("ContainerCatalogPanel", () => {
 
     expect(await screen.findByText("CONT-004")).toBeVisible();
     const row = screen.getByRole("row", { name: /CONT-004/ });
-    await clickContainerAction(user, row, "Completar reparación independiente");
+    await clickContainerAction(user, row, "Completar reparación");
     const dialog = screen.getByRole("dialog");
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(fileInput, new File(["image-bytes"], "repair.png", { type: "image/png" }));
-    await user.click(within(dialog).getByRole("button", { name: "Confirmar reparación completa" }));
+    await user.click(within(dialog).getByRole("button", { name: "Confirmar reparación" }));
 
-    expect(await screen.findByText("Reparación completada con éxito para el contenedor CONT-004.")).toBeVisible();
+    expect(await screen.findByText("Reparación completada: CONT-004.")).toBeVisible();
     expect(evidenceOwners).toEqual(["CONTAINER"]);
   });
 
@@ -449,7 +449,7 @@ describe("ContainerCatalogPanel", () => {
     await user.upload(fileInput, new File(["pdf-bytes"], "removal.pdf", { type: "application/pdf" }));
     await user.click(within(dialog).getByRole("button", { name: "Confirmar retiro" }));
 
-    expect(await screen.findByText("Contenedor CONT-003 retirado con éxito.")).toBeVisible();
+    expect(await screen.findByText("Contenedor retirado: CONT-003.")).toBeVisible();
     expect(evidenceOwners).toEqual(["CONTAINER"]);
   });
 
@@ -493,7 +493,7 @@ describe("ContainerCatalogPanel", () => {
 
     await user.click(within(dialog).getByRole("button", { name: "Confirmar desborde" }));
 
-    expect(await screen.findByText("Desborde reportado con éxito para el contenedor CONT-001.")).toBeVisible();
+    expect(await screen.findByText("Desborde reportado: CONT-001.")).toBeVisible();
 
     // In the row, status badge is now OVERFLOWED
     const updatedRow = screen.getByRole("row", { name: /CONT-001/ });
@@ -523,7 +523,7 @@ describe("ContainerCatalogPanel", () => {
 
     await user.click(within(dialog).getByRole("button", { name: "Confirmar daño" }));
 
-    expect(await screen.findByText("Reporte de daño registrado con éxito para el contenedor CONT-001.")).toBeVisible();
+    expect(await screen.findByText("Daño registrado: CONT-001.")).toBeVisible();
 
     // In the row, status is now DAMAGED
     const updatedRow = screen.getByRole("row", { name: /CONT-001/ });
@@ -534,7 +534,7 @@ describe("ContainerCatalogPanel", () => {
     const detailDialog = screen.getByRole("dialog");
     expect(within(detailDialog).getByText("Vandalizado")).toBeVisible();
     expect(within(detailDialog).getByText("Alta")).toBeVisible();
-    expect(within(detailDialog).getByText(/Sí \(notificación a M3\)/)).toBeVisible();
+    expect(within(detailDialog).getByText("Sí (avisa a Obras Públicas)")).toBeVisible();
   });
 
   it("hides report buttons when actor lacks container:report or container is not ACTIVE", async () => {
@@ -585,13 +585,13 @@ describe("ContainerCatalogPanel", () => {
 
     expect(
       await within(dialog).findByText(
-        /"huge-file.pdf" supera el tamaño máximo permitido de 4 MB\./,
+        /"huge-file.pdf" pesa más de 4 MB./,
         { exact: false },
       ),
     ).toBeVisible();
     expect(
       within(dialog).getByText(
-        /"script.exe" tiene un formato no permitido/,
+        /"script.exe" no es una foto ni un PDF/,
         { exact: false },
       ),
     ).toBeVisible();
@@ -723,7 +723,7 @@ describe("ContainerCatalogPanel", () => {
 
       await user.click(within(dialog).getByRole("button", { name: "Confirmar vaciado" }));
 
-      expect(await screen.findByText("Vaciado registrado con éxito para el contenedor CONT-002.")).toBeVisible();
+      expect(await screen.findByText("Vaciado registrado: CONT-002.")).toBeVisible();
       const updatedRow = screen.getByRole("row", { name: /CONT-002/ });
       expect(within(updatedRow).getByText("Activo")).toBeVisible();
       await openContainerDetail(user, updatedRow);
@@ -764,7 +764,7 @@ describe("ContainerCatalogPanel", () => {
 
       await user.click(within(confirmDialog).getByRole("button", { name: "Confirmar ubicación" }));
 
-      expect(await screen.findByText("Nueva ubicación confirmada con éxito para el contenedor CONT-001.")).toBeVisible();
+      expect(await screen.findByText("Nueva ubicación confirmada: CONT-001.")).toBeVisible();
       const activeRow = screen.getByRole("row", { name: /CONT-001/ });
       expect(within(activeRow).getByText("Activo")).toBeVisible();
       expect(within(activeRow).getByText("Av. Callao 1500")).toBeVisible();

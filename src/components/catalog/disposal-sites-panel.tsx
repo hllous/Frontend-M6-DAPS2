@@ -23,7 +23,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -59,7 +58,6 @@ import {
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -199,7 +197,7 @@ export function DisposalSitesPanel({
       await disposalSitesAdapter.remove(deactivating.id);
       setDeactivating(null);
       notifySuccess(
-        "Sitio de disposición dado de baja. Los registros existentes conservan su referencia.",
+        "Sitio dado de baja.",
       );
       setRequestVersion((version) => version + 1);
     } catch (error) {
@@ -221,7 +219,6 @@ export function DisposalSitesPanel({
       <CatalogPageHeader
         title="Sitios de disposición"
         titleId="disposal-sites-title"
-        description="Destinos de disposición final que pueden referenciar los registros de recolección."
         actions={
           canManage ? (
             <Button
@@ -239,7 +236,7 @@ export function DisposalSitesPanel({
       {!canManage ? (
         <Alert role="status">
           <AlertDescription>
-            Esta sesión puede consultar el catálogo, pero no administrarlo.
+            Solo consulta
           </AlertDescription>
         </Alert>
       ) : null}
@@ -248,10 +245,6 @@ export function DisposalSitesPanel({
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Alta de sitio de disposición</DialogTitle>
-            <DialogDescription>
-                El sitio podrá ser referenciado por registros de recolección
-                existentes y futuros.
-              </DialogDescription>
           </DialogHeader>
           <form
             id="disposal-site-create-form"
@@ -512,9 +505,6 @@ export function DisposalSitesPanel({
           >
             <SheetHeader className="border-b border-border pr-12 pb-4">
               <SheetTitle>Detalle del sitio de disposición</SheetTitle>
-              <SheetDescription>
-                Información del lugar de tratamiento o transferencia.
-              </SheetDescription>
             </SheetHeader>
             <dl className="grid gap-4 px-4 pt-4 text-sm">
               <div>
@@ -583,10 +573,6 @@ export function DisposalSitesPanel({
             <>
           <DialogHeader>
             <DialogTitle>Editar sitio de disposición</DialogTitle>
-            <DialogDescription>
-                La baja siempre es lógica para preservar las referencias de los
-                registros de recolección.
-              </DialogDescription>
           </DialogHeader>
           <form
             id="disposal-site-edit-form"
@@ -694,7 +680,7 @@ export function DisposalSitesPanel({
           }
         }}
         title={`Confirmar baja del sitio de disposición ${deactivating?.code ?? ""}`.trim()}
-        consequence="El sitio quedará inactivo y no se utilizará en nuevas operaciones. Los registros existentes conservarán su referencia."
+        consequence="El sitio quedará inactivo."
         confirmAction="Dar de baja"
         safeAlternative="Conservar sitio"
         onConfirm={() => void confirmDeactivation()}

@@ -162,7 +162,7 @@ describe("TreeInterventionsPanel", () => {
     expect(treesInput).toHaveAttribute("aria-required", "true");
     expect(await within(dialog).findByText("Seleccione al menos un árbol.")).toBeVisible();
     expect(treesInput).toHaveAttribute("aria-invalid", "true");
-    expect(treesInput).toHaveAttribute("aria-describedby", "intervention-trees-help intervention-trees-error");
+    expect(treesInput).toHaveAttribute("aria-describedby", "intervention-trees-error");
 
     await chooseSelectOption(user, treesInput, /ARB-00443/);
     await chooseSelectOption(user, treesInput, /ARB-00445/);
@@ -183,7 +183,7 @@ describe("TreeInterventionsPanel", () => {
     render(<TreeInterventionsPanel scenario={scenarios.officeLimited} />);
     expect(await screen.findByRole("heading", { name: "Intervenciones de arbolado" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Solicitar intervención" })).not.toBeInTheDocument();
-    expect(screen.getByText(/puede consultar las solicitudes/i)).toBeVisible();
+    expect(screen.getByText("Solo consulta")).toBeVisible();
   });
 
   it("authorizes a non-removal intervention and shows the recorded author and time", async () => {
@@ -496,7 +496,7 @@ describe("TreeInterventionsPanel", () => {
     await user.click(await within(detail).findByRole("button", { name: "Rechazar intervención" }));
 
     const confirmation = await screen.findByRole("dialog", { name: /Confirmar rechazo/ });
-    expect(within(confirmation).getByText(/no podrá reabrirse/i)).toBeVisible();
+    expect(within(confirmation).getByText(/No se puede deshacer/i)).toBeVisible();
     await user.click(within(confirmation).getByRole("button", { name: "Confirmar rechazo de intervención" }));
 
     expect(await within(detail).findByText("Rechazada")).toBeVisible();

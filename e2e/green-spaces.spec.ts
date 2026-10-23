@@ -28,7 +28,7 @@ test.describe("Green Spaces catalog management @smoke", () => {
     await dialog.getByLabel("Nombre").fill(name);
     await chooseCatalogAOption(page, dialog, "Tipo de espacio en el formulario", "Plaza");
     await dialog.getByLabel("Superficie (m²)").fill("275");
-    await chooseCatalogAOption(page, dialog, "Zona en el formulario", "Z-BEL · Belgrano");
+    await chooseCatalogAOption(page, dialog, "Zona en el formulario", "Belgrano");
     await dialog.getByRole("button", { name: "Guardar espacio verde" }).click();
     await expect(dialog).not.toBeVisible();
 

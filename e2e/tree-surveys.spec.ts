@@ -29,6 +29,6 @@ test.describe("TreeSurvey ambient history #127", () => {
       requiresStreetClosure: false,
       requiresPublicWorks: false,
     });
-    await expect(page.getByText("Relevamiento registrado con éxito.")).toBeVisible();
+    await expect(page.getByText("Relevamiento registrado.")).toBeVisible();
   });
 });

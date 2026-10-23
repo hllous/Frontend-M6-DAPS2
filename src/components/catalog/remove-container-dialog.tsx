@@ -1,5 +1,5 @@
 "use client";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
@@ -94,9 +94,7 @@ function RemoveContainerModalContent({
       <DialogHeader>
         <DialogTitle>Retirar contenedor {container.code}</DialogTitle>
         <DialogDescription>
-          Esta acción terminal de Oficina cambiará el contenedor dañado a
-          Retirado. No podrá iniciar otra transición de ciclo de vida después
-          del retiro. Puede adjuntar evidencia plana al contenedor.
+          El contenedor pasa a Retirado. No se puede deshacer.
         </DialogDescription>
       </DialogHeader>
 
@@ -113,7 +111,6 @@ function RemoveContainerModalContent({
       >
         <Alert variant="destructive">
           <AlertDescription>
-            <AlertTitle>Confirmación de retiro</AlertTitle>
             <p className="mt-1 text-muted-foreground">
               Verifique que el contenedor {container.code} no volverá a operar.
             </p>

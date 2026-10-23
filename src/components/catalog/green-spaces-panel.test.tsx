@@ -44,7 +44,7 @@ describe("GreenSpacesPanel", () => {
     expect(await screen.findByText("Cantero Central")).toBeVisible();
     expect(screen.queryByText("Parque del Bicentenario")).not.toBeInTheDocument();
 
-    await chooseCatalogOption(user, screen.getByLabelText("Zona"), "Z-PAL · Palermo");
+    await chooseCatalogOption(user, screen.getByLabelText("Zona"), "Palermo");
     expect(screen.getByText("Cantero Central")).toBeVisible();
   });
 
@@ -58,7 +58,7 @@ describe("GreenSpacesPanel", () => {
     await user.type(screen.getByLabelText("Nombre"), "Plaza creada desde panel");
     await chooseCatalogOption(user, screen.getByLabelText("Tipo de espacio en el formulario"), "Plaza");
     await user.type(screen.getByLabelText("Superficie (m²)"), "275");
-    await chooseCatalogOption(user, screen.getByLabelText("Zona en el formulario"), "Z-BEL · Belgrano");
+    await chooseCatalogOption(user, screen.getByLabelText("Zona en el formulario"), "Belgrano");
     await user.click(screen.getByRole("button", { name: "Guardar espacio verde" }));
 
     expect(await screen.findByText("Espacio verde registrado.")).toBeVisible();
@@ -108,7 +108,7 @@ describe("GreenSpacesPanel", () => {
   it("shows the zone name in the Zona column and never the raw zone id", async () => {
     render(<GreenSpacesPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /Parque del Bicentenario/ });
-    expect(await within(row).findByText("Z-BEL · Belgrano")).toBeVisible();
+    expect(await within(row).findByText("Belgrano")).toBeVisible();
     expect(within(row).queryByText("zone-1")).not.toBeInTheDocument();
   });
 
@@ -168,7 +168,7 @@ describe("GreenSpacesPanel pagination", () => {
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 20 })));
     expect(await screen.findByText("Mostrando 21–40 de 57")).toBeVisible();
     for (const [label, value] of [["Estado", "true"], ["Tipo de espacio", "SQUARE"], ["Zona", "zone-1"]]) {
-      await chooseCatalogOption(user, screen.getByRole("combobox", { name: label }), ({ true: "Activos", SQUARE: "Plaza", "zone-1": "Z-BEL · Belgrano" } as Record<string, string>)[value]);
+      await chooseCatalogOption(user, screen.getByRole("combobox", { name: label }), ({ true: "Activos", SQUARE: "Plaza", "zone-1": "Belgrano" } as Record<string, string>)[value]);
       await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
       expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
       await user.click(screen.getByRole("button", { name: "Siguiente" }));

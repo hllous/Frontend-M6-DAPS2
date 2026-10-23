@@ -12,7 +12,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -154,15 +153,9 @@ function ReportDamageModalContent({
   return (
     <DialogContent className="max-w-lg">
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-destructive">
-          <AlertTriangle className="size-4" aria-hidden />
-          <span>Novedad de mantenimiento y avería</span>
-        </div>
         <DialogTitle>Reportar daño en contenedor {container.code}</DialogTitle>
         <DialogDescription>
-          Registre el desperfecto o siniestro observado. Esta acción
-          transicionará el estado a Dañado e informará los requerimientos de
-          reparación.
+          El contenedor pasa a Dañado.
         </DialogDescription>
       </DialogHeader>
 
@@ -281,12 +274,10 @@ function ReportDamageModalContent({
             />
             <FieldContent>
               <FieldLabel htmlFor="damage-public-works">
-                Requiere intervención de Obras Públicas (M3)
+                Requiere intervención de Obras Públicas
               </FieldLabel>
               <FieldDescription>
-                Marque si el daño involucra rotura de calzada, vereda,
-                anclajes civiles o requiere obra civil externa antes de poder
-                restituir o reinstalar el contenedor.
+                Rotura de calzada, vereda o anclajes.
               </FieldDescription>
             </FieldContent>
           </Field>

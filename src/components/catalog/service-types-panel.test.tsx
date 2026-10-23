@@ -95,7 +95,7 @@ describe("ServiceTypesPanel", () => {
     expect(await screen.findByRole("heading", { name: "Tipos de servicio" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Nuevo tipo de servicio" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Dar de baja" })).not.toBeInTheDocument();
-    expect(screen.getByText(/puede consultar el catálogo/i)).toBeVisible();
+    expect(screen.getByText("Solo consulta")).toBeVisible();
   });
 
   it("returns the BFF forbidden envelope for a Field write", async () => {

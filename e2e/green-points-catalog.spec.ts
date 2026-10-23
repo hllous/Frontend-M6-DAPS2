@@ -28,7 +28,7 @@ test.describe("Green Point catalog management #124", () => {
     await dialog.getByRole("button", { name: "Guardar punto verde" }).click();
 
     await expect(dialog).not.toBeVisible();
-    await expect(page.getByText("Punto verde creado con éxito.")).toBeVisible();
+    await expect(page.getByText("Punto verde creado.")).toBeVisible();
     const codeButton = page.getByRole("button", { name: `Ver detalle de ${code}` });
     await expect(codeButton).toBeVisible();
 
