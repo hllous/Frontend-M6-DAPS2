@@ -1,0 +1,9 @@
+.overlay[data-slot="dialog-content"] {
+  max-height: 100dvh;
+}
+
+@media (width >= 640px) {
+  .overlay[data-slot="dialog-content"] {
+    max-height: calc(100dvh - 2rem);
+  }
+}
