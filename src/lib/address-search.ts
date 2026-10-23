@@ -7,6 +7,8 @@ export { ADDRESS_SEARCH_FALLBACK_MESSAGE } from "./address-search-messages";
 export const ADDRESS_SEARCH_PATH = "/api/address-search";
 export const ADDRESS_SEARCH_LIMIT = 5;
 export const ADDRESS_SEARCH_TIMEOUT_MS = 5000;
+export const ADDRESS_SUGGEST_PATH = "/api/address-suggest";
+export const ADDRESS_SUGGEST_LIMIT = 5;
 
 export const addressSearchResultSchema = z.object({
   label: z.string().trim().min(1),
@@ -20,8 +22,10 @@ export type AddressSearchResponse = {
 };
 
 /** Validate the same-origin BFF boundary before mapping results for the picker. */
-export async function searchAddresses(query: string) {
-  const response = await authenticatedFetch(`${ADDRESS_SEARCH_PATH}?${new URLSearchParams({ q: query })}`);
+export async function searchAddresses(query: string, options: { typeahead?: boolean } = {}) {
+  const params = new URLSearchParams({ q: query });
+  if (options.typeahead) params.set("typeahead", "1");
+  const response = await authenticatedFetch(`${ADDRESS_SEARCH_PATH}?${params}`);
   if (!response.ok) throw new Error(ADDRESS_SEARCH_FALLBACK_MESSAGE);
   const payload = z.discriminatedUnion("outcome", [
     z.object({ outcome: z.literal("results"), data: z.array(addressSearchResultSchema).max(ADDRESS_SEARCH_LIMIT) }),
@@ -39,3 +43,12 @@ export type AddressSearchFailure = {
   timestamp: string;
   path: string;
 };
+
+export type StreetSuggestionResponse = { outcome: "results" | "empty"; data: { label: string }[] };
+/** Street names matching what the user has typed so far; failures resolve to no suggestions. */
+export async function suggestStreets(query: string, signal?: AbortSignal): Promise<string[]> {
+  const response = await authenticatedFetch(`${ADDRESS_SUGGEST_PATH}?${new URLSearchParams({ q: query })}`, { signal });
+  if (!response.ok) return [];
+  const payload = z.object({ data: z.array(z.object({ label: z.string().min(1) })).max(ADDRESS_SUGGEST_LIMIT) }).safeParse(await response.json());
+  return payload.success ? payload.data.data.map(({ label }) => label) : [];
+}

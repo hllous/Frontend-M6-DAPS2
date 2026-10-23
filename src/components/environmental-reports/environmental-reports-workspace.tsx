@@ -42,7 +42,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
 import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime } from "@/lib/argentina-date";
-import { searchAddresses } from "@/lib/address-search";
+import { searchAddresses, suggestStreets } from "@/lib/address-search";
 import {
   ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS,
   ENVIRONMENTAL_SEVERITY_LABELS as severityLabels,
@@ -1071,7 +1071,7 @@ function CreateReportDialog({ open, onOpenChange, onSuccess }: { open: boolean; 
           <Field data-invalid={Boolean(errors.location)}>
             <FieldLabel htmlFor="environmental-report-location">Ubicación <span aria-hidden="true">*</span></FieldLabel>
             {point && <p role="status">{locationPointLabel(point)}</p>}
-            <LocationPickerDialog open={locationOpen} onOpenChange={setLocationOpen} currentPoint={point} initialAddress={address} searchAddresses={searchAddresses} onConfirm={(selected, label) => {
+            <LocationPickerDialog open={locationOpen} onOpenChange={setLocationOpen} currentPoint={point} initialAddress={address} searchAddresses={searchAddresses} suggestStreets={suggestStreets} onConfirm={(selected, label) => {
               setPoint(selected);
               if (label && !address.trim()) setAddress(label);
               setErrors((current) => ({ ...current, location: "", ...(label && !address.trim() ? { address: "" } : {}) }));
