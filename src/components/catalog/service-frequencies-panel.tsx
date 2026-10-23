@@ -2,7 +2,7 @@
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { CalendarClock, Check, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { Check, ChevronRight, Pencil, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,6 @@ import { DatePicker } from "@/components/ui/date-picker";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -109,7 +108,7 @@ type EditDraft = {
 };
 
 function formatDate(value: string | null) {
-  if (!value) return "Sin fecha de cierre";
+  if (!value) return "Sin cierre";
   return new Intl.DateTimeFormat("es-AR", {
     day: "2-digit",
     month: "2-digit",
@@ -275,7 +274,7 @@ export function ServiceFrequenciesPanel({
       });
       setShowCreate(false);
       notifySuccess(
-        "Frecuencia creada. La regla queda almacenada para su configuración operativa.",
+        "Frecuencia creada.",
       );
       refresh();
     } catch (error) {
@@ -301,7 +300,7 @@ export function ServiceFrequenciesPanel({
       });
       setEditOpen(false);
       notifySuccess(
-        "Frecuencia actualizada. Los servicios ya creados no se modifican.",
+        "Frecuencia actualizada.",
       );
       refresh();
     } catch (error) {
@@ -321,7 +320,7 @@ export function ServiceFrequenciesPanel({
       await serviceFrequenciesAdapter.close(closing.id);
       setClosing(null);
       notifySuccess(
-        "Vigencia cerrada. Los servicios ya creados no se modifican.",
+        "Vigencia cerrada.",
       );
       refresh();
     } catch (error) {
@@ -337,7 +336,6 @@ export function ServiceFrequenciesPanel({
       <CatalogPageHeader
         title="Frecuencias de servicio"
         titleId="service-frequencies-title"
-        description="Configure reglas de recorrido por día, turno y vigencia. Esta configuración no genera servicios automáticamente."
         actions={
           canManage ? (
             <Button
@@ -356,7 +354,7 @@ export function ServiceFrequenciesPanel({
       {!canManage ? (
         <Alert role="status">
           <AlertDescription>
-            Esta sesión puede consultar las frecuencias, pero no administrarlas.
+            Solo consulta
           </AlertDescription>
         </Alert>
       ) : null}
@@ -372,8 +370,7 @@ export function ServiceFrequenciesPanel({
           <DialogHeader>
             <DialogTitle>Nueva frecuencia</DialogTitle>
             <DialogDescription>
-                Solo se muestran tipos de servicio de modo Recorrido. El tipo y
-                el recorrido quedan inmutables después de crear la regla.
+                Tipo y recorrido no se pueden cambiar después.
               </DialogDescription>
           </DialogHeader>
           <form
@@ -554,7 +551,7 @@ export function ServiceFrequenciesPanel({
               </Select>
             </Field>
             <Field>
-              <FieldLabel htmlFor="filter-frequency-route">Ruta</FieldLabel>
+              <FieldLabel htmlFor="filter-frequency-route">Recorrido</FieldLabel>
               <Select
                 items={Object.fromEntries([
                   ["", "Todos"],
@@ -569,7 +566,7 @@ export function ServiceFrequenciesPanel({
               >
                 <SelectTrigger
                   id="filter-frequency-route"
-                  aria-label="Filtrar por ruta"
+                  aria-label="Filtrar por recorrido"
                   className="bg-card"
                 >
                   <SelectValue />
@@ -753,9 +750,6 @@ export function ServiceFrequenciesPanel({
           >
             <SheetHeader className="border-b border-border pr-12 pb-4">
               <SheetTitle>Detalle de frecuencia de servicio</SheetTitle>
-              <SheetDescription>
-                Regla configurada para un tipo de servicio y recorrido.
-              </SheetDescription>
             </SheetHeader>
             <dl className="grid gap-4 px-4 pt-4 text-sm">
               <div>
@@ -835,7 +829,6 @@ export function ServiceFrequenciesPanel({
                   editing.item.serviceTypeId}
                 . Recorrido:{" "}
                 {routeNames.get(editing.item.routeId) ?? editing.item.routeId}.
-                Estos vínculos no se pueden modificar.
               </DialogDescription>
           </DialogHeader>
           <form
@@ -960,17 +953,9 @@ export function ServiceFrequenciesPanel({
               {closing
                 ? (routeNames.get(closing.routeId) ?? "seleccionado")
                 : "seleccionado"}
-              . La regla dejará de estar vigente.
+              . La regla dejará de estar vigente hoy. Los servicios ya creados no cambian.
             </DialogDescription>
           </DialogHeader>
-          <Alert role="note">
-            <CalendarClock aria-hidden="true" />
-            <AlertDescription>
-              El sistema establecerá la fecha de cierre hoy o en la fecha de
-              inicio si todavía no comenzó. Los servicios ya creados quedan
-              intactos.
-            </AlertDescription>
-          </Alert>
           {closeError ? (
             <Alert variant="destructive">
               <AlertDescription>{closeError}</AlertDescription>
@@ -1006,9 +991,6 @@ function DayPicker({
   return (
     <FieldSet className="md:col-span-2">
       <FieldLegend id={`${idPrefix}-label`}>Días de la semana</FieldLegend>
-      <FieldDescription id={`${idPrefix}-help`}>
-        Seleccione todos los días que forman parte de la regla.
-      </FieldDescription>
       <ToggleGroup
         multiple
         variant="outline"
@@ -1019,7 +1001,6 @@ function DayPicker({
               onToggle(day.value);
         }}
         aria-labelledby={`${idPrefix}-label`}
-        aria-describedby={`${idPrefix}-help`}
         className="flex-wrap"
       >
         {weekdays.map((day) => (

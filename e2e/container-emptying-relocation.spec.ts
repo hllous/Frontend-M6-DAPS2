@@ -61,7 +61,7 @@ test.describe("Office emptying and relocation dispatch #123", () => {
     await expectCatalogAMutation(page, /\/empty$/, null, () => emptyDialog.getByRole("button", { name: "Confirmar vaciado" }).click());
 
     await expect(
-      page.getByText(`Vaciado registrado con éxito para el contenedor ${code}.`),
+      page.getByText(`Vaciado registrado: ${code}.`),
     ).toBeVisible();
     await expect(emptyDialog).not.toBeVisible();
 
@@ -144,7 +144,7 @@ test.describe("Office emptying and relocation dispatch #123", () => {
     await expectCatalogAMutation(page, /\/confirm-relocation$/, { address: "Av. Cabildo 2200", lat: -34.562, lng: -58.456 }, () => confirmDialog.getByRole("button", { name: "Confirmar ubicación" }).click());
 
     await expect(
-      page.getByText(`Nueva ubicación confirmada con éxito para el contenedor ${code}.`),
+      page.getByText(`Nueva ubicación confirmada: ${code}.`),
     ).toBeVisible();
     await expect(confirmDialog).not.toBeVisible();
 

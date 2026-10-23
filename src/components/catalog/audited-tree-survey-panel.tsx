@@ -126,7 +126,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
       return;
     }
     setIsSubmitting(true);
-    try { await treeSurveysAdapter.createTreeSurvey(tree.id, parsed.data as TreeSurveyCreateInput); setFormOpen(false); setNotice("Relevamiento registrado con éxito."); setPage(1); setRequestVersion((version) => version + 1); }
+    try { await treeSurveysAdapter.createTreeSurvey(tree.id, parsed.data as TreeSurveyCreateInput); setFormOpen(false); setNotice("Relevamiento registrado."); setPage(1); setRequestVersion((version) => version + 1); }
     catch (caught) { setFormError(errorMessage(caught, "No se pudo registrar el relevamiento.")); setFormErrorField("form"); }
     finally { setIsSubmitting(false); }
   };
@@ -140,7 +140,7 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
       <div><Button type="button" variant="ghost" size="sm" className="mb-2 -ml-3 gap-1" onClick={onClose}><ArrowLeft data-icon="inline-start" aria-hidden />Volver al censo</Button><h2 id="tree-surveys-title" className="text-2xl font-semibold tracking-tight">Historial de relevamientos · {tree.surveyCode}</h2><p className="mt-1 text-sm text-muted-foreground">{tree.species ?? "Especie no registrada"} · {tree.address ?? "Sin dirección registrada"}</p></div>
       {canSurvey ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar relevamiento</Button> : null}
     </div>
-    {!canSurvey ? <Alert><AlertDescription>Esta sesión puede consultar el historial, pero no registrar relevamientos.</AlertDescription></Alert> : null}
+    {!canSurvey ? <Alert><AlertDescription>Solo consulta</AlertDescription></Alert> : null}
     {notice ? <Alert role="status"><AlertDescription>{notice}</AlertDescription></Alert> : null}
     <Card className="py-0">
       <CardContent className="p-4">
@@ -164,23 +164,22 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
     </Card>
     {state.status === "loading" ? <div role="status" aria-label="Cargando relevamientos" className="flex flex-col gap-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div> : null}
     {state.status === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{state.message}</span><Button type="button" variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></AlertDescription></Alert> : null}
-    {state.status === "ready" && state.page.surveys.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin relevamientos</EmptyTitle><EmptyDescription>No hay registros para los filtros seleccionados. Quite uno o más filtros para consultar el historial completo.</EmptyDescription></EmptyHeader></Empty> : null}
+    {state.status === "ready" && state.page.surveys.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin relevamientos</EmptyTitle><EmptyDescription>Sin relevamientos con esos filtros.</EmptyDescription></EmptyHeader></Empty> : null}
     {state.status === "ready" && state.page.surveys.length > 0 ? <><p className="text-sm text-muted-foreground" aria-live="polite">{state.page.total} {state.page.total === 1 ? "relevamiento" : "relevamientos"}</p><div className="grid gap-3">{state.page.surveys.map((survey) => <article key={survey.id} aria-label={`${dateLabel(survey.surveyedAt)} · ${RISK_LEVEL_LABELS[survey.riskLevel]}`} className="rounded-xl border border-border bg-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold">{dateLabel(survey.surveyedAt)}</p><div className="mt-2 flex flex-wrap gap-2"><HealthBadge status={survey.healthStatus} /><RiskBadge level={survey.riskLevel} /></div></div><Button type="button" size="sm" variant="outline" onClick={() => void openDetail(survey)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button></div><dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de riesgo</dt><dd className="mt-0.5">{survey.riskType ? RISK_TYPE_LABELS[survey.riskType] : "No informado"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Intervención sugerida</dt><dd className="mt-0.5">{survey.suggestedIntervention ? INTERVENTION_LABELS[survey.suggestedIntervention] : "No sugerida"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dependencias</dt><dd className="mt-0.5">{[survey.requiresStreetClosure && "Corte de calle", survey.requiresPublicWorks && "Obras públicas"].filter(Boolean).join(" · ") || "Ninguna"}</dd></div></dl></article>)}</div><div className="flex items-center justify-between gap-3" aria-label="Paginación de relevamientos"><span className="text-sm text-muted-foreground">Página {state.page.page} de {state.page.totalPages}</span><div className="flex gap-2"><Button type="button" variant="outline" size="sm" aria-label="Página anterior" disabled={state.page.page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft data-icon="inline-start" aria-hidden />Anterior</Button><Button type="button" variant="outline" size="sm" aria-label="Página siguiente" disabled={state.page.page >= state.page.totalPages} onClick={() => setPage((current) => current + 1)}>Siguiente<ChevronRight data-icon="inline-end" aria-hidden /></Button></div></div></> : null}
 
     <Dialog open={formOpen} onOpenChange={setFormOpen}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Registrar relevamiento</DialogTitle><DialogDescription>Observación ambiental del árbol. El registro quedará guardado como parte del historial inmutable.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Registrar relevamiento</DialogTitle><DialogDescription>No se puede modificar después.</DialogDescription></DialogHeader>
         {formError && fieldHasError("form") ? <Alert variant="destructive"><AlertDescription>{formError}</AlertDescription></Alert> : null}
         <form id="tree-survey-form" className="flex min-h-0 flex-1 flex-col" onSubmit={(event) => void submit(event)} noValidate>
           <FieldGroup className="gap-4">
             <Field data-invalid={fieldHasError("surveyedAt")}>
-              <FieldLabel htmlFor="surveyed-at">Fecha del relevamiento <span>(obligatorio)</span></FieldLabel>
-              <DatePicker id="surveyed-at" aria-describedby={fieldHasError("surveyedAt") ? "surveyed-at-help surveyed-at-error" : "surveyed-at-help"} invalid={fieldHasError("surveyedAt")} max={today} value={form.surveyedAt} onChange={(surveyedAt) => setForm({ ...form, surveyedAt })} />
-              <FieldDescription className="text-xs leading-4" id="surveyed-at-help">Indique la fecha en que se realizó la observación.</FieldDescription>
+              <FieldLabel htmlFor="surveyed-at">Fecha <span aria-hidden="true">*</span></FieldLabel>
+              <DatePicker id="surveyed-at" aria-describedby={fieldHasError("surveyedAt") ? "surveyed-at-error" : undefined} invalid={fieldHasError("surveyedAt")} max={today} value={form.surveyedAt} onChange={(surveyedAt) => setForm({ ...form, surveyedAt })} />
               {fieldHasError("surveyedAt") ? <FieldError id="surveyed-at-error">{formError}</FieldError> : null}
             </Field>
             <Field data-invalid={fieldHasError("healthStatus")}>
-              <FieldLabel htmlFor="health-status">Estado sanitario <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+              <FieldLabel htmlFor="health-status">Estado sanitario <span aria-hidden="true">*</span></FieldLabel>
               <Select items={HEALTH_LABELS} value={form.healthStatus || null} onValueChange={(value) => setForm({ ...form, healthStatus: String(value ?? "") as FormState["healthStatus"] })}>
                 <SelectTrigger id="health-status" aria-label="Estado sanitario" aria-required="true" aria-invalid={fieldHasError("healthStatus")} aria-describedby={fieldHasError("healthStatus") ? "health-status-help health-status-error" : "health-status-help"}><SelectValue placeholder="Seleccione un estado" /></SelectTrigger>
                 <SelectContent><SelectGroup>{Object.entries(HEALTH_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
@@ -189,12 +188,11 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
               {fieldHasError("healthStatus") ? <FieldError id="health-status-error">{formError}</FieldError> : null}
             </Field>
             <Field data-invalid={fieldHasError("riskLevel")}>
-              <FieldLabel htmlFor="risk-level">Nivel de riesgo <span aria-hidden="true">(obligatorio)</span></FieldLabel>
+              <FieldLabel htmlFor="risk-level">Nivel de riesgo <span aria-hidden="true">*</span></FieldLabel>
               <Select items={RISK_LEVEL_LABELS} value={form.riskLevel || null} onValueChange={(value) => setForm({ ...form, riskLevel: String(value ?? "") as FormState["riskLevel"] })}>
-                <SelectTrigger id="risk-level" aria-label="Nivel de riesgo" aria-required="true" aria-invalid={fieldHasError("riskLevel")} aria-describedby={fieldHasError("riskLevel") ? "risk-level-help risk-level-error" : "risk-level-help"}><SelectValue placeholder="Seleccione un nivel" /></SelectTrigger>
+                <SelectTrigger id="risk-level" aria-label="Nivel de riesgo" aria-required="true" aria-invalid={fieldHasError("riskLevel")} aria-describedby={fieldHasError("riskLevel") ? "risk-level-error" : undefined}><SelectValue placeholder="Seleccione un nivel" /></SelectTrigger>
                 <SelectContent><SelectGroup>{Object.entries(RISK_LEVEL_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
-              <FieldDescription className="text-xs leading-4" id="risk-level-help">Use el nivel que corresponda a la exposición observada.</FieldDescription>
               {fieldHasError("riskLevel") ? <FieldError id="risk-level-error">{formError}</FieldError> : null}
             </Field>
             <Field data-invalid={fieldHasError("riskType")}>
@@ -203,16 +201,15 @@ export function AuditedTreeSurveyPanel({ tree, scenario, onClose }: { tree: Tree
                 <SelectTrigger id="risk-type" aria-label="Tipo de riesgo" aria-required={form.riskLevel === "HIGH" || form.riskLevel === "CRITICAL"} aria-invalid={fieldHasError("riskType")} aria-describedby={fieldHasError("riskType") ? "risk-type-help risk-type-error" : "risk-type-help"}><SelectValue placeholder="Seleccione un tipo" /></SelectTrigger>
                 <SelectContent><SelectGroup><SelectItem value="__none__">Sin tipo</SelectItem>{Object.entries(RISK_TYPE_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
-              <FieldDescription className="text-xs leading-4" id="risk-type-help">Obligatorio para niveles de riesgo alto o crítico.</FieldDescription>
+              <FieldDescription className="text-xs leading-4" id="risk-type-help">Obligatorio si el riesgo es alto o crítico.</FieldDescription>
               {fieldHasError("riskType") ? <FieldError id="risk-type-error">{formError}</FieldError> : null}
             </Field>
             <Field data-invalid={fieldHasError("suggestedIntervention")}>
               <FieldLabel htmlFor="suggested-intervention">Intervención sugerida</FieldLabel>
               <Select items={{ __none__: "Sin sugerencia", ...INTERVENTION_LABELS }} value={form.suggestedIntervention || null} onValueChange={(value) => setForm({ ...form, suggestedIntervention: value === "__none__" ? "" : String(value ?? "") })}>
-                <SelectTrigger id="suggested-intervention" aria-label="Intervención sugerida" aria-invalid={fieldHasError("suggestedIntervention")} aria-describedby={fieldHasError("suggestedIntervention") ? "suggested-intervention-help suggested-intervention-error" : "suggested-intervention-help"}><SelectValue placeholder="Sin sugerencia" /></SelectTrigger>
+                <SelectTrigger id="suggested-intervention" aria-label="Intervención sugerida" aria-invalid={fieldHasError("suggestedIntervention")} aria-describedby={fieldHasError("suggestedIntervention") ? "suggested-intervention-error" : undefined}><SelectValue placeholder="Sin sugerencia" /></SelectTrigger>
                 <SelectContent><SelectGroup><SelectItem value="__none__">Sin sugerencia</SelectItem>{Object.entries(INTERVENTION_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
-              <FieldDescription className="text-xs leading-4" id="suggested-intervention-help">Registre la acción recomendada, si corresponde.</FieldDescription>
               {fieldHasError("suggestedIntervention") ? <FieldError id="suggested-intervention-error">{formError}</FieldError> : null}
             </Field>
             <FieldSet className="gap-3">

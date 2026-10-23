@@ -30,7 +30,6 @@ import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -38,7 +37,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -330,10 +328,10 @@ export function GreenPointCatalogPanel({
           editingPoint.id,
           parsed.data as GreenPointUpdateInput,
         );
-        setNotice("Punto verde actualizado con éxito.");
+        setNotice("Punto verde actualizado.");
       } else {
         await greenPointsAdapter.create(parsed.data as GreenPointCreateInput);
-        setNotice("Punto verde creado con éxito.");
+        setNotice("Punto verde creado.");
       }
       setFormOpen(false);
       setRequestVersion((version) => version + 1);
@@ -362,7 +360,7 @@ export function GreenPointCatalogPanel({
       await greenPointsAdapter.remove(deactivatingPoint.id);
       setDeactivatingPoint(null);
       setNotice(
-        "Punto verde dado de baja. Se conserva su referencia histórica.",
+        "Punto verde dado de baja.",
       );
       setRequestVersion((version) => version + 1);
     } catch (caught) {
@@ -384,7 +382,6 @@ export function GreenPointCatalogPanel({
       <CatalogPageHeader
         title="Puntos verdes"
         titleId="green-points-title"
-        description="Puntos de entrega voluntaria, su ubicación y el conjunto completo de residuos que aceptan."
         actions={
           canManage ? (
             <Button type="button" onClick={openCreate}>
@@ -397,7 +394,7 @@ export function GreenPointCatalogPanel({
 
       {!canManage ? (
         <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
-          Esta sesión puede consultar el catálogo, pero no administrarlo.
+          Solo consulta
         </p>
       ) : null}
       {notice ? (
@@ -426,7 +423,7 @@ export function GreenPointCatalogPanel({
             items={{
               all: "Todas",
               ...Object.fromEntries(
-                zones.map((zone) => [zone.id, `${zone.code} · ${zone.name}`]),
+                zones.map((zone) => [zone.id, zone.name]),
               ),
             }}
             value={zoneFilter}
@@ -443,7 +440,7 @@ export function GreenPointCatalogPanel({
                 <SelectItem value="all">Todas</SelectItem>
                 {zones.map((zone) => (
                   <SelectItem key={zone.id} value={zone.id}>
-                    {zone.code} · {zone.name}
+                    {zone.name}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -642,11 +639,6 @@ export function GreenPointCatalogPanel({
             <DialogTitle>
               {editingPoint ? "Editar punto verde" : "Registrar punto verde"}
             </DialogTitle>
-            <DialogDescription>
-              {editingPoint
-                ? "Actualice los datos del punto. La selección de residuos reemplaza el conjunto completo aceptado."
-                : "Complete los datos del punto de entrega voluntaria."}
-            </DialogDescription>
           </DialogHeader>
           {formError ? (
             <Alert variant="destructive">
@@ -679,8 +671,7 @@ export function GreenPointCatalogPanel({
                     .join(" ")}
                 />
                 <FieldDescription id="green-point-code-help">
-                  El código identifica el punto en la vía pública y no se puede
-                  cambiar.
+                  No se puede cambiar después.
                 </FieldDescription>
                 {fieldErrors.code ? (
                   <FieldError id="green-point-code-error">
@@ -718,7 +709,7 @@ export function GreenPointCatalogPanel({
                     ...Object.fromEntries(
                       zones.map((zone) => [
                         zone.id,
-                        `${zone.code} · ${zone.name}`,
+                        zone.name,
                       ]),
                     ),
                   }}
@@ -743,7 +734,7 @@ export function GreenPointCatalogPanel({
                       <SelectItem value="">Seleccione una zona</SelectItem>
                       {zones.map((zone) => (
                         <SelectItem key={zone.id} value={zone.id}>
-                          {zone.code} · {zone.name}
+                          {zone.name}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -765,10 +756,6 @@ export function GreenPointCatalogPanel({
                 }
               >
                 <FieldLegend>Residuos aceptados</FieldLegend>
-                <p className="text-xs text-muted-foreground">
-                  La selección representa el conjunto completo actual; no es una
-                  lista ordenada.
-                </p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {wasteTypes.map((type) => (
                     <Field
@@ -813,10 +800,6 @@ export function GreenPointCatalogPanel({
                       : undefined
                   }
                 />
-                <FieldDescription>
-                  Opcional. Permite encontrar el punto junto con su ubicación
-                  geográfica.
-                </FieldDescription>
                 {fieldErrors.address ? (
                   <FieldError id="green-point-address-error">
                     {fieldErrors.address}
@@ -916,7 +899,7 @@ export function GreenPointCatalogPanel({
           }
         }}
         title={`Confirmar baja del punto verde ${deactivatingPoint?.code ?? ""}`.trim()}
-        consequence="El punto verde quedará inactivo y no estará disponible para nuevas consultas operativas. Sus registros históricos conservarán la referencia."
+        consequence="El punto verde quedará inactivo."
         confirmAction={`Dar de baja el punto verde ${deactivatingPoint?.code ?? ""}`.trim()}
         safeAlternative={`Conservar el punto verde ${deactivatingPoint?.code ?? ""}`.trim()}
         onConfirm={() => void confirmDeactivation()}
@@ -945,10 +928,6 @@ export function GreenPointCatalogPanel({
             <SheetTitle>
               Detalle del punto verde {detailPoint?.code}
             </SheetTitle>
-            <SheetDescription>
-              Información del emplazamiento y del conjunto completo de residuos
-              aceptados.
-            </SheetDescription>
           </SheetHeader>
           {detailLoading ? (
             <Alert role="status">

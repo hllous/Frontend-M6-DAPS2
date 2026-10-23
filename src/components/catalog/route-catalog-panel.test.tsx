@@ -103,10 +103,10 @@ describe("RouteCatalogPanel component", () => {
     render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
     await user.click(await screen.findByTestId("deactivate-route-route-1"));
     const dialog = await screen.findByRole("dialog");
-    expect(await within(dialog).findByText("No se pudieron verificar las referencias. Si contin\u00faa, la baja puede afectar servicios o elementos que todav\u00eda usan este registro.")).toBeVisible();
+    expect(await within(dialog).findByText("No se pudo verificar si el recorrido está en uso.")).toBeVisible();
     const confirm = within(dialog).getByTestId("confirm-deactivate-button");
     expect(confirm).toBeDisabled();
-    await user.click(within(dialog).getByRole("checkbox", { name: "Entiendo que no se verificaron las referencias" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "Dar de baja de todos modos" }));
     expect(confirm).toBeEnabled();
     await user.click(confirm);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -179,7 +179,7 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByText("REC-003")).toBeInTheDocument();
     });
 
-    await chooseSelectOption(user, "Estado:", "Solo activos");
+    await chooseSelectOption(user, "Estado:", "Activos");
 
     await waitFor(() => {
       expect(screen.getByText("REC-001")).toBeInTheDocument();
@@ -199,7 +199,7 @@ describe("RouteCatalogPanel component", () => {
     });
 
     // Select zone-1: only REC-001 passes through zone-1
-    await chooseSelectOption(user, "Zona:", "Belgrano (Z-BEL)");
+    await chooseSelectOption(user, "Zona:", "Belgrano");
 
     await waitFor(() => {
       expect(screen.getByText("REC-001")).toBeInTheDocument();
@@ -337,7 +337,7 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByTestId("confirm-deactivate-button")).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole("checkbox", { name: "Entiendo que no se verificaron las referencias" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Dar de baja de todos modos" })).not.toBeInTheDocument();
 
     // Confirm deactivation
     await user.click(screen.getByTestId("confirm-deactivate-button"));
@@ -391,7 +391,7 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByLabelText("Zona operativa")).toBeInTheDocument();
 
       // Select zone-1 and add
-      await chooseSelectOption(user, "Zona operativa", /Z-BEL — Belgrano/);
+      await chooseSelectOption(user, "Zona operativa", /^Belgrano$/);
       const durationInput = screen.getByTestId("stop-duration-input");
       await user.clear(durationInput);
       await user.type(durationInput, "45");
@@ -402,7 +402,7 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByText("Belgrano")).toBeInTheDocument();
 
       // Select zone-2 and add
-      await chooseSelectOption(user, "Zona operativa", /Z-PAL — Palermo/);
+      await chooseSelectOption(user, "Zona operativa", /^Palermo$/);
       await user.clear(durationInput);
       await user.type(durationInput, "60");
       await user.click(screen.getByTestId("add-stop-button"));
@@ -446,13 +446,13 @@ describe("RouteCatalogPanel component", () => {
       expect(screen.getByTestId("stop-item-1")).toBeInTheDocument();
 
       // Try adding zone-1 again
-      await chooseSelectOption(user, "Zona operativa", /Z-BEL — Belgrano/);
+      await chooseSelectOption(user, "Zona operativa", /^Belgrano/);
       await user.click(screen.getByTestId("add-stop-button"));
 
       // Client-side error is displayed immediately
       expect(screen.getByTestId("stop-editor-error")).toBeInTheDocument();
       expect(screen.getByTestId("stop-editor-error")).toHaveTextContent(
-        /Una zona no puede repetirse en el mismo recorrido/i,
+        /Belgrano ya está en el recorrido/i,
       );
 
       // Still only 2 stops
@@ -555,7 +555,7 @@ describe("RouteCatalogPanel component", () => {
 
       // Copy makes clear this is advisory and not authoritative
       expect(
-        screen.getByText(/Aviso informativo \(no autoritativo\): El backend no posee control de concurrencia/i),
+        screen.getByText(/Si guarda, reemplaza las paradas actuales/i),
       ).toBeInTheDocument();
 
       // User can proceed anyway
@@ -592,7 +592,7 @@ describe("RouteCatalogPanel component", () => {
       await user.click(screen.getByTestId("save-sequence-button"));
 
       expect(await screen.findByTestId("staleness-warning-dialog")).toBeInTheDocument();
-      expect(screen.getByText(/El recorrido fue modificado en el servidor/i)).toBeInTheDocument();
+      expect(screen.getByText(/Otra persona lo modificó mientras editaba/i)).toBeInTheDocument();
     });
 
     it("warns when the precheck GET fails and sends one PUT after the user continues", async () => {
@@ -608,7 +608,7 @@ describe("RouteCatalogPanel component", () => {
       await user.click(screen.getByTestId("save-sequence-button"));
 
       const warning = await screen.findByTestId("staleness-warning-dialog");
-      expect(within(warning).getByText(/No se pudo comprobar si el recorrido fue modificado/i)).toBeInTheDocument();
+      expect(within(warning).getByText(/No se pudo comprobar si otra persona lo modificó/i)).toBeInTheDocument();
       expect(setStopsSpy).not.toHaveBeenCalled();
 
       await user.click(screen.getByTestId("confirm-staleness-save-button"));

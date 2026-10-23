@@ -14,7 +14,7 @@ test.describe("Tree catalog management #126", () => {
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Código de relevamiento").fill(`ARB-E2E-${Date.now()}`);
     await dialog.getByLabel("Especie").fill("Ceibo");
-    await chooseTreeSelectOption(page, dialog, "Zona operativa", "Z-BEL · Belgrano");
+    await chooseTreeSelectOption(page, dialog, "Zona operativa", "Belgrano");
     await dialog.getByLabel("Dirección").fill("Av. E2E 126");
     await dialog.getByLabel("Latitud").fill("-34.60");
     await dialog.getByLabel("Longitud").fill("-58.38");
@@ -34,7 +34,7 @@ test.describe("Tree catalog management #126", () => {
       active: true,
     });
     await expect(dialog).not.toBeVisible();
-    await expect(page.getByText("Árbol creado con éxito.")).toBeVisible();
+    await expect(page.getByText("Árbol creado.")).toBeVisible();
 
     const row = page.locator("tbody tr").filter({ hasText: "ARB-E2E-" }).last();
     await row.getByRole("button", { name: "Ver detalle" }).click();

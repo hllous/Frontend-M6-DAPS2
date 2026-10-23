@@ -155,7 +155,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           const message =
             caught instanceof ZoneRequestError
               ? caught.message
-              : "No se pudieron cargar las zonas operativas.";
+              : "No se pudieron cargar las zonas. Intente nuevamente.";
           setState({ status: "error", message });
         }
       }
@@ -192,7 +192,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       if (caught instanceof ZoneRequestError) {
         setCreateErrors(mapFormError(caught.message));
       } else {
-        setCreateErrors({ form: "Error inesperado al crear la zona operativa." });
+        setCreateErrors({ form: "No se pudo crear la zona. Intente nuevamente." });
       }
     } finally {
       setIsSubmittingCreate(false);
@@ -228,7 +228,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       if (caught instanceof ZoneRequestError) {
         setEditErrors(mapFormError(caught.message));
       } else {
-        setEditErrors({ form: "Error al actualizar la zona operativa." });
+        setEditErrors({ form: "No se pudo actualizar la zona. Intente nuevamente." });
       }
     } finally {
       setIsSubmittingEdit(false);
@@ -264,7 +264,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       setRequestVersion((v) => v + 1);
       notifySuccess("Zona dada de baja.");
     } catch (caught) {
-      setDeactivateError(caught instanceof ZoneRequestError ? caught.message : "No se pudo dar de baja la zona operativa.");
+      setDeactivateError(caught instanceof ZoneRequestError ? caught.message : "No se pudo dar de baja la zona. Intente nuevamente.");
     } finally {
       setIsSubmittingDeactivate(false);
     }
@@ -370,7 +370,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
       <CatalogPageHeader
         title="Zonas operativas"
         titleId="zones-catalog-heading"
-        description="Configuración de áreas operativas para asignación de cuadrillas y recorridos de recolección."
         actions={canManage ? (
           <Button
             type="button"
@@ -395,9 +394,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="zone-search"
-              aria-label="Buscar zonas operativas"
+              aria-label="Buscar zona"
               className="pl-9"
-              placeholder="Buscar por código o nombre..."
+              placeholder="Buscar zona"
               value={search}
               maxLength={MAX_SEARCH_LENGTH}
               onChange={(e) => setSearch(e.target.value)}
@@ -439,7 +438,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <div>
               <h2 className="text-lg font-semibold">Nueva zona operativa</h2>
               <FieldDescription>
-                El código identifica la zona de forma única y es inmutable tras la creación.
+                No se puede cambiar después.
               </FieldDescription>
             </div>
             <Button
@@ -543,9 +542,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
               <h2 className="text-lg font-semibold">Editar zona operativa</h2>
-              <FieldDescription>
-                El código es de solo lectura porque identifica unívocamente la zona y no puede modificarse.
-              </FieldDescription>
             </div>
             <Button
               type="button"
@@ -607,7 +603,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 checked={editDraft.active}
                 onCheckedChange={(checked) => setEditDraft({ ...editDraft, active: checked })}
               />
-              <FieldLabel htmlFor="edit-zone-active">Zona activa para asignaciones</FieldLabel>
+              <FieldLabel htmlFor="edit-zone-active">Activa</FieldLabel>
             </Field>
           </FieldGroup>
 
@@ -669,7 +665,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <caption className="sr-only">Listado de zonas operativas</caption>
             <thead className="border-b border-border bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Código</th>
                 <th className="px-4 py-3">Nombre</th>
                 <th className="px-4 py-3">Barrios</th>
                 <th className="px-4 py-3">Estado</th>
@@ -681,15 +676,12 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <tbody>
               {state.items.map((zone) => (
                 <tr key={zone.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                  <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">
-                    {zone.code}
-                  </td>
                   <td className="px-4 py-3 font-medium text-foreground">
                     {zone.name}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {zone.neighborhoodIds === undefined
-                      ? "Ver en gestionar barrios"
+                      ? "Ver barrios"
                       : zone.neighborhoodIds.length > 0
                       ? `${zone.neighborhoodIds.length} ${zone.neighborhoodIds.length === 1 ? "barrio" : "barrios"}`
                       : "Sin barrios"}
@@ -710,7 +702,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                           className="h-8 max-[760px]:h-10 gap-1 text-xs"
                         >
                           <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                          Gestionar barrios
+                          Barrios
                         </Button>
                         <Button
                           type="button"
@@ -736,7 +728,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                         )}
                       </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Solo lectura</span>
+                      <span className="text-xs text-muted-foreground">Solo consulta</span>
                     )}
                   </td>
                 </tr>
@@ -756,12 +748,12 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           <DialogHeader>
             <DialogTitle id="manage-neighborhoods-title" className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" aria-hidden="true" />
-              Gestionar barrios
+              Barrios
             </DialogTitle>
             <DialogDescription>
               {neighborhoodZone && (
                 <span>
-                  Zona: <strong>{neighborhoodZone.code}</strong> — {neighborhoodZone.name}
+                  Zona: {neighborhoodZone.name}
                 </span>
               )}
             </DialogDescription>
@@ -777,11 +769,8 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <section aria-labelledby="assigned-neighborhoods-heading" className="space-y-3">
               <div>
                 <h3 id="assigned-neighborhoods-heading" className="text-sm font-semibold">
-                  Barrios asignados
+                  Barrios
                 </h3>
-                <p className="text-xs text-muted-foreground">
-                  Quite un barrio para eliminarlo de esta zona.
-                </p>
               </div>
 
               {isLoadingNeighborhoods ? (
@@ -795,7 +784,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 </Empty>
               ) : (
                 <ItemGroup
-                  aria-label="Barrios asignados"
+                  aria-label="Barrios"
                   className="gap-0 overflow-hidden rounded-md border border-border"
                 >
                   {assignedNeighborhoods.map((neighborhood) => (
@@ -807,7 +796,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                     >
                       <ItemContent className="min-w-0">
                         <ItemTitle className="truncate">{neighborhood.name}</ItemTitle>
-                        <ItemDescription className="font-mono">{neighborhood.id}</ItemDescription>
                       </ItemContent>
                       <Button
                         type="button"
@@ -836,9 +824,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 <h3 id="available-neighborhoods-heading" className="text-sm font-semibold">
                   Agregar barrios
                 </h3>
-                <p className="text-xs text-muted-foreground">
-                  Busque y seleccione uno o más barrios.
-                </p>
               </div>
 
               <Field>
@@ -848,7 +833,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   <Input
                     id="neighborhood-search"
                     className="pl-9"
-                    placeholder="Buscar por nombre o identificador"
+                    placeholder="Buscar barrio"
                     value={neighborhoodSearch}
                     onChange={(event) => setNeighborhoodSearch(event.target.value)}
                     disabled={isLoadingNeighborhoods}
@@ -891,9 +876,6 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                           <FieldLabel htmlFor={inputId} className="min-w-0 cursor-pointer">
                             <span className="truncate">{neighborhood.name}</span>
                           </FieldLabel>
-                          <FieldDescription className="font-mono text-xs">
-                            {neighborhood.id}
-                          </FieldDescription>
                         </FieldContent>
                       </Field>
                     );
@@ -930,10 +912,10 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             setDeactivateError(null);
           }
         }}
-        title={`Confirmar baja de zona ${deactivatingZone?.code ?? ""}`.trim()}
-        consequence={`La zona ${deactivatingZone?.code ?? ""} — ${deactivatingZone?.name ?? ""} quedará inactiva. Los registros asociados conservarán su referencia.`.trim()}
-        confirmAction={`Dar de baja la zona ${deactivatingZone?.code ?? ""}`.trim()}
-        safeAlternative={`Conservar zona ${deactivatingZone?.code ?? ""}`.trim()}
+        title={`Dar de baja la zona ${deactivatingZone?.name ?? ""}`.trim()}
+        consequence={`La zona ${deactivatingZone?.name ?? ""} quedará inactiva.`.trim()}
+        confirmAction={`Dar de baja la zona ${deactivatingZone?.name ?? ""}`.trim()}
+        safeAlternative={`Conservar zona ${deactivatingZone?.name ?? ""}`.trim()}
         confirmDisabled={isLoadingReferences || (referencesUnavailable && !referencesAcknowledged)}
         isSubmitting={isSubmittingDeactivate}
         onConfirm={() => void handleConfirmDeactivate()}
@@ -946,14 +928,14 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
         {isLoadingReferences ? (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
             <Spinner aria-hidden="true" />
-            Verificando referencias de la zona...
+            Verificando…
           </div>
         ) : referencesUnavailable ? (
           <div className="flex flex-col gap-3">
             <Alert variant="warning">
               <AlertTriangle aria-hidden="true" />
               <AlertDescription>
-                No se pudieron verificar las referencias. Si continúa, la baja puede afectar servicios o elementos que todavía usan este registro.
+                No se pudo verificar si la zona está en uso.
               </AlertDescription>
             </Alert>
             <Field orientation="horizontal">
@@ -964,7 +946,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 disabled={isSubmittingDeactivate}
               />
               <FieldLabel htmlFor="zone-reference-acknowledgement">
-                Entiendo que no se verificaron las referencias
+                Dar de baja de todos modos
               </FieldLabel>
             </Field>
           </div>
@@ -973,7 +955,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <Alert variant="warning">
               <AlertTriangle aria-hidden="true" />
               <AlertTitle>
-                Advertencia: esta zona todavía cuenta con elementos activos referenciados:
+                La zona está en uso:
               </AlertTitle>
               <AlertDescription>
                 <ItemGroup className="gap-1">
@@ -983,7 +965,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                         <ItemTitle>Recorridos activos ({referencesReport.activeRoutes.length})</ItemTitle>
                         <ItemDescription>
                           {referencesReport.activeRoutes
-                            .map((route) => `${route.code} (${route.name})`)
+                            .map((route) => route.name)
                             .join(", ")}
                         </ItemDescription>
                       </ItemContent>
@@ -992,7 +974,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   {referencesReport.containersCount > 0 ? (
                     <Item size="xs">
                       <ItemContent>
-                        <ItemTitle>Contenedores asociados:</ItemTitle>
+                        <ItemTitle>Contenedores</ItemTitle>
                         <ItemDescription>{referencesReport.containersCount}</ItemDescription>
                       </ItemContent>
                     </Item>
@@ -1000,7 +982,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   {referencesReport.treesCount > 0 ? (
                     <Item size="xs">
                       <ItemContent>
-                        <ItemTitle>Árboles censados:</ItemTitle>
+                        <ItemTitle>Árboles</ItemTitle>
                         <ItemDescription>{referencesReport.treesCount}</ItemDescription>
                       </ItemContent>
                     </Item>
@@ -1008,15 +990,12 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   {referencesReport.greenSpacesCount > 0 ? (
                     <Item size="xs">
                       <ItemContent>
-                        <ItemTitle>Espacios verdes:</ItemTitle>
+                        <ItemTitle>Espacios verdes</ItemTitle>
                         <ItemDescription>{referencesReport.greenSpacesCount}</ItemDescription>
                       </ItemContent>
                     </Item>
                   ) : null}
                 </ItemGroup>
-                <p className="mt-2">
-                  El backend no realiza control de integridad referencial; los elementos asociados seguirán vinculados a una zona inactiva.
-                </p>
               </AlertDescription>
             </Alert>
           </div>

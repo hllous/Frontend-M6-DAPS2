@@ -72,7 +72,7 @@ describe("CrewCatalogPanel", () => {
     const members = within(sheet).getByRole("list", { name: "Integrantes de la cuadrilla" });
     expect(within(members).getByText("Ana Morales")).toBeVisible();
     expect(within(sheet).queryByText("user-ana")).not.toBeInTheDocument();
-    const memberSelect = within(sheet).getByRole("combobox", { name: /^Agregar integrantes \(M1\)/ });
+    const memberSelect = within(sheet).getByRole("combobox", { name: /^Agregar integrantes/ });
     await user.click(within(sheet).getByRole("button", { name: "Agregar integrantes" }));
     expect(memberSelect).toHaveAttribute("aria-invalid", "true");
     expect(memberSelect).toHaveAttribute("aria-describedby", "crew-members-error");
@@ -104,7 +104,7 @@ describe("CrewCatalogPanel", () => {
     const row = await screen.findByRole("row", { name: /Cuadrilla E - Membresia/ });
     await user.click(within(row).getByRole("button", { name: "Ver detalle de Cuadrilla E - Membresia" }));
     const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
-    const memberPicker = within(sheet).getByRole("combobox", { name: /^Agregar integrantes \(M1\)/ });
+    const memberPicker = within(sheet).getByRole("combobox", { name: /^Agregar integrantes/ });
     expect(memberPicker).toHaveTextContent("0 integrantes seleccionados");
 
     await user.click(memberPicker);

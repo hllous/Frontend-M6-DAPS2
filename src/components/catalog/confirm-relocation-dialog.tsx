@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
-import { MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -126,16 +125,11 @@ function ConfirmRelocationModalContent({
   return (
     <DialogContent className="max-w-lg overflow-y-auto">
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
-          <MapPin className="size-4" aria-hidden />
-          <span>Confirmación de nueva ubicación</span>
-        </div>
         <DialogTitle>
           Confirmar nueva ubicación de contenedor {container.code}
         </DialogTitle>
         <DialogDescription>
-          Indique la nueva dirección y coordenadas geográficas donde ha sido
-          instalado el contenedor para restituirlo a estado Activo.
+          Indique dónde quedó instalado el contenedor.
         </DialogDescription>
       </DialogHeader>
 
@@ -154,7 +148,7 @@ function ConfirmRelocationModalContent({
         <Alert role="note">
           <AlertDescription className="grid gap-2">
             <p className="font-medium text-foreground">
-              Ubicación anterior registrada:
+              Ubicación anterior:
             </p>
             <p className="text-muted-foreground">
               {container.address ?? "Sin dirección registrada"}

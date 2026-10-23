@@ -34,13 +34,13 @@ describe("ZoneCatalogPanel component", () => {
     server.use(http.get("/api/zones/:id/references", () => HttpResponse.json({ message: "No disponible" }, { status: 503 })));
     const user = userEvent.setup();
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
-    const row = await screen.findByRole("row", { name: /Z-BEL/ });
+    const row = await screen.findByRole("row", { name: /Belgrano/ });
     await user.click(within(row).getByRole("button", { name: "Dar de baja" }));
     const dialog = await screen.findByRole("dialog");
-    expect(await within(dialog).findByText("No se pudieron verificar las referencias. Si contin\u00faa, la baja puede afectar servicios o elementos que todav\u00eda usan este registro.")).toBeVisible();
-    const confirm = within(dialog).getByRole("button", { name: "Dar de baja la zona Z-BEL" });
+    expect(await within(dialog).findByText("No se pudo verificar si la zona está en uso.")).toBeVisible();
+    const confirm = within(dialog).getByRole("button", { name: "Dar de baja la zona Belgrano" });
     expect(confirm).toBeDisabled();
-    await user.click(within(dialog).getByRole("checkbox", { name: "Entiendo que no se verificaron las referencias" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "Dar de baja de todos modos" }));
     expect(confirm).toBeEnabled();
     await user.click(confirm);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -52,13 +52,14 @@ describe("ZoneCatalogPanel component", () => {
 
     expect(screen.getByRole("heading", { name: "Zonas operativas" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /nueva zona/i })).toBeVisible();
-    expect(screen.getByLabelText("Buscar zonas operativas")).toBeInTheDocument();
+    expect(screen.getByLabelText("Buscar zona")).toBeInTheDocument();
 
     // Wait for fixtures to load
     await waitFor(() => {
-      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
       expect(screen.getByText("Belgrano")).toBeInTheDocument();
-      expect(screen.getByText("Z-PAL")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
+      expect(screen.queryByText("Z-BEL")).not.toBeInTheDocument();
+      expect(screen.queryByText("Z-PAL")).not.toBeInTheDocument();
     });
   });
 
@@ -70,7 +71,7 @@ describe("ZoneCatalogPanel component", () => {
       expect(screen.getByText("Belgrano")).toBeInTheDocument();
     });
 
-    const searchInput = screen.getByLabelText("Buscar zonas operativas");
+    const searchInput = screen.getByLabelText("Buscar zona");
     await user.type(searchInput, "Pal");
 
     await waitFor(() => {
@@ -101,7 +102,7 @@ describe("ZoneCatalogPanel component", () => {
     const user = userEvent.setup();
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
-    await waitFor(() => expect(screen.getByText("Z-BEL")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Belgrano")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: /nueva zona/i }));
     await user.click(screen.getByRole("button", { name: "Crear zona" }));
 
@@ -116,7 +117,7 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
     });
 
     const newZoneButton = screen.getByRole("button", { name: /nueva zona/i });
@@ -134,7 +135,7 @@ describe("ZoneCatalogPanel component", () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-04")).toBeInTheDocument();
+      expect(screen.queryByText("Z-04")).not.toBeInTheDocument();
       expect(screen.getByText("Zona Centro Histórico")).toBeInTheDocument();
     });
   });
@@ -144,7 +145,7 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
     });
 
     await user.click(screen.getByRole("button", { name: /nueva zona/i }));
@@ -174,11 +175,11 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
     });
 
     // Find the row for Z-01 and click Editar
-    const row = screen.getByText("Z-BEL").closest("tr")!;
+    const row = screen.getByText("Belgrano").closest("tr")!;
     const editButton = within(row).getByRole("button", { name: /editar/i });
     await user.click(editButton);
 
@@ -213,34 +214,34 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
     });
 
     // Click Dar de baja on Z-01 (which has active routes, containers, trees, green spaces)
-    const row = screen.getByText("Z-BEL").closest("tr")!;
+    const row = screen.getByText("Belgrano").closest("tr")!;
     const deleteButton = within(row).getByRole("button", { name: /dar de baja/i });
     await user.click(deleteButton);
 
     // Confirmation dialog should appear
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("heading", { name: "Confirmar baja de zona Z-BEL" })).toBeInTheDocument();
-    expect(within(dialog).getByText(/Advertencia: esta zona todavía cuenta con elementos activos referenciados/i)).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Dar de baja la zona Belgrano" })).toBeInTheDocument();
+    expect(within(dialog).getByText(/La zona está en uso/i)).toBeInTheDocument();
     expect(within(dialog).getByText(/Recorridos activos/i)).toBeInTheDocument();
-    expect(within(dialog).getByText(/Contenedores asociados:/i)).toBeInTheDocument();
-    expect(within(dialog).getByText(/Árboles censados:/i)).toBeInTheDocument();
-    expect(within(dialog).getByText(/Espacios verdes:/i)).toBeInTheDocument();
-    expect(within(dialog).getByText(/El backend no realiza control de integridad referencial/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^Contenedores$/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^Árboles$/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^Espacios verdes$/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/backend/i)).not.toBeInTheDocument();
 
-    expect(screen.queryByRole("checkbox", { name: "Entiendo que no se verificaron las referencias" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Dar de baja de todos modos" })).not.toBeInTheDocument();
 
     // Confirm deactivation
-    const confirmButton = within(dialog).getByRole("button", { name: "Dar de baja la zona Z-BEL" });
+    const confirmButton = within(dialog).getByRole("button", { name: "Dar de baja la zona Belgrano" });
     await user.click(confirmButton);
 
     // Dialog should close and zone status becomes Inactiva
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: "Confirmar baja de zona Z-BEL" })).not.toBeInTheDocument();
-      const updatedRow = screen.getByText("Z-BEL").closest("tr")!;
+      expect(screen.queryByRole("heading", { name: "Dar de baja la zona Belgrano" })).not.toBeInTheDocument();
+      const updatedRow = screen.getByText("Belgrano").closest("tr")!;
       expect(within(updatedRow).getByText("Inactiva")).toBeInTheDocument();
     });
   });
@@ -255,10 +256,10 @@ describe("ZoneCatalogPanel component", () => {
     }, { status: 500 })));
     const user = userEvent.setup();
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
-    const row = await screen.findByRole("row", { name: /Z-BEL/ });
+    const row = await screen.findByRole("row", { name: /Belgrano/ });
     await user.click(within(row).getByRole("button", { name: "Dar de baja" }));
     const dialog = await screen.findByRole("dialog");
-    const confirm = within(dialog).getByRole("button", { name: "Dar de baja la zona Z-BEL" });
+    const confirm = within(dialog).getByRole("button", { name: "Dar de baja la zona Belgrano" });
     await waitFor(() => expect(confirm).toBeEnabled());
     await user.click(confirm);
     const errorMessage = await within(dialog).findByText("No se pudo dar de baja la zona.");
@@ -271,15 +272,15 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
     });
 
-    const row = screen.getByText("Z-BEL").closest("tr")!;
-    await user.click(within(row).getByRole("button", { name: /gestionar barrios/i }));
+    const row = screen.getByText("Belgrano").closest("tr")!;
+    await user.click(within(row).getByRole("button", { name: /^barrios$/i }));
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("heading", { name: "Gestionar barrios" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("list", { name: "Barrios asignados" })).toHaveTextContent("Barrio Centro");
+    expect(within(dialog).getByRole("heading", { name: "Barrios", level: 2 })).toBeInTheDocument();
+    expect(within(dialog).getByRole("list", { name: "Barrios" })).toHaveTextContent("Barrio Centro");
 
     const searchInput = within(dialog).getByLabelText("Buscar barrios");
     await user.type(searchInput, "Industrial");
@@ -288,12 +289,12 @@ describe("ZoneCatalogPanel component", () => {
     await user.click(within(dialog).getByRole("button", { name: "Asignar seleccionados" }));
 
     await waitFor(() => {
-      expect(within(dialog).getByRole("list", { name: "Barrios asignados" })).toHaveTextContent("Barrio Industrial");
+      expect(within(dialog).getByRole("list", { name: "Barrios" })).toHaveTextContent("Barrio Industrial");
     });
 
     await user.click(within(dialog).getByRole("button", { name: "Quitar Barrio Industrial" }));
     await waitFor(() => {
-      expect(within(dialog).getByRole("list", { name: "Barrios asignados" })).not.toHaveTextContent("Barrio Industrial");
+      expect(within(dialog).getByRole("list", { name: "Barrios" })).not.toHaveTextContent("Barrio Industrial");
     });
   });
 
@@ -301,16 +302,16 @@ describe("ZoneCatalogPanel component", () => {
     render(<ZoneCatalogPanel scenario={scenarios.fieldCrewMember} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Z-BEL")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
     });
 
     // "Nueva zona" should not exist
     expect(screen.queryByRole("button", { name: /nueva zona/i })).not.toBeInTheDocument();
 
-    // Table rows should show "Solo lectura" instead of action buttons
+    // Table rows should show "Solo consulta" instead of action buttons
     expect(screen.queryByRole("button", { name: /editar/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /dar de baja/i })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Solo lectura").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Solo consulta").length).toBeGreaterThan(0);
   });
 
   it("returns the BFF forbidden envelope for a Field write", async () => {

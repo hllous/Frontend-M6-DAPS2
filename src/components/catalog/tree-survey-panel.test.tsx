@@ -75,7 +75,7 @@ describe("TreeSurveyPanel", () => {
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
-    expect(within(dialog).getByLabelText(/^Fecha del relevamiento/)).toBeVisible();
+    expect(within(dialog).getByLabelText(/^Fecha/)).toBeVisible();
     expect(within(dialog).getByRole("combobox", { name: "Estado sanitario" })).toHaveAttribute("aria-required", "true");
     expect(within(dialog).getByRole("combobox", { name: "Nivel de riesgo" })).toHaveAttribute("aria-required", "true");
     await chooseSelectOption(user, within(dialog).getByRole("combobox", { name: "Estado sanitario" }), "Debilitado");
@@ -86,7 +86,7 @@ describe("TreeSurveyPanel", () => {
 
     await chooseSelectOption(user, within(dialog).getByRole("combobox", { name: "Tipo de riesgo" }), "Inestabilidad del tronco");
     await user.click(within(dialog).getByRole("button", { name: "Guardar relevamiento" }));
-    expect(await screen.findByText("Relevamiento registrado con éxito.")).toBeVisible();
+    expect(await screen.findByText("Relevamiento registrado.")).toBeVisible();
     expect(screen.queryByText(/Service|servicio asignado/i)).not.toBeInTheDocument();
   });
 
@@ -125,7 +125,7 @@ describe("TreeSurveyPanel", () => {
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
-    const dateInput = within(dialog).getByLabelText(/^Fecha del relevamiento/);
+    const dateInput = within(dialog).getByLabelText(/^Fecha/);
     expect(dateInput).toHaveTextContent("20/09/2026");
     fireEvent.click(dateInput);
     const tomorrow = screen.getAllByRole("button").find((button) => button.getAttribute("data-day") === "21/9/2026");
@@ -140,7 +140,7 @@ describe("TreeSurveyPanel", () => {
     vi.setSystemTime(new Date("2026-09-22T15:00:00Z"));
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
-    expect(within(dialog).getByLabelText(/^Fecha del relevamiento/)).toHaveTextContent("22/09/2026");
+    expect(within(dialog).getByLabelText(/^Fecha/)).toHaveTextContent("22/09/2026");
   });
 
   it("does not allow a future date to be selected", async () => {
@@ -150,7 +150,7 @@ describe("TreeSurveyPanel", () => {
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
-    fireEvent.click(within(dialog).getByLabelText(/^Fecha del relevamiento/));
+    fireEvent.click(within(dialog).getByLabelText(/^Fecha/));
     const tomorrow = screen.getAllByRole("button").find((button) => button.getAttribute("data-day") === "22/9/2026");
     expect(tomorrow).toBeDisabled();
   });

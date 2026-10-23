@@ -51,7 +51,7 @@ describe("ServiceFrequenciesPanel", () => {
     await user.click(within(sheet).getByRole("button", { name: "Editar" }));
     const editDialog = await screen.findByRole("dialog", { name: "Editar frecuencia" });
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
-    expect(within(editDialog).getByText(/estos vínculos no se pueden modificar/i)).toBeVisible();
+    expect(within(editDialog).queryByText(/vínculos/i)).not.toBeInTheDocument();
     expect(within(editDialog).getByRole("combobox", { name: "Turno" })).toBeVisible();
   });
 
@@ -93,7 +93,7 @@ describe("ServiceFrequenciesPanel", () => {
     await user.click(within(sheet).getByRole("button", { name: "Cerrar vigencia" }));
     expect(screen.getByRole("heading", { name: "Confirmar cierre de vigencia" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Conservar vigencia" })).toBeVisible();
-    expect(screen.getByText(/servicios ya creados quedan intactos/i)).toBeVisible();
+    expect(screen.getByText(/servicios ya creados no cambian/i)).toBeVisible();
   });
 
   it("does not expose management actions to Field", async () => {
@@ -101,14 +101,14 @@ describe("ServiceFrequenciesPanel", () => {
     expect(await screen.findByRole("heading", { name: "Frecuencias de servicio" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Nueva frecuencia" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
-    expect(screen.getByText(/puede consultar las frecuencias/i)).toBeVisible();
+    expect(screen.getByText("Solo consulta")).toBeVisible();
   });
 
   it("uses Spanish copy, exposes responsive table labels, and shows focus on weekday controls", async () => {
     const user = userEvent.setup();
     render(<ServiceFrequenciesPanel scenario={scenarios.officeDutyQueue} />);
 
-    expect(await screen.findByText(/no genera servicios automáticamente/i)).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Frecuencias de servicio" })).toBeVisible();
     expect(screen.queryByText(/Services/i)).not.toBeInTheDocument();
     const row = screen.getByRole("row", { name: /Recorrido Casco Histórico/ });
     expect(within(row).getByRole("rowheader")).toHaveAttribute("data-label", "Tipo de servicio");

@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -19,7 +18,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -287,7 +285,6 @@ export function GreenSpacesPanel({
       <CatalogPageHeader
         title="Espacios verdes"
         titleId="green-spaces-title"
-        description="Plazas, parques, canteros y ramblas disponibles para la planificación operativa."
         actions={
           canManage ? (
             <Button onClick={openCreate}>
@@ -363,7 +360,7 @@ export function GreenSpacesPanel({
             items={{
               all: "Todas las zonas",
               ...Object.fromEntries(
-                zones.map((zone) => [zone.id, `${zone.code} · ${zone.name}`]),
+                zones.map((zone) => [zone.id, zone.name]),
               ),
             }}
             value={zoneFilter}
@@ -380,7 +377,7 @@ export function GreenSpacesPanel({
                 <SelectItem value="all">Todas las zonas</SelectItem>
                 {zones.map((zone) => (
                   <SelectItem key={zone.id} value={zone.id}>
-                    {zone.code} · {zone.name}
+                    {zone.name}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -472,7 +469,7 @@ export function GreenSpacesPanel({
           }
         }}
         title={`Confirmar baja del espacio verde ${deactivating?.name ?? ""}`.trim()}
-        consequence="El espacio verde quedará inactivo. Los registros existentes conservarán su referencia histórica."
+        consequence="El espacio verde quedará inactivo."
         confirmAction={`Dar de baja el espacio verde ${deactivating?.name ?? ""}`.trim()}
         safeAlternative={`Conservar el espacio verde ${deactivating?.name ?? ""}`.trim()}
         onConfirm={() => void confirmDeactivation()}
@@ -500,9 +497,6 @@ export function GreenSpacesPanel({
           >
             <SheetHeader>
               <SheetTitle>Detalle del espacio verde</SheetTitle>
-              <SheetDescription>
-                Información del espacio y su zona operativa.
-              </SheetDescription>
             </SheetHeader>
             <dl className="grid gap-4 px-4 text-sm sm:grid-cols-2">
               <div className="sm:col-span-2">
@@ -596,10 +590,6 @@ export function GreenSpacesPanel({
             <DialogTitle>
               {editing ? "Editar espacio verde" : "Registrar espacio verde"}
             </DialogTitle>
-            <DialogDescription>
-              Complete los datos del espacio catalogado. La baja se realiza de
-              forma lógica.
-            </DialogDescription>
           </DialogHeader>
           {formError ? (
             <Alert variant="destructive">
@@ -661,8 +651,7 @@ export function GreenSpacesPanel({
                 </Select>
                 {editing ? (
                   <FieldDescription id="green-space-type-locked">
-                    El tipo no se puede cambiar después de registrar el espacio
-                    verde.
+                    No se puede cambiar después.
                   </FieldDescription>
                 ) : null}
               </Field>
@@ -683,7 +672,7 @@ export function GreenSpacesPanel({
                   required
                 />
                 <FieldDescription>
-                  Superficie declarada en metros cuadrados.
+                  En m²
                 </FieldDescription>
               </Field>
               <Field>
@@ -694,7 +683,7 @@ export function GreenSpacesPanel({
                   items={Object.fromEntries(
                     zones.map((zone) => [
                       zone.id,
-                      `${zone.code} · ${zone.name}`,
+                      zone.name,
                     ]),
                   )}
                   value={form.zoneId}
@@ -713,7 +702,7 @@ export function GreenSpacesPanel({
                     <SelectGroup>
                       {zones.map((zone) => (
                         <SelectItem key={zone.id} value={zone.id}>
-                          {zone.code} · {zone.name}
+                          {zone.name}
                         </SelectItem>
                       ))}
                     </SelectGroup>

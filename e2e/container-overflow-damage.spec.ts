@@ -33,7 +33,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await expectCatalogAMutation(page, /\/report-overflow$/, null, () => dialog.getByRole("button", { name: "Confirmar desborde" }).click());
 
     await expect(
-      page.getByText("Desborde reportado con éxito para el contenedor CONT-008."),
+      page.getByText("Desborde reportado: CONT-008."),
     ).toBeVisible();
     await expect(dialog).not.toBeVisible();
 
@@ -79,7 +79,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "VANDALIZED", severity: "HIGH", requiresPublicWorks: true }, () => dialog.getByRole("button", { name: "Confirmar daño" }).click());
 
     await expect(
-      page.getByText("Reporte de daño registrado con éxito para el contenedor CONT-007."),
+      page.getByText("Daño registrado: CONT-007."),
     ).toBeVisible();
     await expect(dialog).not.toBeVisible();
 
@@ -95,7 +95,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
 
     await expect(detailDialog.getByText("Vandalizado")).toBeVisible();
     await expect(detailDialog.getByText("Alta")).toBeVisible();
-    await expect(detailDialog.getByText(/Sí \(notificación a M3\)/)).toBeVisible();
+    await expect(detailDialog.getByText(/Sí \(avisa a Obras Públicas\)/)).toBeVisible();
     await expect(detailDialog.getByText("container-graffiti.png")).toBeVisible();
   });
 
@@ -146,7 +146,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     });
 
     await expect(
-      overflowDialog.getByText(/"forbidden.exe" tiene un formato no permitido/),
+      overflowDialog.getByText(/"forbidden.exe" no es una foto ni un PDF/),
     ).toBeVisible();
     // The forbidden file is not queued
     await expect(overflowDialog.getByText("Pendiente")).not.toBeVisible();

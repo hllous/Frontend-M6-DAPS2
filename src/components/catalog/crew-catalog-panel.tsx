@@ -21,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -77,7 +76,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetTitle,
@@ -225,12 +223,12 @@ export function CrewCatalogPanel({
     id === null
       ? "—"
       : (users.find((user) => user.id === id)?.displayName ??
-        "Usuario M1 no resuelto");
+        "Persona no encontrada");
   const organizationName = (id: string | null) =>
     id === null
       ? "Sin organización externa"
       : (organizations.find((organization) => organization.id === id)
-          ?.displayName ?? "Organización M1 no resuelta");
+          ?.displayName ?? "Organización no encontrada");
   function openCreate() {
     setEditing(null);
     setForm({
@@ -347,7 +345,6 @@ export function CrewCatalogPanel({
       <CatalogPageHeader
         title="Cuadrillas"
         titleId="crews-title"
-        description="Consulte equipos, turnos y referencias de identidad administradas por M1."
         actions={
           canManage ? (
             <Button onClick={openCreate}>
@@ -564,10 +561,6 @@ export function CrewCatalogPanel({
           >
             <SheetHeader className="border-b border-border pr-12 pb-4">
               <SheetTitle>Detalle de cuadrilla</SheetTitle>
-              <SheetDescription>
-                Las membresías se muestran como referencias de identidad de M1.
-                Office puede administrarlas desde este sub-recurso.
-              </SheetDescription>
             </SheetHeader>
             <div className="grid min-h-0 gap-4 overflow-y-auto px-4 pt-4 [scrollbar-gutter:stable]">
               <section aria-labelledby="crew-detail-name">
@@ -629,7 +622,7 @@ export function CrewCatalogPanel({
                   >
                     <Field data-invalid={Boolean(memberError)}>
                       <FieldLabel htmlFor="crew-members">
-                        Agregar integrantes (M1)
+                        Agregar integrantes
                       </FieldLabel>
                       <CrewMemberMultiSelect
                         id="crew-members"
@@ -650,9 +643,6 @@ export function CrewCatalogPanel({
                           memberError ? "crew-members-error" : undefined
                         }
                       />
-                      <FieldDescription>
-                        Busque nombres disponibles y seleccione uno o más usuarios administrados por M1.
-                      </FieldDescription>
                     </Field>
                     {memberError ? (
                       <Alert id="crew-members-error" variant="destructive">
@@ -711,10 +701,6 @@ export function CrewCatalogPanel({
             <DialogTitle>
               {editing ? "Editar cuadrilla" : "Registrar cuadrilla"}
             </DialogTitle>
-            <DialogDescription>
-              Los responsables y organizaciones se seleccionan mediante sus IDs
-              de referencia M1.
-            </DialogDescription>
           </DialogHeader>
           {formError ? (
             <Alert variant="destructive">
@@ -774,14 +760,13 @@ export function CrewCatalogPanel({
                 </Select>
                 {editing ? (
                   <FieldDescription id="crew-type-locked">
-                    El tipo no se puede cambiar después de registrar la
-                    cuadrilla.
+                    No se puede cambiar después.
                   </FieldDescription>
                 ) : null}
               </Field>
               <Field>
                 <FieldLabel htmlFor="crew-leader">
-                  Responsable de cuadrilla (M1)
+                  Responsable de cuadrilla
                 </FieldLabel>
                 <Combobox
                   id="crew-leader"
@@ -795,12 +780,12 @@ export function CrewCatalogPanel({
                     label: user.displayName,
                   }))}
                   aria-required
-                  placeholder="Seleccione una referencia M1"
+                  placeholder="Seleccione una persona"
                 />
               </Field>
               <Field>
                 <FieldLabel htmlFor="crew-organization">
-                  Organización (M1)
+                  Organización
                 </FieldLabel>
                 <Combobox
                   id="crew-organization"
@@ -814,7 +799,7 @@ export function CrewCatalogPanel({
                     label: organization.displayName,
                   }))}
                   aria-required
-                  placeholder="Seleccione una referencia M1"
+                  placeholder="Seleccione una organización"
                 />
               </Field>
               <Field>
@@ -845,10 +830,6 @@ export function CrewCatalogPanel({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <FieldDescription>
-                  Los integrantes se administran desde el detalle de la
-                  cuadrilla.
-                </FieldDescription>
               </Field>
             </FieldGroup>
           </form>
@@ -875,7 +856,7 @@ export function CrewCatalogPanel({
           }
         }}
         title={`Confirmar baja de la cuadrilla ${deactivating?.name ?? ""}`.trim()}
-        consequence="La cuadrilla quedará inactiva y no estará disponible para nuevas asignaciones. Las asignaciones existentes conservarán su referencia."
+        consequence="La cuadrilla quedará inactiva."
         confirmAction="Dar de baja"
         safeAlternative="Conservar cuadrilla"
         onConfirm={() => void confirmDeactivation()}
@@ -937,7 +918,7 @@ function CrewMemberMultiSelect({
             aria-controls={`${id}-options`}
             aria-invalid={invalid || undefined}
             aria-describedby={describedBy}
-            aria-label={`Agregar integrantes (M1), ${summary}`}
+            aria-label={`Agregar integrantes, ${summary}`}
             className="w-full justify-between bg-card text-left font-normal"
           />
         }

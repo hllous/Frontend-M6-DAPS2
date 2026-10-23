@@ -47,10 +47,10 @@ describe("GreenPointCatalogPanel", () => {
     const detail = await openGreenPointDetail(user, row);
     await user.click(within(detail).getByRole("button", { name: "Editar" }));
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("conjunto completo");
+    expect(dialog).not.toHaveTextContent("conjunto completo");
     await user.click(within(dialog).getByRole("checkbox", { name: "Domiciliarios" }));
     await user.click(within(dialog).getByRole("button", { name: "Guardar punto verde" }));
-    expect(await screen.findByText("Punto verde actualizado con éxito.")).toBeVisible();
+    expect(await screen.findByText("Punto verde actualizado.")).toBeVisible();
 
     const refreshedRow = await screen.findByRole("row", { name: /GP-001/ });
     const refreshedDetail = await openGreenPointDetail(user, refreshedRow);
