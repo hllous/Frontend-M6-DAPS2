@@ -14,7 +14,7 @@ const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
   window.history.replaceState(null, "", "/");
-  document.title = "M6 — Ambiente e Higiene";
+  document.title = "Ambiente e Higiene";
   resetTreeInterventionFixtures();
 });
 afterEach(() => server.resetHandlers());
@@ -100,10 +100,11 @@ describe("AppShell", () => {
     const user = userEvent.setup();
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
 
-    await user.click(screen.getByRole("button", { name: "Más módulos" }));
-    const sheet = await screen.findByRole("dialog");
+    await user.click(screen.getByRole("button", { name: "Más" }));
+    const sheet = await screen.findByRole("dialog", { name: "Más" });
 
     expect(within(sheet).getByRole("button", { name: "Cerrar" })).toBeVisible();
+    expect(within(sheet).queryByText("Seleccione un módulo disponible para su sesión.")).not.toBeInTheDocument();
     expect(within(sheet).getByRole("link", { name: "Catálogo" })).toHaveAttribute("href", "/app?destination=catalog");
     expect(within(sheet).getByRole("link", { name: "Tableros" })).toHaveAttribute("href", "/app?destination=dashboards");
   });
@@ -116,6 +117,9 @@ describe("AppShell", () => {
     expect(within(moduleNavigation).getByRole("link", { name: "Servicios" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
     expect(screen.getByText("Revisar reprogramación de barrido")).toBeVisible();
+    expect(screen.queryByText("Sesión operativa")).not.toBeInTheDocument();
+    expect(screen.queryByText("Priorice y coordine")).not.toBeInTheDocument();
+    expect(screen.queryByText("Requiere revisión")).not.toBeInTheDocument();
   });
 
   it("keeps state-changing Service actions unavailable to a Field crew member", () => {
@@ -124,6 +128,7 @@ describe("AppShell", () => {
     expect(screen.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
     expect(screen.getByText("Integrante de cuadrilla")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Requiere revisión")).not.toBeInTheDocument();
   });
 
   it("adds requested and pending tree interventions to the Office My Work queue", async () => {
@@ -141,11 +146,12 @@ describe("AppShell", () => {
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
 
     const list = screen.getByRole("list");
-    const loading = screen.getByText("Cargando decisiones de arbolado…");
+    const loading = screen.getByText("Cargando intervenciones de arbolado…");
     expect(list).not.toContainElement(loading);
     expect(within(list).getAllByRole("listitem")).toHaveLength(scenarios.officeDutyQueue.work.items.length);
 
     const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("No se pudieron cargar las autorizaciones pendientes. Intente nuevamente.");
     expect(list).not.toContainElement(alert);
     expect(within(list).getAllByRole("listitem")).toHaveLength(scenarios.officeDutyQueue.work.items.length);
   });

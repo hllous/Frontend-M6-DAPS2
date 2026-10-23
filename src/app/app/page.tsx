@@ -21,7 +21,7 @@ export async function generateMetadata({ searchParams }: AppPageProps): Promise<
     ? Object.entries(destinationTitles).find(([id]) => id === destination)?.[1]
     : undefined;
 
-  return { title: `M6 — ${title ?? destinationTitles.work}` };
+  return { title: `${title ?? destinationTitles.work} — Ambiente e Higiene` };
 }
 
 export default function AppPage() {

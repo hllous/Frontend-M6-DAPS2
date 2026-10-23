@@ -13,10 +13,10 @@ test.describe("Zones representative states @smoke", () => {
     await openCatalog(page);
 
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    await expect(page.getByText("Z-BEL")).toBeVisible();
-    await expect(page.getByText("Belgrano")).toBeVisible();
-    await expect(page.getByText("Z-PAL")).toBeVisible();
-    await expect(page.getByText("Z-REC")).toBeVisible();
+    await expect(page.getByText("Belgrano", { exact: true })).toBeVisible();
+    await expect(page.getByText("Palermo", { exact: true })).toBeVisible();
+    await expect(page.getByText("Recoleta", { exact: true })).toBeVisible();
+    await expect(page.getByText(/^Z-[A-Z]{3}$/)).toHaveCount(0);
   });
 
   test("shows the empty state for a search with no matching zones", async ({ page }) => {
@@ -33,6 +33,6 @@ test.describe("Zones representative states @smoke", () => {
     await openCatalog(page);
 
     await expect(page.getByText("Sin zonas operativas")).toBeVisible();
-    await expect(page.getByText("No hay zonas registradas para mostrar.")).toBeVisible();
+    await expect(page.getByText("No hay zonas registradas para mostrar.")).toHaveCount(0);
   });
 });

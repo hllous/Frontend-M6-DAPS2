@@ -52,7 +52,8 @@ describe("FoundationDemo", () => {
 
     render(<FoundationDemo scenarioId="office-duty-queue" />);
 
-    expect(await screen.findByText("Inicie sesión para continuar")).toBeVisible();
+    expect(await screen.findByRole("link", { name: "Iniciar sesión" })).toBeVisible();
+    expect(screen.queryByText("Inicie sesión para continuar")).not.toBeInTheDocument();
   });
 
   it("preserves the session and shows the forbidden state on a 403 scenario response, without a retry", async () => {

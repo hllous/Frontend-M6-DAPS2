@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ZoneRequestError, zonesAdapter, type Zone } from "@/lib/zones";
@@ -66,7 +66,7 @@ export function ZonesPanel() {
       <ShellError
         onRetry={retry}
         title="No se pudieron cargar las zonas"
-        description="Verifique la conexión local y vuelva a intentarlo."
+        description="Revise la conexión e intente nuevamente."
       />
     );
   }
@@ -76,7 +76,6 @@ export function ZonesPanel() {
       <Empty>
         <EmptyHeader>
           <EmptyTitle>Sin zonas operativas</EmptyTitle>
-          <EmptyDescription>No hay zonas registradas para mostrar.</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -89,7 +88,7 @@ export function ZonesPanel() {
         {state.zones.map((zone) => (
           <Item key={zone.id} variant="outline" size="sm">
             <ItemContent>
-              <ItemTitle><span className="font-medium">{zone.code}</span> — {zone.name}</ItemTitle>
+              <ItemTitle>{zone.name}</ItemTitle>
             </ItemContent>
           </Item>
         ))}
