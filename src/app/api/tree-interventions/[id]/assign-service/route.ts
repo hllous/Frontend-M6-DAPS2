@@ -79,7 +79,7 @@ export async function POST(
     return NextResponse.json(updateTreeInterventionFixture(id, { serviceId: service.id }), { status: 200 });
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     return mapSessionError(error, path, "No se pudo asociar el servicio a la intervención.");
   }

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
-import { POST as emptyContainer } from "@/app/api/containers/[id]/empty/route";
+import { POST as repairContainer } from "@/app/api/containers/[id]/start-repair/route";
 import { DELETE as deleteCrew } from "@/app/api/crews/[id]/route";
 import { DELETE as deleteDisposalSite } from "@/app/api/disposal-sites/[id]/route";
 import { DELETE as deleteGreenPoint } from "@/app/api/green-points/[id]/route";
@@ -34,7 +33,7 @@ import * as treeFixtures from "@/lib/tree-fixtures";
 import * as vehicleFixtures from "@/lib/vehicles-fixtures";
 import * as zoneFixtures from "@/lib/zones-fixtures";
 import * as environmentalFixtures from "@/lib/environmental-report-fixtures";
-import { createSessionCookie } from "@/test/session";
+import { createSessionCookie, loginWithMe as login } from "@/test/session";
 
 const fixtureModules = [
   containerFixtures,
@@ -85,7 +84,7 @@ type MutationCase = {
 const mutationCases: MutationCase[] = [
   {
     family: "containers",
-    invoke: (cookie) => emptyContainer(jsonRequest("http://localhost/api/containers/missing-origin-container/empty", "POST", cookie), routeContext("missing-origin-container")),
+    invoke: (cookie) => repairContainer(jsonRequest("http://localhost/api/containers/missing-origin-container/start-repair", "POST", cookie), routeContext("missing-origin-container")),
   },
   {
     family: "crews",
@@ -157,7 +156,14 @@ const mutationCases: MutationCase[] = [
   },
   {
     family: "evidence",
-    invoke: async (cookie) => {
+    // La evidencia de un contenedor solo la sube la cuadrilla (Backend #161): el Admin de `backendCookie` no puede.
+    invoke: async () => {
+      const cookie = createSessionCookie("field-crew-leader-route", {
+        mode: "backend-development",
+        devJwt: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+        backendOrigin: "https://backend.internal",
+      });
+      delete process.env.M6_BACKEND_ORIGIN;
       const form = new FormData();
       form.append("file", new Blob(["evidence"], { type: "image/png" }), "origin.png");
       form.append("ownerType", "CONTAINER");

@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -117,8 +117,8 @@ export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const { session, scenario } = sessionAndScenario(request);
-    if (scenario.actor.kind !== "OFFICE" && scenario.actor.kind !== "FIELD") {
-      return errorResponse(403, "Solo Oficina o Campo puede crear derivaciones.", path);
+    if (!scenario.capabilities.includes("repairRequest:create")) {
+      return errorResponse(403, "Su rol no permite crear derivaciones.", path, FORBIDDEN_CODES.roleRequired);
     }
 
     let body: unknown;

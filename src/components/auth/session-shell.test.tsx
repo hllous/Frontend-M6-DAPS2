@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { notifyError } from "@/components/ui/feedback";
-import { getScenario } from "@/lib/scenarios";
+import { getScenario, scenarioForRoles } from "@/lib/scenarios";
 import { getFieldDraft, setFieldDraftOwner } from "@/lib/field-drafts";
 import { SessionShell } from "./session-shell";
 
@@ -40,6 +40,25 @@ it("broadcasts and redirects after the logout action succeeds", async () => {
   expect(logoutAction).toHaveBeenCalledOnce();
   expect(assign).toHaveBeenCalledWith("/login");
   remote.close();
+});
+
+it("lets an employee without an assigned role log out and return to login", async () => {
+  const assign = vi.fn();
+  Object.defineProperty(window, "location", { value: { assign, pathname: "/app", search: "" }, configurable: true });
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+    String(input).includes("/api/session/logout")
+      ? new Response(null, { status: 200 })
+      : Response.json(scenarioForRoles(getScenario("office-duty-queue"), [])),
+  );
+  const logoutAction = vi.fn().mockResolvedValue(undefined);
+
+  render(<SessionShell actorId="actor-a" scenarioId="office-duty-queue" logoutAction={logoutAction} />);
+
+  expect(await screen.findByText("Sin rol asignado")).toBeVisible();
+  await userEvent.click(await screen.findByRole("button", { name: "Cerrar sesión" }));
+
+  expect(logoutAction).toHaveBeenCalledOnce();
+  expect(assign).toHaveBeenCalledWith("/login");
 });
 
 it("shows a retry message without broadcasting when the logout action fails", async () => {

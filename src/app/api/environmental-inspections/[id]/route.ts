@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -23,7 +23,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     const session = getRequiredSession(request);
     authorize(session, { capability: "environmentalInspection:view", throwOnError: true });
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/environmental-inspections/" + pathId(id), "environmentalInspection:view");
       if (!backendResponse.ok) return withInspectionAttachments(request, backendResponse);
@@ -61,7 +61,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     if (error instanceof BackendUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para consultar inspecciones.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para consultar inspecciones.", path, FORBIDDEN_CODES.roleRequired);
     return errorResponse(500, "No se pudo cargar la inspección.", path);
   }
 }

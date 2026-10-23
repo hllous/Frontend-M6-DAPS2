@@ -111,7 +111,7 @@ describe("treeInterventionsAdapter", () => {
     expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
   });
 
-  it("authorizes every intervention type with the current Office identity", async () => {
+  it("authorizes without sending an identity (the backend takes it from the token)", async () => {
     const authorized = {
       ...intervention,
       status: "AUTHORIZED",
@@ -120,11 +120,12 @@ describe("treeInterventionsAdapter", () => {
     };
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(authorized)));
 
-    await expect(treeInterventionsAdapter.authorize("intervention-1", { authorizedByUserId: "user-lucia" })).resolves.toMatchObject(authorized);
+    await expect(treeInterventionsAdapter.authorize("intervention-1")).resolves.toMatchObject(authorized);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/tree-interventions/intervention-1/authorize",
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ authorizedByUserId: "user-lucia" }) }),
+      expect.objectContaining({ method: "POST" }),
     );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
   });
 
   it("rejects a removal without sending a reason to the backend", async () => {

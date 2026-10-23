@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetTreeSurveyFixtures, treeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { GET, POST } from "./route";
-import { loginAs } from "@/test/session";
+import { createSessionCookie, loginAs } from "@/test/session";
 
 beforeEach(() => resetTreeSurveyFixtures());
 afterEach(() => { vi.restoreAllMocks(); delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; });
@@ -44,7 +44,8 @@ describe("/api/trees/[id]/surveys", () => {
     process.env.M6_DEV_JWT = devJwt;
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    // El relevamiento lo carga la cuadrilla (Backend #161); la cookie sellada evita resolver la cuadrilla contra /crews.
+    const cookie = createSessionCookie("field-crew-leader-route", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
     const request = new Request("http://localhost/api/trees/arbol-abc/surveys", { method, headers: { cookie, "content-type": "application/json" }, ...(method === "POST" ? { body: JSON.stringify(validInput) } : {}) });
     await (method === "GET" ? GET : POST)(request, { params: Promise.resolve({ id: "arbol-abc" }) });
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/trees/arbol-abc/surveys");
@@ -65,7 +66,7 @@ describe("/api/trees/[id]/surveys", () => {
     expect(body.meta.pageSize).toBe(10);
   });
 
-  it("allows Field and Office with tree:survey to create an ambient record without a Service", async () => {
+  it("lets the crew create an ambient record without a Service and denies Office, which does not do Field work", async () => {
     const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const fieldResponse = await POST(new Request("http://localhost/api/trees/tree-2/surveys", { method: "POST", headers: { cookie: fieldCookie, "content-type": "application/json" }, body: JSON.stringify(validInput) }), { params: Promise.resolve({ id: "tree-2" }) });
     expect(fieldResponse.status).toBe(201);
@@ -74,7 +75,8 @@ describe("/api/trees/[id]/surveys", () => {
 
     const officeCookie = await loginAs("office-duty-queue", { mode: "mock" });
     const officeResponse = await POST(new Request("http://localhost/api/trees/tree-1/surveys", { method: "POST", headers: { cookie: officeCookie, "content-type": "application/json" }, body: JSON.stringify({ ...validInput, surveyedAt: "2026-09-07T13:00:00.000Z" }) }), { params: Promise.resolve({ id: "tree-1" }) });
-    expect(officeResponse.status).toBe(201);
+    expect(officeResponse.status).toBe(403);
+    expect(await officeResponse.json()).toMatchObject({ code: "ROLE_REQUIRED" });
   });
 
   it("rejects a high-risk submission without riskType at the route boundary", async () => {

@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -27,9 +27,8 @@ export async function GET(request: Request, context: NoticeContext) {
 
   try {
     const session = getRequiredSession(request);
+    // Backend: el acta la leen Ambiental, Admin, Inspector y Auditor; la capacidad ya lo expresa.
     authorize(session, { capability: "violationNotice:view", throwOnError: true });
-    const scenario = getScenario(session.scenarioId);
-    if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede consultar actas de infracción.", path);
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/environmental-inspections/${pathId(id)}/violation-notice`, "violationNotice:view");
@@ -43,7 +42,7 @@ export async function GET(request: Request, context: NoticeContext) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para consultar actas.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para consultar actas.", path, FORBIDDEN_CODES.roleRequired);
     return mapSessionError(error, path, "No se pudo consultar el acta de infracción.");
   }
 }
@@ -55,7 +54,7 @@ export async function POST(request: Request, context: NoticeContext) {
   try {
     const session = getRequiredSession(request);
     authorize(session, { capability: "violationNotice:issue", throwOnError: true });
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede emitir actas de infracción.", path);
 
     const body = await request.json().catch(() => undefined);
@@ -92,7 +91,7 @@ export async function POST(request: Request, context: NoticeContext) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para emitir actas.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para emitir actas.", path, FORBIDDEN_CODES.roleRequired);
     return mapSessionError(error, path, "No se pudo emitir el acta de infracción.");
   }
 }

@@ -430,7 +430,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       const updated = action === "submit"
         ? await treeInterventionsAdapter.submitForAuthorization(detail.id)
         : action === "authorize"
-          ? await treeInterventionsAdapter.authorize(detail.id, { authorizedByUserId: scenario.actor.userId })
+          ? await treeInterventionsAdapter.authorize(detail.id)
           : await treeInterventionsAdapter.reject(detail.id);
       setDetail(updated);
       setScheduleOpen(false);

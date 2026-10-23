@@ -135,11 +135,15 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
   it("separates the Office issuance role and reports a second notice as 409", async () => {
     const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     expect((await POST(noticeRequest(fieldCookie), noticeContext)).status).toBe(403);
-    expect((await GET(readNoticeRequest(fieldCookie), { params: Promise.resolve({ id: "INS-1008" }) })).status).toBe(403);
+    // El inspector (Campo) sí puede leer el acta (Backend #161): todavía no hay una emitida.
+    expect((await GET(readNoticeRequest(fieldCookie), { params: Promise.resolve({ id: "INS-1008" }) })).status).toBe(404);
 
     const limitedCookie = await loginAs("office-limited-intake", { mode: "mock" });
     expect((await POST(noticeRequest(limitedCookie), noticeContext)).status).toBe(403);
-    expect((await GET(readNoticeRequest(limitedCookie), { params: Promise.resolve({ id: "INS-1008" }) })).status).toBe(403);
+    expect((await GET(readNoticeRequest(limitedCookie), { params: Promise.resolve({ id: "INS-1008" }) })).status).toBe(404);
+
+    const crewOnlyCookie = await loginAs("field-crew-member-route", { mode: "mock" });
+    expect((await GET(readNoticeRequest(crewOnlyCookie), { params: Promise.resolve({ id: "INS-1008" }) })).status).toBe(403);
 
     const officeCookie = await loginAs("office-duty-queue", { mode: "mock" });
     expect((await POST(noticeRequest(officeCookie), noticeContext)).status).toBe(201);
@@ -167,6 +171,7 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
 
   it("denies backend notice reads without violationNotice:view before forwarding", async () => {
     const cookie = await loginAs("office-limited-intake", {
+      roles: ["M6_OFICINA_OPERACIONES"],
       mode: "backend-development",
       devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
       backendOrigin: "https://backend.internal",

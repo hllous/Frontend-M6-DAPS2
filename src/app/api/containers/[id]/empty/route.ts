@@ -24,10 +24,10 @@ export async function POST(
   try {
     const session = getRequiredSession(request);
 
-    authorize(session, { capability: "container:manage", capabilityMessage: "No tiene permisos para vaciar contenedores.", throwOnError: true });
+    authorize(session, { capability: "container:empty", capabilityMessage: "No tiene permisos para vaciar contenedores.", throwOnError: true });
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}/empty`, "container:manage", {
+      const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}/empty`, "container:empty", {
         method: "POST",
       });
             return forwardResponse(backendResponse);

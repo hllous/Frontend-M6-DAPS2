@@ -55,6 +55,7 @@ describe("owned BFF session", () => {
       absoluteExpiresAt: now + 8 * 60 * 60 * 1000,
       jwtExpiresAt: now + 20 * 60 * 1000,
       accessToken: "header.payload.signature",
+      roles: ["M6_CAMPO_CUADRILLA"],
     };
 
     expect(effectiveSessionExpiry(session)).toBe(now + 20 * 60 * 1000);

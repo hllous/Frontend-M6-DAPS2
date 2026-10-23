@@ -7,8 +7,8 @@ import {
 import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
 
-test.describe("Office emptying and relocation dispatch #123", () => {
-  test("Office actor empties an overflowed container without requiring service assignment", async ({
+test.describe("Emptying (crew) and relocation (Office) dispatch #123", () => {
+  test("Crew empties an overflowed container that Office registered, without requiring service assignment", async ({
     page,
   }) => {
     await loginViaApi(page, "office-duty-queue");
@@ -32,6 +32,11 @@ test.describe("Office emptying and relocation dispatch #123", () => {
 
     await createDialog.getByRole("button", { name: "Guardar contenedor" }).click();
     await expect(createDialog).not.toBeVisible();
+
+    // Reporting and emptying are Field work (Backend #161): Office and Field never share a session.
+    await page.context().clearCookies();
+    await loginViaApi(page, "field-crew-leader-route");
+    await page.goto("/app/catalog/containers");
 
     // Filter to our test container
     await page.getByLabel("Buscar contenedor").fill(code);
@@ -155,7 +160,7 @@ test.describe("Office emptying and relocation dispatch #123", () => {
     await expect(activeDetail.getByRole("button", { name: "Confirmar ubicación" })).toHaveCount(0);
   });
 
-  test("Field actor cannot access emptying or relocation controls", async ({
+  test("Field actor empties overflowed containers but cannot relocate or register them", async ({
     page,
   }) => {
     await loginViaApi(page, "field-crew-member-route");
@@ -164,12 +169,12 @@ test.describe("Office emptying and relocation dispatch #123", () => {
     await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
     await expect(page.getByText("CONT-001")).toBeVisible();
 
-    // Field actors lack container:manage capability — standalone dispatch buttons are not rendered in detail.
+    // Field actors lack container:manage: relocation is not rendered. They do hold container:empty.
     const activeDetail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-001/ }));
     await expect(activeDetail.getByRole("button", { name: "Reubicar" })).toHaveCount(0);
     await page.keyboard.press("Escape");
     const overflowDetail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-002/ }));
-    await expect(overflowDetail.getByRole("button", { name: "Vaciar contenedor" })).toHaveCount(0);
+    await expect(overflowDetail.getByRole("button", { name: "Vaciar contenedor" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Registrar contenedor" })).not.toBeVisible();
   });
 

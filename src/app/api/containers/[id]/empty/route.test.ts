@@ -29,8 +29,8 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
     expect(response.status).toBe(401);
   });
 
-  it("blocks Field actors without container:manage with 403", async () => {
-    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
+  it("blocks the Administrator: emptying is Field work (Backend #161)", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-2/empty", {
         method: "POST",
@@ -43,7 +43,7 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
     expect(body.message).toMatch(/permisos/i);
   });
 
-  it("blocks Office actor without container:manage with 403", async () => {
+  it("blocks an Auditor without container:empty with 403", async () => {
     const cookie = await loginAs("office-limited-intake", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-2/empty", {
@@ -55,8 +55,8 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
     expect(response.status).toBe(403);
   });
 
-  it("allows Office actor with container:manage to empty an OVERFLOWED container", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+  it("allows the crew to empty an OVERFLOWED container", async () => {
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     // cont-2 is initialized in OVERFLOWED state
     const response = await POST(
       new Request("http://localhost/api/containers/cont-2/empty", {
@@ -75,7 +75,7 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
   });
 
   it("returns 409 Conflict when attempting to empty a non-OVERFLOWED container", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     // cont-1 is initialized in ACTIVE state
     const response = await POST(
       new Request("http://localhost/api/containers/cont-1/empty", {
@@ -91,7 +91,7 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
   });
 
   it("returns 404 when container is not found", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/nonexistent/empty", {
         method: "POST",
@@ -106,7 +106,7 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
   it("forwards an authorized backend Container empty request with its id and method", async () => {
     const id = "container_42.3~";
     const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", {
+    const cookie = createSessionCookie("field-crew-leader-route", {
       mode: "backend-development",
       devJwt,
       backendOrigin: "https://backend.internal",
@@ -124,7 +124,7 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
     expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 
-  it("denies a backend session without container:manage before forwarding", async () => {
+  it("denies a backend session without container:empty before forwarding", async () => {
     const cookie = await loginAs("office-limited-intake", {
       mode: "backend-development",
       devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
@@ -142,7 +142,7 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
   });
 
   it("fails closed when backend mode has no backend origin", async () => {
-    const cookie = createSessionCookie("office-duty-queue", {
+    const cookie = createSessionCookie("field-crew-leader-route", {
       mode: "backend-development",
       devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
       backendOrigin: "https://backend.internal",

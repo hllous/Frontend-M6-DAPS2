@@ -225,6 +225,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
   const [selectedId, setSelectedId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("detail"));
   const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("inspectionId"));
   const [createOpen, setCreateOpen] = useState(false);
+  const canCreateReport = scenario.capabilities.includes("environmentalReport:create");
   const [initialParams] = useState(initialQueueParams);
   const [filterStatus, setFilterStatus] = useState<EnvironmentalReportStatus[]>(initialParams.status);
   const [filterType, setFilterType] = useState<string>(initialParams.type);
@@ -339,7 +340,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Control ambiental</h1>
           </div>
-          {scenario.capabilities.includes("environmentalReport:create") && <Button className="gap-2" onClick={() => setCreateOpen(true)}><FilePlus2 className="h-4 w-4" aria-hidden />Abrir reporte</Button>}
+          {canCreateReport && <Button className="gap-2" onClick={() => setCreateOpen(true)}><FilePlus2 className="h-4 w-4" aria-hidden />Abrir reporte</Button>}
         </div>
       </header>
 
@@ -350,7 +351,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
         {loadState.status === "ready" && scenario.actor.kind === "OFFICE" && loadState.sanctionOutcomeIntegrationExceptions.length > 0 && <SanctionOutcomeIntegrationExceptionsPanel exceptions={loadState.sanctionOutcomeIntegrationExceptions} />}
         {!rangeError && loadState.status === "loading" && <LoadingState />}
         {!rangeError && loadState.status === "error" && <ErrorState message={loadState.message} onRetry={loadReports} />}
-        {!rangeError && loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={filterStatus.length > 0 || Boolean(filterType || filterPriority || search || filterFrom || filterTo)} onClear={() => { setFilterStatus([]); setFilterType(""); setFilterPriority(""); setSearch(""); setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} canCreate={scenario.actor.kind === "FIELD"} onCreate={() => setCreateOpen(true)} />}
+        {!rangeError && loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={filterStatus.length > 0 || Boolean(filterType || filterPriority || search || filterFrom || filterTo)} onClear={() => { setFilterStatus([]); setFilterType(""); setFilterPriority(""); setSearch(""); setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} canCreate={canCreateReport} onCreate={() => setCreateOpen(true)} />}
         {!rangeError && loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"}><ItemGroup className="grid gap-3">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => { setSelectedId(report.id); setSelectedInspectionId(null); }} />)}</ItemGroup></section>}
         {!rangeError && loadState.status === "ready" && loadState.totalPages > 1 && <QueuePagination page={queuePage} totalPages={loadState.totalPages} total={loadState.total} onPage={setQueuePage} />}
       </div>
@@ -559,22 +560,23 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
   // #639: una sola solicitud abierta por expediente; mientras está pendiente el backend responde 409
   // a derivar, desestimar y cerrar, así que esas acciones no se ofrecen.
   const infoPending = report.informationRequestPending === true;
-  const canRequestInfo = isOffice && report.status === "UNDER_REVIEW" && Boolean(report.ticketId) && !infoPending;
-  const canSchedule = isOffice && report.status === "UNDER_REVIEW" && !activeInspection;
+  const canRequestInfo = scenario.capabilities.includes("environmentalReport:review") && report.status === "UNDER_REVIEW" && Boolean(report.ticketId) && !infoPending;
+  const canSchedule = scenario.capabilities.includes("environmentalInspection:schedule") && report.status === "UNDER_REVIEW" && !activeInspection;
   // La agenda de la inspección vive en su Servicio POINT: reprogramar es reprogramar
   // ese servicio (reschedule + confirm-reschedule), no crear otra inspección.
   const activeService = activeInspection ? inspectionServices[activeInspection.id] ?? null : null;
-  const canReprogram = isOffice && report.status === "INSPECTION_SCHEDULED" && (activeService?.status === "SCHEDULED" || activeService?.status === "RESCHEDULED");
-  const canReinspect = isOffice && report.status === "INSPECTED" && inspections.some((inspection) => inspection.outcome === "INCONCLUSIVE");
+  const canReprogram = scenario.capabilities.includes("service:reschedule") && report.status === "INSPECTION_SCHEDULED" && (activeService?.status === "SCHEDULED" || activeService?.status === "RESCHEDULED");
+  const canReinspect = scenario.capabilities.includes("environmentalInspection:schedule") && report.status === "INSPECTED" && inspections.some((inspection) => inspection.outcome === "INCONCLUSIVE");
   // #320: si el alta del servicio falló, la inspección quedó abierta sin servicio y el expediente ya
   // está en INSPECTION_SCHEDULED (volver a programar da 409): sólo se reintenta el alta del servicio.
-  const orphanInspection = isOffice && report.status === "INSPECTION_SCHEDULED" && activeInspection && !activeInspection.serviceId ? activeInspection : null;
+  const orphanInspection = scenario.capabilities.includes("service:schedule") && report.status === "INSPECTION_SCHEDULED" && activeInspection && !activeInspection.serviceId ? activeInspection : null;
   const claimId = report.publicId ?? report.ticketId;
   const hasClaimData = Boolean(report.escalated || (report.citizenResponse && isOffice) || (claimId && isOffice));
   const closure = getEnvironmentalReportClosure(report);
   const visibleClosure = closure && (closure.kind !== "sanctioned" || canViewSanctionOutcome) ? closure : null;
   const repairRequestInspection = inspections.find((inspection) => inspection.id === repairRequestInspectionId) ?? null;
   const canCreateRepairRequestFromInspection = (inspection: EnvironmentalInspection) => {
+    if (!scenario.capabilities.includes("repairRequest:create")) return false;
     if (isOffice) return true;
     const sourceService = inspectionServices[inspection.id];
     return scenario.actor.kind === "FIELD" && Boolean(sourceService?.crewId && sourceService.crewId === scenario.actor.crewId);
@@ -586,7 +588,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
       : ["FORWARDED", "DISMISSED", "NO_VIOLATION", "SANCTIONED"].includes(report.status)
         ? [{ action: "close", label: "Cerrar expediente", icon: Check, tone: "text-[var(--color-danger)]" }]
         : [];
-  const actions = infoPending ? allActions.filter(({ action }) => action !== "forward" && action !== "dismiss" && action !== "close") : allActions;
+  const actions = allActions.filter(({ action }) => scenario.capabilities.includes(action === "close" ? "environmentalReport:close" : "environmentalReport:review") && !(infoPending && (action === "forward" || action === "dismiss" || action === "close")));
 
   async function handleRequestInformation(input: RequestInformationInput): Promise<string | null> {
     try {

@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -15,7 +15,7 @@ export async function transitionReport(request: Request, id: string, action: "st
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
     authorize(session, { capability: action === "close" ? "environmentalReport:close" : "environmentalReport:review", throwOnError: true });
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede revisar expedientes ambientales.", path);
 
@@ -43,7 +43,7 @@ export async function transitionReport(request: Request, id: string, action: "st
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para revisar este expediente.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para revisar este expediente.", path, FORBIDDEN_CODES.roleRequired);
     return mapSessionError(error, path, "No se pudo actualizar el expediente ambiental.");
   }
 }

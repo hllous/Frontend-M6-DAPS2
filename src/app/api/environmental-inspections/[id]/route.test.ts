@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 import { GET } from "./route";
-import { loginAs } from "@/test/session";
+import { loginAs, loginWithMe as login } from "@/test/session";
 
 const inspectionId = "0b5bd4d8-179b-4de7-82aa-a83524012097";
 const serviceId = "ceec08ae-67e7-4739-9677-150f5085bb1a";

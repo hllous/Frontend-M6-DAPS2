@@ -31,7 +31,6 @@ export function containerRouteHandlers(officeCookie: string, crewCookie: string)
       { method: "post", path: "*/api/containers/:containerId/start-repair", route: startContainerRepair, params: byContainerId },
       { method: "post", path: "*/api/containers/:containerId/complete-repair", route: completeContainerRepair, params: byContainerId },
       { method: "post", path: "*/api/containers/:containerId/remove", route: removeContainer, params: byContainerId },
-      { method: "post", path: "*/api/containers/:containerId/empty", route: emptyContainer, params: byContainerId },
       { method: "post", path: "*/api/containers/:containerId/relocate", route: relocateContainer, params: byContainerId },
       { method: "post", path: "*/api/containers/:containerId/confirm-relocation", route: confirmContainerRelocation, params: byContainerId },
       { method: "get", path: "*/api/disposal-sites", route: listDisposalSites },
@@ -41,6 +40,7 @@ export function containerRouteHandlers(officeCookie: string, crewCookie: string)
       { method: "delete", path: "*/api/disposal-sites/:disposalSiteId", route: deactivateDisposalSite, params: byDisposalSiteId },
     ]),
     ...routeHandlers(crewCookie, [
+      { method: "post", path: "*/api/containers/:containerId/empty", route: emptyContainer, params: byContainerId },
       { method: "post", path: "*/api/containers/:containerId/report-overflow", route: reportContainerOverflow, params: byContainerId },
       { method: "post", path: "*/api/containers/:containerId/report-damage", route: reportContainerDamage, params: byContainerId },
     ]),

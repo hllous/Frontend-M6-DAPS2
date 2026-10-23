@@ -1,20 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
-import { authenticatedFetch, NetworkFailureError } from "@/lib/authenticated-fetch";
-import { loadScenario, ScenarioRequestError } from "@/lib/scenario-client";
-import type { OperationalScenario, ScenarioId } from "@/lib/scenarios";
+import { authenticatedFetch, NetworkFailureError, ROLES_STALE_EVENT } from "@/lib/authenticated-fetch";
+import { loadRoles, loadScenario, ScenarioRequestError } from "@/lib/scenario-client";
+import { scenarioForRoles, type OperationalScenario, type ScenarioId } from "@/lib/scenarios";
 import { onRemoteLogout } from "@/lib/session-client";
 import { ensureMockWorkerStarted } from "@/mocks/ensure-worker-started";
 
 import { AppShell } from "./app-shell";
-import { ShellError, ShellForbidden, ShellUnauthenticated } from "./shell-states";
+import { ShellError, ShellForbidden, ShellNoRole, ShellUnauthenticated } from "./shell-states";
 
 type LoadState =
   | { status: "loading" }
   | { status: "unauthenticated" }
-  | { status: "forbidden" }
+  | { status: "forbidden"; description?: string }
   | { status: "error"; description?: string }
   | { status: "ready"; scenario: OperationalScenario };
 
@@ -37,10 +38,29 @@ export function FoundationDemo({
   children?: ReactNode;
   contentReady?: boolean;
 }) {
+  const router = useRouter();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [requestVersion, setRequestVersion] = useState(0);
 
   useEffect(() => onRemoteLogout(() => window.location.assign("/login")), []);
+
+  // Un 403 ROLE_REQUIRED sugiere roles viejos: se releen de GET /me y la UI se recalcula sin recargar ni parpadear.
+  useEffect(() => {
+    const refreshRoles = () => {
+      loadRoles()
+        .then((roles) => {
+          setState((current) => current.status === "ready"
+            ? { status: "ready", scenario: scenarioForRoles(current.scenario, roles) }
+            : current);
+          // Nested catalog pages receive their scenario from Server Components.
+          // Re-render them with the freshly sealed roles as well as updating the shell.
+          router.refresh();
+        })
+        .catch(() => undefined);
+    };
+    window.addEventListener(ROLES_STALE_EVENT, refreshRoles);
+    return () => window.removeEventListener(ROLES_STALE_EVENT, refreshRoles);
+  }, [router]);
 
   useEffect(() => {
     let lastRefreshAt = 0;
@@ -78,7 +98,7 @@ export function FoundationDemo({
           return;
         }
         if (caught instanceof ScenarioRequestError && caught.status === 403) {
-          setState({ status: "forbidden" });
+          setState({ status: "forbidden", description: caught.message });
           return;
         }
         setState({ status: "error", description: errorDescription(caught) });
@@ -93,7 +113,8 @@ export function FoundationDemo({
   const retry = useCallback(() => setRequestVersion((version) => version + 1), []);
 
   if (state.status === "unauthenticated") return <main className="p-6"><ShellUnauthenticated /></main>;
-  if (state.status === "forbidden") return <main className="p-6"><ShellForbidden /></main>;
+  if (state.status === "forbidden") return <main className="p-6"><ShellForbidden description={state.description} /></main>;
+  if (state.status === "ready" && state.scenario.roles.length === 0) return <ShellNoRole logoutAction={logoutAction} />;
   if (state.status === "error") return <main className="p-6"><ShellError onRetry={retry} description={state.description} /></main>;
   return (
     <AppShell scenario={state.status === "ready" ? state.scenario : undefined} logoutAction={logoutAction} routeContent={children} contentReady={contentReady} />

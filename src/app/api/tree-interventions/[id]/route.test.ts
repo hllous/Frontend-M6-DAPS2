@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { addTreeInterventionFixture, resetTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
 import type { TreeInterventionType } from "@/lib/tree-interventions";
 import { GET } from "./route";
@@ -9,7 +8,7 @@ import { POST as reject } from "./reject/route";
 import { POST as submitForAuthorization } from "./submit-for-authorization/route";
 import { POST as assignService } from "./assign-service/route";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
-import { loginAs } from "@/test/session";
+import { loginAs, loginWithMe as login } from "@/test/session";
 
 beforeEach(() => {
   resetTreeInterventionFixtures();
@@ -59,7 +58,7 @@ describe("/api/tree-interventions/[id]", () => {
     expect([submitted.status, authorized.status, rejected.status]).toEqual([200, 200, 200]);
     expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method, init?.body])).toEqual([
       ["https://backend.internal/tree-interventions/intervention-backend-1/submit-for-authorization", "POST", undefined],
-      ["https://backend.internal/tree-interventions/intervention-backend-1/authorize", "POST", JSON.stringify({ authorizedByUserId: "user-lucia" })],
+      ["https://backend.internal/tree-interventions/intervention-backend-1/authorize", "POST", undefined], // el autorizante sale del token: un authorizedByUserId viejo no viaja
       ["https://backend.internal/tree-interventions/intervention-backend-1/reject", "POST", undefined],
     ]);
     expect(backendFetch.mock.calls.every(([, init]) =>

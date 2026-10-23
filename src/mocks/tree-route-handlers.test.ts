@@ -101,8 +101,9 @@ describe("tree, green space and green point handlers delegate to the real BFF ro
     const submitted = await call("POST", "/api/tree-interventions/intervention-3/submit-for-authorization");
     expect(await submitted.json()).toMatchObject({ status: "PENDING_AUTHORIZATION" });
 
+    // El autorizante sale de la sesión; un authorizedByUserId en el cuerpo se ignora (Backend #161).
     const authorized = await call("POST", "/api/tree-interventions/intervention-3/authorize", undefined, { authorizedByUserId: "user-carlos" });
-    expect(await authorized.json()).toMatchObject({ status: "AUTHORIZED", authorizedByUserId: "user-carlos" });
+    expect(await authorized.json()).toMatchObject({ status: "AUTHORIZED", authorizedByUserId: "user-lucia" });
 
     const pointService = serviceFixtures.find((service) => service.mode === "POINT");
     const assigned = await call("POST", "/api/tree-interventions/intervention-3/assign-service", undefined, { serviceId: pointService?.id });

@@ -654,12 +654,12 @@ export function ServicesWorkspace({
 
   const isField = scenario?.actor.kind === "FIELD";
   const canAssignCrew = Boolean(scenario?.capabilities.includes("service:assign"));
-  const canSchedule = !isField;
+  const canSchedule = Boolean(scenario?.capabilities.includes("service:schedule"));
   const canReschedule = Boolean(scenario?.capabilities.includes("service:reschedule"));
   const canCancel = Boolean(scenario?.capabilities.includes("service:cancel"));
   const canExecuteService = Boolean(scenario?.capabilities.includes("service:execute"));
-  const canCreateRepairRequest = scenario?.actor.kind === "OFFICE" || fieldCanViewRepairRequests;
-  const canCreateStreetClosureRequest = scenario?.actor.kind === "OFFICE";
+  const canCreateRepairRequest = Boolean(scenario?.capabilities.includes("repairRequest:create"));
+  const canCreateStreetClosureRequest = Boolean(scenario?.capabilities.includes("streetClosureRequest:create"));
 
   const [streetClosureDependencyState, setStreetClosureDependencyState] = useState<{
     serviceId: string | null;

@@ -21,16 +21,22 @@ describe("operational scenarios", () => {
     );
     expect(scenarios.fieldCrewLeader.actor.fieldRole).toBe("CREW_LEADER");
     expect(scenarios.fieldCrewMember.actor.fieldRole).toBe("CREW_MEMBER");
-    expect(scenarios.officeLimited.capabilities).not.toContain("inventory:view");
-    expect(scenarios.officeDutyQueue.capabilities).toContain("container:report");
-    expect(scenarios.fieldCrewLeader.capabilities).toContain("container:report");
-    expect(scenarios.fieldCrewMember.capabilities).toContain("container:report");
-    expect(scenarios.officeLimited.capabilities).not.toContain("container:report");
-    expect(scenarios.officeDutyQueue.capabilities).toContain("sanctionOutcome:view");
-    expect(scenarios.fieldCrewLeader.capabilities).not.toContain("sanctionOutcome:view");
-    expect(scenarios.officeLimited.capabilities).not.toContain("sanctionOutcome:view");
     expect(scenarios.officeDutyQueue.capabilities).toContain("service:schedule");
+    expect(scenarios.officeDutyQueue.capabilities).toContain("sanctionOutcome:view");
+    expect(scenarios.fieldCrewLeader.capabilities).toContain("container:report");
+    expect(scenarios.fieldCrewLeader.capabilities).toContain("environmentalInspection:execute");
+    expect(scenarios.fieldCrewMember.capabilities).toContain("container:report");
+    expect(scenarios.fieldCrewMember.capabilities).not.toContain("environmentalInspection:execute");
+    // El integrante comparte el rol de la cuadrilla, pero solo el responsable cambia el estado del servicio.
+    expect(scenarios.fieldCrewLeader.capabilities).toContain("service:execute");
+    expect(scenarios.fieldCrewMember.capabilities).not.toContain("service:execute");
+    // Oficina y Campo no conviven: el administrador no ejecuta trabajo de Campo.
+    expect(scenarios.officeDutyQueue.capabilities).not.toContain("container:report");
+    expect(scenarios.fieldCrewLeader.capabilities).not.toContain("sanctionOutcome:view");
+    // El auditor lee y nada más.
+    expect(scenarios.officeLimited.capabilities).toContain("service:view");
     expect(scenarios.officeLimited.capabilities).not.toContain("service:schedule");
+    expect(scenarios.officeLimited.capabilities).not.toContain("container:report");
   });
 
   it("returns operational scenarios by their stable name", () => {

@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getRepairRequestFixture, transitionRepairRequestFixture } from "@/lib/repair-request-fixtures";
@@ -12,7 +12,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params; const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request); const scenario = getScenario(session);
-    if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede reconciliar derivaciones.", path);
+    if (!scenario.capabilities.includes("referral:reconcile")) return errorResponse(403, "Su rol no permite reconciliar derivaciones.", path, FORBIDDEN_CODES.roleRequired);
     let body: unknown = {};
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = repairRequestRecoveryInputSchema.safeParse(body);

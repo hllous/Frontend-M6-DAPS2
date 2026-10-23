@@ -31,7 +31,7 @@ afterAll(() => server.close());
 describe("TreeSurveyPanel", () => {
   it("lets users clear survey filters and optional survey selections", async () => {
     const user = userEvent.setup();
-    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.fieldCrewLeader} onClose={vi.fn()} />);
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
 
     const healthFilter = screen.getByRole("combobox", { name: "Filtrar por estado sanitario" });
@@ -71,7 +71,7 @@ describe("TreeSurveyPanel", () => {
 
   it("blocks high-risk capture until riskType is selected and submits without Service linkage", async () => {
     const user = userEvent.setup();
-    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.fieldCrewLeader} onClose={vi.fn()} />);
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
@@ -97,7 +97,7 @@ describe("TreeSurveyPanel", () => {
   });
 
   it("offers a guided intervention request from a high-risk survey with a readable source trail", async () => {
-    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeOperations} onClose={vi.fn()} />);
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await (await screen.findByRole("button", { name: "Solicitar intervención sugerida" })).click();
     const dialog = screen.getByRole("dialog", { name: /Solicitar intervención/ });
@@ -121,7 +121,7 @@ describe("TreeSurveyPanel", () => {
   it("defaults the survey date to today in Argentina (not UTC) and blocks later dates", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-09-21T01:30:00Z"));
-    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.fieldCrewLeader} onClose={vi.fn()} />);
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });
@@ -135,7 +135,7 @@ describe("TreeSurveyPanel", () => {
   it("refreshes the default date each time the form opens instead of freezing it at load", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-09-20T15:00:00Z"));
-    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.fieldCrewLeader} onClose={vi.fn()} />);
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     vi.setSystemTime(new Date("2026-09-22T15:00:00Z"));
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
@@ -146,7 +146,7 @@ describe("TreeSurveyPanel", () => {
   it("does not allow a future date to be selected", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-09-21T15:00:00Z"));
-    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeDutyQueue} onClose={vi.fn()} />);
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.fieldCrewLeader} onClose={vi.fn()} />);
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await screen.getByRole("button", { name: "Registrar relevamiento" }).click();
     const dialog = screen.getByRole("dialog", { name: /Registrar relevamiento/ });

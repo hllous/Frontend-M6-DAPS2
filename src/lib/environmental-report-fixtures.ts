@@ -284,6 +284,8 @@ export function createEnvironmentalInspectionFixture(reportId: string, input: En
     id: crypto.randomUUID(),
     reportId,
     serviceId: null,
+    inspectorId: input.inspectorId ?? null,
+    completedByUserId: null,
     inspectedAt: null,
     scheduledDate: input.scheduledDate,
     timeWindow: { ...input.timeWindow },

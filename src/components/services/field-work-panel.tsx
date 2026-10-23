@@ -186,6 +186,7 @@ export function FieldWorkPanel({
     : null;
   const canCreateRepairRequest = Boolean(
     selectedService &&
+      scenario.capabilities.includes("repairRequest:create") &&
       scenario.actor.kind === "FIELD" &&
       scenario.actor.crewId &&
       selectedService.crewId === scenario.actor.crewId,

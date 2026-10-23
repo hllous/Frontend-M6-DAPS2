@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -25,8 +25,8 @@ export async function handleStreetClosureTransition(
   try {
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede reconciliar solicitudes de corte de calle.", path);
+    if (!scenario.capabilities.includes("referral:reconcile")) {
+      return errorResponse(403, "Su rol no permite reconciliar solicitudes de corte de calle.", path, FORBIDDEN_CODES.roleRequired);
     }
 
     let body: unknown = undefined;

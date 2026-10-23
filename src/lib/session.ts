@@ -6,6 +6,7 @@ import {
 } from "node:crypto";
 import { cookies } from "next/headers";
 
+import { m6RoleSchema, type M6Role } from "./m6-roles";
 import { getScenario, type Capability, type ScenarioCrew, type ScenarioId } from "./scenarios";
 import { AUTH_COOKIE_NAME } from "./session-config";
 
@@ -25,6 +26,8 @@ export type Session = {
   absoluteExpiresAt: number;
   jwtExpiresAt: number;
   accessToken?: string;
+  /** Roles de M6 efectivos: en modo backend los trae GET /me (login y refresco); en mock, el fixture del escenario. */
+  roles: M6Role[];
   /** Cuadrilla real de un escenario de Campo, resuelta contra GET /crews en el login (sólo modo backend). */
   crew?: ScenarioCrew;
 };
@@ -65,11 +68,21 @@ export class ForbiddenSessionError extends Error {
   }
 }
 
+/** 403 por `sub_type`: el token es de un ciudadano y el sistema es solo para personal municipal (sin `code`). */
+export class CitizenForbiddenError extends ForbiddenSessionError {
+  constructor(message = "Este sistema es solo para personal municipal.") {
+    super(message);
+    this.name = "CitizenForbiddenError";
+  }
+}
+
 type SessionOptions = {
   mode: AuthMode;
   now?: number;
   devJwt?: string;
   backendOrigin?: string;
+  /** Roles de GET /me; sin ellos, los del fixture del escenario (mock y tests). */
+  roles?: readonly M6Role[];
 };
 
 type RuntimeEnvironment = {
@@ -98,6 +111,7 @@ export function createSession(
 ): Session {
   getScenario(scenarioId);
   const now = options.now ?? Date.now();
+  const roles = [...(options.roles ?? getScenario(scenarioId).roles)];
 
   if (options.mode === "real-m1") {
     throw new AuthUnavailableError("La autenticación real de M1 permanece bloqueada hasta publicar su contrato.");
@@ -111,6 +125,7 @@ export function createSession(
       lastActivityAt: now,
       absoluteExpiresAt: now + SESSION_ABSOLUTE_MS,
       jwtExpiresAt: now + SESSION_ABSOLUTE_MS,
+      roles,
     };
   }
 
@@ -136,6 +151,7 @@ export function createSession(
     absoluteExpiresAt: now + SESSION_ABSOLUTE_MS,
     jwtExpiresAt,
     accessToken,
+    roles,
   };
 }
 
@@ -289,6 +305,7 @@ function isSession(value: Partial<Session>): value is Session {
     typeof value.lastActivityAt === "number" &&
     typeof value.absoluteExpiresAt === "number" &&
     typeof value.jwtExpiresAt === "number" &&
+    m6RoleSchema.array().safeParse(value.roles).success &&
     (value.mode === "mock" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
     (value.crew === undefined || (typeof value.crew?.id === "string" && typeof value.crew?.name === "string"))
   );

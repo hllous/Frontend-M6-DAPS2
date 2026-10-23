@@ -42,7 +42,8 @@ describe("authorized scenario BFF route", () => {
 
   it("forwards a backend-development session before serving its fixture", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      Response.json({ userId: "42", subType: "EMPLEADO", m1Role: "RESPONSABLE_AREA", roles: ["M6_ADMIN"] }));
     const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const response = await GET(new Request("http://localhost/api/mock/scenarios/office-duty-queue", { headers: { cookie } }), {
       params: Promise.resolve({ scenarioId: "office-duty-queue" }),
@@ -50,7 +51,7 @@ describe("authorized scenario BFF route", () => {
 
     expect(response.status).toBe(200);
     expect(backendFetch).toHaveBeenCalledWith(
-      new URL("/service-types", "https://backend.internal"),
+      new URL("/me", "https://backend.internal"),
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
     const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
@@ -60,8 +61,8 @@ describe("authorized scenario BFF route", () => {
   describe("backend failures while validating the session (#240)", () => {
     async function getWithBackend(respond: () => Promise<Response>) {
       process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-      vi.spyOn(globalThis, "fetch").mockImplementation(respond);
       const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+      vi.spyOn(globalThis, "fetch").mockImplementation(respond);
       return GET(new Request("http://localhost/api/mock/scenarios/office-duty-queue", { headers: { cookie } }), {
         params: Promise.resolve({ scenarioId: "office-duty-queue" }),
       });
@@ -74,15 +75,14 @@ describe("authorized scenario BFF route", () => {
       expect((await response.json()).message).toBe("La sesión no está activa.");
     });
 
-    it("preserves the session on a backend 403 and returns a Spanish denial", async () => {
+    it("preserves the session on a backend 403 (a citizen token) and says why, without a role code", async () => {
       const response = await getWithBackend(async () => new Response(null, { status: 403 }));
+      const body = await response.json();
 
       expect(response.status).toBe(403);
       expect(response.headers.get("set-cookie")).toBeNull();
-      expect(await response.json()).toMatchObject({
-        message: "La sesión no puede consultar este escenario.",
-        error: "Forbidden",
-      });
+      expect(body).toMatchObject({ message: "Este sistema es solo para personal municipal.", error: "Forbidden" });
+      expect(body).not.toHaveProperty("code");
     });
 
     it("keeps the real status of a backend 500 and does not blame the session", async () => {
@@ -101,7 +101,7 @@ describe("authorized scenario BFF route", () => {
       const body = await response.json();
 
       expect(response.status).toBe(503);
-      expect(body.message).toBe("No se pudo conectar con el backend.");
+      expect(body.message).toBe("El backend no responde. Reintente en unos segundos.");
     });
   });
 });

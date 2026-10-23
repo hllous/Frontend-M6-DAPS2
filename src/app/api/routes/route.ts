@@ -1,4 +1,4 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-      return errorResponse(403, error.message, path);
+      return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
     }
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);

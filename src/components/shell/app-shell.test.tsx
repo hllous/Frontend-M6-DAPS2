@@ -158,7 +158,11 @@ describe("AppShell", () => {
   });
 
   it("hides a module an actor is not optimistically permitted to see", () => {
-    render(<AppShell scenario={scenarios.officeLimited} />);
+    const withoutInventory = {
+      ...scenarios.officeLimited,
+      capabilities: scenarios.officeLimited.capabilities.filter((capability) => capability !== "inventory:view"),
+    };
+    render(<AppShell scenario={withoutInventory} />);
 
     const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
     expect(within(moduleNavigation).queryByRole("link", { name: "Inventario" })).not.toBeInTheDocument();

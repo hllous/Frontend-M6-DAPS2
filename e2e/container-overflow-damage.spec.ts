@@ -44,10 +44,10 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await expect(detail.getByRole("button", { name: "Reportar daño" })).toHaveCount(0);
   });
 
-  test("Office actor reports damage with type, severity, public works flag, and evidence", async ({
+  test("Field actor reports damage with type, severity, public works flag, and evidence", async ({
     page,
   }) => {
-    await loginViaApi(page, "office-duty-queue");
+    await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app/catalog/containers");
 
     await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
@@ -115,23 +115,11 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
   });
 
   test("Validates file constraints as defense in depth on the client", async ({ page }) => {
-    await loginViaApi(page, "office-duty-queue");
+    await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app/catalog/containers");
 
-    // First register a fresh container to test validation on an active container
-    await page.getByRole("button", { name: "Registrar contenedor" }).click();
-    const createDialog = page.getByRole("dialog");
-    await createDialog.locator("#container-code").fill("CONT-VAL-01");
-    await chooseCatalogAOption(page, createDialog, "Tipo de contenedor en el formulario", "Residuos domiciliarios");
-    await chooseCatalogAOption(page, createDialog, "Zona en el formulario", { index: 0 });
-    await createDialog.locator("#container-capacity").fill("1100");
-    await createDialog.locator("#container-address").fill("Av. Corrientes 1000");
-    await createDialog.locator("#container-lat").fill("-34.603");
-    await createDialog.locator("#container-lng").fill("-58.381");
-    await createDialog.getByRole("button", { name: "Guardar contenedor" }).click();
-    await expect(createDialog).not.toBeVisible();
-
-    const row = page.locator("tr", { hasText: "CONT-VAL-01" });
+    // The dialog is abandoned without confirming, so the ACTIVE fixture is not mutated.
+    const row = page.locator("tr", { hasText: "CONT-001" });
     await expect(row).toBeVisible();
 
     await clickCatalogRowAction(row, "Reportar desborde");

@@ -226,7 +226,7 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("FieldWorkPanel component", () => {
-  it("lets Field create and view referrals only from an assigned Service", async () => {
+  it("lets Field view the referrals of an assigned Service but not create them (Operations and Admin do)", async () => {
     const user = userEvent.setup();
     render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
 
@@ -235,15 +235,7 @@ describe("FieldWorkPanel component", () => {
 
     expect(await screen.findByRole("heading", { name: "Derivaciones" })).toBeVisible();
     expect(screen.getByText("RR-1001")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Crear derivación de reparación" })).toBeVisible();
-
-    await user.click(screen.getByRole("button", { name: "Crear derivación de reparación" }));
-    const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText(/^Ubicación del daño/), "Calle 12 y Bulevar Costero");
-    await user.click(within(dialog).getByRole("button", { name: "Derivar" }));
-
-    await waitFor(() => expect(within(dialog).getByText(/Derivada a Obras Públicas/i)).toBeVisible());
-    expect(dialog).toHaveTextContent("SVC-1050");
+    expect(screen.queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument();
   });
 
   it("uses the real crew resolved for the session and shows a clear error when its services fail to load", async () => {
@@ -301,7 +293,7 @@ describe("FieldWorkPanel component", () => {
     expect(screen.getByText("Solo consulta")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /asignar cuadrilla/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Crear derivación de reparación" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /corte de calle/i })).not.toBeInTheDocument();
 
     // Return back to assigned list

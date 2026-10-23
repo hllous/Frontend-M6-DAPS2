@@ -29,7 +29,7 @@ export async function GET(request: Request, routeContext: Context) {
     return crew ? NextResponse.json(crew) : errorResponse(404, `La cuadrilla ${id} no existe.`, path);
   } catch (error) {
     if (error instanceof InvalidSessionError) { recordTelemetryEvent({ name: "auth_session_expired", status: 401 }); return errorResponse(401, "La sesión no está activa.", path); }
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     return mapSessionError(error, path, "No se pudo cargar la cuadrilla.");
   }
@@ -51,7 +51,7 @@ export async function PATCH(request: Request, routeContext: Context) {
     return NextResponse.json(crew);
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     return mapSessionError(error, path, "No se pudo actualizar la cuadrilla.");
   }
@@ -69,7 +69,7 @@ export async function DELETE(request: Request, routeContext: Context) {
     return NextResponse.json(crew);
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
     return mapSessionError(error, path, "No se pudo dar de baja la cuadrilla.");
   }

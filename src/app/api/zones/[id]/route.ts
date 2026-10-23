@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -107,7 +107,7 @@ export async function PATCH(
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-      return errorResponse(403, error.message, path);
+      return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
     }
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
@@ -151,7 +151,7 @@ export async function DELETE(
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-      return errorResponse(403, error.message, path);
+      return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
     }
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);

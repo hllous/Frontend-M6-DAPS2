@@ -1,3 +1,5 @@
+import { actorKindForRoles, capabilitiesForRoles, type M6Role } from "./m6-roles";
+
 export type Capability =
   | "service:view"
   | "service:execute"
@@ -34,6 +36,8 @@ export type Capability =
   | "container:manage"
   // Frontend hypothesis for Phase 4 Container reporting
   | "container:report"
+  // Vaciar un contenedor desbordado es de Campo (cuadrilla), no de Oficina (Backend #161).
+  | "container:empty"
   // Frontend hypothesis for Phase 5 Tree management
   | "tree:manage"
   | "tree:survey"
@@ -42,15 +46,25 @@ export type Capability =
   | "service:assign"
   | "service:cancel"
   | "service:reschedule"
-  | "service:schedule";
+  | "service:schedule"
+  // Derivaciones a M3/M7: crear (Operaciones y Admin) y reconciliar a mano (solo Admin), según la tabla del backend.
+  | "repairRequest:create"
+  | "streetClosureRequest:create"
+  | "referral:reconcile";
 
 export type ScenarioId =
   | "office-duty-queue"
   | "field-crew-leader-route"
   | "field-crew-member-route"
-  | "office-limited-intake";
+  | "office-limited-intake"
+  | "office-operations"
+  | "office-environmental"
+  | "field-inspector"
+  | "employee-no-role"
+  | "citizen";
 
 export type OperationalScenario = {
+  subType?: "EMPLEADO" | "CIUDADANO";
   id: ScenarioId;
   label: string;
   actor: {
@@ -67,6 +81,9 @@ export type OperationalScenario = {
      */
     backendCrewName?: string;
   };
+  /** Roles de M6 del actor: en modo backend salen de GET /me; en mock, de este fixture. */
+  roles: M6Role[];
+  /** Derivadas de `roles` (nunca declaradas a mano): lo que la UI muestra u oculta. */
   capabilities: Capability[];
   work: {
     title: string;
@@ -75,49 +92,17 @@ export type OperationalScenario = {
   };
 };
 
-export const scenarios: Record<
+type ScenarioFixture = Omit<OperationalScenario, "capabilities">;
+
+const scenarioFixtures: Record<
   "officeDutyQueue" | "fieldCrewLeader" | "fieldCrewMember" | "officeLimited",
-  OperationalScenario
+  ScenarioFixture
 > = {
   officeDutyQueue: {
     id: "office-duty-queue",
     label: "Oficina · cola de decisiones",
     actor: { userId: "user-lucia", name: "Lucía Fernández", kind: "OFFICE" },
-    capabilities: [
-      "service:view",
-      "inventory:view",
-      "environmentalReport:view",
-      "environmentalReport:create",
-      "environmentalReport:review",
-      "environmentalReport:close",
-      "environmentalInspection:view",
-      "environmentalInspection:schedule",
-      "violationNotice:issue",
-      "violationNotice:view",
-      "sanctionOutcome:view",
-      "map:view",
-      "catalog:view",
-      "serviceType:manage",
-      "disposalSite:manage",
-      "vehicle:manage",
-      "crew:manage",
-      "greenSpace:manage",
-      "greenPoint:manage",
-      "container:manage",
-      "indicator:view",
-      "tree:manage",
-      "tree:survey",
-      "treeIntervention:request",
-      "treeIntervention:authorize",
-      "service:schedule",
-      "service:assign",
-      "service:cancel",
-      "service:reschedule",
-      "zone:manage",
-      "route:manage",
-      "serviceFrequency:manage",
-      "container:report",
-    ],
+    roles: ["M6_ADMIN"],
     work: {
       title: "Acciones de la jornada",
       summary: "Prioridades que requieren una decisión de Oficina.",
@@ -140,7 +125,7 @@ export const scenarios: Record<
       crewName: "Cuadrilla B · Fernández",
       backendCrewName: "Cuadrilla Belgrano — Recolección",
     },
-    capabilities: ["service:view", "service:execute", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view", "environmentalInspection:view", "environmentalInspection:execute", "tree:survey"],
+    roles: ["M6_CAMPO_CUADRILLA", "M6_CAMPO_INSPECTOR"],
     work: {
       title: "Servicios asignados",
       summary: "Recorrido de higiene urbana para el turno actual.",
@@ -162,7 +147,7 @@ export const scenarios: Record<
       crewName: "Cuadrilla B · Fernández",
       backendCrewName: "Cuadrilla Belgrano — Recolección",
     },
-    capabilities: ["service:view", "map:view", "container:report", "environmentalReport:create", "environmentalReport:view", "environmentalInspection:view", "tree:survey"],
+    roles: ["M6_CAMPO_CUADRILLA"],
     work: {
       title: "Servicios asignados",
       summary: "Tareas del recorrido que integran su turno.",
@@ -176,13 +161,41 @@ export const scenarios: Record<
     id: "office-limited-intake",
     label: "Oficina · ingreso con alcance limitado",
     actor: { userId: "user-ana", name: "Andrea Ríos", kind: "OFFICE" },
-    capabilities: ["service:view", "environmentalReport:view", "map:view"],
+    roles: ["M6_AUDITOR"],
     work: {
       title: "Acciones de la jornada",
       summary: "Ingreso de avisos con permisos acotados para esta sesión.",
       items: ["Clasificar aviso ambiental recibido"],
     },
   },
+};
+
+/** Un escenario con otros roles: capacidades y tipo de actor siguen a los roles. */
+export function scenarioForRoles(scenario: ScenarioFixture, roles: readonly M6Role[]): OperationalScenario {
+  // Responsable vs integrante no es un rol de M6 sino un dato de la cuadrilla (Crew.leaderUserId): solo el responsable
+  // cambia el estado del servicio, el integrante consulta. Se aplica sobre los roles, nunca en lugar de ellos.
+  const capabilities = capabilitiesForRoles(roles).filter(
+    (capability) => !(scenario.actor.fieldRole === "CREW_MEMBER" && capability === "service:execute"),
+  );
+  return {
+    ...scenario,
+    roles: [...roles],
+    capabilities,
+    actor: { ...scenario.actor, kind: actorKindForRoles(roles) },
+  };
+}
+
+function roleFixture(base: ScenarioFixture, id: ScenarioId, label: string, roles: M6Role[]): OperationalScenario {
+  return scenarioForRoles({ ...base, id, label }, roles);
+}
+
+export const scenarios = {
+  ...Object.fromEntries(Object.entries(scenarioFixtures).map(([key, fixture]) => [key, scenarioForRoles(fixture, fixture.roles)])) as Record<keyof typeof scenarioFixtures, OperationalScenario>,
+  officeOperations: roleFixture(scenarioFixtures.officeDutyQueue, "office-operations", "Oficina · operaciones", ["M6_OFICINA_OPERACIONES"]),
+  officeEnvironmental: roleFixture(scenarioFixtures.officeDutyQueue, "office-environmental", "Oficina · ambiental", ["M6_OFICINA_AMBIENTAL"]),
+  fieldInspector: roleFixture(scenarioFixtures.fieldCrewLeader, "field-inspector", "Campo · inspector ambiental", ["M6_CAMPO_INSPECTOR"]),
+  employeeNoRole: roleFixture(scenarioFixtures.officeDutyQueue, "employee-no-role", "Empleado · sin rol en Ambiente", []),
+  citizen: { ...roleFixture(scenarioFixtures.officeLimited, "citizen", "Ciudadano · sin acceso", []), subType: "CIUDADANO" as const },
 };
 
 const scenariosById = Object.values(scenarios).reduce(
@@ -194,10 +207,11 @@ export type ScenarioCrew = { id: string; name: string };
 
 /** Con una sesión, la cuadrilla resuelta contra el backend pisa la de fixture del escenario. */
 export function getScenario(
-  ref: ScenarioId | { scenarioId: ScenarioId; crew?: ScenarioCrew },
+  ref: ScenarioId | { scenarioId: ScenarioId; crew?: ScenarioCrew; roles?: readonly M6Role[] },
 ): OperationalScenario {
   if (typeof ref === "string") return scenariosById[ref];
-  const scenario = scenariosById[ref.scenarioId];
+  let scenario = scenariosById[ref.scenarioId];
+  if (ref.roles) scenario = scenarioForRoles(scenario, ref.roles);
   if (!ref.crew) return scenario;
   return { ...scenario, actor: { ...scenario.actor, crewId: ref.crew.id, crewName: ref.crew.name } };
 }

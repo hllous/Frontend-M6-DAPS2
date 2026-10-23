@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -15,7 +15,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     const session = getRequiredSession(request);
     authorize(session, { capability: "environmentalReport:view", throwOnError: true });
-    const scenario = getScenario(session.scenarioId);
+    const scenario = getScenario(session);
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/environmental-reports/${pathId(id)}`, "environmentalReport:view");
@@ -44,7 +44,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene acceso al control ambiental.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene acceso al control ambiental.", path, FORBIDDEN_CODES.roleRequired);
     return mapSessionError(error, path, "No se pudo cargar el expediente ambiental.");
   }
 }
