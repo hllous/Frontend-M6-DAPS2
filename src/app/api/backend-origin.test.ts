@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as emptyContainer } from "@/app/api/containers/[id]/empty/route";
+import { POST as repairContainer } from "@/app/api/containers/[id]/start-repair/route";
 import { DELETE as deleteCrew } from "@/app/api/crews/[id]/route";
 import { DELETE as deleteDisposalSite } from "@/app/api/disposal-sites/[id]/route";
 import { DELETE as deleteGreenPoint } from "@/app/api/green-points/[id]/route";
@@ -84,7 +84,7 @@ type MutationCase = {
 const mutationCases: MutationCase[] = [
   {
     family: "containers",
-    invoke: (cookie) => emptyContainer(jsonRequest("http://localhost/api/containers/missing-origin-container/empty", "POST", cookie), routeContext("missing-origin-container")),
+    invoke: (cookie) => repairContainer(jsonRequest("http://localhost/api/containers/missing-origin-container/start-repair", "POST", cookie), routeContext("missing-origin-container")),
   },
   {
     family: "crews",

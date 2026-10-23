@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
 import { authenticatedFetch, NetworkFailureError, ROLES_STALE_EVENT } from "@/lib/authenticated-fetch";
 import { loadRoles, loadScenario, ScenarioRequestError } from "@/lib/scenario-client";
@@ -37,6 +38,7 @@ export function FoundationDemo({
   children?: ReactNode;
   contentReady?: boolean;
 }) {
+  const router = useRouter();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [requestVersion, setRequestVersion] = useState(0);
 
@@ -46,14 +48,19 @@ export function FoundationDemo({
   useEffect(() => {
     const refreshRoles = () => {
       loadRoles()
-        .then((roles) => setState((current) => current.status === "ready"
-          ? { status: "ready", scenario: scenarioForRoles(current.scenario, roles) }
-          : current))
+        .then((roles) => {
+          setState((current) => current.status === "ready"
+            ? { status: "ready", scenario: scenarioForRoles(current.scenario, roles) }
+            : current);
+          // Nested catalog pages receive their scenario from Server Components.
+          // Re-render them with the freshly sealed roles as well as updating the shell.
+          router.refresh();
+        })
         .catch(() => undefined);
     };
     window.addEventListener(ROLES_STALE_EVENT, refreshRoles);
     return () => window.removeEventListener(ROLES_STALE_EVENT, refreshRoles);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     let lastRefreshAt = 0;

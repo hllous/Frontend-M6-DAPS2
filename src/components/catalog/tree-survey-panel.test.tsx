@@ -97,7 +97,7 @@ describe("TreeSurveyPanel", () => {
   });
 
   it("offers a guided intervention request from a high-risk survey with a readable source trail", async () => {
-    render(<TreeSurveyPanel tree={tree} scenario={scenarios.fieldCrewLeader} onClose={vi.fn()} />);
+    render(<TreeSurveyPanel tree={tree} scenario={scenarios.officeOperations} onClose={vi.fn()} />);
     await screen.findByRole("heading", { name: /Historial de relevamientos/ });
     await (await screen.findByRole("button", { name: "Solicitar intervención sugerida" })).click();
     const dialog = screen.getByRole("dialog", { name: /Solicitar intervención/ });

@@ -54,7 +54,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       // El backend solo acepta serviceId/inspectorId al programar (CreateInspectionDto
       // con forbidNonWhitelisted): la fecha, la ventana, el checklist y la zona van al
       // Service, no a la inspección.
-      const response = await fetchBackend(request, "/environmental-reports/" + pathId(id) + "/inspections", "environmentalInspection:schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) });
+      const response = await fetchBackend(request, "/environmental-reports/" + pathId(id) + "/inspections", "environmentalInspection:schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ inspectorId: parsed.data.inspectorId }) });
       return forwardResponse(response);
     }
     const report = getEnvironmentalReportFixture(id);

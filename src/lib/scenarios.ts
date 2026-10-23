@@ -56,9 +56,15 @@ export type ScenarioId =
   | "office-duty-queue"
   | "field-crew-leader-route"
   | "field-crew-member-route"
-  | "office-limited-intake";
+  | "office-limited-intake"
+  | "office-operations"
+  | "office-environmental"
+  | "field-inspector"
+  | "employee-no-role"
+  | "citizen";
 
 export type OperationalScenario = {
+  subType?: "EMPLEADO" | "CIUDADANO";
   id: ScenarioId;
   label: string;
   actor: {
@@ -179,9 +185,18 @@ export function scenarioForRoles(scenario: ScenarioFixture, roles: readonly M6Ro
   };
 }
 
-export const scenarios = Object.fromEntries(
-  Object.entries(scenarioFixtures).map(([key, fixture]) => [key, scenarioForRoles(fixture, fixture.roles)]),
-) as Record<keyof typeof scenarioFixtures, OperationalScenario>;
+function roleFixture(base: ScenarioFixture, id: ScenarioId, label: string, roles: M6Role[]): OperationalScenario {
+  return scenarioForRoles({ ...base, id, label }, roles);
+}
+
+export const scenarios = {
+  ...Object.fromEntries(Object.entries(scenarioFixtures).map(([key, fixture]) => [key, scenarioForRoles(fixture, fixture.roles)])) as Record<keyof typeof scenarioFixtures, OperationalScenario>,
+  officeOperations: roleFixture(scenarioFixtures.officeDutyQueue, "office-operations", "Oficina · operaciones", ["M6_OFICINA_OPERACIONES"]),
+  officeEnvironmental: roleFixture(scenarioFixtures.officeDutyQueue, "office-environmental", "Oficina · ambiental", ["M6_OFICINA_AMBIENTAL"]),
+  fieldInspector: roleFixture(scenarioFixtures.fieldCrewLeader, "field-inspector", "Campo · inspector ambiental", ["M6_CAMPO_INSPECTOR"]),
+  employeeNoRole: roleFixture(scenarioFixtures.officeDutyQueue, "employee-no-role", "Empleado · sin rol en Ambiente", []),
+  citizen: { ...roleFixture(scenarioFixtures.officeLimited, "citizen", "Ciudadano · sin acceso", []), subType: "CIUDADANO" as const },
+};
 
 const scenariosById = Object.values(scenarios).reduce(
   (byId, scenario) => ({ ...byId, [scenario.id]: scenario }),

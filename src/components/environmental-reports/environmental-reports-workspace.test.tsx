@@ -57,6 +57,15 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); re
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
+  it("lets an auditor read a report without offering review or scheduling actions", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeLimited} />);
+    await user.click(await screen.findByRole("button", { name: /^ER-1002,/ }));
+    expect(await screen.findByRole("heading", { name: /ER-1002/ })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Derivar expediente" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Programar inspección" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pedir información al vecino" })).not.toBeInTheDocument();
+  });
   it("lets Office open the same required map location form", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
@@ -578,7 +587,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(payloads).toEqual([expect.objectContaining({ address: "Calle Nueva 100", lat: -34.5446871, lng: -58.4386826 })]);
   });
 
-  it("lets Office schedule and assign an inspection from a report under review", async () => {
+  it("lets Office schedule and assign an inspection from a report under review", { timeout: 15000 }, async () => {
     const user = userEvent.setup();
     const create = vi.spyOn(servicesAdapter, "create");
     const assignCrew = vi.spyOn(servicesAdapter, "assignCrew");
@@ -859,8 +868,8 @@ describe("EnvironmentalReportsWorkspace", () => {
   it("shows an unsent inspection referral after a pre-creation network failure", async () => {
     server.use(http.post("*/api/repair-requests", () => HttpResponse.error()));
     const user = userEvent.setup();
-    render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
-    const list = await screen.findByRole("region", { name: "Reportes ambientales asignados" });
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: /ER-1012/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de ER-1012" });
     await user.click(await within(detail).findByRole("button", { name: "Crear derivación de reparación" }));

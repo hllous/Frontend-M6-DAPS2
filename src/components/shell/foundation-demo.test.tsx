@@ -1,4 +1,5 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import * as navigation from "next/navigation";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
@@ -94,6 +95,9 @@ describe("FoundationDemo", () => {
   });
 
   it("re-reads the roles after a ROLE_REQUIRED 403 and recomputes the actor without reloading", async () => {
+    const refresh = vi.fn();
+    const router = navigation.useRouter();
+    vi.spyOn(navigation, "useRouter").mockReturnValue({ ...router, refresh });
     server.use(
       http.get("*/api/mock/scenarios/office-duty-queue", () => HttpResponse.json(scenarios.officeDutyQueue)),
       http.get("*/api/me", () => HttpResponse.json({ userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles: ["M6_CAMPO_CUADRILLA"] })),
@@ -105,6 +109,8 @@ describe("FoundationDemo", () => {
 
     expect(await screen.findAllByText("Integrante de cuadrilla")).not.toHaveLength(0);
     expect(screen.queryByText("Oficina")).not.toBeInTheDocument();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    vi.restoreAllMocks();
   });
 
   it("recovers to the normal shell after a retryable network failure", async () => {

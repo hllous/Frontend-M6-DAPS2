@@ -40,7 +40,7 @@ describe("container handlers delegate to the real BFF routes", () => {
     expect(await missing.json()).toMatchObject({ statusCode: 404, error: "Not Found" });
   });
 
-  it("runs Office actions through the route state machine", async () => {
+  it("runs Field emptying through the route state machine", async () => {
     const emptied = await call("POST", "/api/containers/cont-2/empty");
     expect(emptied.status).toBe(200);
     expect(await emptied.json()).toMatchObject({ id: "cont-2", status: "ACTIVE" });
@@ -54,7 +54,7 @@ describe("container handlers delegate to the real BFF routes", () => {
     expect(overflow.status).toBe(200);
     expect(await overflow.json()).toMatchObject({ id: "cont-1", status: "OVERFLOWED" });
 
-    for (const action of ["empty", "start-repair", "remove", "relocate"]) {
+    for (const action of ["start-repair", "remove", "relocate"]) {
       const response = await call("POST", `/api/containers/cont-2/${action}`, crewCookie);
       expect(response.status).toBe(403);
       expect(await response.json()).toMatchObject({ statusCode: 403, error: "Forbidden" });

@@ -1127,7 +1127,7 @@ export function ContainerCatalogPanel({
             </dl>
 
             <SheetFooter className="gap-4 pt-0">
-              {canManage && servicesStatus === "error" ? (
+              {(canManage || canEmpty) && servicesStatus === "error" ? (
                 <Alert role="status">
                   <AlertDescription>
                     <p>{serviceLookupFailure}</p>

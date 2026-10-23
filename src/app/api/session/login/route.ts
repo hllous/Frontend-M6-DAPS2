@@ -67,13 +67,14 @@ export async function POST(request: Request) {
   try {
     const backendOrigin = process.env.M6_BACKEND_ORIGIN;
     const mode = getAuthMode();
+    if (mode === "mock" && getScenario(body.scenarioId).subType === "CIUDADANO") throw new CitizenForbiddenError();
     const devJwt = process.env.M6_DEV_JWT;
     // En modo backend los roles de M6 salen de GET /me, no del escenario elegido ni del token.
     const me = mode === "backend-development" && backendOrigin && devJwt
       ? await fetchMeWithToken(backendOrigin, devJwt)
       : undefined;
     const created = createSession(body.scenarioId, { mode, devJwt, backendOrigin, roles: me?.roles });
-    const crew = await resolveBackendCrew(created, backendOrigin);
+    const crew = created.roles.some((role) => role === "M6_CAMPO_CUADRILLA") ? await resolveBackendCrew(created, backendOrigin) : undefined;
     const session = crew ? { ...created, crew } : created;
     const response = NextResponse.json({ session: publicSession(session) });
     response.cookies.set({

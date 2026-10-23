@@ -4,6 +4,13 @@ import { actorKindForRoles, capabilitiesForRoles, meSchema } from "./m6-roles";
 import { scenarios } from "./scenarios";
 
 describe("M6 roles", () => {
+  it("provides selectable fixtures for each role and for denied access", () => {
+    expect(scenarios.officeOperations.roles).toEqual(["M6_OFICINA_OPERACIONES"]);
+    expect(scenarios.officeEnvironmental.roles).toEqual(["M6_OFICINA_AMBIENTAL"]);
+    expect(scenarios.fieldInspector.roles).toEqual(["M6_CAMPO_INSPECTOR"]);
+    expect(scenarios.employeeNoRole.roles).toEqual([]);
+    expect(scenarios.citizen.subType).toBe("CIUDADANO");
+  });
   it("parses the GET /me contract and rejects a role outside the closed catalog", () => {
     const me = { userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles: ["M6_OFICINA_OPERACIONES"] };
     expect(meSchema.parse(me).roles).toEqual(["M6_OFICINA_OPERACIONES"]);

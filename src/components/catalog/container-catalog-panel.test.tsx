@@ -59,7 +59,7 @@ describe("Container Service lookup", () => {
       ? HttpResponse.error()
       : HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } })));
     const user = userEvent.setup({ delay: null });
-    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
@@ -88,7 +88,7 @@ describe("Container Service lookup", () => {
       });
     }));
     const user = userEvent.setup({ delay: null });
-    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
@@ -105,7 +105,7 @@ describe("Container Service lookup", () => {
       return HttpResponse.json({ data: [], meta: { total: 2001, page, pageSize: 100, totalPages: 21 } });
     }));
     const user = userEvent.setup({ delay: null });
-    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
@@ -120,7 +120,7 @@ describe("Container Service lookup", () => {
       data: [], meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
     })));
     const user = userEvent.setup({ delay: null });
-    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
@@ -135,7 +135,7 @@ describe("Container Service lookup", () => {
       return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } });
     }));
     const user = userEvent.setup({ delay: null });
-    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     const previousLookups = lookups;
     await openContainerDetail(user, row);
@@ -159,7 +159,7 @@ describe("Container Service lookup", () => {
       http.get("*/api/services", () => HttpResponse.error()),
     );
     const user = userEvent.setup({ delay: null });
-    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    render(<ContainerCatalogPanel scenario={status === "OVERFLOWED" ? scenarios.fieldCrewLeader : scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
@@ -709,9 +709,9 @@ describe("ContainerCatalogPanel", () => {
   });
 
   describe("Office emptying and relocation dispatch (#123)", () => {
-    it("allows Office actor to empty an OVERFLOWED container (OVERFLOWED -> ACTIVE)", async () => {
+    it("allows Field actor to empty an OVERFLOWED container (OVERFLOWED -> ACTIVE)", async () => {
       const user = userEvent.setup({ delay: null });
-      render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
 
       expect(await screen.findByText("CONT-002")).toBeVisible();
       const row = screen.getByRole("row", { name: /CONT-002/ });
@@ -796,7 +796,7 @@ describe("ContainerCatalogPanel", () => {
         }),
       );
 
-      render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
 
       await screen.findByText("CONT-002");
       const row = screen.getByRole("row", { name: /CONT-002/ });
@@ -809,7 +809,7 @@ describe("ContainerCatalogPanel", () => {
       expect(await within(detail).findByText(/Servicio en curso \(SVC-9901\)/)).toBeVisible();
     });
 
-    it("keeps standalone emptying and relocation dispatch hidden for Field actors", async () => {
+    it("keeps relocation hidden for Field while allowing emptying", async () => {
       const user = userEvent.setup({ delay: null });
       render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
 
@@ -820,7 +820,7 @@ describe("ContainerCatalogPanel", () => {
       expect(within(activeDetail).queryByRole("button", { name: "Reubicar" })).not.toBeInTheDocument();
       await user.keyboard("{Escape}");
       const overflowDetail = await openContainerDetail(user, screen.getByRole("row", { name: /CONT-002/ }));
-      expect(within(overflowDetail).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
+      expect(within(overflowDetail).getByRole("button", { name: "Vaciar contenedor" })).toBeInTheDocument();
     });
 
     it("keeps standalone emptying and relocation dispatch hidden for Office actor without container:manage", async () => {
@@ -855,7 +855,7 @@ describe("ContainerCatalogPanel", () => {
         ),
       );
 
-      render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      render(<ContainerCatalogPanel scenario={scenarios.fieldCrewLeader} />);
 
       expect(await screen.findByText("CONT-002")).toBeVisible();
       const row = screen.getByRole("row", { name: /CONT-002/ });

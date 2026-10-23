@@ -30,8 +30,14 @@ export async function authenticatedFetch(input: string, init?: RequestInit): Pro
     await broadcastLogout();
   } else if (response.status === 403) {
     recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-    if (input !== "/api/me" && typeof window !== "undefined" && (await readForbiddenCode(response)) === "ROLE_REQUIRED") {
-      window.dispatchEvent(new Event(ROLES_STALE_EVENT));
+    if ((await readForbiddenCode(response)) === "ROLE_REQUIRED") {
+      if (input !== "/api/me" && typeof window !== "undefined") {
+        window.dispatchEvent(new Event(ROLES_STALE_EVENT));
+      }
+      const body = await response.json();
+      const headers = new Headers(response.headers);
+      headers.delete("content-length");
+      response = new Response(JSON.stringify({ ...body, message: "No tenés el rol necesario para realizar esta acción en Ambiente. Solicitá acceso a un administrador." }), { status: 403, headers });
     }
   }
 

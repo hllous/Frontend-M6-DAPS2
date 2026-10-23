@@ -15,6 +15,21 @@ afterEach(() => {
 const params = { params: Promise.resolve({ id: "REP-1" }) };
 const inspection = { id: "INS-1", reportId: "REP-1", serviceId: null, checklistItems: [] };
 
+describe("inspection assignment", () => {
+  it("forwards the optional numeric inspector assignment, but no frontend agenda fields", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(inspection), { status: 201, headers: { "content-type": "application/json" } }));
+    const response = await POST(new Request("http://localhost/api/environmental-reports/REP-1/inspections", {
+      method: "POST", headers: { cookie }, body: JSON.stringify({
+        scheduledDate: "2026-10-23", timeWindow: { start: "08:00", end: "12:00" },
+        checklistVersion: "v1", checklist: [{ id: "location", label: "Ubicación", required: true }], inspectorId: "14",
+      }),
+    }), params);
+    expect(response.status).toBe(201);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ inspectorId: "14" });
+  });
+});
+
 describe("GET /api/environmental-reports/:id/inspections", () => {
   it("adds each inspection's evidence from GET /evidence (InspectionResponseDto does not carry it)", async () => {
     const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });

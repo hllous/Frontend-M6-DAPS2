@@ -302,7 +302,7 @@ const realCompletedInspection = {
   ...realCreatedInspection,
   id: "530bf11c-3e96-4ccd-bc3c-52c329578cda",
   serviceId: "c842e0c1-1b66-4c35-ab6a-c389d5538d19",
-  inspectorId: "user-qa246",
+  inspectorId: "246",
   inspectedAt: "2026-09-20T21:34:06.492Z",
   findings: "Acopio de residuos a cielo abierto sobre la vereda.",
   outcome: "VIOLATION_FOUND",

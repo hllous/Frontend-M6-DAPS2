@@ -269,6 +269,7 @@ export type EnvironmentalInspectionCompleteInput = z.infer<typeof environmentalI
 // Hypothesis: schedule fields are kept explicit at this adapter seam until OpenAPI
 // exposes the authoritative request and response nesting.
 export const environmentalInspectionScheduleInputSchema = z.object({
+  inspectorId: z.string().trim().regex(/^\d{1,19}$/, "El inspector debe tener un identificador numérico de M1.").optional(),
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
   timeWindow: z.object({
     start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
@@ -282,6 +283,8 @@ export const environmentalInspectionScheduleInputSchema = z.object({
 export type EnvironmentalInspectionScheduleInput = z.infer<typeof environmentalInspectionScheduleInputSchema>;
 
 export const environmentalInspectionSchema = z.object({
+  inspectorId: z.string().nullable().optional(),
+  completedByUserId: z.string().nullable().optional(),
   id: z.string(),
   reportId: z.string(),
   serviceId: z.string().nullable().optional(),

@@ -47,11 +47,7 @@ test.describe("Crew Leader versus Crew Member presentation @smoke", () => {
 
 test.describe("M6 roles from GET /me @smoke", () => {
   test("an employee with no M6 role gets an explanation, not an error", async ({ page }) => {
-    await loginViaApi(page, "office-duty-queue");
-    await page.route("**/api/mock/scenarios/office-duty-queue", async (route) => {
-      const response = await route.fetch();
-      await route.fulfill({ response, json: { ...(await response.json()), roles: [], capabilities: [] } });
-    });
+    await loginViaApi(page, "employee-no-role");
     await page.goto("/app");
 
     await expect(page.getByText("Sin rol asignado")).toBeVisible();
@@ -69,5 +65,16 @@ test.describe("M6 roles from GET /me @smoke", () => {
 
     await expect(page.getByText("Acceso no disponible")).toBeVisible();
     await expect(page.getByText("Este sistema es solo para personal municipal.")).toBeVisible();
+  });
+
+  test("an auditor can read environmental reports without write actions and receives ROLE_REQUIRED if it attempts a write", async ({ page }) => {
+    await loginViaApi(page, "office-limited-intake");
+    await page.goto("/app?destination=environment&detail=ER-1002");
+    await expect(page.getByRole("heading", { name: "Expediente ER-1002", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Derivar expediente" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Programar inspección" })).toHaveCount(0);
+    const denied = await page.request.post("/api/environmental-reports/ER-1002/forward", { data: { reason: "Prueba de acceso" } });
+    expect(denied.status()).toBe(403);
+    expect(await denied.json()).toMatchObject({ code: "ROLE_REQUIRED" });
   });
 });
