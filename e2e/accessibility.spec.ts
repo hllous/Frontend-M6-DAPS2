@@ -31,9 +31,9 @@ test.describe("automated WCAG checks @smoke", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
 
-    await page.getByRole("button", { name: "Más módulos" }).click();
+    await page.getByRole("button", { name: "Más" }).click();
     const selectedNavigationItem = page
-      .getByRole("dialog", { name: "Más módulos" })
+      .getByRole("dialog", { name: "Más" })
       .getByRole("link", { name: "Mi trabajo", exact: true });
     await selectedNavigationItem.hover();
     await expect.poll(() => selectedNavigationItem.evaluate((element) =>
@@ -80,8 +80,8 @@ test.describe("automated WCAG checks @smoke", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("button", { name: "Más módulos" }).click();
-    const mobileNavigationSheet = page.getByRole("dialog", { name: "Más módulos" });
+    await page.getByRole("button", { name: "Más" }).click();
+    const mobileNavigationSheet = page.getByRole("dialog", { name: "Más" });
     await expect(mobileNavigationSheet).toBeVisible();
     // Otherwise the cursor stays over the trigger's screen position, which the sheet's
     // first pill now renders under — a spurious :hover state, not the steady-state page.
@@ -98,9 +98,9 @@ test.describe("automated WCAG checks @smoke", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("button", { name: "Más módulos" }).click();
+    await page.getByRole("button", { name: "Más" }).click();
 
-    const sheet = page.getByRole("dialog", { name: "Más módulos" });
+    const sheet = page.getByRole("dialog", { name: "Más" });
     await expect(sheet).toBeVisible();
     await expect(sheet).toHaveCSS("transition-duration", "0s");
     await expect(sheet).toHaveCSS("animation-name", "none");

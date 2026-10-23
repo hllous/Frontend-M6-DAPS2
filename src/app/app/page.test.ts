@@ -17,7 +17,7 @@ describe("AppPage metadata", () => {
       searchParams: Promise.resolve({ destination }),
     });
 
-    expect(metadata.title).toBe(`M6 — ${label}`);
+    expect(metadata.title).toBe(`${label} — Ambiente e Higiene`);
   });
 
   it("uses the My Work title when no destination is selected", async () => {
@@ -25,6 +25,6 @@ describe("AppPage metadata", () => {
       searchParams: Promise.resolve({}),
     });
 
-    expect(metadata.title).toBe("M6 — Mi trabajo");
+    expect(metadata.title).toBe("Mi trabajo — Ambiente e Higiene");
   });
 });

@@ -44,8 +44,8 @@ test("catalog confirmation actions fit on mobile with the primary action first",
 test("sheet preserves its slide while software and reduced-motion preferences independently disable it", async ({ page }) => {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=services");
-  await page.getByRole("button", { name: "Más módulos" }).click();
-  const sheet = page.getByRole("dialog", { name: "Más módulos" });
+  await page.getByRole("button", { name: "Más" }).click();
+  const sheet = page.getByRole("dialog", { name: "Más" });
   await expect(sheet).toBeVisible();
   await page.evaluate(() => document.documentElement.removeAttribute("data-overlay-motion"));
   await expect.poll(() => sheet.evaluate((el) => getComputedStyle(el).transitionProperty)).toContain("translate");
@@ -60,5 +60,5 @@ test("sheet preserves its slide while software and reduced-motion preferences in
   await expect.poll(() => sheet.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe("0s");
   await page.keyboard.press("Escape");
   await expect(sheet).not.toBeVisible();
-  await expect(page.getByRole("button", { name: "Más módulos" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Más" })).toBeFocused();
 });

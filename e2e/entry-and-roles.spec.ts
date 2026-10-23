@@ -11,7 +11,8 @@ test.describe("Office and Field mock entry and navigation @smoke", () => {
 
     await page.getByRole("link", { name: "Catálogo" }).click();
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    await expect(page.getByText("Z-BEL")).toBeVisible();
+    await expect(page.getByText("Belgrano", { exact: true })).toBeVisible();
+    await expect(page.getByText(/^Z-[A-Z]{3}$/)).toHaveCount(0);
   });
 
   test("Field actor enters through the login form and reaches the Mapa destination", async ({ page }) => {
