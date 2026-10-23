@@ -95,12 +95,12 @@ export function ServicePreview({
         {service.statusReason && (
           <div className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 p-3 text-xs text-[var(--color-warning)]">
             <span className="font-semibold block mb-0.5">Motivo de estado:</span>
-            {service.statusReason}
+            <p>{service.statusReason}</p>
             {service.statusNote && (
-              <>
-                <span className="font-semibold block mt-2 mb-0.5">Nota de la cuadrilla:</span>
-                {service.statusNote}
-              </>
+              <div className="mt-2">
+                <span className="font-semibold block mb-0.5">Nota de la cuadrilla:</span>
+                <p>{service.statusNote}</p>
+              </div>
             )}
           </div>
         )}

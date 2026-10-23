@@ -33,6 +33,7 @@ import {
   NotServicedReason,
   Service,
   ServiceRequestError,
+  SUSPEND_NOTE_MAX_LENGTH,
   servicesAdapter,
 } from "@/lib/services";
 import {
@@ -430,6 +431,7 @@ function SuspendServiceForm({
                     <Textarea
                       id={`${formId}-note`}
                       rows={3}
+                      maxLength={SUSPEND_NOTE_MAX_LENGTH}
                       value={note}
                       onChange={(e) => {
                         setNote(e.target.value);
@@ -442,8 +444,7 @@ function SuspendServiceForm({
                       placeholder="Describa la causa"
                     />
                     <FieldDescription id={`${formId}-note-help`}>
-                      Obligatoria. Se envía junto con el motivo seleccionado; entre ambos no pueden
-                      superar los 500 caracteres.
+                      Obligatoria. Hasta {SUSPEND_NOTE_MAX_LENGTH} caracteres.
                     </FieldDescription>
                     {fieldErrors.note && <FieldError id={`${formId}-note-error`}>{fieldErrors.note}</FieldError>}
                   </Field>

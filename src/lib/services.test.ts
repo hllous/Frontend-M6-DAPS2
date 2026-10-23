@@ -17,6 +17,7 @@ import {
   ServiceStartBlockedError,
   servicesAdapter,
   suspendServiceInputSchema,
+  suspendServiceRequestSchema,
   toSuspendServiceBackendInput,
   toCreateServiceBackendInput,
 } from "./services";
@@ -1058,10 +1059,18 @@ describe("suspension reason contract", () => {
     const input = suspendServiceInputSchema.parse({ reason: "VEHICLE_BREAKDOWN", note: "  El camión no arranca.  " });
     expect(toSuspendServiceBackendInput(input)).toEqual({ reason: "Desperfecto vehicular", note: "El camión no arranca." });
   });
+  it("omits a whitespace-only optional note from the backend payload", () => {
+    const input = suspendServiceRequestSchema.parse({ reason: "VEHICLE_BREAKDOWN", note: "   " });
+    expect(toSuspendServiceBackendInput(input)).toEqual({ reason: "Desperfecto vehicular" });
+  });
   it.each([[500, true], [501, false]])("caps the note alone at 500 characters (note %s)", (length, valid) => {
     const parsed = suspendServiceInputSchema.safeParse({ reason: "OTHER", note: "a".repeat(length) });
     expect(parsed.success).toBe(valid);
     if (!parsed.success) expect(parsed.error.issues[0].message).toContain("500 caracteres");
+  });
+  it.each([[500, true], [501, false]])("caps the optional BFF note at 500 characters (note %s)", (length, valid) => {
+    const parsed = suspendServiceRequestSchema.safeParse({ reason: "OTHER", note: "a".repeat(length) });
+    expect(parsed.success).toBe(valid);
   });
 });
 
