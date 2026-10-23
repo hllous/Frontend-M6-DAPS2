@@ -114,7 +114,7 @@ export function FoundationDemo({
 
   if (state.status === "unauthenticated") return <main className="p-6"><ShellUnauthenticated /></main>;
   if (state.status === "forbidden") return <main className="p-6"><ShellForbidden description={state.description} /></main>;
-  if (state.status === "ready" && state.scenario.roles.length === 0) return <main className="p-6"><ShellNoRole /></main>;
+  if (state.status === "ready" && state.scenario.roles.length === 0) return <ShellNoRole logoutAction={logoutAction} />;
   if (state.status === "error") return <main className="p-6"><ShellError onRetry={retry} description={state.description} /></main>;
   return (
     <AppShell scenario={state.status === "ready" ? state.scenario : undefined} logoutAction={logoutAction} routeContent={children} contentReady={contentReady} />

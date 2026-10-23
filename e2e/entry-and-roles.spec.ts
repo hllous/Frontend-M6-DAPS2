@@ -51,7 +51,7 @@ test.describe("M6 roles from GET /me @smoke", () => {
     await page.goto("/app");
 
     await expect(page.getByText("Sin rol asignado")).toBeVisible();
-    await expect(page.getByText(/todavía no tiene un rol asignado en Ambiente/)).toBeVisible();
+    await expect(page.getByText("Su usuario aún no tiene un rol asignado en Ambiente. Solicite a un administrador que se lo asigne y vuelva a ingresar.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Reintentar carga" })).toHaveCount(0);
   });
 

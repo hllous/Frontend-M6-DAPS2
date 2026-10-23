@@ -89,7 +89,7 @@ describe("FoundationDemo", () => {
     render(<FoundationDemo scenarioId="office-duty-queue" />);
 
     expect(await screen.findByText("Sin rol asignado")).toBeVisible();
-    expect(screen.getByText(/todavía no tiene un rol asignado en Ambiente/)).toBeVisible();
+    expect(screen.getByText("Su usuario aún no tiene un rol asignado en Ambiente. Solicite a un administrador que se lo asigne y vuelva a ingresar.")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Reintentar carga" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Servicios" })).not.toBeInTheDocument();
   });
