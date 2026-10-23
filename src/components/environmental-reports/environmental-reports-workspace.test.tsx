@@ -16,6 +16,8 @@ import { EnvironmentalReportsWorkspace } from "./environmental-reports-workspace
 import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
+// Leaflet needs browser layout; exercise the real picker controls in jsdom.
+vi.mock("next/dynamic", () => ({ default: () => () => <div>Mapa</div> }));
 
 async function chooseOption(user: ReturnType<typeof userEvent.setup>, scope: ReturnType<typeof within>, label: string | RegExp, option: string | RegExp) {
   const trigger = scope.getByRole("combobox", { name: label });
@@ -55,6 +57,82 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); re
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
+  it("lets Office open the same required map location form", async () => {
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(screen.getByRole("button", { name: "Abrir reporte" }));
+    const dialog = screen.getByRole("dialog", { name: "Abrir reporte" });
+    await user.click(within(dialog).getByRole("button", { name: "Marcar en el mapa" }));
+    expect(await screen.findByRole("dialog", { name: "Ubicación" })).toBeVisible();
+  });
+
+  it.each(["", "Frente a la escuela"])("confirms a searched address without overwriting typed text (%s), preserves failed submissions and cancels changes", async (typedAddress) => {
+    const payloads: unknown[] = [];
+    server.use(
+      http.get("/api/address-search", ({ request }) => {
+        expect(new URL(request.url).searchParams.get("q")).toBe("Corrientes 1000");
+        return HttpResponse.json({ outcome: "results", data: [{ label: "AV CORRIENTES 1000", latitude: -34.123456789, longitude: -58.123456789 }] });
+      }),
+      http.post("/api/environmental-reports", async ({ request }) => {
+        payloads.push(await request.json());
+        return HttpResponse.json({ statusCode: 503, error: "Service Unavailable", timestamp: "2026-10-22T12:00:00Z", path: "/api/environmental-reports", message: "No se pudo abrir el reporte. Intente nuevamente." }, { status: 503 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
+    await screen.findByRole("region", { name: "Reportes ambientales asignados" });
+    await user.click(screen.getByRole("button", { name: "Abrir reporte" }));
+    const dialog = screen.getByRole("dialog", { name: "Abrir reporte" });
+    await chooseOption(user, within(dialog), /Tipo de hallazgo/, "Ruidos molestos");
+    const address = within(dialog).getByLabelText(/Dirección o referencia/);
+    if (typedAddress) await user.type(address, typedAddress);
+    await user.type(within(dialog).getByLabelText(/Descripción del hallazgo/), "Ruido nocturno constante.");
+    await user.click(within(dialog).getByRole("button", { name: "Marcar en el mapa" }));
+    const picker = await screen.findByRole("dialog", { name: "Ubicación" });
+    const query = within(picker).getByRole("textbox", { name: "Dirección" });
+    expect(query).toHaveValue(typedAddress);
+    await user.clear(query);
+    await user.type(query, "Corrientes 1000{Enter}");
+    await user.click(await within(picker).findByRole("button", { name: "AV CORRIENTES 1000" }));
+    await user.click(within(picker).getByRole("button", { name: "Confirmar ubicación" }));
+    expect(address).toHaveValue(typedAddress || "AV CORRIENTES 1000");
+    expect(within(dialog).getByText("Fuera de las zonas operativas")).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Abrir reporte" }));
+    expect(await within(dialog).findByText("No se pudo abrir el reporte. Intente nuevamente.")).toBeVisible();
+    expect(within(dialog).getByLabelText(/Descripción del hallazgo/)).toHaveValue("Ruido nocturno constante.");
+    expect(address).toHaveValue(typedAddress || "AV CORRIENTES 1000");
+    const change = within(dialog).getByRole("button", { name: "Cambiar" });
+    await user.click(change);
+    const reopened = await screen.findByRole("dialog", { name: "Ubicación" });
+    expect(within(reopened).getByRole("status")).toHaveTextContent("-34.1234568, -58.1234568");
+    await user.click(within(reopened).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(change).toHaveFocus());
+    await user.click(within(dialog).getByRole("button", { name: "Abrir reporte" }));
+    await waitFor(() => expect(payloads).toHaveLength(2));
+    expect(payloads).toEqual([expect.objectContaining({ address: typedAddress || "AV CORRIENTES 1000", lat: -34.1234568, lng: -58.1234568 }), payloads[0]]);
+    expect(window.localStorage.length).toBe(0);
+  });
+
+  it("requires a deliberate location and never sends fallback coordinates", async () => {
+    const posts: Request[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "POST" && new URL(request.url).pathname === "/api/environmental-reports") posts.push(request);
+    });
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
+    await screen.findByRole("region", { name: "Reportes ambientales asignados" });
+    await user.click(screen.getByRole("button", { name: "Abrir reporte" }));
+    const dialog = screen.getByRole("dialog", { name: "Abrir reporte" });
+    await chooseOption(user, within(dialog), /Tipo de hallazgo/, "Ruidos molestos");
+    await user.type(within(dialog).getByLabelText(/Dirección o referencia/), "Frente a la escuela");
+    await user.type(within(dialog).getByLabelText(/Descripción del hallazgo/), "Ruido nocturno constante.");
+    await user.click(within(dialog).getByRole("button", { name: "Abrir reporte" }));
+    expect(await within(dialog).findByText("Marque la ubicación")).toBeVisible();
+    expect(posts).toHaveLength(0);
+    expect(within(dialog).queryByLabelText(/Latitud|Longitud/)).not.toBeInTheDocument();
+  });
+
   it("shows the queue without explanatory subtitles or notes", async () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const queue = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
@@ -472,6 +550,13 @@ describe("EnvironmentalReportsWorkspace", () => {
   });
 
   it("keeps Field scoped and submits an own-initiative report", async () => {
+    const payloads: unknown[] = [];
+    server.events.on("request:start", async ({ request }) => {
+      if (request.method === "POST" && new URL(request.url).pathname === "/api/environmental-reports") payloads.push(await request.clone().json());
+    });
+    Object.defineProperty(navigator, "geolocation", { configurable: true, value: {
+      getCurrentPosition: (success: PositionCallback) => success({ coords: { latitude: -34.544687149, longitude: -58.438682649, accuracy: 30 } } as GeolocationPosition),
+    } });
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
     const list = await screen.findByRole("region", { name: "Reportes ambientales asignados" });
@@ -482,10 +567,15 @@ describe("EnvironmentalReportsWorkspace", () => {
     await chooseOption(user, within(dialog), /Tipo de hallazgo/, "Ruidos molestos");
     await user.type(within(dialog).getByLabelText(/Dirección o referencia/), "Calle Nueva 100");
     await user.type(within(dialog).getByLabelText(/Descripción del hallazgo/), "Ruido nocturno constante.");
-    await user.type(within(dialog).getByLabelText(/Latitud/), "-34.6");
-    await user.type(within(dialog).getByLabelText(/Longitud/), "-58.4");
+    await user.click(within(dialog).getByRole("button", { name: "Marcar en el mapa" }));
+    const picker = await screen.findByRole("dialog", { name: "Ubicación" });
+    expect(within(picker).getByRole("textbox", { name: "Dirección" })).toHaveValue("Calle Nueva 100");
+    await user.click(within(picker).getByRole("button", { name: "Usar mi ubicación" }));
+    await user.click(within(picker).getByRole("button", { name: "Confirmar ubicación" }));
+    expect(within(dialog).getByText("Belgrano")).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Abrir reporte" }));
     expect(await screen.findByText(/Expediente ER-/)).toBeInTheDocument();
+    expect(payloads).toEqual([expect.objectContaining({ address: "Calle Nueva 100", lat: -34.5446871, lng: -58.4386826 })]);
   });
 
   it("lets Office schedule and assign an inspection from a report under review", async () => {
@@ -740,8 +830,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(dialog).getByText("Contexto de origen INS-1012")).toBeVisible();
     expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2450");
     expect(within(dialog).getByRole("link", { name: /Ver inspección/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
-    await user.click(within(dialog).getByRole("combobox", { name: /^Severidad/ }));
-    await user.click(screen.getByRole("option", { name: "Baja" }));
+    await chooseOption(user, within(dialog), /^Severidad/, "Baja");
     await user.click(within(dialog).getByRole("radio", { name: "Sí" }));
     await user.click(within(dialog).getByRole("button", { name: "Derivar" }));
 

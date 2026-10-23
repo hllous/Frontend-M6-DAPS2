@@ -417,3 +417,31 @@ These resources exist in Backend and are mirrored in [`docs/backend-context/api/
 |---|---|---|
 | `citizen-portal` | `/public/reports/:ticketId`, `/public/services`, `/public/green-points`, `/public/zones` | The **only** unauthenticated endpoints in the module. Every response is an explicit projection; `/public/reports/:ticketId` returns 404 whether or not the ticket exists, and collapses the 11 case-file states into seven citizen-facing stages |
 | `events` | Inbound event ingestion | Backend-to-backend, not a frontend surface |
+
+## Address search for report location (#693)
+
+`GET /api/address-search?q=<address>` requires an active BFF session (Office or Field). The query is trimmed, required, and limited to 200 characters. Extra parameters cannot change the upstream host, province, or result limit. The browser calls only this same-origin route; no Georef credentials, session cookies, or authorization headers are forwarded.
+
+The consumer contract for #695 is exported from `src/lib/address-search.ts`: `ADDRESS_SEARCH_PATH`, `AddressSearchResult`, `AddressSearchResponse`, `AddressSearchFailure`, and the result Zod schema. Each result is `{ label: string, latitude: number, longitude: number }`, rounded with the existing coordinate helper to at most seven decimal places. The label is Georef's `nomenclatura`.
+
+| HTTP | Body / outcome | Meaning |
+| --- | --- | --- |
+| 200 | `{ outcome: "results", data: AddressSearchResult[] }` | One to five usable points |
+| 200 | `{ outcome: "empty", data: [] }` | No matching address |
+| 400 | Existing BFF error envelope | Missing, blank, or overlong query |
+| 401 | Existing BFF error envelope | Missing, invalid, or expired session |
+| 502 | BFF error envelope + `outcome: "upstream_error"` | Network failure or non-success upstream HTTP status, including 429 |
+| 502 | BFF error envelope + `outcome: "invalid_response"` | Invalid JSON or invalid consumed fields, including absent coordinates or a province other than CABA |
+| 504 | BFF error envelope + `outcome: "timeout"` | Five-second Georef deadline exceeded |
+
+The BFF error envelope is `{ statusCode, message, error, timestamp, path }`. All three search failures use the safe message `No se encontró esa dirección. Márquela en el mapa.` and expose no upstream body or validation detail. The picker should use that same fallback for `empty` and allow marking the map. Authentication availability failures retain the standard session mapping. Runtime validation of the consumed Georef fields remains permanent per ADR 0003; unrelated upstream fields are ignored.
+
+### Georef verification (2026-10-22)
+
+The [official OpenAPI](https://github.com/datosgobar/georef-ar-api/blob/master/public/openapi.json) documents `/direcciones`, filtering `provincia` by name or ID, and a `max` range of 1–5000. This BFF fixes `provincia=02` (Ciudad Autónoma de Buenos Aires) and `max=5`, enforces five results locally too, uses uncached server fetches, and performs no automatic retries. A live official request for `Corrientes 1000` with those parameters returned `AV CORRIENTES 1000, Comuna 1, Ciudad Autónoma de Buenos Aires`, province `02`, latitude `-34.6036694728664`, longitude `-58.3809752829037`.
+
+The [official address guide](https://github.com/datosgobar/georef-ar-api/blob/master/src/content/docs/addresses.md) describes approximate georeferencing from the official street nomenclature: coverage varies by region and coordinates may be absent when indexed data is insufficient. Search is therefore a suggestion requiring the user's confirmation, with manual map placement available on failure; it does not promise rooftop accuracy or exhaustive CABA coverage.
+
+The [official FAQ](https://www.argentina.gob.ar/node/473730) says the public service is free and needs no authentication. No numeric requests-per-second quota or availability SLA was published in the reviewed FAQ, OpenAPI, address guide, or [reference configuration](https://github.com/datosgobar/georef-ar-api/blob/master/config/georef.example.cfg); the result limit is not a rate-limit guarantee. Search remains explicitly submitted, not per-keystroke autocomplete. A 429 is handled as an upstream failure.
+
+No CSP or server host allow-list change is required: `next.config.mjs` defines neither, and the browser never connects to Georef. `allowedDevOrigins` concerns development HMR, not server fetches. The upstream URL is a constant, and no user-supplied origin is accepted. No Backend contract changes are needed.
