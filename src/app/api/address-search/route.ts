@@ -11,11 +11,33 @@ import {
 import { errorResponse, mapSessionError } from "@/lib/bff-route";
 import { georefResponseSchema } from "@/lib/georef";
 import { roundCoordinate } from "@/lib/input-limits";
+import { NOMINATIM_SEARCH_URL, NOMINATIM_USER_AGENT, nominatimLabels, nominatimResponseSchema } from "@/lib/nominatim";
 import { getRequiredSession } from "@/lib/session";
 
 async function searchFailure(path: string, outcome: AddressSearchFailureOutcome, status = 502) {
   const envelope = await errorResponse(status, ADDRESS_SEARCH_FALLBACK_MESSAGE, path).json();
   return NextResponse.json({ ...envelope, outcome }, { status });
+}
+
+/** Street-level fallback; any failure just means "no results", never an error for the user. */
+async function nominatimFallback(query: string) {
+  const url = new URL(NOMINATIM_SEARCH_URL);
+  url.searchParams.set("q", `${query}, CABA`);
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("countrycodes", "ar");
+  url.searchParams.set("limit", String(ADDRESS_SEARCH_LIMIT * 2));
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: { "user-agent": NOMINATIM_USER_AGENT },
+      signal: AbortSignal.timeout(ADDRESS_SEARCH_TIMEOUT_MS),
+    });
+    if (!response.ok) return [];
+    const parsed = nominatimResponseSchema.safeParse(await response.json().catch(() => undefined));
+    return parsed.success ? nominatimLabels(parsed.data).slice(0, ADDRESS_SEARCH_LIMIT) : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function GET(request: Request) {
@@ -40,11 +62,19 @@ export async function GET(request: Request) {
     if (signal.aborted) return searchFailure(path, "timeout", 504);
     const parsed = georefResponseSchema.safeParse(body);
     if (!parsed.success) return searchFailure(path, "invalid_response");
-    const data = parsed.data.direcciones.slice(0, ADDRESS_SEARCH_LIMIT).map((address) => ({
+    let data = parsed.data.direcciones.slice(0, ADDRESS_SEARCH_LIMIT).map((address) => ({
       label: address.nomenclatura,
       latitude: roundCoordinate(address.ubicacion.lat),
       longitude: roundCoordinate(address.ubicacion.lon),
     }));
+    // Typeahead stays on Georef: the public Nominatim service forbids per-keystroke autocomplete.
+    if (!data.length && new URL(request.url).searchParams.get("typeahead") !== "1") {
+      data = (await nominatimFallback(query.data)).map((place) => ({
+        label: place.label,
+        latitude: roundCoordinate(place.lat),
+        longitude: roundCoordinate(place.lon),
+      }));
+    }
     return NextResponse.json({ outcome: data.length ? "results" : "empty", data } satisfies AddressSearchResponse);
   } catch (error) {
     return mapSessionError(error, path, "No se pudo buscar la dirección.");

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import { setupServer } from "msw/node";
 import { delay, http, HttpResponse } from "msw";
 import { createSessionCookie } from "@/test/session";
@@ -104,4 +104,51 @@ it("also permits an Office session", async () => {
   });
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ outcome: "results" });
+});
+
+const nominatimUrl = "https://nominatim.openstreetmap.org/search";
+const caba = "Comuna 1, Ciudad Autónoma de Buenos Aires, 1059, Argentina";
+const nominatim = [
+  { display_name: `Avenida 9 de Julio, Retiro, Buenos Aires, ${caba}`, lat: "-34.5961", lon: "-58.3801" },
+  { display_name: `Avenida 9 de Julio, Retiro, Buenos Aires, ${caba}`, lat: "-34.5950", lon: "-58.3802" },
+  { display_name: "9 de Julio, Crucecita, Avellaneda, Partido de Avellaneda, Buenos Aires, 1870, Argentina", lat: "-34.66", lon: "-58.36" },
+];
+
+it("falls back to CABA-only Nominatim results when Georef has no match", async () => {
+  server.use(
+    http.get(georefUrl, () => HttpResponse.json({ direcciones: [] })),
+    http.get(nominatimUrl, ({ request }) => {
+      expect(new URL(request.url).searchParams.get("q")).toBe("9 de Julio 997, CABA");
+      expect(request.headers.get("user-agent")).toContain("m6-ambiente-frontend");
+      return HttpResponse.json(nominatim);
+    }),
+  );
+  const response = await fetch("http://localhost/api/address-search?q=9%20de%20Julio%20997", { headers: { cookie } });
+  expect(await response.json()).toEqual({ outcome: "results", data: [{ label: "Avenida 9 de Julio, Retiro, Buenos Aires", latitude: -34.5961, longitude: -58.3801 }] });
+});
+
+it("never calls Nominatim for typeahead requests and treats fallback failures as empty", async () => {
+  const fallback = vi.fn(() => HttpResponse.error());
+  server.use(http.get(georefUrl, () => HttpResponse.json({ direcciones: [] })), http.get(nominatimUrl, fallback));
+  const typeahead = await fetch("http://localhost/api/address-search?q=9%20de%20Julio%20997&typeahead=1", { headers: { cookie } });
+  expect(await typeahead.json()).toEqual({ outcome: "empty", data: [] });
+  expect(fallback).not.toHaveBeenCalled();
+  const submitted = await fetch("http://localhost/api/address-search?q=9%20de%20Julio%20997", { headers: { cookie } });
+  expect(await submitted.json()).toEqual({ outcome: "empty", data: [] });
+});
+
+it("suggests unique street names from Georef", async () => {
+  server.use(http.get("https://apis.datos.gob.ar/georef/api/calles", ({ request }) => {
+    expect(new URL(request.url).searchParams.get("nombre")).toBe("corrient");
+    return HttpResponse.json({ calles: [{ nombre: "AV CORRIENTES" }, { nombre: "AV CORRIENTES" }, { nombre: "TORRENT" }] });
+  }));
+  const response = await fetch("http://localhost/api/address-suggest?q=corrient", { headers: { cookie } });
+  expect(await response.json()).toEqual({ outcome: "results", data: [{ label: "AV CORRIENTES" }, { label: "TORRENT" }] });
+});
+
+it("returns no suggestions when Georef fails and rejects a missing session", async () => {
+  server.use(http.get("https://apis.datos.gob.ar/georef/api/calles", () => HttpResponse.error()));
+  const failed = await fetch("http://localhost/api/address-suggest?q=corrient", { headers: { cookie } });
+  expect(await failed.json()).toEqual({ outcome: "empty", data: [] });
+  expect((await fetch("http://localhost/api/address-suggest?q=corrient")).status).toBe(401);
 });
