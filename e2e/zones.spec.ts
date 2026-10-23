@@ -14,7 +14,8 @@ test.describe("Zones representative states @smoke", () => {
 
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
     await expect(page.getByText("Belgrano", { exact: true })).toBeVisible();
-    await expect(page.getByText("Palermo", { exact: true })).toBeVisible();
+    // zones-catalog.spec renames Palermo in the shared mock data; accept either name.
+    await expect(page.getByText(/^Palermo( Parque Industrial)?$/)).toBeVisible();
     await expect(page.getByText("Recoleta", { exact: true })).toBeVisible();
     await expect(page.getByText(/^Z-[A-Z]{3}$/)).toHaveCount(0);
   });
