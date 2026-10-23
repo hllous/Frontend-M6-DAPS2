@@ -16,13 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import {
   containersAdapter,
-  ContainerRequestError,
   type Container,
 } from "@/lib/containers";
-import {
-  EvidenceQueueView,
-  useEvidenceQueue,
-} from "./container-evidence-queue";
 
 interface CompleteRepairDialogProps {
   open: boolean;
@@ -59,7 +54,6 @@ function CompleteRepairModalContent({
 }: Omit<CompleteRepairDialogProps, "open"> & { container: Container }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const evidenceQueue = useEvidenceQueue();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,14 +76,8 @@ function CompleteRepairModalContent({
 
     onSuccess(updated);
 
-    if (evidenceQueue.queuedFiles.length > 0) {
-      const allFilesOk = await evidenceQueue.uploadAll(container.id);
-      setIsSubmitting(false);
-      if (allFilesOk) onOpenChange(false);
-    } else {
-      setIsSubmitting(false);
-      onOpenChange(false);
-    }
+    setIsSubmitting(false);
+    onOpenChange(false);
   }
 
   return (
@@ -122,14 +110,6 @@ function CompleteRepairModalContent({
             <p className="mt-1 text-muted-foreground">Nuevo estado: Activo</p>
           </AlertDescription>
         </Alert>
-        <EvidenceQueueView
-          queuedFiles={evidenceQueue.queuedFiles}
-          fileValidationError={evidenceQueue.fileValidationError}
-          onFileSelect={evidenceQueue.handleFileSelect}
-          onRemoveFile={evidenceQueue.removeFile}
-          onRetryFile={(item) => evidenceQueue.uploadSingle(container.id, item)}
-          disabled={isSubmitting}
-        />
       </form>
 
       <DialogFooter>

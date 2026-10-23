@@ -7,7 +7,6 @@ import { setupServer } from "msw/node";
 
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { handlers } from "@/mocks/handlers";
-import { withNodeFile } from "@/mocks/node-file";
 import { scenarios } from "@/lib/scenarios";
 import { containersAdapter, type ContainerStatus } from "@/lib/containers";
 import { ContainerCatalogPanel } from "./container-catalog-panel";
@@ -392,22 +391,8 @@ describe("ContainerCatalogPanel", () => {
     expect(within(removedRow).queryByRole("button", { name: /reparación|retirar/i })).not.toBeInTheDocument();
   });
 
-  it("uploads repair evidence as flat Container evidence", async () => {
+  it("keeps evidence upload out of Office repair completion", async () => {
     const user = userEvent.setup({ delay: null });
-    const evidenceOwners: string[] = [];
-    server.use(
-      http.post("*/api/evidence", async ({ request }) => {
-        const formData = await withNodeFile(() => request.formData());
-        evidenceOwners.push(String(formData.get("ownerType")));
-        return HttpResponse.json({
-          id: "att-repair-1",
-          url: "/files/repair.png",
-          filename: "repair.png",
-          contentType: "image/png",
-          uploadedAt: new Date().toISOString(),
-        });
-      }),
-    );
 
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
@@ -415,30 +400,14 @@ describe("ContainerCatalogPanel", () => {
     const row = screen.getByRole("row", { name: /CONT-004/ });
     await clickContainerAction(user, row, "Completar reparación");
     const dialog = screen.getByRole("dialog");
-    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(fileInput, new File(["image-bytes"], "repair.png", { type: "image/png" }));
+    expect(dialog.querySelector('input[type="file"]')).toBeNull();
     await user.click(within(dialog).getByRole("button", { name: "Confirmar reparación" }));
 
     expect(await screen.findByText("Reparación completada: CONT-004.")).toBeVisible();
-    expect(evidenceOwners).toEqual(["CONTAINER"]);
   });
 
-  it("uploads removal evidence as flat Container evidence", async () => {
+  it("keeps evidence upload out of Office removal", async () => {
     const user = userEvent.setup({ delay: null });
-    const evidenceOwners: string[] = [];
-    server.use(
-      http.post("*/api/evidence", async ({ request }) => {
-        const formData = await withNodeFile(() => request.formData());
-        evidenceOwners.push(String(formData.get("ownerType")));
-        return HttpResponse.json({
-          id: "att-removal-1",
-          url: "/files/removal.pdf",
-          filename: "removal.pdf",
-          contentType: "application/pdf",
-          uploadedAt: new Date().toISOString(),
-        });
-      }),
-    );
 
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 
@@ -446,12 +415,10 @@ describe("ContainerCatalogPanel", () => {
     const row = screen.getByRole("row", { name: /CONT-003/ });
     await clickContainerAction(user, row, "Retirar contenedor");
     const dialog = screen.getByRole("dialog");
-    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(fileInput, new File(["pdf-bytes"], "removal.pdf", { type: "application/pdf" }));
+    expect(dialog.querySelector('input[type="file"]')).toBeNull();
     await user.click(within(dialog).getByRole("button", { name: "Confirmar retiro" }));
 
     expect(await screen.findByText("Contenedor retirado: CONT-003.")).toBeVisible();
-    expect(evidenceOwners).toEqual(["CONTAINER"]);
   });
 
   it("renders a retryable error state on load failure", async () => {

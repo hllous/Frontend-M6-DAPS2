@@ -9,7 +9,8 @@ import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
 
 test.describe("Office container repair and removal dispatch #122", () => {
-  test("Office completes a standalone repair with Container evidence", async ({ page }) => {
+  test("Crew reports damage and Office completes repair without uploading evidence", async ({ page }) => {
+    const code = `CONT-E2E-${Date.now()}`;
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/catalog/containers");
 
@@ -18,7 +19,7 @@ test.describe("Office container repair and removal dispatch #122", () => {
     // depends on CONT-003 staying DAMAGED.
     await page.getByRole("button", { name: "Registrar contenedor" }).click();
     const createDialog = page.getByRole("dialog");
-    await createDialog.locator("#container-code").fill("CONT-E2E-REPAIR");
+    await createDialog.locator("#container-code").fill(code);
     await chooseCatalogAOption(page, createDialog, "Tipo de contenedor en el formulario", "Residuos domiciliarios");
     await chooseCatalogAOption(page, createDialog, "Zona en el formulario", { index: 0 });
     await createDialog.locator("#container-capacity").fill("1100");
@@ -30,14 +31,21 @@ test.describe("Office container repair and removal dispatch #122", () => {
     // The catalog's default page only shows the first page of results, and other
     // e2e specs permanently add containers of their own — search to make sure the
     // new row is found regardless of how many containers now precede it.
-    await page.getByLabel("Buscar contenedor").fill("CONT-E2E-REPAIR");
-    const row = page.locator("tr", { hasText: "CONT-E2E-REPAIR" });
+    await page.getByLabel("Buscar contenedor").fill(code);
+    const row = page.locator("tr", { hasText: code });
     await expect(row).toBeVisible();
+    await expect(createDialog).not.toBeVisible();
+    await loginViaApi(page, "field-crew-leader-route");
+    await page.goto("/app/catalog/containers");
+    await page.getByLabel("Buscar contenedor").fill(code);
     await clickCatalogRowAction(row, "Reportar daño");
     const damageDialog = page.getByRole("dialog");
     await chooseCatalogAOption(page, damageDialog, "Tipo de daño", "Estructural");
     await chooseCatalogAOption(page, damageDialog, "Severidad", "Alta");
     await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "STRUCTURAL", severity: "HIGH", requiresPublicWorks: false }, () => damageDialog.getByRole("button", { name: "Confirmar daño" }).click());
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app/catalog/containers");
+    await page.getByLabel("Buscar contenedor").fill(code);
     await expect(row.getByText("Dañado")).toBeVisible();
 
     await clickCatalogRowAction(row, "Iniciar reparación");
@@ -50,28 +58,24 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await clickCatalogRowAction(row, "Completar reparación");
     const completeDialog = page.getByRole("dialog");
     await expect(completeDialog.getByText("El contenedor vuelve a Activo.")).toBeVisible();
-    await completeDialog.locator('input[type="file"]').setInputFiles({
-      name: "repair-report.png",
-      mimeType: "image/png",
-      buffer: Buffer.from("fake-png-content-for-repair"),
-    });
-    await expect(completeDialog.getByText("repair-report.png")).toBeVisible();
+    await expect(completeDialog.locator('input[type="file"]')).toHaveCount(0);
     await expectCatalogAMutation(page, /\/complete-repair$/, null, () => completeDialog.getByRole("button", { name: "Confirmar reparación" }).click());
 
-    await expect(page.getByText("Reparación completada: CONT-E2E-REPAIR.")).toBeVisible();
+    await expect(page.getByText(`Reparación completada: ${code}.`)).toBeVisible();
     await expect(completeDialog).not.toBeVisible();
     await expect(row.getByText("Activo")).toBeVisible();
     const activeDetail = await openCatalogRowDetail(row);
     await expect(activeDetail.getByRole("button", { name: /reparación|Retirar contenedor/i })).toHaveCount(0);
   });
 
-  test("Office removes a damaged container with evidence and keeps removal terminal", async ({ page }) => {
+  test("Crew reports damage and Office removes the container without uploading evidence", async ({ page }) => {
+    const code = `CONT-E2E-${Date.now()}`;
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/catalog/containers");
 
     await page.getByRole("button", { name: "Registrar contenedor" }).click();
     const createDialog = page.getByRole("dialog");
-    await createDialog.locator("#container-code").fill("CONT-E2E-122");
+    await createDialog.locator("#container-code").fill(code);
     await chooseCatalogAOption(page, createDialog, "Tipo de contenedor en el formulario", "Residuos domiciliarios");
     await chooseCatalogAOption(page, createDialog, "Zona en el formulario", { index: 0 });
     await createDialog.locator("#container-capacity").fill("1100");
@@ -84,27 +88,30 @@ test.describe("Office container repair and removal dispatch #122", () => {
     // e2e specs (including this file's own prior test) permanently add containers
     // of their own — search to make sure the new row is found regardless of how
     // many containers now precede it.
-    await page.getByLabel("Buscar contenedor").fill("CONT-E2E-122");
-    const row = page.locator("tr", { hasText: "CONT-E2E-122" });
+    await page.getByLabel("Buscar contenedor").fill(code);
+    const row = page.locator("tr", { hasText: code });
     await expect(row).toBeVisible();
+    await expect(createDialog).not.toBeVisible();
+    await loginViaApi(page, "field-crew-leader-route");
+    await page.goto("/app/catalog/containers");
+    await page.getByLabel("Buscar contenedor").fill(code);
     await clickCatalogRowAction(row, "Reportar daño");
     const damageDialog = page.getByRole("dialog");
     await chooseCatalogAOption(page, damageDialog, "Tipo de daño", "Estructural");
     await chooseCatalogAOption(page, damageDialog, "Severidad", "Alta");
     await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "STRUCTURAL", severity: "HIGH", requiresPublicWorks: false }, () => damageDialog.getByRole("button", { name: "Confirmar daño" }).click());
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app/catalog/containers");
+    await page.getByLabel("Buscar contenedor").fill(code);
     await expect(row.getByText("Dañado")).toBeVisible();
 
     await clickCatalogRowAction(row, "Retirar contenedor");
     const removeDialog = page.getByRole("dialog");
-    await expect(removeDialog.getByRole("heading", { name: /Retirar contenedor CONT-E2E-122/ })).toBeVisible();
-    await removeDialog.locator('input[type="file"]').setInputFiles({
-      name: "removal-report.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("fake-pdf-content-for-removal"),
-    });
+    await expect(removeDialog.getByRole("heading", { name: /Retirar contenedor/ })).toBeVisible();
+    await expect(removeDialog.locator('input[type="file"]')).toHaveCount(0);
     await expectCatalogAMutation(page, /\/remove$/, null, () => removeDialog.getByRole("button", { name: "Confirmar retiro" }).click());
 
-    await expect(page.getByText("Contenedor retirado: CONT-E2E-122.")).toBeVisible();
+    await expect(page.getByText(`Contenedor retirado: ${code}.`)).toBeVisible();
     await expect(removeDialog).not.toBeVisible();
     await expect(row.getByText("Retirado")).toBeVisible();
     const removedDetail = await openCatalogRowDetail(row);
