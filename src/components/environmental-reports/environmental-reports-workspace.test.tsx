@@ -430,6 +430,42 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(new URLSearchParams(window.location.search).get("page")).toBe("3");
   });
 
+  it("warns how many records of the page were dropped for an unknown enum, and not when only paginating (#651)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const dropped = (page: number) => (page === 2 ? 1 : 0);
+    server.use(http.get("*/api/environmental-reports", ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get("page") ?? 1);
+      return HttpResponse.json({
+        data: [{ ...environmentalReportFixtures[0] }, ...(dropped(page) ? [{ ...environmentalReportFixtures[1], id: "report-future", status: "FUTURE_STATUS" }] : [])],
+        meta: { total: 40, page, pageSize: 2, totalPages: 20 },
+        sanctionOutcomeIntegrationExceptions: [],
+      });
+    }));
+    window.history.replaceState(null, "", "/app?destination=environment&page=1");
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    expect(screen.queryByText(/no se pudieron? mostrar/)).toBeNull();
+    await user.click(screen.getByRole("link", { name: /siguiente/i }));
+    expect(await screen.findByText("1 registro no se pudo mostrar con esta versión de la aplicación.")).toBeVisible();
+    await user.click(screen.getByRole("link", { name: /siguiente/i }));
+    await waitFor(() => expect(screen.queryByText(/no se pudieron? mostrar/)).toBeNull());
+  });
+
+  it("puts the dropped-records notice above the filters so it is not pushed below the fold on a phone (#651)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    server.use(http.get("*/api/environmental-reports", () => HttpResponse.json({
+      data: [{ ...environmentalReportFixtures[0] }, { ...environmentalReportFixtures[1], id: "report-future", status: "FUTURE_STATUS" }],
+      meta: { total: 2, page: 1, pageSize: 25, totalPages: 1 },
+      sanctionOutcomeIntegrationExceptions: [],
+    })));
+    window.history.replaceState(null, "", "/app?destination=environment");
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const notice = await screen.findByText("1 registro no se pudo mostrar con esta versión de la aplicación.");
+    const search = screen.getByRole("textbox", { name: "Buscar expediente" });
+    expect(notice.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("asks for a reason before forwarding and sends it to the backend", async () => {
     const user = userEvent.setup();
     const forward = vi.spyOn(environmentalReportsAdapter, "forward");

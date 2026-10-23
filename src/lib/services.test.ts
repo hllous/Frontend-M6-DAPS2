@@ -208,6 +208,22 @@ describe("services adapter", () => {
     });
   });
 
+  it("reports how many records of the page it dropped for an unknown enum, apart from the paging total (#651)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const [known] = (await servicesAdapter.list()).services;
+    server.use(http.get("*/api/services", () => HttpResponse.json({
+      data: [known, { ...known, id: "svc-future", status: "FUTURE_STATUS" }],
+      meta: { total: 50, page: 1, pageSize: 2, totalPages: 25 },
+    })));
+    const page = await servicesAdapter.list();
+    expect(page.services.map((service) => service.id)).toEqual([known.id]);
+    expect(page.dropped).toBe(1);
+    server.use(http.get("*/api/services", () => HttpResponse.json({
+      data: [known], meta: { total: 50, page: 1, pageSize: 1, totalPages: 50 },
+    })));
+    expect((await servicesAdapter.list()).dropped).toBe(0);
+  });
+
   it("normalizes the named empty-results scenario", async () => {
     const page = await servicesAdapter.list(EMPTY_SERVICES_QUERY);
 
