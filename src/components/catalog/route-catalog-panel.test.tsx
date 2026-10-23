@@ -11,6 +11,7 @@ import { paginateRouteFixtures, resetRouteFixtures, routeFixtures } from "@/lib/
 import { routesAdapter } from "@/lib/routes";
 import { resetZoneFixtures } from "@/lib/zones-fixtures";
 import { RouteCatalogPanel } from "./route-catalog-panel";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -635,5 +636,14 @@ describe("RouteCatalogPanel component", () => {
       error: "Forbidden",
       path: "/api/routes",
     });
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await waitFor(() => expect(screen.getAllByRole("row").length).toBeGreaterThan(1));
+
+    expectNoInternalJargon(container);
   });
 });

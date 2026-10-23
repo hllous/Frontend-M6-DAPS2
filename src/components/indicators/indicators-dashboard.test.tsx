@@ -10,6 +10,7 @@ import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
 import { handlers } from "@/mocks/handlers";
 
 import { IndicatorsDashboard } from "./indicators-dashboard";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -430,5 +431,15 @@ describe("IndicatorsDashboard", () => {
 
     await chooseDate(user, "Hasta", "2026-09-20");
     expect(screen.queryByText("La fecha «Desde» no puede ser posterior a «Hasta».")).not.toBeInTheDocument();
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await screen.findByText("Atendidos");
+
+    expectNoInternalJargon(container);
   });
 });

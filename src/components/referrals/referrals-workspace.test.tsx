@@ -12,6 +12,7 @@ import { scenarios } from "@/lib/scenarios";
 import { isReferralVisibleToScenario, referralFromBackendRepairRequest } from "@/lib/referrals";
 import { resetStreetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import { ReferralsWorkspace } from "./referrals-workspace";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -394,5 +395,14 @@ describe("ReferralsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: new RegExp(closure.id) }));
     const detail = await screen.findByRole("region", { name: `Detalle de ${closure.id}` });
     expect(within(detail).getByRole("status", { name: "Estado: Vencido" })).toBeVisible();
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("list", { name: "Derivaciones" });
+
+    expectNoInternalJargon(container);
   });
 });

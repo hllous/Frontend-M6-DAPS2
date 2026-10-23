@@ -13,6 +13,7 @@ import { resetServiceFixtures, updateServiceFixture } from "@/lib/services-fixtu
 import { servicesAdapter } from "@/lib/services";
 import { scenarios } from "@/lib/scenarios";
 import { EnvironmentalReportsWorkspace } from "./environmental-reports-workspace";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -781,5 +782,14 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2450");
     const notCreated = await repairRequestsAdapter.list({ detectedInId: "INS-1012" });
     expect(notCreated.repairRequests).toHaveLength(0);
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+
+    expectNoInternalJargon(container);
   });
 });

@@ -9,6 +9,7 @@ import { scenarios } from "@/lib/scenarios";
 import { createSessionCookie } from "@/test/session";
 import { resetZoneFixtures, zoneFixtures } from "@/lib/zones-fixtures";
 import { ZoneCatalogPanel } from "./zone-catalog-panel";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -329,5 +330,14 @@ describe("ZoneCatalogPanel component", () => {
       error: "Forbidden",
       path: "/api/zones",
     });
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await screen.findByText("Belgrano");
+
+    expectNoInternalJargon(container);
   });
 });
