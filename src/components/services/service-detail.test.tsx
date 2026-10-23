@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { ServiceDetail } from "./service-detail";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 describe("ServiceDetail", () => {
   it("keeps one primary action and wraps the action row for rescheduled services", () => {
@@ -22,5 +23,20 @@ describe("ServiceDetail", () => {
     expect(primaryActions).toHaveLength(1);
     expect(primaryActions[0]).toHaveAccessibleName("Confirmar nueva fecha");
     expect(screen.getByRole("button", { name: "Reasignar cuadrilla" }).parentElement).toHaveClass("flex-wrap");
+  });
+});
+
+describe("ServiceDetail internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", () => {
+    const { container } = render(
+      <ServiceDetail
+        service={serviceFixtures[0]}
+        onBack={vi.fn()}
+        onAssignCrew={vi.fn()}
+        onConfirmReschedule={vi.fn()}
+      />,
+    );
+
+    expectNoInternalJargon(container);
   });
 });

@@ -46,7 +46,6 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -227,10 +226,6 @@ export function AppShell({
           )}
         </LoadingRegion>
         <div className={styles.topbarActions}>
-          <Badge variant="status" className={styles.sessionState} aria-label="Estado de sesión">
-            <span className="size-2.5 rounded-full bg-[var(--color-success)]" aria-hidden="true" />
-            Sesión operativa
-          </Badge>
           {logoutAction ? (
             <form action={logoutAction}>
               <Button type="submit" variant="outline">Cerrar sesión</Button>
@@ -296,7 +291,7 @@ export function AppShell({
         {scenario ? <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
           <SheetTrigger
             render={
-              <Button className={styles.mobileNavigationButton} variant="ghost" aria-label="Más módulos" />
+              <Button className={styles.mobileNavigationButton} variant="ghost" aria-label="Más" />
             }
           >
             <CircleHelp aria-hidden />
@@ -304,8 +299,7 @@ export function AppShell({
           </SheetTrigger>
           <SheetContent side="bottom" className={styles.moreSheet}>
             <SheetHeader>
-              <SheetTitle>Más módulos</SheetTitle>
-              <SheetDescription>Seleccione un módulo disponible para su sesión.</SheetDescription>
+              <SheetTitle>Más</SheetTitle>
             </SheetHeader>
             <div className={styles.sheetNavigation}>
               {availableItems.map((item) => (
@@ -420,7 +414,7 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
         if (!isCurrent) return;
         setQueue({
           status: "error",
-          message: "No se pudo cargar la cola de autorizaciones. Intente nuevamente más tarde.",
+          message: "No se pudieron cargar las autorizaciones pendientes. Intente nuevamente.",
         });
       });
 
@@ -432,7 +426,6 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
   return (
     <section aria-labelledby="work-title" className={styles.workPanel}>
       <div className={styles.pageHeading}>
-        <p>Priorice y coordine</p>
         <h1 id="work-title">{scenario.work.title}</h1>
         <span>{scenario.work.summary}</span>
       </div>
@@ -443,16 +436,14 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
             <ItemContent>
               <ItemTitle>{item}</ItemTitle>
             </ItemContent>
-            <ItemActions className="max-sm:basis-full max-sm:pl-[calc(1.5rem+0.625rem)]">
-              {mayExecuteService && index === 0 ? (
+            {mayExecuteService && index === 0 ? (
+              <ItemActions className="max-sm:basis-full max-sm:pl-[calc(1.5rem+0.625rem)]">
                 <Button className="max-sm:w-full" onClick={() => undefined}>
                   <Play data-icon="inline-start" aria-hidden />
                   Iniciar servicio
                 </Button>
-              ) : (
-                <Badge variant="info">Requiere revisión</Badge>
-              )}
-            </ItemActions>
+              </ItemActions>
+            ) : null}
           </Item>
         ))}
         {queue.status === "ready"
@@ -469,7 +460,7 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
         <Item variant="muted" aria-live="polite">
           <ItemMedia><Spinner aria-hidden role="presentation" /></ItemMedia>
           <ItemContent>
-            <ItemDescription>Cargando decisiones de arbolado…</ItemDescription>
+            <ItemDescription>Cargando intervenciones de arbolado…</ItemDescription>
           </ItemContent>
         </Item>
       ) : null}

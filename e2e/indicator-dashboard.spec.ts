@@ -35,7 +35,7 @@ test.describe("operational indicator dashboard #138", () => {
     await page.goto("/app?destination=dashboards");
     await expect(page.getByRole("button", { name: "Cobertura: seleccionar familia" })).toContainText("82,2 %", { timeout: 15_000 });
 
-    const viewToggle = page.getByRole("group", { name: "Visualización de indicadores" });
+    const viewToggle = page.getByRole("group", { name: "Vista" });
     await expect(viewToggle.getByRole("button", { name: "Barras" })).toHaveAttribute("aria-pressed", "true");
     await viewToggle.getByRole("button", { name: "Tabla" }).click();
     await page.getByRole("tab", { name: "Territorio" }).click();
@@ -76,7 +76,7 @@ test.describe("operational indicator dashboard #138", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=dashboards");
 
-    await expect(page.getByText(/Unidad de análisis:/)).toBeVisible();
+    await expect(page.getByText(/Unidad de análisis/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Centro.*89,7.*140.*156/i })).toBeVisible();
 
     await page.getByRole("button", { name: "Tabla" }).click();
@@ -87,7 +87,7 @@ test.describe("operational indicator dashboard #138", () => {
 
     await page.getByRole("button", { name: /Cumplimiento/ }).click();
     await expect(page.getByText("Cuadrilla no disponible").first()).toBeVisible();
-    await expect(page.getByText(/ZoneResult\.recordedAt/)).toBeVisible();
+    await expect(page.getByText(/ZoneResult\.recordedAt/)).toHaveCount(0);
   });
 
   test("Office can inspect exact Incidencias and Residuos details", async ({ page }) => {
@@ -96,8 +96,8 @@ test.describe("operational indicator dashboard #138", () => {
 
     await page.getByRole("button", { name: /Incidencias/ }).click();
     await expect(page.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
-    await expect(page.getByText(/contenedores y arbolado son instantáneas actuales/i)).toBeVisible();
-    await expect(page.getByText(/reportes consideran el período y la resolución media usa solo reportes cerrados/i)).toBeVisible();
+    await expect(page.getByText("Contenedores y arbolado: situación actual.")).toBeVisible();
+    await expect(page.getByText(/reportes consideran el período/i)).toHaveCount(0);
 
     await page.getByRole("button", { name: "Tabla", exact: true }).click();
     const incidentsTable = page.getByRole("region", { name: "Tabla de datos de Incidencias" });
@@ -116,7 +116,7 @@ test.describe("operational indicator dashboard #138", () => {
   test("an Office actor without indicator:view cannot open the destination", async ({ page }) => {
     await loginViaApi(page, "office-limited-intake");
     await page.goto("/app?destination=dashboards");
-    await expect(page.getByRole("heading", { name: "Indicadores no disponibles" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "No tiene permiso para ver los indicadores." })).toBeVisible();
     await expect(page.getByRole("link", { name: "Tableros" })).toHaveCount(0);
   });
 });

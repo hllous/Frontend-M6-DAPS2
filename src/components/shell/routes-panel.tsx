@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RouteRequestError, routesAdapter, type Route } from "@/lib/routes";
@@ -66,7 +66,7 @@ export function RoutesPanel() {
       <ShellError
         onRetry={retry}
         title="No se pudieron cargar los recorridos"
-        description="Verifique la conexión local y vuelva a intentarlo."
+        description="Revise la conexión e intente nuevamente."
       />
     );
   }
@@ -76,7 +76,6 @@ export function RoutesPanel() {
       <Empty>
         <EmptyHeader>
           <EmptyTitle>Sin recorridos</EmptyTitle>
-          <EmptyDescription>No hay recorridos registrados para mostrar.</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );

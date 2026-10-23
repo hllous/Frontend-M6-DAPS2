@@ -10,6 +10,7 @@ import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
 import { handlers } from "@/mocks/handlers";
 
 import { IndicatorsDashboard } from "./indicators-dashboard";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -52,7 +53,7 @@ describe("IndicatorsDashboard", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = screen.getByRole("region", { name: "Familias de indicadores" });
+    const familyBand = screen.getByRole("region", { name: "Familias" });
     expect(familyBand).toBeVisible();
     expect(within(familyBand).getByRole("button", { name: /Cobertura.*seleccionar/i })).toBeVisible();
     expect(within(familyBand).getByLabelText("Cargando Cobertura")).toBeVisible();
@@ -67,7 +68,7 @@ describe("IndicatorsDashboard", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    const familyBand = await screen.findByRole("region", { name: "Familias" });
     expect(within(familyBand).getByRole("button", { name: /Reintentar Cumplimiento/i })).toBeVisible();
 
     const trend = await screen.findByRole("region", { name: "Tendencia" });
@@ -77,7 +78,7 @@ describe("IndicatorsDashboard", () => {
 
     await userEvent.setup().click(within(familyBand).getByRole("button", { name: /Cumplimiento.*seleccionar/i }));
     expect(await screen.findByText("No se pudo cargar Cumplimiento")).toBeVisible();
-    expect(screen.getByRole("region", { name: "Familias de indicadores" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Familias" })).toBeVisible();
   });
 
   it("uses task-focused tabs on narrow screens without changing the selected family", async () => {
@@ -95,7 +96,7 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    const familyBand = await screen.findByRole("region", { name: "Familias" });
     await user.click(within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i }));
     const tabs = await screen.findByRole("tablist", { name: "Secciones del tablero" });
     expect(tabs).toBeVisible();
@@ -104,7 +105,7 @@ describe("IndicatorsDashboard", () => {
     expect(within(tabs).getByRole("tab", { name: "Territorio" })).toBeVisible();
     expect(within(tabs).getByRole("tab", { name: "Registros" })).toBeVisible();
 
-    const viewToggle = screen.getByRole("group", { name: "Visualización de indicadores" });
+    const viewToggle = screen.getByRole("group", { name: "Vista" });
     await user.click(within(viewToggle).getByRole("button", { name: "Tabla" }));
     expect(within(viewToggle).getByRole("button", { name: "Tabla" })).toHaveAttribute("aria-pressed", "true");
 
@@ -170,7 +171,7 @@ describe("IndicatorsDashboard", () => {
     expect(await screen.findByRole("heading", { name: "Cobertura" })).toBeVisible();
     expect(await screen.findByText(/^\d{2}\/\d{2}\/\d{4} – \d{2}\/\d{2}\/\d{4}$/)).toBeVisible();
     expect(screen.getByText(/Actualizado \d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}/)).toBeVisible();
-    expect(screen.getByText(/Unidad de análisis:/).closest("p")).toHaveTextContent("Unidad de análisis: servicio + zona");
+    expect(screen.queryByText(/Unidad de análisis/)).not.toBeInTheDocument();
     expect(screen.getByText("Atendidos")).toBeVisible();
     expect(screen.getByText("Programados")).toBeVisible();
 
@@ -194,7 +195,7 @@ describe("IndicatorsDashboard", () => {
     expect((await screen.findAllByText("344 servicios"))[0]).toBeVisible();
     expect((await screen.findAllByText("Demorados"))[0]).toBeVisible();
     expect(screen.getAllByText(/Cuadrilla no disponible/)[0]).toBeVisible();
-    expect(screen.getByText(/ZoneResult\.recordedAt/i).closest("p")).toHaveTextContent("último ZoneResult.recordedAt");
+    expect(screen.queryByText(/ZoneResult\.recordedAt/i)).not.toBeInTheDocument();
   });
 
   it("lets Office inspect exact Incidencias and Residuos details with their data semantics", async () => {
@@ -205,8 +206,8 @@ describe("IndicatorsDashboard", () => {
     await user.click(screen.getByRole("button", { name: /Incidencias/ }));
 
     expect(screen.getAllByText(/Resolución media de reportes/)[0]).toBeVisible();
-    expect(screen.getByText(/contenedores y arbolado son instantáneas actuales/i)).toBeVisible();
-    expect(screen.getByText(/reportes consideran el período y la resolución media usa solo reportes cerrados/i)).toBeVisible();
+    expect(screen.getByText("Contenedores y arbolado: situación actual.")).toBeVisible();
+    expect(screen.queryByText(/reportes consideran el período/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Tabla" }));
@@ -288,7 +289,7 @@ describe("IndicatorsDashboard", () => {
     await screen.findByRole("heading", { name: "Cobertura" });
     await user.click(await screen.findByRole("button", { name: /Centro.*89,7/i }));
 
-    const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
+    const recordsRegion = await screen.findByRole("region", { name: "Registros" });
     const recordsTable = within(recordsRegion).getByRole("table", { name: "Registros accesibles de Servicios" });
     const recordHeader = within(recordsTable).getByRole("columnheader", { name: "Registro" });
     expect(recordHeader).toHaveAttribute("aria-sort", "none");
@@ -297,13 +298,13 @@ describe("IndicatorsDashboard", () => {
     const serviceLink = () => within(recordsRegion).getAllByRole("link", { name: "Recolección de residuos — Recorrido 4" }).find((link) => link.getAttribute("href") === "/app?destination=services&detail=SVC-1042");
     expect(serviceLink()).toBeVisible();
     expect(within(recordsRegion).queryByText("SVC-1042")).not.toBeInTheDocument();
-    expect(recordsRegion).toHaveTextContent(/Filtro activo:.*Centro/i);
+    expect(recordsRegion).toHaveTextContent(/Filtro:.*Centro/i);
     expect(recordsRegion).toHaveTextContent(/Cobertura por zona/i);
-    expect(screen.getByRole("link", { name: /Abrir Servicios/i })).toHaveAttribute("href", "/app?destination=services");
+    expect(screen.getByRole("link", { name: /Ver servicios/i })).toHaveAttribute("href", "/app?destination=services");
 
-    await user.click(screen.getByRole("button", { name: "Quitar filtro de señal" }));
+    await user.click(screen.getByRole("button", { name: "Quitar filtro" }));
 
-    expect(recordsRegion).toHaveTextContent(/Sin filtro de señal/);
+    expect(recordsRegion).toHaveTextContent(/Todos los registros del período/);
     expect(serviceLink()).toBeVisible();
   });
 
@@ -315,11 +316,11 @@ describe("IndicatorsDashboard", () => {
     await user.click(screen.getByRole("button", { name: /Incidencias/ }));
     await user.click(await screen.findByRole("button", { name: /Centro.*8 incidentes/i }));
 
-    const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
+    const recordsRegion = await screen.findByRole("region", { name: "Registros" });
     expect(within(recordsRegion).getByRole("row", { name: /CONT-001/ })).toBeVisible();
     // Se muestra el código, pero el enlace usa el UUID que `GET /containers/:id` espera.
     expect(within(recordsRegion).getByRole("link", { name: "CONT-001" })).toHaveAttribute("href", "/app/catalog/containers?detail=cont-1");
-    expect(screen.getByRole("link", { name: /Abrir catálogo de contenedores/i })).toHaveAttribute("href", "/app/catalog/containers");
+    expect(screen.getByRole("link", { name: /Ver contenedores/i })).toHaveAttribute("href", "/app/catalog/containers");
     expect(screen.queryByRole("button", { name: /Editar|Eliminar|Dar de baja/i })).not.toBeInTheDocument();
   });
 
@@ -331,8 +332,8 @@ describe("IndicatorsDashboard", () => {
     await user.click(screen.getByRole("button", { name: /Incidencias/ }));
     await user.click(await screen.findByRole("button", { name: /Alto.*9 árboles/i }));
 
-    expect(screen.getByText(/no se puede vincular con un registro operativo/i)).toBeVisible();
-    expect(screen.queryByRole("link", { name: /Abrir catálogo de árboles/i })).not.toBeInTheDocument();
+    expect(screen.getByText("No hay registros para «Alto».")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /Ver árboles/i })).not.toBeInTheDocument();
   });
 
   it("shows «Sin reportes cerrados» when the backend sends avgResolutionDays null (#302)", async () => {
@@ -340,7 +341,7 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    const familyBand = await screen.findByRole("region", { name: "Familias" });
     const incidentsButton = within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i });
     expect(await within(incidentsButton).findByText("Sin reportes cerrados")).toBeVisible();
     expect(within(familyBand).queryByText("No se pudo cargar Incidencias")).not.toBeInTheDocument();
@@ -372,7 +373,7 @@ describe("IndicatorsDashboard", () => {
     );
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    const familyBand = await screen.findByRole("region", { name: "Familias" });
     expect(await within(familyBand).findAllByText("Sin datos")).toHaveLength(2);
   });
 
@@ -409,7 +410,7 @@ describe("IndicatorsDashboard", () => {
 
     expect(screen.getByLabelText("Zona operativa")).toBeDisabled();
     expect(screen.getByLabelText("Tipo de servicio")).toBeDisabled();
-    expect(screen.getByText("Cargando tipos de servicio…")).toBeVisible();
+    expect(screen.getByText("Cargando…", { selector: "#indicator-service-type-hint" })).toBeVisible();
   });
 
   it("blocks an inverted date range with a message and does not call the backend", async () => {
@@ -430,5 +431,15 @@ describe("IndicatorsDashboard", () => {
 
     await chooseDate(user, "Hasta", "2026-09-20");
     expect(screen.queryByText("La fecha «Desde» no puede ser posterior a «Hasta».")).not.toBeInTheDocument();
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await screen.findByText("Atendidos");
+
+    expectNoInternalJargon(container);
   });
 });
