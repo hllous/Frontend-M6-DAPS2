@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useId, useState } from "react";
+import { ADDRESS_SEARCH_FALLBACK_MESSAGE } from "@/lib/address-search-messages";
 import { roundCoordinate } from "@/lib/input-limits";
 import { getOperationalZoneGeometries, isCoordinateInsideOperationalZone } from "@/lib/operational-zones";
 import { cn } from "@/lib/utils";
@@ -66,9 +67,9 @@ export function LocationPicker({ currentPoint, initialAddress = "", searchAddres
     try {
       const found = query.trim() ? await searchAddresses(query.trim()) : [];
       setResults(found);
-      setSearchMessage(found.length ? `${found.length} direcciones encontradas. Elija una.` : "No se encontró esa dirección. Márquela en el mapa.");
+      setSearchMessage(found.length ? `${found.length} direcciones encontradas. Elija una.` : ADDRESS_SEARCH_FALLBACK_MESSAGE);
     } catch {
-      setSearchMessage("No se encontró esa dirección. Márquela en el mapa.");
+      setSearchMessage(ADDRESS_SEARCH_FALLBACK_MESSAGE);
     } finally { setSearching(false); }
   }
 

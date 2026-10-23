@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { authenticatedFetch } from "./authenticated-fetch";
+import { ADDRESS_SEARCH_FALLBACK_MESSAGE } from "./address-search-messages";
+
+export { ADDRESS_SEARCH_FALLBACK_MESSAGE } from "./address-search-messages";
 
 export const ADDRESS_SEARCH_PATH = "/api/address-search";
 export const ADDRESS_SEARCH_LIMIT = 5;
 export const ADDRESS_SEARCH_TIMEOUT_MS = 5000;
-export const ADDRESS_SEARCH_FALLBACK_MESSAGE = "No se encontró esa dirección. Márquela en el mapa.";
 
 export const addressSearchResultSchema = z.object({
   label: z.string().trim().min(1),
