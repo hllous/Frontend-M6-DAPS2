@@ -1,4 +1,5 @@
 import { createSessionCookie } from "@/test/session";
+import { addressSearchRouteHandlers } from "./address-search-route-handlers";
 
 import { containerRouteHandlers } from "./container-route-handlers";
 import { envControlRouteHandlers } from "./env-control-route-handlers";
@@ -15,6 +16,7 @@ const fieldCrewSessionCookie = createSessionCookie("field-crew-leader-route", { 
 
 export const handlers = [
   ...sharedHandlers,
+  ...addressSearchRouteHandlers(fieldCrewSessionCookie),
   ...serviceTypeRouteHandlers(officeSessionCookie),
   ...zoneRouteHandlers(officeSessionCookie),
   ...envControlRouteHandlers(officeSessionCookie, fieldCrewSessionCookie),
