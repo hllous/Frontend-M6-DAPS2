@@ -575,7 +575,7 @@ Los totales de cada área cuentan las filas de las tablas de copy; las propuesta
 
 ### Propuestas estructurales — Reportes ambientales
 
-- **Latitud y longitud como una sola ubicación.** El alta pide dirección, latitud y longitud por separado. Propuesta: dirección obligatoria y "Marcar en el mapa" opcional; las coordenadas salen del formulario.
+- **Latitud y longitud como una sola ubicación — propuesta reemplazada por [#692](https://github.com/hllous/Frontend-M6-DAPS2/issues/692).** Dirección o referencia sigue siendo obligatoria; la ubicación se elige y confirma en el mapa. La acción es obligatoria porque el alta exige coordenadas; [#695](https://github.com/hllous/Frontend-M6-DAPS2/issues/695) elimina los campos manuales y el valor de respaldo.
 - **Detalle con acciones primero.** "Siguiente decisión de Oficina" y "Programación de inspección" se funden en un único bloque "Acciones" con los botones que aplican.
 - **Sobretítulos de diálogo fuera.** Los sobretítulos "Emisión de acta", "Programación operativa", "Detección de campo" repiten el título; se eliminan.
 - **Resolución y excepciones de Faltas.** Las dos alertas se unen en una sección "Resolución" con una fila por acta; la nota de solo lectura se elimina.

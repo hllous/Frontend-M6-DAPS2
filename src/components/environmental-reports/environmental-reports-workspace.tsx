@@ -34,12 +34,15 @@ import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemGroup } from "@/components/ui/item";
+import { LocationPickerDialog } from "@/components/ui/location-picker-dialog";
+import { locationPointLabel, type LocationPoint } from "@/components/ui/location-picker";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
 import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime } from "@/lib/argentina-date";
+import { searchAddresses } from "@/lib/address-search";
 import {
   ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS,
   ENVIRONMENTAL_SEVERITY_LABELS as severityLabels,
@@ -79,7 +82,7 @@ import { RescheduleReasonDialog } from "@/components/services/reschedule-reason-
 import { ConfirmRescheduleDialog } from "@/components/services/confirm-reschedule-dialog";
 import { ReportDecisionDialog, type ReportDecision } from "./report-decision-dialog";
 import { RequestInformationDialog } from "./request-information-dialog";
-import { MAX_SEARCH_LENGTH, parseCoordinateField } from "@/lib/input-limits";
+import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -334,7 +337,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Control ambiental</h1>
           </div>
-          {scenario.actor.kind === "FIELD" && <Button className="gap-2" onClick={() => setCreateOpen(true)}><FilePlus2 className="h-4 w-4" aria-hidden />Abrir reporte</Button>}
+          {scenario.capabilities.includes("environmentalReport:create") && <Button className="gap-2" onClick={() => setCreateOpen(true)}><FilePlus2 className="h-4 w-4" aria-hidden />Abrir reporte</Button>}
         </div>
       </header>
 
@@ -1030,8 +1033,8 @@ function CreateReportDialog({ open, onOpenChange, onSuccess }: { open: boolean; 
   const [reportType, setReportType] = useState<EnvironmentalReportType | "">("");
   const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
-  const [lat, setLat] = useState("");
-  const [lng, setLng] = useState("");
+  const [point, setPoint] = useState<LocationPoint | null>(null);
+  const [locationOpen, setLocationOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -1042,14 +1045,11 @@ function CreateReportDialog({ open, onOpenChange, onSuccess }: { open: boolean; 
     if (!reportType) nextErrors.reportType = "Seleccione el tipo de hallazgo.";
     if (!address.trim()) nextErrors.address = "Indique dónde se observó el hallazgo.";
     if (!description.trim()) nextErrors.description = "Describa el hallazgo.";
-    const latResult = parseCoordinateField(lat, "lat");
-    const lngResult = parseCoordinateField(lng, "lng");
-    if (latResult.error) nextErrors.lat = latResult.error;
-    if (lngResult.error) nextErrors.lng = lngResult.error;
+    if (!point) nextErrors.location = "Marque la ubicación";
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0 || !point) return;
     setSubmitting(true); setErrorMessage(null);
-    try { const created = await environmentalReportsAdapter.create({ reportType: reportType as EnvironmentalReportType, address: address.trim(), description: description.trim(), lat: latResult.value ?? 0, lng: lngResult.value ?? 0 }); onSuccess(created); setReportType(""); setAddress(""); setDescription(""); setLat(""); setLng(""); setErrors({}); } catch (error) { setErrorMessage(getErrorMessage(error, "No se pudo abrir el reporte. Intente nuevamente.")); } finally { setSubmitting(false); }
+    try { const created = await environmentalReportsAdapter.create({ reportType: reportType as EnvironmentalReportType, address: address.trim(), description: description.trim(), lat: point.lat, lng: point.lng }); onSuccess(created); setReportType(""); setAddress(""); setDescription(""); setPoint(null); setErrors({}); } catch (error) { setErrorMessage(getErrorMessage(error, "No se pudo abrir el reporte. Intente nuevamente.")); } finally { setSubmitting(false); }
   };
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1068,10 +1068,16 @@ function CreateReportDialog({ open, onOpenChange, onSuccess }: { open: boolean; 
           </Field>
           <Field><FieldLabel htmlFor="environmental-report-address">Dirección o referencia <span aria-hidden="true">*</span></FieldLabel><Input id="environmental-report-address" value={address} onChange={(event) => setAddress(event.target.value)} disabled={submitting} placeholder="Ej.: Av. Warnes 1840" aria-invalid={Boolean(errors.address)} aria-describedby={errors.address ? "environmental-report-address-error" : undefined} />{errors.address && <FieldError id="environmental-report-address-error">{errors.address}</FieldError>}</Field>
           <Field><FieldLabel htmlFor="environmental-report-description">Descripción del hallazgo <span aria-hidden="true">*</span></FieldLabel><Textarea id="environmental-report-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={submitting} rows={4} placeholder="Describa qué observó y cuándo." aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? "environmental-report-description-error" : undefined} className="resize-y" />{errors.description && <FieldError id="environmental-report-description-error">{errors.description}</FieldError>}<FieldDescription>No incluya datos personales.</FieldDescription></Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field><FieldLabel htmlFor="environmental-report-lat">Latitud <span aria-hidden="true">*</span></FieldLabel><Input id="environmental-report-lat" type="number" min="-90" max="90" step="any" value={lat} onChange={(event) => setLat(event.target.value)} disabled={submitting} aria-invalid={Boolean(errors.lat)} aria-describedby={errors.lat ? "environmental-report-lat-error" : undefined} />{errors.lat && <FieldError id="environmental-report-lat-error">{errors.lat}</FieldError>}</Field>
-            <Field><FieldLabel htmlFor="environmental-report-lng">Longitud <span aria-hidden="true">*</span></FieldLabel><Input id="environmental-report-lng" type="number" min="-180" max="180" step="any" value={lng} onChange={(event) => setLng(event.target.value)} disabled={submitting} aria-invalid={Boolean(errors.lng)} aria-describedby={errors.lng ? "environmental-report-lng-error" : undefined} />{errors.lng && <FieldError id="environmental-report-lng-error">{errors.lng}</FieldError>}</Field>
-          </div>
+          <Field data-invalid={Boolean(errors.location)}>
+            <FieldLabel htmlFor="environmental-report-location">Ubicación <span aria-hidden="true">*</span></FieldLabel>
+            {point && <p role="status">{locationPointLabel(point)}</p>}
+            <LocationPickerDialog open={locationOpen} onOpenChange={setLocationOpen} currentPoint={point} initialAddress={address} searchAddresses={searchAddresses} onConfirm={(selected, label) => {
+              setPoint(selected);
+              if (label && !address.trim()) setAddress(label);
+              setErrors((current) => ({ ...current, location: "", ...(label && !address.trim() ? { address: "" } : {}) }));
+            }} trigger={<Button id="environmental-report-location" type="button" variant="outline" disabled={submitting} aria-label={point ? "Cambiar" : "Marcar en el mapa"} aria-invalid={Boolean(errors.location)} aria-describedby={errors.location ? "environmental-report-location-error" : undefined}>{point ? "Cambiar" : "Marcar en el mapa"}</Button>} />
+            {errors.location && <FieldError id="environmental-report-location-error">{errors.location}</FieldError>}
+          </Field>
         </FieldGroup>
       </form>
       <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button><Button type="submit" form="environmental-report-form" disabled={submitting} className="gap-2">{submitting && <Spinner data-icon="inline-start" aria-hidden />}{submitting ? "Abriendo reporte…" : "Abrir reporte"}</Button></DialogFooter>

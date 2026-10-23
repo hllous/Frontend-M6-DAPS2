@@ -223,20 +223,47 @@ test.describe("EnvironmentalReport case file", () => {
     await expect(detail.getByRole("button", { name: "Derivar expediente" })).toHaveCount(0);
   });
 
-  test("Field submits a report without exposing M2 reporter data", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await loginViaApi(page, "field-crew-leader-route");
-    await page.goto("/app?destination=environment");
-    await expect(page.getByRole("region", { name: "Reportes ambientales asignados" })).toBeVisible();
-    await page.getByRole("button", { name: "Abrir reporte" }).click();
-    const dialog = page.getByRole("dialog");
-    await chooseOption(dialog, /Tipo de hallazgo/, "Ruidos molestos");
-    await dialog.getByLabel(/Dirección o referencia/).fill("Calle Nueva 100");
-    await dialog.getByLabel(/Descripción del hallazgo/).fill("Ruido nocturno constante.");
-    await dialog.getByLabel(/Latitud/).fill("-34.6");
-    await dialog.getByLabel(/Longitud/).fill("-58.4");
-    await dialog.getByRole("button", { name: "Abrir reporte" }).click();
-    await expect(page.getByText(/Expediente ER-/)).toBeVisible();
-    await expect(page.getByText(/reporterSnapshot/i)).not.toBeVisible();
-  });
+  for (const method of ["map", "search", "GPS"] as const) {
+    test(`Field submits a report using ${method} without exposing M2 reporter data`, async ({ page, context }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await loginViaApi(page, "field-crew-leader-route");
+      await page.goto("/app?destination=environment");
+      await expect(page.getByRole("region", { name: "Reportes ambientales asignados" })).toBeVisible();
+      await page.getByRole("button", { name: "Abrir reporte" }).click();
+      const dialog = page.getByRole("dialog", { name: "Abrir reporte", exact: true });
+      await chooseOption(dialog, /Tipo de hallazgo/, "Ruidos molestos");
+      await dialog.getByLabel(/Dirección o referencia/).fill("Calle Nueva 100");
+      await dialog.getByLabel(/Descripción del hallazgo/).fill("Ruido nocturno constante.");
+      await expect(dialog.getByLabel(/Latitud|Longitud/)).toHaveCount(0);
+      await dialog.getByRole("button", { name: "Abrir reporte", exact: true }).click();
+      await expect(dialog.getByText("Marque la ubicación", { exact: true })).toBeVisible();
+      await dialog.getByRole("button", { name: "Marcar en el mapa", exact: true }).click();
+      const picker = page.getByRole("dialog", { name: "Ubicación", exact: true });
+      await expect(picker.getByRole("textbox", { name: "Dirección", exact: true })).toHaveValue("Calle Nueva 100");
+      const map = picker.getByRole("region", { name: /Mapa de ubicación/ });
+      await expect(map).toBeVisible();
+      if (method === "map") {
+        await map.click({ position: { x: 150, y: 120 } });
+      } else if (method === "search") {
+        await page.route("**/api/address-search?*", route => route.fulfill({ json: { outcome: "results", data: [{ label: "AV CABILDO 1200", latitude: -34.544687149, longitude: -58.438682649 }] } }));
+        await picker.getByRole("button", { name: "Buscar dirección", exact: true }).click();
+        await picker.getByRole("button", { name: "AV CABILDO 1200", exact: true }).click();
+      } else {
+        await context.grantPermissions(["geolocation"]);
+        await context.setGeolocation({ latitude: -34.544687149, longitude: -58.438682649, accuracy: 40 });
+        await picker.getByRole("button", { name: "Usar mi ubicación", exact: true }).click();
+      }
+      await picker.getByRole("button", { name: "Confirmar ubicación", exact: true }).click();
+      await expect(dialog.getByRole("button", { name: "Cambiar", exact: true })).toBeFocused();
+      await expect(dialog.getByLabel(/Dirección o referencia/)).toHaveValue("Calle Nueva 100");
+      const submitted = page.waitForRequest(request => new URL(request.url()).pathname === "/api/environmental-reports" && request.method() === "POST");
+      await dialog.getByRole("button", { name: "Abrir reporte" }).click();
+      const payload = (await submitted).postDataJSON();
+      if (method !== "map") expect(payload).toMatchObject({ lat: -34.5446871, lng: -58.4386826 });
+      expect(payload.lat).not.toBe(0);
+      expect(payload.lng).not.toBe(0);
+      await expect(page.getByText(/Expediente ER-/)).toBeVisible();
+      await expect(page.getByText(/reporterSnapshot/i)).not.toBeVisible();
+    });
+  }
 });
