@@ -8,7 +8,7 @@ import {
 } from "@/lib/services-fixtures";
 import {
   STATUS_LABEL,
-  suspendServiceInputSchema,
+  suspendServiceRequestSchema,
   toSuspendServiceBackendInput,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
@@ -41,7 +41,7 @@ export async function POST(
       return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
     }
 
-    const parsed = suspendServiceInputSchema.safeParse(body);
+    const parsed = suspendServiceRequestSchema.safeParse(body);
     if (!parsed.success) {
       return errorResponse(
         400,
@@ -85,11 +85,12 @@ export async function POST(
       );
     }
 
-    const statusReason = toSuspendServiceBackendInput(input).reason;
+    const { reason: statusReason, note: statusNote } = toSuspendServiceBackendInput(input);
 
     const updated = updateServiceFixture(service.id, {
       status: "SUSPENDED",
       statusReason,
+      statusNote: statusNote ?? null,
       history: [
         ...service.history,
         {

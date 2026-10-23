@@ -119,6 +119,11 @@ describe("POST /api/services/[id]/cancel BFF route", () => {
 
   it("cancels a SUSPENDED service", async () => {
     // SVC-1044 is SUSPENDED
+    updateServiceFixture("SVC-1044", {
+      status: "SUSPENDED",
+      statusReason: "Desperfecto vehicular",
+      statusNote: "El camión no arranca.",
+    });
     const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await cancelRequest("SVC-1044", cookie);
 
@@ -126,6 +131,7 @@ describe("POST /api/services/[id]/cancel BFF route", () => {
     const body = await response.json();
     expect(body.status).toBe("CANCELLED");
     expect(body.statusReason).toBe(cancelBody.reason);
+    expect(body.statusNote).toBeNull();
   });
 
   it("forwards the status-change DTO with JSON content type", async () => {

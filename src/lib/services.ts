@@ -96,6 +96,7 @@ export const serviceSchema = z.object({
   mode: serviceModeSchema,
   status: serviceStatusSchema,
   statusReason: z.string().nullable().optional(),
+  statusNote: z.string().nullable().optional(),
   origin: serviceOriginSchema,
   zoneIds: z.array(z.string()).min(1),
   zoneNames: z.array(z.string()).optional().default([]),
@@ -320,17 +321,34 @@ export const assignCrewInputSchema = z.object({
 
 export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
 
+export const SUSPEND_NOTE_MAX_LENGTH = 500;
+
+const suspendServiceNoteSchema = z
+  .string()
+  .max(
+    SUSPEND_NOTE_MAX_LENGTH,
+    `La nota de suspensión no puede superar los ${SUSPEND_NOTE_MAX_LENGTH} caracteres.`,
+  )
+  .trim();
+
+// The Field form keeps the note required; the BFF accepts the backend's optional note contract.
 export const suspendServiceInputSchema = z.object({
   reason: notServicedReasonSchema,
-  note: z.string().trim().min(1, "La nota es obligatoria para suspender el servicio"),
-}).refine((input) => toSuspendServiceBackendInput(input).reason.length <= 500, {
-  path: ["note"],
-  message: "El motivo y la nota de suspensión no pueden superar los 500 caracteres.",
+  note: suspendServiceNoteSchema.min(1, "La nota es obligatoria para suspender el servicio"),
+});
+export const suspendServiceRequestSchema = z.object({
+  reason: notServicedReasonSchema,
+  note: suspendServiceNoteSchema.optional(),
 });
 export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
+export type SuspendServiceRequest = z.infer<typeof suspendServiceRequestSchema>;
 
-export function toSuspendServiceBackendInput(input: { reason: NotServicedReason; note: string }) {
-  return { reason: `${NOT_SERVICED_REASON_LABEL[input.reason]}: ${input.note}` };
+export function toSuspendServiceBackendInput(input: SuspendServiceRequest) {
+  const note = input.note?.trim();
+  return {
+    reason: NOT_SERVICED_REASON_LABEL[input.reason],
+    ...(note ? { note } : {}),
+  };
 }
 
 export const rescheduleServiceInputSchema = z.object({

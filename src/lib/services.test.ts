@@ -17,6 +17,7 @@ import {
   ServiceStartBlockedError,
   servicesAdapter,
   suspendServiceInputSchema,
+  suspendServiceRequestSchema,
   toSuspendServiceBackendInput,
   toCreateServiceBackendInput,
 } from "./services";
@@ -673,7 +674,8 @@ describe("services adapter", () => {
             title: "Barrido mecánico",
             mode: "ROUTE",
             status: "SUSPENDED",
-            statusReason: `Desperfecto vehicular: ${body.note}`,
+            statusReason: "Desperfecto vehicular",
+            statusNote: body.note,
             origin: "PLANNED",
             zoneIds: ["zone-3"],
             scheduledDate: "2026-09-05",
@@ -688,7 +690,8 @@ describe("services adapter", () => {
       });
 
       expect(suspended.status).toBe("SUSPENDED");
-      expect(suspended.statusReason).toContain("El camión no arranca.");
+      expect(suspended.statusReason).toBe("Desperfecto vehicular");
+      expect(suspended.statusNote).toBe("El camión no arranca.");
     });
 
     it("rejects invalid suspend input (missing note) with ServiceContractError before sending request", async () => {
@@ -1068,14 +1071,22 @@ describe("services adapter", () => {
 });
 
 describe("suspension reason contract", () => {
-  it("keeps the reason label and required note in the backend reason", () => {
+  it("sends the reason label and the trimmed note as separate fields", () => {
     const input = suspendServiceInputSchema.parse({ reason: "VEHICLE_BREAKDOWN", note: "  El camión no arranca.  " });
-    expect(toSuspendServiceBackendInput(input)).toEqual({ reason: "Desperfecto vehicular: El camión no arranca." });
+    expect(toSuspendServiceBackendInput(input)).toEqual({ reason: "Desperfecto vehicular", note: "El camión no arranca." });
   });
-  it.each([[487, true], [488, false]])("caps the combined reason at 500 characters (note %s)", (length, valid) => {
+  it("omits a whitespace-only optional note from the backend payload", () => {
+    const input = suspendServiceRequestSchema.parse({ reason: "VEHICLE_BREAKDOWN", note: "   " });
+    expect(toSuspendServiceBackendInput(input)).toEqual({ reason: "Desperfecto vehicular" });
+  });
+  it.each([[500, true], [501, false]])("caps the note alone at 500 characters (note %s)", (length, valid) => {
     const parsed = suspendServiceInputSchema.safeParse({ reason: "OTHER", note: "a".repeat(length) });
     expect(parsed.success).toBe(valid);
     if (!parsed.success) expect(parsed.error.issues[0].message).toContain("500 caracteres");
+  });
+  it.each([[500, true], [501, false]])("caps the optional BFF note at 500 characters (note %s)", (length, valid) => {
+    const parsed = suspendServiceRequestSchema.safeParse({ reason: "OTHER", note: "a".repeat(length) });
+    expect(parsed.success).toBe(valid);
   });
 });
 
