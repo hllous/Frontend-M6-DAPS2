@@ -109,7 +109,8 @@ describe("POST /api/services/[id]/resume BFF route", () => {
   it("successfully resumes a suspended service, transitions to IN_PROGRESS and clears the reason", async () => {
     updateServiceFixture("SVC-1050", {
       status: "SUSPENDED",
-      statusReason: "Desperfecto vehicular: El camión no arranca.",
+      statusReason: "Desperfecto vehicular",
+      statusNote: "El camión no arranca.",
     });
     const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
@@ -124,6 +125,7 @@ describe("POST /api/services/[id]/resume BFF route", () => {
     const body = await response.json();
     expect(body.status).toBe("IN_PROGRESS");
     expect(body.statusReason).toBeNull();
+    expect(body.statusNote).toBeNull();
     expect(body.history).toEqual(
       expect.arrayContaining([expect.objectContaining({ label: "Reanudado", done: true })]),
     );

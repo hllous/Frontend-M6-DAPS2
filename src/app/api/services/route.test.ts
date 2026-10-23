@@ -1,3 +1,4 @@
+import { serviceFixtures } from "@/lib/services-fixtures";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ServiceRequestError, servicesAdapter } from "@/lib/services";
@@ -80,6 +81,19 @@ describe("authenticated services BFF route", () => {
     );
     const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
     expect(new Headers(requestInit.headers).get("Authorization")).toMatch(/^Bearer /);
+  });
+
+  it("tells the client through meta.dropped how many backend records it dropped for an unknown enum (#651)", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const known = serviceFixtures[0];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ data: [known, { ...known, id: "svc-future", status: "FUTURE_STATUS" }], meta: { total: 9, page: 1, pageSize: 2, totalPages: 5 } }),
+    );
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const body = await (await GET(new Request("http://localhost/api/services", { headers: { cookie } }))).json();
+    expect(body.data).toHaveLength(1);
+    expect(body.meta.dropped).toBe(1);
   });
 
   it("POST requires an active session", async () => {

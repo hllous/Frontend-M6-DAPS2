@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { tolerantRecords } from "./tolerant-records";
+import { droppedRecords, tolerantRecords } from "./tolerant-records";
 
 const itemSchema = z.object({ id: z.string(), status: z.enum(["OPEN", "CLOSED"]) });
 
@@ -18,6 +18,15 @@ describe("tolerantRecords", () => {
     expect(warn.mock.calls[0]?.[0]).toContain("trees");
     expect(warn.mock.calls[0]?.[0]).toContain("b");
     expect(warn.mock.calls[0]?.[0]).toContain("FUTURE_STATUS");
+  });
+
+  it("counts what it dropped on this page only, so it is not confused with pagination", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const schema = z.object({ data: tolerantRecords(itemSchema, "trees") });
+    const dropping = schema.parse({ data: [{ id: "a", status: "X" }, { id: "b", status: "OPEN" }, { id: "c", status: "Y" }] });
+    expect(droppedRecords(dropping.data)).toBe(2);
+    expect(droppedRecords(schema.parse({ data: [{ id: "a", status: "OPEN" }] }).data)).toBe(0);
+    expect(droppedRecords([])).toBe(0);
   });
 
   it("still fails the page on a record that is malformed for another reason", () => {

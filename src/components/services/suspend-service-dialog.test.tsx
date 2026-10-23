@@ -78,7 +78,7 @@ function ControlledSuspendServiceDialog({
 }
 
 describe("SuspendServiceDialog", () => {
-  it("explains that the note is sent with the reason within the combined 500-character limit", () => {
+  it("keeps the required note within its own 500-character limit", () => {
     render(
       <ControlledSuspendServiceDialog
         onOpenChange={vi.fn()}
@@ -86,11 +86,8 @@ describe("SuspendServiceDialog", () => {
       />,
     );
 
-    expect(
-      screen.getByText(
-        "Obligatoria. Se envía junto con el motivo seleccionado; entre ambos no pueden superar los 500 caracteres.",
-      ),
-    ).toBeVisible();
+    expect(screen.getByText("Obligatoria. Hasta 500 caracteres.")).toBeVisible();
+    expect((screen.getByLabelText(/^Nota/i) as HTMLTextAreaElement).maxLength).toBe(500);
   });
 
   it("associates required-field validation with the reason and note controls", async () => {

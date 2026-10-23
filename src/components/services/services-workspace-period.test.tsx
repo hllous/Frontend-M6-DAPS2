@@ -20,6 +20,24 @@ afterEach(() => {
 });
 
 describe("Services workspace period", () => {
+  it("warns with the dropped count summed across pages, and stays silent when the total only exceeds the rows because of paging (#651)", async () => {
+    const mockPages = (dropped: (page: number) => number) => vi.spyOn(servicesAdapter, "list").mockImplementation(async (query) => ({
+      services: query?.pageSize === 1 ? [] : [{ ...serviceFixtures[0], id: `p${query?.page ?? 1}` }],
+      dropped: dropped(query?.page ?? 1),
+      total: query?.pageSize === 1 ? 240 : 300, totalPages: query?.pageSize === 1 ? 240 : 3,
+      page: query?.page ?? 1, pageSize: query?.pageSize ?? 100,
+    }));
+    const first = mockPages((page) => (page === 2 ? 2 : page === 3 ? 1 : 0));
+    const { unmount } = render(<ServicesWorkspace />);
+    expect(await screen.findByText("3 registros no se pudieron mostrar con esta versión de la aplicación.")).toBeVisible();
+    unmount();
+    first.mockRestore();
+    mockPages(() => 0);
+    render(<ServicesWorkspace />);
+    expect(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
+    expect(screen.queryByText(/no se pudieron? mostrar/)).toBeNull();
+  });
+
   it("keeps the whole period for 54 services without sending a date filter", async () => {
     const services = Array.from({ length: 54 }, (_, i) => ({ ...serviceFixtures[0], id: `service-${i}` }));
     const list = vi.spyOn(servicesAdapter, "list").mockImplementation(async (query) => ({

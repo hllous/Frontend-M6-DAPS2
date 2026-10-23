@@ -24,7 +24,7 @@ import {
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
-import { tolerantRecords } from "@/lib/tolerant-records";
+import { droppedRecords, tolerantRecords } from "@/lib/tolerant-records";
 
 
 
@@ -96,6 +96,8 @@ async function listFieldReports(request: Request, query: EnvironmentalReportQuer
   const backendPageSize = 100;
   const visibleReports: EnvironmentalReport[] = [];
   let totalPages = 1;
+  // ponytail: counts every unreadable record of the scan, not just this crew's (its crew is unreadable); the notice may slightly overstate.
+  let dropped = 0;
   for (let page = 1; page <= totalPages; page += 1) {
     const backendResponse = await fetchBackend(
       request,
@@ -111,6 +113,7 @@ async function listFieldReports(request: Request, query: EnvironmentalReportQuer
     const parsed = environmentalReportPageSchema.safeParse(payload);
     if (!parsed.success) return errorResponse(502, "La respuesta de expedientes ambientales no respeta el contrato documentado.", path);
     if (page === 1) totalPages = Math.max(1, parsed.data.meta.totalPages);
+    dropped += droppedRecords(parsed.data.data);
     visibleReports.push(...parsed.data.data.filter((report) => report.assignedCrewId === crewId && matchesQuery(report, query)));
   }
 
@@ -118,7 +121,7 @@ async function listFieldReports(request: Request, query: EnvironmentalReportQuer
   const pageSize = query.pageSize ?? 100;
   return NextResponse.json({
     data: visibleReports.slice((page - 1) * pageSize, page * pageSize),
-    meta: { total: visibleReports.length, page, pageSize, totalPages: Math.max(1, Math.ceil(visibleReports.length / pageSize)) },
+    meta: { total: visibleReports.length, page, pageSize, totalPages: Math.max(1, Math.ceil(visibleReports.length / pageSize)), ...(dropped ? { dropped } : {}) },
     sanctionOutcomeIntegrationExceptions: [],
   });
 }

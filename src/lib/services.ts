@@ -10,7 +10,7 @@ import { catalogoDeEtiquetas, componerTituloDeServicio } from "./service-labels"
 import { serviceTypeCategorySchema } from "./service-types";
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_EXTERNAL_ID_LENGTH, MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
-import { tolerantRecords } from "./tolerant-records";
+import { droppedRecords, tolerantRecords } from "./tolerant-records";
 
 export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
 export type ServiceMode = z.infer<typeof serviceModeSchema>;
@@ -96,6 +96,7 @@ export const serviceSchema = z.object({
   mode: serviceModeSchema,
   status: serviceStatusSchema,
   statusReason: z.string().nullable().optional(),
+  statusNote: z.string().nullable().optional(),
   origin: serviceOriginSchema,
   zoneIds: z.array(z.string()).min(1),
   zoneNames: z.array(z.string()).optional().default([]),
@@ -320,17 +321,34 @@ export const assignCrewInputSchema = z.object({
 
 export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
 
+export const SUSPEND_NOTE_MAX_LENGTH = 500;
+
+const suspendServiceNoteSchema = z
+  .string()
+  .max(
+    SUSPEND_NOTE_MAX_LENGTH,
+    `La nota de suspensión no puede superar los ${SUSPEND_NOTE_MAX_LENGTH} caracteres.`,
+  )
+  .trim();
+
+// The Field form keeps the note required; the BFF accepts the backend's optional note contract.
 export const suspendServiceInputSchema = z.object({
   reason: notServicedReasonSchema,
-  note: z.string().trim().min(1, "La nota es obligatoria para suspender el servicio"),
-}).refine((input) => toSuspendServiceBackendInput(input).reason.length <= 500, {
-  path: ["note"],
-  message: "El motivo y la nota de suspensión no pueden superar los 500 caracteres.",
+  note: suspendServiceNoteSchema.min(1, "La nota es obligatoria para suspender el servicio"),
+});
+export const suspendServiceRequestSchema = z.object({
+  reason: notServicedReasonSchema,
+  note: suspendServiceNoteSchema.optional(),
 });
 export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
+export type SuspendServiceRequest = z.infer<typeof suspendServiceRequestSchema>;
 
-export function toSuspendServiceBackendInput(input: { reason: NotServicedReason; note: string }) {
-  return { reason: `${NOT_SERVICED_REASON_LABEL[input.reason]}: ${input.note}` };
+export function toSuspendServiceBackendInput(input: SuspendServiceRequest) {
+  const note = input.note?.trim();
+  return {
+    reason: NOT_SERVICED_REASON_LABEL[input.reason],
+    ...(note ? { note } : {}),
+  };
 }
 
 export const rescheduleServiceInputSchema = z.object({
@@ -455,6 +473,8 @@ export type ServiceQuery = {
 
 export type ServicesPage = {
   services: Service[];
+  /** Records of this page dropped for an unknown enum value (not the same as `total` exceeding the rows shown). */
+  dropped?: number;
   page: number;
   pageSize: number;
   total: number;
@@ -516,6 +536,8 @@ export const servicesEnvelopeSchema = z.object({
     page: z.number(),
     pageSize: z.number(),
     totalPages: z.number(),
+    // Set by the BFF, which parses (and so drops) before re-serializing.
+    dropped: z.number().int().nonnegative().optional(),
   }),
 });
 
@@ -637,6 +659,7 @@ export const servicesAdapter = {
 
     return {
       services: await Promise.all(parsed.data.data.map(completarEtiquetas)),
+      dropped: droppedRecords(parsed.data.data) + (parsed.data.meta.dropped ?? 0),
       page: parsed.data.meta.page,
       pageSize: parsed.data.meta.pageSize,
       total: parsed.data.meta.total,

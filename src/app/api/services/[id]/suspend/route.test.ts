@@ -49,14 +49,14 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     expect(body.message).toMatch(/permisos/i);
   });
 
-  it("returns 400 when reason or note are missing", async () => {
+  it("returns 400 when reason is missing", async () => {
     updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
     const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/suspend", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ reason: "VEHICLE_BREAKDOWN" }),
+        body: JSON.stringify({ note: "El camión no arranca." }),
       }),
       { params: Promise.resolve({ id: "SVC-1050" }) },
     );
@@ -127,14 +127,32 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.status).toBe("SUSPENDED");
-    expect(body.statusReason).toMatch(/desperfecto vehicular/i);
-    expect(body.statusReason).toMatch(/no arranca/i);
+    expect(body.statusReason).toBe("Desperfecto vehicular");
+    expect(body.statusNote).toBe("El camión no arranca.");
     expect(body.history).toEqual(
       expect.arrayContaining([expect.objectContaining({ label: "Suspendido", done: true })]),
     );
 
     const updatedFixture = serviceFixtures.find((s) => s.id === "SVC-1050");
     expect(updatedFixture?.status).toBe("SUSPENDED");
+  });
+
+  it("stores a whitespace-only optional note as null", async () => {
+    updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/suspend", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ reason: "VEHICLE_BREAKDOWN", note: "   " }),
+      }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.statusReason).toBe("Desperfecto vehicular");
+    expect(body.statusNote).toBeNull();
   });
 
   it("forwards the reason label and note with JSON content type in backend-development mode", async () => {
@@ -165,7 +183,36 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     const actionCall = backendFetch.mock.calls.find(([, init]) => init?.method === "POST");
     const requestInit = actionCall?.[1] as RequestInit;
     expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
-    expect(JSON.parse(String(requestInit.body))).toEqual({ reason: "Desperfecto vehicular: El camión no arranca." });
+    expect(JSON.parse(String(requestInit.body))).toEqual({ reason: "Desperfecto vehicular", note: "El camión no arranca." });
+  });
+
+  it("omits a blank note from the backend payload and preserves a null status note", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      if (String(url).includes("/crews")) {
+        return Response.json({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] });
+      }
+      if ((init?.method ?? "GET") === "GET") {
+        return Response.json({ id: "SVC-1050", crewId: "11111111-1111-4111-8111-111111111111" });
+      }
+      return Response.json({ id: "SVC-1050", statusNote: null });
+    });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    backendFetch.mockClear();
+
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/suspend", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ reason: "VEHICLE_BREAKDOWN", note: "  " }),
+      }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const actionCall = backendFetch.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(String((actionCall?.[1] as RequestInit).body))).toEqual({ reason: "Desperfecto vehicular" });
+    expect((await response.json()).statusNote).toBeNull();
   });
 });
 
