@@ -10,7 +10,7 @@ import { catalogoDeEtiquetas, componerTituloDeServicio } from "./service-labels"
 import { serviceTypeCategorySchema } from "./service-types";
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_EXTERNAL_ID_LENGTH, MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
-import { tolerantRecords } from "./tolerant-records";
+import { droppedRecords, tolerantRecords } from "./tolerant-records";
 
 export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
 export type ServiceMode = z.infer<typeof serviceModeSchema>;
@@ -455,6 +455,8 @@ export type ServiceQuery = {
 
 export type ServicesPage = {
   services: Service[];
+  /** Records of this page dropped for an unknown enum value (not the same as `total` exceeding the rows shown). */
+  dropped?: number;
   page: number;
   pageSize: number;
   total: number;
@@ -516,6 +518,8 @@ export const servicesEnvelopeSchema = z.object({
     page: z.number(),
     pageSize: z.number(),
     totalPages: z.number(),
+    // Set by the BFF, which parses (and so drops) before re-serializing.
+    dropped: z.number().int().nonnegative().optional(),
   }),
 });
 
@@ -637,6 +641,7 @@ export const servicesAdapter = {
 
     return {
       services: await Promise.all(parsed.data.data.map(completarEtiquetas)),
+      dropped: droppedRecords(parsed.data.data) + (parsed.data.meta.dropped ?? 0),
       page: parsed.data.meta.page,
       pageSize: parsed.data.meta.pageSize,
       total: parsed.data.meta.total,

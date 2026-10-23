@@ -24,6 +24,7 @@ import {
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { droppedRecords } from "@/lib/tolerant-records";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { zoneFixtures } from "@/lib/zones-fixtures";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
@@ -77,7 +78,8 @@ export async function GET(request: Request) {
       if (!parsed.success) {
         return errorResponse(502, "La respuesta de servicios no respeta el contrato esperado.", path);
       }
-      return NextResponse.json(parsed.data);
+      const dropped = droppedRecords(parsed.data.data);
+      return NextResponse.json(dropped ? { ...parsed.data, meta: { ...parsed.data.meta, dropped } } : parsed.data);
     }
 
     return NextResponse.json(paginateServiceFixtures(filterServiceFixtures(query), query.page, query.pageSize));
