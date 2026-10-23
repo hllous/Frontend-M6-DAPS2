@@ -452,6 +452,20 @@ describe("EnvironmentalReportsWorkspace", () => {
     await waitFor(() => expect(screen.queryByText(/no se pudieron? mostrar/)).toBeNull());
   });
 
+  it("puts the dropped-records notice above the filters so it is not pushed below the fold on a phone (#651)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    server.use(http.get("*/api/environmental-reports", () => HttpResponse.json({
+      data: [{ ...environmentalReportFixtures[0] }, { ...environmentalReportFixtures[1], id: "report-future", status: "FUTURE_STATUS" }],
+      meta: { total: 2, page: 1, pageSize: 25, totalPages: 1 },
+      sanctionOutcomeIntegrationExceptions: [],
+    })));
+    window.history.replaceState(null, "", "/app?destination=environment");
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const notice = await screen.findByText("1 registro no se pudo mostrar con esta versión de la aplicación.");
+    const search = screen.getByRole("textbox", { name: "Buscar expediente" });
+    expect(notice.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("asks for a reason before forwarding and sends it to the backend", async () => {
     const user = userEvent.setup();
     const forward = vi.spyOn(environmentalReportsAdapter, "forward");
