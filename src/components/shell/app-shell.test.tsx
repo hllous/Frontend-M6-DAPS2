@@ -8,6 +8,7 @@ import { AppShell } from "./app-shell";
 import { scenarios } from "@/lib/scenarios";
 import { handlers } from "@/mocks/handlers";
 import { resetTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -207,5 +208,14 @@ describe("AppShell", () => {
     await user.click(within(moduleNavigation).getByRole("link", { name: "Mapa" }));
 
     expect(await screen.findByRole("heading", { name: "Mapa operativo" })).toBeVisible();
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<AppShell scenario={scenarios.officeDutyQueue} />);
+    expect(screen.getByRole("navigation", { name: "Módulos" })).toBeVisible();
+
+    expectNoInternalJargon(container);
   });
 });

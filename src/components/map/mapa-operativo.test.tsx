@@ -9,6 +9,7 @@ import { scenarios } from "@/lib/scenarios";
 import { mockResponseAfter } from "@/mocks/delayed-response";
 import { handlers } from "@/mocks/handlers";
 import { MapaOperativo } from "./mapa-operativo";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -414,5 +415,14 @@ describe("MapaOperativo", () => {
     expect(todaySpy).toHaveBeenCalled();
     expect(serviceListUrls.at(-1)?.searchParams.get("scheduledFrom")).toBe("2026-09-10");
     expect(serviceListUrls.at(-1)?.searchParams.get("scheduledTo")).toBe("2026-09-10");
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Elementos" });
+
+    expectNoInternalJargon(container);
   });
 });

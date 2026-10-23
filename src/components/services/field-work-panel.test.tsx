@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { FieldWorkPanel } from "./field-work-panel";
 import { scenarios } from "@/lib/scenarios";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(
   http.get("*/api/services", ({ request }) => {
@@ -582,5 +583,14 @@ describe("FieldWorkPanel component", () => {
 
     expect(screen.queryByRole("button", { name: "Suspender servicio" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reanudar servicio" })).not.toBeInTheDocument();
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+    await screen.findAllByRole("button", { name: "Abrir" });
+
+    expectNoInternalJargon(container);
   });
 });

@@ -11,6 +11,7 @@ import { withNodeFile } from "@/mocks/node-file";
 import { scenarios } from "@/lib/scenarios";
 import { containersAdapter, type ContainerStatus } from "@/lib/containers";
 import { ContainerCatalogPanel } from "./container-catalog-panel";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -871,5 +872,14 @@ describe("ContainerCatalogPanel", () => {
       expect(dialog).toBeVisible();
       expect(screen.queryByText(/Vaciado registrado con éxito/)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await waitFor(() => expect(screen.getAllByRole("row").length).toBeGreaterThan(1));
+
+    expectNoInternalJargon(container);
   });
 });

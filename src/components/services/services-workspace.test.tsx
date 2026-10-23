@@ -18,6 +18,7 @@ import { operationalMapAdapter } from "@/lib/operational-map";
 import { operationalZonesAdapter } from "@/lib/operational-zones";
 import { resetEnvironmentalInspectionFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { ServicesWorkspace } from "./services-workspace";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -869,5 +870,14 @@ describe("ServicesWorkspace component", () => {
     const rejected = screen.getByRole("status", { name: /corte de calle rechazado/i });
     expect(within(rejected).getByRole("button", { name: "Reprogramar" })).toBeInTheDocument();
     expect(within(rejected).getByRole("button", { name: "Cancelar servicio" })).toBeInTheDocument();
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+
+    expectNoInternalJargon(container);
   });
 });
