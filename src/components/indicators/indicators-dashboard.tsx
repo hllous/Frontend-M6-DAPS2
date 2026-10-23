@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Activity, CheckCheck, Database, RefreshCw, Recycle, TriangleAlert } from "lucide-react";
+import { Activity, CheckCheck, ChevronDown, Database, RefreshCw, Recycle, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Combobox } from "@/components/ui/combobox";
@@ -102,7 +103,7 @@ function defaultTracePlan(family: FamilyKey, period: { from: string; to: string 
     zoneId,
     title: "Servicios",
     href: "/app?destination=services",
-    linkLabel: "Abrir Servicios",
+    linkLabel: "Ver servicios",
   };
 }
 
@@ -114,7 +115,7 @@ function signalTracePlan(data: IndicatorData, breakdown: IndicatorBreakdown, poi
       zoneId: point.id,
       title: "Servicios",
       href: "/app?destination=services",
-      linkLabel: "Abrir Servicios",
+      linkLabel: "Ver servicios",
     };
   }
 
@@ -125,13 +126,13 @@ function signalTracePlan(data: IndicatorData, breakdown: IndicatorBreakdown, poi
       zoneId: point.id,
       title: "Contenedores",
       href: "/app/catalog/containers",
-      linkLabel: "Abrir catálogo de contenedores",
+      linkLabel: "Ver contenedores",
     };
   }
 
   return {
     resource: null,
-    reason: `La señal «${point.label}» no se puede vincular con un registro operativo: el contrato de indicadores no expone una clave compatible con un catálogo actual.`,
+    reason: `No hay registros para «${point.label}».`,
   };
 }
 
@@ -142,7 +143,7 @@ function serviceToTraceRecord(service: Service): TraceRecord {
     href: serviceSourceHref(service.id),
     title: service.title,
     detail: `${formatArgentinaCalendarDate(service.scheduledDate)}${service.windowFrom ? ` · ${service.windowFrom}–${service.windowTo ?? ""}` : ""}`,
-    zone: service.zoneNames.length > 0 ? service.zoneNames.join(" · ") : "Sin zona informada",
+    zone: service.zoneNames.length > 0 ? service.zoneNames.join(" · ") : "Sin zona",
     status: STATUS_LABEL[service.status],
   };
 }
@@ -152,8 +153,8 @@ function containerToTraceRecord(container: Container, zones: Map<string, string>
     id: container.code,
     href: `/app/catalog/containers?detail=${encodeURIComponent(container.id)}`,
     title: container.code,
-    detail: container.address ?? "Sin dirección registrada",
-    zone: zones.get(container.zoneId) ?? "Sin zona informada",
+    detail: container.address ?? "Sin dirección",
+    zone: zones.get(container.zoneId) ?? "Sin zona",
     status: CONTAINER_STATUS_LABELS[container.status],
   };
 }
@@ -217,8 +218,8 @@ function useNarrowDashboard() {
 }
 
 function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { states: Record<FamilyKey, FamilyState>; selectedFamily: FamilyKey; onSelect: (family: FamilyKey) => void; onRetry: (family: FamilyKey) => void }) {
-  return <section aria-label="Familias de indicadores" role="region" aria-busy={familyOrder.some((family) => states[family].status === "loading")}>
-    <ToggleGroup value={[selectedFamily]} onValueChange={(values) => { const family = values[0]; if (family) onSelect(family as FamilyKey); }} aria-label="Familias de indicadores" className={styles.summaryBand}>
+  return <section aria-label="Familias" role="region" aria-busy={familyOrder.some((family) => states[family].status === "loading")}>
+    <ToggleGroup value={[selectedFamily]} onValueChange={(values) => { const family = values[0]; if (family) onSelect(family as FamilyKey); }} aria-label="Familias" className={styles.summaryBand}>
       {familyOrder.map((family) => {
         const state = states[family];
         const item = state.data;
@@ -246,7 +247,7 @@ function ModuleState({ label, status, onRetry, children }: { label: string; stat
   if (status === "ready") return <section className={styles.module} aria-label={label} role="region"><h2 id={titleId}>{label}</h2>{children}</section>;
   if (status === "loading") return <section className={styles.moduleState} aria-label={label} role="region"><h2 id={titleId}>{label}</h2><Skeleton className={styles.moduleSkeleton} aria-hidden /><Alert role="status">Cargando {label.toLowerCase()}…</Alert></section>;
   if (status === "empty") return <section className={styles.moduleState} aria-label={label} role="region"><Empty><EmptyHeader><EmptyTitle id={titleId}>Sin resultados {emptyLabel}</EmptyTitle><EmptyDescription>No hay datos para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty></section>;
-  return <section className={styles.moduleState} aria-label={label} role="region"><Alert variant="danger"><AlertTitle id={titleId}>No se pudo cargar {label}</AlertTitle><AlertDescription>Verifique la conexión y vuelva a intentarlo. El período y la familia seleccionada se conservarán.</AlertDescription><Button type="button" variant="outline" onClick={onRetry}>Reintentar {label}</Button></Alert></section>;
+  return <section className={styles.moduleState} aria-label={label} role="region"><Alert variant="danger"><AlertTitle id={titleId}>No se pudo cargar {label}. Intente nuevamente.</AlertTitle><Button type="button" variant="outline" onClick={onRetry}>Reintentar {label}</Button></Alert></section>;
 }
 
 export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenario }) {
@@ -265,6 +266,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   const [recordPlan, setRecordPlan] = useState<RecordPlan | null>(null);
   const [records, setRecords] = useState<TraceRecord[]>([]);
   const [recordsStatus, setRecordsStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [recordsOpen, setRecordsOpen] = useState(false);
   const [filterCatalog, setFilterCatalog] = useState<FilterCatalog | null>(null);
   const isNarrow = useNarrowDashboard();
   const familyRequestVersions = useRef<Record<FamilyKey, number>>({ coverage: 0, compliance: 0, incidents: 0, waste: 0 });
@@ -386,6 +388,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     setSelectedSignal(signal);
     setRecordsStatus("loading");
     setRecordPlan(signalTracePlan(selectedData, breakdown, point));
+    setRecordsOpen(true);
   }, [selectedData]);
 
   const retryFamily = (family: FamilyKey) => {
@@ -404,20 +407,21 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     setSelectedSignal({ breakdownId, pointId });
     setRecordsStatus("loading");
     setRecordPlan(signalTracePlan(selectedData, breakdown, point));
+    setRecordsOpen(true);
   };
 
   const visibleRecordsStatus = activeRecordPlan?.resource && recordsStatus === "idle" ? "loading" : recordsStatus;
-  const recordsView = <AccessibleRecords family={selectedFamily} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} onClear={clearSignal} />;
+  const recordsView = <AccessibleRecords family={selectedFamily} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} open={recordsOpen} onOpenChange={setRecordsOpen} onClear={clearSignal} />;
   const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Tendencia" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} /></ModuleState>;
 
   if (!canView) {
-    return <section className={styles.empty} aria-labelledby="indicator-forbidden-title"><div><h2 id="indicator-forbidden-title">Indicadores no disponibles</h2><p>Su sesión no tiene la capacidad necesaria para consultar indicadores operativos.</p></div></section>;
+    return <section className={styles.empty} aria-labelledby="indicator-forbidden-title"><div><h2 id="indicator-forbidden-title">No tiene permiso para ver los indicadores.</h2></div></section>;
   }
 
   return (
     <section className={styles.dashboard} aria-labelledby="indicator-dashboard-title">
       <div className={styles.heading}>
-        <div><h1 id="indicator-dashboard-title">Indicadores operativos</h1><p>Una lectura común de cobertura, cumplimiento, incidencias y residuos para coordinar la operación municipal.</p></div>
+        <div><h1 id="indicator-dashboard-title">Indicadores operativos</h1></div>
         {freshness ? <div className={styles.freshness}><Database size={16} aria-hidden /> Actualizado {formatDateTime(freshness)}</div> : null}
       </div>
 
@@ -440,7 +444,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
       <div className={styles.summaryHeading}><h2>Resumen del período</h2><span>{appliedQuery.from && appliedQuery.to ? `${formatDate(appliedQuery.from)} – ${formatDate(appliedQuery.to)}` : "Últimos 30 días"}</span></div>
       <FamilySelectorBand states={familyStates} selectedFamily={selectedFamily} onSelect={selectFamily} onRetry={retryFamily} />
-      {isNarrow ? <ToggleGroup value={[viewMode]} onValueChange={(values) => { const value = values[0]; if (value) setViewMode(value as ViewMode); }} variant="outline" className={styles.mobileViewToggle} aria-label="Visualización de indicadores">
+      {isNarrow ? <ToggleGroup value={[viewMode]} onValueChange={(values) => { const value = values[0]; if (value) setViewMode(value as ViewMode); }} variant="outline" className={styles.mobileViewToggle} aria-label="Vista">
         <ToggleGroupItem value="bars" size="lg">Barras</ToggleGroupItem>
         <ToggleGroupItem value="table" size="lg">Tabla</ToggleGroupItem>
       </ToggleGroup> : null}
@@ -451,7 +455,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
           <TabsTrigger value="territory">Territorio</TabsTrigger>
           <TabsTrigger value="records">Registros</TabsTrigger>
         </TabsList>
-        <TabsContent value="summary"><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">Resumen de {familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : <p>{selectedFamilyState.status === "loading" ? "Cargando resumen…" : selectedFamilyState.status === "error" ? "No se pudo cargar el resumen." : "No hay resultados para este período."}</p>}</section></TabsContent>
+        <TabsContent value="summary"><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : <p>{selectedFamilyState.status === "loading" ? "Cargando…" : selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}</section></TabsContent>
         <TabsContent value="trend">{selectedModuleContent("trend", trendBreakdowns, trendStatus)}</TabsContent>
         <TabsContent value="territory">{selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}</TabsContent>
         <TabsContent value="records">{recordsView}</TabsContent>
@@ -468,7 +472,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 }
 
 function CatalogFilter({ id, label, allLabel, noun, options, value, onChange }: { id: string; label: string; allLabel: string; noun: string; options?: FilterOption[]; value?: string; onChange: (value: string | undefined) => void }) {
-  const hint = !options ? `Cargando ${noun}…` : options.length === 0 ? `No se pudieron cargar las ${noun}; el filtro no está disponible.` : null;
+  const hint = !options ? "Cargando…" : options.length === 0 ? "No se pudieron cargar. Intente nuevamente." : null;
   return <Field className={`${styles.field} min-w-0`}>
     <FieldLabel htmlFor={id}>{label}</FieldLabel>
     <Combobox
@@ -481,7 +485,7 @@ function CatalogFilter({ id, label, allLabel, noun, options, value, onChange }: 
       aria-describedby={hint ? `${id}-hint` : undefined}
       placeholder={allLabel}
       searchPlaceholder={`Buscar ${noun}`}
-      emptyText={`No se encontraron ${noun}.`}
+      emptyText="Sin resultados."
     />
     {hint ? <FieldDescription id={`${id}-hint`} className={styles.note} role="status">{hint}</FieldDescription> : null}
   </Field>;
@@ -500,17 +504,11 @@ function pointText(point: IndicatorPoint) {
 }
 
 function detailContext(data: IndicatorData) {
-  if (data.family === "coverage") {
-    return <p className={styles.detailContext}><strong>Unidad de análisis:</strong> servicio + zona. Los objetivos programados representan la meta del período; los servicios cancelados no se incluyen en el cálculo de incumplimiento.</p>;
-  }
-  if (data.family === "compliance") {
-    return <p className={styles.detailContext}>El estado <strong>en fecha</strong> compara el último <code>ZoneResult.recordedAt</code> con <code>Service.scheduledDate</code>. Las zonas sin atención se ordenan con el motivo registrado.</p>;
-  }
   if (data.family === "incidents") {
-    return <p className={styles.detailContext}>Los contenedores y arbolado son instantáneas actuales; los reportes consideran el período y la resolución media usa solo reportes cerrados.</p>;
+    return <p className={styles.detailContext}>Contenedores y arbolado: situación actual.</p>;
   }
   if (data.family === "waste") {
-    return <p className={styles.detailContext}>Los volúmenes se informan en kilogramos y metros cúbicos por tipo y destino. El desvío expresa el porcentaje del período que no fue enviado al relleno sanitario.</p>;
+    return <p className={styles.detailContext}>Volúmenes en kg y m³. Desvío: porcentaje que no fue a relleno sanitario.</p>;
   }
   return null;
 }
@@ -542,21 +540,23 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
   </section>;
 }
 
-function AccessibleRecords({ family, plan, selection, breakdown, point, records, status, familyStatus = "ready", onClear }: { family: FamilyKey; period?: { from: string; to: string }; plan: RecordPlan | null; selection: SelectedSignal | null; breakdown?: IndicatorBreakdown; point?: IndicatorPoint; records: TraceRecord[]; status: "idle" | "loading" | "ready" | "error"; familyStatus?: LoadStatus; onClear: () => void }) {
+function AccessibleRecords({ family, plan, selection, breakdown, point, records, status, familyStatus = "ready", open, onOpenChange, onClear }: { family: FamilyKey; plan: RecordPlan | null; selection: SelectedSignal | null; breakdown?: IndicatorBreakdown; point?: IndicatorPoint; records: TraceRecord[]; status: "idle" | "loading" | "ready" | "error"; familyStatus?: LoadStatus; open: boolean; onOpenChange: (open: boolean) => void; onClear: () => void }) {
   const meta = familyMeta[family];
   const hasSelection = Boolean(selection && breakdown && point);
   return <section className={styles.records} aria-labelledby="indicator-records-title">
-    {familyStatus === "loading" && !plan ? <Alert role="status" className={styles.recordsMessage}>Cargando registros relacionados…</Alert> : null}
-    {familyStatus === "error" && !plan ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros relacionados porque la familia seleccionada no está disponible.</Alert> : null}
-    <div className={styles.recordsHeader}>
-      <div><h2 id="indicator-records-title">Registros accesibles</h2><p>Consulte los registros que explican la señal sin habilitar su gestión desde el tablero.</p></div>
-      {plan?.resource ? <Link className={styles.recordsLink} href={plan.href}>{plan.linkLabel}</Link> : null}
-    </div>
-    <Alert role="status" variant="info" className={styles.recordsContext}>
-      {plan?.resource === null && hasSelection ? <AlertDescription>{plan.reason}</AlertDescription> : hasSelection ? <AlertDescription><strong>Filtro activo:</strong> {meta.label} · {breakdown?.title} · {point?.label} · {pointText(point!)}</AlertDescription> : plan?.resource ? <AlertDescription><strong>Sin filtro de señal.</strong> Se muestran todos los {plan.title.toLowerCase()} accesibles en el período.</AlertDescription> : <AlertDescription>Seleccione una señal compatible para consultar sus registros accesibles.</AlertDescription>}
-      {hasSelection ? <Button type="button" variant="outline" size="sm" onClick={onClear}>Quitar filtro de señal</Button> : null}
-    </Alert>
-    {plan?.resource ? status === "loading" ? <Alert role="status" className={styles.recordsMessage}>Cargando registros accesibles…</Alert> : status === "error" ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros accesibles.</Alert> : <TraceRecordsTable plan={plan} records={records} /> : <Alert role="status" className={styles.recordsMessage}>{hasSelection ? "No hay una relación de registros disponible para esta señal." : "Esta familia no tiene una vista de registros accesibles para la selección actual."}</Alert>}
+    <Collapsible open={open} onOpenChange={onOpenChange}>
+      <h2 className={styles.recordsHeading}><CollapsibleTrigger id="indicator-records-title" render={<Button type="button" variant="ghost" size="lg" className={styles.recordsTrigger} />}>Registros<ChevronDown data-icon="inline-end" aria-hidden /></CollapsibleTrigger></h2>
+      <CollapsibleContent className={styles.recordsBody}>
+        {familyStatus === "loading" && !plan ? <Alert role="status" className={styles.recordsMessage}>Cargando registros relacionados…</Alert> : null}
+        {familyStatus === "error" && !plan ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros.</Alert> : null}
+        {plan?.resource ? <Link className={styles.recordsLink} href={plan.href}>{plan.linkLabel}</Link> : null}
+        <Alert role="status" variant="info" className={styles.recordsContext}>
+          {plan?.resource === null && hasSelection ? <AlertDescription>{plan.reason}</AlertDescription> : hasSelection ? <AlertDescription><strong>Filtro:</strong> {meta.label} · {breakdown?.title} · {point?.label} · {pointText(point!)}</AlertDescription> : plan?.resource ? <AlertDescription>Todos los registros del período.</AlertDescription> : <AlertDescription>Seleccione un dato del gráfico.</AlertDescription>}
+          {hasSelection ? <Button type="button" variant="outline" size="sm" onClick={onClear}>Quitar filtro</Button> : null}
+        </Alert>
+        {plan?.resource ? status === "loading" ? <Alert role="status" className={styles.recordsMessage}>Cargando…</Alert> : status === "error" ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros.</Alert> : <TraceRecordsTable plan={plan} records={records} /> : <Alert role="status" className={styles.recordsMessage}>Sin registros.</Alert>}
+      </CollapsibleContent>
+    </Collapsible>
   </section>;
 }
 
@@ -567,7 +567,7 @@ function TraceRecordsTable({ plan, records }: { plan: TracePlan; records: TraceR
     table={table}
     container={false}
     className={styles.recordsTable}
-    renderEmpty={() => <TableRow><TableCell colSpan={3}>No hay registros accesibles para este filtro.</TableCell></TableRow>}
+    renderEmpty={() => <TableRow><TableCell colSpan={3}>Sin registros.</TableCell></TableRow>}
   ><TableCaption>Registros accesibles de {plan.title}</TableCaption></DataTable></div>;
 }
 
