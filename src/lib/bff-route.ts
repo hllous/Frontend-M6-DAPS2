@@ -16,6 +16,7 @@ import {
   renewedSessionForResponse,
   requireCapability,
   sealSession,
+  sessionCookieRemovalOptions,
   sessionCookieOptions,
   type Session,
 } from "./session";
@@ -201,7 +202,9 @@ export function errorResponse(status: number, message: string, path: string, cod
 
 export function mapSessionError(error: unknown, path: string, fallbackMessage: string): NextResponse {
   if (error instanceof InvalidSessionError) {
-    return errorResponse(401, "La sesión no está activa.", path);
+    const rejected = errorResponse(401, "La sesión no está activa.", path);
+    rejected.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions());
+    return rejected;
   }
   if (error instanceof CitizenForbiddenError) {
     return errorResponse(403, error.message, path);

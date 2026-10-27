@@ -3,6 +3,7 @@ import {
   BackendUnavailableError,
   InvalidSessionError,
   getRequiredSession,
+  getSessionFromRequest,
   rememberRenewedResponse,
   requireCapability,
   wasSessionRenewed,
@@ -62,26 +63,46 @@ export async function fetchBackend(
   }
 
   const headers = new Headers(init.headers);
+  let accessToken: string = session.accessToken;
   // Renovación preventiva contra M1: el access token vence a los 15 min y M6 solo acepta ese token.
-  if (canRenew(session) && isNearExpiry(session)) session = await renewRequestSession(request, session, true);
+  if (canRenew(session) && isNearExpiry(session)) {
+    const renewed = await renewRequestSession(request, session, { tolerateUnavailable: true, signal: init.signal ?? undefined });
+    session = renewed;
+    accessToken = renewed.accessToken;
+  }
 
-  const send = async (accessToken: string) => {
-    headers.set("Authorization", `Bearer ${accessToken}`);
+  const send = async (token: string) => {
+    headers.set("Authorization", `Bearer ${token}`);
     const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_BACKEND_TIMEOUT_MS);
     const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
     return fetch(resourceUrl, { ...init, headers, signal });
   };
-  try {
-    let response = await send(session.accessToken!);
-    // Un 401 con refresh disponible: renovar UNA vez por pedido y reintentar (un body en stream no se puede reenviar).
-    if (response.status === 401 && canRenew(session) && !wasSessionRenewed(request) && !(init.body instanceof ReadableStream)) {
-      void response.body?.cancel().catch(() => undefined);
-      session = await renewRequestSession(request, session, false);
-      response = await send(session.accessToken!);
-    }
-    if (wasSessionRenewed(request)) rememberRenewedResponse(response, session);
+  const finish = (response: Response): Response => {
+    const renewed = wasSessionRenewed(request) ? getSessionFromRequest(request) : undefined;
+    if (renewed) rememberRenewedResponse(response, renewed);
     rememberBffPath(response, new URL(request.url).pathname);
     return response;
+  };
+  try {
+    let response = await send(accessToken);
+    // Un 401 con refresh disponible se reintenta UNA vez por pedido. Los bodies de un solo uso (stream, AsyncIterable) no se pueden reenviar.
+    const replayable = !(init.body instanceof ReadableStream) && !(typeof init.body === "object" && init.body !== null && Symbol.asyncIterator in init.body);
+    if (response.status === 401 && replayable && canRenew(session)) {
+      const current = getSessionFromRequest(request);
+      if (current?.accessToken && current.accessToken !== accessToken) {
+        // Otra llamada del mismo pedido (Promise.all) ya renovó: se reintenta con su token, sin renovar de nuevo.
+        void response.body?.cancel().catch(() => undefined);
+        accessToken = current.accessToken;
+        response = await send(accessToken);
+      } else if (!wasSessionRenewed(request)) {
+        void response.body?.cancel().catch(() => undefined);
+        const renewed = await renewRequestSession(request, session, { tolerateUnavailable: false, signal: init.signal ?? undefined });
+        session = renewed;
+        accessToken = renewed.accessToken;
+        response = await send(accessToken);
+      }
+    }
+    return finish(response);
   } catch (error) {
     if (init.signal?.aborted) throw error;
     if (error instanceof InvalidSessionError || error instanceof BackendUnavailableError) throw error;
