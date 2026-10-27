@@ -10,9 +10,13 @@ import {
   BackendUnavailableError,
   CitizenForbiddenError,
   ForbiddenSessionError,
+  AUTH_COOKIE_NAME,
   InvalidSessionError,
   getRequiredSession,
+  renewedSessionForResponse,
   requireCapability,
+  sealSession,
+  sessionCookieOptions,
   type Session,
 } from "./session";
 
@@ -224,11 +228,15 @@ export function forwardResponse(response: Response, path = bffPathForResponse(re
     error.headers.set("X-Content-Type-Options", "nosniff");
     return error;
   }
-  return new NextResponse(response.body, {
+  const forwarded = new NextResponse(response.body, {
     status: response.status,
     headers: {
       "content-type": contentType ?? "application/json",
       "X-Content-Type-Options": "nosniff",
     },
   });
+  // Si el pedido renovó los tokens contra M1, la cookie se resella con el material nuevo (no solo se extiende).
+  const renewed = renewedSessionForResponse(response);
+  if (renewed) forwarded.cookies.set({ name: AUTH_COOKIE_NAME, value: sealSession(renewed), ...sessionCookieOptions(renewed) });
+  return forwarded;
 }

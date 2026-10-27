@@ -26,13 +26,15 @@ export type Session = {
   absoluteExpiresAt: number;
   jwtExpiresAt: number;
   accessToken?: string;
+  /** Token de renovación de M1 (`X-Refresh-Token`, 7 días). Solo existe si el login lo trajo; nunca llega al navegador. */
+  refreshToken?: string;
   /** Roles de M6 efectivos: en modo backend los trae GET /me (login y refresco); en mock, el fixture del escenario. */
   roles: M6Role[];
   /** Cuadrilla real de un escenario de Campo, resuelta contra GET /crews en el login (sólo modo backend). */
   crew?: ScenarioCrew;
 };
 
-export type PublicSession = Omit<Session, "accessToken"> & {
+export type PublicSession = Omit<Session, "accessToken" | "refreshToken"> & {
   expiresAt: number;
 };
 
@@ -168,7 +170,7 @@ export function isSessionActive(session: Session, now = Date.now()): boolean {
 }
 
 export function publicSession(session: Session): PublicSession {
-  const { accessToken: _accessToken, ...safeSession } = session;
+  const { accessToken: _accessToken, refreshToken: _refreshToken, ...safeSession } = session;
   return { ...safeSession, expiresAt: effectiveSessionExpiry(session) };
 }
 
@@ -226,11 +228,35 @@ export function getSessionFromCookieValue(
   }
 }
 
+// Sesión renovada contra M1 durante un pedido: el resto del pedido ve los tokens nuevos, no los de la cookie.
+const renewedRequestSessions = new WeakMap<Request, Session>();
+// Respuesta que debe llevar la cookie resellada con esa sesión (la aplica forwardResponse).
+const renewedResponseSessions = new WeakMap<Response, Session>();
+
+export function rememberRenewedSession(request: Request, session: Session): void {
+  renewedRequestSessions.set(request, session);
+}
+
+export function wasSessionRenewed(request: Request): boolean {
+  return renewedRequestSessions.has(request);
+}
+
+export function rememberRenewedResponse(response: Response, session: Session): void {
+  renewedResponseSessions.set(response, session);
+}
+
+export function renewedSessionForResponse(response: Response): Session | undefined {
+  return renewedResponseSessions.get(response);
+}
+
 export function getSessionFromRequest(
   request: Request,
   secret: string | undefined = undefined,
   now = Date.now(),
 ): Session | undefined {
+  const renewed = renewedRequestSessions.get(request);
+  if (renewed) return renewed;
+
   const cookieHeader = request.headers.get("cookie");
   const cookieValue = cookieHeader
     ?.split(";")
@@ -285,7 +311,7 @@ function deriveKey(secret: string): Buffer {
   ));
 }
 
-function readJwtExpiry(token: string): number | undefined {
+export function readJwtExpiry(token: string): number | undefined {
   const [, encodedPayload] = token.split(".");
   if (!encodedPayload) return undefined;
 
@@ -307,6 +333,7 @@ function isSession(value: Partial<Session>): value is Session {
     typeof value.jwtExpiresAt === "number" &&
     m6RoleSchema.array().safeParse(value.roles).success &&
     (value.mode === "mock" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
+    (value.refreshToken === undefined || (value.mode !== "mock" && typeof value.refreshToken === "string")) &&
     (value.crew === undefined || (typeof value.crew?.id === "string" && typeof value.crew?.name === "string"))
   );
 }

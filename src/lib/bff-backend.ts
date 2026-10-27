@@ -1,9 +1,13 @@
 import {
   AuthUnavailableError,
   BackendUnavailableError,
+  InvalidSessionError,
   getRequiredSession,
+  rememberRenewedResponse,
   requireCapability,
+  wasSessionRenewed,
 } from "./session";
+import { canRenew, isNearExpiry, renewRequestSession } from "./m1-refresh";
 import type { Capability } from "./scenarios";
 import { errorResponse } from "./bff-route";
 import { rememberBffPath } from "./bff-response-path";
@@ -30,7 +34,7 @@ export async function fetchBackend(
   init: RequestInit = {},
   options: FetchBackendOptions = {},
 ): Promise<Response> {
-  const session = getRequiredSession(request);
+  let session = getRequiredSession(request);
   if (capability) requireCapability(session, capability);
 
   if (session.mode === "mock") {
@@ -58,15 +62,29 @@ export async function fetchBackend(
   }
 
   const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${session.accessToken}`);
-  const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_BACKEND_TIMEOUT_MS);
-  const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+  // Renovación preventiva contra M1: el access token vence a los 15 min y M6 solo acepta ese token.
+  if (canRenew(session) && isNearExpiry(session)) session = await renewRequestSession(request, session, true);
+
+  const send = async (accessToken: string) => {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+    const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_BACKEND_TIMEOUT_MS);
+    const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+    return fetch(resourceUrl, { ...init, headers, signal });
+  };
   try {
-    const response = await fetch(resourceUrl, { ...init, headers, signal });
+    let response = await send(session.accessToken!);
+    // Un 401 con refresh disponible: renovar UNA vez por pedido y reintentar (un body en stream no se puede reenviar).
+    if (response.status === 401 && canRenew(session) && !wasSessionRenewed(request) && !(init.body instanceof ReadableStream)) {
+      void response.body?.cancel().catch(() => undefined);
+      session = await renewRequestSession(request, session, false);
+      response = await send(session.accessToken!);
+    }
+    if (wasSessionRenewed(request)) rememberRenewedResponse(response, session);
     rememberBffPath(response, new URL(request.url).pathname);
     return response;
   } catch (error) {
     if (init.signal?.aborted) throw error;
+    if (error instanceof InvalidSessionError || error instanceof BackendUnavailableError) throw error;
     throw new BackendUnavailableError(503, BACKEND_UNAVAILABLE_MESSAGE);
   }
 }
