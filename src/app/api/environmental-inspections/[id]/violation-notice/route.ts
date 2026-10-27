@@ -1,6 +1,7 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   addViolationNoticeFixture,
   createViolationNoticeFixture,
@@ -10,30 +11,15 @@ import {
   transitionEnvironmentalReportFixture,
 } from "@/lib/environmental-report-fixtures";
 import { issueViolationNoticeInputSchema } from "@/lib/environmental-reports";
+import { establishmentDirectoryAdapter } from "@/lib/establishment-directory";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  500: "Internal Server Error",
-  503: "Service Unavailable",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json({
-    statusCode: status,
-    message,
-    error: ERROR_LABELS[status] ?? "Error",
-    timestamp: new Date().toISOString(),
-    path,
-  }, { status });
-}
 
-type NoticeContext = { params: Promise<{ id: string }> | { id: string } };
+
+
+type NoticeContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, context: NoticeContext) {
   const { id } = await context.params;
@@ -41,16 +27,12 @@ export async function GET(request: Request, context: NoticeContext) {
 
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "violationNotice:view");
-    const scenario = getScenario(session.scenarioId);
-    if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede consultar actas de infracción.", path);
+    // Backend: el acta la leen Ambiental, Admin, Inspector y Auditor; la capacidad ya lo expresa.
+    authorize(session, { capability: "violationNotice:view", throwOnError: true });
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/environmental-inspections/${encodeURIComponent(id)}/violation-notice`, "violationNotice:view");
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/environmental-inspections/${pathId(id)}/violation-notice`, "violationNotice:view");
+      return forwardResponse(backendResponse);
     }
 
     const notice = getViolationNoticeFixture(id);
@@ -60,8 +42,8 @@ export async function GET(request: Request, context: NoticeContext) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof Error && error.name === "ForbiddenSessionError") return errorResponse(403, "La sesión no tiene permiso para consultar actas.", path);
-    return errorResponse(500, "No se pudo consultar el acta de infracción.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para consultar actas.", path, FORBIDDEN_CODES.roleRequired);
+    return mapSessionError(error, path, "No se pudo consultar el acta de infracción.");
   }
 }
 
@@ -71,24 +53,21 @@ export async function POST(request: Request, context: NoticeContext) {
 
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "violationNotice:issue");
-    const scenario = getScenario(session.scenarioId);
+    authorize(session, { capability: "violationNotice:issue", throwOnError: true });
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede emitir actas de infracción.", path);
 
     const body = await request.json().catch(() => undefined);
     const parsedInput = issueViolationNoticeInputSchema.safeParse(body);
     if (!parsedInput.success) return errorResponse(400, parsedInput.error.issues.map((issue) => issue.message).join(" "), path);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/environmental-inspections/${encodeURIComponent(id)}/violation-notice`, "violationNotice:issue", {
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/environmental-inspections/${pathId(id)}/violation-notice`, "violationNotice:issue", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       });
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     const inspection = getEnvironmentalInspectionFixture(id);
@@ -98,6 +77,13 @@ export async function POST(request: Request, context: NoticeContext) {
     if (getViolationNoticeFixture(id)) return errorResponse(409, "La inspección ya tiene un acta emitida. Las correcciones requieren una nueva inspección.", path);
     if (!getEnvironmentalReportFixture(inspection.reportId)) return errorResponse(404, "Expediente ambiental no encontrado.", path);
 
+    if (parsedInput.data.establishmentId) {
+      const establishment = await establishmentDirectoryAdapter.resolve({ query: parsedInput.data.establishmentId });
+      if (!establishment || establishment.id !== parsedInput.data.establishmentId) {
+        return errorResponse(400, "El establecimiento indicado no existe en el directorio local.", path);
+      }
+    }
+
     const notice = createViolationNoticeFixture(id, parsedInput.data);
     addViolationNoticeFixture(notice);
     transitionEnvironmentalReportFixture(inspection.reportId, notice.establishmentId ? "NOTICE_ISSUED" : "CLOSED");
@@ -105,7 +91,7 @@ export async function POST(request: Request, context: NoticeContext) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof Error && error.name === "ForbiddenSessionError") return errorResponse(403, "La sesión no tiene permiso para emitir actas.", path);
-    return errorResponse(500, "No se pudo emitir el acta de infracción.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para emitir actas.", path, FORBIDDEN_CODES.roleRequired);
+    return mapSessionError(error, path, "No se pudo emitir el acta de infracción.");
   }
 }

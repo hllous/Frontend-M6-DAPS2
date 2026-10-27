@@ -1,13 +1,34 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { formControlClass } from "@/components/ui/form-control";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import {
   serviceTypeCategorySchema,
   serviceTypeModeSchema,
@@ -19,6 +40,32 @@ import {
 } from "@/lib/service-types";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
+
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { Input } from "@/components/ui/input";
+import { notifySuccess } from "@/components/ui/feedback";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import styles from "./catalog-panel.module.css";
 
 const categories: Array<{ value: ServiceTypeCategory; label: string }> = [
   { value: "WASTE_COLLECTION", label: "Recolección" },
@@ -34,21 +81,54 @@ const modes: Array<{ value: ServiceTypeMode; label: string }> = [
   { value: "POINT", label: "Punto" },
 ];
 
-const initialCreate = { code: "", name: "", category: "WASTE_COLLECTION" as ServiceTypeCategory, mode: "ROUTE" as ServiceTypeMode, requiresVehicle: true };
+const tableColumnClasses = [
+  "w-[16%]",
+  "w-[30%]",
+  "w-[18%]",
+  "w-[10%]",
+  "w-[10%]",
+  "w-[10%]",
+  "w-[6%]",
+] as const;
 
-type LoadState = { status: "loading" } | { status: "ready"; items: ServiceType[] } | { status: "error"; message: string };
+const initialCreate = {
+  code: "",
+  name: "",
+  category: "WASTE_COLLECTION" as ServiceTypeCategory,
+  mode: "ROUTE" as ServiceTypeMode,
+  requiresVehicle: true,
+};
 
-export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario }) {
-  const canManage = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("serviceType:manage");
-  const [state, setState] = useState<LoadState>({ status: "loading" });
+type LoadState =
+  | { status: "loading"; rowCount: number }
+  | { status: "ready"; items: ServiceType[] }
+  | { status: "error"; message: string };
+
+export function ServiceTypesPanel({
+  scenario,
+}: {
+  scenario: OperationalScenario;
+}) {
+  const canManage =
+    scenario.actor.kind === "OFFICE" &&
+    scenario.capabilities.includes("serviceType:manage");
+  const [state, setState] = useState<LoadState>({
+    status: "loading",
+    rowCount: 5,
+  });
   const [search, setSearch] = useState("");
   const [active, setActive] = useState("all");
   const [category, setCategory] = useState<ServiceTypeCategory | "">("");
   const [mode, setMode] = useState<ServiceTypeMode | "">("");
   const [showCreate, setShowCreate] = useState(false);
   const [createDraft, setCreateDraft] = useState(initialCreate);
+  const [selectedItem, setSelectedItem] = useState<ServiceType | null>(null);
+  const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
   const [editing, setEditing] = useState<ServiceType | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deactivating, setDeactivating] = useState<ServiceType | null>(null);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
@@ -56,7 +136,15 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
   useEffect(() => {
     let isCurrent = true;
     async function requestServiceTypes() {
-      setState({ status: "loading" });
+      setState((previous) => ({
+        status: "loading",
+        rowCount:
+          previous.status === "ready"
+            ? previous.items.length
+            : previous.status === "loading"
+              ? previous.rowCount
+              : 5,
+      }));
       try {
         const result = await serviceTypesAdapter.list({
           search: search || undefined,
@@ -64,100 +152,699 @@ export function ServiceTypesPanel({ scenario }: { scenario: OperationalScenario 
           category: category || undefined,
           mode: mode || undefined,
         });
-        if (isCurrent) setState({ status: "ready", items: result.serviceTypes });
+        if (isCurrent)
+          setState({ status: "ready", items: result.serviceTypes });
       } catch (error) {
-        if (isCurrent) setState({ status: "error", message: error instanceof Error ? error.message : "No se pudieron cargar los tipos de servicio." });
+        if (isCurrent)
+          setState({
+            status: "error",
+            message: getErrorMessage(
+              error,
+              "No se pudieron cargar los tipos de servicio.",
+            ),
+          });
       }
     }
     void requestServiceTypes();
-    return () => { isCurrent = false; };
+    return () => {
+      isCurrent = false;
+    };
   }, [active, category, mode, requestVersion, search]);
+
+  useEffect(() => {
+    const media =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(max-width: 760px)")
+        : null;
+    const updateSheetSide = () =>
+      setSheetSide(media?.matches ? "bottom" : "right");
+    updateSheetSide();
+    if (!media) return;
+    media.addEventListener("change", updateSheetSide);
+    return () => media.removeEventListener("change", updateSheetSide);
+  }, []);
 
   const submitCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage(null);
+
     setCreateError(null);
     try {
       await serviceTypesAdapter.create(createDraft);
       setCreateDraft(initialCreate);
       setShowCreate(false);
-      setMessage("Tipo de servicio creado.");
+      notifySuccess("Tipo de servicio creado.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "No se pudo crear el tipo de servicio.";
+      const errorMessage = getErrorMessage(
+        error,
+        "No se pudo crear el tipo de servicio.",
+      );
       setCreateError(errorMessage);
-      setMessage(errorMessage);
     }
   };
 
   const submitEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editing) return;
-    setMessage(null);
+
     setEditError(null);
     try {
-      await serviceTypesAdapter.update(editing.id, { name: editing.name, requiresVehicle: editing.requiresVehicle, active: editing.active });
-      setEditing(null);
-      setMessage("Tipo de servicio actualizado.");
+      await serviceTypesAdapter.update(editing.id, {
+        name: editing.name,
+        requiresVehicle: editing.requiresVehicle,
+        active: editing.active,
+      });
+      setEditOpen(false);
+      notifySuccess("Tipo de servicio actualizado.");
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "No se pudo actualizar el tipo de servicio.";
+      const errorMessage = getErrorMessage(
+        error,
+        "No se pudo actualizar el tipo de servicio.",
+      );
       setEditError(errorMessage);
-      setMessage(errorMessage);
     }
   };
 
-  const deactivate = async (item: ServiceType) => {
-    setMessage(null);
+  const deactivate = (item: ServiceType) => {
+    setDeactivating(item);
+    setDeactivateError(null);
+  };
+
+  const confirmDeactivation = async () => {
+    if (!deactivating) return;
+    setIsSubmittingDeactivate(true);
+    setDeactivateError(null);
     try {
-      await serviceTypesAdapter.remove(item.id);
-      setMessage("Tipo de servicio dado de baja. Los servicios existentes conservan su configuración.");
+      await serviceTypesAdapter.remove(deactivating.id);
+      setDeactivating(null);
+      notifySuccess(
+        "Tipo de servicio dado de baja.",
+      );
       setRequestVersion((version) => version + 1);
     } catch (error) {
-      setMessage(error instanceof ServiceTypeRequestError ? error.message : "No se pudo dar de baja el tipo de servicio.");
+      setDeactivateError(
+        error instanceof ServiceTypeRequestError
+          ? error.message
+          : "No se pudo dar de baja el tipo de servicio.",
+      );
+    } finally {
+      setIsSubmittingDeactivate(false);
     }
   };
 
   return (
-    <section aria-labelledby="service-types-title" className="flex flex-col gap-6">
+    <section
+      aria-labelledby="service-types-title"
+      className="flex flex-col gap-6 max-[760px]:pb-[calc(6rem+env(safe-area-inset-bottom))]"
+    >
       <CatalogPageHeader
         title="Tipos de servicio"
         titleId="service-types-title"
-        description="Definí cómo se programan y ejecutan los servicios urbanos."
-        actions={canManage ? <Button type="button" onClick={() => { setShowCreate((value) => !value); setEditing(null); }}>{showCreate ? "Cerrar alta" : "Nuevo tipo de servicio"}</Button> : null}
+        actions={
+          canManage ? (
+            <Button
+              type="button"
+              onClick={() => {
+                setShowCreate(true);
+                setEditOpen(false);
+              }}
+            >
+              Nuevo tipo de servicio
+            </Button>
+          ) : null
+        }
       />
 
-      {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Esta sesión puede consultar el catálogo, pero no administrarlo.</p> : null}
-      {message ? <p role="status" className="rounded-lg border border-border bg-card px-3 py-2 text-sm">{message}</p> : null}
-
-      {showCreate && canManage ? (
-        <form onSubmit={submitCreate} className="rounded-xl border border-border bg-card p-5">
-          <h2 className="text-lg font-semibold">Alta de tipo de servicio</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Código, categoría y modo quedan fijos al crear el tipo.</p>
-          <FieldGroup className="mt-5 grid gap-4 md:grid-cols-2">
-            <Field><FieldLabel htmlFor="service-type-code">Código</FieldLabel><input id="service-type-code" className={formControlClass} required value={createDraft.code} aria-invalid={Boolean(createError)} aria-describedby={createError ? "service-type-code-error" : undefined} onChange={(event) => setCreateDraft({ ...createDraft, code: event.target.value })} /><FieldError id="service-type-code-error">{createError}</FieldError></Field>
-            <Field><FieldLabel htmlFor="service-type-name">Nombre</FieldLabel><input id="service-type-name" className={formControlClass} required value={createDraft.name} onChange={(event) => setCreateDraft({ ...createDraft, name: event.target.value })} /></Field>
-            <Field><FieldLabel htmlFor="service-type-category">Categoría</FieldLabel><select id="service-type-category" className={formControlClass} value={createDraft.category} onChange={(event) => { const parsed = serviceTypeCategorySchema.safeParse(event.target.value); if (parsed.success) setCreateDraft({ ...createDraft, category: parsed.data }); }}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
-            <Field><FieldLabel htmlFor="service-type-mode">Modo</FieldLabel><select id="service-type-mode" className={formControlClass} value={createDraft.mode} onChange={(event) => { const parsed = serviceTypeModeSchema.safeParse(event.target.value); if (parsed.success) setCreateDraft({ ...createDraft, mode: parsed.data }); }}>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
-            <label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm md:col-span-2"><input type="checkbox" checked={createDraft.requiresVehicle} onChange={(event) => setCreateDraft({ ...createDraft, requiresVehicle: event.target.checked })} /> Requiere vehículo</label>
-          </FieldGroup>
-          <div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button><Button type="submit">Crear tipo</Button></div>
-        </form>
+      {!canManage ? (
+        <Alert role="status">
+          <AlertDescription>
+            Solo consulta
+          </AlertDescription>
+        </Alert>
       ) : null}
 
-      <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_160px_190px_150px]">
-        <label className="flex flex-col gap-1 text-sm font-semibold">Buscar<input aria-label="Buscar tipos de servicio" className={formControlClass} placeholder="Código o nombre" value={search} maxLength={MAX_SEARCH_LENGTH} onChange={(event) => setSearch(event.target.value)} /></label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">Estado<select aria-label="Filtrar por estado" className={formControlClass} value={active} onChange={(event) => setActive(event.target.value)}><option value="all">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select></label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">Categoría<select aria-label="Filtrar por categoría" className={formControlClass} value={category} onChange={(event) => setCategory(event.target.value as ServiceTypeCategory | "")}><option value="">Todas</option>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">Modo<select aria-label="Filtrar por modo" className={formControlClass} value={mode} onChange={(event) => setMode(event.target.value as ServiceTypeMode | "")}><option value="">Todos</option>{modes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-      </div>
+      <Dialog open={showCreate && canManage} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Alta de tipo de servicio</DialogTitle>
+            <DialogDescription>
+                No se pueden cambiar después.
+              </DialogDescription>
+          </DialogHeader>
+          <form
+            id="service-type-create-form"
+            className="-mx-1 -my-1 min-h-0 overflow-y-auto px-1 py-1"
+            onSubmit={submitCreate}
+          >
+              <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field data-invalid={Boolean(createError)}>
+                  <FieldLabel htmlFor="service-type-code">Código</FieldLabel>
+                  <Input
+                    id="service-type-code"
+                    className="bg-card"
+                    required
+                    value={createDraft.code}
+                    aria-invalid={Boolean(createError)}
+                    aria-describedby={
+                      createError ? "service-type-code-error" : undefined
+                    }
+                    onChange={(event) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        code: event.target.value,
+                      })
+                    }
+                  />
+                  <FieldError id="service-type-code-error">
+                    {createError}
+                  </FieldError>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="service-type-name">Nombre</FieldLabel>
+                  <Input
+                    id="service-type-name"
+                    className="bg-card"
+                    required
+                    value={createDraft.name}
+                    onChange={(event) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        name: event.target.value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="service-type-category">
+                    Categoría
+                  </FieldLabel>
+                  <Select
+                    items={Object.fromEntries([
+                      ...categories.map((item) => [item.value, item.label]),
+                    ])}
+                    value={createDraft.category}
+                    onValueChange={(value) => {
+                      if (value !== null) {
+                        const parsed =
+                          serviceTypeCategorySchema.safeParse(value);
+                        if (parsed.success)
+                          setCreateDraft({
+                            ...createDraft,
+                            category: parsed.data,
+                          });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="service-type-category" className="bg-card">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {categories.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="service-type-mode">Modo</FieldLabel>
+                  <Select
+                    items={Object.fromEntries([
+                      ...modes.map((item) => [item.value, item.label]),
+                    ])}
+                    value={createDraft.mode}
+                    onValueChange={(value) => {
+                      if (value !== null) {
+                        const parsed = serviceTypeModeSchema.safeParse(value);
+                        if (parsed.success)
+                          setCreateDraft({ ...createDraft, mode: parsed.data });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="service-type-mode" className="bg-card">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {modes.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field orientation="horizontal" className="md:col-span-2">
+                  <Checkbox
+                    id="service-types-panel-requires-vehicle-create"
+                    checked={createDraft.requiresVehicle}
+                    onCheckedChange={(checked) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        requiresVehicle: checked,
+                      })
+                    }
+                  />
+                  <FieldLabel htmlFor="service-types-panel-requires-vehicle-create">
+                    Requiere vehículo
+                  </FieldLabel>
+                </Field>
+              </FieldGroup>
+          </form>
+          <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreate(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" form="service-type-create-form">Crear tipo</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio" className="flex flex-col gap-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : null}
-      {state.status === "error" ? <div role="alert" className="rounded-xl border border-destructive/30 bg-card p-5"><p>{state.message}</p><Button type="button" variant="outline" className="mt-3" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></div> : null}
-      {state.status === "ready" && state.items.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin tipos de servicio</EmptyTitle><EmptyDescription>No hay resultados para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty> : null}
-      {state.status === "ready" && state.items.length > 0 ? <div className="relative overflow-x-auto rounded-xl border border-border bg-card"><table className="w-full min-w-[760px] text-left text-sm"><caption className="sr-only">Tipos de servicio</caption><thead className="border-b border-border bg-muted text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Código</th><th className="px-4 py-3">Nombre</th><th className="px-4 py-3">Categoría</th><th className="px-4 py-3">Modo</th><th className="px-4 py-3">Vehículo</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3"><span className="sr-only">Acciones</span></th></tr></thead><tbody>{state.items.map((item) => <tr key={item.id} className="border-b border-border last:border-0"><td className="px-4 py-3 font-mono text-xs">{item.code}</td><td className="px-4 py-3 font-medium">{item.name}</td><td className="px-4 py-3">{categories.find((option) => option.value === item.category)?.label ?? item.category}</td><td className="px-4 py-3">{item.mode === "ROUTE" ? "Recorrido" : "Punto"}</td><td className="px-4 py-3">{item.requiresVehicle ? "Sí" : "No"}</td><td className="px-4 py-3">{item.active ? "Activo" : "Inactivo"}</td><td className="px-4 py-3"><div className="flex justify-end gap-2">{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => { setEditing(item); setShowCreate(false); }}>Editar</Button>{item.active ? <Button type="button" size="sm" variant="destructive" onClick={() => void deactivate(item)}>Dar de baja</Button> : null}</> : null}</div></td></tr>)}</tbody></table></div> : null}
+      <Card>
+        <CardContent>
+          <FieldGroup className="grid max-w-full gap-3 md:w-fit md:grid-cols-[repeat(3,minmax(0,18rem))]">
+            <Field>
+              <FieldLabel htmlFor="service-types-panel-filter-1">
+                Buscar
+              </FieldLabel>
+              <Input
+                id="service-types-panel-filter-1"
+                className="bg-card"
+                aria-label="Buscar tipos de servicio"
+                placeholder="Código o nombre"
+                value={search}
+                maxLength={MAX_SEARCH_LENGTH}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="service-types-panel-filter-2">
+                Estado
+              </FieldLabel>
+              <Select
+                items={Object.fromEntries([
+                  ["all", "Todos"],
+                  ["true", "Activos"],
+                  ["false", "Inactivos"],
+                ])}
+                value={active}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setActive(value);
+                  }
+                }}
+              >
+                <SelectTrigger
+                  id="service-types-panel-filter-2"
+                  aria-label="Filtrar por estado"
+                  className="bg-card"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="true">Activos</SelectItem>
+                    <SelectItem value="false">Inactivos</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="service-types-panel-filter-3">
+                Categoría
+              </FieldLabel>
+              <Select
+                items={Object.fromEntries([
+                  ["", "Todas"],
+                  ...categories.map((item) => [item.value, item.label]),
+                ])}
+                value={category}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setCategory(value as ServiceTypeCategory | "");
+                  }
+                }}
+              >
+                <SelectTrigger
+                  id="service-types-panel-filter-3"
+                  aria-label="Filtrar por categoría"
+                  className="bg-card"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="">Todas</SelectItem>
+                    {categories.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="service-types-panel-filter-4">
+                Modo
+              </FieldLabel>
+              <Select
+                items={Object.fromEntries([
+                  ["", "Todos"],
+                  ...modes.map((item) => [item.value, item.label]),
+                ])}
+                value={mode}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setMode(value as ServiceTypeMode | "");
+                  }
+                }}
+              >
+                <SelectTrigger
+                  id="service-types-panel-filter-4"
+                  aria-label="Filtrar por modo"
+                  className="bg-card"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="">Todos</SelectItem>
+                    {modes.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          </FieldGroup>
+        </CardContent>
+      </Card>
 
-      {editing && canManage ? <form onSubmit={submitEdit} className="rounded-xl border border-border bg-card p-5"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">Editar tipo de servicio</h2><FieldDescription>El código, la categoría y el modo son de solo lectura porque ya pueden estar copiados en servicios programados.</FieldDescription></div><Button type="button" variant="ghost" onClick={() => setEditing(null)}>Cerrar</Button></div><FieldGroup className="mt-5 grid gap-4 md:grid-cols-2"><Field><FieldLabel htmlFor="edit-service-type-code">Código</FieldLabel><input id="edit-service-type-code" className={formControlClass} value={editing.code} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-service-type-name">Nombre</FieldLabel><input id="edit-service-type-name" className={formControlClass} required value={editing.name} aria-invalid={Boolean(editError)} aria-describedby={editError ? "edit-service-type-name-error" : undefined} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /><FieldError id="edit-service-type-name-error">{editError}</FieldError></Field><Field><FieldLabel htmlFor="edit-service-type-category">Categoría</FieldLabel><input id="edit-service-type-category" className={formControlClass} value={categories.find((item) => item.value === editing.category)?.label ?? editing.category} readOnly aria-readonly="true" /></Field><Field><FieldLabel htmlFor="edit-service-type-mode">Modo</FieldLabel><input id="edit-service-type-mode" className={formControlClass} value={editing.mode === "ROUTE" ? "Recorrido" : "Punto"} readOnly aria-readonly="true" /></Field><label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm"><input type="checkbox" checked={editing.requiresVehicle} onChange={(event) => setEditing({ ...editing, requiresVehicle: event.target.checked })} /> Requiere vehículo</label><label className="flex min-h-10 max-[760px]:min-h-12 items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(event) => setEditing({ ...editing, active: event.target.checked })} /> Activo</label></FieldGroup><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancelar</Button><Button type="submit">Guardar cambios</Button></div></form> : null}
+      {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio"><TableRowsSkeleton rowCount={state.rowCount} rowHeight="" columnClasses={tableColumnClasses} columnWidths={["w-16", "w-40", "w-28", "w-20", "w-8", "w-12", "w-4"]} columnLabels={["Código", "Nombre", "Categoría", "Modo", "Vehículo", "Estado", "Ver detalle"]} className={styles.tableWrap} tableClassName={`${styles.table} min-[761px]:table-fixed`} /></div> : null}
+      {state.status === "error" ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {state.message}
+            <div className="mt-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3"
+                onClick={() => setRequestVersion((version) => version + 1)}
+              >
+                Reintentar
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {state.status === "ready" && state.items.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Sin tipos de servicio</EmptyTitle>
+            <EmptyDescription>
+              No hay resultados para los filtros seleccionados.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : null}
+      {state.status === "ready" && state.items.length > 0 ? (
+        <div className={styles.tableWrap}>
+          <table className={`${styles.table} min-[761px]:table-fixed`}>
+            <caption className="sr-only">Tipos de servicio</caption>
+            <colgroup>{tableColumnClasses.map((width, column) => <col key={column} className={width} />)}</colgroup>
+            <thead>
+              <tr>
+                <th scope="col">Código</th>
+                <th scope="col">Nombre</th>
+                <th scope="col">Categoría</th>
+                <th scope="col">Modo</th>
+                <th scope="col">Vehículo</th>
+                <th scope="col">Estado</th>
+                <th scope="col"><span className="sr-only">Ver detalle</span></th>
+              </tr>
+            </thead>
+            <tbody>{state.items.map((item) => (
+              <tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
+                <th scope="row" data-label="Código">
+                  <Button
+                    type="button"
+                    variant="link"
+                    aria-label={`Ver detalle del tipo de servicio ${item.code}`}
+                    onClick={() => setSelectedItem(item)}
+                    className="h-auto min-h-0 justify-start p-0 text-left font-semibold text-foreground no-underline after:absolute after:inset-0 after:z-10 after:content-[''] active:not-aria-[haspopup]:translate-none focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] max-[760px]:focus-visible:after:rounded-2xl"
+                  >
+                    {item.code}
+                  </Button>
+                </th>
+                <td data-label="Nombre">{item.name}</td>
+                <td data-label="Categoría">{categories.find((option) => option.value === item.category)?.label ?? item.category}</td>
+                <td data-label="Modo">{item.mode === "ROUTE" ? "Recorrido" : "Punto"}</td>
+                <td data-label="Vehículo">{item.requiresVehicle ? "Sí" : "No"}</td>
+                <td data-label="Estado">{item.active ? "Activo" : "Inactivo"}</td>
+                <td data-label="" aria-hidden="true" className="text-right">
+                  <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ) : null}
+
+      <Sheet
+        open={selectedItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedItem(null);
+        }}
+      >
+        {selectedItem ? (
+          <SheetContent
+            side={sheetSide}
+            className={
+              sheetSide === "bottom"
+                ? "max-h-[88dvh] overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]"
+                : "w-[min(92vw,28rem)] overflow-y-auto"
+            }
+          >
+            <SheetHeader className="border-b border-border pr-12 pb-4">
+              <SheetTitle>Detalle del tipo de servicio</SheetTitle>
+            </SheetHeader>
+            <dl className="grid gap-4 px-4 pt-4 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Código</dt>
+                <dd className="font-semibold">{selectedItem.code}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Nombre</dt>
+                <dd>{selectedItem.name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Categoría</dt>
+                <dd>
+                  {categories.find((option) => option.value === selectedItem.category)?.label ?? selectedItem.category}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Modo</dt>
+                <dd>{selectedItem.mode === "ROUTE" ? "Recorrido" : "Punto"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Vehículo</dt>
+                <dd>{selectedItem.requiresVehicle ? "Sí" : "No"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Estado</dt>
+                <dd>{selectedItem.active ? "Activo" : "Inactivo"}</dd>
+              </div>
+            </dl>
+            {canManage ? (
+              <SheetFooter className="border-t border-border pt-4">
+                <section aria-label="Acciones del tipo de servicio" className="grid gap-2">
+                  <h3 className="text-sm font-semibold">Acciones disponibles</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start bg-card"
+                    onClick={() => {
+                      const item = selectedItem;
+                      setSelectedItem(null);
+                      setEditing(item);
+                      setEditOpen(true);
+                      setShowCreate(false);
+                      setEditError(null);
+                    }}
+                  >
+                    <Pencil data-icon="inline-start" aria-hidden />
+                    Editar
+                  </Button>
+                  {selectedItem.active ? (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const item = selectedItem;
+                        setSelectedItem(null);
+                        deactivate(item);
+                      }}
+                    >
+                      <Trash2 data-icon="inline-start" aria-hidden />
+                      Dar de baja
+                    </Button>
+                  ) : null}
+                </section>
+              </SheetFooter>
+            ) : null}
+          </SheetContent>
+        ) : null}
+      </Sheet>
+
+      <Dialog open={editOpen && canManage} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl">
+          {editing ? (
+            <>
+          <DialogHeader>
+            <DialogTitle>Editar tipo de servicio</DialogTitle>
+            <DialogDescription>
+                No se pueden cambiar después.
+              </DialogDescription>
+          </DialogHeader>
+          <form
+            id="service-type-edit-form"
+            className="-mx-1 -my-1 min-h-0 overflow-y-auto px-1 py-1"
+            onSubmit={submitEdit}
+          >
+              <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="edit-service-type-code">
+                    Código
+                  </FieldLabel>
+                  <Input
+                    id="edit-service-type-code"
+                    value={editing.code}
+                    readOnly
+                    aria-readonly="true"
+                  />
+                </Field>
+                <Field data-invalid={Boolean(editError)}>
+                  <FieldLabel htmlFor="edit-service-type-name">
+                    Nombre
+                  </FieldLabel>
+                  <Input
+                    id="edit-service-type-name"
+                    className="bg-card"
+                    required
+                    value={editing.name}
+                    aria-invalid={Boolean(editError)}
+                    aria-describedby={
+                      editError ? "edit-service-type-name-error" : undefined
+                    }
+                    onChange={(event) =>
+                      setEditing({ ...editing, name: event.target.value })
+                    }
+                  />
+                  <FieldError id="edit-service-type-name-error">
+                    {editError}
+                  </FieldError>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="edit-service-type-category">
+                    Categoría
+                  </FieldLabel>
+                  <Input
+                    id="edit-service-type-category"
+                    value={
+                      categories.find((item) => item.value === editing.category)
+                        ?.label ?? editing.category
+                    }
+                    readOnly
+                    aria-readonly="true"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="edit-service-type-mode">Modo</FieldLabel>
+                  <Input
+                    id="edit-service-type-mode"
+                    value={editing.mode === "ROUTE" ? "Recorrido" : "Punto"}
+                    readOnly
+                    aria-readonly="true"
+                  />
+                </Field>
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="service-types-panel-requires-vehicle-edit"
+                    checked={editing.requiresVehicle}
+                    onCheckedChange={(checked) =>
+                      setEditing({ ...editing, requiresVehicle: checked })
+                    }
+                  />
+                  <FieldLabel htmlFor="service-types-panel-requires-vehicle-edit">
+                    Requiere vehículo
+                  </FieldLabel>
+                </Field>
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="service-types-panel-active-edit"
+                    checked={editing.active}
+                    onCheckedChange={(checked) =>
+                      setEditing({ ...editing, active: checked })
+                    }
+                  />
+                  <FieldLabel htmlFor="service-types-panel-active-edit">
+                    Activo
+                  </FieldLabel>
+                </Field>
+              </FieldGroup>
+          </form>
+          <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" form="service-type-edit-form">Guardar cambios</Button>
+          </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <CatalogDeactivationDialog
+        open={deactivating !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeactivating(null);
+            setDeactivateError(null);
+          }
+        }}
+        title={`Confirmar baja del tipo de servicio ${deactivating?.code ?? ""}`.trim()}
+        consequence="El tipo de servicio quedará inactivo. Los servicios existentes conservarán la configuración con la que se crearon."
+        confirmAction="Dar de baja"
+        safeAlternative="Conservar tipo"
+        onConfirm={() => void confirmDeactivation()}
+        isSubmitting={isSubmittingDeactivate}
+      >
+        {deactivateError ? (
+          <Alert variant="destructive">
+            <AlertDescription>{deactivateError}</AlertDescription>
+          </Alert>
+        ) : null}
+      </CatalogDeactivationDialog>
     </section>
   );
 }

@@ -1,11 +1,12 @@
 import {
   createCipheriv,
   createDecipheriv,
-  createHash,
+  hkdfSync,
   randomBytes,
 } from "node:crypto";
 import { cookies } from "next/headers";
 
+import { m6RoleSchema, type M6Role } from "./m6-roles";
 import { getScenario, type Capability, type ScenarioCrew, type ScenarioId } from "./scenarios";
 import { AUTH_COOKIE_NAME } from "./session-config";
 
@@ -25,6 +26,8 @@ export type Session = {
   absoluteExpiresAt: number;
   jwtExpiresAt: number;
   accessToken?: string;
+  /** Roles de M6 efectivos: en modo backend los trae GET /me (login y refresco); en mock, el fixture del escenario. */
+  roles: M6Role[];
   /** Cuadrilla real de un escenario de Campo, resuelta contra GET /crews en el login (sólo modo backend). */
   crew?: ScenarioCrew;
 };
@@ -35,7 +38,8 @@ export type PublicSession = Omit<Session, "accessToken"> & {
 
 export class AuthUnavailableError extends Error {
   constructor(message = "La autenticación solicitada no está disponible.") {
-    super(message);
+    console.error("[m6-auth-unavailable]", message);
+    super("La autenticación solicitada no está disponible.");
     this.name = "AuthUnavailableError";
   }
 }
@@ -43,7 +47,7 @@ export class AuthUnavailableError extends Error {
 export class BackendUnavailableError extends Error {
   readonly status: number;
 
-  constructor(status: number, message = "El backend no está disponible.") {
+  constructor(status: number, message = "El backend no responde. Reintente en unos segundos.") {
     super(message);
     this.name = "BackendUnavailableError";
     this.status = status;
@@ -64,10 +68,21 @@ export class ForbiddenSessionError extends Error {
   }
 }
 
+/** 403 por `sub_type`: el token es de un ciudadano y el sistema es solo para personal municipal (sin `code`). */
+export class CitizenForbiddenError extends ForbiddenSessionError {
+  constructor(message = "Este sistema es solo para personal municipal.") {
+    super(message);
+    this.name = "CitizenForbiddenError";
+  }
+}
+
 type SessionOptions = {
   mode: AuthMode;
   now?: number;
   devJwt?: string;
+  backendOrigin?: string;
+  /** Roles de GET /me; sin ellos, los del fixture del escenario (mock y tests). */
+  roles?: readonly M6Role[];
 };
 
 type RuntimeEnvironment = {
@@ -78,6 +93,8 @@ type RuntimeEnvironment = {
 };
 
 const localSessionSecret = "m6-local-development-session-secret";
+const sessionKeySalt = Buffer.from("m6-bff-session-key-salt-v1", "utf8");
+const sessionKeyInfo = Buffer.from("aes-256-gcm cookie encryption v1", "utf8");
 
 export function getAuthMode(environment: RuntimeEnvironment = process.env): AuthMode {
   const configuredMode = environment.M6_AUTH_MODE;
@@ -94,6 +111,7 @@ export function createSession(
 ): Session {
   getScenario(scenarioId);
   const now = options.now ?? Date.now();
+  const roles = [...(options.roles ?? getScenario(scenarioId).roles)];
 
   if (options.mode === "real-m1") {
     throw new AuthUnavailableError("La autenticación real de M1 permanece bloqueada hasta publicar su contrato.");
@@ -107,12 +125,17 @@ export function createSession(
       lastActivityAt: now,
       absoluteExpiresAt: now + SESSION_ABSOLUTE_MS,
       jwtExpiresAt: now + SESSION_ABSOLUTE_MS,
+      roles,
     };
   }
 
   const accessToken = options.devJwt;
   if (!accessToken) {
     throw new AuthUnavailableError("El modo de desarrollo requiere M6_DEV_JWT en el servidor.");
+  }
+
+  if (!options.backendOrigin) {
+    throw new AuthUnavailableError("El backend de desarrollo no está configurado.");
   }
 
   const jwtExpiresAt = readJwtExpiry(accessToken);
@@ -128,6 +151,7 @@ export function createSession(
     absoluteExpiresAt: now + SESSION_ABSOLUTE_MS,
     jwtExpiresAt,
     accessToken,
+    roles,
   };
 }
 
@@ -141,11 +165,6 @@ export function effectiveSessionExpiry(session: Session): number {
 
 export function isSessionActive(session: Session, now = Date.now()): boolean {
   return now < effectiveSessionExpiry(session);
-}
-
-export function refreshSession(session: Session, now = Date.now()): Session | undefined {
-  if (!isSessionActive(session, now)) return undefined;
-  return { ...session, lastActivityAt: now };
 }
 
 export function publicSession(session: Session): PublicSession {
@@ -200,7 +219,7 @@ export function getSessionFromCookieValue(
     ]).toString("utf8");
     const value = JSON.parse(plaintext) as Partial<Session>;
 
-    if (!isSession(value)) return undefined;
+    if (!isSession(value) || value.mode !== getAuthMode()) return undefined;
     return isSessionActive(value, now) ? value : undefined;
   } catch {
     return undefined;
@@ -257,7 +276,13 @@ export function sessionSecret(environment: RuntimeEnvironment = process.env): st
 }
 
 function deriveKey(secret: string): Buffer {
-  return createHash("sha256").update(secret).digest();
+  return Buffer.from(hkdfSync(
+    "sha256",
+    Buffer.from(secret, "utf8"),
+    sessionKeySalt,
+    sessionKeyInfo,
+    32,
+  ));
 }
 
 function readJwtExpiry(token: string): number | undefined {
@@ -280,6 +305,7 @@ function isSession(value: Partial<Session>): value is Session {
     typeof value.lastActivityAt === "number" &&
     typeof value.absoluteExpiresAt === "number" &&
     typeof value.jwtExpiresAt === "number" &&
+    m6RoleSchema.array().safeParse(value.roles).success &&
     (value.mode === "mock" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
     (value.crew === undefined || (typeof value.crew?.id === "string" && typeof value.crew?.name === "string"))
   );

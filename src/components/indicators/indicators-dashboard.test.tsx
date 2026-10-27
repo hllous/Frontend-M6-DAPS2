@@ -1,17 +1,34 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse, passthrough } from "msw";
 import { setupServer } from "msw/node";
 
 import { scenarios } from "@/lib/scenarios";
-import { coverageIndicatorFixture, incidentsIndicatorFixture } from "@/lib/indicator-fixtures";
+import { coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "@/lib/indicator-fixtures";
 import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
 import { handlers } from "@/mocks/handlers";
 
 import { IndicatorsDashboard } from "./indicators-dashboard";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
+
+async function chooseDate(user: ReturnType<typeof userEvent.setup>, label: string, value: string) {
+  const trigger = screen.getByRole("button", { name: new RegExp(`^${label}`) });
+  const displayedValue = trigger.textContent?.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  const currentMonth = displayedValue ? Number(displayedValue[2]) - 1 : new Date().getMonth();
+  const currentYear = displayedValue ? Number(displayedValue[3]) : new Date().getFullYear();
+  const [year, month, day] = value.split("-").map(Number);
+  const offset = (year - currentYear) * 12 + month - 1 - currentMonth;
+
+  await user.click(trigger);
+  for (let index = 0; index < Math.abs(offset); index += 1) {
+    await user.click(screen.getByRole("button", { name: offset < 0 ? "Mes anterior" : "Mes siguiente" }));
+  }
+  const dateLabel = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, day)));
+  await user.click(screen.getByRole("button", { name: new RegExp(`(?:^|,\\s)${dateLabel}$`, "i") }));
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
@@ -36,7 +53,7 @@ describe("IndicatorsDashboard", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = screen.getByRole("region", { name: "Familias de indicadores" });
+    const familyBand = screen.getByRole("region", { name: "Familias" });
     expect(familyBand).toBeVisible();
     expect(within(familyBand).getByRole("button", { name: /Cobertura.*seleccionar/i })).toBeVisible();
     expect(within(familyBand).getByLabelText("Cargando Cobertura")).toBeVisible();
@@ -51,7 +68,7 @@ describe("IndicatorsDashboard", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    const familyBand = await screen.findByRole("region", { name: "Familias" });
     expect(within(familyBand).getByRole("button", { name: /Reintentar Cumplimiento/i })).toBeVisible();
 
     const trend = await screen.findByRole("region", { name: "Tendencia" });
@@ -61,7 +78,7 @@ describe("IndicatorsDashboard", () => {
 
     await userEvent.setup().click(within(familyBand).getByRole("button", { name: /Cumplimiento.*seleccionar/i }));
     expect(await screen.findByText("No se pudo cargar Cumplimiento")).toBeVisible();
-    expect(screen.getByRole("region", { name: "Familias de indicadores" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Familias" })).toBeVisible();
   });
 
   it("uses task-focused tabs on narrow screens without changing the selected family", async () => {
@@ -79,7 +96,7 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    const familyBand = await screen.findByRole("region", { name: "Familias" });
     await user.click(within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i }));
     const tabs = await screen.findByRole("tablist", { name: "Secciones del tablero" });
     expect(tabs).toBeVisible();
@@ -88,9 +105,14 @@ describe("IndicatorsDashboard", () => {
     expect(within(tabs).getByRole("tab", { name: "Territorio" })).toBeVisible();
     expect(within(tabs).getByRole("tab", { name: "Registros" })).toBeVisible();
 
+    const viewToggle = screen.getByRole("group", { name: "Vista" });
+    await user.click(within(viewToggle).getByRole("button", { name: "Tabla" }));
+    expect(within(viewToggle).getByRole("button", { name: "Tabla" })).toHaveAttribute("aria-pressed", "true");
+
     await user.click(within(tabs).getByRole("tab", { name: "Territorio" }));
     expect(within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByRole("heading", { name: "Contenedores por zona" })).toBeVisible();
+    expect(await within(screen.getByRole("region", { name: "Detalle territorial" })).findByRole("table")).toBeVisible();
 
     vi.unstubAllGlobals();
   });
@@ -118,22 +140,52 @@ describe("IndicatorsDashboard", () => {
     expect(centro).toHaveFocus();
   });
 
+  it("uses semantic colors for danger, success, warning, and neutral indicator points (#420)", async () => {
+    const user = userEvent.setup();
+    const dimensions = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, width: 480, height: 280, top: 0, right: 480, bottom: 280, left: 0, toJSON: () => ({}),
+    } as DOMRect);
+    const { container } = render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await screen.findByRole("button", { name: /Centro.*89,7.*140.*156/i });
+    expect(container.querySelector('[fill="var(--color-action)"]')).not.toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
+    await screen.findByRole("heading", { name: "Cumplimiento" });
+    await screen.findByRole("button", { name: /En fecha.*344 servicios/i });
+    expect(container.querySelector('[fill="var(--color-success)"]')).not.toBeNull();
+    expect(container.querySelector('[fill="var(--color-warning)"]')).not.toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+    await screen.findByRole("heading", { name: "Incidencias" });
+    await screen.findByRole("button", { name: /Crítico.*3 árboles/i });
+    expect(container.querySelector('[fill="var(--color-danger)"]')).not.toBeNull();
+    dimensions.mockRestore();
+  });
+
   it("lets Office explore exact coverage and compliance values through keyboard-accessible detail", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByRole("heading", { name: "Cobertura" })).toBeVisible();
-    expect(screen.getByText(/Unidad de análisis:/).closest("p")).toHaveTextContent("Unidad de análisis: servicio + zona");
+    expect(await screen.findByText(/^\d{2}\/\d{2}\/\d{4} – \d{2}\/\d{2}\/\d{4}$/)).toBeVisible();
+    expect(screen.getByText(/Actualizado \d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}/)).toBeVisible();
+    expect(screen.queryByText(/Unidad de análisis/)).not.toBeInTheDocument();
     expect(screen.getByText("Atendidos")).toBeVisible();
     expect(screen.getByText("Programados")).toBeVisible();
 
     const centro = await screen.findByRole("button", { name: /Centro.*89,7.*140.*156/i });
     centro.focus();
     await user.keyboard("{Enter}");
-    expect(screen.getAllByText(/Seleccionado:/)[0]?.closest("p")).toHaveTextContent("Seleccionado: Centro");
+    const selectedStatus = screen.getAllByRole("status").find((status) => status.textContent?.includes("Seleccionado:"));
+    expect(selectedStatus).toHaveTextContent("Seleccionado: Centro");
 
     await user.click(screen.getByRole("button", { name: "Tabla" }));
     const coverageTable = screen.getByRole("region", { name: "Tabla de datos de Cobertura" });
+    const categoryHeader = within(coverageTable).getAllByRole("columnheader", { name: "Categoría" })[0];
+    expect(categoryHeader).toHaveAttribute("aria-sort", "none");
+    expect(within(categoryHeader).queryByRole("button")).not.toBeInTheDocument();
     expect(within(coverageTable).getAllByRole("columnheader", { name: "Atendidos" })[0]).toBeVisible();
     expect(within(coverageTable).getAllByRole("columnheader", { name: "Programados" })[0]).toBeVisible();
     expect(within(coverageTable).getAllByText("140 objetivos")[0]).toBeVisible();
@@ -143,7 +195,7 @@ describe("IndicatorsDashboard", () => {
     expect((await screen.findAllByText("344 servicios"))[0]).toBeVisible();
     expect((await screen.findAllByText("Demorados"))[0]).toBeVisible();
     expect(screen.getAllByText(/Cuadrilla no disponible/)[0]).toBeVisible();
-    expect(screen.getByText(/ZoneResult\.recordedAt/i).closest("p")).toHaveTextContent("último ZoneResult.recordedAt");
+    expect(screen.queryByText(/ZoneResult\.recordedAt/i)).not.toBeInTheDocument();
   });
 
   it("lets Office inspect exact Incidencias and Residuos details with their data semantics", async () => {
@@ -154,8 +206,8 @@ describe("IndicatorsDashboard", () => {
     await user.click(screen.getByRole("button", { name: /Incidencias/ }));
 
     expect(screen.getAllByText(/Resolución media de reportes/)[0]).toBeVisible();
-    expect(screen.getByText(/contenedores y arbolado son instantáneas actuales/i)).toBeVisible();
-    expect(screen.getByText(/reportes consideran el período y la resolución media usa solo reportes cerrados/i)).toBeVisible();
+    expect(screen.getByText("Contenedores y arbolado: situación actual.")).toBeVisible();
+    expect(screen.queryByText(/reportes consideran el período/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Tabla" }));
@@ -173,6 +225,63 @@ describe("IndicatorsDashboard", () => {
     expect(within(wasteTable).getAllByText("62,8 m³")[0]).toBeVisible();
   });
 
+  it("shows fractional mean resolution days without rounding them away (#421)", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+    expect((await screen.findAllByText("2,4 días"))[0]).toBeVisible();
+  });
+
+  it("does not add a trailing decimal to whole mean resolution days (#421)", async () => {
+    server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json({
+      ...incidentsIndicatorFixture,
+      reports: { ...incidentsIndicatorFixture.reports, avgResolutionDays: 2 },
+    })));
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+    expect((await screen.findAllByText("2 días"))[0]).toBeVisible();
+    expect(screen.queryByText("2,0 días")).not.toBeInTheDocument();
+  });
+
+  it("unions compliance detail columns across zones and leaves missing details empty (#421)", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
+    await screen.findByRole("heading", { name: "Cumplimiento" });
+    await user.click(screen.getByRole("button", { name: "Tabla" }));
+
+    const tablesRegion = screen.getByRole("region", { name: "Tabla de datos de Cumplimiento" });
+    const zonesTable = within(tablesRegion).getByRole("table", { name: "Valores exactos de zonas sin atención" });
+    const headers = within(zonesTable).getAllByRole("columnheader").map((header) => header.textContent);
+    expect(headers).toEqual([
+      "Categoría",
+      "Cuadrilla no disponible",
+      "Condición meteorológica",
+      "Desperfecto vehicular",
+      "Acceso bloqueado",
+      "Corte de calle / Obra",
+      "Objetivos",
+    ]);
+
+    const costera = within(zonesTable).getByRole("row", { name: /Costera/ });
+    expect(within(costera).getByRole("cell", { name: "5 objetivos" })).toBeVisible();
+    expect(within(costera).getByRole("cell", { name: "3 objetivos" })).toBeVisible();
+    const costeraButton = within(costera).getByRole("button", { name: /Costera/ });
+    await user.click(costeraButton);
+    expect(costeraButton).toHaveAttribute("aria-pressed", "true");
+    const norte = within(zonesTable).getByRole("row", { name: /Norte/ });
+    expect(within(norte).getByRole("cell", { name: "7 objetivos" })).toBeVisible();
+    expect(within(norte).getByRole("cell", { name: "5 objetivos" })).toBeVisible();
+    expect(within(norte).getAllByRole("cell").filter((cell) => cell.textContent === "")).toHaveLength(3);
+  });
+
   it("traces a selected zone to services and restores the unfiltered records view", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
@@ -180,18 +289,22 @@ describe("IndicatorsDashboard", () => {
     await screen.findByRole("heading", { name: "Cobertura" });
     await user.click(await screen.findByRole("button", { name: /Centro.*89,7/i }));
 
-    const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
+    const recordsRegion = await screen.findByRole("region", { name: "Registros" });
+    const recordsTable = within(recordsRegion).getByRole("table", { name: "Registros accesibles de Servicios" });
+    const recordHeader = within(recordsTable).getByRole("columnheader", { name: "Registro" });
+    expect(recordHeader).toHaveAttribute("aria-sort", "none");
+    expect(within(recordHeader).queryByRole("button")).not.toBeInTheDocument();
     // La fila se nombra con el título del servicio, no con su identificador.
     const serviceLink = () => within(recordsRegion).getAllByRole("link", { name: "Recolección de residuos — Recorrido 4" }).find((link) => link.getAttribute("href") === "/app?destination=services&detail=SVC-1042");
     expect(serviceLink()).toBeVisible();
     expect(within(recordsRegion).queryByText("SVC-1042")).not.toBeInTheDocument();
-    expect(recordsRegion).toHaveTextContent(/Filtro activo:.*Centro/i);
+    expect(recordsRegion).toHaveTextContent(/Filtro:.*Centro/i);
     expect(recordsRegion).toHaveTextContent(/Cobertura por zona/i);
-    expect(screen.getByRole("link", { name: /Abrir Servicios/i })).toHaveAttribute("href", "/app?destination=services");
+    expect(screen.getByRole("link", { name: /Ver servicios/i })).toHaveAttribute("href", "/app?destination=services");
 
-    await user.click(screen.getByRole("button", { name: "Quitar filtro de señal" }));
+    await user.click(screen.getByRole("button", { name: "Quitar filtro" }));
 
-    expect(recordsRegion).toHaveTextContent(/Sin filtro de señal/);
+    expect(recordsRegion).toHaveTextContent(/Todos los registros del período/);
     expect(serviceLink()).toBeVisible();
   });
 
@@ -203,11 +316,11 @@ describe("IndicatorsDashboard", () => {
     await user.click(screen.getByRole("button", { name: /Incidencias/ }));
     await user.click(await screen.findByRole("button", { name: /Centro.*8 incidentes/i }));
 
-    const recordsRegion = await screen.findByRole("region", { name: "Registros accesibles" });
+    const recordsRegion = await screen.findByRole("region", { name: "Registros" });
     expect(within(recordsRegion).getByRole("row", { name: /CONT-001/ })).toBeVisible();
     // Se muestra el código, pero el enlace usa el UUID que `GET /containers/:id` espera.
     expect(within(recordsRegion).getByRole("link", { name: "CONT-001" })).toHaveAttribute("href", "/app/catalog/containers?detail=cont-1");
-    expect(screen.getByRole("link", { name: /Abrir catálogo de contenedores/i })).toHaveAttribute("href", "/app/catalog/containers");
+    expect(screen.getByRole("link", { name: /Ver contenedores/i })).toHaveAttribute("href", "/app/catalog/containers");
     expect(screen.queryByRole("button", { name: /Editar|Eliminar|Dar de baja/i })).not.toBeInTheDocument();
   });
 
@@ -219,8 +332,8 @@ describe("IndicatorsDashboard", () => {
     await user.click(screen.getByRole("button", { name: /Incidencias/ }));
     await user.click(await screen.findByRole("button", { name: /Alto.*9 árboles/i }));
 
-    expect(screen.getByText(/no se puede vincular con un registro operativo/i)).toBeVisible();
-    expect(screen.queryByRole("link", { name: /Abrir catálogo de árboles/i })).not.toBeInTheDocument();
+    expect(screen.getByText("No hay registros para «Alto».")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /Ver árboles/i })).not.toBeInTheDocument();
   });
 
   it("shows «Sin reportes cerrados» when the backend sends avgResolutionDays null (#302)", async () => {
@@ -228,7 +341,7 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias de indicadores" });
+    const familyBand = await screen.findByRole("region", { name: "Familias" });
     const incidentsButton = within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i });
     expect(await within(incidentsButton).findByText("Sin reportes cerrados")).toBeVisible();
     expect(within(familyBand).queryByText("No se pudo cargar Incidencias")).not.toBeInTheDocument();
@@ -236,6 +349,32 @@ describe("IndicatorsDashboard", () => {
     await user.click(incidentsButton);
     expect(await screen.findByRole("heading", { name: "Incidencias" })).toBeVisible();
     expect(screen.getByText(/Resolución media de reportes:/).closest("p")).toHaveTextContent("Sin reportes cerrados");
+  });
+
+  it("marks Incidencias and Residuos as empty when their families have no records", async () => {
+    const incidents = structuredClone(incidentsIndicatorFixture);
+    incidents.containers.byStatus = [];
+    incidents.containers.byZone = [];
+    incidents.trees.byRiskLevel = [];
+    incidents.reports.total = 0;
+    incidents.reports.byType = [];
+    incidents.reports.byStatus = [];
+    incidents.reports.avgResolutionDays = null;
+
+    const waste = structuredClone(wasteIndicatorFixture);
+    waste.totals = { weightKg: 0, volumeM3: 0, divertedKg: 0, divertedPct: 0 };
+    waste.byWasteType = [];
+    waste.byDisposalSite = [];
+    waste.records = 0;
+
+    server.use(
+      http.get("*/api/indicators/incidents", () => HttpResponse.json(incidents)),
+      http.get("*/api/indicators/waste", () => HttpResponse.json(waste)),
+    );
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const familyBand = await screen.findByRole("region", { name: "Familias" });
+    expect(await within(familyBand).findAllByText("Sin datos")).toHaveLength(2);
   });
 
   it("lists real zones and service types and sends their UUIDs as filters (#302)", async () => {
@@ -252,8 +391,10 @@ describe("IndicatorsDashboard", () => {
 
     const requested: string[] = [];
     server.use(http.get("*/api/indicators/:family", ({ request }) => { requested.push(new URL(request.url).search); return passthrough(); }));
-    await user.selectOptions(await screen.findByLabelText("Zona operativa"), "Zona Sur real");
-    await user.selectOptions(screen.getByLabelText("Tipo de servicio"), "Censo de arbolado urbano");
+    await user.click(await screen.findByRole("combobox", { name: "Zona operativa" }));
+    await user.click(await screen.findByRole("option", { name: "Zona Sur real" }));
+    await user.click(screen.getByRole("combobox", { name: "Tipo de servicio" }));
+    await user.click(await screen.findByRole("option", { name: "Censo de arbolado urbano" }));
     expect(screen.queryByRole("option", { name: "Centro" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Actualizar" }));
 
@@ -269,7 +410,7 @@ describe("IndicatorsDashboard", () => {
 
     expect(screen.getByLabelText("Zona operativa")).toBeDisabled();
     expect(screen.getByLabelText("Tipo de servicio")).toBeDisabled();
-    expect(screen.getByText("Cargando tipos de servicio…")).toBeVisible();
+    expect(screen.getByText("Cargando…", { selector: "#indicator-service-type-hint" })).toBeVisible();
   });
 
   it("blocks an inverted date range with a message and does not call the backend", async () => {
@@ -280,15 +421,25 @@ describe("IndicatorsDashboard", () => {
     let indicatorRequests = 0;
     server.use(http.get("*/api/indicators/:family", () => { indicatorRequests += 1; return HttpResponse.json({}, { status: 500 }); }));
 
-    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-09-20" } });
-    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-09-01" } });
+    await chooseDate(user, "Desde", "2026-09-20");
+    await chooseDate(user, "Hasta", "2026-09-01");
     await user.click(screen.getByRole("button", { name: "Actualizar" }));
 
     expect(await screen.findByText("La fecha «Desde» no puede ser posterior a «Hasta».")).toBeVisible();
-    expect(screen.getByLabelText("Hasta")).toBeInvalid();
+    expect(screen.getByRole("button", { name: /^Hasta/ })).toHaveAttribute("aria-invalid", "true");
     expect(indicatorRequests).toBe(0);
 
-    fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2026-09-20" } });
+    await chooseDate(user, "Hasta", "2026-09-20");
     expect(screen.queryByText("La fecha «Desde» no puede ser posterior a «Hasta».")).not.toBeInTheDocument();
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Cobertura" });
+    await screen.findByText("Atendidos");
+
+    expectNoInternalJargon(container);
   });
 });

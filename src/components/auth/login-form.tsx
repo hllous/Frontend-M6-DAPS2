@@ -3,18 +3,22 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AuthMode } from "@/lib/session";
+import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import type { OperationalScenario, ScenarioId } from "@/lib/scenarios";
-
-import styles from "./login-form.module.css";
 
 export function LoginForm({
   scenarios,
   authMode,
+  redirectTo,
 }: {
   scenarios: OperationalScenario[];
   authMode: AuthMode;
+  redirectTo: string;
 }) {
   const [scenarioId, setScenarioId] = useState<ScenarioId>(scenarios[0]?.id ?? "office-duty-queue");
   const [error, setError] = useState<string>();
@@ -27,56 +31,69 @@ export function LoginForm({
     try {
       const response = await fetch("/api/session/login", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: SESSION_MUTATION_HEADERS,
         body: JSON.stringify({ scenarioId }),
       });
       if (!response.ok) {
         const body = (await response.json()) as { message?: string };
-        setError(body.message ?? "No se pudo iniciar la sesión.");
+        setError(body.message ?? "No se pudo ingresar. Intente nuevamente.");
         return;
       }
-      window.location.assign("/app");
+      window.location.assign(redirectTo);
     } catch {
-      setError("No se pudo conectar con la sesión local. Vuelva a intentarlo.");
+      setError("No se pudo ingresar. Revise la conexión e intente nuevamente.");
     }
   }
 
   return (
-    <main className={styles.page}>
-      <section className={styles.panel} aria-labelledby="login-title">
-        <div className={styles.mark} aria-hidden="true">M6</div>
-        <p className={styles.kicker}>Ambiente y servicios</p>
-        <h1 id="login-title">Ingresar al sistema operativo</h1>
-        <p className={styles.intro}>
-          Seleccione un escenario de trabajo para abrir una sesión protegida.
-        </p>
-        {isUnavailable ? (
-          <p className={styles.unavailable} role="alert">
-            La autenticación real de M1 no está disponible hasta publicar su contrato.
-          </p>
-        ) : (
-          <form onSubmit={submit}>
-            <FieldGroup className={styles.form}>
-              <Field className={styles.field}>
-                <FieldLabel htmlFor="operational-scenario">Escenario operativo</FieldLabel>
-              <select
-                id="operational-scenario"
-                value={scenarioId}
-                onChange={(event) => setScenarioId(event.target.value as ScenarioId)}
-                aria-describedby="scenario-help"
-              >
-                {scenarios.map((scenario) => (
-                  <option key={scenario.id} value={scenario.id}>{scenario.label}</option>
-                ))}
-              </select>
-                <FieldDescription id="scenario-help">El alcance de la sesión se limita al escenario elegido.</FieldDescription>
-              </Field>
-              {error ? <FieldError className={styles.error}>{error}</FieldError> : null}
-              <Button type="submit">Ingresar al sistema</Button>
-            </FieldGroup>
-          </form>
-        )}
-      </section>
+    <main className="grid min-h-dvh place-items-center bg-[var(--color-canvas)] p-4 sm:p-6">
+      <Card className="w-full max-w-[520px] gap-0 p-4 sm:p-8">
+        <CardHeader className="gap-0 px-0">
+          <p className="mb-5 text-sm font-semibold tracking-wide text-[var(--color-institutional)]">Ambiente e Higiene</p>
+          <h1 id="login-title" className="max-w-[16ch] text-[28px] leading-[34px]">
+            Ingresar
+          </h1>
+        </CardHeader>
+        <CardContent className="px-0">
+          {isUnavailable ? (
+            <Alert variant="danger">
+              <AlertDescription>
+                El ingreso no está disponible por el momento.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <form onSubmit={submit}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="operational-scenario">Perfil</FieldLabel>
+                  <Select
+                    value={scenarioId}
+                    items={Object.fromEntries(scenarios.map((scenario) => [scenario.id, scenario.label]))}
+                    onValueChange={(value) => setScenarioId(value as ScenarioId)}
+                  >
+                    <SelectTrigger id="operational-scenario" aria-label="Perfil">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {scenarios.map((scenario) => (
+                          <SelectItem key={scenario.id} value={scenario.id}>{scenario.label}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                {error ? (
+                  <Alert variant="danger">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <Button type="submit" className="w-full">Ingresar al sistema</Button>
+              </FieldGroup>
+            </form>
+          )}
+        </CardContent>
+      </Card>
     </main>
   );
 }

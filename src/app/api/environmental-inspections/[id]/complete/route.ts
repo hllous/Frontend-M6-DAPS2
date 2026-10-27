@@ -1,40 +1,22 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   getEnvironmentalInspectionFixture,
   transitionEnvironmentalReportFixture,
   updateEnvironmentalInspectionFixture,
 } from "@/lib/environmental-report-fixtures";
-import { environmentalInspectionCompleteInputSchema, inspectionChecklist } from "@/lib/environmental-reports";
+import { environmentalInspectionCompleteInputSchema, environmentalInspectionSchema, inspectionChecklist } from "@/lib/environmental-reports";
 import { serviceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { withInspectionAttachments } from "../../_attachments";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  500: "Internal Server Error",
-  503: "Service Unavailable",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 function nextStepForOutcome(outcome: "NO_VIOLATION" | "VIOLATION_FOUND" | "INCONCLUSIVE") {
   if (outcome === "NO_VIOLATION") return "CASE_CLOSED" as const;
@@ -44,17 +26,15 @@ function nextStepForOutcome(outcome: "NO_VIOLATION" | "VIOLATION_FOUND" | "INCON
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
   const path = new URL(request.url).pathname;
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session.scenarioId);
-    if (!scenario.capabilities.includes("environmentalInspection:execute")) {
-      return errorResponse(403, "Solo la persona responsable de la cuadrilla puede completar la inspección.", path);
-    }
+    const scenario = getScenario(session);
+    authorize(session, { capability: "environmentalInspection:execute", capabilityMessage: "Solo la persona responsable de la cuadrilla puede completar la inspección.", throwOnError: true });
 
     const requestBody = await request.text();
     let parsedBody: unknown;
@@ -68,7 +48,23 @@ export async function POST(
       return errorResponse(400, parsedInput.error.issues.map((issue) => issue.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
+      if (scenario.actor.kind === "FIELD") {
+        const inspectionResponse = await fetchBackend(request, `/environmental-inspections/${pathId(id)}`);
+        if (!inspectionResponse.ok) return forwardResponse(inspectionResponse);
+        let inspectionPayload: unknown;
+        try { inspectionPayload = await inspectionResponse.json(); } catch {
+          return errorResponse(502, "La respuesta de la inspección no contiene JSON válido.", path);
+        }
+        const rawInspection = inspectionPayload && typeof inspectionPayload === "object" && "data" in inspectionPayload && !("id" in inspectionPayload)
+          ? (inspectionPayload as { data: unknown }).data
+          : inspectionPayload;
+        const inspection = environmentalInspectionSchema.safeParse(rawInspection);
+        if (!inspection.success) return errorResponse(502, "La respuesta de la inspección no respeta el contrato documentado.", path);
+        if (!inspection.data.serviceId) return errorResponse(409, "La inspección no tiene un servicio operativo vinculado.", path);
+        const scopedService = await requireCrewScope(request, session, { serviceId: inspection.data.serviceId });
+        if (scopedService instanceof Response) return scopedService;
+      }
       const backendInput = {
         inspectedAt: parsedInput.data.inspectedAt,
         outcome: parsedInput.data.outcome,
@@ -86,7 +82,7 @@ export async function POST(
       };
       return withInspectionAttachments(request, await fetchBackend(
         request,
-        `/environmental-inspections/${encodeURIComponent(id)}/complete`,
+        `/environmental-inspections/${pathId(id)}/complete`,
         "environmentalInspection:execute",
         {
           method: "POST",
@@ -148,6 +144,6 @@ export async function POST(
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo completar la inspección.", path);
+    return mapSessionError(error, path, "No se pudo completar la inspección.");
   }
 }

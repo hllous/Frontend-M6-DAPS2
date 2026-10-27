@@ -52,8 +52,8 @@ describe("EmptyContainerDialog", () => {
     );
 
     expect(screen.getByRole("heading", { name: /Registrar vaciado de contenedor CONT-TEST-002/i })).toBeVisible();
-    expect(screen.getByText("Av. Santa Fe 3400")).toBeVisible();
-    expect(screen.getByText(/2\.400 L/)).toBeVisible();
+    expect(screen.queryByText("Av. Santa Fe 3400")).not.toBeInTheDocument();
+    expect(screen.getByText("El contenedor vuelve a Activo.")).toBeVisible();
 
     const confirmButton = screen.getByRole("button", { name: "Confirmar vaciado" });
     await user.click(confirmButton);

@@ -1,3 +1,8 @@
+import {
+  chooseCatalogAOption,
+  clickCatalogRowAction,
+  openCatalogRowDetail,
+} from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
@@ -8,33 +13,37 @@ test.describe("Green Point catalog management #124", () => {
     await page.goto("/app/catalog/green-points");
 
     await expect(page.getByRole("heading", { name: "Puntos verdes" })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "GP-001" })).toBeVisible();
+    await expect(page.getByRole("rowheader", { name: "GP-001" })).toBeVisible();
 
     await page.getByRole("button", { name: "Registrar punto verde" }).click();
     const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Código").fill(`GP-E2E-${Date.now()}`);
+    const code = `GP-E2E-${Date.now()}`;
+    await dialog.getByLabel("Código").fill(code);
     await dialog.getByLabel("Nombre").fill("Punto verde e2e");
-    await dialog.getByLabel("Zona operativa").selectOption({ index: 1 });
-    await dialog.getByLabel("Domiciliarios").check();
+    await chooseCatalogAOption(page, dialog, "Zona operativa", { index: 1 });
+    await dialog.getByRole("checkbox", { name: "Domiciliarios" }).check();
     await dialog.getByLabel("Dirección").fill("Av. E2E 124");
     await dialog.getByLabel("Latitud").fill("-34.60");
     await dialog.getByLabel("Longitud").fill("-58.38");
     await dialog.getByRole("button", { name: "Guardar punto verde" }).click();
 
     await expect(dialog).not.toBeVisible();
-    await expect(page.getByText("Punto verde creado con éxito.")).toBeVisible();
-    const code = await page.locator("tbody tr").last().locator("td").first().textContent();
-    expect(code).toMatch(/^GP-E2E-/);
+    await expect(page.getByText("Punto verde creado.")).toBeVisible();
+    const codeButton = page.getByRole("button", { name: `Ver detalle de ${code}` });
+    await expect(codeButton).toBeVisible();
 
     const row = page.getByRole("row", { name: new RegExp(code ?? "GP-E2E-") });
-    await row.getByRole("button", { name: "Ver detalle" }).click();
+    await openCatalogRowDetail(row);
     await expect(page.getByRole("dialog")).toContainText("Domiciliarios");
-    await page.getByRole("dialog").getByRole("button", { name: "Cerrar detalle" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Cerrar" }).click();
 
-    await row.getByRole("button", { name: "Dar de baja" }).click();
+    await clickCatalogRowAction(row, "Dar de baja");
+    const deactivateDialog = page.getByRole("dialog");
+    await expect(deactivateDialog.getByRole("heading", { name: new RegExp(`Confirmar baja del punto verde ${code}`) })).toBeVisible();
+    await deactivateDialog.getByRole("button", { name: `Dar de baja el punto verde ${code}` }).click();
     await expect(page.getByText("Punto verde dado de baja")).toBeVisible();
-    await page.getByLabel("Filtrar puntos verdes por estado").selectOption("false");
-    await expect(page.getByRole("cell", { name: code ?? "GP-E2E-" })).toBeVisible();
+    await chooseCatalogAOption(page, page, "Filtrar puntos verdes por estado", "Inactivos");
+    await expect(page.getByRole("button", { name: `Ver detalle de ${code ?? "GP-E2E-"}` })).toBeVisible();
   });
 
   test("Field can inspect but cannot manage Green Points", async ({ page }) => {
@@ -43,7 +52,8 @@ test.describe("Green Point catalog management #124", () => {
     await expect(page.getByRole("heading", { name: "Puntos verdes" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Registrar punto verde" })).not.toBeVisible();
     await expect(page.getByRole("button", { name: "Editar" })).not.toBeVisible();
-    await page.getByRole("row", { name: /GP-001/ }).getByRole("button", { name: "Ver detalle" }).click();
-    await expect(page.getByRole("dialog", { name: /Detalle del punto verde/ })).toBeVisible();
+    const detail = await openCatalogRowDetail(page.getByRole("row", { name: /GP-001/ }));
+    await expect(detail).toHaveAccessibleName(/Detalle del punto verde/);
+    await expect(detail.getByRole("button", { name: "Editar" })).toHaveCount(0);
   });
 });

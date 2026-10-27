@@ -1,19 +1,20 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseCalendarDay, chooseFieldOption, setFieldTime } from "./support/services-608-controls";
 
 test.describe.serial("Environmental inspection execution #134", () => {
   test("Crew Member sees the assigned inspection as read-only", async ({ page }) => {
     await loginViaApi(page, "field-crew-member-route");
     await page.goto("/app");
 
-    const serviceCard = page.locator("li").filter({ hasText: "SVC-1112" });
+    const serviceCard = page.locator('[data-service-id="SVC-1112"]');
     await expect(serviceCard).toBeVisible();
-    await serviceCard.getByRole("button", { name: "Ver detalle" }).click();
+    await serviceCard.getByRole("button", { name: "Abrir" }).click();
 
-    const inspection = page.getByRole("region", { name: /Ejecuci/ });
+    const inspection = page.getByRole("region", { name: "Inspección ambiental" });
     await expect(inspection).toBeVisible();
-    await expect(inspection.getByText(/La persona responsable de la cuadrilla registra el resultado/)).toBeVisible();
+    await expect(inspection.getByText("Solo consulta")).toBeVisible();
     await expect(inspection.getByRole("button", { name: /Completar inspecci/ })).toHaveCount(0);
   });
 
@@ -21,22 +22,39 @@ test.describe.serial("Environmental inspection execution #134", () => {
     await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app");
 
-    const serviceCard = page.locator("li").filter({ hasText: "SVC-1112" });
+    const serviceCard = page.locator('[data-service-id="SVC-1112"]');
     await expect(serviceCard).toBeVisible();
     await serviceCard.getByRole("button", { name: "Iniciar servicio" }).click();
     await expect(serviceCard.getByText("En curso")).toBeVisible();
-    await serviceCard.getByRole("button", { name: "Ver detalle" }).click();
+    await serviceCard.getByRole("button", { name: "Abrir" }).click();
 
-    const inspection = page.getByRole("region", { name: /Ejecuci/ });
+    const inspection = page.getByRole("region", { name: "Inspección ambiental" });
     await expect(inspection).toBeVisible();
+    await expect(inspection.getByRole("checkbox").first()).toBeVisible();
     await inspection.getByRole("checkbox").all().then(async (checkboxes) => {
       for (const checkbox of checkboxes) await checkbox.check();
     });
-    await inspection.getByRole("combobox", { name: /Resultado/ }).selectOption("VIOLATION_FOUND");
+    const inspectedAt = await page.evaluate(() => {
+      const now = new Date();
+      return {
+        day: now.getDate(),
+        monthName: new Intl.DateTimeFormat("es-AR", { month: "long" }).format(now),
+        year: now.getFullYear(),
+        time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+      };
+    });
+    await chooseCalendarDay(inspection, /Fecha y hora de inspección/, {
+      monthsAhead: 0,
+      day: inspectedAt.day,
+      monthName: inspectedAt.monthName,
+      year: inspectedAt.year,
+    });
+    await setFieldTime(inspection, /Fecha y hora de inspección/, inspectedAt.time);
+    await chooseFieldOption(inspection, /Resultado de la inspección/, "Infracción constatada");
     await inspection.getByRole("textbox", { name: /Hallazgos/ }).fill("Emisión visible constatada en la visita.");
-    await inspection.getByRole("combobox", { name: /Tipo de infracc/ }).selectOption("AIR_EMISSION");
-    await inspection.getByRole("combobox", { name: "Gravedad" }).selectOption("HIGH");
-    await inspection.getByRole("combobox", { name: /Acc/ }).selectOption("FORMAL_NOTICE");
+    await chooseFieldOption(inspection, /Tipo de infracción/, "Emisión al aire");
+    await chooseFieldOption(inspection, "Gravedad", "Alta");
+    await chooseFieldOption(inspection, /Acción sugerida/, "Aviso formal");
     await inspection.getByLabel(/Seleccionar archivos/).setInputFiles({
       name: "evidencia_chimenea.jpg",
       mimeType: "image/jpeg",

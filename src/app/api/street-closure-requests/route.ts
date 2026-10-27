@@ -1,3 +1,4 @@
+import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, requireCrewScope, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -18,36 +19,20 @@ import { serviceFixtures } from "@/lib/services-fixtures";
 import { getTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
 
-function requireReadAccess(request: Request, path: string, sourceId?: string) {
+
+
+async function requireReadAccess(request: Request, path: string, sourceId?: string) {
   const session = getRequiredSession(request);
   const scenario = getScenario(session);
   if (scenario.actor.kind === "OFFICE") return { session, scenario };
 
   // Field may read only the dependency context for a Service assigned to its crew.
   // Backend remains authoritative for this scope when the BFF is forwarding.
-  if (sourceId && session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+  if (sourceId && backendMode(session)) {
+    const scopedService = await requireCrewScope(request, session, { serviceId: sourceId });
+    if (scopedService instanceof Response) return { response: scopedService };
     return { session, scenario };
   }
   const service = sourceId
@@ -59,21 +44,11 @@ function requireReadAccess(request: Request, path: string, sourceId?: string) {
   return { session, scenario };
 }
 
-function backendQueryString(query: ReturnType<typeof streetClosureRequestQuerySchema.parse>): string {
-  const params = new URLSearchParams();
-  if (query.status) params.set("status", query.status);
-  if (query.sourceId) params.set("sourceId", query.sourceId);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
-}
-
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const sourceId = new URL(request.url).searchParams.get("sourceId") ?? undefined;
-    const access = requireReadAccess(request, path, sourceId);
+    const access = await requireReadAccess(request, path, sourceId);
     if (access.response) return access.response;
     const queryResult = streetClosureRequestQuerySchema.safeParse({
       status: new URL(request.url).searchParams.get("status") ?? undefined,
@@ -85,15 +60,12 @@ export async function GET(request: Request) {
       return errorResponse(400, "Los filtros de solicitudes de corte de calle son inválidos.", path);
     }
 
-    if (access.session && access.session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (access.session && backendMode(access.session)) {
       const backendResponse = await fetchBackend(
         request,
-        `/street-closure-requests${backendQueryString(queryResult.data)}`,
+        `/street-closure-requests${backendQuery(queryResult.data, ["status", "sourceId", "page", "pageSize"])}`,
       );
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     return NextResponse.json(
@@ -102,7 +74,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudieron cargar las solicitudes de corte de calle.", path);
+    return mapSessionError(error, path, "No se pudieron cargar las solicitudes de corte de calle.");
   }
 }
 
@@ -111,8 +83,8 @@ export async function POST(request: Request) {
   try {
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede crear solicitudes de corte de calle.", path);
+    if (!scenario.capabilities.includes("streetClosureRequest:create")) {
+      return errorResponse(403, "Su rol no permite crear solicitudes de corte de calle.", path, FORBIDDEN_CODES.roleRequired);
     }
     let body: unknown;
     try {
@@ -125,16 +97,13 @@ export async function POST(request: Request) {
       return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     }
 
-    if (session && session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (session && backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/street-closure-requests", undefined, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     const source = parsed.data.sourceType === "SERVICE"
@@ -165,6 +134,6 @@ export async function POST(request: Request) {
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo crear la solicitud de corte de calle.", path);
+    return mapSessionError(error, path, "No se pudo crear la solicitud de corte de calle.");
   }
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { OverlayMotionPreference } from "./overlay-motion";
+
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -19,19 +21,31 @@ import {
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
+  EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
 import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { Spinner } from "@/components/ui/spinner";
+import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -45,6 +59,9 @@ import { cn } from "@/lib/utils";
 import type { Capability, OperationalScenario } from "@/lib/scenarios";
 
 import styles from "./app-shell.module.css";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
 import { FieldWorkPanel } from "@/components/services/field-work-panel";
 import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ReferralsWorkspace } from "@/components/referrals/referrals-workspace";
@@ -122,10 +139,12 @@ export function AppShell({
   scenario,
   logoutAction,
   routeContent,
+  contentReady = true,
 }: {
-  scenario: OperationalScenario;
+  scenario?: OperationalScenario;
   logoutAction?: LogoutAction;
   routeContent?: ReactNode;
+  contentReady?: boolean;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -135,14 +154,26 @@ export function AppShell({
     : requestedDestination && navigation.some((item) => item.id === requestedDestination)
       ? requestedDestination
       : "work";
+  const mainRef = useRef<HTMLElement>(null);
+  const previousDestination = useRef(destination);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const isTablet = useTabletNavigation();
   const navigationIsIconOnly = isCollapsed || isTablet;
   const [isMoreOpen, setIsMoreOpen] = useState(false);
-  const availableItems = navigation.filter((item) => isAllowed(item, scenario));
+  const availableItems = scenario ? navigation.filter((item) => isAllowed(item, scenario)) : [];
+
+  useEffect(() => {
+    if (previousDestination.current !== destination) mainRef.current?.focus();
+    previousDestination.current = destination;
+  }, [destination]);
 
   return (
-    <div className={`${styles.shell} ${isCollapsed ? styles.collapsed : ""}`}>
+    <div className={cn(
+      styles.shell,
+      isCollapsed && styles.collapsed,
+      destination === "services" && styles.servicesShell,
+    )}>
+      <OverlayMotionPreference />
       <a className={styles.skipLink} href="#contenido-principal">
         Saltar al contenido principal
       </a>
@@ -152,14 +183,22 @@ export function AppShell({
           <span className={styles.brandText}>Ambiente<br />y Servicios</span>
         </div>
         <nav className={styles.moduleNav} aria-label="Módulos">
-          {availableItems.map((item) => (
-            <NavigationLink
-              key={item.id}
-              item={item}
-              selected={destination === item.id}
-              showTooltip={navigationIsIconOnly}
-            />
-          ))}
+          <LoadingRegion label="Navegación" isLoading={!scenario} className="flex flex-col gap-1.5">
+            {!scenario ? navigation.map((item) => (
+              <Button key={item.id} variant="sidebar" className={styles.navigationButton} disabled aria-hidden="true">
+                <Skeleton className="size-4 shrink-0" />
+                {!navigationIsIconOnly ? <Skeleton className="h-5 w-28" /> : null}
+              </Button>
+            )) : null}
+            {availableItems.map((item) => (
+              <NavigationLink
+                key={item.id}
+                item={item}
+                selected={destination === item.id}
+                showTooltip={navigationIsIconOnly}
+              />
+            ))}
+          </LoadingRegion>
         </nav>
         <Button
           className={styles.collapseButton}
@@ -173,15 +212,20 @@ export function AppShell({
       </aside>
 
       <header className={styles.topbar}>
-        <div>
-          <p className={styles.contextLabel}>{actorLabel(scenario)}</p>
-          <p className={styles.actorName}>{scenario.actor.name}</p>
-        </div>
+        <LoadingRegion label="Actor" isLoading={!scenario}>
+          {scenario ? (
+            <>
+              <p className={styles.contextLabel}>{actorLabel(scenario)}</p>
+              <p className={styles.actorName}>{scenario.actor.name}</p>
+            </>
+          ) : (
+            <div className="flex h-10 flex-col justify-center gap-1">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-5 w-36" />
+            </div>
+          )}
+        </LoadingRegion>
         <div className={styles.topbarActions}>
-          <div className={styles.sessionState} aria-label="Estado de sesión">
-            <span aria-hidden="true" />
-            Sesión operativa
-          </div>
           {logoutAction ? (
             <form action={logoutAction}>
               <Button type="submit" variant="outline">Cerrar sesión</Button>
@@ -190,8 +234,15 @@ export function AppShell({
         </div>
       </header>
 
-      <main className={styles.main} id="contenido-principal" tabIndex={-1}>
-        {pathname.startsWith("/app/") ? (
+      <main
+        ref={mainRef}
+        className={cn(styles.main, destination === "services" && styles.servicesMain)}
+        id="contenido-principal"
+        tabIndex={-1}
+      >
+        {!scenario || !contentReady ? (
+          <LoadingRegion label="Contenido"><ListItemsSkeleton /></LoadingRegion>
+        ) : pathname.startsWith("/app/") ? (
           routeContent
         ) : destination === "work" ? (
           <WorkPanel scenario={scenario} />
@@ -219,6 +270,16 @@ export function AppShell({
       </main>
 
       <nav className={styles.mobileNav} aria-label="Navegación móvil">
+        {!scenario ? (
+          <LoadingRegion label="Navegación móvil" className="col-span-4 grid grid-cols-4 gap-1">
+            {[...mobileDestinations, "more"].map((id) => (
+              <Button key={id} variant="ghost" className={styles.mobileNavigationButton} disabled aria-hidden="true">
+                <Skeleton className="size-4" />
+                <Skeleton className="h-4 w-12" />
+              </Button>
+            ))}
+          </LoadingRegion>
+        ) : null}
         {availableItems.filter((item) => mobileDestinations.includes(item.id)).map((item) => (
           <NavigationLink
             key={item.id}
@@ -227,10 +288,10 @@ export function AppShell({
             compact
           />
         ))}
-        <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
+        {scenario ? <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
           <SheetTrigger
             render={
-              <Button className={styles.mobileNavigationButton} variant="ghost" aria-label="Más módulos" />
+              <Button className={styles.mobileNavigationButton} variant="ghost" aria-label="Más" />
             }
           >
             <CircleHelp aria-hidden />
@@ -238,25 +299,31 @@ export function AppShell({
           </SheetTrigger>
           <SheetContent side="bottom" className={styles.moreSheet}>
             <SheetHeader>
-              <SheetTitle>Más módulos</SheetTitle>
-              <SheetDescription>Seleccione un módulo disponible para su sesión.</SheetDescription>
+              <SheetTitle>Más</SheetTitle>
             </SheetHeader>
             <div className={styles.sheetNavigation}>
               {availableItems.map((item) => (
-                <Link
+                <Button
                   key={item.id}
-                  href={destinationHref(item.id)}
-                  className={cn(buttonVariants({ variant: destination === item.id ? "default" : "outline" }), styles.sheetNavigationButton)}
-                  aria-current={destination === item.id ? "page" : undefined}
-                  onClick={() => setIsMoreOpen(false)}
+                  variant={destination === item.id ? "default" : "outline"}
+                  className={styles.sheetNavigationButton}
+                  nativeButton={false}
+                  role="link"
+                  render={
+                    <Link
+                      href={destinationHref(item.id)}
+                      aria-current={destination === item.id ? "page" : undefined}
+                      onClick={() => setIsMoreOpen(false)}
+                    />
+                  }
                 >
                   <item.icon data-icon="inline-start" aria-hidden />
                   {item.label}
-                </Link>
+                </Button>
               ))}
             </div>
           </SheetContent>
-        </Sheet>
+        </Sheet> : null}
       </nav>
       <p className="sr-only" aria-live="polite">
         {navigation.find((item) => item.id === destination)?.label} seleccionado
@@ -277,18 +344,16 @@ function NavigationLink({
   showTooltip?: boolean;
 }) {
   const link = (
-    <Link
-      href={destinationHref(item.id)}
-      className={cn(
-        buttonVariants({ variant: selected ? "default" : "ghost" }),
-        compact ? styles.mobileNavigationButton : styles.navigationButton,
-      )}
-      aria-current={selected ? "page" : undefined}
-      aria-label={item.label}
+    <Button
+      variant={compact ? (selected ? "default" : "ghost") : "sidebar"}
+      className={compact ? styles.mobileNavigationButton : styles.navigationButton}
+      nativeButton={false}
+      role="link"
+      render={<Link href={destinationHref(item.id)} aria-current={selected ? "page" : undefined} aria-label={item.label} />}
     >
       <item.icon data-icon="inline-start" aria-hidden />
       <span>{item.label}</span>
-    </Link>
+    </Button>
   );
 
   return compact || !showTooltip ? link : (
@@ -349,7 +414,7 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
         if (!isCurrent) return;
         setQueue({
           status: "error",
-          message: "No se pudo cargar la cola de autorizaciones. Intente nuevamente más tarde.",
+          message: "No se pudieron cargar las autorizaciones pendientes. Intente nuevamente.",
         });
       });
 
@@ -361,39 +426,26 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
   return (
     <section aria-labelledby="work-title" className={styles.workPanel}>
       <div className={styles.pageHeading}>
-        <p>Priorice y coordine</p>
         <h1 id="work-title">{scenario.work.title}</h1>
         <span>{scenario.work.summary}</span>
       </div>
-      <ol className={styles.workList}>
+      <ItemGroup>
         {scenario.work.items.map((item, index) => (
-          <li key={item}>
-            <div>
-              <span className={styles.workIndex}>{String(index + 1).padStart(2, "0")}</span>
-              <p>{item}</p>
-            </div>
+          <Item key={item} variant="outline">
+            <ItemMedia className="w-6 text-xs text-muted-foreground tabular-nums">{String(index + 1).padStart(2, "0")}</ItemMedia>
+            <ItemContent>
+              <ItemTitle>{item}</ItemTitle>
+            </ItemContent>
             {mayExecuteService && index === 0 ? (
-              <Button onClick={() => undefined}>
-                <Play data-icon="inline-start" aria-hidden />
-                Iniciar servicio
-              </Button>
-            ) : (
-              <span className={styles.workState}>
-                Requiere revisión
-              </span>
-            )}
-          </li>
+              <ItemActions className="max-sm:basis-full max-sm:pl-[calc(1.5rem+0.625rem)]">
+                <Button className="max-sm:w-full" onClick={() => undefined}>
+                  <Play data-icon="inline-start" aria-hidden />
+                  Iniciar servicio
+                </Button>
+              </ItemActions>
+            ) : null}
+          </Item>
         ))}
-        {queue.status === "loading" ? (
-          <li className={styles.workQueueMessage} aria-live="polite">
-            <span>Cargando decisiones de arbolado…</span>
-          </li>
-        ) : null}
-        {queue.status === "error" ? (
-          <li className={styles.workQueueMessage} role="alert">
-            <span>{queue.message}</span>
-          </li>
-        ) : null}
         {queue.status === "ready"
           ? queue.interventions.map((intervention, index) => (
               <TreeInterventionWorkItem
@@ -403,7 +455,20 @@ function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
               />
             ))
           : null}
-      </ol>
+      </ItemGroup>
+      {queue.status === "loading" ? (
+        <Item variant="muted" aria-live="polite">
+          <ItemMedia><Spinner aria-hidden role="presentation" /></ItemMedia>
+          <ItemContent>
+            <ItemDescription>Cargando intervenciones de arbolado…</ItemDescription>
+          </ItemContent>
+        </Item>
+      ) : null}
+      {queue.status === "error" ? (
+        <Alert variant="danger">
+          <AlertDescription>{queue.message}</AlertDescription>
+        </Alert>
+      ) : null}
     </section>
   );
 }
@@ -418,23 +483,23 @@ function TreeInterventionWorkItem({
   const StatusIcon = intervention.status === "REQUESTED" ? Clock3 : ShieldAlert;
 
   return (
-    <li>
-      <div>
-        <span className={styles.workIndex}>{String(index).padStart(2, "0")}</span>
-        <div className={styles.workInterventionCopy}>
-          <p>
-            <Link href="/app/catalog/tree-interventions">
-              {treeInterventionLabels[intervention.interventionType]} · {intervention.address}
-            </Link>
-          </p>
-          <span className={styles.workInterventionHint}>Intervención de arbolado</span>
-        </div>
-      </div>
-      <span className={`${styles.workState} ${intervention.status === "PENDING_AUTHORIZATION" ? styles.workStatePending : ""}`}>
-        <StatusIcon aria-hidden />
-        {treeInterventionStatusLabels[intervention.status]}
-      </span>
-    </li>
+    <Item variant="outline">
+      <ItemMedia className="w-6 text-xs text-muted-foreground tabular-nums">{String(index).padStart(2, "0")}</ItemMedia>
+      <ItemContent>
+        <ItemTitle>
+          <Link href="/app/catalog/tree-interventions" className="hover:underline focus-visible:underline">
+            {treeInterventionLabels[intervention.interventionType]} · {intervention.address}
+          </Link>
+        </ItemTitle>
+        <ItemDescription>Intervención de arbolado</ItemDescription>
+      </ItemContent>
+      <ItemActions className="max-sm:basis-full max-sm:pl-[calc(1.5rem+0.625rem)]">
+        <Badge variant={intervention.status === "PENDING_AUTHORIZATION" ? "warning" : "info"}>
+          <StatusIcon data-icon="inline-start" aria-hidden />
+          {treeInterventionStatusLabels[intervention.status]}
+        </Badge>
+      </ItemActions>
+    </Item>
   );
 }
 
@@ -442,9 +507,9 @@ function FoundationPlaceholder({ item, actor }: { item: NavigationItem; actor: s
   const Icon = item.icon;
 
   return (
-    <Empty className={styles.placeholder}>
+    <Empty className="min-h-[420px] border bg-card">
       <EmptyHeader>
-        <span className={styles.placeholderIcon} aria-hidden><Icon /></span>
+        <EmptyMedia variant="icon"><Icon aria-hidden /></EmptyMedia>
         <EmptyTitle>{item.label}</EmptyTitle>
         <EmptyDescription>
           Este destino estará disponible como flujo operativo en una próxima entrega. Su navegación ya se adapta al alcance de {actor.toLowerCase()}.

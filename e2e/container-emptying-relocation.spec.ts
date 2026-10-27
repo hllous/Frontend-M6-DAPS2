@@ -1,8 +1,14 @@
+import {
+  chooseCatalogAOption,
+  clickCatalogRowAction,
+  expectCatalogAMutation,
+  openCatalogRowDetail,
+} from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
 
-test.describe("Office emptying and relocation dispatch #123", () => {
-  test("Office actor empties an overflowed container without requiring service assignment", async ({
+test.describe("Emptying (crew) and relocation (Office) dispatch #123", () => {
+  test("Crew empties an overflowed container that Office registered, without requiring service assignment", async ({
     page,
   }) => {
     await loginViaApi(page, "office-duty-queue");
@@ -17,8 +23,8 @@ test.describe("Office emptying and relocation dispatch #123", () => {
 
     const code = `CONT-EMP-${Date.now()}`;
     await createDialog.locator("#container-code").fill(code);
-    await createDialog.locator("#container-type-form").selectOption("HOUSEHOLD");
-    await createDialog.locator("#container-zone-form").selectOption({ index: 0 });
+    await chooseCatalogAOption(page, createDialog, "Tipo de contenedor en el formulario", "Residuos domiciliarios");
+    await chooseCatalogAOption(page, createDialog, "Zona en el formulario", { index: 0 });
     await createDialog.locator("#container-capacity").fill("1100");
     await createDialog.locator("#container-address").fill("Av. Paseo Colón 950");
     await createDialog.locator("#container-lat").fill("-34.6180");
@@ -27,26 +33,27 @@ test.describe("Office emptying and relocation dispatch #123", () => {
     await createDialog.getByRole("button", { name: "Guardar contenedor" }).click();
     await expect(createDialog).not.toBeVisible();
 
+    // Reporting and emptying are Field work (Backend #161): Office and Field never share a session.
+    await page.context().clearCookies();
+    await loginViaApi(page, "field-crew-leader-route");
+    await page.goto("/app/catalog/containers");
+
     // Filter to our test container
     await page.getByLabel("Buscar contenedor").fill(code);
     const row = page.locator("tr", { hasText: code });
     await expect(row).toBeVisible();
 
     // Report overflow so the container transitions from ACTIVE to OVERFLOWED
-    const overflowBtn = row.getByRole("button", { name: "Reportar desborde" });
-    await expect(overflowBtn).toBeVisible();
-    await overflowBtn.click();
+    await clickCatalogRowAction(row, "Reportar desborde");
 
     const overflowDialog = page.getByRole("dialog");
     await expect(overflowDialog).toBeVisible();
-    await overflowDialog.getByRole("button", { name: "Confirmar desborde" }).click();
+    await expectCatalogAMutation(page, /\/report-overflow$/, null, () => overflowDialog.getByRole("button", { name: "Confirmar desborde" }).click());
     await expect(overflowDialog).not.toBeVisible();
     await expect(row.getByText("Desbordado")).toBeVisible();
 
     // Standalone emptying button is now visible
-    const emptyBtn = row.getByRole("button", { name: "Vaciar contenedor" });
-    await expect(emptyBtn).toBeVisible();
-    await emptyBtn.click();
+    await clickCatalogRowAction(row, "Vaciar contenedor");
 
     const emptyDialog = page.getByRole("dialog");
     await expect(emptyDialog).toBeVisible();
@@ -56,16 +63,17 @@ test.describe("Office emptying and relocation dispatch #123", () => {
       }),
     ).toBeVisible();
 
-    await emptyDialog.getByRole("button", { name: "Confirmar vaciado" }).click();
+    await expectCatalogAMutation(page, /\/empty$/, null, () => emptyDialog.getByRole("button", { name: "Confirmar vaciado" }).click());
 
     await expect(
-      page.getByText(`Vaciado registrado con éxito para el contenedor ${code}.`),
+      page.getByText(`Vaciado registrado: ${code}.`),
     ).toBeVisible();
     await expect(emptyDialog).not.toBeVisible();
 
     // Container returns to ACTIVE and "Vaciar contenedor" button is no longer present
     await expect(row.getByText("Activo")).toBeVisible();
-    await expect(row.getByRole("button", { name: "Vaciar contenedor" })).not.toBeVisible();
+    const activeDetail = await openCatalogRowDetail(row);
+    await expect(activeDetail.getByRole("button", { name: "Vaciar contenedor" })).toHaveCount(0);
   });
 
   test("Office actor executes two-step relocation on an active container", async ({
@@ -83,8 +91,8 @@ test.describe("Office emptying and relocation dispatch #123", () => {
 
     const code = `CONT-REL-${Date.now()}`;
     await createDialog.locator("#container-code").fill(code);
-    await createDialog.locator("#container-type-form").selectOption("RECYCLABLE");
-    await createDialog.locator("#container-zone-form").selectOption({ index: 0 });
+    await chooseCatalogAOption(page, createDialog, "Tipo de contenedor en el formulario", "Materiales reciclables");
+    await chooseCatalogAOption(page, createDialog, "Zona en el formulario", { index: 0 });
     await createDialog.locator("#container-capacity").fill("2400");
     await createDialog.locator("#container-address").fill("Av. San Juan 1500");
     await createDialog.locator("#container-lat").fill("-34.6210");
@@ -100,9 +108,7 @@ test.describe("Office emptying and relocation dispatch #123", () => {
     await expect(row.getByText("Activo")).toBeVisible();
 
     // Step 1: Start relocation (ACTIVE -> RELOCATING)
-    const relocateBtn = row.getByRole("button", { name: "Reubicar" });
-    await expect(relocateBtn).toBeVisible();
-    await relocateBtn.click();
+    await clickCatalogRowAction(row, "Reubicar");
 
     const startDialog = page.getByRole("dialog");
     await expect(startDialog).toBeVisible();
@@ -112,7 +118,7 @@ test.describe("Office emptying and relocation dispatch #123", () => {
       }),
     ).toBeVisible();
 
-    await startDialog.getByRole("button", { name: "Iniciar reubicación" }).click();
+    await expectCatalogAMutation(page, /\/relocate$/, null, () => startDialog.getByRole("button", { name: "Iniciar reubicación" }).click());
 
     await expect(
       page.getByText(`Proceso de reubicación iniciado para el contenedor ${code}.`),
@@ -121,12 +127,12 @@ test.describe("Office emptying and relocation dispatch #123", () => {
 
     // Container is now in RELOCATING status
     await expect(row.getByText("En reubicación")).toBeVisible();
-    await expect(row.getByRole("button", { name: "Reubicar" })).not.toBeVisible();
+    const relocatingDetail = await openCatalogRowDetail(row);
+    await expect(relocatingDetail.getByRole("button", { name: "Reubicar" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
 
     // Step 2: Confirm relocation (RELOCATING -> ACTIVE with new address and coordinates)
-    const confirmBtn = row.getByRole("button", { name: "Confirmar ubicación" });
-    await expect(confirmBtn).toBeVisible();
-    await confirmBtn.click();
+    await clickCatalogRowAction(row, "Confirmar ubicación");
 
     const confirmDialog = page.getByRole("dialog");
     await expect(confirmDialog).toBeVisible();
@@ -140,20 +146,21 @@ test.describe("Office emptying and relocation dispatch #123", () => {
     await confirmDialog.locator("#relocation-lat").fill("-34.5620");
     await confirmDialog.locator("#relocation-lng").fill("-58.4560");
 
-    await confirmDialog.getByRole("button", { name: "Confirmar ubicación" }).click();
+    await expectCatalogAMutation(page, /\/confirm-relocation$/, { address: "Av. Cabildo 2200", lat: -34.562, lng: -58.456 }, () => confirmDialog.getByRole("button", { name: "Confirmar ubicación" }).click());
 
     await expect(
-      page.getByText(`Nueva ubicación confirmada con éxito para el contenedor ${code}.`),
+      page.getByText(`Nueva ubicación confirmada: ${code}.`),
     ).toBeVisible();
     await expect(confirmDialog).not.toBeVisible();
 
     // Container is ACTIVE again with new address
     await expect(row.getByText("Activo")).toBeVisible();
     await expect(row.getByText("Av. Cabildo 2200")).toBeVisible();
-    await expect(row.getByRole("button", { name: "Confirmar ubicación" })).not.toBeVisible();
+    const activeDetail = await openCatalogRowDetail(row);
+    await expect(activeDetail.getByRole("button", { name: "Confirmar ubicación" })).toHaveCount(0);
   });
 
-  test("Field actor cannot access emptying or relocation controls", async ({
+  test("Field actor empties overflowed containers but cannot relocate or register them", async ({
     page,
   }) => {
     await loginViaApi(page, "field-crew-member-route");
@@ -162,10 +169,12 @@ test.describe("Office emptying and relocation dispatch #123", () => {
     await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
     await expect(page.getByText("CONT-001")).toBeVisible();
 
-    // Field actors lack container:manage capability — standalone dispatch buttons are not rendered
-    await expect(page.getByRole("button", { name: "Vaciar contenedor" })).not.toBeVisible();
-    await expect(page.getByRole("button", { name: "Reubicar" })).not.toBeVisible();
-    await expect(page.getByRole("button", { name: "Confirmar ubicación" })).not.toBeVisible();
+    // Field actors lack container:manage: relocation is not rendered. They do hold container:empty.
+    const activeDetail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-001/ }));
+    await expect(activeDetail.getByRole("button", { name: "Reubicar" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    const overflowDetail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-002/ }));
+    await expect(overflowDetail.getByRole("button", { name: "Vaciar contenedor" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Registrar contenedor" })).not.toBeVisible();
   });
 
@@ -179,8 +188,10 @@ test.describe("Office emptying and relocation dispatch #123", () => {
     await expect(page.getByText("CONT-001")).toBeVisible();
 
     // Actors lacking container:manage cannot empty or relocate
-    await expect(page.getByRole("button", { name: "Vaciar contenedor" })).not.toBeVisible();
-    await expect(page.getByRole("button", { name: "Reubicar" })).not.toBeVisible();
-    await expect(page.getByRole("button", { name: "Confirmar ubicación" })).not.toBeVisible();
+    const activeDetail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-001/ }));
+    await expect(activeDetail.getByRole("button", { name: "Reubicar" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    const overflowDetail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-002/ }));
+    await expect(overflowDetail.getByRole("button", { name: "Vaciar contenedor" })).toHaveCount(0);
   });
 });

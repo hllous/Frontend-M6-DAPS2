@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import {
   addZoneResultFixture,
   resetServiceFixtures,
@@ -10,6 +9,26 @@ import {
 } from "@/lib/services-fixtures";
 import { getContainerFixture, resetContainerFixtures } from "@/lib/containers-fixtures";
 import { POST } from "./route";
+import { loginAs } from "@/test/session";
+
+const backendOrigin = "https://backend.internal";
+const backendDevJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+const backendCrew = {
+  id: "11111111-1111-4111-8111-111111111111",
+  name: "Cuadrilla Belgrano — Recolección",
+};
+
+function mockFieldBackend(serviceCrewId = backendCrew.id) {
+  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = new URL(String(input));
+    const method = init?.method ?? "GET";
+    if (url.pathname === "/crews") return Response.json({ data: [backendCrew] });
+    if (url.pathname.startsWith("/services/") && method === "GET") {
+      return Response.json({ id: url.pathname.split("/")[2], crewId: serviceCrewId });
+    }
+    return Response.json({ id: url.pathname, status: "COMPLETED" });
+  });
+}
 
 beforeEach(() => {
   resetServiceFixtures();
@@ -24,20 +43,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("POST /api/services/[id]/complete BFF route", () => {
   it("requires an active session and returns 401", async () => {
@@ -51,7 +57,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
   });
 
   it("returns 403 when session lacks service:execute (Crew Member)", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -63,7 +69,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
   });
 
   it("returns 404 if the target service does not exist", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-NONEXISTENT/complete", {
         method: "POST",
@@ -75,7 +81,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
   });
 
   it("returns 409 if the service is not IN_PROGRESS", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     // SVC-1050 is SCHEDULED
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
@@ -104,7 +110,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       recordedAt: "2026-09-05 10:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -140,7 +146,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       recordedAt: "2026-09-05 11:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -180,7 +186,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       recordedAt: "2026-09-05 11:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -204,7 +210,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
     addZoneResultFixture({ id: "ZR-LONG-1", serviceId: "SVC-1050", zoneId: "zone-3", status: "PARTIAL", reason: "WEATHER", notes: "a".repeat(1500), attachments: [], recordedAt: "2026-09-05 10:00" });
     addZoneResultFixture({ id: "ZR-LONG-2", serviceId: "SVC-1050", zoneId: "zone-1", status: "NOT_SERVICED", reason: "WEATHER", notes: "b".repeat(1500), attachments: [], recordedAt: "2026-09-05 11:00" });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", { method: "POST", headers: { cookie } }),
       { params: Promise.resolve({ id: "SVC-1050" }) },
@@ -239,7 +245,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       recordedAt: "2026-09-05 11:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -274,7 +280,7 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       recordedAt: "2026-09-05 11:00",
     });
 
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/complete", {
         method: "POST",
@@ -294,5 +300,53 @@ describe("POST /api/services/[id]/complete BFF route", () => {
       lat: -34.595,
       lng: -58.39,
     });
+  });
+});
+
+describe("POST /api/services/[id]/complete backend forward path", () => {
+  it("forwards an authorized Field completion with its path, method, and bearer token", async () => {
+    const serviceId = "field-service_42.3~";
+    const backendFetch = mockFieldBackend();
+    const cookie = await loginAs("field-crew-leader-route", {
+      mode: "backend-development",
+      devJwt: backendDevJwt,
+      backendOrigin,
+    });
+    backendFetch.mockClear();
+
+    const response = await POST(
+      new Request(`http://localhost/api/services/${serviceId}/complete`, {
+        method: "POST",
+        headers: { cookie },
+      }),
+      { params: Promise.resolve({ id: serviceId }) },
+    );
+
+    expect(response.status).toBe(200);
+    const forwarded = backendFetch.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(String(forwarded?.[0])).toBe(`https://backend.internal/services/${serviceId}/complete`);
+    expect(forwarded?.[1]?.method).toBe("POST");
+    expect(new Headers(forwarded?.[1]?.headers).get("authorization")).toBe(`Bearer ${backendDevJwt}`);
+  });
+
+  it("checks the Field crew scope before forwarding the completion action", async () => {
+    const serviceId = "field-service-out-of-scope";
+    const backendFetch = mockFieldBackend("22222222-2222-4222-8222-222222222222");
+    const cookie = await loginAs("field-crew-leader-route", {
+      mode: "backend-development",
+      devJwt: backendDevJwt,
+      backendOrigin,
+    });
+    backendFetch.mockClear();
+
+    const response = await POST(
+      new Request(`http://localhost/api/services/${serviceId}/complete`, { method: "POST", headers: { cookie } }),
+      { params: Promise.resolve({ id: serviceId }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual([
+      [`${backendOrigin}/services/${serviceId}`, "GET"],
+    ]);
   });
 });

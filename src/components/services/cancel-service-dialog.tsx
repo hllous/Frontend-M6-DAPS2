@@ -1,18 +1,22 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useId, useState } from "react";
-import { AlertCircle, Ban, Loader2 } from "lucide-react";
+import { useRevealFirstError } from "./use-reveal-first-error";
+import { AlertCircle } from "lucide-react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { servicesAdapter, type Service } from "@/lib/services";
 import { MAX_REASON_LENGTH } from "@/lib/input-limits";
 
@@ -33,7 +37,7 @@ export function CancelServiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg border-[var(--color-border)] bg-[var(--color-surface)]">
+      <DialogContent className="max-w-lg">
         <CancelServiceForm
           key={service.id}
           service={service}
@@ -58,15 +62,19 @@ function CancelServiceForm({
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reasonError, setReasonError] = useState<string | null>(null);
+  const formRef = useRevealFirstError<HTMLFormElement>(errorMessage, reasonError);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!reason.trim()) {
-      setErrorMessage("Debe indicar el motivo de la cancelación.");
+      setReasonError("Indique el motivo.");
+      setErrorMessage(null);
       return;
     }
 
     setIsSubmitting(true);
+    setReasonError(null);
     setErrorMessage(null);
     try {
       const updated = await servicesAdapter.cancel(service.id, { reason: reason.trim() });
@@ -74,7 +82,7 @@ function CancelServiceForm({
       onOpenChange(false);
     } catch (cause) {
       const msg =
-        cause instanceof Error ? cause.message : "Ocurrió un error al cancelar el servicio.";
+        getErrorMessage(cause, "No se pudo cancelar. Intente nuevamente.");
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
@@ -84,52 +92,42 @@ function CancelServiceForm({
   return (
     <>
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-danger)]">
-          <Ban className="h-4 w-4" aria-hidden />
-          <span>Cancelación de servicio</span>
-        </div>
-        <DialogTitle>Cancelar {service.id}</DialogTitle>
-        <DialogDescription>
-          El servicio pasará a estado &quot;Cancelado&quot; de forma definitiva
-          {service.status === "RESCHEDULED"
-            ? "; al estar a reprogramar, se cancela directamente sin requerir una nueva fecha."
-            : "."}
-        </DialogDescription>
+        <DialogTitle>Cancelar {service.title}</DialogTitle>
       </DialogHeader>
 
-      <form id={formId} noValidate onSubmit={handleSubmit} className="space-y-4 py-2">
+      <form ref={formRef} id={formId} noValidate onSubmit={handleSubmit} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
         {errorMessage && (
-          <div
-            role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-            <span>{errorMessage}</span>
-          </div>
+          <Alert variant="danger">
+            <AlertCircle aria-hidden />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
         )}
 
         <Field>
           <FieldLabel htmlFor={`${formId}-reason`}>
             Motivo <span className="text-[var(--color-danger)]" aria-hidden>*</span>
           </FieldLabel>
-          <textarea
+          <Textarea
             id={`${formId}-reason`}
             rows={3}
             maxLength={MAX_REASON_LENGTH}
             value={reason}
             onChange={(e) => {
               setReason(e.target.value);
+              setReasonError(null);
               setErrorMessage(null);
             }}
             required
-            placeholder="Ej. Solicitud del cliente, servicio duplicado, ya no es necesario…"
-            className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+            aria-invalid={Boolean(reasonError)}
+            aria-describedby={reasonError ? `${formId}-reason-help ${formId}-reason-error` : `${formId}-reason-help`}
+            placeholder="Ej. Servicio duplicado"
           />
-          <FieldDescription>Obligatorio. Esta acción no se puede deshacer.</FieldDescription>
+          <FieldDescription id={`${formId}-reason-help`}>Esta acción no se puede deshacer.</FieldDescription>
+          {reasonError && <FieldError id={`${formId}-reason-error`}>{reasonError}</FieldError>}
         </Field>
       </form>
 
-      <DialogFooter>
+      <DialogFooter className="flex-wrap">
         <Button
           type="button"
           variant="outline"
@@ -142,16 +140,11 @@ function CancelServiceForm({
           type="submit"
           form={formId}
           disabled={isSubmitting}
-          className="font-semibold bg-[var(--color-danger)] text-white hover:bg-[var(--color-danger)]/90"
+          aria-busy={isSubmitting}
+          variant="destructive"
         >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              <span>Cancelando…</span>
-            </>
-          ) : (
-            <span>Cancelar servicio</span>
-          )}
+          {isSubmitting && <Spinner data-icon="inline-start" aria-hidden="true" />}
+          <span>Confirmar cancelación</span>
         </Button>
       </DialogFooter>
     </>

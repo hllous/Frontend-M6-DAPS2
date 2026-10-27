@@ -23,18 +23,20 @@ export function ServicePreview({
   onOpenDetail,
   onAssignCrew,
   onClose,
+  autoFocusCloseButton = false,
   className,
 }: {
   service: Service;
   onOpenDetail: (id: string) => void;
   onAssignCrew?: (service: Service) => void;
   onClose?: () => void;
+  autoFocusCloseButton?: boolean;
   className?: string;
 }) {
   return (
     <aside
       className={cn(
-        "flex h-full flex-col bg-[var(--color-surface)] border-l border-[var(--color-border)] shadow-md overflow-hidden",
+        "flex h-full flex-col bg-[var(--color-surface)] border-l border-[var(--color-border)] overflow-hidden",
         className,
       )}
       aria-labelledby="preview-title"
@@ -53,8 +55,6 @@ export function ServicePreview({
                 Punto
               </span>
             )}
-            <span>·</span>
-            <span className="font-bold text-[var(--color-text)]">{service.id}</span>
           </div>
           <h2
             id="preview-title"
@@ -78,7 +78,8 @@ export function ServicePreview({
             variant="ghost"
             size="icon"
             onClick={onClose}
-            aria-label="Cerrar vista previa"
+            autoFocus={autoFocusCloseButton}
+            aria-label="Cerrar"
             className="h-8 w-8 rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
           >
             <X className="h-4 w-4" aria-hidden />
@@ -94,7 +95,13 @@ export function ServicePreview({
         {service.statusReason && (
           <div className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 p-3 text-xs text-[var(--color-warning)]">
             <span className="font-semibold block mb-0.5">Motivo de estado:</span>
-            {service.statusReason}
+            <p>{service.statusReason}</p>
+            {service.statusNote && (
+              <div className="mt-2">
+                <span className="font-semibold block mb-0.5">Nota de la cuadrilla:</span>
+                <p>{service.statusNote}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -123,7 +130,7 @@ export function ServicePreview({
               Horario
             </dt>
             <dd className="mt-0.5 font-semibold text-[var(--color-text)] tabular-nums">
-              {service.windowFrom ? `${service.windowFrom} – ${service.windowTo ?? ""}` : "No definida"}
+              {service.windowFrom ? `${service.windowFrom} – ${service.windowTo ?? ""}` : "Sin definir"}
             </dd>
           </div>
           <div>
@@ -132,7 +139,7 @@ export function ServicePreview({
               Vehículo
             </dt>
             <dd className="mt-0.5 font-semibold text-[var(--color-text)]">
-              {service.vehiclePlate ?? "No asignado"}
+              {service.vehiclePlate ?? "Sin vehículo"}
             </dd>
           </div>
         </dl>
@@ -140,7 +147,7 @@ export function ServicePreview({
         {service.notes && (
           <div>
             <span className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">
-              Notas operativas
+              Notas
             </span>
             <p className="mt-1 text-xs text-[var(--color-text)] bg-[var(--color-surface-subtle)] p-2.5 rounded-lg border border-[var(--color-border)]">
               {service.notes}
@@ -151,7 +158,7 @@ export function ServicePreview({
         {service.history.length > 0 && (
           <div>
             <span className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">
-              Historial de cambios
+              Historial
             </span>
             <ol className="mt-3 relative pl-4 border-l-2 border-[var(--color-border)] space-y-3">
               {service.history.map((step, idx) => (
@@ -200,7 +207,7 @@ export function ServicePreview({
           onClick={() => onOpenDetail(service.id)}
           className="w-full justify-center text-xs font-semibold gap-1.5"
         >
-          <span>Ver detalle completo</span>
+          <span>Ver detalle</span>
           <ExternalLink className="h-3.5 w-3.5" aria-hidden />
         </Button>
       </div>

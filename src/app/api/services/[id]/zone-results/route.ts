@@ -1,6 +1,7 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   addZoneResultFixture,
   getZoneResultsByServiceId,
@@ -14,31 +15,13 @@ import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const params = await context.params;
   const serviceId = params.id;
@@ -48,16 +31,14 @@ export async function GET(
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
+      const scopedService = await requireCrewScope(request, session, { serviceId });
+      if (scopedService instanceof Response) return scopedService;
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/zone-results`,
+        `/services/${pathId(serviceId)}/zone-results`,
       );
-      const bodyText = await backendResponse.text();
-      return new NextResponse(bodyText, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const service = serviceFixtures.find((s) => s.id === serviceId);
@@ -78,13 +59,13 @@ export async function GET(
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa o es inválida.", path);
     }
-    return errorResponse(500, "Error interno del servidor.", path);
+    return mapSessionError(caught, path, "Error interno del servidor.");
   }
 }
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const params = await context.params;
   const serviceId = params.id;
@@ -94,13 +75,7 @@ export async function POST(
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
 
-    if (!scenario.capabilities.includes("service:execute")) {
-      return errorResponse(
-        403,
-        "No tiene permisos para registrar resultados de zona. Solo la persona responsable de la cuadrilla puede hacerlo.",
-        path,
-      );
-    }
+    authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para registrar resultados de zona. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
 
     let body: unknown;
     try {
@@ -120,10 +95,12 @@ export async function POST(
 
     const input = parsed.data;
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
+      const scopedService = await requireCrewScope(request, session, { serviceId });
+      if (scopedService instanceof Response) return scopedService;
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/zone-results`,
+        `/services/${pathId(serviceId)}/zone-results`,
         undefined,
         {
           method: "POST",
@@ -131,11 +108,7 @@ export async function POST(
           body: JSON.stringify(input),
         },
       );
-      const bodyText = await backendResponse.text();
-      return new NextResponse(bodyText, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const service = serviceFixtures.find((s) => s.id === serviceId);
@@ -193,6 +166,6 @@ export async function POST(
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa o es inválida.", path);
     }
-    return errorResponse(500, "Error interno del servidor.", path);
+    return mapSessionError(caught, path, "Error interno del servidor.");
   }
 }

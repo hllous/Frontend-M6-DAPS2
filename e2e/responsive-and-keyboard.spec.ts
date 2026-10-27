@@ -23,8 +23,8 @@ test.describe("responsive shell navigation @smoke", () => {
     await expect(page.getByRole("navigation", { name: "Módulos" })).not.toBeVisible();
     await expect(page.getByRole("navigation", { name: "Navegación móvil" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Más módulos" }).click();
-    await expect(page.getByRole("dialog", { name: "Más módulos" })).toBeVisible();
+    await page.getByRole("button", { name: "Más" }).click();
+    await expect(page.getByRole("dialog", { name: "Más" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Catálogo" })).toBeVisible();
   });
 
@@ -129,7 +129,8 @@ test.describe("keyboard-only shell operation @smoke", () => {
     await expect(page.locator(":focus")).not.toHaveAttribute("aria-current", "page");
 
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
-    await expect(page.locator(":focus")).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("main")).toBeFocused();
+    await expect(page).toHaveTitle("Servicios — Ambiente e Higiene");
   });
 });

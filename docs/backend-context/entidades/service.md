@@ -17,7 +17,7 @@ Las podas y las inspecciones ambientales también son servicios: [`TreeIntervent
 
 | Entidad | Campos principales |
 |---|---|
-| `Service` | `serviceTypeId`, `mode`, `zoneIds[]`, `routeId` \| `targetRef`, `scheduledDate`, `timeWindow`, `crewId`, `vehicleId`, `status`, `statusReason`, `origin`, `ticketId`, `weatherAlertId`, `attachments[]`, `notes`. `crewId` es opcional hasta que se asigna la cuadrilla. `assignmentOverrideNote` / `By` / `At` solo se llenan si la asignación o la programación se hizo **sobre un solapamiento** |
+| `Service` | `serviceTypeId`, `mode`, `zoneIds[]`, `routeId` \| `targetRef`, `scheduledDate`, `timeWindow`, `crewId`, `vehicleId`, `status`, `statusReason`, `statusNote`, `origin`, `ticketId`, `weatherAlertId`, `attachments[]`, `notes`. `crewId` es opcional hasta que se asigna la cuadrilla. `assignmentOverrideNote` / `By` / `At` solo se llenan si la asignación o la programación se hizo **sobre un solapamiento** |
 | `ServiceDelayNotice` | Hijo de un `Service`, uno por aviso de demora. `delayType`, `delayMinutes`, `reason`, `newEstimatedEnd`, `serviceStatus`, `reportedBy`, `detectedAt`, `supersededById`. El vigente es el que no fue reemplazado |
 | `ZoneResult` | Hijo de un `Service` con `mode = ROUTE`, uno por zona. `zoneId`, `status`, `reason`, `proposedDate`, `notes`, `attachments[]`, `recordedAt` |
 | `CollectionRecord` | `wasteType`, `volumeM3`, `weightKg`, `disposalSiteId` |
@@ -53,6 +53,8 @@ stateDiagram-v2
     PARTIALLY_COMPLETED --> [*]
 ```
 
+`statusNote` es el detalle opcional de la suspensión: solo vive mientras el servicio está `SUSPENDED`; `resume` y `cancel` lo ponen en `null`. Solo `suspend` la recibe.
+
 `DELAYED` **no es un estado**: es un aviso, y vive en su propia tabla. El servicio sigue en `SCHEDULED` o en `IN_PROGRESS` mientras se demora, y esos son los dos únicos momentos en los que un retraso significa algo — uno cerrado ya no se demora, y uno suspendido tiene su motivo en `statusReason`.
 
 El tipo tiene que coincidir con el momento: `START` es empezar tarde y solo aplica antes de arrancar; `DURATION` es tardar más, y solo aplica con la cuadrilla trabajando. Aceptar la combinación cruzada dejaría entrar datos que después nadie sabe leer.
@@ -77,8 +79,10 @@ Una franja horaria ausente se trata como **todo el día**: es lo único honesto 
 
 ## Qué publica
 
-- Al agendarse: [`urbanServiceScheduled`](../eventos/publicados/urbanServiceScheduled.md) → M7.
+- Hacia M7 no sale nada al agendarse: `urbanServiceScheduled` se dejó de emitir el 21/10 ([descartados](../eventos/publicados/descartados.md)). Si el servicio requiere cortar la calle, se pide aparte con [`streetClosureRequested`](../eventos/publicados/streetClosureRequested.md) (`sourceType = SERVICE`).
 - Si nació de un reclamo (`origin = TICKET`), cada cambio relevante dispara un [`updateTicketStatus`](../eventos/publicados/updateTicketStatus.md) → M2. **Si no hay `ticketId`, no sale nada hacia M2**: un servicio planificado —la recolección de todos los martes— no proyecta.
+
+Agendar (`POST /services`) y confirmar una reprogramación (`confirm-reschedule`) informan a M2 la fecha y la franja como **texto** en el `publicMessage` (es-AR, solo fecha y franja: nunca la cuadrilla ni las notas; M2 no tiene campo estructurado). Va como `STARTED` si el ticket todavía no está en gestión y como `PROGRESS` si ya está `IN_PROGRESS`; con el ticket pendiente de información o terminado no se publica. El estado del ticket lo llevamos en `ticket_m2_state` (ver [`updateTicketStatus`](../eventos/publicados/updateTicketStatus.md)). `reschedule` sin fecha nueva no avisa.
 
 Un aviso de demora sobre un servicio nacido de un reclamo sale como `updateTicketStatus / PROGRESS`: el motivo viaja como mensaje interno, al vecino se le dice que se demora y no por qué.
 

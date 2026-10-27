@@ -11,6 +11,14 @@ describe("optimistic session proxy", () => {
     expect(response?.headers.get("location")).toBe("http://localhost/login");
   });
 
+  it("preserves the Services destination across the signed-out redirect", () => {
+    const response = proxy(new NextRequest("http://localhost/app?destination=services"));
+
+    expect(response?.headers.get("location")).toBe(
+      "http://localhost/login?destination=services",
+    );
+  });
+
   it("lets requests with a session cookie reach the server page", () => {
     const response = proxy(new NextRequest("http://localhost/app", {
       headers: { cookie: "m6_session=opaque" },

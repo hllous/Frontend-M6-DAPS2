@@ -1,3 +1,9 @@
+import {
+  chooseCatalogAOption,
+  clickCatalogRowAction,
+  expectCatalogAMutation,
+  openCatalogRowDetail,
+} from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
 
@@ -15,11 +21,8 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     const row = page.locator("tr", { hasText: "CONT-008" });
     await expect(row).toBeVisible();
 
-    // Report buttons are available directly from catalog without an assigned Service
-    const overflowBtn = row.getByRole("button", { name: "Reportar desborde" });
-    await expect(overflowBtn).toBeVisible();
-
-    await overflowBtn.click();
+    // Reporting remains available from the row detail without an assigned Service.
+    await clickCatalogRowAction(row, "Reportar desborde");
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -27,23 +30,24 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
       dialog.getByRole("heading", { name: "Reportar desborde de contenedor CONT-008" }),
     ).toBeVisible();
 
-    await dialog.getByRole("button", { name: "Confirmar desborde" }).click();
+    await expectCatalogAMutation(page, /\/report-overflow$/, null, () => dialog.getByRole("button", { name: "Confirmar desborde" }).click());
 
     await expect(
-      page.getByText("Desborde reportado con éxito para el contenedor CONT-008."),
+      page.getByText("Desborde reportado: CONT-008."),
     ).toBeVisible();
     await expect(dialog).not.toBeVisible();
 
     // Row now shows OVERFLOWED status and report buttons are removed
     await expect(row.getByText("Desbordado")).toBeVisible();
-    await expect(row.getByRole("button", { name: "Reportar desborde" })).not.toBeVisible();
-    await expect(row.getByRole("button", { name: "Reportar daño" })).not.toBeVisible();
+    const detail = await openCatalogRowDetail(row);
+    await expect(detail.getByRole("button", { name: "Reportar desborde" })).toHaveCount(0);
+    await expect(detail.getByRole("button", { name: "Reportar daño" })).toHaveCount(0);
   });
 
-  test("Office actor reports damage with type, severity, public works flag, and evidence", async ({
+  test("Field actor reports damage with type, severity, public works flag, and evidence", async ({
     page,
   }) => {
-    await loginViaApi(page, "office-duty-queue");
+    await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app/catalog/containers");
 
     await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
@@ -51,9 +55,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     const row = page.locator("tr", { hasText: "CONT-007" });
     await expect(row).toBeVisible();
 
-    const damageBtn = row.getByRole("button", { name: "Reportar daño" });
-    await expect(damageBtn).toBeVisible();
-    await damageBtn.click();
+    await clickCatalogRowAction(row, "Reportar daño");
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -61,9 +63,9 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
       dialog.getByRole("heading", { name: "Reportar daño en contenedor CONT-007" }),
     ).toBeVisible();
 
-    await dialog.locator("#damage-type").selectOption("VANDALIZED");
-    await dialog.locator("#damage-severity").selectOption("HIGH");
-    await dialog.locator("#damage-public-works").check();
+    await chooseCatalogAOption(page, dialog, "Tipo de daño", "Vandalizado");
+    await chooseCatalogAOption(page, dialog, "Severidad", "Alta");
+    await dialog.getByRole("checkbox", { name: /Requiere intervención de Obras Públicas/ }).check();
 
     // Attach sample evidence image
     await dialog.locator('input[type="file"]').setInputFiles({
@@ -74,10 +76,10 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
 
     await expect(dialog.getByText("container-graffiti.png")).toBeVisible();
 
-    await dialog.getByRole("button", { name: "Confirmar daño" }).click();
+    await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "VANDALIZED", severity: "HIGH", requiresPublicWorks: true }, () => dialog.getByRole("button", { name: "Confirmar daño" }).click());
 
     await expect(
-      page.getByText("Reporte de daño registrado con éxito para el contenedor CONT-007."),
+      page.getByText("Daño registrado: CONT-007."),
     ).toBeVisible();
     await expect(dialog).not.toBeVisible();
 
@@ -85,8 +87,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await expect(row.getByText("Dañado")).toBeVisible();
 
     // Open detail dialog to inspect damage diagnostic and attached evidence
-    await row.getByRole("button", { name: "Ver detalle" }).click();
-    const detailDialog = page.getByRole("dialog");
+    const detailDialog = await openCatalogRowDetail(row);
     await expect(detailDialog).toBeVisible();
     await expect(
       detailDialog.getByRole("heading", { name: "Detalle del contenedor CONT-007" }),
@@ -94,7 +95,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
 
     await expect(detailDialog.getByText("Vandalizado")).toBeVisible();
     await expect(detailDialog.getByText("Alta")).toBeVisible();
-    await expect(detailDialog.getByText(/Sí \(notificación a M3\)/)).toBeVisible();
+    await expect(detailDialog.getByText(/Sí \(avisa a Obras Públicas\)/)).toBeVisible();
     await expect(detailDialog.getByText("container-graffiti.png")).toBeVisible();
   });
 
@@ -108,31 +109,20 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await expect(page.getByText("CONT-001")).toBeVisible();
 
     // Report buttons must be completely absent for actors lacking container:report
-    await expect(page.getByRole("button", { name: "Reportar desborde" })).not.toBeVisible();
-    await expect(page.getByRole("button", { name: "Reportar daño" })).not.toBeVisible();
+    const detail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-001/ }));
+    await expect(detail.getByRole("button", { name: "Reportar desborde" })).toHaveCount(0);
+    await expect(detail.getByRole("button", { name: "Reportar daño" })).toHaveCount(0);
   });
 
   test("Validates file constraints as defense in depth on the client", async ({ page }) => {
-    await loginViaApi(page, "office-duty-queue");
+    await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app/catalog/containers");
 
-    // First register a fresh container to test validation on an active container
-    await page.getByRole("button", { name: "Registrar contenedor" }).click();
-    const createDialog = page.getByRole("dialog");
-    await createDialog.locator("#container-code").fill("CONT-VAL-01");
-    await createDialog.locator("#container-type-form").selectOption("HOUSEHOLD");
-    await createDialog.locator("#container-zone-form").selectOption({ index: 0 });
-    await createDialog.locator("#container-capacity").fill("1100");
-    await createDialog.locator("#container-address").fill("Av. Corrientes 1000");
-    await createDialog.locator("#container-lat").fill("-34.603");
-    await createDialog.locator("#container-lng").fill("-58.381");
-    await createDialog.getByRole("button", { name: "Guardar contenedor" }).click();
-    await expect(createDialog).not.toBeVisible();
-
-    const row = page.locator("tr", { hasText: "CONT-VAL-01" });
+    // The dialog is abandoned without confirming, so the ACTIVE fixture is not mutated.
+    const row = page.locator("tr", { hasText: "CONT-001" });
     await expect(row).toBeVisible();
 
-    await row.getByRole("button", { name: "Reportar desborde" }).click();
+    await clickCatalogRowAction(row, "Reportar desborde");
     const overflowDialog = page.getByRole("dialog");
     await expect(overflowDialog).toBeVisible();
 
@@ -144,7 +134,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     });
 
     await expect(
-      overflowDialog.getByText(/"forbidden.exe" tiene un formato no permitido/),
+      overflowDialog.getByText(/"forbidden.exe" no es una foto ni un PDF/),
     ).toBeVisible();
     // The forbidden file is not queued
     await expect(overflowDialog.getByText("Pendiente")).not.toBeVisible();

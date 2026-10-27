@@ -1,13 +1,12 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import {
@@ -17,28 +16,9 @@ import {
 import { setRouteStopsInputSchema } from "@/lib/routes";
 import { zoneFixtures } from "@/lib/zones-fixtures";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 export async function PUT(
   request: Request,
@@ -49,12 +29,8 @@ export async function PUT(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede editar la secuencia de paradas de recorridos.");
-    }
-    requireCapability(session, "route:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede editar la secuencia de paradas de recorridos.", capability: "route:manage", throwOnError: true });
 
     let body: unknown;
     try {
@@ -68,17 +44,13 @@ export async function PUT(
       return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/routes/${id}/stops`, "route:manage", {
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/routes/${pathId(id)}/stops`, "route:manage", {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const responseBody = await backendResponse.text();
-      return new NextResponse(responseBody, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const existingRoute = getRouteFixture(id);
@@ -108,11 +80,11 @@ export async function PUT(
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-      return errorResponse(403, error.message, path);
+      return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
     }
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo actualizar la secuencia de paradas.", path);
+    return mapSessionError(error, path, "No se pudo actualizar la secuencia de paradas.");
   }
 }

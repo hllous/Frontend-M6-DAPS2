@@ -276,8 +276,8 @@ describe("zones adapter", () => {
 describe("zoneLabel", () => {
   const zones = [{ id: "zone-uuid-1", code: "Z-01", name: "Zona Norte", active: true }];
 
-  it("shows code and name when the zone is resolved", () => {
-    expect(zoneLabel(zones, "zone-uuid-1", true)).toBe("Z-01 · Zona Norte");
+  it("shows only the name when the zone is resolved", () => {
+    expect(zoneLabel(zones, "zone-uuid-1", true)).toBe("Zona Norte");
   });
 
   it("shows neutral text while zones are still loading", () => {

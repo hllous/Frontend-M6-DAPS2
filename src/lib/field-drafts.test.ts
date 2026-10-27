@@ -1,14 +1,16 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import {
   clearFieldDraft,
+  clearAllFieldDrafts,
   getFieldDraft,
   hasServiceDrifted,
   resubmitFieldAction,
   retryFieldDraft,
   saveFieldDraft,
+  setFieldDraftOwner,
   snapshotService,
   submitFieldAction,
   type FieldDraft,
@@ -18,9 +20,12 @@ import { NetworkFailureError } from "./authenticated-fetch";
 
 const server = setupServer();
 
+beforeEach(() => setFieldDraftOwner("actor-a"));
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
+  vi.restoreAllMocks();
   localStorage.clear();
 });
 afterAll(() => server.close());
@@ -53,6 +58,33 @@ function makeService(overrides: Partial<Service> = {}): Service {
 }
 
 describe("field-drafts storage primitives", () => {
+  it("clears all actors' drafts and legacy keys while preserving unrelated storage", () => {
+    localStorage.setItem("m6:field-draft:v2:actor-a:service:start", "private-a");
+    localStorage.setItem("m6:field-draft:v2:actor-b:service:start", "private-b");
+    localStorage.setItem("m6:field-draft:service:start", "legacy");
+    localStorage.setItem("map-preference", "table");
+    clearAllFieldDrafts();
+    expect(localStorage.length).toBe(1);
+    expect(localStorage.getItem("map-preference")).toBe("table");
+    const draft: FieldDraft = { serviceId: "SVC-9001", actionType: "start", payload: null, composedAgainst: snapshotService(makeService()), savedAt: "2026-09-05T09:00:00.000Z" };
+    expect(saveFieldDraft(draft)).toBe(false);
+    expect(getFieldDraft("SVC-9001", "start")).toBeNull();
+  });
+
+  it("isolates drafts by actor and does not expose legacy unscoped drafts", () => {
+    const draft: FieldDraft = { serviceId: "SVC-9001", actionType: "start", payload: { note: "private" }, composedAgainst: snapshotService(makeService()), savedAt: "2026-09-05T09:00:00.000Z" };
+    localStorage.setItem("m6:field-draft:SVC-9001:start", JSON.stringify(draft));
+    setFieldDraftOwner("actor-a");
+    expect(localStorage.getItem("m6:field-draft:SVC-9001:start")).toBeNull();
+    expect(getFieldDraft("SVC-9001", "start")).toBeNull();
+    expect(saveFieldDraft(draft)).toBe(true);
+    setFieldDraftOwner("actor-b");
+    expect(getFieldDraft("SVC-9001", "start")).toBeNull();
+    clearFieldDraft("SVC-9001", "start");
+    setFieldDraftOwner("actor-a");
+    expect(getFieldDraft("SVC-9001", "start")).toEqual(draft);
+  });
+
   it("round-trips a draft through save/get/clear", () => {
     const service = makeService();
     const draft: FieldDraft<{ note: string }> = {
@@ -63,7 +95,7 @@ describe("field-drafts storage primitives", () => {
       savedAt: "2026-09-05T09:00:00.000Z",
     };
 
-    saveFieldDraft(draft);
+    expect(saveFieldDraft(draft)).toBe(true);
     expect(getFieldDraft(service.id, "suspend")).toEqual(draft);
 
     clearFieldDraft(service.id, "suspend");
@@ -145,6 +177,61 @@ describe("submitFieldAction", () => {
     const stored = getFieldDraft(service.id, "suspend");
     expect(stored?.payload).toEqual({ reason: "VEHICLE_BREAKDOWN", note: "no arranca" });
     expect(stored?.composedAgainst.updatedAt).toBe(service.updatedAt);
+  });
+
+  it("reports when localStorage.setItem cannot save the draft", async () => {
+    const service = makeService();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+
+    const outcome = await submitFieldAction({
+      service,
+      actionType: "suspend",
+      payload: { reason: "VEHICLE_BREAKDOWN", note: "no arranca" },
+      submit: async () => {
+        throw new NetworkFailureError();
+      },
+    });
+
+    expect(outcome).toEqual({
+      kind: "error",
+      message: "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.",
+      draftUnsaved: true,
+    });
+  });
+
+  it("reports when reading localStorage itself throws while saving the draft", async () => {
+    const service = makeService();
+    const descriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("Storage access denied", "SecurityError");
+      },
+    });
+    expect(() => window.localStorage).toThrow("Storage access denied");
+
+    let outcome;
+    try {
+      outcome = await submitFieldAction({
+        service,
+        actionType: "suspend",
+        payload: { reason: "VEHICLE_BREAKDOWN", note: "no arranca" },
+        submit: async () => {
+          throw new NetworkFailureError();
+        },
+      });
+    } finally {
+      if (descriptor) Object.defineProperty(window, "localStorage", descriptor);
+      else Reflect.deleteProperty(window, "localStorage");
+    }
+
+    expect(outcome).toEqual({
+      kind: "error",
+      message: "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.",
+      draftUnsaved: true,
+    });
   });
 
   it("surfaces a normal error message for a non-network failure (no draft saved)", async () => {
@@ -245,5 +332,29 @@ describe("resubmitFieldAction / retryFieldDraft", () => {
 
     expect(outcome.kind).toBe("still-offline");
     expect(getFieldDraft(service.id, "resume")).not.toBeNull();
+  });
+
+  it("reports an unsaved draft when an offline resubmit cannot re-save it", async () => {
+    const service = makeService();
+    server.use(http.get("*/api/services/:id", () => HttpResponse.json(service)));
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+
+    const outcome = await resubmitFieldAction({
+      serviceId: service.id,
+      actionType: "resume",
+      composedAgainst: snapshotService(service),
+      payload: null,
+      submit: async () => {
+        throw new NetworkFailureError();
+      },
+    });
+
+    expect(outcome).toEqual({
+      kind: "error",
+      message: "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.",
+      draftUnsaved: true,
+    });
   });
 });

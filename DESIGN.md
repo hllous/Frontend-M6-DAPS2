@@ -9,7 +9,7 @@
 - **2026-09-03 — Type scale and density:** **B · Adaptativa equilibrada** was approved. Office uses compact data presentation without shrinking general reading text; Field uses larger touch controls. **C · Cómoda universal** was explicitly rejected as too spacious.
 - **2026-09-03 — Radius and elevation:** The revised **C · Suave sin sombras** was approved. Controls use 12 px radii, panels and overlays use 16 px radii, and content surfaces rely on borders instead of shadows.
 - **2026-09-03 — Desktop navigation:** The revised **A · Sidebar plegable** was approved. It opens as a 220 px labeled sidebar and can be collapsed by the user into a 72 px icon rail.
-- **2026-09-03 — Mobile navigation:** **C · Tareas + Más** was approved. The bottom bar keeps Inicio, Servicios, and Mapa visible, while secondary and future modules live under Más.
+- **2026-09-03 — Mobile navigation:** **C · Tareas + Más** was approved. The bottom bar keeps Mi trabajo, Servicios, and Mapa visible, while secondary and future modules live under Más.
 - **2026-09-03 — Operational statuses:** **A · Etiqueta semántica** was approved. Statuses use a soft semantic fill, a distinct icon, and a visible Spanish label; color never carries meaning alone.
 - **2026-09-03 — Route map markers:** The revised **A · Pin numerado** was approved. Route stops use numbered location pins; selecting one opens an anchored information card and synchronizes the corresponding list row.
 - **2026-09-03 — Mobile map/list workspace:** **B · Mapa + bandeja** was approved. The map remains visible while the synchronized service list occupies a resizable bottom sheet.
@@ -45,6 +45,7 @@ Use the approved **A · Azul institucional** palette as the visual foundation. K
 | `--color-border` | `#CBD5DF` | Border | Dividers and panel edges only |
 | `--color-border-strong` | `#70849A` | Strong border | Boundaries of interactive controls |
 | `--color-focus` | `#2377BD` | Focus | Keyboard focus indicator |
+| `--color-overlay` | `#000000` | Overlay | Backdrop tint, used at 40% for dialogs and 10% for sheets |
 | `--color-on-institutional` | `#FFFFFF` | Text on dark | Primary text on institutional or action fills |
 | `--color-on-institutional-secondary` | `#B7C6D8` | Secondary text on dark | Supporting text on institutional or action fills |
 
@@ -162,7 +163,7 @@ Use the approved **Sidebar plegable** app shell for Office-sized viewports:
 
 Use the approved **Tareas + Más** pattern for Field and narrow-screen navigation:
 
-- Keep four bottom-bar destinations: `Inicio`, `Servicios`, `Mapa`, and `Más`.
+- Keep four bottom-bar destinations: `Mi trabajo`, `Servicios`, `Mapa`, and `Más`.
 - Use `Más` to open a bottom sheet containing the complete module list, including `Inventario` and `Control ambiental`.
 - Preserve the active destination indicator when the current module also appears in the complete list.
 - Keep each bottom target at least 48 px high and provide both an icon and a visible Spanish label.
@@ -181,7 +182,7 @@ Use the approved **Campos explícitos** anatomy as the default for forms and tas
 - Support empty, hover, active, focus, invalid, disabled, read-only, loading, success, and destructive-confirmation states without relying on color alone.
 - Task sections may organize genuinely multi-stage workflows, but they do not replace the approved field anatomy or become a decorative container around routine forms.
 
-In production, align this anatomy with the project-owned shadcn/Base UI compositions (`FieldGroup`, `Field`, `Button`, `Spinner`, toast, and `AlertDialog`) rather than creating parallel primitives.
+In production, align this anatomy with the project-owned shadcn/Base UI compositions (`FieldGroup`, `Field`, `Button`, `Spinner`, toast, and `AlertDialog`) rather than creating parallel primitives, as required by the [shadcn-first rule in AGENTS.md](AGENTS.md#ui-components-shadcn-first).
 
 ### Motion and reduced motion
 
@@ -209,6 +210,19 @@ Use the approved **Institucional clara** voice throughout Office and Field inter
 - Success messages confirm the completed outcome and mention its next operational consequence only when that information affects the user's work.
 - Use sentence case, complete translatable messages, and visible labels that align with accessible names. Do not rely on punctuation, color, or iconography to convey tone or meaning.
 - Prefer role-based, gender-inclusive wording such as `persona supervisora` when referring to an unknown individual.
+
+### UX copy
+
+Spanish UX writing sets the voice; these rules set how much text a screen carries. They apply to every user-visible string: headings, subtitles, body text, labels, placeholders, empty states, toasts, dialogs, validation and errors, page titles, buttons, `aria-label`, `title` and screen-reader-only text.
+
+1. **Decide or act.** Keep a string only if it helps the Office or Field user decide or act on that screen. Office screens may be dense with data, not with prose. Field screens are stricter.
+2. **No internal vocabulary.** Never show module codes (M1, M3, M6, M7), API field names (`workOrderId`, `closureId`) or developer terms (“backend”, “versión”, “módulo de origen”, “registro M6”, “fuente canónica”). Name external areas by what they do. “M6” becomes “el sistema” or is dropped. `GLOSSARY.md`, docs, code identifiers and tests keep the codes.
+3. **Zones by name.** Show a zone by its name only (“Belgrano”) in the map, lists, tables, filters and selects. The zone code appears only in the zone catalog's create and edit form, where it is the field being edited.
+4. **No subtitles by default.** A subtitle under a heading survives only if it carries information not visible elsewhere on the screen, such as a date or data freshness.
+5. **Accessibility without narration.** Keep the behavior (labels, keyboard, colour plus text cues); remove sentences that explain it (“El color no es el único indicador…”).
+6. **No disclaimers.** Cut statements about what the system does not do. Where one prevents a costly mistake, reduce it to one short sentence next to the relevant action.
+7. **Errors say what and what next.** State what happened and what the user can do. Never name the layer, team or version that failed.
+8. **Structure before prose.** When density comes from layout, collapse secondary information into a disclosure, merge redundant fields or delete elements that are irrelevant or obvious, instead of rewording them.
 
 ### Operational statuses
 
@@ -284,7 +298,7 @@ Choose chart forms according to the operational question rather than applying on
 - Keep chart color subordinate to data meaning: institutional blue carries the primary series; semantic colors retain their approved status meanings; coral marks exceptional thresholds or selections rather than ordinary decoration.
 - Show units, date range, data freshness, and relevant targets in text. Tooltips supplement persistent labels and cannot be the only way to retrieve a value.
 - Preserve the current filters and selected datum when switching between visualization and table. On narrow screens, prefer readable transformation or the table companion over horizontal chart scrolling.
-- Production charts should compose the project-owned shadcn Chart wrapper and Recharts foundation, using M6 semantic tokens and component rules rather than copying gallery examples verbatim.
+- Production charts should compose the project-owned shadcn Chart wrapper and Recharts foundation, using M6 semantic tokens and component rules rather than copying gallery examples verbatim, as required by the [shadcn-first rule in AGENTS.md](AGENTS.md#ui-components-shadcn-first).
 
 ### Accessibility
 
@@ -341,7 +355,7 @@ Use the approved **Par canónico y lista de verificación** format to make the r
 - Name the governing rule on every pair and state why the incorrect version fails. A pair without a stated reason is decoration.
 - Give each area a review checklist. Checklists are text tied to rules, so they cover the rules that have no rendered pair and stay accurate when a component changes.
 - Keep the rule prose normative. The pair and the checklist are aids for applying a rule, not separate rules; when they disagree with the section above, the section wins and the example is corrected.
-- Do not grow this into a component catalog. Component-level documentation belongs with the project-owned shadcn/Base UI compositions.
+- Do not grow this into a component catalog; component documentation lives with the shadcn compositions in `src/components/ui/`, as required by the [shadcn-first rule in AGENTS.md](AGENTS.md#ui-components-shadcn-first).
 
 The canonical pairs live at [`docs/design/examples/index.html`](docs/design/examples/index.html). Open that file directly in a browser; it is self-contained, needs no build step, and carries all seven pairs and all seven checklists on one page. It is versioned with this document, so a change to a rule and a change to its example arrive in the same commit.
 

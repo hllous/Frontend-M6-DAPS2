@@ -1,33 +1,16 @@
+import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { containerFixtures, updateContainerFixture } from "@/lib/containers-fixtures";
 import { updateContainerInputSchema } from "@/lib/containers";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 async function targetId(context: { params: Promise<{ id: string }> }) {
   return (await context.params).id;
@@ -43,13 +26,9 @@ export async function GET(
   try {
     const session = getRequiredSession(request);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/containers/${id}`);
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}`);
+            return forwardResponse(backendResponse);
     }
 
     const container = containerFixtures.find((c) => c.id === id);
@@ -64,7 +43,7 @@ export async function GET(
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo cargar el contenedor.", path);
+    return mapSessionError(error, path, "No se pudo cargar el contenedor.");
   }
 }
 
@@ -96,17 +75,13 @@ export async function PATCH(
       return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/containers/${id}`, "container:manage", {
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/containers/${pathId(id)}`, "container:manage", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const bodyText = await backendResponse.text();
-      return new NextResponse(bodyText, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const existing = containerFixtures.find((c) => c.id === id);
@@ -123,6 +98,6 @@ export async function PATCH(
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo actualizar el contenedor.", path);
+    return mapSessionError(error, path, "No se pudo actualizar el contenedor.");
   }
 }

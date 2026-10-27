@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { GET, POST } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -10,15 +10,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("green spaces BFF route", () => {
   it("requires an active session", async () => {
@@ -29,7 +21,7 @@ describe("green spaces BFF route", () => {
   });
 
   it("lists GreenSpaces for an authenticated Field actor with the documented filters", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/green-spaces?active=true&spaceType=PARK&zoneId=zone-1", { headers: { cookie } }));
     const body = await response.json();
 
@@ -38,7 +30,7 @@ describe("green spaces BFF route", () => {
   });
 
   it("keeps GreenSpace management Office-only", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(new Request("http://localhost/api/green-spaces", {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
@@ -50,7 +42,7 @@ describe("green spaces BFF route", () => {
   });
 
   it("creates a GreenSpace for Office with the documented response", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(new Request("http://localhost/api/green-spaces", {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
@@ -60,5 +52,18 @@ describe("green spaces BFF route", () => {
 
     expect(response.status).toBe(201);
     expect(body).toMatchObject({ name: "Plaza nueva #108", spaceType: "SQUARE", areaM2: 250, zoneId: "zone-2", active: true });
+  });
+
+  it("forwards an authenticated backend green-space list with GET", async () => {
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [] }));
+
+    const response = await GET(new Request("http://localhost/api/green-spaces", { headers: { cookie } }));
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/green-spaces");
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 });

@@ -1,6 +1,7 @@
+import { backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   getStreetClosureRequestFixture,
   updateStreetClosureRequestFixture,
@@ -11,22 +12,9 @@ import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@
 
 type Transition = "approve" | "reject" | "end";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    { statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path },
-    { status },
-  );
-}
+
+
 
 export async function handleStreetClosureTransition(
   request: Request,
@@ -37,8 +25,8 @@ export async function handleStreetClosureTransition(
   try {
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede reconciliar solicitudes de corte de calle.", path);
+    if (!scenario.capabilities.includes("referral:reconcile")) {
+      return errorResponse(403, "Su rol no permite reconciliar solicitudes de corte de calle.", path, FORBIDDEN_CODES.roleRequired);
     }
 
     let body: unknown = undefined;
@@ -53,16 +41,13 @@ export async function handleStreetClosureTransition(
       body = parsed.data;
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/street-closure-requests/${id}/${transition}`, undefined, {
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/street-closure-requests/${pathId(id)}/${transition}`, undefined, {
         method: "POST",
         headers: transition === "approve" ? { "content-type": "application/json" } : undefined,
         body: transition === "approve" ? JSON.stringify(body) : undefined,
       });
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     const current = getStreetClosureRequestFixture(id);
@@ -70,7 +55,7 @@ export async function handleStreetClosureTransition(
     const valid =
       (transition === "approve" && current.status === "REQUESTED") ||
       (transition === "reject" && current.status === "REQUESTED") ||
-      (transition === "end" && current.status === "APPROVED");
+      (transition === "end" && (current.status === "APPROVED" || current.status === "EXPIRED"));
     if (!valid) return errorResponse(409, "La transición no es válida para el estado actual de la solicitud.", path);
 
     const changes = {
@@ -82,6 +67,6 @@ export async function handleStreetClosureTransition(
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo reconciliar la solicitud de corte de calle.", path);
+    return mapSessionError(error, path, "No se pudo reconciliar la solicitud de corte de calle.");
   }
 }

@@ -9,7 +9,7 @@ Guía de referencia para los despliegues de M6. Las URLs y plataformas vienen de
 | Componente | Plataforma documentada | URL de referencia |
 |---|---|---|
 | Backend NestJS | Render | `https://m6-backend-m64k.onrender.com` |
-| PostgreSQL | Render, acceso interno | No tiene URL pública |
+| PostgreSQL | Supabase (gestionado; el backend migró desde Render el 08/10/2026) | No tiene URL pública de la app |
 | Frontend Next.js | Vercel | `https://m6-ambiente-frontend.vercel.app` |
 
 | Recurso | URL |
@@ -50,7 +50,7 @@ La lista para desarrollo está en [`.env.example`](../../.env.example). En Verce
 | `M6_AUTH_MODE` | `mock` para escenarios locales; `backend-development` para integrar con el backend usando un JWT de desarrollo. `real-m1` todavía falla de forma cerrada. Configurar el modo explícitamente en producción: si se omite, el código selecciona `real-m1`. |
 | `M6_BACKEND_ORIGIN` | Origen privado de M6 Backend; requerido en `backend-development`. |
 | `M6_DEV_JWT` | JWT de desarrollo aceptado por el backend; requerido en `backend-development`. Guardar como secreto. |
-| `M6_SESSION_SECRET` | Secreto del BFF para sellar la cookie de sesión. Obligatorio cuando `NODE_ENV=production`; el desarrollo local tiene un valor de respaldo. |
+| `M6_SESSION_SECRET` | Secreto aleatorio de al menos 32 bytes para sellar la cookie del BFF (generalo con `openssl rand -base64 32`). Obligatorio cuando `NODE_ENV=production`; el desarrollo local tiene un valor de respaldo. |
 | `NEXT_PUBLIC_DISABLE_MSW` | Solo para desarrollo y depuración de pruebas; desactiva el service worker de MSW. |
 
 La cookie de sesión es `httpOnly`, `Secure` en producción y `SameSite=Lax`. La implementación actual la cifra con AES-256-GCM; aún no autentica contra M1. Para una demo aislada, el modo `mock` usa fixtures. Para probar llamadas al backend, usá `backend-development` y un JWT temporal válido. No publiques secretos en el repositorio ni los incluyas en variables públicas.
@@ -66,13 +66,15 @@ Los nombres exactos están definidos en `Backend-M6-DAPS2/src/config/env.validat
 | `JWT_EXPIRATION` | Duración de JWT; default de 3600 segundos. |
 | `SANCTION_DEADLINE_DAYS` | Plazo de cierre automático de expedientes; default de 30 días. |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL_BASE` | Cloudflare R2 para evidencia. Sin la configuración de storage, `/evidence` no puede completar la subida. |
-| `KAFKA_BROKERS` | Broker de eventos. Si falta, el backend conserva los eventos en outbox y no los publica. |
+| `RABBITMQ_URL` | Broker de eventos del Core (RabbitMQ). Si falta, el backend conserva los eventos en outbox y no los publica ni consume. |
+| `RABBITMQ_EXCHANGE`, `RABBITMQ_QUEUE` | `muni.inbox` y `q.ambiente` (defaults): los crea el Core y el backend solo verifica que existan. |
+| `CORE_API_URL`, `CORE_MODULE_ID`, `CORE_MODULE_SECRET` | API del Core, id del módulo (`ambiente`) y secret para pedir el token de módulo. El secret se carga solo en el panel de Render. |
 
 Render provee `PORT`; no lo fijes manualmente. El backend sirve en `0.0.0.0` dentro del contenedor.
 
 ## Estado y límites conocidos
 
-- Backend `develop` implementa sus siete fases: 134 rutas REST en 23 tags Swagger (snapshot verificado en [30d49ea](https://github.com/hllous/Backend-M6-DAPS2/commit/30d49ea1d56f735a124ae9260cafefff095e07b6)). El [mirror local](../backend-context/README.md) y su [catálogo](../backend-context/api/endpoints.md) se actualizaron desde ese mismo snapshot el 01/10/2026.
+- Backend `develop` implementa sus siete fases: 134 rutas REST en 23 tags Swagger (cuenta verificada el 01/10/2026 en [30d49ea](https://github.com/hllous/Backend-M6-DAPS2/commit/30d49ea1d56f735a124ae9260cafefff095e07b6) y contada de nuevo el 13/10/2026 sobre [d3b7b4a](https://github.com/hllous/Backend-M6-DAPS2/commit/d3b7b4a16c377d1a0f52915130803d1cb2433a22)). El [mirror local](../backend-context/README.md) y su [catálogo](../backend-context/api/endpoints.md) se re-sincronizaron desde `d3b7b4a` el 13/10/2026.
 - La integración de autenticación real de M1 sigue pendiente. El frontend tiene modo mock y un modo de desarrollo con JWT; el control de capabilities del frontend no reemplaza autorización en backend.
 - En `POST /evidence`, Backend verifica el tipo real por magic bytes, limita el tamaño a 10 MB y elimina metadatos de JPEG, PNG y WebP cuando reconoce la estructura del archivo. Las imágenes con estructuras inesperadas se almacenan sin modificar para preservar la evidencia. Los PDF pasan sin limpiar y no hay escaneo de malware. [Backend issue #90](https://github.com/hllous/Backend-M6-DAPS2/issues/90) está cerrado con estas exclusiones documentadas; ver también [ADR-0006](../adr/0006-frontend-security-controls-are-defense-in-depth-only.md).
 - Backend no tiene auditoría de lecturas ni escrituras para los datos Tier 2; el alcance se difirió fuera del TPO en el cierre de [Backend issue #90](https://github.com/hllous/Backend-M6-DAPS2/issues/90). No prometas mostrar quién vio esos datos.

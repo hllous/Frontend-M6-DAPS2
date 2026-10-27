@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetServiceFixtures, resetZoneResultFixtures, serviceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { GET, POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetServiceFixtures();
@@ -16,20 +16,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("zone-results BFF route", () => {
   it("GET requires an active session and returns 401", async () => {
@@ -53,7 +40,7 @@ describe("zone-results BFF route", () => {
   });
 
   it("POST returns 403 when session lacks service:execute (Crew Member)", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/zone-results", {
         method: "POST",
@@ -68,7 +55,7 @@ describe("zone-results BFF route", () => {
   });
 
   it("POST returns 404 if the target service does not exist", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-NONEXISTENT/zone-results", {
         method: "POST",
@@ -81,7 +68,7 @@ describe("zone-results BFF route", () => {
   });
 
   it("POST returns 403 when trying to record results for another crew's service", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     // SVC-1042 belongs to crew-a
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1042/zone-results", {
@@ -95,7 +82,7 @@ describe("zone-results BFF route", () => {
   });
 
   it("POST returns 409 if service is not IN_PROGRESS", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     // SVC-1050 is in SCHEDULED
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/zone-results", {
@@ -112,7 +99,7 @@ describe("zone-results BFF route", () => {
 
   it("POST returns 400 if zoneId is not in service.zoneIds", async () => {
     updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/zone-results", {
         method: "POST",
@@ -128,7 +115,7 @@ describe("zone-results BFF route", () => {
 
   it("POST returns 400 when status is PARTIAL or NOT_SERVICED but reason is missing", async () => {
     updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/zone-results", {
         method: "POST",
@@ -144,7 +131,7 @@ describe("zone-results BFF route", () => {
 
   it("POST returns 400 when status is SERVICED but a reason is provided", async () => {
     updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/zone-results", {
         method: "POST",
@@ -160,7 +147,7 @@ describe("zone-results BFF route", () => {
 
   it("POST successfully records SERVICED result and returns 201", async () => {
     updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services/SVC-1050/zone-results", {
         method: "POST",
@@ -180,7 +167,7 @@ describe("zone-results BFF route", () => {
 
   it("POST rejects duplicate recording for the same zone with 409", async () => {
     updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     await POST(
       new Request("http://localhost/api/services/SVC-1050/zone-results", {
         method: "POST",
@@ -205,7 +192,7 @@ describe("zone-results BFF route", () => {
 
   it("GET returns all recorded zone results for the service", async () => {
     updateServiceFixture("SVC-1050", { status: "IN_PROGRESS" });
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     await POST(
       new Request("http://localhost/api/services/SVC-1050/zone-results", {
         method: "POST",
@@ -229,10 +216,18 @@ describe("zone-results BFF route", () => {
 
   it("forwards the zone-result DTO with JSON content type", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 201 }));
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/crews")) {
+        return new Response(JSON.stringify({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (url.endsWith("/services/SVC-1050")) {
+        return new Response(JSON.stringify({ id: "SVC-1050", crewId: "11111111-1111-4111-8111-111111111111" }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response("{}", { status: 201, headers: { "content-type": "application/json" } });
+    });
     // El login resuelve la cuadrilla de Campo contra GET /crews antes de la llamada bajo prueba.
-    backendFetch.mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] }), { status: 200 }));
-    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     backendFetch.mockClear();
     const input = { zoneId: "zone-3", status: "PARTIAL" as const, reason: "WEATHER" as const, notes: "Lluvia intensa" };
 
@@ -246,7 +241,12 @@ describe("zone-results BFF route", () => {
     );
 
     expect(response.status).toBe(201);
-    const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(backendFetch.mock.calls.map(([url]) => String(url))).toEqual([
+      "https://backend.internal/services/SVC-1050",
+      "https://backend.internal/services/SVC-1050/zone-results",
+    ]);
+    const requestInit = backendFetch.mock.calls[1]?.[1] as RequestInit;
+    expect(requestInit.method).toBe("POST");
     expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
     expect(JSON.parse(String(requestInit.body))).toEqual(input);
   });

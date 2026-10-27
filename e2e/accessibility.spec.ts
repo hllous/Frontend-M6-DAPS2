@@ -31,12 +31,14 @@ test.describe("automated WCAG checks @smoke", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
 
-    await page.getByRole("button", { name: "Más módulos" }).click();
+    await page.getByRole("button", { name: "Más" }).click();
     const selectedNavigationItem = page
-      .getByRole("dialog", { name: "Más módulos" })
+      .getByRole("dialog", { name: "Más" })
       .getByRole("link", { name: "Mi trabajo", exact: true });
     await selectedNavigationItem.hover();
-    await page.waitForTimeout(200);
+    await expect.poll(() => selectedNavigationItem.evaluate((element) =>
+      element.getAnimations({ subtree: true }).every((animation) => animation.playState === "finished"),
+    )).toBe(true);
 
     await expectNoViolations(page);
   });
@@ -50,12 +52,36 @@ test.describe("automated WCAG checks @smoke", () => {
     await expectNoViolations(page);
   });
 
+  test("the Services workspace has no axe violations at desktop and mobile sizes", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=services");
+    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Mapa de servicios" })).toBeVisible();
+    await expectNoViolations(page);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
+    const map = page.getByRole("region", { name: "Mapa de servicios" });
+    await expect(page.getByRole("slider", { name: "Altura de la lista" })).toBeVisible();
+    await expect(table).toBeVisible();
+    await expect(map).toBeVisible();
+    await expect(page.getByRole("button", { name: "Lista", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Mapa", exact: true })).toHaveCount(0);
+    await expectNoViolations(page);
+
+    await page.getByRole("slider", { name: "Altura de la lista" }).press("End");
+    await expect(page.getByRole("complementary", { name: "Lista de servicios" })).toHaveAttribute("data-snap", "full");
+    await expectNoViolations(page);
+  });
+
   test("the mobile navigation sheet has no axe violations", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("button", { name: "Más módulos" }).click();
-    const mobileNavigationSheet = page.getByRole("dialog", { name: "Más módulos" });
+    await page.getByRole("button", { name: "Más" }).click();
+    const mobileNavigationSheet = page.getByRole("dialog", { name: "Más" });
     await expect(mobileNavigationSheet).toBeVisible();
     // Otherwise the cursor stays over the trigger's screen position, which the sheet's
     // first pill now renders under — a spurious :hover state, not the steady-state page.
@@ -65,5 +91,20 @@ test.describe("automated WCAG checks @smoke", () => {
     await expect(mobileNavigationSheet).toHaveCSS("opacity", "1");
 
     await expectNoViolations(page);
+  });
+
+  test("the portaled mobile sheet honors reduced motion and has a Spanish close name", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app");
+    await page.getByRole("button", { name: "Más" }).click();
+
+    const sheet = page.getByRole("dialog", { name: "Más" });
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toHaveCSS("transition-duration", "0s");
+    await expect(sheet).toHaveCSS("animation-name", "none");
+    await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCSS("background-color", "oklab(0 0 0 / 0.1)");
+    await expect(sheet.getByRole("button", { name: "Cerrar" })).toBeVisible();
   });
 });

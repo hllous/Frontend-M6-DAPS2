@@ -9,8 +9,8 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 
 # Solo manifiestos para aprovechar la caché de Docker.
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
 
 # ─── Etapa 2: builder (compilación de Next.js) ───────────────
 FROM node:22-alpine AS builder
@@ -22,9 +22,10 @@ COPY --from=deps /app/node_modules ./node_modules
 
 # Copia el resto del código fuente (respeta .dockerignore).
 COPY . .
+RUN corepack enable
 
 # Compila la app y genera el servidor standalone (.next/standalone).
-RUN npm run build
+RUN pnpm build
 
 # ─── Etapa 3: runner (imagen final, liviana) ─────────────────
 FROM node:22-alpine AS runner

@@ -1,28 +1,41 @@
 import { NextResponse } from "next/server";
 
+import { fetchMe, sameRoles } from "@/lib/me";
 import {
   AUTH_COOKIE_NAME,
+  InvalidSessionError,
   getSessionFromRequest,
   publicSession,
-  refreshSession,
   sealSession,
   sessionCookieOptions,
   sessionCookieRemovalOptions,
 } from "@/lib/session";
 
 export async function GET(request: Request) {
-  const session = getSessionFromRequest(request);
+  const now = Date.now();
+  const session = getSessionFromRequest(request, undefined, now);
   if (!session) {
     const response = NextResponse.json({ message: "La sesión no está activa." }, { status: 401 });
     response.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions());
     return response;
   }
 
-  const activeSession = refreshSession(session);
-  if (!activeSession) {
-    return NextResponse.json({ message: "La sesión expiró." }, { status: 401 });
+  // En modo backend el pulso de actividad también releé los roles de M6: un cambio de asignación rige sin volver a ingresar.
+  let roles = session.roles;
+  if (session.mode === "backend-development") {
+    try {
+      roles = (await fetchMe(request)).roles;
+    } catch (error) {
+      if (error instanceof InvalidSessionError) {
+        const rejected = NextResponse.json({ message: "La sesión no está activa." }, { status: 401 });
+        rejected.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions());
+        return rejected;
+      }
+      // Indisponibilidad o ciudadano: se conservan los roles de la cookie; el backend sigue siendo la autoridad.
+    }
   }
 
+  const activeSession = { ...session, lastActivityAt: now, roles: sameRoles(session.roles, roles) ? session.roles : roles };
   const response = NextResponse.json({ session: publicSession(activeSession) });
   response.cookies.set({
     name: AUTH_COOKIE_NAME,

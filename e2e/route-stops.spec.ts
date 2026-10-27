@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { chooseCatalogOption } from "./support/catalog-611-controls";
 
 async function openRoutesCatalog(page: import("@playwright/test").Page) {
   await loginViaApi(page, "office-duty-queue");
@@ -45,17 +46,16 @@ test.describe("Route stop-sequence builder #111", () => {
     await expect(builder.getByTestId("stop-item-0")).toBeVisible();
 
     // Attempt to add duplicate zone-2 (Palermo is already in the sequence)
-    const zoneSelect = builder.getByTestId("stop-zone-select");
-    await zoneSelect.selectOption("zone-2");
+    await chooseCatalogOption(page, "Zona operativa", "Palermo (ya en el recorrido)");
     await builder.getByTestId("add-stop-button").click();
 
     // Acceptance Criteria: Duplicate rejected client-side before submit
     const errorBox = builder.getByTestId("stop-editor-error");
     await expect(errorBox).toBeVisible();
-    await expect(errorBox).toContainText(/Una zona no puede repetirse en el mismo recorrido/i);
+    await expect(errorBox).toContainText(/Palermo ya está en el recorrido/i);
 
     // Add zone-1 (Belgrano, 40 min)
-    await zoneSelect.selectOption("zone-1");
+    await chooseCatalogOption(page, "Zona operativa", "Belgrano");
     const durationInput = builder.getByTestId("stop-duration-input");
     await durationInput.fill("40");
     await builder.getByTestId("add-stop-button").click();
@@ -63,6 +63,9 @@ test.describe("Route stop-sequence builder #111", () => {
     // Now 2 stops exist: index 0 (Palermo), index 1 (Belgrano)
     await expect(builder.getByTestId("stop-item-0")).toContainText("Palermo");
     await expect(builder.getByTestId("stop-item-1")).toContainText("Belgrano");
+    await expect(
+      builder.getByTestId("stop-item-1").getByRole("spinbutton", { name: "Duración (min)" }),
+    ).toHaveValue("40");
 
     // Reorder: move stop 1 (Belgrano) up to position 1
     await builder.getByTestId("stop-move-up-1").click();
@@ -118,7 +121,7 @@ test.describe("Route stop-sequence builder #111", () => {
     await expect(builder).not.toBeVisible();
     const emptyStops = detailView.getByTestId("empty-stops-section");
     await expect(emptyStops).toBeVisible();
-    await expect(emptyStops.getByText("Este recorrido no tiene paradas configuradas")).toBeVisible();
+    await expect(emptyStops.getByText("Sin paradas")).toBeVisible();
 
     // Click "Agregar paradas" CTA
     const addStopsCta = detailView.getByTestId("add-stops-cta");
@@ -130,7 +133,7 @@ test.describe("Route stop-sequence builder #111", () => {
     await expect(builder.getByTestId("builder-empty-stops")).toBeVisible();
 
     // Add a stop and save
-    await builder.getByTestId("stop-zone-select").selectOption("zone-1");
+    await chooseCatalogOption(page, "Zona operativa", "Belgrano");
     await builder.getByTestId("stop-duration-input").fill("25");
     await builder.getByTestId("add-stop-button").click();
     await builder.getByTestId("save-sequence-button").click();

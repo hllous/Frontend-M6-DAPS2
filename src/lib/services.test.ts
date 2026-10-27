@@ -7,6 +7,7 @@ import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_SERVICES_QUERY } from "./services-fixtures";
 import {
   BackendServiceZoneSelectionError,
+  assignCrewInputSchema,
   checkAssignmentConflicts,
   confirmRescheduleInputSchema,
   createServiceInputSchema,
@@ -15,6 +16,9 @@ import {
   ServiceRequestError,
   ServiceStartBlockedError,
   servicesAdapter,
+  suspendServiceInputSchema,
+  suspendServiceRequestSchema,
+  toSuspendServiceBackendInput,
   toCreateServiceBackendInput,
 } from "./services";
 import { olvidarCatalogoDeEtiquetas } from "./service-labels";
@@ -202,6 +206,22 @@ describe("services adapter", () => {
       total: expect.any(Number),
       totalPages: expect.any(Number),
     });
+  });
+
+  it("reports how many records of the page it dropped for an unknown enum, apart from the paging total (#651)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const [known] = (await servicesAdapter.list()).services;
+    server.use(http.get("*/api/services", () => HttpResponse.json({
+      data: [known, { ...known, id: "svc-future", status: "FUTURE_STATUS" }],
+      meta: { total: 50, page: 1, pageSize: 2, totalPages: 25 },
+    })));
+    const page = await servicesAdapter.list();
+    expect(page.services.map((service) => service.id)).toEqual([known.id]);
+    expect(page.dropped).toBe(1);
+    server.use(http.get("*/api/services", () => HttpResponse.json({
+      data: [known], meta: { total: 50, page: 1, pageSize: 1, totalPages: 50 },
+    })));
+    expect((await servicesAdapter.list()).dropped).toBe(0);
   });
 
   it("normalizes the named empty-results scenario", async () => {
@@ -654,7 +674,8 @@ describe("services adapter", () => {
             title: "Barrido mecánico",
             mode: "ROUTE",
             status: "SUSPENDED",
-            statusReason: `Desperfecto vehicular: ${body.note}`,
+            statusReason: "Desperfecto vehicular",
+            statusNote: body.note,
             origin: "PLANNED",
             zoneIds: ["zone-3"],
             scheduledDate: "2026-09-05",
@@ -669,7 +690,8 @@ describe("services adapter", () => {
       });
 
       expect(suspended.status).toBe("SUSPENDED");
-      expect(suspended.statusReason).toContain("El camión no arranca.");
+      expect(suspended.statusReason).toBe("Desperfecto vehicular");
+      expect(suspended.statusNote).toBe("El camión no arranca.");
     });
 
     it("rejects invalid suspend input (missing note) with ServiceContractError before sending request", async () => {
@@ -881,6 +903,39 @@ describe("services adapter", () => {
       expect(result.isOutside).toBe(true);
       expect(result.timing).toBe("late");
     });
+
+    it("uses the Argentine day at 22:30 even when UTC has crossed into tomorrow", () => {
+      const result = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-09-22", windowFrom: "00:00", windowTo: "23:59" } as any,
+        new Date("2026-09-23T01:30:00Z"),
+      );
+
+      expect(result).toEqual({ isOutside: false, timing: "within", message: null });
+    });
+
+    it("uses the Argentine day across month and year boundaries", () => {
+      const monthEnd = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-02-28", windowFrom: "00:00", windowTo: "23:59" } as any,
+        new Date("2026-03-01T02:30:00Z"),
+      );
+      const yearEnd = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-12-31", windowFrom: "00:00", windowTo: "23:59" } as any,
+        new Date("2027-01-01T02:30:00Z"),
+      );
+
+      expect(monthEnd).toEqual({ isOutside: false, timing: "within", message: null });
+      expect(yearEnd).toEqual({ isOutside: false, timing: "within", message: null });
+    });
+
+    it("formats the scheduled calendar date in outside-window messages", () => {
+      const result = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-09-23" } as any,
+        new Date("2026-09-22T15:00:00Z"),
+      );
+
+      expect(result.message).toContain("23 sept 2026");
+      expect(result.message).not.toContain("2026-09-23");
+    });
   });
 
   describe("servicesAdapter zone results and completion", () => {
@@ -1012,5 +1067,36 @@ describe("services adapter", () => {
       expect(completed.id).toBe("SVC-1050");
       expect(completed.status).toBe("COMPLETED");
     });
+  });
+});
+
+describe("suspension reason contract", () => {
+  it("sends the reason label and the trimmed note as separate fields", () => {
+    const input = suspendServiceInputSchema.parse({ reason: "VEHICLE_BREAKDOWN", note: "  El camión no arranca.  " });
+    expect(toSuspendServiceBackendInput(input)).toEqual({ reason: "Desperfecto vehicular", note: "El camión no arranca." });
+  });
+  it("omits a whitespace-only optional note from the backend payload", () => {
+    const input = suspendServiceRequestSchema.parse({ reason: "VEHICLE_BREAKDOWN", note: "   " });
+    expect(toSuspendServiceBackendInput(input)).toEqual({ reason: "Desperfecto vehicular" });
+  });
+  it.each([[500, true], [501, false]])("caps the note alone at 500 characters (note %s)", (length, valid) => {
+    const parsed = suspendServiceInputSchema.safeParse({ reason: "OTHER", note: "a".repeat(length) });
+    expect(parsed.success).toBe(valid);
+    if (!parsed.success) expect(parsed.error.issues[0].message).toContain("500 caracteres");
+  });
+  it.each([[500, true], [501, false]])("caps the optional BFF note at 500 characters (note %s)", (length, valid) => {
+    const parsed = suspendServiceRequestSchema.safeParse({ reason: "OTHER", note: "a".repeat(length) });
+    expect(parsed.success).toBe(valid);
+  });
+});
+
+describe("planning overrideNote boundaries", () => {
+  it.each([[9, false], [10, true], [500, true], [501, false]])("validates overrideNote length %s for scheduling and assignment", (length, valid) => {
+    const overrideNote = "a".repeat(length);
+    expect(assignCrewInputSchema.safeParse({ crewId: "crew-real", overrideNote }).success).toBe(valid);
+    expect(createServiceInputSchema.safeParse({
+      serviceTypeId: "type-real", origin: "PLANNED", zoneIds: ["zone-real"],
+      scheduledDate: "2099-09-10", timeWindow: { start: "09:00", end: "13:00" }, overrideNote,
+    }).success).toBe(valid);
   });
 });

@@ -8,9 +8,15 @@ The checklist lives in the PR template, [`.github/PULL_REQUEST_TEMPLATE.md`](../
 
 ## Branch protection
 
-Rules on `main`/`test`/`develop`: required `build`+`test`+`docs` checks, linear history, no force-push, no deletion. `Backend-M6-DAPS2` has no `docs` job, so its rule sets require only `build`+`test` and the two repos' rules now differ. The `docs` job has no path filter on purpose: a required check that never reports blocks the merge. Reference: [`.github/branch-protection-rules.json`](../../.github/branch-protection-rules.json).
+Classic branch protection (not rulesets) on `main`/`test`/`develop`: required `build`+`test`+`docs` checks, strict, linear history, no force-push, no deletion; admins are not enforced. `Backend-M6-DAPS2` has no `docs` job, so its rules differ. The `docs` job has no path filter on purpose: a required check that never reports blocks the merge.
 
-`docs` is required only once the rules are applied. The reference file changes first; an admin then applies it (idempotent) with [`.github/scripts/apply-branch-protection.ps1`](../../.github/scripts/apply-branch-protection.ps1) (needs `pwsh` + `gh` logged in as an admin).
+Change the required checks per branch with a `PATCH` on `required_status_checks`:
+
+```bash
+gh api --method PATCH repos/hllous/Frontend-M6-DAPS2/branches/<branch>/protection/required_status_checks -F strict=true -f 'contexts[]=build' -f 'contexts[]=test' -f 'contexts[]=docs'
+```
+
+[`.github/scripts/apply-branch-protection.ps1`](../../.github/scripts/apply-branch-protection.ps1) is outdated: it sets only `build`+`test`, so running it would drop `docs`. [`.github/branch-protection-rules.json`](../../.github/branch-protection-rules.json) is in ruleset format and is not what's applied.
 
 ## `hotfix/*` exception
 

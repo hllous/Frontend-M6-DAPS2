@@ -9,16 +9,18 @@ import type { Service } from "@/lib/services";
 import type { MapCoordinate } from "@/lib/operational-zones";
 import { summarizeServiceZones, type ServiceMapLocation } from "@/lib/services-map";
 
+import { SERVICE_MODE_LABEL } from "./service-ui-labels";
 import styles from "./services-map.module.css";
 
 const defaultCenter: MapCoordinate = [-34.58, -58.42];
 
 type ServicesMapCanvasProps = {
   services: Service[];
+  serviceOrdinals: ReadonlyMap<string, number>;
   locations: ServiceMapLocation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  filterFingerprint?: string;
+  compact?: boolean;
 };
 
 // Paths of lucide's TreeDeciduous: divIcon takes an HTML string, not a React node.
@@ -61,9 +63,9 @@ function AccessibleServiceMarker({
   onSelect,
 }: AccessibleServiceMarkerProps) {
   const markerRef = useRef<LeafletMarker | null>(null);
-  const locationLabel = location.locationLabel ?? "Ubicación resuelta";
+  const locationLabel = location.locationLabel ?? "Ubicación";
   const greenSpace = isGreenSpaceService(service);
-  const accessibleLabel = `Parada ${markerNumber}${greenSpace ? " en espacio verde" : ""}: ${service.id} — ${service.title} (${location.zones
+  const accessibleLabel = `Parada ${markerNumber}${greenSpace ? " en espacio verde" : ""}: ${service.title} (${location.zones
     .map((zone) => zone.name)
     .join(", ")})`;
 
@@ -73,6 +75,7 @@ function AccessibleServiceMarker({
 
     element.setAttribute("aria-label", accessibleLabel);
     element.setAttribute("aria-pressed", String(selected));
+    element.setAttribute("data-service-id", service.id);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -89,15 +92,16 @@ function AccessibleServiceMarker({
     <Marker
       ref={markerRef}
       position={location.coordinates!}
-      title={`${service.id} · ${service.title} · ${locationLabel}`}
+      zIndexOffset={selected ? 1000 : 0}
+      title={`${service.title} · ${locationLabel}`}
       alt={accessibleLabel}
       icon={serviceMarkerIcon(markerNumber, selected, greenSpace)}
       eventHandlers={{ click: () => onSelect(service.id) }}
     >
       <Popup>
-        <strong>{service.id} · {service.title}</strong>
+        <strong>{service.title}</strong>
         <span className={styles.popupDescription}>
-          {service.serviceTypeName} · {service.mode === "ROUTE" ? "Recorrido" : "Punto"}
+          {service.serviceTypeName} · {SERVICE_MODE_LABEL[service.mode]}
         </span>
         <span className={styles.popupDescription}>
           {greenSpace ? `Espacio verde · ${locationLabel}` : locationLabel}
@@ -121,66 +125,139 @@ function MapResizeController() {
 
   useEffect(() => {
     const container = map.getContainer();
+    let frame = 0;
+    let workspaceLayoutAnimating = false;
+    let lastWidth = container.clientWidth;
+    let lastHeight = container.clientHeight;
 
-    // El contenedor del mapa vive dentro de paneles redimensionables (react-resizable-panels)
-    // y de un layout con flex/grid. Leaflet no detecta esos cambios de tamaño por sí solo:
-    // si no se le avisa con invalidateSize(), sigue usando las dimensiones con las que
-    // midió por última vez, lo que rompe el renderizado al hacer zoom y limita el arrastre
-    // a la zona que sí alcanzó a medir correctamente.
-    const observer = new ResizeObserver(() => {
-      map.invalidateSize();
-    });
+    const scheduleInvalidate = (force = false) => {
+      if (workspaceLayoutAnimating) return;
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      if (!force && width === lastWidth && height === lastHeight) return;
+      lastWidth = width;
+      lastHeight = height;
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        map.invalidateSize({ pan: false, debounceMoveend: true });
+      });
+    };
+    const beginWorkspaceLayout = () => {
+      workspaceLayoutAnimating = true;
+      window.cancelAnimationFrame(frame);
+    };
+    const settleWorkspaceLayout = () => {
+      workspaceLayoutAnimating = false;
+      scheduleInvalidate(true);
+    };
+
+    const observer = new ResizeObserver(() => scheduleInvalidate());
     observer.observe(container);
+    window.addEventListener("services-workspace-layout-changing", beginWorkspaceLayout);
+    window.addEventListener("services-workspace-layout-settled", settleWorkspaceLayout);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("services-workspace-layout-changing", beginWorkspaceLayout);
+      window.removeEventListener("services-workspace-layout-settled", settleWorkspaceLayout);
+      window.cancelAnimationFrame(frame);
+    };
   }, [map]);
 
   return null;
 }
 
-function MapViewportController({
-  locations,
-  filterFingerprint,
-}: {
-  locations: ServiceMapLocation[];
-  filterFingerprint?: string;
-}) {
+function MapViewportController({ locations }: { locations: ServiceMapLocation[] }) {
   const map = useMap();
+  const hasInitialFit = useRef(false);
+  const hasUserMovedMap = useRef(false);
 
   useEffect(() => {
     const points = locations.flatMap((location) => [
       ...(location.coordinates ? [location.coordinates] : []),
       ...(location.locationType === "route"
-        ? location.zones.flatMap((zone) => zone.coordinates.flat())
+        ? location.zones.flatMap((zone) => zone.coordinates.flat(2))
         : []),
     ]);
 
-    if (points.length === 0) return;
+    const fitInitialResult = () => {
+      if (hasInitialFit.current || hasUserMovedMap.current || points.length === 0) return;
+      const size = map.getSize();
+      if (size.x <= 0 || size.y <= 0) return;
 
-    const bounds = new LatLngBounds(points);
-    if (bounds.isValid()) {
+      const bounds = new LatLngBounds(points);
+      if (!bounds.isValid()) return;
       map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+      hasInitialFit.current = true;
+    };
+    const markUserMovement = () => {
+      hasUserMovedMap.current = true;
+    };
+
+    map.on("resize", fitInitialResult);
+    map.on("dragstart", markUserMovement);
+    map.on("zoomstart", markUserMovement);
+    fitInitialResult();
+
+    return () => {
+      map.off("resize", fitInitialResult);
+      map.off("dragstart", markUserMovement);
+      map.off("zoomstart", markUserMovement);
+    };
+  }, [locations, map]);
+
+  return null;
+}
+
+function MapSelectionController({
+  selectedId,
+  locations,
+}: {
+  selectedId: string | null;
+  locations: ServiceMapLocation[];
+}) {
+  const map = useMap();
+  const lastPannedServiceId = useRef<string | null>(null);
+  const selectedLocation = locations.find((location) => location.serviceId === selectedId);
+
+  useEffect(() => {
+    if (!selectedId) {
+      lastPannedServiceId.current = null;
+      return;
     }
-  }, [filterFingerprint, locations, map]);
+    if (lastPannedServiceId.current === selectedId || !selectedLocation?.coordinates) return;
+
+    lastPannedServiceId.current = selectedId;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+    map.panTo(selectedLocation.coordinates, {
+      animate: !reducedMotion,
+      duration: reducedMotion ? 0 : 0.28,
+    });
+  }, [map, selectedId, selectedLocation]);
 
   return null;
 }
 
 export function ServicesMapCanvas({
   services,
+  serviceOrdinals,
   locations,
   selectedId,
   onSelect,
-  filterFingerprint,
+  compact = false,
 }: ServicesMapCanvasProps) {
-  const servicesById = useMemo(() => new Map(services.map((service) => [service.id, service])), [services]);
+  const locationsByServiceId = useMemo(
+    () => new Map(locations.map((location) => [location.serviceId, location])),
+    [locations],
+  );
   // Every zone with a service gets its outline, so neighbouring barrios stay distinguishable.
   const serviceZones = useMemo(() => summarizeServiceZones(locations), [locations]);
-  const visibleMarkers = locations.flatMap((location) => {
-    const service = servicesById.get(location.serviceId);
-    if (!service || !location.coordinates) return [];
+  const visibleMarkers = services.flatMap((service) => {
+    const location = locationsByServiceId.get(service.id);
+    const markerNumber = serviceOrdinals.get(service.id);
+    if (!location || !location.coordinates || markerNumber === undefined) return [];
 
-    return [{ service, location }];
+    return [{ service, location, markerNumber }];
   });
 
   return (
@@ -188,37 +265,40 @@ export function ServicesMapCanvas({
       center={defaultCenter}
       zoom={12}
       scrollWheelZoom
-      className={styles.map}
-      aria-label="Mapa geográfico de servicios operativos"
+      className={compact ? `${styles.map} ${styles.mapCompact}` : styles.map}
+      aria-label="Mapa de servicios"
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <MapResizeController />
-      <MapViewportController locations={locations} filterFingerprint={filterFingerprint} />
+      <MapViewportController locations={locations} />
+      <MapSelectionController selectedId={selectedId} locations={locations} />
 
-      {serviceZones.map(({ zone, serviceIds }) => (
-        <Polygon
-          key={zone.zoneId}
-          positions={zone.coordinates}
-          pathOptions={serviceZonePathOptions(serviceIds.includes(selectedId ?? ""))}
-        >
-          <Tooltip sticky>
-            <strong>{zone.code}</strong> · {zone.name}
-            <br />
-            {serviceIds.length} servicio{serviceIds.length === 1 ? "" : "s"} en la zona
-          </Tooltip>
-        </Polygon>
-      ))}
+      {serviceZones.flatMap(({ zone, serviceIds }) =>
+        zone.coordinates.map((polygon, partIndex) => (
+          <Polygon
+            key={`${zone.zoneId}-${partIndex}`}
+            positions={polygon}
+            pathOptions={serviceZonePathOptions(serviceIds.includes(selectedId ?? ""))}
+          >
+            <Tooltip sticky>
+              <strong>{zone.name}</strong>
+              <br />
+              {serviceIds.length} servicio{serviceIds.length === 1 ? "" : "s"} en la zona
+            </Tooltip>
+          </Polygon>
+        )),
+      )}
 
-      {visibleMarkers.map(({ service, location }, index) => {
+      {visibleMarkers.map(({ service, location, markerNumber }) => {
         return (
           <AccessibleServiceMarker
             key={service.id}
             service={service}
             location={location}
-            markerNumber={index + 1}
+            markerNumber={markerNumber}
             selected={service.id === selectedId}
             onSelect={onSelect}
           />

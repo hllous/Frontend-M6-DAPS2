@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { GET, PATCH } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -10,23 +10,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 const params = Promise.resolve({ id: "cont-1" });
 
 describe("Container detail BFF route", () => {
   it("returns Container detail to any authenticated actor", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await GET(
       new Request("http://localhost/api/containers/cont-1", {
         headers: { cookie },
@@ -44,7 +34,7 @@ describe("Container detail BFF route", () => {
   });
 
   it("updates Container fields for Office without allowing code/type mutations", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const update = await PATCH(
       new Request("http://localhost/api/containers/cont-1", {
         method: "PATCH",
@@ -73,7 +63,7 @@ describe("Container detail BFF route", () => {
   });
 
   it("rejects Field edits to Containers", async () => {
-    const fieldCookie = await authenticatedCookie("field-crew-member-route");
+    const fieldCookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const forbidden = await PATCH(
       new Request("http://localhost/api/containers/cont-1", {
         method: "PATCH",
@@ -87,7 +77,7 @@ describe("Container detail BFF route", () => {
   });
 
   it("returns 404 for missing Containers", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const missing = await GET(
       new Request("http://localhost/api/containers/missing-id", {
         headers: { cookie },
@@ -96,5 +86,26 @@ describe("Container detail BFF route", () => {
     );
 
     expect(missing.status).toBe(404);
+  });
+
+  it("forwards an authenticated backend Container detail request with its id and method", async () => {
+    const id = "container_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id }));
+
+    const response = await GET(
+      new Request(`http://localhost/api/containers/${id}`, { headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/containers/${id}`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 });

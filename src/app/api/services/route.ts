@@ -1,4 +1,6 @@
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { crewFixtures } from "@/lib/crew-fixtures";
@@ -15,49 +17,35 @@ import {
   ROUTE_CATALOG,
   SERVICE_TYPE_CATALOG,
   type Service,
-  type ServiceMode,
-  type ServiceOrigin,
   type ServiceQuery,
-  type ServiceStatus,
+  serviceQuerySchema,
+  servicesEnvelopeSchema,
   toCreateServiceBackendInput,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { droppedRecords } from "@/lib/tolerant-records";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { zoneFixtures } from "@/lib/zones-fixtures";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 function parseServiceQuery(url: URL): ServiceQuery {
   const statuses = url.searchParams.getAll("status");
-  return {
+  return serviceQuerySchema.parse({
     status: statuses.length > 1
-      ? (statuses as ServiceStatus[])
+      ? statuses
       : statuses.length === 1
-      ? (statuses[0] as ServiceStatus)
+      ? statuses[0]
       : undefined,
-    mode: (url.searchParams.get("mode") as ServiceMode) ?? undefined,
-    origin: (url.searchParams.get("origin") as ServiceOrigin) ?? undefined,
+    mode: url.searchParams.get("mode") ?? undefined,
+    origin: url.searchParams.get("origin") ?? undefined,
+    serviceTypeId: url.searchParams.get("serviceTypeId") ?? undefined,
+    vehicleId: url.searchParams.get("vehicleId") ?? undefined,
+    ticketId: url.searchParams.get("ticketId") ?? undefined,
     zoneId: url.searchParams.get("zoneId") ?? undefined,
     crewId: url.searchParams.get("crewId") ?? undefined,
     search: searchParam(url.searchParams),
@@ -67,32 +55,7 @@ function parseServiceQuery(url: URL): ServiceQuery {
     scheduledTo: url.searchParams.get("scheduledTo") ?? undefined,
     page: pageParam(url.searchParams),
     pageSize: pageSizeParam(url.searchParams),
-  };
-}
-
-function backendQueryString(query: ServiceQuery): string {
-  const params = new URLSearchParams();
-  if (query.status) {
-    if (Array.isArray(query.status)) {
-      query.status.forEach((st) => params.append("status", st));
-    } else {
-      params.set("status", query.status);
-    }
-  }
-  if (query.mode) params.set("mode", query.mode);
-  if (query.origin) params.set("origin", query.origin);
-  if (query.zoneId) params.set("zoneId", query.zoneId);
-  if (query.crewId) params.set("crewId", query.crewId);
-  if (query.search) params.set("search", query.search);
-  if (query.timeFrom) params.set("timeFrom", query.timeFrom);
-  if (query.timeTo) params.set("timeTo", query.timeTo);
-  if (query.scheduledFrom) params.set("scheduledFrom", query.scheduledFrom);
-  if (query.scheduledTo) params.set("scheduledTo", query.scheduledTo);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
+  });
 }
 
 export async function GET(request: Request) {
@@ -108,17 +71,20 @@ export async function GET(request: Request) {
       query.crewId = scenario.actor.crewId;
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/services${backendQueryString(query)}`);
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/services${backendQuery(query, ["status", "mode", "origin", "zoneId", "crewId", "serviceTypeId", "vehicleId", "ticketId", "scheduledFrom", "scheduledTo", "page", "pageSize"])}`);
+      if (!backendResponse.ok) return forwardResponse(backendResponse);
+      const parsed = servicesEnvelopeSchema.safeParse(await backendResponse.json().catch(() => undefined));
+      if (!parsed.success) {
+        return errorResponse(502, "La respuesta de servicios no respeta el contrato esperado.", path);
+      }
+      const dropped = droppedRecords(parsed.data.data);
+      return NextResponse.json(dropped ? { ...parsed.data, meta: { ...parsed.data.meta, dropped } } : parsed.data);
     }
 
     return NextResponse.json(paginateServiceFixtures(filterServiceFixtures(query), query.page, query.pageSize));
   } catch (error) {
+    if (error instanceof z.ZodError) return errorResponse(400, "Los filtros de servicios son inválidos.", path);
     if (error instanceof InvalidSessionError) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa.", path);
@@ -126,7 +92,7 @@ export async function GET(request: Request) {
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudieron cargar los servicios.", path);
+    return mapSessionError(error, path, "No se pudieron cargar los servicios.");
   }
 }
 
@@ -135,13 +101,9 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     // Permission check: scheduling is an Office decision, not a Field action.
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede programar un servicio.", path);
-    }
-    requireCapability(session, "service:schedule");
+    authorize(session, { office: true, officeMessage: "Solo Oficina puede programar un servicio.", capability: "service:schedule", throwOnError: true });
 
     let body: unknown;
     try {
@@ -158,11 +120,12 @@ export async function POST(request: Request) {
 
     const input = parsed.data;
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       let backendInput;
       try {
         backendInput = toCreateServiceBackendInput(input);
       } catch (error) {
+      if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
         if (error instanceof BackendServiceZoneSelectionError) {
           return errorResponse(400, error.message, path);
         }
@@ -173,11 +136,7 @@ export async function POST(request: Request) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(backendInput),
       });
-      const bodyText = await backendResponse.text();
-      return new NextResponse(bodyText, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const serviceType = SERVICE_TYPE_CATALOG.find((t) => t.id === input.serviceTypeId);
@@ -236,7 +195,7 @@ export async function POST(request: Request) {
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    if (error instanceof ForbiddenSessionError) return errorResponse(403, error.message, path);
-    return errorResponse(500, "No se pudo programar el servicio.", path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
+    return mapSessionError(error, path, "No se pudo programar el servicio.");
   }
 }

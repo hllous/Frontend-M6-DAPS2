@@ -8,6 +8,7 @@ test.describe("Catalog shell navigation regression #231", () => {
     await page.goto("/app?destination=catalog");
 
     const sidebar = page.locator("aside[aria-label='Navegación principal']");
+    await expect(page).toHaveTitle("Catálogo — Ambiente e Higiene");
     await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
     await expect(sidebar).toBeVisible();
 
@@ -16,6 +17,7 @@ test.describe("Catalog shell navigation regression #231", () => {
 
     await page.locator('a[href="/app/catalog/containers"]').click();
     await expect(page).toHaveURL(/\/app\/catalog\/containers$/);
+    await expect(page).toHaveTitle("Catálogo — Ambiente e Higiene");
     await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
     await expect(sidebar).toBeVisible();
     await expect(page.getByRole("button", { name: "Expandir navegación" })).toBeVisible();
@@ -40,7 +42,7 @@ test.describe("Catalog shell navigation regression #231", () => {
 
     await sidebar.getByRole("link", { name: "Servicios" }).click();
     await expect(page).toHaveURL(/\/app\?destination=services$/);
-    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
 
     await page.goBack();
     await expect(page).toHaveURL(/\/app\/catalog\/containers$/);
@@ -48,7 +50,7 @@ test.describe("Catalog shell navigation regression #231", () => {
 
     await page.goForward();
     await expect(page).toHaveURL(/\/app\?destination=services$/);
-    await expect(page.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
   });
 
   test("sidebar destinations are real links that open in a new tab (#243)", async ({ page }) => {
@@ -65,7 +67,7 @@ test.describe("Catalog shell navigation regression #231", () => {
     ]);
     await newTab.waitForLoadState();
     await expect(newTab).toHaveURL(/\/app\?destination=services$/);
-    await expect(newTab.getByRole("heading", { name: "Servicios Urbanos" })).toBeVisible();
+    await expect(newTab.getByRole("heading", { name: "Servicios" })).toBeVisible();
     await expect(page).toHaveURL(/\/app$/);
   });
 

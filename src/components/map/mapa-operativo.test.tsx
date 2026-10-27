@@ -1,12 +1,15 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
-import { handlers } from "@/mocks/handlers";
+import * as argentinaDate from "@/lib/argentina-date";
 import { scenarios } from "@/lib/scenarios";
+import { mockResponseAfter } from "@/mocks/delayed-response";
+import { handlers } from "@/mocks/handlers";
 import { MapaOperativo } from "./mapa-operativo";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
@@ -29,17 +32,89 @@ const canonicalZoneResponse = {
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 afterAll(() => server.close());
 
 describe("MapaOperativo", () => {
+  it("keeps the map heading concise and exposes an accessible refresh action", async () => {
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByRole("heading", { name: "Mapa operativo" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Elementos" })).toBeVisible();
+    expect(screen.queryByText(/Supervise el inventario urbano/)).not.toBeInTheDocument();
+    const refresh = screen.getByRole("button", { name: "Actualizar" });
+    expect(refresh).toBeEnabled();
+    expect(refresh).toHaveAttribute("aria-label", "Actualizar");
+  });
+
+  it("holds the inventory layout with a busy skeleton region while the map data is delayed", async () => {
+    server.use(http.get("*/api/containers*", () => mockResponseAfter(350, () => HttpResponse.json({
+      data: [],
+      meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 },
+    }))));
+    const { container } = render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    const region = screen.getByRole("region", { name: "Mapa" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(container.querySelector("[data-slot=map-pane-skeleton]")).not.toBeNull();
+    expect(region.querySelector('[data-skeleton="map-context-header"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton^="map-context-"]')).toHaveLength(4);
+    expect(region.querySelector('[data-skeleton="map-layer-controls"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton="map-layer-control"]')).toHaveLength(4);
+    expect(region.querySelector('[data-skeleton="map-elements-heading"]')).not.toBeNull();
+    expect(region.querySelectorAll('[data-skeleton="list-item"]')).toHaveLength(6);
+    expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
+
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
+    expect(await screen.findByRole("heading", { name: "Elementos" }, { timeout: 3000 })).toBeVisible();
+    expect(region.querySelector('[data-skeleton="map-context-header"]')).toBeNull();
+    expect(region.querySelector('[data-skeleton="map-layer-controls"]')).toBeNull();
+  });
+
+  it.each([
+    ["Cobertura", "Cargando"],
+    ["Recorrido", "Cargando"],
+    ["Hoy", "Cargando"],
+  ])("shows a busy skeleton in the %s side panel while its data is delayed", async (tab, label) => {
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Elementos" });
+
+    server.use(http.all("*/api/*", () => mockResponseAfter(350, () => undefined)));
+    await user.click(screen.getByRole("tab", { name: tab }));
+
+    const region = screen.getByRole("region", { name: label });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(region.querySelector("[data-skeleton=list]")).not.toBeNull();
+    expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByRole("region", { name: label })).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
+    expect(screen.getByRole("region", { name: label }).querySelector("[data-skeleton=list]")).toBeNull();
+  });
+
+  it("changes map views with keyboard-operable tabs", async () => {
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    const inventoryTab = await screen.findByRole("tab", { name: "Inventario" });
+    inventoryTab.focus();
+    await user.keyboard("{ArrowRight}");
+
+    expect(screen.getByRole("tab", { name: "Zonas" })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("presents every point layer with a synchronized accessible list", async () => {
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    expect(screen.getByRole("status", { name: "Cargando mapa operativo" })).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Elementos visibles" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Mapa" })).toHaveAttribute("aria-busy", "true");
+    expect(await screen.findByRole("heading", { name: "Elementos" })).toBeInTheDocument();
+    const inventoryList = screen.getByRole("list", { name: "Elementos visibles" });
+    expect(within(inventoryList).getAllByRole("listitem").length).toBeGreaterThan(0);
     expect(screen.getByText("CONT-002")).toBeInTheDocument();
     expect(screen.getByText("Punto verde Plaza Mitre")).toBeInTheDocument();
     expect(screen.getByText("Parque del Bicentenario")).toBeInTheDocument();
@@ -54,12 +129,37 @@ describe("MapaOperativo", () => {
     expect(screen.getByText("Punto verde Plaza Mitre")).toBeInTheDocument();
   });
 
+  it("selects containers, green points, and green spaces from the inventory list", async () => {
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    for (const label of [/CONT-002/, /Punto verde Plaza Mitre/, /^Parque del Bicentenario/]) {
+      const item = await screen.findByRole("button", { name: label });
+      await user.click(item);
+
+      expect(item).toHaveAttribute("aria-pressed", "true");
+    }
+  });
+
+  it("shows the last consultation time in each operational map view", async () => {
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("heading", { name: "Elementos" });
+    expect(screen.getByText(/Consultado/)).toBeVisible();
+
+    for (const view of ["Zonas", "Cobertura", "Recorrido", "Hoy"]) {
+      await user.click(screen.getByRole("tab", { name: view }));
+      expect(await screen.findByText(/Consultado/)).toBeVisible();
+    }
+  });
+
   it("keeps the selected tree in the URL and links its catalog detail", async () => {
     window.history.replaceState(null, "", "/app?destination=map&tree=tree-1");
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    const list = within(await screen.findByRole("region", { name: "Elementos visibles" }));
+    const list = within(await screen.findByRole("region", { name: "Elementos" }));
     const selected = list.getByRole("button", { name: /ARB-00442/ });
     expect(selected).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("link", { name: "Ver ficha del árbol ARB-00442" })).toHaveAttribute("href", "/app/catalog/trees?tree=tree-1&detail=tree-1");
@@ -93,8 +193,8 @@ describe("MapaOperativo", () => {
 
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    expect(await screen.findByText("El mapa no está disponible")).toBeVisible();
-    expect(screen.getByText(/Revise la conexión e intente nuevamente/)).toBeVisible();
+    expect(await screen.findByText("No se pudo cargar el mapa")).toBeVisible();
+    expect(screen.getByText("No se pudo cargar el mapa. Intente nuevamente.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeVisible();
   });
 
@@ -108,17 +208,14 @@ describe("MapaOperativo", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Zonas" }));
 
-    expect(await screen.findByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    expect(screen.getByText("Z-BEL")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Zonas" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "Zonas" })).toBeVisible();
     expect(screen.getByText("Belgrano")).toBeVisible();
-    expect(screen.getByText("Z-PAL")).toBeVisible();
     expect(screen.getByText("Palermo")).toBeVisible();
-    expect(screen.getByText("Z-REC")).toBeVisible();
     expect(screen.getByText("Recoleta")).toBeVisible();
-    expect(screen.getByText("Z-RET")).toBeVisible();
     expect(screen.getByText("Retiro")).toBeVisible();
-    for (const code of ["Z-COL", "Z-SNI", "Z-PMA", "Z-MON"]) expect(screen.getByText(code)).toBeVisible();
-    expect(screen.getByText(/8 zonas operativas/)).toBeVisible();
+    for (const name of ["Colegiales", "San Nicolás", "Puerto Madero", "Montserrat"]) expect(screen.getByText(name)).toBeVisible();
+    expect(screen.getByText(/8 zonas/)).toBeVisible();
   });
 
   it("shows coverage rates with a semantic legend and exact zone values", async () => {
@@ -145,10 +242,11 @@ describe("MapaOperativo", () => {
     await user.click(await screen.findByRole("tab", { name: "Cobertura" }));
 
     expect(await screen.findByRole("heading", { name: "Cobertura por zona" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "Cobertura por zona" })).toBeVisible();
     expect(screen.getByText(/92,5/)).toBeVisible();
     expect(screen.getByText(/148 de 160 objetivos/)).toBeVisible();
     expect(screen.getByText("Cobertura alta")).toBeVisible();
-    expect(screen.getByText("4 de 8 zonas con datos")).toBeVisible();
+    expect(screen.getByText("4 de 8 con datos")).toBeVisible();
     expect(screen.getByText("Recoleta")).toBeVisible();
     expect(screen.getByText("Cobertura parcial")).toBeVisible();
   });
@@ -204,15 +302,50 @@ describe("MapaOperativo", () => {
     await user.click(await screen.findByRole("tab", { name: "Recorrido" }));
 
     expect(await screen.findByRole("heading", { name: "Recorrido Norte" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "Paradas del recorrido" })).toBeVisible();
     expect(screen.getByText("Parada 1")).toBeVisible();
     expect(screen.getByText("Parada 2")).toBeVisible();
     expect(screen.getByText("Parada 3")).toBeVisible();
-    expect(screen.getByText("35 min estimados")).toBeVisible();
-    expect(screen.getByText("Z-PAL · Palermo")).toBeVisible();
+    expect(screen.getByText("35 min")).toBeVisible();
+    expect(screen.getByText("Palermo")).toBeVisible();
+  });
+
+  it("offers active routes from every paginated result in the picker", async () => {
+    const requestedPages: number[] = [];
+    const createRoute = (id: string, code: string, name: string) => ({ id, code, name, active: true, stops: [] });
+    server.use(
+      http.get("*/api/routes", ({ request }) => {
+        const url = new URL(request.url);
+        requestedPages.push(Number(url.searchParams.get("page")));
+        const page = Number(url.searchParams.get("page"));
+        const route = page === 1
+          ? createRoute("route-first-page", "R-001", "Primer recorrido")
+          : createRoute("route-later-page", "R-101", "Recorrido posterior");
+        return HttpResponse.json({
+          data: [route],
+          meta: { total: 101, page, pageSize: 100, totalPages: 2 },
+        });
+      }),
+      http.get("*/api/routes/:id", ({ params }) => HttpResponse.json(
+        params.id === "route-later-page"
+          ? createRoute("route-later-page", "R-101", "Recorrido posterior")
+          : createRoute("route-first-page", "R-001", "Primer recorrido"),
+      )),
+    );
+
+    const user = userEvent.setup();
+    render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("tab", { name: "Recorrido" }));
+
+    const picker = await screen.findByRole("combobox", { name: "Recorrido" });
+    expect(within(picker).getByRole("option", { name: "R-101 · Recorrido posterior" })).toBeInTheDocument();
+    expect(requestedPages.sort()).toEqual([1, 2]);
   });
 
   it("loads each scheduled service detail to paint today's per-zone results", async () => {
-    vi.setSystemTime(new Date("2026-09-10T12:00:00-03:00"));
+    vi.setSystemTime(new Date("2026-09-11T02:30:00.000Z"));
+    const todaySpy = vi.spyOn(argentinaDate, "todayInArgentina").mockReturnValue("2026-09-10");
+    const serviceListUrls: URL[] = [];
     const service = {
       id: "SVC-TODAY-1",
       serviceTypeId: "st-waste-route",
@@ -255,25 +388,41 @@ describe("MapaOperativo", () => {
 
     server.use(
       http.get("*/api/zones", () => HttpResponse.json(canonicalZoneResponse)),
-      http.get("*/api/services", () =>
-        HttpResponse.json({
+      http.get("*/api/services", ({ request }) => {
+        serviceListUrls.push(new URL(request.url));
+        return HttpResponse.json({
           data: [{ ...service, zoneResults: undefined }],
           meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
-        }),
-      ),
+        });
+      }),
       http.get("*/api/services/SVC-TODAY-1", () => HttpResponse.json(service)),
     );
 
     const user = userEvent.setup();
     render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
 
-    await user.click(await screen.findByRole("tab", { name: "Atención hoy" }));
+    await user.click(await screen.findByRole("tab", { name: "Hoy" }));
 
-    expect(await screen.findByRole("heading", { name: "Zonas atendidas hoy" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Hoy" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "Hoy" })).toBeVisible();
+    const serviceList = screen.getByRole("list", { name: "Servicios" });
+    expect(within(serviceList).getByRole("listitem")).toBeVisible();
     expect(screen.getByText("Belgrano")).toBeVisible();
     expect(screen.getByText("Atendida")).toBeVisible();
     expect(screen.getByText("Palermo")).toBeVisible();
     expect(screen.getByText("Parcial")).toBeVisible();
-    expect(screen.getByText(/1 servicio programado hoy/)).toBeVisible();
+    expect(screen.getByText(/1 servicio hoy/)).toBeVisible();
+    expect(todaySpy).toHaveBeenCalled();
+    expect(serviceListUrls.at(-1)?.searchParams.get("scheduledFrom")).toBe("2026-09-10");
+    expect(serviceListUrls.at(-1)?.searchParams.get("scheduledTo")).toBe("2026-09-10");
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<MapaOperativo scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Elementos" });
+
+    expectNoInternalJargon(container);
   });
 });

@@ -4,6 +4,7 @@ import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 import { externalIdListInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export type ZoneQuery = {
   active?: boolean;
@@ -52,7 +53,7 @@ export type Zone = z.infer<typeof zoneSchema>;
 /** Etiqueta de zona para tablas y detalles: nunca expone el id crudo. */
 export function zoneLabel(zones: Zone[], zoneId: string, loaded: boolean): string {
   const zone = zones.find((candidate) => candidate.id === zoneId);
-  if (zone) return `${zone.code} · ${zone.name}`;
+  if (zone) return zone.name;
   return loaded ? "Zona no disponible" : "Cargando zona…";
 }
 
@@ -94,7 +95,7 @@ export const zoneReferenceReportSchema = z.object({
 export type ZoneReferenceReport = z.infer<typeof zoneReferenceReportSchema>;
 
 const zonesEnvelopeSchema = z.object({
-  data: z.array(zoneWireSchema),
+  data: tolerantRecords(zoneWireSchema, "zones"),
   meta: z.object({
     total: z.number(),
     page: z.number(),

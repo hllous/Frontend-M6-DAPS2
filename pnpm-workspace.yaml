@@ -1,0 +1,11 @@
+packages:
+  - '.'
+
+strictDepBuilds: true
+allowBuilds:
+  # Copies the tracked mockServiceWorker into public/.
+  msw: true
+  # Builds the native import resolver used by ESLint.
+  unrs-resolver: true
+  # Optional macOS file watcher; skipped on Windows and Linux.
+  fsevents: true

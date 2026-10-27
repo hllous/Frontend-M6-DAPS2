@@ -1,7 +1,8 @@
 "use client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,8 +12,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { containersAdapter, ContainerRequestError, type Container } from "@/lib/containers";
-import { EvidenceQueueView, useEvidenceQueue } from "./container-evidence-queue";
+import {
+  containersAdapter,
+  ContainerRequestError,
+  type Container,
+} from "@/lib/containers";
+import {
+  EvidenceQueueView,
+  useEvidenceQueue,
+} from "./container-evidence-queue";
 
 interface ReportOverflowDialogProps {
   open: boolean;
@@ -66,10 +74,7 @@ function ReportOverflowModalContent({
     try {
       updated = await containersAdapter.reportOverflow(container.id);
     } catch (err) {
-      const msg =
-        err instanceof ContainerRequestError || err instanceof Error
-          ? err.message
-          : "No se pudo reportar el desborde.";
+      const msg = getErrorMessage(err, "No se pudo reportar el desborde.");
       setErrorMessage(msg);
       setIsSubmitting(false);
       return;
@@ -94,38 +99,25 @@ function ReportOverflowModalContent({
   return (
     <DialogContent className="max-w-md">
       <DialogHeader>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-warning)]">
-          <AlertTriangle className="size-4" aria-hidden />
-          <span>Novedad operativa en vía pública</span>
-        </div>
-        <DialogTitle>Reportar desborde de contenedor {container.code}</DialogTitle>
+        <DialogTitle>
+          Reportar desborde de contenedor {container.code}
+        </DialogTitle>
         <DialogDescription>
-          Confirme que el contenedor ha superado su capacidad física o presenta acumulación de
-          residuos perimetral. Esta acción transicionará el estado a Desbordado.
+          El contenedor pasa a Desbordado.
         </DialogDescription>
       </DialogHeader>
 
       {errorMessage && (
-        <div
-          role="alert"
-          className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-        >
-          {errorMessage}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
       )}
 
-      <form id="report-overflow-form" onSubmit={handleSubmit} className="space-y-4">
-        <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs">
-          <p className="font-medium text-foreground">Detalles del contenedor:</p>
-          <p className="mt-1 text-muted-foreground">
-            <span className="font-semibold">Ubicación:</span> {container.address ?? "Sin dirección registrada"}
-          </p>
-          <p className="text-muted-foreground">
-            <span className="font-semibold">Capacidad:</span>{" "}
-            {container.capacityLiters.toLocaleString("es-AR")} L
-          </p>
-        </div>
-
+      <form
+        id="report-overflow-form"
+        onSubmit={handleSubmit}
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain"
+      >
         <EvidenceQueueView
           queuedFiles={evidenceQueue.queuedFiles}
           fileValidationError={evidenceQueue.fileValidationError}
@@ -148,8 +140,8 @@ function ReportOverflowModalContent({
         <Button
           type="submit"
           form="report-overflow-form"
+          variant="warning"
           disabled={isSubmitting}
-          className="bg-[var(--color-warning)] text-white hover:bg-[var(--color-warning)]/90"
         >
           {isSubmitting ? "Reportando…" : "Confirmar desborde"}
         </Button>

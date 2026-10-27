@@ -21,7 +21,11 @@ export type ServiceMapZone = {
 export type ServiceMapLocation = {
   serviceId: string;
   coordinates: MapCoordinate | null;
-  locationType: "point" | "route" | "unresolved";
+  /**
+   * `unverified`: the target has coordinates but the service zone snapshot is
+   * missing, so the point cannot be checked against its zone and is not plotted.
+   */
+  locationType: "point" | "route" | "unresolved" | "unverified";
   locationLabel: string | null;
   zones: ServiceMapZone[];
 };
@@ -107,10 +111,20 @@ function resolvePointLocation(
     };
   }
 
-  // A catalog coordinate is authoritative, but when the canonical zone is
-  // available also verify that it belongs to the zone snapshot used by the
-  // service. This prevents rendering a valid-looking point in the wrong zone.
-  const targetMatchesZone = targetZones.length === 0 || targetZones.some((zone) =>
+  // A catalog coordinate is only plotted after it is verified against the zone
+  // snapshot used by the service, which prevents rendering a valid-looking
+  // point in the wrong zone. When no zone resolves the check cannot run, so the
+  // item is reported as unverified instead of being plotted unchecked.
+  if (targetZones.length === 0) {
+    return {
+      coordinates: null,
+      locationType: "unverified",
+      locationLabel: targetLabel(target),
+      zones: targetZones,
+    };
+  }
+
+  const targetMatchesZone = targetZones.some((zone) =>
     isCoordinateInsideOperationalZone([target.lat, target.lng], zone),
   );
 

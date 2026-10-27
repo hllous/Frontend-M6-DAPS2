@@ -1,39 +1,20 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { assignNeighborhoodsFixture, getZoneFixture } from "@/lib/zones-fixtures";
 import { assignNeighborhoodsInputSchema } from "@/lib/zones";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -43,12 +24,8 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede asignar barrios a una zona operativa.");
-    }
-    requireCapability(session, "zone:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede asignar barrios a una zona operativa.", capability: "zone:manage", throwOnError: true });
 
     let body: unknown;
     try {
@@ -62,17 +39,13 @@ export async function POST(
       return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/zones/${id}/neighborhoods`, "zone:manage", {
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/zones/${pathId(id)}/neighborhoods`, "zone:manage", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const responseBody = await backendResponse.text();
-      return new NextResponse(responseBody, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     if (!getZoneFixture(id)) {
@@ -88,11 +61,11 @@ export async function POST(
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-      return errorResponse(403, error.message, path);
+      return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
     }
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudieron asignar los barrios a la zona operativa.", path);
+    return mapSessionError(error, path, "No se pudieron asignar los barrios a la zona operativa.");
   }
 }

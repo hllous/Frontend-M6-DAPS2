@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { request, type FullConfig } from "@playwright/test";
+import { SESSION_MUTATION_HEADERS } from "../src/lib/session-request";
 
 // `next dev` compiles each route lazily, on the server, the first time any
 // client (browser or plain HTTP) requests it — so a lightweight request
@@ -59,7 +60,10 @@ export default async function globalSetup(config: FullConfig) {
     // Seeds a session cookie so subsequent warm-up requests to authenticated
     // routes render their real page/handler instead of bouncing off a
     // login redirect that never reaches (and so never compiles) them.
-    await context.post("/api/session/login", { data: { scenarioId: "office-duty-queue" } });
+    await context.post("/api/session/login", {
+      data: { scenarioId: "office-duty-queue" },
+      headers: SESSION_MUTATION_HEADERS,
+    });
 
     await context.get("/login").catch(() => undefined);
     await context.get("/app").catch(() => undefined);

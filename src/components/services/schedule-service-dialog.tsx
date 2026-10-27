@@ -1,18 +1,30 @@
 "use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useId, useMemo, useState } from "react";
-import { AlertCircle, Calendar, Check, Clock, Info, Loader2, MapPin, Route as RouteIcon } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Info, MapPin, Route as RouteIcon } from "lucide-react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Item, ItemContent, ItemTitle } from "@/components/ui/item";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { TimePicker } from "@/components/ui/time-picker";
 import { servicesAdapter, type CreateServiceInput, type Service, type ServiceMode, type ServiceOrigin } from "@/lib/services";
 import { routesAdapter, type Route } from "@/lib/routes";
 import { serviceTypesAdapter, type ServiceType } from "@/lib/service-types";
@@ -21,8 +33,10 @@ import { containersAdapter } from "@/lib/containers";
 import { treesAdapter } from "@/lib/trees";
 import { greenSpacesAdapter } from "@/lib/green-spaces";
 import { greenPointsAdapter } from "@/lib/green-points";
-import { cn } from "@/lib/utils";
+import { todayInArgentina } from "@/lib/argentina-date";
 import { MAX_NOTES_LENGTH } from "@/lib/input-limits";
+import { SERVICE_MODE_LABEL, SERVICE_ORIGIN_LABEL } from "./service-ui-labels";
+import { useRevealFirstError } from "./use-reveal-first-error";
 
 interface ScheduleServiceDialogProps {
   open: boolean;
@@ -47,10 +61,11 @@ const TARGET_KIND_LABELS: Record<TargetKind, string> = {
   TREE: "Árbol urbano",
   GREEN_SPACE: "Espacio verde",
   GREEN_POINT: "Punto verde",
-  LOCATION: "Ubicación suelta (sin bien del inventario)",
+  LOCATION: "Otra ubicación",
 };
 
 const TARGET_PAGE_SIZE = 20;
+const PAST_DATE_ERROR = "La fecha debe ser hoy o posterior.";
 
 /** Busca bienes del inventario del tipo pedido y los muestra por código o dirección, nunca por UUID. */
 async function searchTargets(type: InventoryTargetType, search: string): Promise<TargetOption[]> {
@@ -147,11 +162,13 @@ export function ScheduleServiceDialog({
   }
 
   // Scheduling temporal state
-  const [scheduledDate, setScheduledDate] = useState<string>(() => {
-    return new Date().toISOString().slice(0, 10);
-  });
+  const [today] = useState(() => todayInArgentina());
+  const [scheduledDate, setScheduledDate] = useState<string>(() => today);
   const [windowStart, setWindowStart] = useState<string>("08:00");
   const [windowEnd, setWindowEnd] = useState<string>("12:00");
+
+  // "Más datos" disclosure
+  const [moreOpen, setMoreOpen] = useState(false);
 
   // Notes
   const [notes, setNotes] = useState<string>("");
@@ -159,6 +176,16 @@ export function ScheduleServiceDialog({
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [scheduledDateError, setScheduledDateError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    serviceType?: string;
+    target?: string;
+    targetRef?: string;
+    reference?: string;
+    route?: string;
+    zone?: string;
+  }>({});
+  const scrollRef = useRevealFirstError(errorMessage, scheduledDateError, fieldErrors);
 
   // Los tipos de servicio, recorridos y zonas son los del backend (UUID): no se pueden fijar en el código.
   useEffect(() => {
@@ -185,6 +212,7 @@ export function ScheduleServiceDialog({
     setTargetType(next);
     setSelectedTarget(null);
     setTargetSearch("");
+    setFieldErrors({});
   };
 
   const serviceTypes = useMemo(() => (catalogs.status === "ready" ? catalogs.serviceTypes : []), [catalogs]);
@@ -238,6 +266,8 @@ export function ScheduleServiceDialog({
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setErrorMessage(null);
+      setFieldErrors({});
+      setScheduledDateError(null);
       setIsSubmitting(false);
     }
     onOpenChange(nextOpen);
@@ -246,44 +276,53 @@ export function ScheduleServiceDialog({
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setErrorMessage(null);
+    setFieldErrors({});
+    setScheduledDateError(null);
 
     if (catalogs.status !== "ready" || !selectedServiceType) {
-      setErrorMessage("No hay un tipo de servicio activo para programar. Cree o active uno en Catálogo > Tipos de servicio.");
+      const message = "No hay tipos de servicio activos. Active uno en Catálogo.";
+      if (catalogs.status === "ready") setFieldErrors({ serviceType: message });
+      else setErrorMessage(message);
+      return;
+    }
+
+    if (scheduledDate < today) {
+      setScheduledDateError(PAST_DATE_ERROR);
       return;
     }
 
     if (inventoryType && !selectedTarget) {
-      setErrorMessage(`Debe elegir el ${TARGET_KIND_LABELS[inventoryType].toLocaleLowerCase("es")} sobre el que se ejecuta el servicio.`);
+      setFieldErrors({ target: `Debe elegir el ${TARGET_KIND_LABELS[inventoryType].toLocaleLowerCase("es")} sobre el que se ejecuta el servicio.` });
       return;
     }
 
     if (derivedMode === "POINT" && !inventoryType && !targetRef.trim()) {
-      setErrorMessage("Debe indicar la dirección o referencia de la ubicación.");
+      setFieldErrors({ targetRef: "Debe indicar la dirección o referencia de la ubicación." });
       return;
     }
 
     if (origin === "TICKET" && !referenceId.trim()) {
-      setErrorMessage("Debe indicar el UUID técnico del reclamo.");
+      setFieldErrors({ reference: "Indique el Nº de reclamo." });
       return;
     }
 
     if (origin === "TICKET" && !isUuid(referenceId.trim())) {
-      setErrorMessage("El ticketId debe ser un UUID válido. El identificador TK-… es publicId y no reemplaza el UUID técnico.");
+      setFieldErrors({ reference: "El Nº de reclamo no es válido." });
       return;
     }
 
     if (origin === "INSPECTION" && !referenceId.trim()) {
-      setErrorMessage("El identificador de inspección es obligatorio.");
+      setErrorMessage("Indique la inspección.");
       return;
     }
 
     if (origin === "INSPECTION" && !isUuid(referenceId.trim())) {
-      setErrorMessage("El identificador de inspección debe ser el UUID de la inspección.");
+      setErrorMessage("La inspección no es válida.");
       return;
     }
 
     if (origin === "WEATHER_ALERT" && !referenceId.trim()) {
-      setErrorMessage("El identificador de alerta meteorológica es obligatorio.");
+      setErrorMessage("Indique la alerta meteorológica.");
       return;
     }
 
@@ -297,14 +336,16 @@ export function ScheduleServiceDialog({
         const stops = selectedRouteZones.length > 0 ? selectedRouteZones.map((zone) => zone.id) : (await routesAdapter.get(routeId)).stops.map((stop) => stop.zoneId);
         zoneIds = [...new Set(stops)];
       } catch (cause) {
-        setErrorMessage(cause instanceof Error ? cause.message : "No se pudo consultar el recorrido seleccionado.");
+        setFieldErrors({ route: getErrorMessage(cause, "No se pudo consultar el recorrido seleccionado.") });
         setIsSubmitting(false);
         return;
       }
     }
 
     if (zoneIds.filter(Boolean).length === 0) {
-      setErrorMessage(derivedMode === "ROUTE" ? "El recorrido seleccionado no tiene paradas con zona asignada." : "Debe seleccionarse al menos una zona para el servicio.");
+      setFieldErrors(derivedMode === "ROUTE"
+        ? { route: "El recorrido no tiene zonas." }
+        : { zone: "Seleccione al menos una zona." });
       setIsSubmitting(false);
       return;
     }
@@ -334,349 +375,362 @@ export function ScheduleServiceDialog({
       handleOpenChange(false);
     } catch (cause) {
       const msg =
-        cause instanceof Error
-          ? cause.message
-          : "No se pudo programar el servicio. Verifique los datos ingresados.";
+        getErrorMessage(cause, "No se pudo programar el servicio. Verifique los datos ingresados.");
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  const originItems = { MANUAL: "Manual", PLANNED: "Planificado" };
+  const serviceTypeItems = Object.fromEntries(serviceTypes.map((t) => [t.id, `${t.name} (${SERVICE_MODE_LABEL[t.mode]})`]));
+  const routeItems = Object.fromEntries(routes.map((r) => [r.id, `${r.name} (${r.code})`]));
+  const activeZones = zones.filter((z) => z.active);
+  const zoneItems = Object.fromEntries(activeZones.map((z) => [z.id, z.name]));
+  const targetItems = Object.fromEntries(visibleTargetOptions.map((o) => [o.id, o.label]));
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>
-            {isLinked ? "Programar servicio vinculado" : "Programar nuevo servicio"}
+            Programar servicio
           </DialogTitle>
-          <DialogDescription>
-            {isLinked
-              ? "Programación vinculada a un evento u origen externo. El origen se preserva sin requerir reingreso."
-              : "Defina el tipo de servicio, cobertura territorial y ventana horaria. Nace sin cuadrilla ni vehículo asignados."}
-          </DialogDescription>
         </DialogHeader>
 
-        {errorMessage && (
-          <div
-            role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {catalogs.status === "error" && (
-          <div
-            role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-            <span>No se pudieron cargar los tipos de servicio, recorridos y zonas. Cierre este diálogo y vuelva a intentarlo.</span>
-          </div>
-        )}
-
-        <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-4 py-2" aria-busy={catalogs.status === "loading"}>
-          {/* Linked Origin Banner */}
-          {isLinked ? (
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text)]">
-                <Info className="h-4 w-4 text-[var(--color-action)] shrink-0" aria-hidden />
-                <span>Origen vinculado preservado</span>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-[var(--color-text-secondary)]">Origen:</span>
-                  <p className="font-bold text-[var(--color-text)] mt-0.5">
-                    {origin === "TICKET" && "Reclamo ciudadano (TICKET)"}
-                    {origin === "INSPECTION" && "Inspección ambiental (INSPECTION)"}
-                    {origin === "WEATHER_ALERT" && "Alerta meteorológica (WEATHER_ALERT)"}
-                  </p>
-                </div>
-                {origin === "TICKET" && !hasTrustedTicketContext ? (
-                  <Field>
-                    <FieldLabel htmlFor="linked-ticket-id">UUID del ticket de M2 *</FieldLabel>
-                    <input
-                      id="linked-ticket-id"
-                      value={manualTicketId}
-                      onChange={(event) => setManualTicketId(event.target.value)}
-                      className="mt-1 h-10 w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 font-mono text-xs text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]"
-                      aria-describedby="linked-ticket-id-help"
-                    />
-                    <FieldDescription id="linked-ticket-id-help">Pegue el UUID técnico del expediente. El formato TK-… es publicId y no sirve para correlacionar eventos.</FieldDescription>
-                  </Field>
-                ) : (
-                  <div>
-                    <span className="text-[var(--color-text-secondary)]">{origin === "TICKET" ? "UUID de ticket:" : "ID Referencia:"}</span>
-                    <p className="font-mono font-bold text-[var(--color-text)] mt-0.5">
-                      {referenceId || "(Sin ID)"}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* Generic Origin Selector */
-            <Field>
-              <FieldLabel htmlFor="service-origin">Origen del servicio *</FieldLabel>
-              <select
-                id="service-origin"
-                value={genericOrigin}
-                onChange={(e) => setGenericOrigin(e.target.value as ServiceOrigin)}
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              >
-                <option value="MANUAL">Manual (operación a demanda)</option>
-                <option value="PLANNED">Planificado (programa regular de servicio)</option>
-              </select>
-              <FieldDescription>
-                Los servicios planificados corresponden al cronograma habitual; los manuales a intervenciones no rutinarias.
-              </FieldDescription>
-            </Field>
+        <div ref={scrollRef} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
+          {errorMessage && (
+            <Alert variant="danger">
+              <AlertCircle aria-hidden />
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
           )}
 
-          {/* Service Type Selection */}
-          <Field>
-            <FieldLabel htmlFor="service-type">Tipo de servicio *</FieldLabel>
-            <select
-              id="service-type"
-              value={serviceTypeId}
-              onChange={(e) => setServiceTypeId(e.target.value)}
-              className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs font-medium text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            >
-              {serviceTypes.map((st) => (
-                <option key={st.id} value={st.id}>
-                  {st.name} ({st.mode === "ROUTE" ? "Recorrido" : "Punto"})
-                </option>
-              ))}
-            </select>
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className="text-xs text-[var(--color-text-secondary)]">
-                Modo determinado por el catálogo:
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                  derivedMode === "ROUTE"
-                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20"
-                    : "bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20",
-                )}
+          {catalogs.status === "error" && (
+            <Alert variant="danger">
+              <AlertCircle aria-hidden />
+              <AlertDescription>No se pudo cargar el formulario. Ciérrelo e intente nuevamente.</AlertDescription>
+            </Alert>
+          )}
+
+          <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4" aria-busy={catalogs.status === "loading"}>
+            {isLinked && (
+              <Item variant="muted">
+                <ItemContent>
+                  <ItemTitle>
+                    <Info className="size-4 text-primary" aria-hidden />
+                    Origen: {SERVICE_ORIGIN_LABEL[origin]}
+                  </ItemTitle>
+                  {origin === "TICKET" && !hasTrustedTicketContext && (
+                    <Field className="mt-2" data-invalid={Boolean(fieldErrors.reference) || undefined}>
+                      <FieldLabel htmlFor="linked-ticket-id">Nº de reclamo{" "}<span aria-hidden>*</span></FieldLabel>
+                      <Input
+                        id="linked-ticket-id"
+                        value={manualTicketId}
+                        onChange={(event) => { setManualTicketId(event.target.value); setFieldErrors((prev) => ({ ...prev, reference: undefined })); }}
+                        className="font-mono" placeholder="Pegue el Nº de reclamo"
+                        aria-invalid={Boolean(fieldErrors.reference)}
+                        aria-describedby={fieldErrors.reference ? "linked-ticket-id-error" : undefined}
+                      />
+                      {fieldErrors.reference && <FieldError id="linked-ticket-id-error">{fieldErrors.reference}</FieldError>}
+                    </Field>
+                  )}
+                </ItemContent>
+              </Item>
+            )}
+
+            <Field data-invalid={Boolean(fieldErrors.serviceType) || undefined}>
+              <FieldLabel htmlFor="service-type">Tipo de servicio{" "}<span aria-hidden>*</span></FieldLabel>
+              <Select
+                value={serviceTypeId || null}
+                items={serviceTypeItems}
+                onValueChange={(value) => { setServiceTypeId(String(value)); setFieldErrors((prev) => ({ ...prev, serviceType: undefined })); }}
               >
-                {derivedMode === "ROUTE" ? (
-                  <>
-                    <RouteIcon className="h-3 w-3" aria-hidden />
-                    <span>Recorrido (ROUTE)</span>
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="h-3 w-3" aria-hidden />
-                    <span>Punto fijo (POINT)</span>
-                  </>
-                )}
-              </span>
-            </div>
-            <FieldDescription>
-              El modo de ejecución no es configurable por el operador; se hereda del tipo de servicio seleccionado.
-            </FieldDescription>
-          </Field>
-
-          {/* Scope / Destination: ROUTE vs POINT */}
-          {derivedMode === "ROUTE" ? (
-            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3.5 flex flex-col gap-2.5">
-              <Field>
-                <FieldLabel htmlFor="service-route">Recorrido asignado *</FieldLabel>
-                <select
-                  id="service-route"
-                  value={routeId}
-                  onChange={(e) => setRouteId(e.target.value)}
-                  className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                <SelectTrigger
+                  id="service-type"
+                  aria-invalid={Boolean(fieldErrors.serviceType) || undefined}
+                  aria-describedby={fieldErrors.serviceType ? "service-type-error" : undefined}
                 >
-                  {routes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.code})
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              {selectedRoute && (
-                <div className="text-xs">
-                  <span className="text-[var(--color-text-secondary)] font-medium">
-                    Zonas cubiertas (snapshot inmutable):
-                  </span>
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {selectedRouteZones.map((zone) => (
-                      <span
-                        key={zone.id}
-                        className="inline-flex items-center gap-1 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] px-2 py-0.5 text-xs text-[var(--color-text)]"
-                      >
-                        <Check className="h-3 w-3 text-blue-600 dark:text-blue-400" aria-hidden />
-                        {zone.name}
-                      </span>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {serviceTypes.map((st) => (
+                      <SelectItem key={st.id} value={st.id}>
+                        {serviceTypeItems[st.id]}
+                      </SelectItem>
                     ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3.5 flex flex-col gap-3">
-              <Field>
-                <FieldLabel htmlFor="target-type">Tipo de objetivo *</FieldLabel>
-                <select
-                  id="target-type"
-                  value={targetType}
-                  onChange={(e) => handleTargetTypeChange(e.target.value as TargetKind)}
-                  className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                >
-                  {(Object.keys(TARGET_KIND_LABELS) as TargetKind[]).map((kind) => (
-                    <option key={kind} value={kind}>
-                      {TARGET_KIND_LABELS[kind]}
-                    </option>
-                  ))}
-                </select>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {fieldErrors.serviceType && <FieldError id="service-type-error">{fieldErrors.serviceType}</FieldError>}
+              <div className="flex flex-wrap items-center gap-2">
+                
+                <Badge variant="info">
+                  {derivedMode === "ROUTE" ? (
+                    <>
+                      <RouteIcon data-icon="inline-start" aria-hidden />
+                      Recorrido
+                    </>
+                  ) : (
+                    <>
+                      <MapPin data-icon="inline-start" aria-hidden />
+                      Puntual
+                    </>
+                  )}
+                </Badge>
+              </div>
+            </Field>
+
+            {derivedMode === "ROUTE" ? (
+              <Card size="sm">
+                <CardContent className="flex flex-col gap-3">
+                  <Field data-invalid={Boolean(fieldErrors.route) || undefined}>
+                    <FieldLabel htmlFor="service-route">Recorrido asignado{" "}<span aria-hidden>*</span></FieldLabel>
+                    <Select
+                      value={routeId || null}
+                      items={routeItems}
+                      onValueChange={(value) => { setRouteId(String(value)); setFieldErrors((prev) => ({ ...prev, route: undefined })); }}
+                    >
+                      <SelectTrigger
+                        id="service-route"
+                        aria-invalid={Boolean(fieldErrors.route) || undefined}
+                        aria-describedby={fieldErrors.route ? "service-route-error" : undefined}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {routes.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>
+                              {routeItems[r.id]}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    {fieldErrors.route && <FieldError id="service-route-error">{fieldErrors.route}</FieldError>}
+                  </Field>
+
+                  {selectedRoute && (
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-muted-foreground">Zonas:</span>
+                      <ul className="flex flex-wrap gap-1.5" aria-label="Zonas cubiertas">
+                        {selectedRouteZones.map((zone) => (
+                          <li key={zone.id}>
+                            <Badge variant="neutral">
+                              <Check data-icon="inline-start" aria-hidden />
+                              {zone.name}
+                            </Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card size="sm">
+                <CardContent className="flex flex-col gap-3">
+                  <Field>
+                    <FieldLabel htmlFor="target-type">Tipo de objetivo{" "}<span aria-hidden>*</span></FieldLabel>
+                    <Select
+                      value={targetType}
+                      items={TARGET_KIND_LABELS}
+                      onValueChange={(value) => handleTargetTypeChange(value as TargetKind)}
+                    >
+                      <SelectTrigger id="target-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {(Object.keys(TARGET_KIND_LABELS) as TargetKind[]).map((kind) => (
+                            <SelectItem key={kind} value={kind}>
+                              {TARGET_KIND_LABELS[kind]}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  {inventoryType ? (
+                    <>
+                      <Field>
+                        <FieldLabel htmlFor="target-search">Buscar {TARGET_KIND_LABELS[inventoryType].toLocaleLowerCase("es")}</FieldLabel>
+                        <Input
+                          id="target-search"
+                          type="search"
+                          value={targetSearch}
+                          onChange={(e) => setTargetSearch(e.target.value)}
+                          placeholder={inventoryType === "GREEN_SPACE" ? "Nombre del espacio" : "Código o dirección"}
+                        />
+                      </Field>
+                      <Field data-invalid={Boolean(fieldErrors.target) || undefined}>
+                        <FieldLabel htmlFor="target-id">Elemento{" "}<span aria-hidden>*</span></FieldLabel>
+                        <Select
+                          value={selectedTarget?.id ?? null}
+                          items={targetItems}
+                          onValueChange={(value) => { setSelectedTarget(visibleTargetOptions.find((o) => o.id === value) ?? null); setFieldErrors((prev) => ({ ...prev, target: undefined })); }}
+                        >
+                          <SelectTrigger
+                            id="target-id"
+                            aria-required="true"
+                            aria-invalid={Boolean(fieldErrors.target) || undefined}
+                            aria-describedby={fieldErrors.target ? "target-id-status target-id-error" : "target-id-status"}
+                            aria-busy={targetOptions.status === "loading"}
+                          >
+                            <SelectValue placeholder="Seleccione un elemento" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {visibleTargetOptions.map((option) => (
+                                <SelectItem key={option.id} value={option.id}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FieldDescription id="target-id-status" aria-live="polite" className="flex items-center gap-2">
+                          {targetOptions.status === "loading" && (
+                            <>
+                              <Spinner aria-hidden="true" />
+                              Buscando…
+                            </>
+                          )}
+                          {targetOptions.status === "ready" && targetOptions.options.length === 0 && "Sin resultados."}
+                          {targetOptions.status === "ready" && targetOptions.options.length > 0 &&
+                            (selectedTargetZone ? `Zona: ${selectedTargetZone.name}` : null)}
+                        </FieldDescription>
+                        {fieldErrors.target && <FieldError id="target-id-error">{fieldErrors.target}</FieldError>}
+                        {targetOptions.status === "error" && (
+                          <FieldError>No se pudo buscar. Intente nuevamente.</FieldError>
+                        )}
+                      </Field>
+                    </>
+                  ) : (
+                    <FieldGroup className="grid gap-4 sm:grid-cols-2">
+                      <Field data-invalid={Boolean(fieldErrors.zone) || undefined}>
+                        <FieldLabel htmlFor="point-zone">Zona operativa{" "}<span aria-hidden>*</span></FieldLabel>
+                        <Select
+                          value={pointZoneId || null}
+                          items={zoneItems}
+                          onValueChange={(value) => { setPointZoneId(String(value)); setFieldErrors((prev) => ({ ...prev, zone: undefined })); }}
+                        >
+                          <SelectTrigger
+                            id="point-zone"
+                            aria-invalid={Boolean(fieldErrors.zone) || undefined}
+                            aria-describedby={fieldErrors.zone ? "point-zone-error" : undefined}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {activeZones.map((z) => (
+                                <SelectItem key={z.id} value={z.id}>
+                                  {zoneItems[z.id]}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        {fieldErrors.zone && <FieldError id="point-zone-error">{fieldErrors.zone}</FieldError>}
+                      </Field>
+                      <Field data-invalid={Boolean(fieldErrors.targetRef) || undefined}>
+                        <FieldLabel htmlFor="target-ref">Dirección o referencia{" "}<span aria-hidden>*</span></FieldLabel>
+                        <Input
+                          id="target-ref"
+                          type="text"
+                          value={targetRef}
+                          onChange={(e) => { setTargetRef(e.target.value); setFieldErrors((prev) => ({ ...prev, targetRef: undefined })); }}
+                          placeholder="p. ej. Av. Rivadavia 2200"
+                          required
+                          aria-invalid={Boolean(fieldErrors.targetRef)}
+                          aria-describedby={fieldErrors.targetRef ? "target-ref-error" : undefined}
+                        />
+                        {fieldErrors.targetRef && <FieldError id="target-ref-error">{fieldErrors.targetRef}</FieldError>}
+                      </Field>
+                    </FieldGroup>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <FieldGroup className="grid gap-4 sm:grid-cols-2">
+              <Field className="sm:col-span-2" data-invalid={Boolean(scheduledDateError) || undefined}>
+                <FieldLabel htmlFor="scheduled-date">Fecha programada{" "}<span aria-hidden>*</span></FieldLabel>
+                <DatePicker
+                  id="scheduled-date"
+                  value={scheduledDate}
+                  min={today}
+                  invalid={Boolean(scheduledDateError)}
+                  aria-required
+                  aria-describedby={scheduledDateError ? "scheduled-date-error" : undefined}
+                  onChange={(value) => {
+                    setScheduledDate(value);
+                    setScheduledDateError(null);
+                  }}
+                />
+                {scheduledDateError && <FieldError id="scheduled-date-error">{scheduledDateError}</FieldError>}
               </Field>
 
-              {inventoryType ? (
-                <>
+              <Field>
+                <FieldLabel id="window-start-label" htmlFor="window-start">Desde{" "}<span aria-hidden>*</span></FieldLabel>
+                <TimePicker id="window-start" value={windowStart} onChange={setWindowStart} required aria-labelledby="window-start-label" />
+              </Field>
+
+              <Field>
+                <FieldLabel id="window-end-label" htmlFor="window-end">Hasta{" "}<span aria-hidden>*</span></FieldLabel>
+                <TimePicker id="window-end" value={windowEnd} onChange={setWindowEnd} required aria-labelledby="window-end-label" />
+              </Field>
+            </FieldGroup>
+
+            <Collapsible open={moreOpen} onOpenChange={setMoreOpen} className="flex flex-col gap-4">
+              <CollapsibleTrigger className="inline-flex w-fit items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&[data-panel-open]>svg]:rotate-180">
+                Más datos
+                <ChevronDown className="size-4 transition-transform" aria-hidden />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="flex flex-col gap-4">
+                {!isLinked && (
                   <Field>
-                    <FieldLabel htmlFor="target-search">Buscar {TARGET_KIND_LABELS[inventoryType].toLocaleLowerCase("es")}</FieldLabel>
-                    <input
-                      id="target-search"
-                      type="search"
-                      value={targetSearch}
-                      onChange={(e) => setTargetSearch(e.target.value)}
-                      placeholder={inventoryType === "GREEN_SPACE" ? "Nombre del espacio" : "Código o dirección"}
-                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="target-id">Bien del inventario *</FieldLabel>
-                    <select
-                      id="target-id"
-                      value={selectedTarget?.id ?? ""}
-                      onChange={(e) => setSelectedTarget(visibleTargetOptions.find((o) => o.id === e.target.value) ?? null)}
-                      aria-describedby="target-id-status"
-                      aria-busy={targetOptions.status === "loading"}
-                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                    <FieldLabel htmlFor="service-origin">Origen del servicio{" "}<span aria-hidden>*</span></FieldLabel>
+                    <Select
+                      value={genericOrigin}
+                      items={originItems}
+                      onValueChange={(value) => setGenericOrigin(value as ServiceOrigin)}
                     >
-                      <option value="">Seleccione un bien…</option>
-                      {visibleTargetOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <FieldDescription id="target-id-status" aria-live="polite">
-                      {targetOptions.status === "loading" && "Buscando en el inventario…"}
-                      {targetOptions.status === "ready" && targetOptions.options.length === 0 && "No hay bienes que coincidan con la búsqueda."}
-                      {targetOptions.status === "ready" && targetOptions.options.length > 0 &&
-                        (selectedTargetZone ? `Zona derivada del bien: ${selectedTargetZone.name}.` : "La zona del servicio se deriva del bien elegido.")}
-                    </FieldDescription>
-                    {targetOptions.status === "error" && (
-                      <FieldError>No se pudo consultar el inventario. Cambie la búsqueda para reintentar.</FieldError>
-                    )}
+                      <SelectTrigger id="service-origin">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="MANUAL">{originItems.MANUAL}</SelectItem>
+                          <SelectItem value="PLANNED">{originItems.PLANNED}</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   </Field>
-                </>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Field>
-                    <FieldLabel htmlFor="point-zone">Zona operativa *</FieldLabel>
-                    <select
-                      id="point-zone"
-                      value={pointZoneId}
-                      onChange={(e) => setPointZoneId(e.target.value)}
-                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                    >
-                      {zones
-                        .filter((z) => z.active)
-                        .map((z) => (
-                          <option key={z.id} value={z.id}>
-                            {z.name} ({z.code})
-                          </option>
-                        ))}
-                    </select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="target-ref">Dirección o referencia *</FieldLabel>
-                    <input
-                      id="target-ref"
-                      type="text"
-                      value={targetRef}
-                      onChange={(e) => setTargetRef(e.target.value)}
-                      placeholder="p. ej. Av. Rivadavia 2200"
-                      required
-                      className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-                    />
-                    <FieldDescription>Sin bien del inventario el servicio se ubica por zona; la referencia queda en las notas.</FieldDescription>
-                  </Field>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              <Field>
+                <FieldLabel htmlFor="service-notes">Notas (opcional)</FieldLabel>
+                <Textarea
+                  id="service-notes"
+                  rows={2}
+                  maxLength={MAX_NOTES_LENGTH}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Indicaciones para la cuadrilla"
+                  className="min-h-16 resize-none"
+                />
+              </Field>
+              </CollapsibleContent>
+            </Collapsible>
 
-          {/* Temporal scheduling: Date & Time window */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Field className="sm:col-span-1">
-              <FieldLabel htmlFor="scheduled-date">Fecha programada *</FieldLabel>
-              <input
-                id="scheduled-date"
-                type="date"
-                value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
-                required
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
-            </Field>
+          </form>
+        </div>
 
-            <Field className="sm:col-span-1">
-              <FieldLabel htmlFor="window-start">Desde *</FieldLabel>
-              <input
-                id="window-start"
-                type="time"
-                value={windowStart}
-                onChange={(e) => setWindowStart(e.target.value)}
-                required
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
-            </Field>
-
-            <Field className="sm:col-span-1">
-              <FieldLabel htmlFor="window-end">Hasta *</FieldLabel>
-              <input
-                id="window-end"
-                type="time"
-                value={windowEnd}
-                onChange={(e) => setWindowEnd(e.target.value)}
-                required
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-              />
-            </Field>
-          </div>
-
-          {/* Notes */}
-          <Field>
-            <FieldLabel htmlFor="service-notes">Notas e instrucciones operativas (opcional)</FieldLabel>
-            <textarea
-              id="service-notes"
-              rows={2}
-              maxLength={MAX_NOTES_LENGTH}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Instrucciones especiales para la cuadrilla o restricciones de acceso…"
-              className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] resize-none"
-            />
-          </Field>
-
-          {/* Unassigned Guarantee notice */}
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-[11px] text-[var(--color-text-secondary)] flex items-center gap-2">
-            <Info className="h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" aria-hidden />
-            <span>
-              El servicio se creará en estado <strong>PROGRAMADO</strong> sin cuadrilla ni vehículo asignados. La asignación operativa se realiza posteriormente en el despacho.
-            </span>
-          </div>
-        </form>
-
-        <DialogFooter>
+        <DialogFooter className="flex-wrap">
           <Button
             type="button"
             variant="outline"
@@ -689,16 +743,10 @@ export function ScheduleServiceDialog({
             type="submit"
             form={formId}
             disabled={isSubmitting || catalogs.status !== "ready"}
-            className="font-semibold"
+            aria-busy={isSubmitting}
           >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                <span>Programando…</span>
-              </>
-            ) : (
-              <span>Programar servicio</span>
-            )}
+            {isSubmitting && <Spinner data-icon="inline-start" aria-hidden="true" />}
+            <span>Programar servicio</span>
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import { authenticatedFetch, NetworkFailureError, ROLES_STALE_EVENT } from "./authenticated-fetch";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -43,5 +43,22 @@ describe("authenticatedFetch", () => {
 
     expect(response.status).toBe(403);
     expect(assignMock).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("403 classification", () => {
+  it("explains ROLE_REQUIRED in Spanish and requests a role refresh without retry or logout", async () => {
+    const listener = vi.fn();
+    window.addEventListener(ROLES_STALE_EVENT, listener);
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      statusCode: 403, message: "Forbidden resource", code: "ROLE_REQUIRED", error: "Forbidden", timestamp: "2026-10-23T12:00:00Z", path: "/api/services",
+    }), { status: 403 }));
+    try {
+      const response = await authenticatedFetch("/api/services", { method: "POST" });
+      expect(await response.json()).toMatchObject({ code: "ROLE_REQUIRED", message: "No tenés el rol necesario para realizar esta acción en Ambiente. Solicitá acceso a un administrador." });
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally { window.removeEventListener(ROLES_STALE_EVENT, listener); }
   });
 });

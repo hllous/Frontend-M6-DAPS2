@@ -1,4 +1,5 @@
 import { NetworkFailureError } from "./authenticated-fetch";
+import { registerSessionLogoutCleanup } from "./session-client";
 import { servicesAdapter, type Service } from "./services";
 
 /**
@@ -36,9 +37,50 @@ export interface FieldDraft<TPayload = unknown> {
 }
 
 const STORAGE_PREFIX = "m6:field-draft:";
+const ACTOR_STORAGE_PREFIX = `${STORAGE_PREFIX}v2:`;
+let draftOwner: string | undefined;
+const ownerListeners = new Set<() => void>();
+const DRAFT_UNSAVED_MESSAGE = "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.";
+
+export function getFieldDraftOwner(): string | undefined {
+  return draftOwner;
+}
+
+export function subscribeFieldDraftOwner(listener: () => void): () => void {
+  ownerListeners.add(listener);
+  return () => { ownerListeners.delete(listener); };
+}
+
+/** Set from the public session before any Field component reads storage. */
+export function setFieldDraftOwner(actorId: string | undefined): void {
+  try {
+    // Old unscoped drafts have no trustworthy owner. Never migrate their contents.
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(STORAGE_PREFIX) && !key.startsWith(ACTOR_STORAGE_PREFIX)) localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage may be unavailable; reads/writes still fail closed below.
+  }
+  if (draftOwner === actorId) return;
+  draftOwner = actorId;
+  ownerListeners.forEach((listener) => listener());
+}
+
+export function clearAllFieldDrafts(): void {
+  setFieldDraftOwner(undefined);
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(STORAGE_PREFIX)) localStorage.removeItem(key);
+    }
+  } catch {
+    // Logout still proceeds when storage is unavailable.
+  }
+}
 
 function draftKey(serviceId: string, actionType: FieldDraftActionType, scope?: string): string {
-  return `${STORAGE_PREFIX}${serviceId}:${actionType}${scope ? `:${scope}` : ""}`;
+  return `${ACTOR_STORAGE_PREFIX}${encodeURIComponent(draftOwner!)}:${serviceId}:${actionType}${scope ? `:${scope}` : ""}`;
 }
 
 export function snapshotService(service: Service): FieldDraftServiceSnapshot {
@@ -56,14 +98,17 @@ export function snapshotService(service: Service): FieldDraftServiceSnapshot {
   };
 }
 
-export function saveFieldDraft<TPayload>(draft: FieldDraft<TPayload>): void {
+export function saveFieldDraft<TPayload>(draft: FieldDraft<TPayload>): boolean {
+  if (!draftOwner) return false;
   try {
     localStorage.setItem(
       draftKey(draft.serviceId, draft.actionType, draft.scope),
       JSON.stringify(draft),
     );
+    return true;
   } catch {
     // Best-effort: if storage is unavailable, the draft simply isn't retained on-device.
+    return false;
   }
 }
 
@@ -72,6 +117,7 @@ export function getFieldDraft<TPayload>(
   actionType: FieldDraftActionType,
   scope?: string,
 ): FieldDraft<TPayload> | null {
+  if (!draftOwner) return null;
   try {
     const raw = localStorage.getItem(draftKey(serviceId, actionType, scope));
     if (!raw) return null;
@@ -86,12 +132,17 @@ export function clearFieldDraft(
   actionType: FieldDraftActionType,
   scope?: string,
 ): void {
+  if (!draftOwner) return;
   try {
     localStorage.removeItem(draftKey(serviceId, actionType, scope));
   } catch {
     // ignore
   }
 }
+
+// The session client is also imported by service adapters, so register cleanup
+// here instead of making that shared module import this services-dependent module.
+registerSessionLogoutCleanup(clearAllFieldDrafts);
 
 /** True when the Service changed server-side since the draft was composed. */
 export function hasServiceDrifted(
@@ -104,7 +155,7 @@ export function hasServiceDrifted(
 export type FieldActionOutcome<TPayload, TResult = Service> =
   | { kind: "success"; result: TResult }
   | { kind: "draft-saved"; draft: FieldDraft<TPayload> }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; draftUnsaved?: true };
 
 /**
  * First attempt at a field action. On a real network failure the input is
@@ -140,7 +191,9 @@ export async function submitFieldAction<TPayload, TResult = Service>({
         composedAgainst: snapshotService(service),
         savedAt: new Date().toISOString(),
       };
-      saveFieldDraft(draft);
+      if (!saveFieldDraft(draft)) {
+        return { kind: "error", message: DRAFT_UNSAVED_MESSAGE, draftUnsaved: true };
+      }
       return { kind: "draft-saved", draft };
     }
     const message = cause instanceof Error ? cause.message : "Ocurrió un error inesperado.";
@@ -152,7 +205,7 @@ export type FieldActionResubmitOutcome<TResult = Service> =
   | { kind: "success"; result: TResult }
   | { kind: "conflict"; current: Service; composedAgainst: FieldDraftServiceSnapshot }
   | { kind: "still-offline" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; draftUnsaved?: true };
 
 /**
  * Manual resubmission of a local draft: fetches the Service's current state
@@ -197,7 +250,7 @@ export async function resubmitFieldAction<TPayload, TResult = Service>({
   } catch (cause) {
     if (cause instanceof NetworkFailureError) {
       // Still offline: keep the (possibly edited) draft pending, anchor unchanged.
-      saveFieldDraft({
+      const saved = saveFieldDraft({
         serviceId,
         actionType,
         scope,
@@ -205,6 +258,9 @@ export async function resubmitFieldAction<TPayload, TResult = Service>({
         composedAgainst,
         savedAt: new Date().toISOString(),
       });
+      if (!saved) {
+        return { kind: "error", message: DRAFT_UNSAVED_MESSAGE, draftUnsaved: true };
+      }
       return { kind: "still-offline" };
     }
     return {
