@@ -1,41 +1,22 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
-import { confirmRescheduleInputSchema, toConfirmRescheduleBackendInput } from "@/lib/services";
-import { getScenario } from "@/lib/scenarios";
+import { confirmRescheduleInputSchema, STATUS_LABEL, toConfirmRescheduleBackendInput } from "@/lib/services";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const params = await context.params;
   const serviceId = params.id;
@@ -43,12 +24,9 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     // Permission check: reprogramming is an Office decision, not a Field action.
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede confirmar la nueva fecha de un servicio.", path);
-    }
+    authorize(session, { office: true, officeMessage: "Solo Oficina puede confirmar la nueva fecha de un servicio.", capability: "service:reschedule", throwOnError: true });
 
     let body: unknown;
     try {
@@ -68,10 +46,10 @@ export async function POST(
 
     const input = parsed.data;
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/confirm-reschedule`,
+        `/services/${pathId(serviceId)}/confirm-reschedule`,
         undefined,
         {
           method: "POST",
@@ -79,11 +57,7 @@ export async function POST(
           body: JSON.stringify(toConfirmRescheduleBackendInput(input)),
         },
       );
-      const bodyText = await backendResponse.text();
-      return new NextResponse(bodyText, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const service = serviceFixtures.find((s) => s.id === serviceId);
@@ -94,7 +68,7 @@ export async function POST(
     if (service.status !== "RESCHEDULED") {
       return errorResponse(
         409,
-        `Solo se puede confirmar la nueva fecha de servicios a reprogramar (RESCHEDULED) (estado actual: ${service.status}).`,
+        `Solo se puede confirmar la nueva fecha de servicios a reprogramar (estado actual: ${STATUS_LABEL[service.status]}).`,
         path,
       );
     }
@@ -126,6 +100,6 @@ export async function POST(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo confirmar la reprogramación del servicio.", path);
+    return mapSessionError(error, path, "No se pudo confirmar la reprogramación del servicio.");
   }
 }

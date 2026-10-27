@@ -1,4 +1,5 @@
 "use client";
+import { errorMessage } from "@/lib/error-message";
 
 import {
   useCallback,
@@ -6,14 +7,11 @@ import {
   useMemo,
   useRef,
   useState,
-  useTransition,
 } from "react";
+import { useGroupRef } from "react-resizable-panels";
 import { useSearchParams } from "next/navigation";
 import {
-  ArrowLeftRight,
   FilterX,
-  LayoutList,
-  Map as MapIcon,
   Plus,
   RefreshCw,
   Search,
@@ -21,7 +19,12 @@ import {
   X,
 } from "lucide-react";
 
+import { InventoryMapDrawer, type InventoryMapDrawerSnapState } from "@/components/map/inventory-map-drawer";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { FormControl } from "@/components/ui/form-control";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -60,12 +63,56 @@ import {
   type SortDir,
   type SortKey,
 } from "./services-table";
+import { createServiceOrdinals, sortServices } from "./service-sorting";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
+import { todayInArgentina } from "@/lib/argentina-date";
+import { servicesMobileBreakpoint } from "@/lib/services-layout";
+import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
+import styles from "./services-workspace.module.css";
+import {
+  ServicesColumnEditor,
+  useServicesColumnPreferences,
+} from "./services-column-editor";
+
+type Period = "semana" | "mes" | "todo";
+
+const periodItems: Record<Period, string> = {
+  semana: "Esta semana",
+  mes: "Este mes",
+  todo: "Todo el período",
+};
+
+function getWorkspaceSplitStorageKey(userId: string): string {
+  return `m6:services-workspace-split:v1:${encodeURIComponent(userId)}`;
+}
+
+function readWorkspaceSplit(storageKey: string): Record<string, number> | null {
+  try {
+    const saved = window.localStorage.getItem(storageKey);
+    if (!saved) return null;
+    const parsed = JSON.parse(saved) as Record<string, unknown>;
+    const mapSize = parsed["map-pane"];
+    if (typeof mapSize !== "number" || !Number.isFinite(mapSize) || mapSize < 30 || mapSize > 70) {
+      return null;
+    }
+    return { "map-pane": mapSize, "table-pane": 100 - mapSize };
+  } catch {
+    return null;
+  }
+}
+
+function writeWorkspaceSplit(storageKey: string, layout: Record<string, number>): void {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(layout));
+  } catch {
+    // The current split remains usable if storage is unavailable.
+  }
+}
 
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; services: Service[] };
+  | { status: "ready"; services: Service[]; dropped: number };
 
 export function ServicesWorkspace({
   scenario,
@@ -94,13 +141,25 @@ export function ServicesWorkspace({
 
   // Load state
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const loadedScopeRef = useRef<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [periodChoice, setPeriodChoice] = useState<Period | null>(() => {
+    const value = getParam("periodo");
+    return value === "semana" || value === "mes" || value === "todo" ? value : null;
+  });
+  const [activePeriod, setActivePeriod] = useState<Period>(periodChoice ?? "todo");
+  const handlePeriodChoiceChange = useCallback((period: Period) => {
+    setActivePeriod(period);
+    setPeriodChoice(period);
+  }, []);
 
   // Global search
   const [search, setSearch] = useState<string>(() => getParam("q") ?? "");
 
   // Sorting
-  const [sortKey, setSortKey] = useState<SortKey>(() => {
+  const [sortKey, setSortKey] = useState<SortKey | null>(() => {
     const s = getParam("sort") as SortKey | null;
     return s && ["service", "zone", "status", "crew", "scheduled"].includes(s) ? s : "status";
   });
@@ -134,7 +193,9 @@ export function ServicesWorkspace({
 
   // Selection & Detail
   const [selectedId, setSelectedId] = useState<string | null>(() => getParam("selected"));
+  const [retainedPreviewId, setRetainedPreviewId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(() => getParam("detail"));
+  const [resolvedDetail, setResolvedDetail] = useState<{ id: string; service: Service | null; error?: string } | null>(null);
 
   // Scheduling modal state
   const [isScheduleOpen, setIsScheduleOpen] = useState<boolean>(() => {
@@ -163,6 +224,8 @@ export function ServicesWorkspace({
 
   // Suspend modal state (Field crew leader)
   const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
+  const [startingId, setStartingId] = useState<string | null>(null);
+  const [startErrors, setStartErrors] = useState<Record<string, string>>({});
   const [resumingId, setResumingId] = useState<string | null>(null);
   const [resumeErrors, setResumeErrors] = useState<Record<string, string>>({});
 
@@ -181,21 +244,36 @@ export function ServicesWorkspace({
   const [streetClosureServiceId, setStreetClosureServiceId] = useState<string | null>(null);
 
   // Layout presentation
-  const [mapSide, setMapSide] = useState<"left" | "right">(() => {
-    return getParam("mapSide") === "left" ? "left" : "right";
+  const [mobileDrawerSnap, setMobileDrawerSnap] = useState<InventoryMapDrawerSnapState>("half");
+  const columnPreferences = useServicesColumnPreferences({
+    userId: scenario?.actor.userId ?? "user-lucia",
+    variant: "1",
+    data: loadState.status === "ready" ? loadState.services : [],
   });
-  const [mobileTab, setMobileTab] = useState<"list" | "map">(() => {
-    return getParam("view") === "map" ? "map" : "list";
-  });
+  const panelGroupRef = useGroupRef();
+  const workspaceSplitStorageKey = getWorkspaceSplitStorageKey(scenario?.actor.userId ?? "user-lucia");
+  const loadedSplitStorageKeyRef = useRef<string | null>(null);
   const [isNarrow, setIsNarrow] = useState(false);
+
+  useEffect(() => {
+    loadedSplitStorageKeyRef.current = null;
+    const savedLayout = readWorkspaceSplit(workspaceSplitStorageKey);
+    if (savedLayout) panelGroupRef.current?.setLayout(savedLayout);
+    loadedSplitStorageKeyRef.current = workspaceSplitStorageKey;
+  }, [loadState.status, panelGroupRef, workspaceSplitStorageKey]);
+
+  const handlePanelLayoutChanged = useCallback((layout: Record<string, number>, meta: { isUserInteraction: boolean }) => {
+    if (!meta.isUserInteraction || loadedSplitStorageKeyRef.current !== workspaceSplitStorageKey) return;
+    writeWorkspaceSplit(workspaceSplitStorageKey, layout);
+  }, [workspaceSplitStorageKey]);
 
   // Map resilience
   const [mapError, setMapError] = useState(initialMapError);
 
-  // Detect viewport width for 760px boundary
+  // Use the design token as the single source for the workspace breakpoint.
   useEffect(() => {
     const checkWidth = () => {
-      setIsNarrow(window.innerWidth < 760);
+      setIsNarrow(window.innerWidth <= servicesMobileBreakpoint());
     };
     checkWidth();
     window.addEventListener("resize", checkWidth);
@@ -205,37 +283,114 @@ export function ServicesWorkspace({
   // Fetch all services
   useEffect(() => {
     let isCurrent = true;
-    async function load() {
+    const scopeKey = scenario?.actor.kind === "FIELD"
+      ? `field:${scenario.actor.crewId ?? ""}`
+      : "office";
+    const keepCurrentWorkspace = loadedScopeRef.current === scopeKey;
+    if (keepCurrentWorkspace) {
+      setIsRefreshing(true);
+      setRefreshError(null);
+    } else {
       setLoadState({ status: "loading" });
+      setIsRefreshing(false);
+      setRefreshError(null);
+    }
+
+    async function load() {
       try {
-        const query: ServiceQuery = { pageSize: 100 };
+        const base: ServiceQuery = {};
         if (scenario?.actor.kind === "FIELD" && scenario.actor.crewId) {
-          query.crewId = scenario.actor.crewId;
+          base.crewId = scenario.actor.crewId;
+        }
+        let period = periodChoice;
+        if (!period) {
+          const count = await servicesAdapter.list({ ...base, pageSize: 1 });
+          if (!isCurrent) return;
+          period = count.total > 100 ? "semana" : "todo";
+        }
+        setActivePeriod(period);
+        const query: ServiceQuery = { ...base, pageSize: 100 };
+        if (period !== "todo") {
+          const today = todayInArgentina();
+          const from = new Date(`${today}T00:00:00Z`);
+          const to = new Date(from);
+          if (period === "semana") {
+            from.setUTCDate(from.getUTCDate() - ((from.getUTCDay() + 6) % 7));
+            to.setTime(from.getTime());
+            to.setUTCDate(to.getUTCDate() + 6);
+          } else {
+            from.setUTCDate(1);
+            to.setUTCMonth(to.getUTCMonth() + 1, 0);
+          }
+          query.scheduledFrom = from.toISOString().slice(0, 10);
+          query.scheduledTo = to.toISOString().slice(0, 10);
         }
         const page = await servicesAdapter.list(query);
-        if (isCurrent) setLoadState({ status: "ready", services: page.services });
+        const services = [...page.services];
+        let totalPages = page.totalPages;
+        let dropped = page.dropped ?? 0;
+        for (let nextPage = 2; nextPage <= Math.min(totalPages, 20); nextPage += 1) {
+          if (!isCurrent) return;
+          const next = await servicesAdapter.list({ ...query, page: nextPage });
+          services.push(...next.services);
+          dropped += next.dropped ?? 0;
+          totalPages = next.totalPages;
+        }
+        if (totalPages > 20) throw new RangeError("Hay demasiados servicios en el período. Elija un período más corto.");
+        if (isCurrent) {
+          loadedScopeRef.current = scopeKey;
+          setLoadState({ status: "ready", services, dropped });
+          setIsRefreshing(false);
+          setRefreshError(null);
+        }
       } catch (cause) {
         if (!isCurrent) return;
         const msg =
-          cause instanceof ServiceRequestError
-            ? `Error del servidor (${cause.status}): ${cause.message}`
-            : "No se pudieron cargar los servicios operativos.";
-        setLoadState({ status: "error", message: msg });
+          cause instanceof RangeError ? cause.message : cause instanceof ServiceRequestError
+            ? "No se pudieron cargar los servicios. Intente nuevamente."
+            : "No se pudieron cargar los servicios. Intente nuevamente.";
+        if (keepCurrentWorkspace) {
+          setIsRefreshing(false);
+          setRefreshError(msg);
+        } else {
+          setLoadState({ status: "error", message: msg });
+        }
       }
     }
     void load();
     return () => {
       isCurrent = false;
     };
-  }, [reloadVersion, scenario]);
+  }, [reloadVersion, scenario, periodChoice]);
 
-  // Compute filter fingerprint to trigger map bounds fit only when filters change
-  const filterFingerprint = useMemo(() => {
-    const z = Array.from(columnFilters.zones).sort().join(",");
-    const s = Array.from(columnFilters.statuses).sort().join(",");
-    const c = Array.from(columnFilters.crews).sort().join(",");
-    return `${search}|${z}|${s}|${c}|${columnFilters.timeFrom}|${columnFilters.timeTo}`;
-  }, [search, columnFilters]);
+  const focusSelectedServiceAction = useCallback((id = selectedId) => {
+    if (!id || typeof document === "undefined") return;
+    requestAnimationFrame(() => {
+      const action = Array.from(document.querySelectorAll<HTMLButtonElement>("button[data-service-select]"))
+        .find((element) => element.dataset.serviceId === id);
+      action?.focus();
+    });
+  }, [selectedId]);
+
+  const closePreview = useCallback(() => {
+    const id = selectedId;
+    if (id) setRetainedPreviewId(id);
+    setSelectedId(null);
+    focusSelectedServiceAction(id ?? undefined);
+  }, [focusSelectedServiceAction, selectedId]);
+
+  useEffect(() => {
+    if (!selectedId || detailId) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      const target = event.target;
+      if (target instanceof Element && target.closest('[role="dialog"]')) return;
+      event.preventDefault();
+      closePreview();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closePreview, detailId, selectedId]);
 
   // Synchronize state with URL parameters
   useEffect(() => {
@@ -253,11 +408,9 @@ export function ServicesWorkspace({
     if (search.trim()) newParams.set("q", search.trim());
     if (selectedId) newParams.set("selected", selectedId);
     if (detailId) newParams.set("detail", detailId);
-    if (sortKey !== "status") newParams.set("sort", sortKey);
-    if (sortDir !== "asc") newParams.set("dir", sortDir);
-    if (mapSide !== "right") newParams.set("mapSide", mapSide);
-    if (mobileTab !== "list") newParams.set("view", mobileTab);
-
+    if (periodChoice) newParams.set("periodo", periodChoice);
+    if (sortKey && sortKey !== "status") newParams.set("sort", sortKey);
+    if (sortKey && sortDir !== "asc") newParams.set("dir", sortDir);
     columnFilters.zones.forEach((z) => newParams.append("zone", z));
     columnFilters.statuses.forEach((st) => newParams.append("status", st));
     columnFilters.crews.forEach((cr) => newParams.append("crew", cr));
@@ -282,10 +435,9 @@ export function ServicesWorkspace({
     search,
     selectedId,
     detailId,
+    periodChoice,
     sortKey,
     sortDir,
-    mapSide,
-    mobileTab,
     columnFilters,
     isScheduleOpen,
     scheduleOrigin,
@@ -344,15 +496,53 @@ export function ServicesWorkspace({
     });
   }, [loadState, search, columnFilters]);
 
+  const sortedServices = useMemo(
+    () => sortKey ? sortServices(filteredServices, sortKey, sortDir) : filteredServices,
+    [filteredServices, sortKey, sortDir],
+  );
+  const serviceOrdinals = useMemo(
+    () => createServiceOrdinals(sortedServices),
+    [sortedServices],
+  );
+
   const selectedService = useMemo(() => {
     if (!selectedId || loadState.status !== "ready") return null;
     return loadState.services.find((s) => s.id === selectedId) ?? null;
   }, [selectedId, loadState]);
+  const previewService = selectedService ?? (loadState.status === "ready" && retainedPreviewId
+    ? loadState.services.find((service) => service.id === retainedPreviewId) ?? null
+    : null);
 
-  const detailService = useMemo(() => {
+  useEffect(() => {
+    if (selectedService || !retainedPreviewId) return;
+    const timeout = window.setTimeout(() => setRetainedPreviewId(null), 420);
+    return () => window.clearTimeout(timeout);
+  }, [retainedPreviewId, selectedService]);
+
+  const windowDetailService = useMemo(() => {
     if (!detailId || loadState.status !== "ready") return null;
     return loadState.services.find((s) => s.id === detailId) ?? null;
   }, [detailId, loadState]);
+
+  useEffect(() => {
+    if (!detailId || loadState.status !== "ready" || windowDetailService) return;
+    let isCurrent = true;
+    void servicesAdapter.get(detailId).then((service) => {
+      if (!isCurrent) return;
+      const allowed = scenario?.actor.kind !== "FIELD" || service.crewId === scenario.actor.crewId;
+      setResolvedDetail({ id: detailId, service: allowed ? service : null });
+    }).catch((cause) => {
+      if (!isCurrent) return;
+      setResolvedDetail({
+        id: detailId, service: null,
+        error: cause instanceof ServiceRequestError && cause.status === 404 ? undefined : "No se pudo cargar el servicio. Intente nuevamente.",
+      });
+    });
+    return () => { isCurrent = false; };
+  }, [detailId, loadState, windowDetailService, scenario]);
+
+  const outsideDetail = loadState.status === "ready" && resolvedDetail?.id === detailId ? resolvedDetail : null;
+  const detailService = windowDetailService ?? outsideDetail?.service ?? null;
 
   const fieldCanViewRepairRequests = Boolean(
     scenario?.actor.kind === "FIELD" &&
@@ -369,7 +559,7 @@ export function ServicesWorkspace({
         if (isCurrent) setRepairRequests((current) => ({ ...current, [detailService.id]: page.repairRequests }));
       })
       .catch(() => {
-        if (isCurrent) setRepairRequestsErrors((current) => ({ ...current, [detailService.id]: "No se pudieron cargar las derivaciones de este Servicio." }));
+        if (isCurrent) setRepairRequestsErrors((current) => ({ ...current, [detailService.id]: "No se pudieron cargar las derivaciones." }));
       });
 
     return () => {
@@ -393,19 +583,28 @@ export function ServicesWorkspace({
   }, [streetClosureServiceId, loadState]);
 
   const handleSelect = useCallback((id: string) => {
+    setRetainedPreviewId(id);
     setSelectedId((prev) => (prev === id ? null : id));
   }, []);
 
-  const handleSortChange = useCallback((key: SortKey) => {
-    setSortKey((prevKey) => {
-      if (prevKey === key) {
-        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-        return key;
-      }
-      setSortDir("asc");
-      return key;
-    });
+  const handleOpenDetail = useCallback((id: string) => {
+    setStartErrors({});
+    setDetailId(id);
   }, []);
+
+  const handleSortChange = useCallback((key: SortKey) => {
+    if (sortKey === key) {
+      if (sortDir === "asc") {
+        setSortDir("desc");
+      } else {
+        setSortKey(null);
+        setSortDir("asc");
+      }
+      return;
+    }
+    setSortKey(key);
+    setSortDir("asc");
+  }, [sortKey, sortDir]);
 
   const handleClearFilters = useCallback(() => {
     setSearch("");
@@ -436,6 +635,7 @@ export function ServicesWorkspace({
     });
     setSearch("");
     setSelectedId(newService.id);
+    setRetainedPreviewId(newService.id);
     setIsScheduleOpen(false);
     setScheduleOrigin(undefined);
     setScheduleReferenceId(undefined);
@@ -453,12 +653,13 @@ export function ServicesWorkspace({
   }, []);
 
   const isField = scenario?.actor.kind === "FIELD";
-  const canAssignCrew = !isField;
-  const canSchedule = !isField;
-  const canReschedule = !isField;
+  const canAssignCrew = Boolean(scenario?.capabilities.includes("service:assign"));
+  const canSchedule = Boolean(scenario?.capabilities.includes("service:schedule"));
+  const canReschedule = Boolean(scenario?.capabilities.includes("service:reschedule"));
+  const canCancel = Boolean(scenario?.capabilities.includes("service:cancel"));
   const canExecuteService = Boolean(scenario?.capabilities.includes("service:execute"));
-  const canCreateRepairRequest = scenario?.actor.kind === "OFFICE" || fieldCanViewRepairRequests;
-  const canCreateStreetClosureRequest = scenario?.actor.kind === "OFFICE";
+  const canCreateRepairRequest = Boolean(scenario?.capabilities.includes("repairRequest:create"));
+  const canCreateStreetClosureRequest = Boolean(scenario?.capabilities.includes("streetClosureRequest:create"));
 
   const [streetClosureDependencyState, setStreetClosureDependencyState] = useState<{
     serviceId: string | null;
@@ -481,7 +682,7 @@ export function ServicesWorkspace({
         setStreetClosureDependencyState({
           serviceId: detailId,
           dependency: null,
-          error: cause instanceof Error ? cause.message : "No se pudo consultar la respuesta de M7.",
+          error: errorMessage(cause, "No se pudo consultar el estado del corte. Intente nuevamente."),
         });
       });
 
@@ -496,6 +697,8 @@ export function ServicesWorkspace({
       : { serviceId: null, dependency: null, error: null };
 
   const handleStartService = useCallback(async (service: Service) => {
+    setStartingId(service.id);
+    setStartErrors((prev) => ({ ...prev, [service.id]: "" }));
     try {
       const updated = await servicesAdapter.start(service.id);
       setLoadState((prev) => {
@@ -505,8 +708,14 @@ export function ServicesWorkspace({
           services: prev.services.map((s) => (s.id === updated.id ? updated : s)),
         };
       });
-    } catch {
-      // Handled in dialog or caller
+    } catch (cause) {
+      const msg =
+        cause instanceof ServiceRequestError
+          ? cause.message
+          : "No se pudo registrar el inicio del servicio.";
+      setStartErrors((prev) => ({ ...prev, [service.id]: msg }));
+    } finally {
+      setStartingId((current) => (current === service.id ? null : current));
     }
   }, []);
 
@@ -596,24 +805,97 @@ export function ServicesWorkspace({
     columnFilters.crews.size > 0 ||
     Boolean(columnFilters.timeFrom || columnFilters.timeTo);
 
+  const servicesTableProps = {
+    services: sortedServices,
+    filterOptionsServices: loadState.status === "ready" ? loadState.services : [],
+    serviceOrdinals,
+    selectedId,
+    onSelect: handleSelect,
+    sortKey,
+    sortDir,
+    onSortChange: handleSortChange,
+    columnFilters,
+    onColumnFiltersChange: setColumnFilters,
+    hasActiveFilters,
+    onClearFilters: handleClearFilters,
+    dense: isNarrow,
+    columnPreferences,
+  };
+  const servicesTable = (
+    <ServicesTable
+      {...servicesTableProps}
+    />
+  );
+
+  const periodBar = (
+    <div className={cn(
+      "flex items-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
+      isNarrow ? "min-w-0 flex-1 flex-nowrap gap-2 px-2 py-1 text-xs" : "flex-wrap gap-3 px-4 py-2 text-sm",
+    )} aria-busy={isRefreshing}>
+      <div className="flex min-w-0 items-center gap-2">
+        <Label htmlFor="services-period">Período</Label>
+        <Select
+          value={activePeriod}
+          items={periodItems}
+          onValueChange={(value) => handlePeriodChoiceChange(value as Period)}
+        >
+          <SelectTrigger
+            id="services-period"
+            size={isNarrow ? "sm" : "default"}
+            className={cn("w-auto", isNarrow && "min-w-0 px-1 [@media(max-width:760px)]:text-sm")}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="semana">{periodItems.semana}</SelectItem>
+              <SelectItem value="mes">{periodItems.mes}</SelectItem>
+              <SelectItem value="todo">{periodItems.todo}</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
+      <span
+        className="inline-flex size-6 items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-label={isRefreshing ? "Actualizando servicios" : refreshError ? "No se pudieron actualizar los servicios" : undefined}
+        title={refreshError ?? undefined}
+      >
+        {isRefreshing ? <Spinner aria-hidden="true" role="presentation" /> : null}
+        {refreshError ? <span aria-hidden="true" className="font-bold text-[var(--color-danger)]">!</span> : null}
+      </span>
+    </div>
+  );
+
   // Full detail view (explicit action)
   if (detailService) {
     return (
       <>
+        {!windowDetailService && (
+          <p role="status" className="border-b border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">Fuera del período elegido.</p>
+        )}
         <ServiceDetail
           service={detailService}
-          onBack={() => setDetailId(null)}
+          onBack={() => {
+            setDetailId(null);
+            // On phones going back also closes the preview, so the filters it hid come back.
+            if (isNarrow) closePreview();
+            else focusSelectedServiceAction();
+          }}
           onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
           onStartService={canExecuteService ? handleStartService : undefined}
           onSuspendService={canExecuteService ? (s) => setSuspendingServiceId(s.id) : undefined}
           onResumeService={canExecuteService ? handleResumeService : undefined}
           onReschedule={canReschedule ? (s) => setReschedulingServiceId(s.id) : undefined}
           onConfirmReschedule={canReschedule ? (s) => setConfirmingRescheduleServiceId(s.id) : undefined}
-          onCancelService={canReschedule ? (s) => setCancelingServiceId(s.id) : undefined}
+          onCancelService={canCancel ? (s) => setCancelingServiceId(s.id) : undefined}
           onCreateRepairRequest={canCreateRepairRequest ? (s) => setRepairRequestServiceId(s.id) : undefined}
           onCreateStreetClosureRequest={canCreateStreetClosureRequest ? (s) => setStreetClosureServiceId(s.id) : undefined}
           onServiceUpdated={handleServiceUpdated}
           canStartService={canExecuteService}
+          isStarting={startingId === detailService.id}
+          startError={startErrors[detailService.id] ?? null}
           isResuming={resumingId === detailService.id}
           resumeError={resumeErrors[detailService.id] ?? null}
           streetClosureDependency={displayedStreetClosureState.dependency}
@@ -623,8 +905,8 @@ export function ServicesWorkspace({
               displayedStreetClosureState.serviceId !== detailId,
           )}
           streetClosureDependencyError={displayedStreetClosureState.error}
-          onRejectedClosureReschedule={(service) => setReschedulingServiceId(service.id)}
-          onRejectedClosureCancel={(service) => setCancelingServiceId(service.id)}
+          onRejectedClosureReschedule={canReschedule ? (service) => setReschedulingServiceId(service.id) : undefined}
+          onRejectedClosureCancel={canCancel ? (service) => setCancelingServiceId(service.id) : undefined}
           repairRequests={fieldCanViewRepairRequests ? repairRequests[detailService.id] ?? [] : undefined}
           repairRequestsLoading={fieldCanViewRepairRequests && !Object.prototype.hasOwnProperty.call(repairRequests, detailService.id) && !repairRequestsErrors[detailService.id]}
           repairRequestsError={repairRequestsErrors[detailService.id] ?? null}
@@ -688,14 +970,6 @@ export function ServicesWorkspace({
               service={confirmingRescheduleServiceId ? detailService : null}
               onConfirmed={handleRescheduleConfirmed}
             />
-            <CancelServiceDialog
-              open={Boolean(cancelingServiceId && detailService.id === cancelingServiceId)}
-              onOpenChange={(open) => {
-                if (!open) setCancelingServiceId(null);
-              }}
-              service={cancelingServiceId ? detailService : null}
-              onCancelled={handleServiceCancelled}
-            />
             {canCreateStreetClosureRequest && streetClosureService && (
               <CreateStreetClosureRequestDialog
                 key={streetClosureService.id}
@@ -715,46 +989,59 @@ export function ServicesWorkspace({
             )}
           </>
         )}
+        {canCancel && (
+          <CancelServiceDialog
+            open={Boolean(cancelingServiceId && detailService.id === cancelingServiceId)}
+            onOpenChange={(open) => {
+              if (!open) setCancelingServiceId(null);
+            }}
+            service={cancelingServiceId ? detailService : null}
+            onCancelled={handleServiceCancelled}
+          />
+        )}
       </>
     );
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--color-canvas)]">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[var(--color-canvas)]">
       {/* Workspace Header & Toolbar */}
-      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-3 md:px-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <header className={cn(
+        "border-b border-[var(--color-border)] bg-[var(--color-surface)]",
+        isNarrow ? "p-2" : "px-5 py-3",
+      )}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-lg font-bold tracking-tight text-[var(--color-text)]">
-              Servicios Urbanos
+              Servicios
             </h1>
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              Programación y seguimiento territorial de recorridos y puntos
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
             {/* Global search */}
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden />
-              <input
+              <FormControl
+                as="input"
                 type="search"
                 value={search}
                 maxLength={MAX_SEARCH_LENGTH}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar servicio, zona o cuadrilla…"
-                aria-label="Buscar servicios por texto libre"
-                className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] pl-8 pr-8 py-1.5 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
+                placeholder={isNarrow ? "Buscar" : "Buscar servicio, zona o cuadrilla…"}
+                aria-label="Buscar servicios"
+                className="rounded-xl pl-8 pr-8 text-xs"
               />
               {search && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={() => setSearch("")}
                   aria-label="Borrar búsqueda"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               )}
             </div>
 
@@ -764,7 +1051,7 @@ export function ServicesWorkspace({
                 size="sm"
                 onClick={handleClearFilters}
                 className="text-xs text-[var(--color-action)] font-semibold"
-                aria-label="Limpiar todos los filtros aplicados"
+                aria-label="Limpiar filtros"
               >
                 <FilterX data-icon="inline-start" aria-hidden />
                 <span>Limpiar filtros</span>
@@ -780,11 +1067,11 @@ export function ServicesWorkspace({
                   setScheduleReferenceId(undefined);
                   setIsScheduleOpen(true);
                 }}
-                className="text-xs font-semibold gap-1.5 shrink-0"
-                aria-label="Programar nuevo servicio"
+                className={cn("text-xs font-semibold gap-1.5 shrink-0", isNarrow && "h-12 px-3")}
+                aria-label="Programar servicio"
               >
                 <Plus className="h-3.5 w-3.5" aria-hidden />
-                <span>Programar servicio</span>
+                <span>{isNarrow ? "Programar" : "Programar servicio"}</span>
               </Button>
             )}
           </div>
@@ -823,193 +1110,151 @@ export function ServicesWorkspace({
         </div>
       )}
 
+      {loadState.status === "error" && periodBar}
+
       {/* Ready State */}
+      {outsideDetail?.error && <p role="alert" className="px-4 py-3 text-sm text-[var(--color-danger)]">{outsideDetail.error}</p>}
+      {loadState.status === "ready" && <DroppedRecordsAlert count={loadState.dropped} className="mx-4 my-2 w-auto" />}
       {loadState.status === "ready" && (
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-          {isNarrow ? (
-            /* Narrow Screens (< 760px): Focused List/Map Presentation */
-            <div className="flex flex-col flex-1 min-h-0">
-              <div className="flex border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-                <button
-                  type="button"
-                  onClick={() => setMobileTab("list")}
-                  aria-pressed={mobileTab === "list"}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2",
-                    mobileTab === "list"
-                      ? "border-[var(--color-action)] text-[var(--color-action)] bg-[var(--color-surface-subtle)]"
-                      : "border-transparent text-[var(--color-text-secondary)]",
-                  )}
-                >
-                  <LayoutList className="h-4 w-4" aria-hidden />
-                  <span>Lista ({filteredServices.length})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMobileTab("map")}
-                  aria-pressed={mobileTab === "map"}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2",
-                    mobileTab === "map"
-                      ? "border-[var(--color-action)] text-[var(--color-action)] bg-[var(--color-surface-subtle)]"
-                      : "border-transparent text-[var(--color-text-secondary)]",
-                  )}
-                >
-                  <MapIcon className="h-4 w-4" aria-hidden />
-                  <span>Mapa</span>
-                </button>
-              </div>
+          <div className="flex min-h-0 flex-1 flex-col">
+            {/* On phones the preview covers the list the filters apply to, so the filters go with it. */}
+            <div
+              data-services-filter-toolbar
+              hidden={isNarrow && Boolean(selectedService)}
+              className={cn(
+                "flex flex-wrap items-center border-b border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 text-xs text-[var(--color-text-secondary)]",
+                // On phones the period selector shrinks so it never pushes «Categorías» onto a second row.
+                isNarrow ? "gap-2 px-2" : "gap-3 px-4",
+              )}
+            >
+              {periodBar}
+              {refreshError && (
+                <p role="alert" className={cn("px-4 py-1.5 text-xs text-[var(--color-danger)]", isNarrow && "basis-full")}>
+                  No se pudo actualizar. Se muestran los datos anteriores.
+                </p>
+              )}
+              <ServicesColumnEditor controller={columnPreferences} />
+            </div>
 
-              <div className="flex-1 min-h-0 relative">
-                {mobileTab === "list" ? (
-                  <ServicesTable
-                    services={filteredServices}
-                    selectedId={selectedId}
-                    onSelect={handleSelect}
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSortChange={handleSortChange}
-                    columnFilters={columnFilters}
-                    onColumnFiltersChange={setColumnFilters}
-                    dense
-                  />
-                ) : (
-                  <div className="h-full p-2">
+            <div className={cn(
+              "relative min-h-0 min-w-0 flex-1",
+              isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout,
+              styles.workspaceResults,
+            )}
+            data-refreshing={isRefreshing}
+            aria-busy={isRefreshing}
+          >
+              <ResizablePanelGroup
+                groupRef={panelGroupRef}
+                orientation="horizontal"
+                defaultLayout={{ "map-pane": 50, "table-pane": 50 }}
+                onLayoutChanged={handlePanelLayoutChanged}
+                className={cn("h-full min-w-0 flex-1", styles.panelGroup)}
+                aria-hidden={Boolean(isNarrow && selectedService) || undefined}
+                inert={Boolean(isNarrow && selectedService)}
+              >
+                <ResizablePanel
+                  id="map-pane"
+                  defaultSize="50%"
+                  minSize="30%"
+                  style={{ overflow: "hidden" }}
+                  aria-hidden={Boolean(isNarrow && mobileDrawerSnap === "full") || undefined}
+                  inert={Boolean(isNarrow && mobileDrawerSnap === "full")}
+                  className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileMapPanel)}
+                >
+                  <div className={cn("h-full min-h-0 min-w-0", !isNarrow && "p-3")}>
                     <MapView
-                      services={filteredServices}
+                      services={sortedServices}
+                      serviceOrdinals={serviceOrdinals}
                       selectedId={selectedId}
                       onSelect={handleSelect}
                       error={mapError}
                       onRetry={() => setMapError(false)}
-                      filterFingerprint={filterFingerprint}
+                      compact={isNarrow}
                     />
                   </div>
-                )}
+                </ResizablePanel>
 
-                {/* Mobile live preview sheet/card when an item is selected */}
-                {selectedService && (
-                  <div className="absolute inset-x-0 bottom-0 z-40 max-h-[75%] rounded-t-2xl border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl">
-                    <ServicePreview
-                      service={selectedService}
-                      onOpenDetail={(id) => setDetailId(id)}
-                      onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
-                      onClose={() => setSelectedId(null)}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* Wide Screens (>= 760px): Resizable, side-swappable split pane with live preview */
-            <div className="relative flex flex-1 min-h-0 flex-col">
-              {/* Split pane control bar */}
-              <div className="flex items-center justify-end gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)]">
-                <button
-                  type="button"
-                  onClick={() => setMapSide((s) => (s === "right" ? "left" : "right"))}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1 font-medium hover:bg-[var(--color-surface-subtle)] hover:text-[var(--color-text)] transition-colors"
-                  aria-label={`Intercambiar paneles: colocar mapa a la ${mapSide === "right" ? "izquierda" : "derecha"}`}
+                <ResizableHandle
+                  withHandle={false}
+                  disabled={isNarrow}
+                  aria-label="Ajustar ancho del mapa"
+                  className={cn(styles.mobileResizeHandle, isNarrow && "hidden")}
+                />
+
+                <ResizablePanel
+                  id="table-pane"
+                  defaultSize="50%"
+                  minSize="30%"
+                  style={{ overflow: "hidden" }}
+                  className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}
                 >
-                  <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
-                  <span>Mapa a la {mapSide === "right" ? "izquierda" : "derecha"}</span>
-                </button>
-              </div>
-
-              <div className="relative flex-1 min-h-0">
-                <ResizablePanelGroup direction="horizontal" className="h-full">
-                  {mapSide === "left" ? (
-                    <>
-                      <ResizablePanel
-                        id="map-pane"
-                        defaultSize={50}
-                        minSize={30}
+                  <div className={cn("h-full min-h-0", styles.tableContent, isNarrow && "pointer-events-none")}>
+                    {isNarrow ? (
+                      <InventoryMapDrawer
+                        ariaLabel="Lista de servicios"
+                        summary={`${sortedServices.length} servicios`}
+                        snapState={mobileDrawerSnap}
+                        onSnapStateChange={setMobileDrawerSnap}
+                        // A modal dialog must stay the topmost layer: the sheet portal would otherwise remount above it on a resize.
+                        suspended={Boolean(selectedService) || isScheduleOpen || Boolean(assigningService)}
+                        className={styles.mobileServiceDrawer}
                       >
-                        <div className="h-full p-3">
-                          <MapView
-                            services={filteredServices}
-                            selectedId={selectedId}
-                            onSelect={handleSelect}
-                            error={mapError}
-                            onRetry={() => setMapError(false)}
-                            filterFingerprint={filterFingerprint}
-                          />
+                        <div className={styles.mobileDrawerContent}>
+                          <div
+                            className={cn(styles.mobileTablePane, selectedService && styles.mobileTablePaneHidden)}
+                            aria-hidden={Boolean(selectedService)}
+                            inert={Boolean(selectedService)}
+                          >
+                            {servicesTable}
+                          </div>
                         </div>
-                      </ResizablePanel>
-
-                      <ResizableHandle withHandle />
-
-                      <ResizablePanel
-                        id="table-pane"
-                        defaultSize={50}
-                        minSize={30}
-                      >
-                        <ServicesTable
-                          services={filteredServices}
-                          selectedId={selectedId}
-                          onSelect={handleSelect}
-                          sortKey={sortKey}
-                          sortDir={sortDir}
-                          onSortChange={handleSortChange}
-                          columnFilters={columnFilters}
-                          onColumnFiltersChange={setColumnFilters}
-                        />
-                      </ResizablePanel>
-                    </>
-                  ) : (
-                    <>
-                      <ResizablePanel
-                        id="table-pane"
-                        defaultSize={50}
-                        minSize={30}
-                      >
-                        <ServicesTable
-                          services={filteredServices}
-                          selectedId={selectedId}
-                          onSelect={handleSelect}
-                          sortKey={sortKey}
-                          sortDir={sortDir}
-                          onSortChange={handleSortChange}
-                          columnFilters={columnFilters}
-                          onColumnFiltersChange={setColumnFilters}
-                        />
-                      </ResizablePanel>
-
-                      <ResizableHandle withHandle />
-
-                      <ResizablePanel
-                        id="map-pane"
-                        defaultSize={50}
-                        minSize={30}
-                      >
-                        <div className="h-full p-3">
-                          <MapView
-                            services={filteredServices}
-                            selectedId={selectedId}
-                            onSelect={handleSelect}
-                            error={mapError}
-                            onRetry={() => setMapError(false)}
-                            filterFingerprint={filterFingerprint}
-                          />
-                        </div>
-                      </ResizablePanel>
-                    </>
-                  )}
-                </ResizablePanelGroup>
-
-                {/* Anchored live preview alongside split pane when service selected */}
-                {selectedService && (
-                  <div className="absolute inset-y-0 right-0 z-30 w-80 md:w-96 shadow-2xl transition-transform duration-300">
-                    <ServicePreview
-                      service={selectedService}
-                      onOpenDetail={(id) => setDetailId(id)}
-                      onAssignCrew={canAssignCrew ? (s) => setAssigningServiceId(s.id) : undefined}
-                      onClose={() => setSelectedId(null)}
-                    />
+                      </InventoryMapDrawer>
+                    ) : servicesTable}
                   </div>
-                )}
-              </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+
+              {isNarrow && previewService && (
+                <div
+                  className={cn(styles.mobilePreviewOverlay, selectedService && styles.mobilePreviewOverlayOpen)}
+                  aria-hidden={!selectedService}
+                  inert={!selectedService}
+                >
+                  <ServicePreview
+                    service={previewService}
+                    onOpenDetail={handleOpenDetail}
+                    onAssignCrew={canAssignCrew ? (service) => setAssigningServiceId(service.id) : undefined}
+                    onClose={closePreview}
+                    autoFocusCloseButton={isNarrow}
+                    className="select-text border-l-0"
+                  />
+                </div>
+              )}
+
+              {!isNarrow && (
+                <div
+                  className={cn(styles.previewRail, selectedService && styles.previewRailOpen)}
+                  data-preview-rail="true"
+                  aria-hidden={!selectedService}
+                  inert={!selectedService}
+                >
+                  <div className={styles.previewSurface}>
+                    {previewService && (
+                      <ServicePreview
+                        service={previewService}
+                        onOpenDetail={handleOpenDetail}
+                        onAssignCrew={canAssignCrew ? (service) => setAssigningServiceId(service.id) : undefined}
+                        onClose={closePreview}
+                        className="select-text"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
 

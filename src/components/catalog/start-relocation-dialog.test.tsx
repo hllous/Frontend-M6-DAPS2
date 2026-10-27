@@ -52,7 +52,7 @@ describe("StartRelocationDialog", () => {
     );
 
     expect(screen.getByRole("heading", { name: /Iniciar reubicación de contenedor CONT-TEST-001/i })).toBeVisible();
-    expect(screen.getByText("Av. Rivadavia 1200")).toBeVisible();
+    expect(screen.queryByText("Av. Rivadavia 1200")).not.toBeInTheDocument();
 
     const confirmButton = screen.getByRole("button", { name: "Iniciar reubicación" });
     await user.click(confirmButton);

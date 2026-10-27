@@ -20,7 +20,35 @@ export type ReferralAnomaly = {
   sourceChanges: ReferralSourceChange[];
 };
 
-const terminalStatuses = new Set(["CLOSED", "REJECTED", "ENDED"]);
+const terminalStatuses = new Set(["CLOSED", "REJECTED", "ENDED", "EXPIRED"]);
+
+function normalizedLocation(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function closureSectionsKey(sections: Array<{ streetName: string; fromCross: string; toCross: string }>): string {
+  return JSON.stringify(sections
+    .map((section) => JSON.stringify([section.streetName, section.fromCross, section.toCross].map(normalizedLocation)))
+    .sort());
+}
+
+function hasSameDuplicateCriteria(referral: Referral, candidate: Referral): boolean {
+  if (referral.kind !== candidate.kind || referral.sourceId !== candidate.sourceId) return false;
+
+  if (referral.kind === "REPAIR_REQUEST" && candidate.kind === "REPAIR_REQUEST") {
+    return referral.request.detectedInType === candidate.request.detectedInType &&
+      referral.request.damageType === candidate.request.damageType &&
+      normalizedLocation(referral.request.address) === normalizedLocation(candidate.request.address);
+  }
+
+  if (referral.kind === "STREET_CLOSURE_REQUEST" && candidate.kind === "STREET_CLOSURE_REQUEST") {
+    return referral.sourceType === candidate.sourceType &&
+      referral.request.closureType === candidate.request.closureType &&
+      closureSectionsKey(referral.request.affectedSections) === closureSectionsKey(candidate.request.affectedSections);
+  }
+
+  return false;
+}
 
 export function isReferralOpen(referral: Referral): boolean {
   return !terminalStatuses.has(referral.status);
@@ -37,8 +65,7 @@ function duplicateIdsFor(referral: Referral, referrals: Referral[]): string[] {
   if (!isReferralOpen(referral)) return [];
   return referrals
     .filter((candidate) =>
-      candidate.kind === referral.kind &&
-      candidate.sourceId === referral.sourceId &&
+      hasSameDuplicateCriteria(referral, candidate) &&
       isReferralOpen(candidate),
     )
     .map((candidate) => candidate.id)

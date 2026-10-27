@@ -6,7 +6,7 @@ Modelo relacional derivado de `docs/entidades/` del Módulo 6. Convenciones apli
 - **IDs externos no son FK.** `ticketId` (M2), `establishmentId` (M4), `organizationId` / `leaderUserId` / `memberUserIds` (M1), `neighborhoodId` (M9) se guardan como referencias sin integridad referencial: viven en otra base. Van marcados `EXT` y con índice, no con `FOREIGN KEY`.
 - **Referencias polimórficas** (`targetRef`, `sourceRef`, `detectedIn`) se modelan como par `*_type` + `*_id`, porque apuntan a tablas distintas según el caso.
 - **Enums** = los 33 de `enumeraciones.md`. Se implementan como tipo enumerado o `VARCHAR` + `CHECK`, no como tabla de catálogo (son valores cerrados de código, no configurables por el usuario).
-- Toda tabla lleva `id UUID PK` y auditoría (`created_at`, `updated_at`, `created_by`); la auditoría no se repite en el diagrama para no ensuciarlo.
+- Toda tabla lleva `id UUID PK` y auditoría (`created_at`, `updated_at`; `service` además lleva `created_by`); la auditoría no se repite en el diagrama para no ensuciarlo.
 
 ## Diagrama
 
@@ -223,6 +223,7 @@ erDiagram
         varchar authorized_by_user_id "solo REMOVAL"
         timestamp authorized_at "solo REMOVAL"
         text justification "solo REMOVAL"
+        timestamp pruning_scheduled_at "columna sin uso: antes marca de treePruningScheduled emitido"
     }
     INTERVENTION_TREE {
         uuid intervention_id PK
@@ -233,6 +234,8 @@ erDiagram
         varchar name
         enum space_type "GreenSpaceType"
         uuid zone_id FK
+        numeric lat
+        numeric lng
         numeric area_m2
         boolean active
     }
@@ -252,6 +255,13 @@ erDiagram
         enum priority "Severity"
         boolean escalated "EXT M2 - ticketUpdated"
         text citizen_response "EXT M2 - ticketUpdated"
+        timestamp information_requested_at "solicitud de informacion pendiente (null = ninguna)"
+        text information_request_message "lo que se le pidio al vecino"
+        timestamp information_request_required_by "plazo dado al vecino"
+        timestamp priority_changed_at "occurredAt del ultimo PRIORITY_CHANGED aplicado o del ROUTED"
+        timestamp escalation_changed_at "occurredAt del ultimo ESCALATION_CHANGED aplicado o del ROUTED"
+        timestamp citizen_response_at "occurredAt del ultimo INFORMATION_PROVIDED aplicado"
+        timestamp ticket_status_at "occurredAt del ultimo REOPENED, CANCELLED o ROUTED aplicado"
         timestamp deadline_at "cierre por vencimiento"
     }
     ENVIRONMENTAL_INSPECTION {
@@ -317,6 +327,8 @@ erDiagram
         enum closure_type "StreetClosureType"
         timestamp closure_from
         timestamp closure_to
+        timestamp approved_from
+        timestamp approved_to
         enum status "StreetClosureRequestStatus"
         varchar closure_id "EXT M7"
     }
@@ -340,6 +352,8 @@ erDiagram
         varchar last_error "error del ultimo intento"
         timestamp occurred_at
         timestamp published_at
+        uuid correlation_id "hilo del flujo, heredado del evento consumido"
+        uuid causation_id "eventId consumido que lo causo, null si es accion directa"
     }
     INBOX_EVENT {
         uuid id PK
@@ -349,6 +363,16 @@ erDiagram
         timestamp received_at
         timestamp processed_at "null mientras no se aplico"
         varchar error
+        uuid correlation_id "hilo con el que corrio el handler"
+        varchar source_module "modulo emisor segun el sobre del Core"
+        timestamp occurred_at "occurredAt del sobre, el reintento ordena con este"
+    }
+    TICKET_M2_STATE {
+        varchar ticket_id PK
+        varchar status "valor de M2 (IN_PROGRESS, ROUTED...), no un enum nuestro"
+        enum source "DEDUCED o RECEIVED"
+        timestamp received_at "data.updatedAt del ticketUpdated, marca de orden"
+        timestamp updated_at
     }
 
     %% ======== RELACIONES ========
@@ -405,17 +429,14 @@ erDiagram
 | 5 | `SANCTION_OUTCOME` separado del acta | Es espejo de solo lectura de lo que decide M4. Separarlo deja explícito que ese registro no lo escribe nuestro dominio sino el consumidor de eventos |
 | 6 | `ENVIRONMENTAL_REPORT.deadline_at` (campo agregado) | El paso `NOTICE_ISSUED → CLOSED` por vencimiento de plazo es diseño explícito, no atajo. Necesita una fecha materializada para que un job la barra; no está en el doc porque el doc modela el *qué*, no el *cómo* |
 | 7 | `damage_type`, `severity`, `requires_public_works` como columnas nullables en `CONTAINER` | Solo se llenan en `DAMAGED`. La alternativa (tabla `CONTAINER_DAMAGE` con historial) es mejor si se quiere saber cuántas veces se rompió un contenedor: hoy el doc no lo pide |
-| 8 | `OUTBOX_EVENT` / `INBOX_EVENT` | No son dominio, pero el módulo publica 8 eventos y consume 10. Sin outbox transaccional, un commit que falla al publicar deja el estado y el bus desincronizados; sin inbox con `message_id` único, un evento reentregado por M4 duplica el `SANCTION_OUTCOME` |
+| 8 | `OUTBOX_EVENT` / `INBOX_EVENT` | No son dominio, pero el módulo publica 6 eventos y consume 10. Sin outbox transaccional, un commit que falla al publicar deja el estado y el bus desincronizados; sin inbox con `message_id` único, un evento reentregado por M4 duplica el `SANCTION_OUTCOME` |
+| 8b | `TICKET_M2_STATE` | M2 no avisa el `IN_PROGRESS`: el estado del ticket lo llevamos nosotros (deducido de lo que publicamos, corregido con el `currentStatus` que M2 informa) para elegir entre `STARTED` y `PROGRESS` al informar la programación (#303). Sin FK: el `ticket_id` es de M2 y puede no tener expediente ni servicio |
 | 9 | Los enums viven en el código, no en tablas de catálogo | Son valores cerrados versionados con el código (33 en total). `SERVICE_TYPE` y `ZONE` sí son tablas: esos los configura el municipio |
 | 10 | `ATTACHMENT` polimórfico y genérico con idempotencia | En vez de endpoints de subida aislados por recurso, `POST /evidence` acepta `owner_type` (`SERVICE`, `ZONE_RESULT`, `INSPECTION`, `CONTAINER`), guarda el archivo en Cloudflare R2 y exige `Idempotency-Key` respaldado por índice único `(owner_type, owner_id, idempotency_key)` para reintentos seguros |
 | 11 | `REPAIR_REQUEST.public_safety_risk` independiente de `severity` | Requerido por el esquema de M3 (`infrastructureRepairRequested`). No se deriva de `severity`: un daño leve puede implicar riesgo peatonal inminente |
 
 ## Riesgos abiertos que impactan el esquema
 
-Salen de `bloqueantes.md` y de las divergencias de enums. Ninguno bloquea empezar, pero conviene tenerlos a la vista antes de escribir la primera migración:
+El estado vivo está en [bloqueantes.md](bloqueantes.md); acá solo lo que toca el esquema.
 
-- **`sourceViolationId` que M4 no devuelve.** Sin ese campo en `commercialFineGenerated` / `closureOrdered` / `closureLifted` no se sabe a qué acta corresponde la resolución, y `SANCTION_OUTCOME` nunca se llena. El esquema soporta el caso (el expediente cierra por `deadline_at`), pero el dato se pierde.
-- **`sourceRequestId` de M3 y M7.** Mismo problema en `REPAIR_REQUEST` y `STREET_CLOSURE_REQUEST`: las columnas `work_order_id` / `closure_id` existen para correlacionar, pero hoy la respuesta no trae con qué llenarlas.
 - **Catálogo de barrios de M9 sin exponer.** `ZONE_NEIGHBORHOOD.neighborhood_id` queda como `VARCHAR` sin validación hasta que se conozca el formato del ID.
-- **Divergencias 2 a 5 de enums** (`ServiceOrigin`, `TreeHealthStatus`, `TreeInterventionType`, `SuggestedAction`). Como esos valores viajan al bus, elegir mal implica migrar datos y no solo cambiar una constante: conviene cerrarlas antes de la primera migración.
-- **Colisión del nombre `Zone` con M9.** Si M9 se queda con la palabra, el rename es de tabla y de API. Mejor decidirlo antes que después.

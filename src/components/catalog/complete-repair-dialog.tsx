@@ -1,4 +1,6 @@
 "use client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
@@ -12,8 +14,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { containersAdapter, ContainerRequestError, type Container } from "@/lib/containers";
-import { EvidenceQueueView, useEvidenceQueue } from "./container-evidence-queue";
+import {
+  containersAdapter,
+  type Container,
+} from "@/lib/containers";
 
 interface CompleteRepairDialogProps {
   open: boolean;
@@ -50,7 +54,6 @@ function CompleteRepairModalContent({
 }: Omit<CompleteRepairDialogProps, "open"> & { container: Container }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const evidenceQueue = useEvidenceQueue();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,9 +65,10 @@ function CompleteRepairModalContent({
       updated = await containersAdapter.completeRepair(container.id);
     } catch (error) {
       setErrorMessage(
-        error instanceof ContainerRequestError || error instanceof Error
-          ? error.message
-          : "No se pudo completar la reparación del contenedor.",
+        getErrorMessage(
+          error,
+          "No se pudo completar la reparación del contenedor.",
+        ),
       );
       setIsSubmitting(false);
       return;
@@ -72,55 +76,58 @@ function CompleteRepairModalContent({
 
     onSuccess(updated);
 
-    if (evidenceQueue.queuedFiles.length > 0) {
-      const allFilesOk = await evidenceQueue.uploadAll(container.id);
-      setIsSubmitting(false);
-      if (allFilesOk) onOpenChange(false);
-    } else {
-      setIsSubmitting(false);
-      onOpenChange(false);
-    }
+    setIsSubmitting(false);
+    onOpenChange(false);
   }
 
   return (
-    <DialogContent className="max-w-lg">
+    <DialogContent className="max-w-lg overflow-y-auto">
       <DialogHeader>
-        <DialogTitle>Completar reparación independiente · {container.code}</DialogTitle>
+        <DialogTitle>
+          Completar reparación · {container.code}
+        </DialogTitle>
         <DialogDescription>
-          Acción independiente de Oficina para restituir el contenedor a estado Activo. No
-          corresponde al completado de un Servicio vinculado. Puede adjuntar evidencia plana al
-          contenedor.
+          El contenedor vuelve a Activo.
         </DialogDescription>
       </DialogHeader>
 
       {errorMessage && (
-        <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {errorMessage}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
       )}
 
-      <form id="complete-repair-form" onSubmit={handleSubmit} className="space-y-4">
-        <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
-          <p className="font-medium text-foreground">Estado actual: En reparación</p>
-          <p className="mt-1 text-muted-foreground">Nuevo estado: Activo</p>
-        </div>
-        <EvidenceQueueView
-          queuedFiles={evidenceQueue.queuedFiles}
-          fileValidationError={evidenceQueue.fileValidationError}
-          onFileSelect={evidenceQueue.handleFileSelect}
-          onRemoveFile={evidenceQueue.removeFile}
-          onRetryFile={(item) => evidenceQueue.uploadSingle(container.id, item)}
-          disabled={isSubmitting}
-        />
+      <form
+        id="complete-repair-form"
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+      >
+        <Alert role="note">
+          <AlertDescription>
+            <p className="font-medium text-foreground">
+              Estado: En reparación
+            </p>
+            <p className="mt-1 text-muted-foreground">Nuevo estado: Activo</p>
+          </AlertDescription>
+        </Alert>
       </form>
 
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onOpenChange(false)}
+          disabled={isSubmitting}
+        >
           Cancelar
         </Button>
-        <Button type="submit" form="complete-repair-form" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          form="complete-repair-form"
+          disabled={isSubmitting}
+        >
           <CheckCircle2 data-icon="inline-start" aria-hidden />
-          {isSubmitting ? "Completando…" : "Confirmar reparación completa"}
+          {isSubmitting ? "Completando…" : "Confirmar reparación"}
         </Button>
       </DialogFooter>
     </DialogContent>

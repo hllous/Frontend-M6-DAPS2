@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { withResponseCoordinates } from "./response-coordinates";
 import {
   riskLevelSchema,
   riskTypeSchema,
@@ -9,6 +10,7 @@ import {
   treeInterventionTypeSchema,
 } from "./tree-surveys";
 import { MAX_TREE_DIAMETER_CM, MAX_TREE_HEIGHT_M, boundedDecimalInput, latitudeInput, longitudeInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export const treeLastSurveySchema = z.object({
   surveyedAt: z.string(),
@@ -18,14 +20,12 @@ export const treeLastSurveySchema = z.object({
   suggestedIntervention: treeInterventionTypeSchema.nullable(),
 });
 
-export const treeSchema = z.object({
+export const treeSchema = withResponseCoordinates({
   id: z.string(),
   surveyCode: z.string(),
   zoneId: z.string(),
   species: z.string().nullable(),
   address: z.string().nullable(),
-  lat: z.number().nullable(),
-  lng: z.number().nullable(),
   heightM: z.number().nullable(),
   diameterCm: z.number().nullable(),
   active: z.boolean(),
@@ -107,7 +107,7 @@ export class TreeRequestError extends Error {
 }
 
 const pageSchema = z.object({
-  data: z.array(treeSchema),
+  data: tolerantRecords(treeSchema, "trees"),
   meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
 });
 

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
 import { POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetContainerFixtures();
@@ -16,17 +16,7 @@ afterEach(() => {
   resetContainerFixtures();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("POST /api/containers/[id]/start-repair BFF route", () => {
   it("requires an active session and returns 401", async () => {
@@ -39,7 +29,7 @@ describe("POST /api/containers/[id]/start-repair BFF route", () => {
   });
 
   it("allows only Office actors with container:manage", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-3/start-repair", {
         method: "POST",
@@ -52,7 +42,7 @@ describe("POST /api/containers/[id]/start-repair BFF route", () => {
   });
 
   it("transitions a damaged container to under repair", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-3/start-repair", {
         method: "POST",
@@ -69,7 +59,7 @@ describe("POST /api/containers/[id]/start-repair BFF route", () => {
   });
 
   it("rejects a start request when the container is not damaged", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/containers/cont-1/start-repair", {
         method: "POST",
@@ -80,5 +70,26 @@ describe("POST /api/containers/[id]/start-repair BFF route", () => {
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({ error: "Conflict" });
+  });
+
+  it("forwards an authorized backend repair start with its id and method", async () => {
+    const id = "container_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "backend-development",
+      devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "UNDER_REPAIR" }));
+
+    const response = await POST(
+      new Request(`http://localhost/api/containers/${id}/start-repair`, { method: "POST", headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/containers/${id}/start-repair`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 });

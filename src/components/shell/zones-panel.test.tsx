@@ -28,7 +28,8 @@ describe("ZonesPanel", () => {
     render(<ZonesPanel />);
 
     expect(await screen.findByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    expect(screen.getByText(/Z-BEL/)).toBeVisible();
+    expect(screen.getByText("Belgrano")).toBeVisible();
+    expect(screen.queryByText(/Z-BEL/)).not.toBeInTheDocument();
   });
 
   it("renders an empty state when the adapter returns no zones", async () => {
@@ -41,6 +42,7 @@ describe("ZonesPanel", () => {
     render(<ZonesPanel />);
 
     expect(await screen.findByText("Sin zonas operativas")).toBeVisible();
+    expect(screen.queryByText("No hay zonas registradas para mostrar.")).not.toBeInTheDocument();
   });
 
   it("renders a retryable error state when the read fails", async () => {
@@ -49,6 +51,7 @@ describe("ZonesPanel", () => {
     render(<ZonesPanel />);
 
     expect(await screen.findByText("No se pudieron cargar las zonas")).toBeVisible();
+    expect(screen.getByText("Revise la conexión e intente nuevamente.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Reintentar carga" })).toBeVisible();
   });
 
@@ -59,7 +62,9 @@ describe("ZonesPanel", () => {
 
     render(<ZonesPanel />);
 
-    expect(await screen.findByText("Inicie sesión para continuar")).toBeVisible();
+    expect(await screen.findByRole("link", { name: "Iniciar sesión" })).toBeVisible();
+    expect(screen.queryByText("Inicie sesión para continuar")).not.toBeInTheDocument();
+    expect(screen.queryByText("La aplicación operativa requiere una sesión activa.")).not.toBeInTheDocument();
     expect(screen.queryByText(/Z-BEL/)).not.toBeInTheDocument();
   });
 
@@ -71,6 +76,7 @@ describe("ZonesPanel", () => {
     render(<ZonesPanel />);
 
     expect(await screen.findByText("Acceso no disponible")).toBeVisible();
+    expect(screen.getByText("No tiene permiso para ver esta sección.")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Reintentar carga" })).not.toBeInTheDocument();
   });
 

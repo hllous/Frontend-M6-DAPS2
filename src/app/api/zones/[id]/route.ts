@@ -1,13 +1,12 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import {
@@ -17,36 +16,18 @@ import {
 } from "@/lib/zones-fixtures";
 import { updateZoneInputSchema } from "@/lib/zones";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
 
-async function targetId(context: { params: Promise<{ id: string }> | { id: string } }) {
+
+
+async function targetId(context: { params: Promise<{ id: string }> }) {
   const resolved = await context.params;
   return resolved.id;
 }
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const path = new URL(request.url).pathname;
 
@@ -54,13 +35,9 @@ export async function GET(
     const session = getRequiredSession(request);
     const id = await targetId(context);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/zones/${id}`);
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/zones/${pathId(id)}`);
+            return forwardResponse(backendResponse);
     }
 
     const zone = getZoneFixture(id);
@@ -77,24 +54,20 @@ export async function GET(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo cargar la zona operativa.", path);
+    return mapSessionError(error, path, "No se pudo cargar la zona operativa.");
   }
 }
 
 export async function PATCH(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const path = new URL(request.url).pathname;
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede editar zonas operativas.");
-    }
-    requireCapability(session, "zone:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede editar zonas operativas.", capability: "zone:manage", throwOnError: true });
 
     const id = await targetId(context);
 
@@ -110,17 +83,13 @@ export async function PATCH(
       return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/zones/${id}`, "zone:manage", {
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/zones/${pathId(id)}`, "zone:manage", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const text = await backendResponse.text();
-      return new NextResponse(text, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     const existing = zoneFixtures.find((candidate) => candidate.id === id);
@@ -138,41 +107,33 @@ export async function PATCH(
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-      return errorResponse(403, error.message, path);
+      return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
     }
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo actualizar la zona operativa.", path);
+    return mapSessionError(error, path, "No se pudo actualizar la zona operativa.");
   }
 }
 
 export async function DELETE(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const path = new URL(request.url).pathname;
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede dar de baja zonas operativas.");
-    }
-    requireCapability(session, "zone:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede dar de baja zonas operativas.", capability: "zone:manage", throwOnError: true });
 
     const id = await targetId(context);
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/zones/${id}`, "zone:manage", {
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/zones/${pathId(id)}`, "zone:manage", {
         method: "DELETE",
       });
-      const text = await backendResponse.text();
-      return new NextResponse(text, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     const existing = zoneFixtures.find((candidate) => candidate.id === id);
@@ -190,11 +151,11 @@ export async function DELETE(
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-      return errorResponse(403, error.message, path);
+      return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
     }
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo dar de baja la zona operativa.", path);
+    return mapSessionError(error, path, "No se pudo dar de baja la zona operativa.");
   }
 }

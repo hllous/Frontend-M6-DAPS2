@@ -28,7 +28,8 @@ export function resetTreeInterventionFixtures() {
 export function filterTreeInterventionFixtures(query: TreeInterventionQuery) {
   return treeInterventionFixtures
     .filter((item) => !query.interventionType || item.interventionType === query.interventionType)
-    .filter((item) => !query.status || item.status === query.status);
+    .filter((item) => !query.status || item.status === query.status)
+    .filter((item) => !query.priority || item.priority === query.priority);
 }
 
 export function paginateTreeInterventionFixtures(items: TreeIntervention[], page = 1, pageSize = 20) {

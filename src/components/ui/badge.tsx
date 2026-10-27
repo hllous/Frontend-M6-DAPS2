@@ -13,8 +13,16 @@ const badgeVariants = cva(
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
+        danger:
+          "border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] text-[var(--color-danger)] focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
+        info: "border-[var(--color-info-line)] bg-[var(--color-info-fill)] text-[var(--color-info)]",
+        success: "border-[var(--color-success-line)] bg-[var(--color-success-fill)] text-[var(--color-success)]",
+        warning: "border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] text-[var(--color-warning)]",
+        neutral: "border-[var(--color-border-strong)] bg-[var(--color-surface-subtle)] text-[var(--color-text-secondary)]",
         outline:
           "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
+        status:
+          "h-auto rounded-full border-[var(--color-border)] bg-[var(--color-surface-subtle)] text-[var(--color-text)]",
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",

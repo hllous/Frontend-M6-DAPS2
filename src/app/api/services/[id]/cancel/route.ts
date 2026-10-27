@@ -1,43 +1,24 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
-import { cancelServiceInputSchema } from "@/lib/services";
-import { getScenario } from "@/lib/scenarios";
+import { cancelServiceInputSchema, STATUS_LABEL } from "@/lib/services";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 const CANCELLABLE_STATUSES = new Set(["SCHEDULED", "RESCHEDULED", "SUSPENDED"]);
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const params = await context.params;
   const serviceId = params.id;
@@ -45,12 +26,9 @@ export async function POST(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
     // Permission check: cancellation is an Office decision, not a Field action.
-    if (scenario.actor.kind !== "OFFICE") {
-      return errorResponse(403, "Solo Oficina puede cancelar un servicio.", path);
-    }
+    authorize(session, { office: true, officeMessage: "Solo Oficina puede cancelar un servicio.", capability: "service:cancel", throwOnError: true });
 
     let body: unknown;
     try {
@@ -70,10 +48,10 @@ export async function POST(
 
     const input = parsed.data;
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/cancel`,
+        `/services/${pathId(serviceId)}/cancel`,
         undefined,
         {
           method: "POST",
@@ -81,11 +59,7 @@ export async function POST(
           body: JSON.stringify(input),
         },
       );
-      const bodyText = await backendResponse.text();
-      return new NextResponse(bodyText, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const service = serviceFixtures.find((s) => s.id === serviceId);
@@ -96,8 +70,8 @@ export async function POST(
     if (!CANCELLABLE_STATUSES.has(service.status)) {
       const message =
         service.status === "IN_PROGRESS"
-          ? `No se puede cancelar un servicio en curso (IN_PROGRESS) directamente; debe suspenderse primero.`
-          : `Solo se pueden cancelar servicios programados (SCHEDULED), a reprogramar (RESCHEDULED) o suspendidos (SUSPENDED) (estado actual: ${service.status}).`;
+          ? `No se puede cancelar un servicio en curso directamente; debe suspenderse primero.`
+          : `Solo se pueden cancelar servicios programados, a reprogramar o suspendidos (estado actual: ${STATUS_LABEL[service.status]}).`;
       return errorResponse(409, message, path);
     }
 
@@ -105,6 +79,7 @@ export async function POST(
     const updated = updateServiceFixture(service.id, {
       status: "CANCELLED",
       statusReason: input.reason,
+      statusNote: null,
       history: [
         ...service.history,
         {
@@ -124,6 +99,6 @@ export async function POST(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo cancelar el servicio.", path);
+    return mapSessionError(error, path, "No se pudo cancelar el servicio.");
   }
 }

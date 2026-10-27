@@ -1,11 +1,14 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import * as navigation from "next/navigation";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 import { HttpResponse, http } from "msw";
 
 import { handlers } from "@/mocks/handlers";
-import { scenarios } from "@/lib/scenarios";
+import { mockResponseAfter } from "@/mocks/delayed-response";
+import { ROLES_STALE_EVENT } from "@/lib/authenticated-fetch";
+import { scenarioForRoles, scenarios } from "@/lib/scenarios";
 import { FoundationDemo } from "./foundation-demo";
 
 const server = setupServer(...handlers);
@@ -26,6 +29,23 @@ function documentedError(statusCode: number, message: string) {
 }
 
 describe("FoundationDemo", () => {
+  it("keeps the frame visible while navigation and actor data load", async () => {
+    server.use(http.get("*/api/mock/scenarios/office-duty-queue", () =>
+      mockResponseAfter(150, () => HttpResponse.json(scenarios.officeDutyQueue))));
+    render(<FoundationDemo scenarioId="office-duty-queue" />);
+    const banner = screen.getByRole("banner");
+    const navigation = screen.getByRole("navigation", { name: "Módulos" });
+    const region = screen.getByRole("region", { name: "Navegación" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(region).toHaveTextContent("Cargando");
+    expect(screen.queryByText("Cargando...")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Servicios" })).not.toBeInTheDocument();
+    expect(await within(navigation).findByRole("link", { name: "Servicios" })).toBeVisible();
+    expect(region).toHaveAttribute("aria-busy", "false");
+    expect(screen.getByRole("banner")).toBe(banner);
+    expect(screen.getByRole("navigation", { name: "Módulos" })).toBe(navigation);
+  });
+
   it("renders the unauthenticated state on a 401 scenario response", async () => {
     server.use(
       http.get("*/api/mock/scenarios/office-duty-queue", () =>
@@ -34,7 +54,8 @@ describe("FoundationDemo", () => {
 
     render(<FoundationDemo scenarioId="office-duty-queue" />);
 
-    expect(await screen.findByText("Inicie sesión para continuar")).toBeVisible();
+    expect(await screen.findByRole("link", { name: "Iniciar sesión" })).toBeVisible();
+    expect(screen.queryByText("Inicie sesión para continuar")).not.toBeInTheDocument();
   });
 
   it("preserves the session and shows the forbidden state on a 403 scenario response, without a retry", async () => {
@@ -47,6 +68,49 @@ describe("FoundationDemo", () => {
 
     expect(await screen.findByText("Acceso no disponible")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Reintentar carga" })).not.toBeInTheDocument();
+  });
+
+  it("explains the Backend message on a 403 without a code (a citizen token), not a generic error", async () => {
+    server.use(
+      http.get("*/api/mock/scenarios/office-duty-queue", () =>
+        HttpResponse.json(documentedError(403, "Este sistema es solo para personal municipal."), { status: 403 })),
+    );
+
+    render(<FoundationDemo scenarioId="office-duty-queue" />);
+
+    expect(await screen.findByText("Acceso no disponible")).toBeVisible();
+    expect(screen.getByText("Este sistema es solo para personal municipal.")).toBeVisible();
+  });
+
+  it("says the user has no M6 role yet instead of showing an error or an empty shell", async () => {
+    server.use(http.get("*/api/mock/scenarios/office-duty-queue", () =>
+      HttpResponse.json(scenarioForRoles(scenarios.officeDutyQueue, []))));
+
+    render(<FoundationDemo scenarioId="office-duty-queue" />);
+
+    expect(await screen.findByText("Sin rol asignado")).toBeVisible();
+    expect(screen.getByText("Su usuario aún no tiene un rol asignado en Ambiente. Solicite a un administrador que se lo asigne y vuelva a ingresar.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Reintentar carga" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Servicios" })).not.toBeInTheDocument();
+  });
+
+  it("re-reads the roles after a ROLE_REQUIRED 403 and recomputes the actor without reloading", async () => {
+    const refresh = vi.fn();
+    const router = navigation.useRouter();
+    vi.spyOn(navigation, "useRouter").mockReturnValue({ ...router, refresh });
+    server.use(
+      http.get("*/api/mock/scenarios/office-duty-queue", () => HttpResponse.json(scenarios.officeDutyQueue)),
+      http.get("*/api/me", () => HttpResponse.json({ userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles: ["M6_CAMPO_CUADRILLA"] })),
+    );
+    render(<FoundationDemo scenarioId="office-duty-queue" />);
+    expect(await screen.findAllByText("Oficina")).not.toHaveLength(0);
+
+    act(() => { window.dispatchEvent(new Event(ROLES_STALE_EVENT)); });
+
+    expect(await screen.findAllByText("Integrante de cuadrilla")).not.toHaveLength(0);
+    expect(screen.queryByText("Oficina")).not.toBeInTheDocument();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    vi.restoreAllMocks();
   });
 
   it("recovers to the normal shell after a retryable network failure", async () => {

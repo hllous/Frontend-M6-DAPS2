@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetRouteFixtures } from "@/lib/routes-fixtures";
 import { RouteRequestError, routesAdapter } from "@/lib/routes";
 import { GET, POST } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   resetRouteFixtures();
@@ -13,18 +13,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("authenticated routes BFF route", () => {
   it("requires an active session and returns the documented error envelope", async () => {
@@ -53,7 +42,7 @@ describe("authenticated routes BFF route", () => {
   });
 
   it("serves deterministic fixtures in mock mode without any capability requirement", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/routes", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -63,7 +52,7 @@ describe("authenticated routes BFF route", () => {
   });
 
   it("filters fixtures by zoneId", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/routes?zoneId=zone-1", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -75,7 +64,7 @@ describe("authenticated routes BFF route", () => {
   });
 
   it("filters fixtures down to the named empty-results scenario", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/routes?search=zzz-sin-resultados", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -92,7 +81,7 @@ describe("authenticated routes BFF route", () => {
         headers: { "content-type": "application/json" },
       }),
     );
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const response = await GET(new Request("http://localhost/api/routes?active=true", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -117,7 +106,7 @@ describe("authenticated routes BFF route", () => {
   });
 
   it("POST blocks Field actors with 403 Forbidden (Office-only gate)", async () => {
-    const cookie = await authenticatedCookie("field-crew-member-route");
+    const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/routes", {
         method: "POST",
@@ -133,7 +122,7 @@ describe("authenticated routes BFF route", () => {
   });
 
   it("POST validates request body and returns 400 on invalid input", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/routes", {
         method: "POST",
@@ -146,7 +135,7 @@ describe("authenticated routes BFF route", () => {
   });
 
   it("POST rejects duplicate code with 409 Conflict", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/routes", {
         method: "POST",
@@ -162,7 +151,7 @@ describe("authenticated routes BFF route", () => {
   });
 
   it("POST creates a new route born without stops and returns 201 for Office actor", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/routes", {
         method: "POST",

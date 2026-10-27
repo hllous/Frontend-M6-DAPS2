@@ -41,7 +41,7 @@ test.describe("StreetClosure dependency gate", () => {
     await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app?destination=work");
 
-    const card = page.locator("li").filter({ hasText: "SVC-1097" });
+    const card = page.locator('li[data-service-id="SVC-1097"]');
     await expect(card).toBeVisible();
     await card.getByRole("button", { name: "Iniciar servicio" }).click();
 
@@ -59,17 +59,17 @@ test.describe("StreetClosure dependency gate", () => {
 
     await page.goto("/app?destination=services");
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
-    await expect(table.getByRole("row", { name: /SVC-1054/ })).toBeVisible();
-    await table.getByRole("row", { name: /SVC-1054/ }).click();
-    await page.getByRole("button", { name: "Ver detalle completo" }).click();
+    await expect(table.locator('tr[data-service-id="SVC-1054"]')).toBeVisible();
+    await table.locator('tr[data-service-id="SVC-1054"]').click();
+    await page.getByRole("button", { name: "Ver detalle" }).click();
 
     const gate = page.getByRole("status", { name: "Corte de calle rechazado" });
-    await expect(gate).toContainText(/decidir explícitamente si reprogramar o cancelar/i);
-    await expect(gate.getByRole("button", { name: "Reprogramar servicio por rechazo de corte" })).toBeVisible();
-    await expect(gate.getByRole("button", { name: "Cancelar servicio por rechazo de corte" })).toBeVisible();
+    await expect(gate).toContainText(/Tránsito rechazó el corte/i);
+    await expect(gate.getByRole("button", { name: "Reprogramar" })).toBeVisible();
+    await expect(gate.getByRole("button", { name: "Cancelar servicio" })).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
-    await gate.getByRole("button", { name: "Reprogramar servicio por rechazo de corte" }).click();
-    await expect(page.getByRole("dialog")).toContainText(/Paso 1 de 2/i);
+    await gate.getByRole("button", { name: "Reprogramar" }).click();
+    await expect(page.getByRole("dialog")).toContainText(/Reprogramar/i);
   });
 });

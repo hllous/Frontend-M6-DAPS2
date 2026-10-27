@@ -7,11 +7,27 @@ import { routesAdapter } from "./routes";
 import { servicesAdapter, type Service, type ZoneResult, type ZoneResultStatus } from "./services";
 import { zonesAdapter, type Zone } from "./zones";
 
-const coordinateSchema = z.tuple([z.number(), z.number()]);
+const coordinateSchema = z.tuple([
+  z.number().finite().min(-180).max(180),
+  z.number().finite().min(-90).max(90),
+]);
+const linearRingSchema = z.array(coordinateSchema).min(4).superRefine((ring, context) => {
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (!first || !last || first[0] !== last[0] || first[1] !== last[1]) {
+    context.addIssue({ code: "custom", message: "A GeoJSON linear ring must be closed." });
+  }
+});
+const polygonCoordinatesSchema = z.array(linearRingSchema).min(1);
 const polygonSchema = z.object({
   type: z.literal("Polygon"),
-  coordinates: z.array(z.array(coordinateSchema)),
+  coordinates: polygonCoordinatesSchema,
 });
+const multiPolygonSchema = z.object({
+  type: z.literal("MultiPolygon"),
+  coordinates: z.array(polygonCoordinatesSchema).min(1),
+});
+const geometrySchema = z.discriminatedUnion("type", [polygonSchema, multiPolygonSchema]);
 
 const operationalZonesGeoJsonSchema = z.object({
   type: z.literal("FeatureCollection"),
@@ -26,18 +42,19 @@ const operationalZonesGeoJsonSchema = z.object({
           zoneName: z.string(),
         })
         .passthrough(),
-      geometry: polygonSchema,
+      geometry: geometrySchema,
     }),
   ),
 });
 
 export type MapCoordinate = [number, number];
+export type MapPolygon = MapCoordinate[][];
 
 export type OperationalZoneGeometry = {
   code: string;
   name: string;
   sourceName: string;
-  coordinates: MapCoordinate[][];
+  coordinates: MapPolygon[];
   center: MapCoordinate;
 };
 
@@ -45,18 +62,83 @@ export type OperationalZone = OperationalZoneGeometry & {
   zone: Zone | null;
 };
 
-const parsedGeoJson = operationalZonesGeoJsonSchema.parse(operationalZonesGeoJson);
+export function safeParseOperationalZoneGeoJson(value: unknown) {
+  return operationalZonesGeoJsonSchema.safeParse(value);
+}
 
-function toLeafletCoordinates(coordinates: [number, number][][]): MapCoordinate[][] {
+function toLeafletPolygon(coordinates: z.infer<typeof polygonCoordinatesSchema>): MapPolygon {
   return coordinates.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
 }
 
-function isPointInRing([pointLat, pointLng]: MapCoordinate, ring: MapCoordinate[]): boolean {
+function toLeafletPolygons(geometry: z.infer<typeof geometrySchema>): MapPolygon[] {
+  return geometry.type === "Polygon"
+    ? [toLeafletPolygon(geometry.coordinates)]
+    : geometry.coordinates.map(toLeafletPolygon);
+}
+
+export function parseOperationalZoneGeoJson(value: unknown): OperationalZoneGeometry[] {
+  const parsed = safeParseOperationalZoneGeoJson(value);
+  if (!parsed.success) {
+    console.error("Operational zone GeoJSON is invalid; zone overlays are disabled.", parsed.error);
+    return [];
+  }
+
+  return parsed.data.features.map((feature) => {
+    const coordinates = toLeafletPolygons(feature.geometry);
+    return {
+      code: feature.properties.zoneCode,
+      name: feature.properties.zoneName,
+      sourceName: feature.properties.nombre,
+      coordinates,
+      center: polygonCenter(coordinates),
+    };
+  });
+}
+
+let cachedOperationalZoneGeometries: OperationalZoneGeometry[] | undefined;
+
+export function getOperationalZoneGeometries(): OperationalZoneGeometry[] {
+  if (cachedOperationalZoneGeometries) return cachedOperationalZoneGeometries;
+  cachedOperationalZoneGeometries = parseOperationalZoneGeoJson(operationalZonesGeoJson);
+  return cachedOperationalZoneGeometries;
+}
+
+const boundaryTolerance = 1e-8;
+
+function isPointOnSegment(
+  [pointLat, pointLng]: MapCoordinate,
+  [firstLat, firstLng]: MapCoordinate,
+  [lastLat, lastLng]: MapCoordinate,
+): boolean {
+  const deltaLat = lastLat - firstLat;
+  const deltaLng = lastLng - firstLng;
+  const cross = (pointLng - firstLng) * deltaLat - (pointLat - firstLat) * deltaLng;
+  const scale = Math.max(1, Math.hypot(deltaLat, deltaLng));
+
+  return (
+    Math.abs(cross) <= boundaryTolerance * scale &&
+    pointLat >= Math.min(firstLat, lastLat) - boundaryTolerance &&
+    pointLat <= Math.max(firstLat, lastLat) + boundaryTolerance &&
+    pointLng >= Math.min(firstLng, lastLng) - boundaryTolerance &&
+    pointLng <= Math.max(firstLng, lastLng) + boundaryTolerance
+  );
+}
+
+function isPointInRing(
+  [pointLat, pointLng]: MapCoordinate,
+  ring: MapCoordinate[],
+  includeBoundary: boolean,
+): boolean {
+  if (ring.length < 3) return false;
   let inside = false;
 
   for (let index = 0, previousIndex = ring.length - 1; index < ring.length; previousIndex = index++) {
     const [lat, lng] = ring[index]!;
     const [previousLat, previousLng] = ring[previousIndex]!;
+    if (isPointOnSegment([pointLat, pointLng], [lat, lng], [previousLat, previousLng])) {
+      return includeBoundary;
+    }
+
     const crossesLatitude = (lat > pointLat) !== (previousLat > pointLat);
     const boundaryLng =
       ((previousLng - lng) * (pointLat - lat)) / (previousLat - lat) + lng;
@@ -72,16 +154,26 @@ export function isCoordinateInsideOperationalZone(
   coordinate: MapCoordinate,
   geometry: Pick<OperationalZoneGeometry, "coordinates">,
 ): boolean {
-  const [outerRing, ...holes] = geometry.coordinates;
-  return Boolean(outerRing && isPointInRing(coordinate, outerRing)) &&
-    holes.every((hole) => !isPointInRing(coordinate, hole));
+  return geometry.coordinates.some(([outerRing, ...holes]) =>
+    Boolean(outerRing && isPointInRing(coordinate, outerRing, true)) &&
+      holes.every((hole) => !isPointInRing(coordinate, hole, false)),
+  );
 }
 
-function polygonCenter(coordinates: MapCoordinate[][]): MapCoordinate {
-  const ring = coordinates[0] ?? [];
+function ringDoubleArea(ring: MapCoordinate[]): number {
+  let areaTwice = 0;
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    const [lat, lng] = ring[index]!;
+    const [nextLat, nextLng] = ring[index + 1]!;
+    areaTwice += lng * nextLat - nextLng * lat;
+  }
+  return areaTwice;
+}
+
+function ringCenter(ring: MapCoordinate[]): MapCoordinate {
   if (ring.length < 3) return ring[0] ?? [-34.58, -58.42];
 
-  let areaTwice = 0;
+  const areaTwice = ringDoubleArea(ring);
   let centerLat = 0;
   let centerLng = 0;
 
@@ -89,20 +181,28 @@ function polygonCenter(coordinates: MapCoordinate[][]): MapCoordinate {
     const [lat, lng] = ring[index]!;
     const [nextLat, nextLng] = ring[index + 1]!;
     const cross = lng * nextLat - nextLng * lat;
-    areaTwice += cross;
     centerLat += (lat + nextLat) * cross;
     centerLng += (lng + nextLng) * cross;
   }
 
   if (Math.abs(areaTwice) < Number.EPSILON) {
-    const [latTotal, lngTotal] = ring.reduce(
+    const distinctRing = ring.slice(0, -1);
+    const [latTotal, lngTotal] = distinctRing.reduce(
       ([lat, lng], [nextLat, nextLng]) => [lat + nextLat, lng + nextLng],
       [0, 0],
     );
-    return [latTotal / ring.length, lngTotal / ring.length];
+    return [latTotal / distinctRing.length, lngTotal / distinctRing.length];
   }
 
   return [centerLat / (3 * areaTwice), centerLng / (3 * areaTwice)];
+}
+
+function polygonCenter(coordinates: MapPolygon[]): MapCoordinate {
+  const outerRings = coordinates.map((polygon) => polygon[0] ?? []);
+  const largestOuterRing = outerRings.reduce((largest, ring) =>
+    Math.abs(ringDoubleArea(ring)) > Math.abs(ringDoubleArea(largest)) ? ring : largest,
+  );
+  return ringCenter(largestOuterRing);
 }
 
 /**
@@ -111,21 +211,11 @@ function polygonCenter(coordinates: MapCoordinate[][]): MapCoordinate {
  * https://cdn.buenosaires.gob.ar/datosabiertos/datasets/innovacion-transformacion-digital/barrios/barrios.geojson
  * (CC-BY-2.5-AR).
  */
-export const operationalZoneGeometries: OperationalZoneGeometry[] = parsedGeoJson.features.map(
-  (feature) => {
-    const coordinates = toLeafletCoordinates(feature.geometry.coordinates);
-    return {
-      code: feature.properties.zoneCode,
-      name: feature.properties.zoneName,
-      sourceName: feature.properties.nombre,
-      coordinates,
-      center: polygonCenter(coordinates),
-    };
-  },
-);
-
-export function resolveOperationalZones(zones: Zone[]): OperationalZone[] {
-  return operationalZoneGeometries.map((geometry) => ({
+export function resolveOperationalZones(
+  zones: Zone[],
+  geometries: OperationalZoneGeometry[] = getOperationalZoneGeometries(),
+): OperationalZone[] {
+  return geometries.map((geometry) => ({
     ...geometry,
     zone: zones.find((zone) => zone.code === geometry.code) ?? null,
   }));
@@ -134,7 +224,7 @@ export function resolveOperationalZones(zones: Zone[]): OperationalZone[] {
 export const operationalZonesAdapter = {
   async list(): Promise<OperationalZone[]> {
     const result = await zonesAdapter.list({ active: true, page: 1, pageSize: 100 });
-    return resolveOperationalZones(result.zones);
+    return resolveOperationalZones(result.zones, getOperationalZoneGeometries());
   },
 };
 
@@ -147,10 +237,9 @@ export type RouteStopOverlay = {
   geometry: OperationalZoneGeometry | null;
 };
 
-const geometryByCode = new Map(operationalZoneGeometries.map((geometry) => [geometry.code, geometry]));
-
 export function routeToStopOverlays(route: Route, zones: Zone[]): RouteStopOverlay[] {
   const zoneById = new Map(zones.map((zone) => [zone.id, zone]));
+  const geometryByCode = new Map(getOperationalZoneGeometries().map((geometry) => [geometry.code, geometry]));
 
   return [...route.stops]
     .sort((left, right) => left.sequence - right.sequence)
@@ -206,6 +295,7 @@ export function buildTodayZoneCoverage(
   zones: Zone[],
 ): TodayZoneCoverage[] {
   const zoneById = new Map(zones.map((zone) => [zone.id, zone]));
+  const geometryByCode = new Map(getOperationalZoneGeometries().map((geometry) => [geometry.code, geometry]));
   const coverageByZone = new Map<string, TodayZoneCoverage>();
 
   for (const { service, zoneResults } of services) {

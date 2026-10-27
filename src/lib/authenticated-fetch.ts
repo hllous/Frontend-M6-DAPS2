@@ -1,6 +1,15 @@
 import { broadcastLogout } from "./session-client";
 import { recordTelemetryEvent } from "./telemetry";
 
+/** Un 403 con `code: ROLE_REQUIRED` avisa que los roles de la sesión pueden estar desactualizados. */
+export const ROLES_STALE_EVENT = "m6:roles-stale";
+
+/** Código estable del cuerpo de un 403 (`ROLE_REQUIRED`, `NOT_ASSIGNED`, ...); sin código es un 403 de `sub_type` u otro. */
+export async function readForbiddenCode(response: Response): Promise<string | undefined> {
+  const body = (await response.clone().json().catch(() => undefined)) as { code?: unknown } | undefined;
+  return typeof body?.code === "string" ? body.code : undefined;
+}
+
 export class NetworkFailureError extends Error {
   constructor(options?: { cause?: unknown }) {
     super("No se pudo conectar con el servidor. Verifique su conexión.", options);
@@ -21,6 +30,15 @@ export async function authenticatedFetch(input: string, init?: RequestInit): Pro
     await broadcastLogout();
   } else if (response.status === 403) {
     recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
+    if ((await readForbiddenCode(response)) === "ROLE_REQUIRED") {
+      if (input !== "/api/me" && typeof window !== "undefined") {
+        window.dispatchEvent(new Event(ROLES_STALE_EVENT));
+      }
+      const body = await response.json();
+      const headers = new Headers(response.headers);
+      headers.delete("content-length");
+      response = new Response(JSON.stringify({ ...body, message: "No tenés el rol necesario para realizar esta acción en Ambiente. Solicitá acceso a un administrador." }), { status: 403, headers });
+    }
   }
 
   return response;

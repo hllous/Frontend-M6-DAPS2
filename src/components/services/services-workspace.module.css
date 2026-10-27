@@ -1,0 +1,198 @@
+.desktopWorkspaceLayout {
+  position: relative;
+  display: block;
+}
+
+.workspaceResults {
+  transition: opacity 150ms ease-out;
+}
+
+.workspaceResults[data-refreshing="true"] {
+  opacity: 0.86;
+}
+
+.mobileWorkspaceLayout {
+  width: 100%;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.mobileWorkspaceLayout .panelGroup {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.mobileWorkspaceLayout .mobileMapPanel,
+.mobileWorkspaceLayout .mobileTablePanel {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  flex: none !important;
+}
+
+.mobileWorkspaceLayout .mobileMapPanel {
+  z-index: 0;
+}
+
+.mobileWorkspaceLayout .mobileTablePanel {
+  z-index: 1;
+  pointer-events: none;
+}
+
+.mobileWorkspaceLayout .mobileTablePanel > div {
+  pointer-events: none;
+}
+
+.mobileServiceDrawer {
+  pointer-events: auto;
+}
+
+.mobileDrawerContent {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.mobileTablePane {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobileTablePane {
+  opacity: 1;
+}
+
+.mobileTablePaneHidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+}
+
+.mobilePreviewOverlay {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  overflow: hidden;
+  background: var(--color-surface);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition:
+    opacity 160ms ease-out,
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobilePreviewOverlayOpen {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition-duration: 280ms;
+}
+
+.previewRail {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.previewSurface {
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transform: translateX(8px);
+  transition:
+    opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.previewRailOpen .previewSurface {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.desktopWorkspaceLayout > .panelGroup {
+  width: 100%;
+}
+
+.desktopWorkspaceLayout .previewRail {
+  position: absolute;
+  z-index: 20;
+  inset: 0 0 0 auto;
+  width: min(20rem, 22vw);
+  pointer-events: none;
+}
+
+.desktopWorkspaceLayout .previewSurface {
+  opacity: 0;
+  transform: translateX(24px);
+  transition:
+    opacity 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.desktopWorkspaceLayout .previewRailOpen {
+  pointer-events: auto;
+}
+
+.desktopWorkspaceLayout .previewRailOpen .previewSurface {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.desktopWorkspaceLayout .previewRail:not(.previewRailOpen) .previewSurface {
+  transition-duration: 280ms;
+}
+
+.desktopWorkspaceLayout [data-preview-clip] {
+  overflow-x: hidden;
+}
+
+.desktopWorkspaceLayout .tableContent tbody tr[aria-selected="false"],
+.mobileWorkspaceLayout .tableContent tbody tr[aria-selected="false"] {
+  filter: none;
+  opacity: 1;
+  background-color: var(--color-canvas);
+}
+
+.desktopWorkspaceLayout [data-column-dragging="true"],
+.mobileWorkspaceLayout [data-column-dragging="true"] {
+  background-color: var(--color-surface-subtle);
+}
+
+.desktopWorkspaceLayout table[data-column-resizing="true"] col,
+.mobileWorkspaceLayout table[data-column-resizing="true"] col {
+  transition: none !important;
+}
+
+.desktopWorkspaceLayout .tableContent tbody tr[aria-selected="true"],
+.mobileWorkspaceLayout .tableContent tbody tr[aria-selected="true"] {
+  filter: none;
+  opacity: 1;
+  background-color: var(--color-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspaceResults,
+  .previewSurface,
+  .mobileTablePane,
+  .mobilePreviewOverlay {
+    transform: none;
+    transition-duration: 1ms;
+  }
+
+  .desktopWorkspaceLayout .previewSurface {
+    transition-duration: 1ms;
+  }
+}

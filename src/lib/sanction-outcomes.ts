@@ -10,19 +10,19 @@ export const SANCTION_DECISION_LABELS: Record<SanctionOutcome["decision"], strin
   FINE_ISSUED: "Multa emitida",
   CLOSURE_ORDERED: "Clausura ordenada",
   FORMAL_NOTICE_ISSUED: "Aviso formal emitido",
-  DISMISSED: "Desestimada por M4",
+  DISMISSED: "Desestimada por Faltas",
 };
 
 export type EnvironmentalReportClosure =
   | {
       kind: "sanctioned";
-      label: "Cierre por resolución de M4";
+      label: "Cierre por resolución de Faltas";
       description: string;
       outcome: SanctionOutcome;
     }
   | {
       kind: "waiting";
-      label: "Esperando resolución de M4";
+      label: "Esperando resolución de Faltas";
       description: string;
       deadlineAt: string | null;
     }
@@ -94,7 +94,7 @@ export function ingestSanctionOutcome(
         violationNoticeId: outcome.violationNoticeId,
         externalRef: outcome.externalRef,
         receivedAt: now.toISOString(),
-        message: "La resolución de M4 no pudo correlacionarse con un acta conocida.",
+        message: "La resolución de Faltas no coincide con ningún acta.",
       },
     };
   }
@@ -123,8 +123,8 @@ export function getEnvironmentalReportClosure(
   if (report.sanctionOutcome) {
     return {
       kind: "sanctioned",
-      label: "Cierre por resolución de M4",
-      description: `M4 resolvió el acta: ${SANCTION_DECISION_LABELS[report.sanctionOutcome.decision]}.`,
+      label: "Cierre por resolución de Faltas",
+      description: `Faltas resolvió el acta: ${SANCTION_DECISION_LABELS[report.sanctionOutcome.decision]}.`,
       outcome: report.sanctionOutcome,
     };
   }
@@ -138,16 +138,16 @@ export function getEnvironmentalReportClosure(
       return {
         kind: "deadline-pending",
         label: "Plazo de resolución vencido",
-        description: "El cierre automático quedará reflejado cuando el Backend actualice el expediente.",
+        description: "El expediente se cerrará automáticamente.",
         deadlineAt,
       };
     }
     return {
       kind: "waiting",
-      label: "Esperando resolución de M4",
+      label: "Esperando resolución de Faltas",
       description: deadlineAt
-        ? `M4 debe resolver antes del ${deadlineAt}. El expediente permanece abierto mientras espera esa respuesta.`
-        : "El expediente permanece abierto mientras espera la respuesta de M4.",
+        ? `Faltas debe resolver antes del ${deadlineAt}.`
+        : "Esperando la respuesta de Faltas.",
       deadlineAt: deadlineAt ?? null,
     };
   }
@@ -157,14 +157,14 @@ export function getEnvironmentalReportClosure(
     return {
       kind: "deadline",
       label: "Cierre automático por vencimiento",
-      description: "El expediente se cerró automáticamente sin una resolución de M4.",
+      description: "Se cerró sin resolución de Faltas.",
       deadlineAt,
     };
   }
   return {
     kind: "local",
     label: "Cierre local",
-    description: "El expediente se cerró en M6 sin una resolución sancionatoria de M4.",
+    description: "Se cerró sin resolución de Faltas.",
   };
 }
 

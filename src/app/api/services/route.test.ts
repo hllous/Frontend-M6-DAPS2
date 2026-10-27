@@ -1,8 +1,10 @@
+import { serviceFixtures } from "@/lib/services-fixtures";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { ServiceRequestError, servicesAdapter } from "@/lib/services";
 import { GET, POST } from "./route";
+import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
@@ -11,18 +13,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("authenticated services BFF route", () => {
   it("requires an active session and returns the documented error envelope", async () => {
@@ -53,7 +44,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("serves deterministic fixtures in mock mode", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/services", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -63,7 +54,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("filters fixtures down to the named empty-results scenario", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/services?search=zzz-sin-servicios", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -80,7 +71,7 @@ describe("authenticated services BFF route", () => {
         headers: { "content-type": "application/json" },
       }),
     );
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const response = await GET(new Request("http://localhost/api/services?mode=ROUTE", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -90,6 +81,19 @@ describe("authenticated services BFF route", () => {
     );
     const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
     expect(new Headers(requestInit.headers).get("Authorization")).toMatch(/^Bearer /);
+  });
+
+  it("tells the client through meta.dropped how many backend records it dropped for an unknown enum (#651)", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const known = serviceFixtures[0];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ data: [known, { ...known, id: "svc-future", status: "FUTURE_STATUS" }], meta: { total: 9, page: 1, pageSize: 2, totalPages: 5 } }),
+    );
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const body = await (await GET(new Request("http://localhost/api/services", { headers: { cookie } }))).json();
+    expect(body.data).toHaveLength(1);
+    expect(body.meta.dropped).toBe(1);
   });
 
   it("POST requires an active session", async () => {
@@ -111,7 +115,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("POST returns 403 for a Field actor (scheduling is an Office decision)", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -132,7 +136,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("POST returns 403 for an Office actor without the scheduling capability", async () => {
-    const cookie = await authenticatedCookie("office-limited-intake");
+    const cookie = await loginAs("office-limited-intake", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -154,7 +158,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("POST rejects malformed or invalid input with 400", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -175,7 +179,7 @@ describe("authenticated services BFF route", () => {
   });
 
   it("POST schedules a new unassigned service in mock mode and returns 201", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -225,7 +229,7 @@ describe("authenticated services BFF route", () => {
         { status: 201, headers: { "content-type": "application/json" } },
       ),
     );
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -262,5 +266,70 @@ describe("authenticated services BFF route", () => {
       // targetRef no existe en el DTO: sin targetId se conserva en las notas y no se descarta.
       notes: "Objetivo: Referencia visible",
     });
+  });
+});
+
+function listRequest(query = "") {
+  process.env.M6_AUTH_MODE = "backend-development";
+  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+  process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+  const session = createSession("office-duty-queue", {
+    mode: "backend-development",
+    devJwt: process.env.M6_DEV_JWT,
+    backendOrigin: process.env.M6_BACKEND_ORIGIN,
+  });
+  return new Request(`http://localhost/api/services${query}`, { headers: { cookie: `${AUTH_COOKIE_NAME}=${sealSession(session)}` } });
+}
+const envelope = { data: [], meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 } };
+describe("Services list backend contract", () => {
+  it.each(["status", "mode", "origin"])("rejects invalid %s before forwarding", async (key) => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(envelope));
+    expect((await GET(listRequest(`?${key}=INVALID`))).status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("forwards supported filters and excludes mock-only filters", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(envelope));
+    const response = await GET(listRequest("?serviceTypeId=type-real&vehicleId=vehicle-real&ticketId=ticket-real&search=texto&timeFrom=08:00&timeTo=10:00"));
+    expect(response.status).toBe(200);
+    expect(String(fetch.mock.calls[0]?.[0])).toBe("https://backend.internal/services?serviceTypeId=type-real&vehicleId=vehicle-real&ticketId=ticket-real");
+    expect(await response.json()).toEqual(envelope);
+  });
+  it("rejects malformed successful backend payloads", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [{ id: "real-service" }] }));
+    expect((await GET(listRequest())).status).toBe(502);
+  });
+});
+
+describe("Services list pagination and crew scope", () => {
+  it.each([
+    ["?page=-9&pageSize=-2", "?page=1&pageSize=1"],
+    ["?page=99999999999&pageSize=9999", "?page=10000000&pageSize=100"],
+    ["?page=2.8&pageSize=3.8", "?page=2&pageSize=3"],
+    ["?page=invalid&pageSize=invalid", ""],
+  ])("clamps pagination %s before forwarding", async (query, expected) => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(envelope));
+    expect((await GET(listRequest(query))).status).toBe(200);
+    expect(String(fetch.mock.calls[0][0])).toBe(`https://backend.internal/services${expected}`);
+  });
+  it("overrides an arbitrary crewId with the Field session crew", async () => {
+    listRequest();
+    const session = createSession("field-crew-leader-route", {
+      mode: "backend-development", devJwt: process.env.M6_DEV_JWT, backendOrigin: process.env.M6_BACKEND_ORIGIN,
+    });
+    session.crew = { id: "crew-real", name: "Cuadrilla real" };
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(envelope));
+    const response = await GET(new Request("http://localhost/api/services?crewId=crew-other", {
+      headers: { cookie: `${AUTH_COOKIE_NAME}=${sealSession(session)}` },
+    }));
+    expect(response.status).toBe(200);
+    expect(String(fetch.mock.calls[0][0])).toBe("https://backend.internal/services?crewId=crew-real");
+  });
+  it("returns only the Field crew services in mock mode even with another crew filter", async () => {
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
+    const response = await GET(new Request("http://localhost/api/services?crewId=crew-a", { headers: { cookie } }));
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.data.length).toBeGreaterThan(0);
+    expect(payload.data.every((service: { crewId: string }) => service.crewId === "crew-b")).toBe(true);
   });
 });

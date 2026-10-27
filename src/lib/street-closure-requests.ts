@@ -12,6 +12,7 @@ export const streetClosureRequestStatusSchema = z.enum([
   "APPROVED",
   "REJECTED",
   "ENDED",
+  "EXPIRED",
 ]);
 export type StreetClosureRequestStatus = z.infer<typeof streetClosureRequestStatusSchema>;
 
@@ -115,6 +116,8 @@ export type StreetClosureRequestQuery = z.infer<typeof streetClosureRequestQuery
 
 export type StreetClosureRequestPage = {
   requests: StreetClosureRequest[];
+  /** Records the backend sent that do not match the contract (e.g. an unknown status); never shown as valid. */
+  invalid: number;
   page: number;
   pageSize: number;
   total: number;
@@ -126,7 +129,9 @@ export type StreetClosureDependencyOutcome =
   | "blocked"
   | "allowed"
   | "rejected"
-  | "released";
+  | "released"
+  // Backend swept an APPROVED closure M7 let lapse; the unstarted Service is already RESCHEDULED.
+  | "expired";
 
 export type StreetClosureDependency = {
   request: StreetClosureRequest | null;
@@ -144,6 +149,7 @@ export function resolveStreetClosureDependency(
   if (request.status === "REQUESTED") return { request, outcome: "blocked" };
   if (request.status === "REJECTED") return { request, outcome: "rejected" };
   if (request.status === "ENDED") return { request, outcome: "released" };
+  if (request.status === "EXPIRED") return { request, outcome: "expired" };
   return { request, outcome: "allowed" };
 }
 
@@ -173,7 +179,7 @@ const errorResponseSchema = z.object({
 });
 
 const requestPageSchema = z.object({
-  data: z.array(streetClosureRequestSchema),
+  data: z.array(z.unknown()),
   meta: z.object({
     total: z.number(),
     page: z.number(),
@@ -255,14 +261,31 @@ export const streetClosureRequestsAdapter = {
         { cause: parsed.error },
       );
     }
-    return {
-      requests: parsed.data.data,
-      ...parsed.data.meta,
-    };
+    const requests: StreetClosureRequest[] = [];
+    let invalid = 0;
+    for (const record of parsed.data.data) {
+      const item = streetClosureRequestSchema.safeParse(record);
+      if (item.success) {
+        requests.push(item.data);
+        continue;
+      }
+      invalid += 1;
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "street-closure-requests" });
+      const id = typeof record === "object" && record && "id" in record ? String(record.id) : "?";
+      const status = typeof record === "object" && record && "status" in record ? String(record.status) : "?";
+      console.warn(`Corte de calle ${id} descartado: no respeta el contrato (status: ${status}).`);
+    }
+    return { requests, invalid, ...parsed.data.meta };
   },
 
   async getForService(serviceId: string): Promise<StreetClosureDependency> {
     const page = await this.list({ sourceId: serviceId, pageSize: 100 });
+    // An unreadable record could be the one that decides the dependency: do not guess.
+    if (page.invalid > 0) {
+      throw new StreetClosureRequestContractError(
+        "Un corte de calle del Servicio no respeta el contrato esperado; no se puede resolver la dependencia.",
+      );
+    }
     return resolveStreetClosureDependency(page.requests);
   },
 

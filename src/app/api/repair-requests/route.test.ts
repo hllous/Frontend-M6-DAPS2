@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetEnvironmentalInspectionFixtures } from "@/lib/environmental-report-fixtures";
 import { resetRepairRequestFixtures, repairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
 import { GET, POST } from "./route";
+import { createSessionCookie, loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetRepairRequestFixtures();
@@ -20,15 +20,7 @@ afterEach(() => {
   delete process.env.M6_BACKEND_ORIGIN;
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  const response = await login(new Request("http://localhost/api/session/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ scenarioId }),
-  }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 function createRequest(cookie: string, body: unknown) {
   return new Request("http://localhost/api/repair-requests", {
@@ -39,6 +31,93 @@ function createRequest(cookie: string, body: unknown) {
 }
 
 describe("repair request BFF collection routes", () => {
+  describe("creación desde orígenes reales", () => {
+    const serviceId = "ceec08ae-67e7-4739-9677-150f5085bb1a";
+    const inspectionId = "4d5683b8-d493-43bb-83ce-071bd074fe19";
+    const crewId = "c1ba1a57-6f23-4871-b6b3-1d7ce231a516";
+    const body = {
+      damageType: "BROKEN_SIDEWALK", address: "Av. Rivadavia 2200", severity: "LOW",
+      publicSafetyRisk: true, detectedInType: "SERVICE", detectedInId: serviceId,
+    };
+
+    beforeEach(() => {
+      process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+      process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    });
+
+    it.each(["SERVICE", "INSPECTION"])("conserva el 404 local para un origen %s desconocido", async (detectedInType) => {
+      const backendFetch = vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(Response.json({ message: "Not found" }, { status: 404 }));
+      const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+      const response = await POST(createRequest(cookie, { ...body, detectedInType }));
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({
+        statusCode: 404, error: "Not Found", path: "/api/repair-requests",
+        message: detectedInType === "SERVICE" ? `Servicio ${serviceId} no encontrado.` : `Inspección ${serviceId} no encontrada.`,
+      });
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+      expect(String(backendFetch.mock.calls[0]?.[0])).toBe(
+        `https://backend.internal/${detectedInType === "SERVICE" ? "services" : "environmental-inspections"}/${serviceId}`,
+      );
+    });
+
+    it.each([401, 403, 500, 503])("conserva el error %s del origen sin crear la derivación", async (status) => {
+      const error = { statusCode: status, message: "No se pudo consultar el origen." };
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(error, { status }));
+      const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+      const response = await POST(createRequest(cookie, body));
+
+      expect(response.status).toBe(status);
+      expect(await response.json()).toEqual(error);
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+      expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    });
+
+    it("rechaza payloads del origen sin el contrato mínimo", async () => {
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ crewId: 42 }));
+      const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+      const response = await POST(createRequest(cookie, body));
+
+      expect(response.status).toBe(500);
+      expect(backendFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("Campo no crea derivaciones: el rol de Campo no alcanza y no se consulta el origen (Backend #161)", async () => {
+      const cookie = createSessionCookie("field-crew-leader-route", { mode: "backend-development" });
+      const backendFetch = vi.spyOn(globalThis, "fetch");
+      const response = await POST(createRequest(cookie, body));
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "ROLE_REQUIRED" });
+      expect(backendFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  it("Oficina crea una derivación desde un servicio real tras consultar su origen", async () => {
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const body = {
+      damageType: "BROKEN_SIDEWALK", address: "Av. Rivadavia 2200", severity: "LOW",
+      publicSafetyRisk: true, detectedInType: "SERVICE",
+      detectedInId: "ceec08ae-67e7-4739-9677-150f5085bb1a",
+    };
+    const backendFetch = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ crewId: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516" }))
+      .mockResolvedValueOnce(Response.json({ id: "derivacion-real", ...body }, { status: 201 }));
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+
+    const response = await POST(createRequest(cookie, { ...body, ignored: "not forwarded" }));
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ id: "derivacion-real", ...body });
+    expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual([
+      ["https://backend.internal/services/ceec08ae-67e7-4739-9677-150f5085bb1a", "GET"],
+      ["https://backend.internal/repair-requests", "POST"],
+    ]);
+    expect(JSON.parse(String(backendFetch.mock.calls[1]?.[1]?.body))).toEqual(body);
+  });
+
   it("permite consultar derivaciones de un servicio real de la cuadrilla de Campo", async () => {
     process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
@@ -56,7 +135,7 @@ describe("repair request BFF collection routes", () => {
         vehicleId: null, windowFrom: "08:00", windowTo: "12:00",
       }))
       .mockResolvedValueOnce(Response.json({ data: [], meta: { total: 0, page: 1, pageSize: 20 } }));
-    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
@@ -77,7 +156,7 @@ describe("repair request BFF collection routes", () => {
           name: "Cuadrilla Belgrano — Recolección",
         }] }))
         .mockResolvedValueOnce(Response.json({ id: "ceec08ae-67e7-4739-9677-150f5085bb1a", crewId }));
-      const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+      const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
 
       const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
@@ -97,7 +176,7 @@ describe("repair request BFF collection routes", () => {
         name: "Cuadrilla Belgrano — Recolección",
       }] }))
       .mockResolvedValueOnce(Response.json(error, { status }));
-    const cookie = await authenticatedCookie("field-crew-leader-route", "backend-development");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
@@ -111,7 +190,7 @@ describe("repair request BFF collection routes", () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const payload = { data: [{ id: "derivacion-real", detectedInId: "servicio-real" }], meta: { total: 1 } };
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(payload));
-    const cookie = await authenticatedCookie("office-duty-queue", "backend-development");
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=servicio-real", { headers: { cookie } }));
 
@@ -126,8 +205,8 @@ describe("repair request BFF collection routes", () => {
     expect(response.status).toBe(401);
   });
 
-  it("scopes Field list and create to the actor's assigned crew", async () => {
-    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+  it("scopes the Field list to the actor's assigned crew and denies creating", async () => {
+    const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const assigned = await GET(new Request("http://localhost/api/repair-requests?detectedInId=SVC-1050", { headers: { cookie: fieldCookie } }));
     expect(assigned.status).toBe(200);
     expect((await assigned.json()).data).toEqual([
@@ -140,6 +219,7 @@ describe("repair request BFF collection routes", () => {
     const unscoped = await GET(new Request("http://localhost/api/repair-requests", { headers: { cookie: fieldCookie } }));
     expect(unscoped.status).toBe(403);
 
+
     const created = await POST(createRequest(fieldCookie, {
       damageType: "BROKEN_SIDEWALK",
       address: "Av. Rivadavia 2200",
@@ -148,21 +228,12 @@ describe("repair request BFF collection routes", () => {
       detectedInType: "SERVICE",
       detectedInId: "SVC-1050",
     }));
-    expect(created.status).toBe(201);
-
-    const forbiddenCreate = await POST(createRequest(fieldCookie, {
-      damageType: "BROKEN_SIDEWALK",
-      address: "Calle 1",
-      severity: "LOW",
-      publicSafetyRisk: false,
-      detectedInType: "SERVICE",
-      detectedInId: "SVC-1042",
-    }));
-    expect(forbiddenCreate.status).toBe(403);
+    expect(created.status).toBe(403);
+    expect(await created.json()).toMatchObject({ code: "ROLE_REQUIRED" });
   });
 
   it("lists fixtures and creates a pending Service-sourced referral", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const list = await GET(new Request("http://localhost/api/repair-requests", { headers: { cookie } }));
     expect((await list.json()).meta).toMatchObject({ total: 1, page: 1 });
 
@@ -181,7 +252,7 @@ describe("repair request BFF collection routes", () => {
   });
 
   it("lets Office create a pending referral from an EnvironmentalInspection", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(createRequest(cookie, {
       damageType: "BLOCKED_DRAIN",
       address: "Av. Brasil 2450",
@@ -201,9 +272,9 @@ describe("repair request BFF collection routes", () => {
     });
   });
 
-  it("scopes Field inspection referrals to the linked Service crew", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
-    const created = await POST(createRequest(cookie, {
+  it("Campo no crea derivaciones desde una inspección: solo Oficina de Operaciones o Admin", async () => {
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
+    const denied = await POST(createRequest(cookie, {
       damageType: "BLOCKED_DRAIN",
       address: "Av. Brasil 2450",
       severity: "LOW",
@@ -211,16 +282,7 @@ describe("repair request BFF collection routes", () => {
       detectedInType: "INSPECTION",
       detectedInId: "INS-1012",
     }));
-    expect(created.status).toBe(201);
-
-    const forbidden = await POST(createRequest(cookie, {
-      damageType: "BLOCKED_DRAIN",
-      address: "Av. Costanera km 3",
-      severity: "HIGH",
-      publicSafetyRisk: true,
-      detectedInType: "INSPECTION",
-      detectedInId: "INS-1005",
-    }));
-    expect(forbidden.status).toBe(403);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ code: "ROLE_REQUIRED" });
   });
 });

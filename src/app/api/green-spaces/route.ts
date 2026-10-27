@@ -1,3 +1,4 @@
+import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -18,20 +19,9 @@ import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    { statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path },
-    { status },
-  );
-}
+
+
 function parseGreenSpaceQuery(url: URL): GreenSpaceQuery {
   const rawSpaceType = url.searchParams.get("spaceType");
   return {
@@ -45,17 +35,6 @@ function parseGreenSpaceQuery(url: URL): GreenSpaceQuery {
   };
 }
 
-function backendQueryString(query: GreenSpaceQuery): string {
-  const params = new URLSearchParams();
-  if (query.active !== undefined) params.set("active", String(query.active));
-  if (query.spaceType) params.set("spaceType", query.spaceType);
-  if (query.zoneId) params.set("zoneId", query.zoneId);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
-}
-
 function isOffice(scenario: OperationalScenario) {
   return scenario.actor.kind === "OFFICE";
 }
@@ -67,13 +46,9 @@ export async function GET(request: Request) {
     const session = getRequiredSession(request);
     const query = parseGreenSpaceQuery(new URL(request.url));
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/green-spaces${backendQueryString(query)}`);
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/green-spaces${backendQuery(query, ["active", "spaceType", "zoneId", "page", "pageSize"])}`);
+            return forwardResponse(backendResponse);
     }
 
     return NextResponse.json(paginateGreenSpaceFixtures(filterGreenSpaceFixtures(query), query.page, query.pageSize));
@@ -83,7 +58,7 @@ export async function GET(request: Request) {
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudieron cargar los espacios verdes.", path);
+    return mapSessionError(error, path, "No se pudieron cargar los espacios verdes.");
   }
 }
 
@@ -100,17 +75,13 @@ export async function POST(request: Request) {
       return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/green-spaces", undefined, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const greenSpace: GreenSpace = {
@@ -128,6 +99,6 @@ export async function POST(request: Request) {
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo registrar el espacio verde.", path);
+    return mapSessionError(error, path, "No se pudo registrar el espacio verde.");
   }
 }

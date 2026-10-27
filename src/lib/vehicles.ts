@@ -1,8 +1,10 @@
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import { BackendContractError, parseBackendError, readJsonBody as readBackendJsonBody } from "./backend-client";
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_DECIMAL_10_2, boundedDecimalInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export const vehicleTypeSchema = z.enum([
   "COMPACTOR_TRUCK",
@@ -68,21 +70,13 @@ export class VehicleRequestError extends Error {
 }
 
 const vehiclesEnvelopeSchema = z.object({
-  data: z.array(vehicleSchema),
+  data: tolerantRecords(vehicleSchema, "vehicles"),
   meta: z.object({
     total: z.number(),
     page: z.number(),
     pageSize: z.number(),
     totalPages: z.number(),
   }),
-});
-
-const errorResponseSchema = z.object({
-  statusCode: z.number(),
-  message: z.union([z.string(), z.array(z.string())]),
-  error: z.string(),
-  timestamp: z.string(),
-  path: z.string(),
 });
 
 function buildVehiclesQueryString(query: VehicleQuery): string {
@@ -97,23 +91,21 @@ function buildVehiclesQueryString(query: VehicleQuery): string {
 
 async function readJsonBody(response: Response): Promise<unknown> {
   try {
-    return await response.json();
-  } catch (cause) {
+    return await readBackendJsonBody(response, "vehículos");
+  } catch (error) {
+    if (!(error instanceof BackendContractError)) throw error;
     recordTelemetryEvent({ name: "request_malformed_response", resource: "vehicles" });
-    throw new VehicleContractError("La respuesta de vehículos no es JSON válido.", { cause });
+    throw new VehicleContractError(error.message, { cause: error.cause });
   }
 }
 
 function requestError(payload: unknown, resource = "vehículos"): VehicleRequestError | VehicleContractError {
-  const parsed = errorResponseSchema.safeParse(payload);
-  if (!parsed.success) {
+  const error = parseBackendError(payload, resource);
+  if (error instanceof BackendContractError) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "vehicles" });
-    return new VehicleContractError(`La respuesta de error de ${resource} no respeta el contrato documentado.`, {
-      cause: parsed.error,
-    });
+    return new VehicleContractError(error.message, { cause: error.cause });
   }
-  const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message;
-  return new VehicleRequestError(message, parsed.data.statusCode);
+  return new VehicleRequestError(error.message, error.status);
 }
 
 async function send(

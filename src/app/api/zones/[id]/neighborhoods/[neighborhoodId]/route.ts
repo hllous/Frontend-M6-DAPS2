@@ -1,37 +1,19 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { getZoneFixture, removeNeighborhoodFixture } from "@/lib/zones-fixtures";
 
-const ERROR_LABELS: Record<number, string> = {
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string; neighborhoodId: string }> },
@@ -41,25 +23,17 @@ export async function DELETE(
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede quitar barrios de una zona operativa.");
-    }
-    requireCapability(session, "zone:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede quitar barrios de una zona operativa.", capability: "zone:manage", throwOnError: true });
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(
         request,
-        `/zones/${id}/neighborhoods/${encodeURIComponent(neighborhoodId)}`,
+        `/zones/${pathId(id)}/neighborhoods/${pathId(neighborhoodId)}`,
         "zone:manage",
         { method: "DELETE" },
       );
-      const responseBody = await backendResponse.text();
-      return new NextResponse(responseBody, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const zone = getZoneFixture(id);
@@ -79,11 +53,11 @@ export async function DELETE(
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-      return errorResponse(403, error.message, path);
+      return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
     }
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo quitar el barrio de la zona operativa.", path);
+    return mapSessionError(error, path, "No se pudo quitar el barrio de la zona operativa.");
   }
 }

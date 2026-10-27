@@ -101,6 +101,33 @@ describe("resolveServiceMapLocations", () => {
     });
   });
 
+  it("does not plot a target whose zone snapshot cannot be resolved and reports it as unverified", () => {
+    const service = makeService({
+      id: "SVC-UNVERIFIED",
+      zoneIds: ["zone-does-not-exist"],
+      targetType: "TREE",
+      targetId: "tree-1",
+    });
+
+    const [location] = resolveServiceMapLocations([service], mapData, zones);
+
+    expect(location).toMatchObject({
+      serviceId: "SVC-UNVERIFIED",
+      coordinates: null,
+      locationType: "unverified",
+      zones: [],
+    });
+    expect(location?.locationLabel).toBeTruthy();
+  });
+
+  it("does not plot a target when the zone catalog is empty", () => {
+    const service = makeService({ id: "SVC-NO-ZONES", targetType: "TREE", targetId: "tree-1" });
+
+    const [location] = resolveServiceMapLocations([service], mapData, []);
+
+    expect(location).toMatchObject({ coordinates: null, locationType: "unverified" });
+  });
+
   it("resolves a GREEN_SPACE target with the green space coordinates and name", () => {
     const service = makeService({
       id: "SVC-GREEN-SPACE-1",

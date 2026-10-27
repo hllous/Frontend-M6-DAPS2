@@ -1,6 +1,8 @@
+import { backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import {
@@ -21,19 +23,9 @@ import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json({ statusCode: status, message, error: ERROR_LABELS[status] ?? "Error", timestamp: new Date().toISOString(), path }, { status });
-}
+
+
 
 function sessionAndScenario(request: Request) {
   const session = getRequiredSession(request);
@@ -83,7 +75,7 @@ export async function GET(request: Request) {
   try {
     const { session, scenario } = sessionAndScenario(request);
     const query = queryFromUrl(new URL(request.url));
-    const useBackend = session.mode === "backend-development" && Boolean(process.env.M6_BACKEND_ORIGIN);
+    const useBackend = backendMode(session);
 
     if (scenario.actor.kind === "FIELD") {
       if (!query.detectedInId) {
@@ -93,12 +85,9 @@ export async function GET(request: Request) {
         if (!session.crew?.id) {
           return errorResponse(403, "Solo puede consultar derivaciones de su cuadrilla.", path);
         }
-        const serviceResponse = await fetchBackend(request, `/services/${encodeURIComponent(query.detectedInId)}`);
+        const serviceResponse = await fetchBackend(request, `/services/${pathId(query.detectedInId)}`);
         if (!serviceResponse.ok) {
-          return new NextResponse(await serviceResponse.text(), {
-            status: serviceResponse.status,
-            headers: { "content-type": serviceResponse.headers.get("content-type") ?? "application/json" },
-          });
+          return forwardResponse(serviceResponse);
         }
         const service = await serviceResponse.json();
         if (service?.crewId !== session.crew.id) {
@@ -113,17 +102,14 @@ export async function GET(request: Request) {
 
     if (useBackend) {
       const backendResponse = await fetchBackend(request, `/repair-requests${new URL(request.url).search}`);
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+      return forwardResponse(backendResponse);
     }
 
     return NextResponse.json(paginateRepairRequestFixtures(filterRepairRequestFixtures(query), query.page, query.pageSize));
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudieron cargar las derivaciones.", path);
+    return mapSessionError(error, path, "No se pudieron cargar las derivaciones.");
   }
 }
 
@@ -131,14 +117,53 @@ export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const { session, scenario } = sessionAndScenario(request);
-    if (scenario.actor.kind !== "OFFICE" && scenario.actor.kind !== "FIELD") {
-      return errorResponse(403, "Solo Oficina o Campo puede crear derivaciones.", path);
+    if (!scenario.capabilities.includes("repairRequest:create")) {
+      return errorResponse(403, "Su rol no permite crear derivaciones.", path, FORBIDDEN_CODES.roleRequired);
     }
 
     let body: unknown;
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = createRepairRequestInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+    if (backendMode(session)) {
+      const sourcePath = parsed.data.detectedInType === "SERVICE" ? "/services" : "/environmental-inspections";
+      const sourceResponse = await fetchBackend(request, `${sourcePath}/${pathId(parsed.data.detectedInId)}`);
+      if (sourceResponse.status === 404) {
+        return errorResponse(404, parsed.data.detectedInType === "SERVICE"
+          ? `Servicio ${parsed.data.detectedInId} no encontrado.`
+          : `Inspección ${parsed.data.detectedInId} no encontrada.`, path);
+      }
+      if (!sourceResponse.ok) {
+        return forwardResponse(sourceResponse);
+      }
+      const sourceSchema = parsed.data.detectedInType === "SERVICE"
+        ? z.object({ crewId: z.string().nullable().optional() }).passthrough()
+        : z.object({ serviceId: z.string() }).passthrough();
+      const source = sourceSchema.parse(await sourceResponse.json());
+      if (scenario.actor.kind === "FIELD") {
+        if (!session.crew?.id) {
+          return errorResponse(403, "Solo puede crear derivaciones desde trabajo de su cuadrilla.", path);
+        }
+        let service = source;
+        if (parsed.data.detectedInType === "INSPECTION") {
+          const serviceResponse = await fetchBackend(request, `/services/${pathId(source.serviceId as string)}`);
+          if (!serviceResponse.ok) {
+            return forwardResponse(serviceResponse);
+          }
+          service = z.object({ crewId: z.string().nullable().optional() }).passthrough().parse(await serviceResponse.json());
+        }
+        if (service.crewId !== session.crew.id) {
+          return errorResponse(403, "Solo puede crear derivaciones desde trabajo de su cuadrilla.", path);
+        }
+      }
+      const backendResponse = await fetchBackend(request, "/repair-requests", undefined, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsed.data),
+      });
+      return forwardResponse(backendResponse);
+    }
+
     if (parsed.data.detectedInType === "SERVICE" && !serviceFixtures.some((service) => service.id === parsed.data.detectedInId)) {
       return errorResponse(404, `Servicio ${parsed.data.detectedInId} no encontrado.`, path);
     }
@@ -147,18 +172,6 @@ export async function POST(request: Request) {
     }
     if (scenario.actor.kind === "FIELD" && !fieldCanAccessSource(scenario, parsed.data.detectedInId)) {
       return errorResponse(403, "Solo puede crear derivaciones desde trabajo de su cuadrilla.", path);
-    }
-
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, "/repair-requests", undefined, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsed.data),
-      });
-      return new NextResponse(await backendResponse.text(), {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
     }
 
     const service = parsed.data.detectedInType === "SERVICE"
@@ -173,6 +186,6 @@ export async function POST(request: Request) {
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo crear la derivación.", path);
+    return mapSessionError(error, path, "No se pudo crear la derivación.");
   }
 }

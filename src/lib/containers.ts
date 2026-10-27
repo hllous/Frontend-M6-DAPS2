@@ -3,7 +3,9 @@ import { z } from "zod";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema, type Attachment, type Service, type ServiceStatus } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
+import { withResponseCoordinates } from "./response-coordinates";
 import { MAX_INT32, latitudeInput, longitudeInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export { attachmentSchema, type Attachment };
 
@@ -33,14 +35,12 @@ export type DamageType = z.infer<typeof damageTypeSchema>;
 export const severitySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 export type Severity = z.infer<typeof severitySchema>;
 
-export const containerSchema = z.object({
+export const containerSchema = withResponseCoordinates({
   id: z.string(),
   code: z.string(),
   containerType: containerTypeSchema,
   zoneId: z.string(),
   address: z.string().nullable(),
-  lat: z.number().nullable(),
-  lng: z.number().nullable(),
   capacityLiters: z.number(),
   status: containerStatusSchema,
   damageType: damageTypeSchema.nullable().optional(),
@@ -185,7 +185,7 @@ export const SEVERITY_LABELS: Record<Severity, string> = {
 };
 
 const containersEnvelopeSchema = z.object({
-  data: z.array(containerSchema),
+  data: tolerantRecords(containerSchema, "containers"),
   meta: z.object({
     total: z.number(),
     page: z.number(),
@@ -382,7 +382,6 @@ export const containersAdapter = {
     const formData = new FormData();
     formData.append("file", params.file);
     formData.append("fileName", params.file.name);
-    formData.append("fileSize", String(params.file.size));
     formData.append("ownerType", "CONTAINER");
     formData.append("ownerId", params.containerId);
 

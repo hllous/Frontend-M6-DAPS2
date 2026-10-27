@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetZoneFixtures, zoneFixtures } from "@/lib/zones-fixtures";
 import { DELETE, GET, PATCH } from "./route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   resetZoneFixtures();
@@ -12,20 +12,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string, mode = "mock") {
-  process.env.M6_AUTH_MODE = mode;
-  if (mode === "backend-development") {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  }
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 describe("authenticated zones [id] BFF route", () => {
   describe("GET", () => {
@@ -38,7 +25,7 @@ describe("authenticated zones [id] BFF route", () => {
     });
 
     it("returns 404 when zone is not found", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await GET(
         new Request("http://localhost/api/zones/nonexistent", {
           headers: { cookie },
@@ -50,7 +37,7 @@ describe("authenticated zones [id] BFF route", () => {
     });
 
     it("returns the zone for an authenticated actor", async () => {
-      const cookie = await authenticatedCookie("field-crew-member-route");
+      const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
       const response = await GET(
         new Request("http://localhost/api/zones/zone-1", {
           headers: { cookie },
@@ -83,7 +70,7 @@ describe("authenticated zones [id] BFF route", () => {
     });
 
     it("blocks Field actors with 403 Forbidden (Office-only gate)", async () => {
-      const cookie = await authenticatedCookie("field-crew-member-route");
+      const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
       const response = await PATCH(
         new Request("http://localhost/api/zones/zone-1", {
           method: "PATCH",
@@ -100,7 +87,7 @@ describe("authenticated zones [id] BFF route", () => {
     });
 
     it("returns 404 when updating a nonexistent zone", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await PATCH(
         new Request("http://localhost/api/zones/nonexistent", {
           method: "PATCH",
@@ -114,7 +101,7 @@ describe("authenticated zones [id] BFF route", () => {
     });
 
     it("updates name and active status, and guarantees code is immutable", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await PATCH(
         new Request("http://localhost/api/zones/zone-1", {
           method: "PATCH",
@@ -143,7 +130,7 @@ describe("authenticated zones [id] BFF route", () => {
     });
 
     it("blocks Field actors with 403 Forbidden (Office-only gate)", async () => {
-      const cookie = await authenticatedCookie("field-crew-member-route");
+      const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
       const response = await DELETE(
         new Request("http://localhost/api/zones/zone-1", {
           method: "DELETE",
@@ -159,7 +146,7 @@ describe("authenticated zones [id] BFF route", () => {
     });
 
     it("returns 404 when deleting a nonexistent zone", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await DELETE(
         new Request("http://localhost/api/zones/nonexistent", {
           method: "DELETE",
@@ -172,7 +159,7 @@ describe("authenticated zones [id] BFF route", () => {
     });
 
     it("deactivates zone logically (active = false) for Office actor", async () => {
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await DELETE(
         new Request("http://localhost/api/zones/zone-1", {
           method: "DELETE",
@@ -189,5 +176,22 @@ describe("authenticated zones [id] BFF route", () => {
       const fixture = zoneFixtures.find((z) => z.id === "zone-1");
       expect(fixture?.active).toBe(false);
     });
+  });
+
+  it("forwards an authorized backend zone deactivation with its id and DELETE method", async () => {
+    const id = "zone_42.3~";
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, active: false }));
+
+    const response = await DELETE(
+      new Request(`http://localhost/api/zones/${id}`, { method: "DELETE", headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/zones/${id}`);
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("DELETE");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 });

@@ -20,103 +20,260 @@ on:
   push:
     branches: [develop, test, main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect documentation-only pull request
+        id: detect
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { isDocsOnlyChange } = require("./scripts/ci/docs-only.cjs");
+            const { owner, repo } = context.repo;
+            const pullNumber = context.payload.pull_request.number;
+            const [{ data: pull }, files] = await Promise.all([
+              github.rest.pulls.get({ owner, repo, pull_number: pullNumber }),
+              github.paginate(github.rest.pulls.listFiles, {
+                owner,
+                repo,
+                pull_number: pullNumber,
+                per_page: 100,
+              }),
+            ]);
+
+            const docsOnly = isDocsOnlyChange({
+              changedFiles: pull.changed_files,
+              files,
+            });
+
+            core.setOutput("docs_only", String(docsOnly));
+            core.info(`Documentation-only pull request: ${docsOnly}`);
+
   # Todos los jobs usan Ubuntu 24.04 para evitar la migración de ubuntu-latest a Ubuntu 26 el 2026-10-19.
   build:
     name: build
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+          run_install: false
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
+
+      - name: Restore node_modules cache
+        id: cache-node-modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
-        run: npm ci
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore Next.js build cache
+        uses: actions/cache@v6
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Type check
-        run: npm run typecheck
+        run: pnpm typecheck
 
       - name: Build
-        run: npm run build
+        run: pnpm build
 
   test:
     name: test
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+          run_install: false
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
+
+      - name: Restore node_modules cache
+        id: cache-node-modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
-        run: npm ci
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm lint
 
       - name: Unit and component tests
-        run: npm test
+        run: pnpm test
 
-  e2e:
-    name: e2e
+      - name: Documentation-only classifier tests
+        run: node --test scripts/ci/docs-only.node-test.mjs
+
+  e2e-shard:
+    name: e2e shard ${{ matrix.shard }}/3
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+          run_install: false
 
       - name: Setup Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
+
+      - name: Restore node_modules cache
+        id: cache-node-modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
-        run: npm ci
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Read Playwright version
+        id: playwright-version
+        run: |
+          version=$(node -p "require('@playwright/test/package.json').version")
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright browser cache
+        id: cache-playwright
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright system dependencies
+        run: pnpm exec playwright install-deps chromium
 
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
 
       # Smoke journeys, failure journeys, and axe/WCAG checks run against deterministic
       # mock scenarios and fixture data only — no production or Tier 2 data ever enters
       # these runs, so the traces/screenshots below carry none either.
       - name: Playwright smoke and accessibility suite
-        run: npm run test:e2e
+        run: pnpm exec playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
+  e2e:
+    name: e2e
+    runs-on: ubuntu-24.04
+    needs: [changes, e2e-shard]
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Require every Playwright shard to succeed
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          SHARDS_RESULT: ${{ needs.e2e-shard.result }}
+        run: |
+          if [ "$CHANGES_RESULT" = "success" ] && [ "$DOCS_ONLY" = "true" ]; then
+            exit 0
+          fi
+          test "$SHARDS_RESULT" = "success"
+
   security:
     name: security
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+          run_install: false
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
+
+      - name: Restore node_modules cache
+        id: cache-node-modules
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
-        run: npm ci
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
 
       - name: Dependency vulnerability scan
-        run: npm audit --omit=dev --audit-level=high
+        run: pnpm audit --prod --audit-level=high
 
   docs:
     name: docs
@@ -129,13 +286,20 @@ jobs:
 
       # markdownlint-cli2 0.23 exige Node 22+; todos los jobs usan Node 22.
       # Reglas y alcance en .markdownlint-cli2.jsonc.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+          run_install: false
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: pnpm
 
       - name: Markdown lint
-        run: npx --yes markdownlint-cli2@0.23.3
+        run: pnpm dlx markdownlint-cli2@0.23.3
 
       # Versión y checksum fijados: se descarga un binario, no una action de terceros.
       # Reglas y alcance en lychee.toml (offline: solo enlaces y anclas internas).

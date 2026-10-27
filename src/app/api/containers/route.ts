@@ -1,3 +1,4 @@
+import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -19,28 +20,9 @@ import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 function parseContainerQuery(url: URL): ContainerQuery {
   const rawStatus = url.searchParams.get("status");
@@ -59,18 +41,6 @@ function parseContainerQuery(url: URL): ContainerQuery {
   };
 }
 
-function backendQueryString(query: ContainerQuery): string {
-  const params = new URLSearchParams();
-  if (query.status) params.set("status", query.status);
-  if (query.containerType) params.set("containerType", query.containerType);
-  if (query.zoneId) params.set("zoneId", query.zoneId);
-  if (query.search) params.set("search", query.search);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
-}
-
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
 
@@ -78,13 +48,9 @@ export async function GET(request: Request) {
     const session = getRequiredSession(request);
     const query = parseContainerQuery(new URL(request.url));
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/containers${backendQueryString(query)}`);
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/containers${backendQuery(query, ["status", "containerType", "zoneId", "search", "page", "pageSize"])}`);
+            return forwardResponse(backendResponse);
     }
 
     return NextResponse.json(
@@ -96,7 +62,7 @@ export async function GET(request: Request) {
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudieron cargar los contenedores.", path);
+    return mapSessionError(error, path, "No se pudieron cargar los contenedores.");
   }
 }
 
@@ -124,17 +90,13 @@ export async function POST(request: Request) {
       return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/containers", "container:manage", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const bodyText = await backendResponse.text();
-      return new NextResponse(bodyText, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const existing = containerFixtures.find(
@@ -158,6 +120,6 @@ export async function POST(request: Request) {
       return errorResponse(401, "La sesión no está activa.", path);
     }
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return errorResponse(500, "No se pudo registrar el contenedor.", path);
+    return mapSessionError(error, path, "No se pudo registrar el contenedor.");
   }
 }

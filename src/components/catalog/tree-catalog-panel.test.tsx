@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
@@ -9,12 +10,34 @@ import { scenarios } from "@/lib/scenarios";
 import { TreeCatalogPanel } from "./tree-catalog-panel";
 
 const server = setupServer(...handlers);
+async function chooseSelectOption(user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement, name: string | RegExp) {
+  await user.click(trigger);
+  await user.click(await screen.findByRole("option", { name }));
+  if (trigger.getAttribute("aria-expanded") === "true") await user.keyboard("{Escape}");
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => { resetTreeFixtures(); window.history.replaceState(null, "", "/app/catalog/trees"); });
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
 describe("TreeCatalogPanel", () => {
+  it("marks the required zone and associates its validation error with the field", async () => {
+    const user = userEvent.setup();
+    render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("heading", { name: "Árboles" });
+    await user.click(screen.getByRole("button", { name: "Registrar árbol" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Registrar árbol" });
+    const zone = within(dialog).getByRole("combobox", { name: "Zona operativa" });
+    expect(zone).toHaveAttribute("aria-required", "true");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar árbol" }));
+
+    expect(await within(dialog).findByText("La zona operativa es obligatoria.")).toBeVisible();
+    expect(zone).toHaveAttribute("aria-invalid", "true");
+    expect(zone).toHaveAttribute("aria-describedby", "tree-zone-error");
+  });
+
   it("lists trees for any authenticated actor and opens detail without management actions", async () => {
     render(<TreeCatalogPanel scenario={scenarios.fieldCrewLeader} />);
     expect(await screen.findByRole("heading", { name: "Árboles" })).toBeVisible();
@@ -32,17 +55,18 @@ describe("TreeCatalogPanel", () => {
     expect(within(dialog).getByLabelText("Código de relevamiento")).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText("Altura (m)"), { target: { value: "15" } });
     await within(dialog).getByRole("button", { name: "Guardar árbol" }).click();
-    expect(await screen.findByText("Árbol actualizado con éxito.")).toBeVisible();
+    expect(await screen.findByText("Árbol actualizado.")).toBeVisible();
     const refreshedRow = await screen.findByRole("row", { name: /ARB-00442/ });
     await within(refreshedRow).getByRole("button", { name: "Dar de baja" }).click();
-    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Confirmar baja" }));
+    const deactivateDialog = await screen.findByRole("dialog");
+    fireEvent.click(within(deactivateDialog).getByRole("button", { name: "Dar de baja el árbol ARB-00442" }));
     expect(await screen.findByText(/Árbol dado de baja/)).toBeVisible();
   });
 
   it("shows the zone name in the Zona column and never the raw zone id", async () => {
     render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /ARB-00442/ });
-    expect(await within(row).findByText("Z-BEL · Belgrano")).toBeVisible();
+    expect(await within(row).findByText("Belgrano")).toBeVisible();
     expect(within(row).queryByText("zone-1")).not.toBeInTheDocument();
   });
 
@@ -79,18 +103,36 @@ describe("TreeCatalogPanel", () => {
     const row = await screen.findByRole("row", { name: /ARB-00442/ });
     fireEvent.click(within(row).getByRole("button", { name: "Dar de baja" }));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Conservar árbol ARB-00442" }));
     expect(removed).toBe(0);
     expect(screen.queryByText(/Árbol dado de baja/)).not.toBeInTheDocument();
   });
 
+  it("shows a deactivation failure as an alert and keeps the confirmation open", async () => {
+    server.use(http.delete("*/api/trees/:treeId", () => HttpResponse.json({
+      statusCode: 500,
+      message: "No se pudo eliminar",
+      error: "Internal Server Error",
+      timestamp: "2026-10-13T12:00:00.000Z",
+      path: "/api/trees/tree-1",
+    }, { status: 500 })));
+    render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /ARB-00442/ });
+    fireEvent.click(within(row).getByRole("button", { name: "Dar de baja" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Dar de baja el árbol ARB-00442" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("No se pudo eliminar");
+    expect(dialog).toBeVisible();
+  });
+
   it("keeps filters and selected tree in the URL and restores them on load", async () => {
     window.history.replaceState(null, "", "/app/catalog/trees?q=Jacar&active=true&page=1");
+    const user = userEvent.setup();
     render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
     expect(await screen.findByLabelText("Buscar árbol")).toHaveValue("Jacar");
-    expect(screen.getByLabelText("Filtrar árboles por estado")).toHaveValue("true");
+    expect(screen.getByRole("combobox", { name: "Filtrar árboles por estado" })).toHaveTextContent("Activos");
     await screen.findByRole("row", { name: /ARB-00442/ });
-    fireEvent.change(screen.getByLabelText("Filtrar árboles por zona"), { target: { value: "zone-1" } });
+    await chooseSelectOption(user, screen.getByRole("combobox", { name: "Filtrar árboles por zona" }), "Belgrano");
     const params = new URLSearchParams(window.location.search);
     expect(params.get("zone")).toBe("zone-1");
     expect(params.get("active")).toBe("true");
@@ -148,5 +190,24 @@ describe("TreeCatalogPanel", () => {
     render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
     await screen.findByText("Sin árboles");
     expect(seen[0]).toEqual({ page: "2", pageSize: "20" });
+  });
+
+  it("removes link behavior from disabled pagination controls", async () => {
+    server.use(http.get("*/api/trees", ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get("page") ?? 1);
+      return HttpResponse.json({ data: [], meta: { total: 45, page, pageSize: 20, totalPages: 3 } });
+    }));
+    const firstPage = render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByText("Página 1 de 3")).toBeVisible();
+    expect(screen.getByLabelText("Página anterior")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByLabelText("Página anterior")).not.toHaveAttribute("href");
+    expect(screen.getByLabelText("Página siguiente")).toHaveAttribute("href", "/app/catalog/trees?page=2");
+
+    firstPage.unmount();
+    window.history.replaceState(null, "", "/app/catalog/trees?page=3");
+    render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByText("Página 3 de 3")).toBeVisible();
+    expect(screen.getByLabelText("Página siguiente")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByLabelText("Página siguiente")).not.toHaveAttribute("href");
   });
 });

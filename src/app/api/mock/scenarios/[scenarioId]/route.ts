@@ -1,34 +1,21 @@
+import { errorResponse, mapSessionError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { loadAuthorizedScenario } from "@/lib/bff-data";
+import { sealRolesIfChanged } from "@/lib/me";
 import {
   AuthUnavailableError,
   BackendUnavailableError,
+  CitizenForbiddenError,
   ForbiddenSessionError,
   InvalidSessionError,
 } from "@/lib/session";
 import { isScenarioId } from "@/lib/scenarios";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
-const ERROR_LABELS: Record<number, string> = {
-  401: "Unauthorized",
-  403: "Forbidden",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 export async function GET(
   request: Request,
@@ -41,11 +28,18 @@ export async function GET(
   }
 
   try {
-    return NextResponse.json(await loadAuthorizedScenario(request, scenarioId));
+    const { session, roles, scenario } = await loadAuthorizedScenario(request, scenarioId);
+    const response = NextResponse.json(scenario);
+    sealRolesIfChanged(response, session, roles);
+    return response;
   } catch (error) {
     if (error instanceof InvalidSessionError) {
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa.", path);
+    }
+    if (error instanceof CitizenForbiddenError) {
+      recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
+      return errorResponse(403, error.message, path);
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
@@ -57,6 +51,6 @@ export async function GET(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo cargar el escenario.", path);
+    return mapSessionError(error, path, "No se pudo cargar el escenario.");
   }
 }

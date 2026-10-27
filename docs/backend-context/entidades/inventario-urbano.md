@@ -7,7 +7,7 @@ El patrimonio ambiental que administramos, sin contar los contenedores ([contain
 | `GreenPoint` | Punto verde de entrega voluntaria. `code`, `name`, `location`, `acceptedWasteTypes[]`, `zoneId`, `status` |
 | `Tree` | `surveyCode`, `species`, `location`, `heightM`, `diameterCm`, `zoneId`, más el historial de `TreeSurvey` |
 | `TreeSurvey` | `treeId`, `surveyedAt`, `inspectorId`, `healthStatus`, `riskLevel`, `riskType`, `suggestedIntervention`, `requiresStreetClosure`, `requiresPublicWorks`, `notes` |
-| `GreenSpace` | `name`, `spaceType`, `areaM2`, `zoneId`, `status` |
+| `GreenSpace` | `name`, `spaceType`, `lat`, `lng` (punto, opcionales), `areaM2`, `zoneId`, `active` |
 
 Enums: `acceptedWasteTypes[]` es `WasteType`, `healthStatus` es `TreeHealthStatus`, `riskLevel` es `RiskLevel`, `riskType` es `RiskType`, `suggestedIntervention` es `TreeInterventionType`, `spaceType` es `GreenSpaceType` — ver [enumeraciones.md](../enumeraciones.md). `zoneId` → [`Zone`](configuracion-y-recursos.md#zone).
 
@@ -17,7 +17,7 @@ El árbol es la entidad estable; el relevamiento es la foto. **`Tree` guarda el 
 
 El relevamiento es el que decide: `riskLevel` y `riskType` salen de acá, y `suggestedIntervention` es lo que después se materializa en una [`TreeIntervention`](tree-intervention.md).
 
-**Un `TreeSurvey` con `riskLevel` en `HIGH` o `CRITICAL` dispara [`treeRiskDetected`](../eventos/publicados/treeRiskDetected.md)** → M3 y M7. Con cualquier otro valor no sale nada. Con HIGH o CRITICAL `riskType` es obligatorio (400 si falta), y `surveyedAt` no puede ser posterior a hoy (huso Argentina).
+**Un `TreeSurvey` con `riskLevel` en `HIGH` o `CRITICAL` dispara [`treeRiskDetected`](../eventos/publicados/treeRiskDetected.md)** → M3 (el corte de calle, si hace falta, se pide aparte con `streetClosureRequested`). Con cualquier otro valor no sale nada. Con HIGH o CRITICAL `riskType` es obligatorio (400 si falta), y `surveyedAt` no puede ser posterior a hoy (huso Argentina).
 
 `requiresPublicWorks` señala el componente que no nos corresponde (una raíz que levantó la vereda); `requiresStreetClosure` anticipa que la intervención va a necesitar cortar la calle.
 

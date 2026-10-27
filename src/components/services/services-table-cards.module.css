@@ -1,0 +1,108 @@
+.serviceCardsTable {
+  border-collapse: separate;
+  border-spacing: 0 var(--space-8);
+  color: var(--color-text);
+}
+
+.serviceCardsTable thead th[data-column-key]:not([data-column-key="ordinal"]) {
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.serviceCardsTable thead th[data-column-key]:not([data-column-key="ordinal"]):active {
+  cursor: grabbing;
+}
+
+.serviceCardsTable tbody tr[data-service-id] {
+  background: var(--color-surface);
+  transition: background-color 150ms ease;
+}
+
+.serviceCardsTable tbody tr[data-service-id]:not([aria-selected="true"]) {
+  opacity: 1;
+}
+
+.serviceCardsTable tbody tr[data-service-id]:not([aria-selected="true"]):hover {
+  background: var(--color-canvas);
+}
+
+.serviceCardsTable tbody tr[data-service-id][aria-selected="true"] {
+  background: color-mix(in srgb, var(--color-action) 8%, var(--color-surface));
+}
+
+.serviceCardsTable tbody tr[data-service-id] > td {
+  border-block: 1px solid var(--color-border);
+  background: inherit;
+}
+
+.serviceCardsTable tbody tr[data-service-id] > td:first-child {
+  border-inline-start: 1px solid var(--color-border);
+  border-start-start-radius: 12px;
+  border-end-start-radius: 12px;
+}
+
+.serviceCardsTable tbody tr[data-service-id] > td:last-child {
+  border-inline-end: 1px solid var(--color-border);
+  border-start-end-radius: 12px;
+  border-end-end-radius: 12px;
+}
+
+.serviceCardsTable [role="slider"] {
+  color: var(--color-text-secondary);
+}
+
+.serviceCardsTable [role="slider"]:hover,
+.serviceCardsTable [role="slider"]:focus-visible {
+  color: var(--color-action);
+}
+
+@media (max-width: 760px) {
+  .serviceCardsTable {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+
+  .serviceCardsTable tbody {
+    display: table-row-group;
+    width: auto;
+  }
+
+  .serviceCardsTable tbody tr[data-service-id] {
+    display: table-row;
+    width: auto;
+    box-sizing: content-box;
+    gap: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .serviceCardsTable tbody tr[data-service-id] > td,
+  .serviceCardsTable tbody tr[data-service-id] > td:first-child,
+  .serviceCardsTable tbody tr[data-service-id] > td:last-child {
+    display: table-cell;
+    grid-template-columns: initial;
+    align-items: initial;
+    gap: initial;
+    min-width: 0;
+    border: 0;
+    border-block-end: 1px solid var(--color-border);
+    border-radius: 0;
+    padding: 0.5rem 0.25rem;
+  }
+
+  .serviceCardsTable tbody tr[data-service-id] > td::before {
+    content: none;
+  }
+
+  .serviceCardsTable tbody tr[data-service-id] > td[data-column-key="service"] > button {
+    grid-column: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .serviceCardsTable tbody tr[data-service-id] {
+    transition: none;
+  }
+}

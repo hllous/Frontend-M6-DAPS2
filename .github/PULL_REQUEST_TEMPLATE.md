@@ -22,8 +22,8 @@ Docs-only changes: say that no application tests were run.
 
 ## Checklist
 
-- [ ] `npm run typecheck`, `npm run build`, `npm run lint` and `npm test` pass; `npm run test:e2e` too when this touches routes, session or navigation
+- [ ] `pnpm typecheck`, `pnpm build`, `pnpm lint` and `pnpm test` pass; `pnpm test:e2e` too when this touches routes, session or navigation
 - [ ] No conflicts with `develop`
-- [ ] Docs updated if behavior, vocabulary, contracts or a decision changed: `CONTEXT.md`, `CONTRACTS.md`, `DESIGN.md`, `ROADMAP.md` or a record in `docs/adr/` (name the ADR if this contradicts one)
+- [ ] Docs updated if behavior, vocabulary, contracts or a decision changed: `GLOSSARY.md`, `CONTRACTS.md`, `DESIGN.md`, `ROADMAP.md` or a record in `docs/adr/` (name the ADR if this contradicts one)
 - [ ] Contract changes (Backend endpoints consumed, shared types): team notified, docs updated, backwards compatible where possible; Backend issue filed in `hllous/Backend-M6-DAPS2` if Backend needs to change
 - [ ] User-facing copy is in Spanish and follows the "Spanish UX writing" section of `DESIGN.md`

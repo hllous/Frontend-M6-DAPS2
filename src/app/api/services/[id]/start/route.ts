@@ -1,6 +1,7 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   serviceFixtures,
   updateServiceFixture,
@@ -14,32 +15,13 @@ import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const params = await context.params;
   const serviceId = params.id;
@@ -50,28 +32,20 @@ export async function POST(
     const scenario = getScenario(session);
 
     // Permission check: only actors with service:execute capability (Crew Leader)
-    if (!scenario.capabilities.includes("service:execute")) {
-      return errorResponse(
-        403,
-        "No tiene permisos para iniciar el servicio. Solo la persona responsable de la cuadrilla puede iniciar.",
-        path,
-      );
-    }
+    authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para iniciar el servicio. Solo la persona responsable de la cuadrilla puede iniciar.", throwOnError: true });
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
+      const scopedService = await requireCrewScope(request, session, { serviceId });
+      if (scopedService instanceof Response) return scopedService;
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/start`,
+        `/services/${pathId(serviceId)}/start`,
         undefined,
         {
           method: "POST",
         },
       );
-      const bodyText = await backendResponse.text();
-      return new NextResponse(bodyText, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const service = serviceFixtures.find((s) => s.id === serviceId);
@@ -154,6 +128,6 @@ export async function POST(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo iniciar el servicio.", path);
+    return mapSessionError(error, path, "No se pudo iniciar el servicio.");
   }
 }

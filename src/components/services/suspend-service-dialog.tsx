@@ -1,17 +1,18 @@
 "use client";
 
-import { useId, useState } from "react";
+import { OfflineDraftNotice } from "./offline-draft-notice";
+import { useId, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
-  CloudOff,
   Pause,
   Paperclip,
   RefreshCw,
-  Upload,
   X,
 } from "lucide-react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,12 +22,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldTitle } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import {
   NOT_SERVICED_REASON_LABEL,
   NotServicedReason,
   Service,
   ServiceRequestError,
+  SUSPEND_NOTE_MAX_LENGTH,
   servicesAdapter,
 } from "@/lib/services";
 import {
@@ -37,6 +44,7 @@ import {
   type FieldDraftServiceSnapshot,
 } from "@/lib/field-drafts";
 import { DraftConflictView } from "./draft-conflict-view";
+import { useRevealFirstError } from "./use-reveal-first-error";
 
 interface SuspendDraftPayload {
   reason: NotServicedReason;
@@ -66,15 +74,25 @@ export function SuspendServiceDialog({
   service,
   onSuspended,
 }: SuspendServiceDialogProps) {
+  const preventCloseRef = useRef(false);
+
   if (!service) return null;
 
+  const requestOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && preventCloseRef.current) return;
+    onOpenChange(nextOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-0 border-[var(--color-border)] bg-[var(--color-surface)]">
+    <Dialog open={open} onOpenChange={requestOpenChange}>
+      <DialogContent className="max-w-lg">
         <SuspendServiceForm
           key={service.id}
           service={service}
-          onOpenChange={onOpenChange}
+          onOpenChange={requestOpenChange}
+          onPendingEvidenceChange={(pending) => {
+            preventCloseRef.current = pending;
+          }}
           onSuspended={onSuspended}
         />
       </DialogContent>
@@ -85,13 +103,16 @@ export function SuspendServiceDialog({
 function SuspendServiceForm({
   service,
   onOpenChange,
+  onPendingEvidenceChange,
   onSuspended,
 }: {
   service: Service;
   onOpenChange: (open: boolean) => void;
+  onPendingEvidenceChange: (pending: boolean) => void;
   onSuspended: (updatedService: Service) => void;
 }) {
   const formId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const existingDraft = getFieldDraft<SuspendDraftPayload>(service.id, "suspend");
 
@@ -106,8 +127,13 @@ function SuspendServiceForm({
   } | null>(null);
   const [draftPending, setDraftPending] = useState(Boolean(existingDraft));
   const [queuedFiles, setQueuedFiles] = useState<QueuedEvidenceFile[]>([]);
+  const [suspendedService, setSuspendedService] = useState<Service | null>(null);
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ reason?: string; note?: string }>({});
+  const scrollRef = useRevealFirstError(errorMessage, fieldErrors);
+  const pendingEvidenceCount = queuedFiles.filter((file) => file.status !== "success").length;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -150,7 +176,7 @@ function SuspendServiceForm({
       );
       return true;
     } catch (err) {
-      const msg = err instanceof ServiceRequestError ? err.message : "Error al subir el archivo";
+      const msg = err instanceof ServiceRequestError ? err.message : "No se pudo subir el archivo. Intente nuevamente.";
       setQueuedFiles((prev) =>
         prev.map((f) => (f.id === item.id ? { ...f, status: "error", error: msg } : f)),
       );
@@ -159,17 +185,69 @@ function SuspendServiceForm({
   };
 
   const handleRetryUpload = async (item: QueuedEvidenceFile) => {
-    await uploadSingleFile(item);
+    if (!suspendedService) return;
+
+    setIsSubmitting(true);
+    const uploaded = await uploadSingleFile(item);
+    const everyFileUploaded =
+      uploaded && queuedFiles.every((file) => file.id === item.id || file.status === "success");
+    if (everyFileUploaded) {
+      finishSuspension(suspendedService);
+      return;
+    }
+    setIsSubmitting(false);
   };
 
-  async function afterSuspended(updated: Service) {
-    if (queuedFiles.length > 0) {
-      for (const queued of queuedFiles) {
-        await uploadSingleFile(queued);
-      }
-    }
+  function finishSuspension(updated: Service) {
+    onPendingEvidenceChange(false);
+    setIsSubmitting(false);
     onSuspended(updated);
     onOpenChange(false);
+  }
+
+  async function afterSuspended(updated: Service) {
+    if (queuedFiles.length === 0) {
+      finishSuspension(updated);
+      return;
+    }
+
+    onPendingEvidenceChange(true);
+    let everyFileUploaded = true;
+    for (const queued of queuedFiles) {
+      if (!(await uploadSingleFile(queued))) everyFileUploaded = false;
+    }
+
+    if (everyFileUploaded) {
+      finishSuspension(updated);
+      return;
+    }
+
+    setSuspendedService(updated);
+    setIsSubmitting(false);
+  }
+
+  async function handleRetryPendingUploads() {
+    if (!suspendedService) return;
+
+    setIsSubmitting(true);
+    let everyFileUploaded = true;
+    for (const queued of queuedFiles.filter((file) => file.status !== "success")) {
+      if (!(await uploadSingleFile(queued))) everyFileUploaded = false;
+    }
+
+    if (everyFileUploaded) {
+      finishSuspension(suspendedService);
+      return;
+    }
+    setIsSubmitting(false);
+  }
+
+  function handleConfirmDiscard() {
+    if (!suspendedService) return;
+
+    setConfirmDiscardOpen(false);
+    setQueuedFiles([]);
+    finishSuspension(suspendedService);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -177,14 +255,17 @@ function SuspendServiceForm({
     setErrorMessage(null);
 
     if (!reason) {
-      setErrorMessage("Debe seleccionar un motivo de suspensión.");
+      setErrorMessage(null);
+      setFieldErrors({ reason: "Seleccione un motivo." });
       return;
     }
     if (!note.trim()) {
-      setErrorMessage("Debe indicar una nota describiendo la suspensión.");
+      setErrorMessage(null);
+      setFieldErrors({ note: "Describa la suspensión." });
       return;
     }
 
+    setFieldErrors({});
     const payload: SuspendDraftPayload = { reason: reason as NotServicedReason, note: note.trim() };
     setIsSubmitting(true);
 
@@ -211,7 +292,7 @@ function SuspendServiceForm({
       if (outcome.kind === "still-offline") {
         setDraftPending(true);
         setErrorMessage(
-          "Seguimos sin conexión. El borrador se conserva en este dispositivo para reintentar el envío más tarde.",
+          "Sin conexión. Se guardó en este dispositivo; reenvíe cuando vuelva la conexión.",
         );
         setIsSubmitting(false);
         return;
@@ -236,7 +317,7 @@ function SuspendServiceForm({
       setComposedAgainst(outcome.draft.composedAgainst);
       setDraftPending(true);
       setErrorMessage(
-        "No se pudo conectar con el servidor. La suspensión quedó guardada como borrador local: puede reintentar el envío cuando recupere la conexión.",
+        "Sin conexión. Se guardó en este dispositivo; reenvíe cuando vuelva la conexión.",
       );
       setIsSubmitting(false);
       return;
@@ -259,231 +340,277 @@ function SuspendServiceForm({
     setErrorMessage(null);
   }
 
+  const reasonItems = NOT_SERVICED_REASON_LABEL;
+
   return (
     <>
-      <DialogHeader className="border-b border-[var(--color-border)] p-6 pb-4 bg-[var(--color-canvas)]">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-warning)]">
-          <Pause className="h-4 w-4" aria-hidden />
-          <span>Suspensión de servicio en curso</span>
-        </div>
-        <DialogTitle className="text-xl font-bold text-[var(--color-text)]">
-          Suspender {service.id}
+      <DialogHeader>
+        <DialogTitle>
+          {suspendedService ? `Servicio suspendido · ${service.title}` : `Suspender ${service.title}`}
         </DialogTitle>
-        <DialogDescription className="text-xs text-[var(--color-text-secondary)]">
-          Registre el motivo de la interrupción. El servicio pasará a estado Suspendido hasta que la
-          persona responsable de la cuadrilla lo reanude.
+        <DialogDescription>
+          {suspendedService
+            ? "Suspendido. Reintente los archivos pendientes."
+            : "Registre el motivo. La cuadrilla podrá reanudarlo."}
         </DialogDescription>
       </DialogHeader>
 
-      {conflict ? (
-        <div className="p-6">
+      <div ref={scrollRef} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
+        {conflict ? (
           <DraftConflictView
-            serviceId={service.id}
-            actionLabel="suspensión"
             composedAgainst={conflict.composedAgainst}
             current={conflict.current}
             onPreserve={handlePreserveDraft}
             onDiscard={handleDiscardDraft}
           />
-        </div>
-      ) : (
-      <form id={formId} noValidate onSubmit={handleSubmit} className="p-6 space-y-5">
-        {draftPending && (
-          <div
-            role="status"
-            className="flex items-start gap-2.5 rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/50 p-3 text-xs text-[var(--color-warning)]"
-          >
-            <CloudOff className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-            <div className="font-semibold">
-              Borrador local pendiente de envío. Los datos se conservaron en este dispositivo;
-              reenvíelos manualmente cuando recupere la conexión.
-            </div>
-          </div>
-        )}
-
-        {errorMessage && (
-          <div
-            role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-xs text-[var(--color-danger)]"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-            <div className="font-semibold">{errorMessage}</div>
-          </div>
-        )}
-
-        <FieldGroup className="space-y-4">
-          <Field>
-            <FieldLabel htmlFor={`${formId}-reason`}>
-              Motivo de suspensión <span className="text-[var(--color-danger)]" aria-hidden>*</span>
-            </FieldLabel>
-            <select
-              id={`${formId}-reason`}
-              value={reason}
-              onChange={(e) => {
-                setReason(e.target.value as NotServicedReason);
-                setErrorMessage(null);
-              }}
-              required
-              className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2 text-xs text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            >
-              <option value="">Seleccione un motivo…</option>
-              {(Object.keys(NOT_SERVICED_REASON_LABEL) as NotServicedReason[]).map((r) => (
-                <option key={r} value={r}>
-                  {NOT_SERVICED_REASON_LABEL[r]}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor={`${formId}-note`}>
-              Nota <span className="text-[var(--color-danger)]" aria-hidden>*</span>
-            </FieldLabel>
-            <textarea
-              id={`${formId}-note`}
-              rows={3}
-              value={note}
-              onChange={(e) => {
-                setNote(e.target.value);
-                setErrorMessage(null);
-              }}
-              required
-              placeholder="Describa la causa de la interrupción y cualquier detalle relevante para Oficina…"
-              className="w-full rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)]"
-            />
-            <FieldDescription>
-              Obligatoria. Explica el motivo seleccionado con el detalle operativo del caso.
-            </FieldDescription>
-          </Field>
-
-          <div className="space-y-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="font-bold text-[var(--color-text)] block text-xs">
-                  Evidencia adjunta
-                </span>
-                <span className="text-[11px] text-[var(--color-text-secondary)]">
-                  Opcional, cuando sea aplicable (ej. fotografía del desperfecto o del obstáculo).
-                </span>
-              </div>
-              <label
-                htmlFor={`${formId}-evidence-input`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)] cursor-pointer"
-              >
-                <Upload className="h-3.5 w-3.5" aria-hidden />
-                <span>Seleccionar archivo</span>
-              </label>
-              <input
-                id={`${formId}-evidence-input`}
-                type="file"
-                multiple
-                accept="image/jpeg,image/png,image/webp,application/pdf"
-                onChange={handleFileSelect}
-                className="sr-only"
-              />
-            </div>
-
-            {queuedFiles.length > 0 && (
-              <ul className="mt-3 space-y-2" role="list">
-                {queuedFiles.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-xs"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <Paperclip className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-secondary)]" />
-                      <div className="min-w-0">
-                        <span className="font-semibold text-[var(--color-text)] truncate block">
-                          {item.status === "success" && item.canonicalFilename
-                            ? item.canonicalFilename
-                            : item.localFilename}
-                        </span>
-                        {item.status === "error" && (
-                          <span className="text-[10px] text-[var(--color-danger)] block">
-                            {item.error}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {item.status === "pending" && (
-                        <span className="rounded bg-[var(--color-surface-subtle)] px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
-                          Pendiente
-                        </span>
-                      )}
-                      {item.status === "uploading" && (
-                        <span className="rounded bg-[var(--color-info-fill)] px-2 py-0.5 text-[10px] text-[var(--color-info)]">
-                          Subiendo...
-                        </span>
-                      )}
-                      {item.status === "success" && (
-                        <span className="rounded bg-[var(--color-success-fill)] px-2 py-0.5 text-[10px] font-bold text-[var(--color-success)] flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Subido
-                        </span>
-                      )}
-                      {item.status === "error" && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRetryUpload(item)}
-                          className="h-6 gap-1 px-2 text-[10px] text-[var(--color-danger)] hover:bg-[var(--color-danger-fill)]/30"
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                          <span>Reintentar</span>
-                        </Button>
-                      )}
-                      {item.status !== "uploading" && item.status !== "success" && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFile(item.id)}
-                          aria-label={`Eliminar ${item.localFilename}`}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-danger)]"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+        ) : (
+          <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {suspendedService && (
+              <Alert variant="warning">
+                <AlertCircle aria-hidden />
+                <AlertDescription>
+                  Servicio suspendido; falta subir {pendingEvidenceCount}{" "}
+                  {pendingEvidenceCount === 1 ? "archivo." : "archivos."} El servicio ya está suspendido;
+                  reintente la carga o descarte los archivos pendientes.
+                </AlertDescription>
+              </Alert>
             )}
-          </div>
-        </FieldGroup>
 
-        <DialogFooter className="border-t border-[var(--color-border)] pt-4 gap-2 sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={isSubmitting}
-            onClick={() => onOpenChange(false)}
-            className="text-xs"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            form={formId}
-            variant="default"
-            size="sm"
-            disabled={isSubmitting}
-            className="text-xs font-semibold gap-1.5"
-          >
-            <Pause className="h-3.5 w-3.5" aria-hidden />
-            <span>
-              {isSubmitting
-                ? "Suspendiendo..."
-                : draftPending
-                ? "Reintentar envío"
-                : "Suspender servicio"}
-            </span>
-          </Button>
+            {draftPending && (
+              <OfflineDraftNotice />
+            )}
+
+            {errorMessage && (
+              <Alert variant="danger">
+                <AlertCircle aria-hidden />
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            )}
+
+            <FieldGroup>
+              {!suspendedService && (
+                <>
+                  <Field data-invalid={Boolean(fieldErrors.reason) || undefined}>
+                    <FieldLabel htmlFor={`${formId}-reason`}>
+                      Motivo de suspensión <span aria-hidden>*</span>
+                    </FieldLabel>
+                    <Select
+                      value={reason || null}
+                      items={reasonItems}
+                      onValueChange={(value) => {
+                        setReason(value as NotServicedReason);
+                        setFieldErrors((prev) => ({ ...prev, reason: undefined }));
+                        setErrorMessage(null);
+                      }}
+                    >
+                      <SelectTrigger
+                        id={`${formId}-reason`}
+                        aria-required="true"
+                        aria-invalid={Boolean(fieldErrors.reason) || undefined}
+                        aria-describedby={fieldErrors.reason ? `${formId}-reason-error` : undefined}
+                      >
+                        <SelectValue placeholder="Seleccione un motivo…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {(Object.keys(NOT_SERVICED_REASON_LABEL) as NotServicedReason[]).map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {NOT_SERVICED_REASON_LABEL[r]}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    {fieldErrors.reason && <FieldError id={`${formId}-reason-error`}>{fieldErrors.reason}</FieldError>}
+                  </Field>
+
+                  <Field data-invalid={Boolean(fieldErrors.note) || undefined}>
+                    <FieldLabel htmlFor={`${formId}-note`}>
+                      Nota <span aria-hidden>*</span>
+                    </FieldLabel>
+                    <Textarea
+                      id={`${formId}-note`}
+                      rows={3}
+                      maxLength={SUSPEND_NOTE_MAX_LENGTH}
+                      value={note}
+                      onChange={(e) => {
+                        setNote(e.target.value);
+                        setFieldErrors((prev) => ({ ...prev, note: undefined }));
+                        setErrorMessage(null);
+                      }}
+                      required
+                      aria-invalid={Boolean(fieldErrors.note)}
+                      aria-describedby={fieldErrors.note ? `${formId}-note-help ${formId}-note-error` : `${formId}-note-help`}
+                      placeholder="Describa la causa"
+                    />
+                    <FieldDescription id={`${formId}-note-help`}>
+                      Obligatoria. Hasta {SUSPEND_NOTE_MAX_LENGTH} caracteres.
+                    </FieldDescription>
+                    {fieldErrors.note && <FieldError id={`${formId}-note-error`}>{fieldErrors.note}</FieldError>}
+                  </Field>
+                </>
+              )}
+
+              <Field>
+                {suspendedService ? (
+                  <FieldTitle>Evidencia adjunta</FieldTitle>
+                ) : (
+                  <FieldLabel htmlFor={`${formId}-evidence-input`}>Evidencia adjunta</FieldLabel>
+                )}
+                {!suspendedService && <FieldDescription>Opcional. Foto del problema.</FieldDescription>}
+                {!suspendedService && (
+                  <>
+                    <Input
+                      ref={fileInputRef}
+                      id={`${formId}-evidence-input`}
+                      type="file"
+                      className="sr-only"
+                      tabIndex={-1}
+                      multiple
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      onChange={handleFileSelect}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="self-start"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip data-icon="inline-start" aria-hidden />
+                      Adjuntar archivos
+                    </Button>
+                  </>
+                )}
+
+                <div aria-live="polite">
+                {queuedFiles.length > 0 && (
+                  <ItemGroup className="gap-2">
+                    {queuedFiles.map((item) => (
+                      <Item key={item.id} variant="outline" size="sm">
+                        <ItemMedia variant="icon">
+                          <Paperclip aria-hidden />
+                        </ItemMedia>
+                        <ItemContent className="min-w-0">
+                          <ItemTitle className="max-w-full truncate">
+                            {item.status === "success" && item.canonicalFilename
+                              ? item.canonicalFilename
+                              : item.localFilename}
+                          </ItemTitle>
+                          {item.status === "error" && (
+                            <ItemDescription className="text-destructive">{item.error}</ItemDescription>
+                          )}
+                        </ItemContent>
+                        <ItemActions>
+                          {item.status === "pending" && <Badge variant="neutral">Pendiente</Badge>}
+                          {item.status === "uploading" && (
+                            <Badge variant="info">
+                              <Spinner data-icon="inline-start" aria-hidden="true" />
+                              Subiendo...
+                            </Badge>
+                          )}
+                          {item.status === "success" && (
+                            <Badge variant="success">
+                              <CheckCircle2 data-icon="inline-start" aria-hidden />
+                              Subido
+                            </Badge>
+                          )}
+                          {item.status === "error" && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              aria-label={`Reintentar ${item.localFilename}`}
+                              onClick={() => handleRetryUpload(item)}
+                              disabled={isSubmitting}
+                            >
+                              <RefreshCw data-icon="inline-start" aria-hidden />
+                              <span>Reintentar</span>
+                            </Button>
+                          )}
+                          {!suspendedService && item.status !== "uploading" && item.status !== "success" && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => handleRemoveFile(item.id)}
+                              aria-label={`Eliminar ${item.localFilename}`}
+                            >
+                              <X aria-hidden />
+                            </Button>
+                          )}
+                        </ItemActions>
+                      </Item>
+                    ))}
+                  </ItemGroup>
+                )}
+                </div>
+              </Field>
+            </FieldGroup>
+          </form>
+        )}
+      </div>
+
+      {!conflict && (
+        <DialogFooter className="flex-wrap">
+          {suspendedService ? (
+            <>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={isSubmitting}
+                onClick={() => setConfirmDiscardOpen(true)}
+                className="mr-auto"
+              >
+                Descartar archivos pendientes
+              </Button>
+              <Button
+                type="button"
+                disabled={isSubmitting || pendingEvidenceCount === 0}
+                onClick={handleRetryPendingUploads}
+                aria-busy={isSubmitting}
+              >
+                {isSubmitting ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <RefreshCw data-icon="inline-start" aria-hidden />}
+                <span>Reintentar archivos pendientes</span>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" form={formId} disabled={isSubmitting} aria-busy={isSubmitting}>
+                {isSubmitting ? (
+                  <Spinner data-icon="inline-start" aria-hidden="true" />
+                ) : draftPending ? (
+                  <RefreshCw data-icon="inline-start" aria-hidden />
+                ) : (
+                  <Pause data-icon="inline-start" aria-hidden />
+                )}
+                <span>{draftPending ? "Reenviar" : "Suspender servicio"}</span>
+              </Button>
+            </>
+          )}
         </DialogFooter>
-      </form>
       )}
+
+      <Dialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+        <DialogContent showCloseButton={false} className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Descartar archivos pendientes</DialogTitle>
+            <DialogDescription>
+              Los archivos pendientes no se enviarán.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmDiscardOpen(false)}>
+              Seguir con los archivos
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleConfirmDiscard}>
+              Confirmar descarte
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

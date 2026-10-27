@@ -1,6 +1,24 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
+
+import { resetContainerFixtures } from "@/lib/containers-fixtures";
+import { resetCrewFixtures } from "@/lib/crew-fixtures";
+import { resetDisposalSiteFixtures } from "@/lib/disposal-site-fixtures";
+import { resetEnvironmentalReportFixtures } from "@/lib/environmental-report-fixtures";
+import { resetGreenPointFixtures } from "@/lib/green-point-fixtures";
+import { resetGreenSpaceFixtures } from "@/lib/green-space-fixtures";
+import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
+import { resetRouteFixtures } from "@/lib/routes-fixtures";
+import { resetServiceFrequencyFixtures } from "@/lib/service-frequency-fixtures";
+import { resetServiceTypeFixtures } from "@/lib/service-type-fixtures";
+import { resetServiceFixtures, resetZoneResultFixtures } from "@/lib/services-fixtures";
+import { resetStreetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
+import { resetTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
+import { resetTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
+import { resetTreeFixtures } from "@/lib/tree-fixtures";
+import { resetVehicleFixtures } from "@/lib/vehicles-fixtures";
+import { resetZoneFixtures } from "@/lib/zones-fixtures";
 
 function navigate(href: string, replace = false) {
   window.history[replace ? "replaceState" : "pushState"](null, "", href);
@@ -81,3 +99,31 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 afterEach(() => {
   cleanup();
 });
+
+// Restore shared mutable fixtures before each test; each test can mutate its own baseline.
+beforeEach(() => {
+  resetContainerFixtures();
+  resetCrewFixtures();
+  resetDisposalSiteFixtures();
+  resetEnvironmentalReportFixtures();
+  resetGreenPointFixtures();
+  resetGreenSpaceFixtures();
+  resetRepairRequestFixtures();
+  resetRouteFixtures();
+  resetServiceFrequencyFixtures();
+  resetServiceTypeFixtures();
+  resetServiceFixtures();
+  resetZoneResultFixtures();
+  resetStreetClosureRequestFixtures();
+  resetTreeInterventionFixtures();
+  resetTreeSurveyFixtures();
+  resetTreeFixtures();
+  resetVehicleFixtures();
+  resetZoneFixtures();
+});
+
+// #397 field-draft owner for component tests
+import { setFieldDraftOwner } from "@/lib/field-drafts";
+
+beforeEach(() => setFieldDraftOwner("test-actor"));
+afterEach(() => setFieldDraftOwner(undefined));

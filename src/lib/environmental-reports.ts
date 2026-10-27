@@ -4,6 +4,7 @@ import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_NOTES_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
+import { droppedRecords, tolerantRecords } from "./tolerant-records";
 
 export const environmentalReportTypeSchema = z.enum([
   "NOISE",
@@ -74,6 +75,16 @@ export type CreateEnvironmentalReportInput = z.infer<typeof createEnvironmentalR
 export const reportDecisionInputSchema = z.object({ reason: reasonInput("Debe indicar el motivo.") });
 export type ReportDecisionInput = z.infer<typeof reportDecisionInputSchema>;
 
+// Backend RequestInformationDto: message (required, max 500) is what the citizen sees in M2;
+// requiredBy is a SUGGESTED deadline (YYYY-MM-DD; M2 sets the effective one); internalNote is
+// team-only (max 500); a blank one is dropped instead of sent as "".
+export const requestInformationInputSchema = z.object({
+  message: reasonInput("Debe indicar qué información se le pide al vecino."),
+  requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha sugerida es inválida.").optional(),
+  internalNote: z.string().trim().max(500, "La nota interna no puede superar los 500 caracteres.").optional().transform((value) => value || undefined),
+});
+export type RequestInformationInput = z.input<typeof requestInformationInputSchema>;
+
 const reportLocationSchema = z.object({
   address: z.string().nullable().optional(),
   lat: z.number().nullable().optional(),
@@ -103,6 +114,10 @@ export const environmentalReportSchema = z.object({
   deadlineAt: z.string().nullable().optional(),
   escalated: z.boolean().optional(),
   citizenResponse: z.string().nullable().optional(),
+  informationRequestPending: z.boolean().optional(),
+  informationRequestedAt: z.string().nullable().optional(),
+  informationRequestMessage: z.string().nullable().optional(),
+  informationRequestRequiredBy: z.string().nullable().optional(),
   sanctionOutcome: sanctionOutcomeSchema.nullable().optional(),
   assignedCrewId: z.string().nullable().optional(),
   createdAt: z.string(),
@@ -254,6 +269,7 @@ export type EnvironmentalInspectionCompleteInput = z.infer<typeof environmentalI
 // Hypothesis: schedule fields are kept explicit at this adapter seam until OpenAPI
 // exposes the authoritative request and response nesting.
 export const environmentalInspectionScheduleInputSchema = z.object({
+  inspectorId: z.string().trim().regex(/^\d{1,19}$/, "El inspector debe tener un identificador numérico de M1.").optional(),
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
   timeWindow: z.object({
     start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
@@ -267,6 +283,8 @@ export const environmentalInspectionScheduleInputSchema = z.object({
 export type EnvironmentalInspectionScheduleInput = z.infer<typeof environmentalInspectionScheduleInputSchema>;
 
 export const environmentalInspectionSchema = z.object({
+  inspectorId: z.string().nullable().optional(),
+  completedByUserId: z.string().nullable().optional(),
   id: z.string(),
   reportId: z.string(),
   serviceId: z.string().nullable().optional(),
@@ -339,8 +357,18 @@ export const violationNoticeSchema = z.object({
 }).passthrough();
 export type ViolationNotice = z.infer<typeof violationNoticeSchema>;
 
+export const environmentalReportDateRangeSchema = z.object({
+  from: z.iso.date("Use una fecha válida con formato AAAA-MM-DD.").optional(),
+  to: z.iso.date("Use una fecha válida con formato AAAA-MM-DD.").optional(),
+}).refine((range) => !range.from || !range.to || range.from <= range.to, {
+  path: ["to"],
+  message: "La fecha «Desde» no puede ser posterior a «Hasta».",
+});
+
 export type EnvironmentalReportQuery = {
-  status?: EnvironmentalReportStatus;
+  from?: string;
+  to?: string;
+  status?: EnvironmentalReportStatus | EnvironmentalReportStatus[];
   reportType?: EnvironmentalReportType;
   priority?: EnvironmentalReportPriority;
   publicId?: string;
@@ -352,6 +380,8 @@ export type EnvironmentalReportQuery = {
 
 export type EnvironmentalReportsPage = {
   environmentalReports: EnvironmentalReport[];
+  /** Records of this page dropped for an unknown enum value (not the same as `total` exceeding the rows shown). */
+  dropped?: number;
   page: number;
   pageSize: number;
   total: number;
@@ -418,7 +448,10 @@ const errorResponseSchema = z.object({
 
 function queryString(query: EnvironmentalReportQuery): string {
   const params = new URLSearchParams();
-  if (query.status) params.set("status", query.status);
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
+  const statuses = Array.isArray(query.status) ? query.status : query.status ? [query.status] : [];
+  for (const status of statuses) params.append("status", status);
   if (query.reportType) params.set("reportType", query.reportType);
   if (query.priority) params.set("priority", query.priority);
   if (query.publicId) params.set("publicId", query.publicId);
@@ -515,13 +548,15 @@ export const environmentalReportsAdapter = {
   async list(query: EnvironmentalReportQuery = {}): Promise<EnvironmentalReportsPage> {
     const payload = await requestJson(`/api/environmental-reports${queryString(query)}`);
     const parsed = z.object({
-      data: z.array(environmentalReportSchema),
-      meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
+      data: tolerantRecords(environmentalReportSchema, "environmental-reports"),
+      // `meta.dropped`: what the Field BFF already dropped while scoping to the crew.
+      meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number(), dropped: z.number().int().nonnegative().optional() }),
       sanctionOutcomeIntegrationExceptions: z.array(sanctionOutcomeIntegrationExceptionSchema).optional(),
     }).safeParse(payload);
     if (!parsed.success) throw new EnvironmentalReportContractError("La lista de expedientes no respeta el contrato esperado.", { cause: parsed.error });
     return {
       environmentalReports: parsed.data.data,
+      dropped: droppedRecords(parsed.data.data) + (parsed.data.meta.dropped ?? 0),
       page: parsed.data.meta.page,
       pageSize: parsed.data.meta.pageSize,
       total: parsed.data.meta.total,
@@ -552,6 +587,15 @@ export const environmentalReportsAdapter = {
   },
   async dismiss(id: string, input: ReportDecisionInput): Promise<EnvironmentalReport> {
     return transition(id, "dismiss", "La respuesta de desestimación no respeta el contrato esperado.", decisionBody(input));
+  },
+  async requestInformation(id: string, input: RequestInformationInput): Promise<EnvironmentalReport> {
+    const parsed = requestInformationInputSchema.safeParse(input);
+    if (!parsed.success) throw new EnvironmentalReportContractError(parsed.error.issues[0]?.message ?? "El pedido de información es inválido.", { cause: parsed.error });
+    return parseResource(await requestJson(`/api/environmental-reports/${encodeURIComponent(id)}/request-information`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsed.data),
+    }), "La respuesta del pedido de información no respeta el contrato esperado.");
   },
   async close(id: string): Promise<EnvironmentalReport> {
     return transition(id, "close", "La respuesta de cierre no respeta el contrato esperado.");

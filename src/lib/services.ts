@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { todayInArgentina } from "./argentina-date";
+import { formatCalendarDay, todayInArgentina } from "./argentina-date";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import {
   streetClosureRequestsAdapter,
@@ -10,6 +10,7 @@ import { catalogoDeEtiquetas, componerTituloDeServicio } from "./service-labels"
 import { serviceTypeCategorySchema } from "./service-types";
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_EXTERNAL_ID_LENGTH, MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
+import { droppedRecords, tolerantRecords } from "./tolerant-records";
 
 export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
 export type ServiceMode = z.infer<typeof serviceModeSchema>;
@@ -95,6 +96,7 @@ export const serviceSchema = z.object({
   mode: serviceModeSchema,
   status: serviceStatusSchema,
   statusReason: z.string().nullable().optional(),
+  statusNote: z.string().nullable().optional(),
   origin: serviceOriginSchema,
   zoneIds: z.array(z.string()).min(1),
   zoneNames: z.array(z.string()).optional().default([]),
@@ -319,14 +321,34 @@ export const assignCrewInputSchema = z.object({
 
 export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
 
+export const SUSPEND_NOTE_MAX_LENGTH = 500;
+
+const suspendServiceNoteSchema = z
+  .string()
+  .max(
+    SUSPEND_NOTE_MAX_LENGTH,
+    `La nota de suspensión no puede superar los ${SUSPEND_NOTE_MAX_LENGTH} caracteres.`,
+  )
+  .trim();
+
+// The Field form keeps the note required; the BFF accepts the backend's optional note contract.
 export const suspendServiceInputSchema = z.object({
   reason: notServicedReasonSchema,
-  note: z.string().trim().min(1, "La nota es obligatoria para suspender el servicio"),
+  note: suspendServiceNoteSchema.min(1, "La nota es obligatoria para suspender el servicio"),
+});
+export const suspendServiceRequestSchema = z.object({
+  reason: notServicedReasonSchema,
+  note: suspendServiceNoteSchema.optional(),
 });
 export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
+export type SuspendServiceRequest = z.infer<typeof suspendServiceRequestSchema>;
 
-export function toSuspendServiceBackendInput(input: SuspendServiceInput) {
-  return { reason: input.reason };
+export function toSuspendServiceBackendInput(input: SuspendServiceRequest) {
+  const note = input.note?.trim();
+  return {
+    reason: NOT_SERVICED_REASON_LABEL[input.reason],
+    ...(note ? { note } : {}),
+  };
 }
 
 export const rescheduleServiceInputSchema = z.object({
@@ -413,12 +435,33 @@ export const NOT_SERVICED_REASON_LABEL: Record<NotServicedReason, string> = {
   OTHER: "Otro motivo",
 };
 
+export const serviceQuerySchema = z.object({
+  status: z.union([serviceStatusSchema, z.array(serviceStatusSchema)]).optional(),
+  mode: serviceModeSchema.optional(),
+  origin: serviceOriginSchema.optional(),
+  serviceTypeId: z.string().min(1).optional(),
+  vehicleId: z.string().min(1).optional(),
+  ticketId: z.string().min(1).optional(),
+  zoneId: z.string().min(1).optional(),
+  crewId: z.string().min(1).optional(),
+  scheduledFrom: z.union([z.iso.date(), z.iso.datetime({ offset: true })]).optional(),
+  scheduledTo: z.union([z.iso.date(), z.iso.datetime({ offset: true })]).optional(),
+  search: z.string().optional(),
+  timeFrom: z.string().optional(),
+  timeTo: z.string().optional(),
+  page: z.number().int().optional(),
+  pageSize: z.number().int().optional(),
+});
+
 export type ServiceQuery = {
   status?: ServiceStatus | ServiceStatus[];
   mode?: ServiceMode;
   origin?: ServiceOrigin;
   zoneId?: string;
   crewId?: string;
+  serviceTypeId?: string;
+  vehicleId?: string;
+  ticketId?: string;
   search?: string;
   timeFrom?: string;
   timeTo?: string;
@@ -430,6 +473,8 @@ export type ServiceQuery = {
 
 export type ServicesPage = {
   services: Service[];
+  /** Records of this page dropped for an unknown enum value (not the same as `total` exceeding the rows shown). */
+  dropped?: number;
   page: number;
   pageSize: number;
   total: number;
@@ -484,13 +529,15 @@ export const STATUS_ORDER: Record<ServiceStatus, number> = {
   CANCELLED: 6,
 };
 
-const servicesEnvelopeSchema = z.object({
-  data: z.array(serviceWireSchema),
+export const servicesEnvelopeSchema = z.object({
+  data: tolerantRecords(serviceWireSchema, "services"),
   meta: z.object({
     total: z.number(),
     page: z.number(),
     pageSize: z.number(),
     totalPages: z.number(),
+    // Set by the BFF, which parses (and so drops) before re-serializing.
+    dropped: z.number().int().nonnegative().optional(),
   }),
 });
 
@@ -515,6 +562,9 @@ function buildServicesQueryString(query: ServiceQuery): string {
   if (query.origin) params.set("origin", query.origin);
   if (query.zoneId) params.set("zoneId", query.zoneId);
   if (query.crewId) params.set("crewId", query.crewId);
+  if (query.serviceTypeId) params.set("serviceTypeId", query.serviceTypeId);
+  if (query.vehicleId) params.set("vehicleId", query.vehicleId);
+  if (query.ticketId) params.set("ticketId", query.ticketId);
   if (query.search) params.set("search", query.search);
   if (query.timeFrom) params.set("timeFrom", query.timeFrom);
   if (query.timeTo) params.set("timeTo", query.timeTo);
@@ -609,6 +659,7 @@ export const servicesAdapter = {
 
     return {
       services: await Promise.all(parsed.data.data.map(completarEtiquetas)),
+      dropped: droppedRecords(parsed.data.data) + (parsed.data.meta.dropped ?? 0),
       page: parsed.data.meta.page,
       pageSize: parsed.data.meta.pageSize,
       total: parsed.data.meta.total,
@@ -1157,6 +1208,7 @@ export const servicesAdapter = {
     file: File;
     ownerType: EvidenceOwnerType;
     ownerId: string;
+    serviceId?: string;
     idempotencyKey?: string;
   }): Promise<Attachment> {
     const key =
@@ -1167,9 +1219,11 @@ export const servicesAdapter = {
     const formData = new FormData();
     formData.append("file", params.file);
     formData.append("fileName", params.file.name);
-    formData.append("fileSize", String(params.file.size));
     formData.append("ownerType", params.ownerType);
     formData.append("ownerId", params.ownerId);
+    if (params.ownerType === "ZONE_RESULT" && params.serviceId) {
+      formData.append("serviceId", params.serviceId);
+    }
 
     let response: Response;
     try {
@@ -1341,10 +1395,8 @@ export function checkServiceWindowTiming(
     return { isOutside: false, timing: "within", message: null };
   }
 
-  const currentYear = now.getFullYear();
-  const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
-  const currentDay = String(now.getDate()).padStart(2, "0");
-  const currentDateStr = `${currentYear}-${currentMonth}-${currentDay}`;
+  const currentDateStr = todayInArgentina(now);
+  const scheduledDateLabel = formatCalendarDay(service.scheduledDate);
 
   const currentHours = String(now.getHours()).padStart(2, "0");
   const currentMinutes = String(now.getMinutes()).padStart(2, "0");
@@ -1354,14 +1406,14 @@ export function checkServiceWindowTiming(
     return {
       isOutside: true,
       timing: "late",
-      message: `Inicio fuera de ventana horaria: la fecha programada fue el ${service.scheduledDate} (${service.windowFrom} – ${service.windowTo}).`,
+      message: `Inicio fuera de ventana horaria: la fecha programada fue el ${scheduledDateLabel} (${service.windowFrom} – ${service.windowTo}).`,
     };
   }
   if (service.scheduledDate > currentDateStr) {
     return {
       isOutside: true,
       timing: "early",
-      message: `Inicio fuera de ventana horaria: el servicio está programado para el ${service.scheduledDate} (${service.windowFrom} – ${service.windowTo}).`,
+      message: `Inicio fuera de ventana horaria: el servicio está programado para el ${scheduledDateLabel} (${service.windowFrom} – ${service.windowTo}).`,
     };
   }
 

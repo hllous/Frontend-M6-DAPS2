@@ -1,6 +1,7 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   getZoneResultsByServiceId,
   serviceFixtures,
@@ -19,27 +20,9 @@ import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 function findTargetContainer(service: (typeof serviceFixtures)[number]) {
   if (service.mode !== "POINT" || service.targetType !== "CONTAINER") return null;
@@ -83,7 +66,7 @@ function capStatusReason(value: string): string {
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const params = await context.params;
   const serviceId = params.id;
@@ -93,13 +76,7 @@ export async function POST(
     const session = getRequiredSession(request);
     const scenario = getScenario(session);
 
-    if (!scenario.capabilities.includes("service:execute")) {
-      return errorResponse(
-        403,
-        "No tiene permisos para completar el servicio. Solo la persona responsable de la cuadrilla puede hacerlo.",
-        path,
-      );
-    }
+    authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para completar el servicio. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
 
     let completionInput: CompleteServiceInput = {};
     const requestBody = await request.text();
@@ -117,7 +94,9 @@ export async function POST(
       completionInput = parsedInput.data;
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
+      const scopedService = await requireCrewScope(request, session, { serviceId });
+      if (scopedService instanceof Response) return scopedService;
       const backendInit: RequestInit = { method: "POST" };
       if (requestBody.trim()) {
         backendInit.headers = { "content-type": "application/json" };
@@ -125,15 +104,11 @@ export async function POST(
       }
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/complete`,
+        `/services/${pathId(serviceId)}/complete`,
         undefined,
         backendInit,
       );
-      const bodyText = await backendResponse.text();
-      return new NextResponse(bodyText, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const service = serviceFixtures.find((s) => s.id === serviceId);
@@ -181,6 +156,7 @@ export async function POST(
       try {
         transitionTargetContainer(service, completionInput);
       } catch (error) {
+      if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
         if (error instanceof Error && error.message === "CONTAINER_LOCATION_REQUIRED") {
           return errorResponse(400, "La nueva ubicación del contenedor es obligatoria para completar la reubicación.", path);
         }
@@ -209,6 +185,6 @@ export async function POST(
       recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
       return errorResponse(401, "La sesión no está activa o es inválida.", path);
     }
-    return errorResponse(500, "Error interno del servidor.", path);
+    return mapSessionError(caught, path, "Error interno del servidor.");
   }
 }

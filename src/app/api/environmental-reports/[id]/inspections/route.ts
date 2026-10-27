@@ -1,6 +1,7 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   addEnvironmentalInspectionFixture,
   createEnvironmentalInspectionFixture,
@@ -12,51 +13,49 @@ import {
 import { environmentalInspectionScheduleInputSchema, type EnvironmentalInspection } from "@/lib/environmental-reports";
 import { withInspectionAttachments } from "@/app/api/environmental-inspections/_attachments";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError, requireCapability } from "@/lib/session";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json({ statusCode: status, message, error: status === 409 ? "Conflict" : status === 404 ? "Not Found" : status === 403 ? "Forbidden" : status === 401 ? "Unauthorized" : "Error", timestamp: new Date().toISOString(), path }, { status });
-}
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "environmentalInspection:view");
-    const scenario = getScenario(session.scenarioId);
+    authorize(session, { capability: "environmentalInspection:view", throwOnError: true });
+    const scenario = getScenario(session);
     if (scenario.actor.kind === "FIELD") return errorResponse(404, "Historia de inspecciones no encontrada.", path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      return withInspectionAttachments(request, await fetchBackend(request, "/environmental-reports/" + encodeURIComponent(id) + "/inspections", "environmentalInspection:view"));
+    if (backendMode(session)) {
+      return withInspectionAttachments(request, await fetchBackend(request, "/environmental-reports/" + pathId(id) + "/inspections", "environmentalInspection:view"));
     }
     if (!getEnvironmentalReportFixture(id)) return errorResponse(404, "Expediente ambiental no encontrado.", path);
     return NextResponse.json(listEnvironmentalInspectionFixtures(id));
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof Error && error.name === "ForbiddenSessionError") return errorResponse(403, "La sesión no tiene permiso para consultar inspecciones.", path);
-    return errorResponse(500, "No se pudo cargar la historia de inspecciones.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para consultar inspecciones.", path, FORBIDDEN_CODES.roleRequired);
+    return mapSessionError(error, path, "No se pudo cargar la historia de inspecciones.");
   }
 }
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    requireCapability(session, "environmentalInspection:schedule");
-    const scenario = getScenario(session.scenarioId);
+    authorize(session, { capability: "environmentalInspection:schedule", throwOnError: true });
+    const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede programar inspecciones.", path);
     let body: unknown;
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = environmentalInspectionScheduleInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       // El backend solo acepta serviceId/inspectorId al programar (CreateInspectionDto
       // con forbidNonWhitelisted): la fecha, la ventana, el checklist y la zona van al
       // Service, no a la inspección.
-      const response = await fetchBackend(request, "/environmental-reports/" + encodeURIComponent(id) + "/inspections", "environmentalInspection:schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) });
-      return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
+      const response = await fetchBackend(request, "/environmental-reports/" + pathId(id) + "/inspections", "environmentalInspection:schedule", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ inspectorId: parsed.data.inspectorId }) });
+      return forwardResponse(response);
     }
     const report = getEnvironmentalReportFixture(id);
     if (!report) return errorResponse(404, "Expediente ambiental no encontrado.", path);
@@ -72,7 +71,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    if (error instanceof Error && error.name === "ForbiddenSessionError") return errorResponse(403, "La sesión no tiene permiso para programar inspecciones.", path);
-    return errorResponse(500, "No se pudo programar la inspección.", path);
+    if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene permiso para programar inspecciones.", path, FORBIDDEN_CODES.roleRequired);
+    return mapSessionError(error, path, "No se pudo programar la inspección.");
   }
 }

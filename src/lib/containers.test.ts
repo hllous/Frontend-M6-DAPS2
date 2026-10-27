@@ -5,6 +5,7 @@ import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { withNodeFile } from "@/mocks/node-file";
 import { NetworkFailureError } from "./authenticated-fetch";
+import { containerFixtures } from "./containers-fixtures";
 import {
   ContainerContractError,
   ContainerRequestError,
@@ -37,6 +38,24 @@ describe("containers adapter", () => {
 
     await expect(containersAdapter.list()).resolves.toMatchObject({
       containers: [{ id: "container-null", address: null, lat: null, lng: null }],
+    });
+  });
+
+  it("keeps the container page when a response coordinate is out of range (#439)", async () => {
+    const base = containerFixtures[0]!;
+    server.use(http.get("*/api/containers", () => HttpResponse.json({
+      data: [
+        { ...base, id: "container-invalid-map-coordinate", code: "CT-INVALID-COORD", lat: 91, lng: -58.4 },
+        { ...base, id: "container-valid-map-coordinate", code: "CT-VALID-COORD", lat: -34.6, lng: -58.4 },
+      ],
+      meta: { total: 2, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    await expect(containersAdapter.list()).resolves.toMatchObject({
+      containers: [
+        { id: "container-invalid-map-coordinate", lat: null, lng: null },
+        { id: "container-valid-map-coordinate", lat: -34.6, lng: -58.4 },
+      ],
     });
   });
 
@@ -142,6 +161,18 @@ describe("containers adapter", () => {
       address: "Av. Rivadavia 2000",
       capacityLiters: 3200,
     });
+  });
+
+  it("drops a container with an unknown status instead of failing the whole list (#638)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const good = { id: "c-ok", code: "CT-OK", containerType: "HOUSEHOLD", zoneId: "zone-1", address: null, lat: null, lng: null, capacityLiters: 1100, status: "ACTIVE", damageType: null, severity: null, requiresPublicWorks: null };
+    server.use(http.get("*/api/containers", () => HttpResponse.json({
+      data: [{ ...good, id: "c-new", status: "FROM_THE_FUTURE" }, good],
+      meta: { total: 2, page: 1, pageSize: 20, totalPages: 1 },
+    })));
+
+    const page = await containersAdapter.list();
+    expect(page.containers.map((container) => container.id)).toEqual(["c-ok"]);
   });
 
   it("fails explicitly on malformed success payloads", async () => {

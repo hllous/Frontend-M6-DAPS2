@@ -1,11 +1,16 @@
 import type { Vehicle, VehicleQuery } from "./vehicles";
 
-export const vehicleFixtures: Vehicle[] = [
+const INITIAL_VEHICLE_FIXTURES: Vehicle[] = [
   { id: "vehicle-1", plate: "AA 123 AA", vehicleType: "COMPACTOR_TRUCK", capacity: 16, active: true },
   { id: "vehicle-2", plate: "AB 456 BC", vehicleType: "SWEEPER", capacity: 8, active: true },
   { id: "vehicle-3", plate: "AC 789 CD", vehicleType: "DUMP_TRUCK", capacity: 12, active: false },
   { id: "vehicle-4", plate: "AD 321 DE", vehicleType: "VAN", capacity: 5, active: true },
 ];
+export const vehicleFixtures: Vehicle[] = structuredClone(INITIAL_VEHICLE_FIXTURES);
+
+export function resetVehicleFixtures() {
+  vehicleFixtures.splice(0, vehicleFixtures.length, ...structuredClone(INITIAL_VEHICLE_FIXTURES));
+}
 
 export function filterVehicleFixtures(query: VehicleQuery): Vehicle[] {
   return vehicleFixtures.filter((vehicle) => {

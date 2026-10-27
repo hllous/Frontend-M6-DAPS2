@@ -1,13 +1,12 @@
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
-import { getScenario } from "@/lib/scenarios";
 import {
   AuthUnavailableError,
   ForbiddenSessionError,
   getRequiredSession,
   InvalidSessionError,
-  requireCapability,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import {
@@ -19,28 +18,9 @@ import {
 import { createRouteInputSchema, type Route, type RouteQuery } from "@/lib/routes";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 function parseRouteQuery(url: URL): RouteQuery {
   return {
@@ -52,18 +32,6 @@ function parseRouteQuery(url: URL): RouteQuery {
   };
 }
 
-function backendQueryString(query: RouteQuery): string {
-  const params = new URLSearchParams();
-  if (query.active !== undefined) params.set("active", String(query.active));
-  if (query.zoneId) params.set("zoneId", query.zoneId);
-  if (query.search) params.set("search", query.search);
-  if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
-
-  const queryString = params.toString();
-  return queryString ? `?${queryString}` : "";
-}
-
 export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
 
@@ -71,13 +39,9 @@ export async function GET(request: Request) {
     const session = getRequiredSession(request);
     const query = parseRouteQuery(new URL(request.url));
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
-      const backendResponse = await fetchBackend(request, `/routes${backendQueryString(query)}`);
-      const body = await backendResponse.text();
-      return new NextResponse(body, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/routes${backendQuery(query, ["active", "zoneId", "search", "page", "pageSize"])}`);
+            return forwardResponse(backendResponse);
     }
 
     return NextResponse.json(paginateRouteFixtures(filterRouteFixtures(query), query.page, query.pageSize));
@@ -89,7 +53,7 @@ export async function GET(request: Request) {
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudieron cargar los recorridos.", path);
+    return mapSessionError(error, path, "No se pudieron cargar los recorridos.");
   }
 }
 
@@ -98,12 +62,8 @@ export async function POST(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const scenario = getScenario(session);
 
-    if (scenario.actor.kind !== "OFFICE") {
-      throw new ForbiddenSessionError("Solo el rol de Oficina puede crear recorridos.");
-    }
-    requireCapability(session, "route:manage");
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede crear recorridos.", capability: "route:manage", throwOnError: true });
 
     let body: unknown;
     try {
@@ -117,17 +77,13 @@ export async function POST(request: Request) {
       return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
     }
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/routes", "route:manage", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const responseBody = await backendResponse.text();
-      return new NextResponse(responseBody, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const existing = routeFixtures.find(
@@ -154,11 +110,11 @@ export async function POST(request: Request) {
     }
     if (error instanceof ForbiddenSessionError) {
       recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-      return errorResponse(403, error.message, path);
+      return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
     }
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo crear el recorrido.", path);
+    return mapSessionError(error, path, "No se pudo crear el recorrido.");
   }
 }

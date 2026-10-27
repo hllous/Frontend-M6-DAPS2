@@ -17,8 +17,8 @@ export const neighborhoodsAdapter = {
   },
 
   /**
-   * Un barrio asignado en el backend puede no estar en este catálogo: los barrios
-   * son de M9 y su catálogo todavía no se publicó (docs/bloqueantes.md), así que
+   * Un barrio asignado en el backend puede no estar en este catálogo: el catálogo
+   * de barrios todavía no se publicó y su dueño está por confirmar (ROADMAP.md), así que
    * un id como `caba-belgrano` no resuelve a un nombre. Se devuelve el id como
    * nombre en vez de descartarlo: la zona tiene ese barrio asignado y decir que no
    * tiene ninguno sería peor que mostrar el identificador.

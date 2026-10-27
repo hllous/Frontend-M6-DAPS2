@@ -2,13 +2,15 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2, MapPin, MapPinOff, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { operationalMapAdapter, type OperationalMapData } from "@/lib/operational-map";
 import { operationalZonesAdapter, type OperationalZone } from "@/lib/operational-zones";
 import { resolveServiceMapLocations } from "@/lib/services-map";
 import type { Service } from "@/lib/services";
 import { cn } from "@/lib/utils";
+import { createServiceOrdinals } from "./service-sorting";
 import styles from "./services-map.module.css";
 
 const ServicesMapCanvas = dynamic(
@@ -16,8 +18,8 @@ const ServicesMapCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className={styles.mapLoading} role="status" aria-label="Preparando mapa geográfico">
-        Preparando mapa geográfico
+      <div className={styles.mapLoading} role="status" aria-label="Cargando mapa…">
+        Cargando mapa…
       </div>
     ),
   },
@@ -28,37 +30,33 @@ type ReferenceDataState =
   | { status: "error"; message: string }
   | { status: "ready"; mapData: OperationalMapData; zones: OperationalZone[] };
 
-function serviceCountLabel(count: number) {
-  return `${count} servicio${count === 1 ? "" : "s"} visible${count === 1 ? "" : "s"}`;
-}
-
-function unlocatedServiceLabel(count: number) {
-  return `${count} servicio${count === 1 ? "" : "s"} sin ubicación`;
-}
-
 type MapViewProps = {
   services: Service[];
+  serviceOrdinals?: ReadonlyMap<string, number>;
   selectedId: string | null;
   onSelect: (id: string) => void;
   loading?: boolean;
   error?: boolean;
   onRetry?: () => void;
-  filterFingerprint?: string;
+  compact?: boolean;
   className?: string;
 };
 
 export function MapView({
   services,
+  serviceOrdinals: suppliedServiceOrdinals,
   selectedId,
   onSelect,
   loading = false,
   error = false,
   onRetry,
-  filterFingerprint,
+  compact = false,
   className,
 }: MapViewProps) {
   const [referenceData, setReferenceData] = useState<ReferenceDataState>({ status: "loading" });
   const [retryVersion, setRetryVersion] = useState(0);
+  const computedServiceOrdinals = useMemo(() => createServiceOrdinals(services), [services]);
+  const serviceOrdinals = suppliedServiceOrdinals ?? computedServiceOrdinals;
 
   useEffect(() => {
     let isCurrent = true;
@@ -74,7 +72,7 @@ export function MapView({
           setReferenceData({
             status: "error",
             message:
-              "No se pudo cargar la información territorial. Revise la conexión e intente nuevamente.",
+              "No se pudo cargar el mapa. Intente nuevamente.",
           });
         }
       });
@@ -91,11 +89,6 @@ export function MapView({
         : [],
     [referenceData, services],
   );
-  const unlocatedLocations = useMemo(
-    () => locations.filter((location) => location.coordinates === null),
-    [locations],
-  );
-  const selectedUnlocated = unlocatedLocations.find((location) => location.serviceId === selectedId);
   const hasReferenceDataError = referenceData.status === "error";
   const hasError = error || hasReferenceDataError;
   const isLoading = loading || referenceData.status === "loading";
@@ -108,60 +101,24 @@ export function MapView({
   return (
     <div
       className={cn(
-        "relative h-full min-h-[360px] w-full overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-canvas)]",
+        "relative h-full w-full overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-canvas)]",
         className,
+        compact && styles.mapCompact,
       )}
       role="region"
-      aria-label="Mapa territorial de Servicios"
+      aria-label="Mapa de servicios"
     >
       {!hasError && referenceData.status === "ready" ? (
-        <div className={styles.mapLayer}>
+        <div className={cn(styles.mapLayer, compact && styles.mapLayerCompact)}>
           <ServicesMapCanvas
             services={services}
+            serviceOrdinals={serviceOrdinals}
             locations={locations}
             selectedId={selectedId}
             onSelect={onSelect}
-            filterFingerprint={filterFingerprint}
+            compact={compact}
           />
 
-          {services.length === 0 ? (
-            <div className={styles.emptyNotice} role="status">
-              <MapPin aria-hidden="true" />
-              <strong>No hay servicios para mostrar</strong>
-              <span>Modifique los filtros para consultar otra selección.</span>
-            </div>
-          ) : null}
-
-          {unlocatedLocations.length > 0 ? (
-            <div className={styles.locationNotice} role="status" aria-live="polite">
-              <MapPinOff aria-hidden="true" />
-              <div>
-                <strong>{unlocatedServiceLabel(unlocatedLocations.length)}</strong>
-                <span>
-                  {selectedUnlocated
-                    ? `${selectedUnlocated.serviceId} no tiene un objetivo o una zona con coordenadas resolubles.`
-                    : "No se muestran como pines hasta contar con una ubicación resoluble."}
-                </span>
-                <div className={styles.locationActions} aria-label="Servicios sin ubicación">
-                  {unlocatedLocations.map((location) => {
-                    const service = services.find((candidate) => candidate.id === location.serviceId);
-                    return (
-                      <button
-                        key={location.serviceId}
-                        type="button"
-                        className={styles.locationAction}
-                        aria-label={`Seleccionar ${location.serviceId} sin ubicación`}
-                        aria-pressed={location.serviceId === selectedId}
-                        onClick={() => onSelect(location.serviceId)}
-                      >
-                        {service?.id ?? location.serviceId}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : null}
         </div>
       ) : null}
 
@@ -172,23 +129,19 @@ export function MapView({
           </div>
           <div>
             <h3>No se pudo cargar el mapa</h3>
-            <p>
-              {hasReferenceDataError && referenceData.status === "error"
-                ? referenceData.message
-                : "La tabla de servicios permanece completamente disponible y operativa. El mapa es una vista complementaria."}
-            </p>
+            {hasReferenceDataError && referenceData.status === "error" ? <p>{referenceData.message}</p> : null}
           </div>
           {onRetry ? (
             <Button variant="outline" size="sm" onClick={handleRetry}>
               <RefreshCw data-icon="inline-start" aria-hidden="true" />
-              Reintentar mapa
+              Reintentar
             </Button>
           ) : null}
         </div>
       ) : isLoading ? (
-        <div role="status" aria-live="polite" className={styles.stateOverlay}>
-          <Loader2 className="h-5 w-5 animate-spin text-[var(--color-action)]" aria-hidden="true" />
-          <span>Cargando mapa territorial…</span>
+        <div role="status" aria-live="polite" className={cn(styles.stateOverlay, compact && styles.stateOverlayCompact)}>
+          <Spinner className="size-5 text-[var(--color-action)]" aria-hidden="true" role="presentation" />
+          <span>Cargando mapa…</span>
         </div>
       ) : null}
 
@@ -196,27 +149,25 @@ export function MapView({
         <div
           className={cn(styles.loadingIndex, (!isLoading || hasError) && styles.loadingIndexHidden)}
           aria-hidden={!isLoading || hasError}
-          aria-label="Servicios disponibles mientras carga el mapa"
         >
-          {services.map((service, index) => (
-            <button
+          {services.map((service) => (
+            <Button
               key={service.id}
               type="button"
+              variant="outline"
+              size="icon-sm"
+              className="rounded-full font-bold tabular-nums text-[var(--color-action)]"
               tabIndex={isLoading && !hasError ? 0 : -1}
-              aria-label={`Parada ${index + 1}: ${service.id} — ${service.title} (${service.zoneNames.join(", ")})`}
+              aria-label={`Parada ${serviceOrdinals.get(service.id)}: ${service.title} (${service.zoneNames.join(", ")})`}
               aria-pressed={service.id === selectedId}
               onClick={() => onSelect(service.id)}
             >
-              {index + 1}
-            </button>
+              {serviceOrdinals.get(service.id)}
+            </Button>
           ))}
         </div>
       ) : null}
 
-      <div className={styles.counter} aria-live="polite">
-        <MapPin aria-hidden="true" />
-        <span>{serviceCountLabel(services.length)}</span>
-      </div>
     </div>
   );
 }

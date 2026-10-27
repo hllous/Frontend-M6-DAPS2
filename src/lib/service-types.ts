@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import { tolerantRecords } from "./tolerant-records";
 
 export const serviceTypeCategorySchema = z.enum([
   "WASTE_COLLECTION",
@@ -77,7 +78,7 @@ export class ServiceTypeRequestError extends Error {
 }
 
 const pageSchema = z.object({
-  data: z.array(serviceTypeSchema),
+  data: tolerantRecords(serviceTypeSchema, "service-types"),
   meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
 });
 

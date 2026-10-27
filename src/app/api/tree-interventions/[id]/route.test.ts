@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { addTreeInterventionFixture, resetTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
 import type { TreeInterventionType } from "@/lib/tree-interventions";
 import { GET } from "./route";
@@ -9,18 +8,15 @@ import { POST as reject } from "./reject/route";
 import { POST as submitForAuthorization } from "./submit-for-authorization/route";
 import { POST as assignService } from "./assign-service/route";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
+import { loginAs, loginWithMe as login } from "@/test/session";
 
 beforeEach(() => {
   resetTreeInterventionFixtures();
   resetServiceFixtures();
 });
-afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; });
+afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
 
-async function authenticatedCookie(scenarioId = "office-duty-queue") {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenarioId }) }));
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 function transitionRequest(id: string, action: string, cookie: string, body?: unknown) {
   return new Request(`http://localhost/api/tree-interventions/${id}/${action}`, {
@@ -31,8 +27,64 @@ function transitionRequest(id: string, action: string, cookie: string, body?: un
 }
 
 describe("/api/tree-interventions/[id]", () => {
+  it("forwards backend intervention detail with the session bearer token", async () => {
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "intervention-backend-1" }));
+
+    const response = await GET(new Request("http://localhost/api/tree-interventions/intervention-backend-1", { headers: { cookie } }), {
+      params: Promise.resolve({ id: "intervention-backend-1" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/tree-interventions/intervention-backend-1");
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+  });
+
+  it("forwards backend intervention transitions with their action paths and bodies", async () => {
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ status: "PENDING_AUTHORIZATION" }))
+      .mockResolvedValueOnce(Response.json({ status: "AUTHORIZED" }))
+      .mockResolvedValueOnce(Response.json({ status: "REJECTED" }));
+    const context = { params: Promise.resolve({ id: "intervention-backend-1" }) };
+
+    const submitted = await submitForAuthorization(transitionRequest("intervention-backend-1", "submit-for-authorization", cookie), context);
+    const authorized = await authorize(transitionRequest("intervention-backend-1", "authorize", cookie, { authorizedByUserId: "user-lucia" }), context);
+    const rejected = await reject(transitionRequest("intervention-backend-1", "reject", cookie), context);
+
+    expect([submitted.status, authorized.status, rejected.status]).toEqual([200, 200, 200]);
+    expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method, init?.body])).toEqual([
+      ["https://backend.internal/tree-interventions/intervention-backend-1/submit-for-authorization", "POST", undefined],
+      ["https://backend.internal/tree-interventions/intervention-backend-1/authorize", "POST", undefined], // el autorizante sale del token: un authorizedByUserId viejo no viaja
+      ["https://backend.internal/tree-interventions/intervention-backend-1/reject", "POST", undefined],
+    ]);
+    expect(backendFetch.mock.calls.every(([, init]) =>
+      new Headers(init?.headers).get("authorization") === `Bearer ${devJwt}`,
+    )).toBe(true);
+  });
+
+  it("forwards backend service assignment with the validated body and bearer token", async () => {
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const input = { serviceId: "SVC-1043" };
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "intervention-backend-1", ...input }));
+
+    const response = await assignService(transitionRequest("intervention-backend-1", "assign-service", cookie, input), {
+      params: Promise.resolve({ id: "intervention-backend-1" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/tree-interventions/intervention-backend-1/assign-service");
+    expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body))).toEqual(input);
+  });
+
   it("returns detail with every linked tree", async () => {
-    const cookie = await authenticatedCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await GET(new Request("http://localhost/api/tree-interventions/intervention-1", { headers: { cookie } }), { params: Promise.resolve({ id: "intervention-1" }) });
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -42,13 +94,13 @@ describe("/api/tree-interventions/[id]", () => {
   });
 
   it("returns not found for an unknown intervention", async () => {
-    const cookie = await authenticatedCookie();
-    const response = await GET(new Request("http://localhost/api/tree-interventions/missing", { headers: { cookie } }), { params: { id: "missing" } });
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const response = await GET(new Request("http://localhost/api/tree-interventions/missing", { headers: { cookie } }), { params: Promise.resolve({ id: "missing" }) });
     expect(response.status).toBe(404);
   });
 
   it("moves a removal through pending authorization and records the authoritative decision", async () => {
-    const cookie = await authenticatedCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const pending = await submitForAuthorization(
       transitionRequest("intervention-3", "submit-for-authorization", cookie),
       { params: Promise.resolve({ id: "intervention-3" }) },
@@ -69,7 +121,7 @@ describe("/api/tree-interventions/[id]", () => {
   });
 
   it("authorizes non-removal interventions directly and rejects an invalid repeat transition", async () => {
-    const cookie = await authenticatedCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const authorized = await authorize(
       transitionRequest("intervention-1", "authorize", cookie, { authorizedByUserId: "user-lucia" }),
       { params: Promise.resolve({ id: "intervention-1" }) },
@@ -91,7 +143,7 @@ describe("/api/tree-interventions/[id]", () => {
     "PLANTING",
     "TREATMENT",
   ] as TreeInterventionType[])("uses the universal authorize action for %s", async (interventionType) => {
-    const cookie = await authenticatedCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const id = `intervention-${interventionType.toLowerCase()}`;
     addTreeInterventionFixture({
       id,
@@ -129,7 +181,7 @@ describe("/api/tree-interventions/[id]", () => {
   });
 
   it("rejects a pending removal terminally without persisting a rejection reason", async () => {
-    const cookie = await authenticatedCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     await submitForAuthorization(
       transitionRequest("intervention-3", "submit-for-authorization", cookie),
       { params: Promise.resolve({ id: "intervention-3" }) },
@@ -156,7 +208,7 @@ describe("/api/tree-interventions/[id]", () => {
   });
 
   it("returns backend transition errors and denies Field authorization", async () => {
-    const officeCookie = await authenticatedCookie();
+    const officeCookie = await loginAs("office-duty-queue", { mode: "mock" });
     const invalidRemoval = await authorize(
       transitionRequest("intervention-3", "authorize", officeCookie, { authorizedByUserId: "user-lucia" }),
       { params: Promise.resolve({ id: "intervention-3" }) },
@@ -164,7 +216,7 @@ describe("/api/tree-interventions/[id]", () => {
     expect(invalidRemoval.status).toBe(409);
 
     process.env.M6_AUTH_MODE = "mock";
-    const loginResponse = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenarioId: "field-crew-member-route" }) }));
+    const loginResponse = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" }, body: JSON.stringify({ scenarioId: "field-crew-member-route" }) }));
     const fieldCookie = loginResponse.headers.get("set-cookie") ?? "";
     const forbidden = await authorize(
       transitionRequest("intervention-1", "authorize", fieldCookie, { authorizedByUserId: "user-sofia" }),
@@ -174,7 +226,7 @@ describe("/api/tree-interventions/[id]", () => {
   });
 
   it("links an authorized intervention to a POINT Service", async () => {
-    const cookie = await authenticatedCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await assignService(
       transitionRequest("intervention-2", "assign-service", cookie, { serviceId: "SVC-1043" }),
       { params: Promise.resolve({ id: "intervention-2" }) },
@@ -185,7 +237,7 @@ describe("/api/tree-interventions/[id]", () => {
   });
 
   it("gates linking by authorization, POINT mode and the unique existing link", async () => {
-    const cookie = await authenticatedCookie();
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
 
     const unauthorized = await assignService(
       transitionRequest("intervention-1", "assign-service", cookie, { serviceId: "SVC-1043" }),
@@ -213,7 +265,7 @@ describe("/api/tree-interventions/[id]", () => {
   });
 
   it("denies service linking to an Office session without service scheduling capability and to Field", async () => {
-    const limitedCookie = await authenticatedCookie("office-limited-intake");
+    const limitedCookie = await loginAs("office-limited-intake", { mode: "mock" });
     const limited = await assignService(
       transitionRequest("intervention-2", "assign-service", limitedCookie, { serviceId: "SVC-1043" }),
       { params: Promise.resolve({ id: "intervention-2" }) },
@@ -222,7 +274,7 @@ describe("/api/tree-interventions/[id]", () => {
 
     const fieldLogin = await login(new Request("http://localhost/api/session/login", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
       body: JSON.stringify({ scenarioId: "field-crew-member-route" }),
     }));
     const fieldCookie = fieldLogin.headers.get("set-cookie") ?? "";

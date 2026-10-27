@@ -1,5 +1,4 @@
 "use client";
-
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CloudOff, Play } from "lucide-react";
 
@@ -24,6 +23,7 @@ import {
 } from "@/lib/field-drafts";
 import styles from "@/components/shell/app-shell.module.css";
 import { DraftConflictDialog } from "./draft-conflict-view";
+import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
 import { ServiceDetail } from "./service-detail";
 import { StatusBadge } from "./status-badge";
 import { SuspendServiceDialog } from "./suspend-service-dialog";
@@ -42,6 +42,7 @@ export function FieldWorkPanel({
   );
   const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [dropped, setDropped] = useState(0);
   const [startingId, setStartingId] = useState<string | null>(null);
   const [startErrors, setStartErrors] = useState<Record<string, string>>({});
   const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
@@ -65,11 +66,12 @@ export function FieldWorkPanel({
         const page = await servicesAdapter.list({ crewId, pageSize: 50 });
         if (isCurrent) {
           setServices(page.services);
+          setDropped(page.dropped ?? 0);
           setLoadError(null);
         }
-      } catch (cause) {
+      } catch {
         // Retain existing services if refresh fails, but say so: an empty list would read as "nothing assigned".
-        if (isCurrent) setLoadError(cause instanceof Error ? cause.message : "No se pudieron cargar los servicios de la cuadrilla.");
+        if (isCurrent) setLoadError("No se pudieron cargar los servicios. Intente nuevamente.");
       }
     }
     void load();
@@ -167,7 +169,7 @@ export function FieldWorkPanel({
         if (isCurrent) setRepairRequests((current) => ({ ...current, [selectedService.id]: page.repairRequests }));
       })
       .catch(() => {
-        if (isCurrent) setRepairRequestsErrors((current) => ({ ...current, [selectedService.id]: "No se pudieron cargar las derivaciones de este Servicio." }));
+        if (isCurrent) setRepairRequestsErrors((current) => ({ ...current, [selectedService.id]: "No se pudieron cargar las derivaciones." }));
       });
 
     return () => {
@@ -184,6 +186,7 @@ export function FieldWorkPanel({
     : null;
   const canCreateRepairRequest = Boolean(
     selectedService &&
+      scenario.capabilities.includes("repairRequest:create") &&
       scenario.actor.kind === "FIELD" &&
       scenario.actor.crewId &&
       selectedService.crewId === scenario.actor.crewId,
@@ -210,7 +213,7 @@ export function FieldWorkPanel({
           isResuming={resumingId === selectedService.id}
           resumeError={resumeErrors[selectedService.id] ?? null}
           resumeDraftPending={Boolean(getFieldDraft(selectedService.id, "resume"))}
-          backLabel="Volver a Servicios asignados"
+          backLabel="Volver"
         />
         {mayExecuteService && (
           <SuspendServiceDialog
@@ -246,8 +249,6 @@ export function FieldWorkPanel({
             onOpenChange={(open) => {
               if (!open) setConflict(null);
             }}
-            serviceId={conflict?.serviceId ?? ""}
-            actionLabel={conflict?.actionType === "resume" ? "reanudación" : "inicio"}
             composedAgainst={conflict?.composedAgainst ?? null}
             current={conflict?.current ?? null}
             onPreserve={handlePreserveConflict}
@@ -261,7 +262,6 @@ export function FieldWorkPanel({
   return (
     <section aria-labelledby="work-title" className={styles.workPanel}>
       <div className={styles.pageHeading}>
-        <p>Turno en curso</p>
         <h1 id="work-title">Servicios asignados</h1>
         <span>
           {scenario.work.summary}
@@ -271,13 +271,15 @@ export function FieldWorkPanel({
 
       {loadError && (
         <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">
-          No se pudieron cargar los servicios de la cuadrilla: {loadError}
+          {loadError}
         </div>
       )}
 
+      <DroppedRecordsAlert count={dropped} />
+
       {services.length === 0 && !loadError ? (
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-center text-sm text-[var(--color-text-secondary)]">
-          No hay servicios asignados para su cuadrilla en este turno.
+          Sin servicios asignados.
         </div>
       ) : (
         <ol className="m-0 flex list-none flex-col gap-3 p-0">
@@ -291,6 +293,7 @@ export function FieldWorkPanel({
             return (
               <li
                 key={service.id}
+                data-service-id={service.id}
                 className="flex flex-col gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex flex-1 flex-col gap-2 min-w-0">
@@ -302,9 +305,6 @@ export function FieldWorkPanel({
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold text-[var(--color-text)]">
                           {service.title}
-                        </span>
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
-                          {service.id}
                         </span>
                         <StatusBadge status={service.status} />
                       </div>
@@ -332,7 +332,7 @@ export function FieldWorkPanel({
                       className="ml-8 flex self-start items-center gap-1.5 rounded-lg border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 px-2.5 py-1 text-xs font-medium text-[var(--color-warning)]"
                     >
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      <span>Aviso: Inicio fuera de ventana horaria</span>
+                      <span>Fuera del horario</span>
                     </div>
                   )}
 
@@ -342,7 +342,7 @@ export function FieldWorkPanel({
                       className="ml-8 flex self-start items-center gap-1.5 rounded-lg border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)]/40 px-2.5 py-1 text-xs font-medium text-[var(--color-warning)]"
                     >
                       <CloudOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      <span>Borrador local pendiente de envío (sin conexión)</span>
+                      <span>Sin enviar (sin conexión)</span>
                     </div>
                   )}
 
@@ -364,7 +364,7 @@ export function FieldWorkPanel({
                     onClick={() => setSelectedDetailId(service.id)}
                     className="text-xs font-semibold"
                   >
-                    Ver detalle
+                    Abrir
                   </Button>
 
                   {mayExecuteService && service.status === "SCHEDULED" ? (
@@ -379,12 +379,10 @@ export function FieldWorkPanel({
                         {startingId === service.id
                           ? "Iniciando..."
                           : draftPending
-                          ? "Reintentar envío"
+                          ? "Reenviar"
                           : "Iniciar servicio"}
                       </span>
                     </Button>
-                  ) : !mayExecuteService ? (
-                    <span className={styles.workState}>Solo consulta</span>
                   ) : null}
                 </div>
               </li>
@@ -393,11 +391,7 @@ export function FieldWorkPanel({
         </ol>
       )}
 
-      {!mayExecuteService && (
-        <p className={styles.permissionNote}>
-          La persona responsable de la cuadrilla registra los cambios de estado del servicio.
-        </p>
-      )}
+      {!mayExecuteService && <p className={styles.permissionNote}>Solo consulta</p>}
 
       {mayExecuteService && (
         <DraftConflictDialog
@@ -405,8 +399,6 @@ export function FieldWorkPanel({
           onOpenChange={(open) => {
             if (!open) setConflict(null);
           }}
-          serviceId={conflict?.serviceId ?? ""}
-          actionLabel={conflict?.actionType === "resume" ? "reanudación" : "inicio"}
           composedAgainst={conflict?.composedAgainst ?? null}
           current={conflict?.current ?? null}
           onPreserve={handlePreserveConflict}

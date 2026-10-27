@@ -1,45 +1,27 @@
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
-import { fetchBackend } from "@/lib/bff-backend";
+import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import {
-  NOT_SERVICED_REASON_LABEL,
-  suspendServiceInputSchema,
+  STATUS_LABEL,
+  suspendServiceRequestSchema,
   toSuspendServiceBackendInput,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 
-const ERROR_LABELS: Record<number, string> = {
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  409: "Conflict",
-  503: "Service Unavailable",
-  500: "Internal Server Error",
-};
 
-function errorResponse(status: number, message: string, path: string) {
-  return NextResponse.json(
-    {
-      statusCode: status,
-      message,
-      error: ERROR_LABELS[status] ?? "Error",
-      timestamp: new Date().toISOString(),
-      path,
-    },
-    { status },
-  );
-}
+
+
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> | { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const params = await context.params;
   const serviceId = params.id;
@@ -50,13 +32,7 @@ export async function POST(
     const scenario = getScenario(session);
 
     // Permission check: only actors with service:execute capability (Crew Leader of the assigned crew)
-    if (!scenario.capabilities.includes("service:execute")) {
-      return errorResponse(
-        403,
-        "No tiene permisos para suspender el servicio. Solo la persona responsable de la cuadrilla puede hacerlo.",
-        path,
-      );
-    }
+    authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para suspender el servicio. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
 
     let body: unknown;
     try {
@@ -65,7 +41,7 @@ export async function POST(
       return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
     }
 
-    const parsed = suspendServiceInputSchema.safeParse(body);
+    const parsed = suspendServiceRequestSchema.safeParse(body);
     if (!parsed.success) {
       return errorResponse(
         400,
@@ -76,10 +52,12 @@ export async function POST(
 
     const input = parsed.data;
 
-    if (session.mode === "backend-development" && process.env.M6_BACKEND_ORIGIN) {
+    if (backendMode(session)) {
+      const scopedService = await requireCrewScope(request, session, { serviceId });
+      if (scopedService instanceof Response) return scopedService;
       const backendResponse = await fetchBackend(
         request,
-        `/services/${serviceId}/suspend`,
+        `/services/${pathId(serviceId)}/suspend`,
         undefined,
         {
           method: "POST",
@@ -87,11 +65,7 @@ export async function POST(
           body: JSON.stringify(toSuspendServiceBackendInput(input)),
         },
       );
-      const bodyText = await backendResponse.text();
-      return new NextResponse(bodyText, {
-        status: backendResponse.status,
-        headers: { "content-type": backendResponse.headers.get("content-type") ?? "application/json" },
-      });
+            return forwardResponse(backendResponse);
     }
 
     const service = serviceFixtures.find((s) => s.id === serviceId);
@@ -106,16 +80,17 @@ export async function POST(
     if (service.status !== "IN_PROGRESS") {
       return errorResponse(
         409,
-        `Solo se pueden suspender servicios en curso (IN_PROGRESS) (estado actual: ${service.status}).`,
+        `Solo se pueden suspender servicios en curso (estado actual: ${STATUS_LABEL[service.status]}).`,
         path,
       );
     }
 
-    const statusReason = `${NOT_SERVICED_REASON_LABEL[input.reason]}: ${input.note}`;
+    const { reason: statusReason, note: statusNote } = toSuspendServiceBackendInput(input);
 
     const updated = updateServiceFixture(service.id, {
       status: "SUSPENDED",
       statusReason,
+      statusNote: statusNote ?? null,
       history: [
         ...service.history,
         {
@@ -135,6 +110,6 @@ export async function POST(
     if (error instanceof AuthUnavailableError) {
       return errorResponse(503, error.message, path);
     }
-    return errorResponse(500, "No se pudo suspender el servicio.", path);
+    return mapSessionError(error, path, "No se pudo suspender el servicio.");
   }
 }

@@ -5,6 +5,7 @@ import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { NetworkFailureError } from "./authenticated-fetch";
 import {
+  getStreetClosureRequestFixture,
   resetStreetClosureRequestFixtures,
   updateStreetClosureRequestFixture,
 } from "./street-closure-request-fixtures";
@@ -25,6 +26,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 afterAll(() => server.close());
+
+function streetClosureRequestFixturesSnapshot(id: string) {
+  return structuredClone(getStreetClosureRequestFixture(id)!);
+}
 
 const createInput = {
   reason: "El recorrido requiere trabajar con circulación reducida.",
@@ -137,6 +142,7 @@ describe("street closure request adapter", () => {
     ["APPROVED", "allowed"],
     ["REJECTED", "rejected"],
     ["ENDED", "released"],
+    ["EXPIRED", "expired"],
   ] as const)("resolves a Service dependency from the linked request: %s is %s", async (status, outcome) => {
     updateStreetClosureRequestFixture("SCR-1001", { status });
 
@@ -144,6 +150,52 @@ describe("street closure request adapter", () => {
       request: expect.objectContaining({ status }),
       outcome,
     });
+  });
+
+  it("lets Office end an EXPIRED closure (late ENDED from M7)", async () => {
+    updateStreetClosureRequestFixture("SCR-1001", { status: "EXPIRED" });
+
+    await expect(streetClosureRequestsAdapter.end("SCR-1001")).resolves.toMatchObject({ status: "ENDED" });
+  });
+
+  it("accepts EXPIRED in the list response and as the status filter", async () => {
+    updateStreetClosureRequestFixture("SCR-1001", { status: "EXPIRED" });
+
+    const page = await streetClosureRequestsAdapter.list({ status: "EXPIRED" });
+
+    expect(page.requests).toEqual([expect.objectContaining({ id: "SCR-1001", status: "EXPIRED" })]);
+    expect(page.invalid).toBe(0);
+  });
+
+  it("skips records with an unknown status, counts them and keeps the rest", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    server.use(http.get("*/api/street-closure-requests", () => {
+      return HttpResponse.json({
+        data: [
+          { ...streetClosureRequestFixturesSnapshot("SCR-1001"), status: "SUSPENDED_BY_ALIEN" },
+          streetClosureRequestFixturesSnapshot("SCR-1002"),
+        ],
+        meta: { total: 2, page: 1, pageSize: 20, totalPages: 1 },
+      });
+    }));
+
+    const page = await streetClosureRequestsAdapter.list();
+
+    expect(page.requests.map((request) => request.id)).toEqual(["SCR-1002"]);
+    expect(page.invalid).toBe(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("SCR-1001"));
+  });
+
+  it("refuses to resolve a Service dependency when a linked record is unreadable", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    server.use(http.get("*/api/street-closure-requests", () => HttpResponse.json({
+      data: [{ ...streetClosureRequestFixturesSnapshot("SCR-1001"), status: "FUTURE_STATE" }],
+      meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+    })));
+
+    await expect(streetClosureRequestsAdapter.getForService("SVC-1050")).rejects.toBeInstanceOf(
+      StreetClosureRequestContractError,
+    );
   });
 
   it("returns no dependency when a Service has no closure request", async () => {

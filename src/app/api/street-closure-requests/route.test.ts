@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as login } from "@/app/api/session/login/route";
 import { resetStreetClosureRequestFixtures, streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
 import { resetTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 import { GET, POST } from "./route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetServiceFixtures();
@@ -16,19 +16,10 @@ afterEach(() => {
   delete process.env.M6_AUTH_MODE;
   delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
+  vi.restoreAllMocks();
 });
 
-async function authenticatedCookie(scenarioId: string) {
-  process.env.M6_AUTH_MODE = "mock";
-  const response = await login(
-    new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenarioId }),
-    }),
-  );
-  return response.headers.get("set-cookie") ?? "";
-}
+
 
 function requestBody() {
   return {
@@ -56,7 +47,7 @@ function treeRequestBody() {
 
 describe("street closure request BFF routes", () => {
   it("keeps creation Office-only", async () => {
-    const cookie = await authenticatedCookie("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/street-closure-requests", {
         method: "POST",
@@ -70,7 +61,7 @@ describe("street closure request BFF routes", () => {
   });
 
   it("creates a pending M6 record only from an authorized TreeIntervention", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await POST(
       new Request("http://localhost/api/street-closure-requests", {
         method: "POST",
@@ -98,7 +89,7 @@ describe("street closure request BFF routes", () => {
     "does not create a TreeIntervention-sourced request while status is %s",
     async (status) => {
       updateTreeInterventionFixture("intervention-1", { status });
-      const cookie = await authenticatedCookie("office-duty-queue");
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
       const response = await POST(
         new Request("http://localhost/api/street-closure-requests", {
           method: "POST",
@@ -113,7 +104,7 @@ describe("street closure request BFF routes", () => {
   );
 
   it("rejects empty sections and creates a pending Service-linked record for Office", async () => {
-    const cookie = await authenticatedCookie("office-duty-queue");
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const emptyResponse = await POST(
       new Request("http://localhost/api/street-closure-requests", {
         method: "POST",
@@ -137,13 +128,13 @@ describe("street closure request BFF routes", () => {
   });
 
   it("requires an Office session for list and detail views", async () => {
-    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+    const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await GET(
       new Request("http://localhost/api/street-closure-requests", { headers: { cookie: fieldCookie } }),
     );
     expect(response.status).toBe(403);
 
-    const officeCookie = await authenticatedCookie("office-duty-queue");
+    const officeCookie = await loginAs("office-duty-queue", { mode: "mock" });
     const list = await GET(
       new Request("http://localhost/api/street-closure-requests", { headers: { cookie: officeCookie } }),
     );
@@ -152,7 +143,7 @@ describe("street closure request BFF routes", () => {
   });
 
   it("allows Field to read only the closure context for its assigned Service", async () => {
-    const fieldCookie = await authenticatedCookie("field-crew-leader-route");
+    const fieldCookie = await loginAs("field-crew-leader-route", { mode: "mock" });
     const response = await GET(
       new Request("http://localhost/api/street-closure-requests?sourceId=SVC-1050", {
         headers: { cookie: fieldCookie },
@@ -163,5 +154,18 @@ describe("street closure request BFF routes", () => {
     expect((await response.json()).data).toEqual([
       expect.objectContaining({ sourceId: "SVC-1050", status: "REQUESTED" }),
     ]);
+  });
+
+  it("forwards an authorized backend closure list with its filters and GET method", async () => {
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0, page: 2, pageSize: 50 } }));
+
+    const response = await GET(new Request("http://localhost/api/street-closure-requests?page=2&pageSize=50", { headers: { cookie } }));
+
+    expect(response.status).toBe(200);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/street-closure-requests?page=2&pageSize=50");
+    expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 });

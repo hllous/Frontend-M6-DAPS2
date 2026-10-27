@@ -5,6 +5,7 @@ import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 import { treeSchema, type Tree } from "./trees";
 import { externalIdInput, externalIdListInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
 
 export const treeInterventionTypeSchema = z.enum(["FORMATION_PRUNING", "SAFETY_PRUNING", "REMOVAL", "PLANTING", "TREATMENT"]);
 export type TreeInterventionType = z.infer<typeof treeInterventionTypeSchema>;
@@ -52,11 +53,6 @@ export const treeInterventionCreateInputSchema = z.object({
 });
 export type TreeInterventionCreateInput = z.infer<typeof treeInterventionCreateInputSchema>;
 
-export const treeInterventionAuthorizeInputSchema = z.object({
-  authorizedByUserId: externalIdInput("No se pudo identificar a la persona autorizante."),
-});
-export type TreeInterventionAuthorizeInput = z.infer<typeof treeInterventionAuthorizeInputSchema>;
-
 export const treeInterventionAssignServiceInputSchema = z.object({
   serviceId: z.string().trim().min(1, "Debe indicar el servicio que ejecutará la intervención."),
 });
@@ -65,6 +61,7 @@ export type TreeInterventionAssignServiceInput = z.infer<typeof treeIntervention
 export type TreeInterventionQuery = {
   interventionType?: TreeInterventionType;
   status?: TreeInterventionStatus;
+  priority?: TreeInterventionPriority;
   page?: number;
   pageSize?: number;
 };
@@ -95,7 +92,7 @@ export class TreeInterventionRequestError extends Error {
 }
 
 const pageSchema = z.object({
-  data: z.array(treeInterventionResponseSchema),
+  data: tolerantRecords(treeInterventionResponseSchema, "tree-interventions"),
   meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number() }),
 });
 const errorResponseSchema = z.object({
@@ -110,6 +107,7 @@ function queryString(query: TreeInterventionQuery) {
   const params = new URLSearchParams();
   if (query.interventionType) params.set("interventionType", query.interventionType);
   if (query.status) params.set("status", query.status);
+  if (query.priority) params.set("priority", query.priority);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
   const value = params.toString();
@@ -174,15 +172,10 @@ export const treeInterventionsAdapter = {
     );
   },
 
-  async authorize(id: string, input: TreeInterventionAuthorizeInput): Promise<TreeInterventionDetail> {
-    const parsedInput = treeInterventionAuthorizeInputSchema.safeParse(input);
-    if (!parsedInput.success) throw new TreeInterventionContractError("La identidad de autorización es inválida.", { cause: parsedInput.error });
+  /** Quién autoriza lo toma el backend del token; el cliente ya no manda `authorizedByUserId` (deprecado, se ignora). */
+  async authorize(id: string): Promise<TreeInterventionDetail> {
     return parseIntervention(
-      await request(`/api/tree-interventions/${encodeURIComponent(id)}/authorize`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsedInput.data),
-      }),
+      await request(`/api/tree-interventions/${encodeURIComponent(id)}/authorize`, { method: "POST" }),
       "La respuesta de autorización no respeta el contrato esperado.",
     );
   },

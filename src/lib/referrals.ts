@@ -44,6 +44,8 @@ export type Referral =
 export type ReferralsPage = {
   referrals: Referral[];
   total: number;
+  /** Records the BFF dropped because they did not match the contract. */
+  invalid: number;
 };
 
 const referralSourceSchema = z.object({
@@ -88,7 +90,7 @@ const referralSchema = z.discriminatedUnion("kind", [
     sourceTreeInterventionId: z.string().optional(),
     sourceLabel: z.string(),
     sourceHref: z.string(),
-    status: z.enum(["REQUESTED", "APPROVED", "REJECTED", "ENDED"]),
+    status: z.enum(["REQUESTED", "APPROVED", "REJECTED", "ENDED", "EXPIRED"]),
     createdAt: z.string(),
     updatedAt: z.string(),
     request: z.object({
@@ -105,7 +107,7 @@ const referralSchema = z.discriminatedUnion("kind", [
         fromCross: z.string(),
         toCross: z.string(),
       })),
-      status: z.enum(["REQUESTED", "APPROVED", "REJECTED", "ENDED"]),
+      status: z.enum(["REQUESTED", "APPROVED", "REJECTED", "ENDED", "EXPIRED"]),
       closureId: z.string().nullable(),
       createdAt: z.string(),
       updatedAt: z.string(),
@@ -115,7 +117,7 @@ const referralSchema = z.discriminatedUnion("kind", [
 
 const referralsPageSchema = z.object({
   data: z.array(referralSchema),
-  meta: z.object({ total: z.number() }),
+  meta: z.object({ total: z.number(), invalid: z.number().int().nonnegative().optional() }),
 });
 
 export function getReferralSourceServiceIds(scenario: OperationalScenario): string[] | undefined {
@@ -140,6 +142,12 @@ export function isReferralVisibleToScenario(referral: Referral | { sourceService
   return Boolean(sourceServiceId && serviceIds.includes(sourceServiceId));
 }
 
+export function isReferralVisibleToBackendSources(referral: Referral, sourceIds: ReadonlySet<string> | undefined): boolean {
+  if (sourceIds === undefined) return true;
+  if (referral.sourceType === "TREE_INTERVENTION") return false;
+  return sourceIds.has(referral.sourceId);
+}
+
 export function serviceSourceHref(serviceId: string): string {
   return `/app?destination=services&detail=${encodeURIComponent(serviceId)}`;
 }
@@ -156,6 +164,14 @@ export function treeInterventionSourceHref(interventionId: string): string {
 }
 
 export function referralFromRepairRequest(request: RepairRequest): Referral {
+  return mapRepairRequest(request, true);
+}
+
+export function referralFromBackendRepairRequest(request: RepairRequest): Referral {
+  return mapRepairRequest(request, false);
+}
+
+function mapRepairRequest(request: RepairRequest, useFixtures: boolean): Referral {
   const source = request.sourceContext;
   const isInspection = request.detectedInType === "INSPECTION";
   return {
@@ -166,7 +182,9 @@ export function referralFromRepairRequest(request: RepairRequest): Referral {
     sourceId: request.detectedInId,
     sourceServiceId: request.detectedInId,
     sourceLabel: source?.label ?? (isInspection ? `Inspección ambiental ${request.detectedInId}` : `Servicio ${request.detectedInId}`),
-    sourceHref: source?.href ?? (isInspection ? environmentalInspectionSourceHref(request.detectedInId) : serviceSourceHref(request.detectedInId)),
+    sourceHref: source?.href ?? (isInspection
+      ? useFixtures ? environmentalInspectionSourceHref(request.detectedInId) : `/app?destination=environment&inspectionId=${encodeURIComponent(request.detectedInId)}`
+      : serviceSourceHref(request.detectedInId)),
     status: request.status,
     createdAt: request.createdAt ?? request.requestedAt,
     updatedAt: request.updatedAt ?? request.createdAt ?? request.requestedAt,
@@ -223,7 +241,7 @@ export const referralsAdapter = {
   async list(): Promise<ReferralsPage> {
     const parsed = referralsPageSchema.safeParse(await requestJson("/api/referrals"));
     if (!parsed.success) throw new ReferralContractError("La lista de derivaciones no respeta el contrato esperado.", { cause: parsed.error });
-    return { referrals: parsed.data.data as Referral[], total: parsed.data.meta.total };
+    return { referrals: parsed.data.data as Referral[], total: parsed.data.meta.total, invalid: parsed.data.meta.invalid ?? 0 };
   },
 
   async get(id: string): Promise<Referral> {
