@@ -28,9 +28,9 @@ export async function GET(
   }
 
   try {
-    const { session, roles, scenario } = await loadAuthorizedScenario(request, scenarioId);
+    const { roles, scenario } = await loadAuthorizedScenario(request, scenarioId);
     const response = NextResponse.json(scenario);
-    sealRolesIfChanged(response, session, roles);
+    sealRolesIfChanged(response, request, roles);
     return response;
   } catch (error) {
     if (error instanceof InvalidSessionError) {

@@ -7,6 +7,7 @@ import {
   BackendUnavailableError,
   CitizenForbiddenError,
   InvalidSessionError,
+  getRequiredSession,
   sealSession,
   sessionCookieOptions,
   type Session,
@@ -52,7 +53,9 @@ export function sameRoles(a: readonly M6Role[], b: readonly M6Role[]): boolean {
 }
 
 /** Si los roles cambiaron en el backend, la cookie los toma ya: el BFF autoriza con lo mismo que la UI. */
-export function sealRolesIfChanged(response: NextResponse, session: Session, roles: readonly M6Role[]): void {
+export function sealRolesIfChanged(response: NextResponse, request: Request, roles: readonly M6Role[]): void {
+  // Parte de la sesión del pedido (la renovada, si fetchMe renovó), no de una copia leída antes.
+  const session = getRequiredSession(request);
   if (sameRoles(session.roles, roles)) return;
   const next = { ...session, roles: [...roles] };
   response.cookies.set({ name: AUTH_COOKIE_NAME, value: sealSession(next), ...sessionCookieOptions(next) });

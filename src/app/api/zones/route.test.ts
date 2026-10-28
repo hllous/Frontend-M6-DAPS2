@@ -128,14 +128,14 @@ describe("authenticated zones BFF route", () => {
       new Request("http://localhost/api/zones", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ code: "Z-BEL", name: "Zona Duplicada" }),
+        body: JSON.stringify({ code: "belgrano", name: "Zona Duplicada" }),
       }),
     );
 
     expect(response.status).toBe(409);
     const body = await response.json();
     expect(body.statusCode).toBe(409);
-    expect(body.message).toContain("Z-BEL");
+    expect(body.message).toContain("belgrano");
   });
 
   it("POST creates a new zone and returns 201 for Office actor", async () => {
@@ -159,3 +159,46 @@ describe("authenticated zones BFF route", () => {
   });
 });
 
+
+describe("GET /api/zones communeId filter", () => {
+  it("forwards communeId to the backend", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 } }));
+
+    await GET(new Request("http://localhost/api/zones?communeId=c0a80101-0000-4000-8000-000000000014&pageSize=100", { headers: { cookie } }));
+
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/zones?communeId=c0a80101-0000-4000-8000-000000000014&pageSize=100");
+  });
+
+  it("filters the mock fixtures by commune", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+
+    const body = await (await GET(new Request("http://localhost/api/zones?communeId=c0a80101-0000-4000-8000-000000000014&pageSize=100", { headers: { cookie } }))).json();
+
+    expect(body.data.map((zone: { code: string }) => zone.code)).toEqual(["palermo"]);
+  });
+});
+
+describe("zone input validation matches the backend", () => {
+  const unknownCommune = "c0a80101-0000-4000-8000-0000000000ff";
+
+  it("POST answers 400 for a commune that does not exist, a non-UUID commune and an over-long code", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    for (const body of [
+      { code: "nueva", name: "Nueva", communeId: unknownCommune },
+      { code: "nueva", name: "Nueva", communeId: "comuna-14" },
+      { code: "x".repeat(21), name: "Nueva" },
+    ]) {
+      const response = await POST(new Request("http://localhost/api/zones", { method: "POST", headers: { "content-type": "application/json", cookie }, body: JSON.stringify(body) }));
+      expect(response.status, JSON.stringify(body)).toBe(400);
+    }
+  });
+
+  it("ignores an active filter that is not true or false instead of reading it as false", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+
+    const body = await (await GET(new Request("http://localhost/api/zones?active=maybe&pageSize=100", { headers: { cookie } }))).json();
+
+    expect(body.meta.total).toBe(48);
+  });
+});

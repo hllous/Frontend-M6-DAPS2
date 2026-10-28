@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { neighborhoodFixtures } from "@/lib/neighborhoods-fixtures";
 import { resetZoneFixtures, getZoneFixture } from "@/lib/zones-fixtures";
 import { POST } from "./route";
 import { loginAs } from "@/test/session";
+
+const barrioId = (codigo: string) => neighborhoodFixtures.find((barrio) => barrio.codigo === codigo)!.id;
 
 afterEach(() => {
   resetZoneFixtures();
@@ -47,14 +50,31 @@ describe("POST /api/zones/[id]/neighborhoods", () => {
       new Request("http://localhost/api/zones/zone-1/neighborhoods", {
         method: "POST",
         headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ neighborhoodIds: ["barrio-1", "barrio-4"] }),
+        body: JSON.stringify({ neighborhoodIds: [barrioId("belgrano"), barrioId("palermo")] }),
       }),
       { params: Promise.resolve({ id: "zone-1" }) },
     );
 
     expect(response.status).toBe(200);
-    expect((await response.json()).neighborhoodIds).toEqual(["barrio-1", "barrio-2", "barrio-4"]);
-    expect(getZoneFixture("zone-1")?.neighborhoodIds).toEqual(["barrio-1", "barrio-2", "barrio-4"]);
+    expect((await response.json()).neighborhoodIds).toEqual([barrioId("belgrano"), barrioId("palermo")]);
+    expect(getZoneFixture("zone-1")?.neighborhoodIds).toEqual([barrioId("belgrano"), barrioId("palermo")]);
+  });
+
+  it("rejects with 400 a neighborhood that is not in the M9 catalog, including a codigo sent instead of the id", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    for (const neighborhoodId of ["barrio-palermo", "palermo"]) {
+      const response = await POST(
+        new Request("http://localhost/api/zones/zone-1/neighborhoods", {
+          method: "POST",
+          headers: { cookie, "content-type": "application/json" },
+          body: JSON.stringify({ neighborhoodIds: [neighborhoodId] }),
+        }),
+        { params: Promise.resolve({ id: "zone-1" }) },
+      );
+
+      expect(response.status).toBe(400);
+    }
+    expect(getZoneFixture("zone-1")?.neighborhoodIds).toEqual([barrioId("belgrano")]);
   });
 
   it("proxies the assignment to the backend in backend-development mode", async () => {

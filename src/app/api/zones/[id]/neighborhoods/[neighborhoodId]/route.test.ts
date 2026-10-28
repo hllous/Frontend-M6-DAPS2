@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { neighborhoodFixtures } from "@/lib/neighborhoods-fixtures";
 import { resetZoneFixtures, getZoneFixture } from "@/lib/zones-fixtures";
 import { DELETE } from "./route";
 import { loginAs } from "@/test/session";
+
+const barrioId = (codigo: string) => neighborhoodFixtures.find((barrio) => barrio.codigo === codigo)!.id;
 
 afterEach(() => {
   resetZoneFixtures();
@@ -17,8 +20,8 @@ describe("DELETE /api/zones/[id]/neighborhoods/[neighborhoodId]", () => {
   it("blocks Field actors with 403", async () => {
     const cookie = await loginAs("field-crew-member-route", { mode: "mock" });
     const response = await DELETE(
-      new Request("http://localhost/api/zones/zone-1/neighborhoods/barrio-1", { headers: { cookie } }),
-      { params: Promise.resolve({ id: "zone-1", neighborhoodId: "barrio-1" }) },
+      new Request(`http://localhost/api/zones/zone-1/neighborhoods/${barrioId("belgrano")}`, { headers: { cookie } }),
+      { params: Promise.resolve({ id: "zone-1", neighborhoodId: barrioId("belgrano") }) },
     );
 
     expect(response.status).toBe(403);
@@ -38,13 +41,13 @@ describe("DELETE /api/zones/[id]/neighborhoods/[neighborhoodId]", () => {
   it("removes an assigned neighborhood", async () => {
     const cookie = await loginAs("office-duty-queue", { mode: "mock" });
     const response = await DELETE(
-      new Request("http://localhost/api/zones/zone-1/neighborhoods/barrio-1", { headers: { cookie } }),
-      { params: Promise.resolve({ id: "zone-1", neighborhoodId: "barrio-1" }) },
+      new Request(`http://localhost/api/zones/zone-1/neighborhoods/${barrioId("belgrano")}`, { headers: { cookie } }),
+      { params: Promise.resolve({ id: "zone-1", neighborhoodId: barrioId("belgrano") }) },
     );
 
     expect(response.status).toBe(200);
-    expect((await response.json()).neighborhoodIds).toEqual(["barrio-2"]);
-    expect(getZoneFixture("zone-1")?.neighborhoodIds).toEqual(["barrio-2"]);
+    expect((await response.json()).neighborhoodIds).toEqual([]);
+    expect(getZoneFixture("zone-1")?.neighborhoodIds).toEqual([]);
   });
 
   it("forwards an authorized backend neighborhood removal with both ids and DELETE method", async () => {

@@ -13,24 +13,28 @@ test.describe("Zone catalog management #106", () => {
     await openZonesCatalog(page);
 
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    await expect(page.getByText("Belgrano")).toBeVisible();
-    await expect(page.getByText("Z-BEL")).toHaveCount(0);
-    await expect(page.getByText("Palermo")).toBeVisible();
+    // 48 zonas, una por barrio: el nombre y la comuna se ven, el código interno no.
+    const belgrano = page.getByRole("row", { name: /Belgrano/ });
+    const palermo = page.getByRole("row", { name: /Palermo/ });
+    await expect(belgrano).toBeVisible();
+    await expect(belgrano.getByRole("cell", { name: "Comuna 13" })).toBeVisible();
+    await expect(palermo.getByRole("cell", { name: "Comuna 14" })).toBeVisible();
+    await expect(page.getByRole("row")).toHaveCount(49);
 
     await chooseCatalogOption(page, "Filtrar por estado", "Activas");
-    await expect(page.getByText("Palermo")).toBeVisible();
+    await expect(palermo).toBeVisible();
 
     await chooseCatalogOption(page, "Filtrar por estado", "Todos");
 
     // Filter by search
     const searchInput = page.getByLabel("Buscar zona");
     await searchInput.fill("lerm");
-    await expect(page.getByText("Palermo")).toBeVisible();
-    await expect(page.getByText("Belgrano")).not.toBeVisible();
+    await expect(palermo).toBeVisible();
+    await expect(belgrano).toHaveCount(0);
 
     // Clear search
     await searchInput.fill("");
-    await expect(page.getByText("Belgrano")).toBeVisible();
+    await expect(belgrano).toBeVisible();
   });
 
   test("Office actor creates a new zone and it appears in the catalog", async ({ page }) => {
@@ -50,7 +54,7 @@ test.describe("Zone catalog management #106", () => {
   test("Office actor edits a zone and observes that code is immutable", async ({ page }) => {
     await openZonesCatalog(page);
 
-    // Find row for Z-PAL and click Editar
+    // Find the row for Palermo and click Editar
     const row = page.locator("tr", { hasText: "Palermo" });
     await row.getByRole("button", { name: "Editar" }).click();
 
@@ -59,7 +63,7 @@ test.describe("Zone catalog management #106", () => {
     // Verify code input is read-only
     const codeInput = page.getByLabel(/Código/i);
     await expect(codeInput).toHaveAttribute("readonly");
-    await expect(codeInput).toHaveValue("Z-PAL");
+    await expect(codeInput).toHaveValue("palermo");
 
     // Edit name
     const nameInput = page.getByLabel("Nombre");
@@ -75,7 +79,7 @@ test.describe("Zone catalog management #106", () => {
   }) => {
     await openZonesCatalog(page);
 
-    // Z-BEL has references
+    // Belgrano has references
     const row = page.locator("tr", { hasText: "Belgrano" });
     await row.getByRole("button", { name: "Dar de baja" }).click();
 
@@ -101,14 +105,20 @@ test.describe("Zone catalog management #106", () => {
 
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: "Barrios", level: 2 })).toBeVisible();
-    await dialog.getByLabel("Buscar barrios").fill("Industrial");
-    await dialog.getByRole("checkbox", { name: /Barrio Industrial/ }).click();
+    const assigned = dialog.getByRole("list", { name: "Barrios" });
+    await expect(assigned.getByText("Belgrano")).toBeVisible();
+
+    // Catálogo de M9 agrupado por comuna: Recoleta está en la Comuna 2.
+    await dialog.getByLabel("Buscar barrios").fill("Recol");
+    await dialog.getByRole("group", { name: "Comuna 2" }).getByRole("checkbox", { name: "Recoleta" }).click();
+    await expect(dialog.getByText("1 seleccionado")).toBeVisible();
     await dialog.getByRole("button", { name: "Asignar seleccionados" }).click();
 
     await expect(page.getByText("Barrios asignados correctamente.")).toBeVisible();
-    await expect(dialog.getByRole("list", { name: "Barrios" }).getByText("Barrio Industrial")).toBeVisible();
+    await expect(assigned.getByText("Recoleta")).toBeVisible();
+    await expect(dialog.getByText("Ya asignado")).toBeVisible();
 
-    await dialog.getByRole("button", { name: "Quitar Barrio Industrial" }).click();
+    await dialog.getByRole("button", { name: "Quitar Recoleta" }).click();
     await expect(page.getByText("Barrio quitado de la zona.")).toBeVisible();
   });
 });

@@ -35,7 +35,9 @@ export async function GET(request: Request) {
     }
   }
 
-  const activeSession = { ...session, lastActivityAt: now, roles: sameRoles(session.roles, roles) ? session.roles : roles };
+  // fetchMe pudo renovar los tokens contra M1: la cookie resellada lleva el material nuevo.
+  const current = getSessionFromRequest(request, undefined, now) ?? session;
+  const activeSession = { ...current, lastActivityAt: now, roles: sameRoles(session.roles, roles) ? session.roles : roles };
   const response = NextResponse.json({ session: publicSession(activeSession) });
   response.cookies.set({
     name: AUTH_COOKIE_NAME,

@@ -1,9 +1,14 @@
 import {
   AuthUnavailableError,
   BackendUnavailableError,
+  InvalidSessionError,
   getRequiredSession,
+  getSessionFromRequest,
+  rememberRenewedResponse,
   requireCapability,
+  wasSessionRenewed,
 } from "./session";
+import { canRenew, isNearExpiry, renewRequestSession } from "./m1-refresh";
 import type { Capability } from "./scenarios";
 import { errorResponse } from "./bff-route";
 import { rememberBffPath } from "./bff-response-path";
@@ -30,7 +35,7 @@ export async function fetchBackend(
   init: RequestInit = {},
   options: FetchBackendOptions = {},
 ): Promise<Response> {
-  const session = getRequiredSession(request);
+  let session = getRequiredSession(request);
   if (capability) requireCapability(session, capability);
 
   if (session.mode === "mock") {
@@ -58,15 +63,49 @@ export async function fetchBackend(
   }
 
   const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${session.accessToken}`);
-  const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_BACKEND_TIMEOUT_MS);
-  const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
-  try {
-    const response = await fetch(resourceUrl, { ...init, headers, signal });
+  let accessToken: string = session.accessToken;
+  // Renovación preventiva contra M1: el access token vence a los 15 min y M6 solo acepta ese token.
+  if (canRenew(session) && isNearExpiry(session)) {
+    const renewed = await renewRequestSession(request, session, { tolerateUnavailable: true });
+    session = renewed;
+    accessToken = renewed.accessToken;
+  }
+
+  const send = async (token: string) => {
+    headers.set("Authorization", `Bearer ${token}`);
+    const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_BACKEND_TIMEOUT_MS);
+    const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+    return fetch(resourceUrl, { ...init, headers, signal });
+  };
+  const finish = (response: Response): Response => {
+    const renewed = wasSessionRenewed(request) ? getSessionFromRequest(request) : undefined;
+    if (renewed) rememberRenewedResponse(response, renewed);
     rememberBffPath(response, new URL(request.url).pathname);
     return response;
+  };
+  try {
+    let response = await send(accessToken);
+    // Un 401 con refresh disponible se reintenta UNA vez por pedido. Los bodies de un solo uso (stream, AsyncIterable) no se pueden reenviar.
+    const replayable = !(init.body instanceof ReadableStream) && !(typeof init.body === "object" && init.body !== null && Symbol.asyncIterator in init.body);
+    if (response.status === 401 && replayable && canRenew(session)) {
+      const current = getSessionFromRequest(request);
+      if (current?.accessToken && current.accessToken !== accessToken) {
+        // Otra llamada del mismo pedido (Promise.all) ya renovó: se reintenta con su token, sin renovar de nuevo.
+        void response.body?.cancel().catch(() => undefined);
+        accessToken = current.accessToken;
+        response = await send(accessToken);
+      } else if (!wasSessionRenewed(request)) {
+        void response.body?.cancel().catch(() => undefined);
+        const renewed = await renewRequestSession(request, session, { tolerateUnavailable: false });
+        session = renewed;
+        accessToken = renewed.accessToken;
+        response = await send(accessToken);
+      }
+    }
+    return finish(response);
   } catch (error) {
     if (init.signal?.aborted) throw error;
+    if (error instanceof InvalidSessionError || error instanceof BackendUnavailableError) throw error;
     throw new BackendUnavailableError(503, BACKEND_UNAVAILABLE_MESSAGE);
   }
 }

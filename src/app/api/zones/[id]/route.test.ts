@@ -49,8 +49,10 @@ describe("authenticated zones [id] BFF route", () => {
       const body = await response.json();
       expect(body).toMatchObject({
         id: "zone-1",
-        code: "Z-BEL",
+        code: "belgrano",
         name: "Belgrano",
+        commune: { code: "comuna-13", name: "Comuna 13" },
+        neighborhood: { codigo: "belgrano", nombre: "Belgrano" },
       });
     });
   });
@@ -115,7 +117,22 @@ describe("authenticated zones [id] BFF route", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.name).toBe("Zona Norte Renombrada");
-      expect(body.code).toBe("Z-BEL"); // Remains Z-BEL
+      expect(body.code).toBe("belgrano"); // Remains belgrano
+    });
+  });
+
+  describe("PATCH commune", () => {
+    it("answers 400 when the commune does not exist and lets null clear it", async () => {
+      const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+      const patch = (communeId: string | null) => PATCH(
+        new Request("http://localhost/api/zones/zone-1", { method: "PATCH", headers: { "content-type": "application/json", cookie }, body: JSON.stringify({ communeId }) }),
+        { params: Promise.resolve({ id: "zone-1" }) },
+      );
+
+      expect((await patch("c0a80101-0000-4000-8000-0000000000ff")).status).toBe(400);
+      const cleared = await patch(null);
+      expect(cleared.status).toBe(200);
+      expect((await cleared.json()).commune).toBeNull();
     });
   });
 

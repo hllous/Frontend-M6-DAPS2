@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   MapPin,
@@ -35,6 +35,8 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -55,7 +57,15 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { notifySuccess } from "@/components/ui/feedback";
-import { neighborhoodsAdapter, type Neighborhood } from "@/lib/neighborhoods";
+import { communesAdapter, type Commune } from "@/lib/communes";
+import {
+  catalogErrorMessage,
+  groupNeighborhoodsByCommune,
+  neighborhoodName,
+  neighborhoodsAdapter,
+  type CatalogStatus,
+  type Neighborhood,
+} from "@/lib/neighborhoods";
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   type CreateZoneInput,
@@ -69,8 +79,56 @@ import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
-  | { status: "ready"; items: Zone[] }
+  | { status: "ready"; items: Zone[]; total: number }
   | { status: "error"; message: string };
+
+const NO_COMMUNE = "none";
+
+/** Barrio de la zona según el listado (uno solo); el detalle completo se ve con la acción «Barrios». */
+function neighborhoodCell(zone: Zone): string {
+  return zone.neighborhood?.nombre ?? "—";
+}
+
+function CommuneField({
+  id,
+  value,
+  communes,
+  current,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  communes: Commune[];
+  /** Comuna actual de la zona: si no figura en `communes`, se agrega para que el selector no quede en blanco. */
+  current?: { id: string; name: string } | null;
+  onChange: (communeId: string) => void;
+}) {
+  const options = current && !communes.some((commune) => commune.id === current.id) ? [...communes, current] : communes;
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>Comuna</FieldLabel>
+      <Select
+        value={value}
+        items={{ [NO_COMMUNE]: "Sin comuna", ...Object.fromEntries(options.map((commune) => [commune.id, commune.name])) }}
+        onValueChange={(next) => onChange(next as string)}
+      >
+        <SelectTrigger id={id} aria-label="Comuna">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            <SelectItem value={NO_COMMUNE}>Sin comuna</SelectItem>
+            {options.map((commune) => (
+              <SelectItem key={commune.id} value={commune.id}>
+                {commune.name}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+}
 
 type FormErrors = { code?: string; name?: string; form?: string };
 
@@ -101,18 +159,23 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   // Filters
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "true" | "false">("all");
+  const [communeFilter, setCommuneFilter] = useState("all");
+  const [communes, setCommunes] = useState<Commune[]>([]);
+  const [communesError, setCommunesError] = useState<string | null>(null);
 
   // Create state
   const [showCreate, setShowCreate] = useState(false);
   const [createDraft, setCreateDraft] = useState<CreateZoneInput>({ code: "", name: "" });
+  const [createCommuneId, setCreateCommuneId] = useState(NO_COMMUNE);
   const [createErrors, setCreateErrors] = useState<FormErrors>({});
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
 
   // Edit state
   const [editingZone, setEditingZone] = useState<Zone | null>(null);
-  const [editDraft, setEditDraft] = useState<{ name: string; active: boolean }>({
+  const [editDraft, setEditDraft] = useState<{ name: string; active: boolean; communeId: string }>({
     name: "",
     active: true,
+    communeId: NO_COMMUNE,
   });
   const [editErrors, setEditErrors] = useState<FormErrors>({});
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
@@ -129,8 +192,11 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   // Neighborhood assignment state
   const [neighborhoodZone, setNeighborhoodZone] = useState<Zone | null>(null);
   const [neighborhoodSearch, setNeighborhoodSearch] = useState("");
-  const [neighborhoodOptions, setNeighborhoodOptions] = useState<Neighborhood[]>([]);
-  const [assignedNeighborhoods, setAssignedNeighborhoods] = useState<Neighborhood[]>([]);
+  // Catálogo completo de M9 (activos e inactivos): el nombre se resuelve al mostrar, no se persiste.
+  const [neighborhoodCatalog, setNeighborhoodCatalog] = useState<Neighborhood[]>([]);
+  const [catalogStatus, setCatalogStatus] = useState<CatalogStatus>("loading");
+  const catalogLoaded = catalogStatus === "ready";
+  const catalogFailed = catalogStatus === "failed";
   const [selectedNeighborhoodIds, setSelectedNeighborhoodIds] = useState<string[]>([]);
   const [neighborhoodError, setNeighborhoodError] = useState<string | null>(null);
   const [isLoadingNeighborhoods, setIsLoadingNeighborhoods] = useState(false);
@@ -146,9 +212,11 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
         const page = await zonesAdapter.list({
           search: search.trim() || undefined,
           active: activeParam,
+          communeId: communeFilter === "all" ? undefined : communeFilter,
+          pageSize: 100,
         });
         if (isCurrent) {
-          setState({ status: "ready", items: page.zones });
+          setState({ status: "ready", items: page.zones, total: page.total });
         }
       } catch (caught) {
         if (isCurrent) {
@@ -165,7 +233,23 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     return () => {
       isCurrent = false;
     };
-  }, [search, activeFilter, requestVersion]);
+  }, [search, activeFilter, communeFilter, requestVersion]);
+
+  // Comunas para el filtro y los formularios; si fallan, esos controles se ocultan, se avisa y la lista sigue funcionando.
+  useEffect(() => {
+    let isCurrent = true;
+    void communesAdapter.list().then(
+      (list) => {
+        if (isCurrent) setCommunes(list);
+      },
+      (caught: unknown) => {
+        if (isCurrent) setCommunesError(catalogErrorMessage(caught, "comunas"));
+      },
+    );
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   // Submit create
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -182,9 +266,10 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
     setIsSubmittingCreate(true);
     try {
-      await zonesAdapter.create(createDraft);
+      await zonesAdapter.create({ ...createDraft, communeId: createCommuneId === NO_COMMUNE ? undefined : createCommuneId });
       setShowCreate(false);
       setCreateDraft({ code: "", name: "" });
+      setCreateCommuneId(NO_COMMUNE);
       setRequestVersion((v) => v + 1);
       setCreateErrors({});
       notifySuccess("Zona creada.");
@@ -202,7 +287,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
   // Start edit
   const handleStartEdit = (zone: Zone) => {
     setEditingZone(zone);
-    setEditDraft({ name: zone.name, active: zone.active });
+    setEditDraft({ name: zone.name, active: zone.active, communeId: zone.commune?.id ?? NO_COMMUNE });
     setEditErrors({});
   };
 
@@ -219,7 +304,13 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
     setIsSubmittingEdit(true);
     try {
-      await zonesAdapter.update(editingZone.id, editDraft);
+      // La comuna se manda solo si cambió: una zona derivada de un barrio no debe perderla por reenviarla.
+      const communeChanged = editDraft.communeId !== (editingZone.commune?.id ?? NO_COMMUNE);
+      await zonesAdapter.update(editingZone.id, {
+        name: editDraft.name,
+        active: editDraft.active,
+        ...(communeChanged ? { communeId: editDraft.communeId === NO_COMMUNE ? null : editDraft.communeId } : {}),
+      });
       setEditingZone(null);
       setRequestVersion((v) => v + 1);
       setEditErrors({});
@@ -278,62 +369,132 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     );
   };
 
+  // Cada apertura, cierre o recarga del diálogo de barrios incrementa el contador: la respuesta de una
+  // solicitud anterior se descarta en vez de reabrir el diálogo o pisar el estado de otra zona.
+  const neighborhoodRequest = useRef(0);
+
+  const loadNeighborhoodCatalog = async (token: number): Promise<Neighborhood[] | null> => {
+    try {
+      const list = await neighborhoodsAdapter.list();
+      if (token !== neighborhoodRequest.current) return null;
+      setNeighborhoodCatalog(list);
+      setCatalogStatus("ready");
+      // Una selección que ya no existe (o se dio de baja) se descarta.
+      setSelectedNeighborhoodIds((current) => current.filter((id) => list.some((n) => n.id === id && n.activo)));
+      return list;
+    } catch (caught) {
+      if (token === neighborhoodRequest.current) {
+        setCatalogStatus("failed");
+        setNeighborhoodError(catalogErrorMessage(caught));
+      }
+      return null;
+    }
+  };
+
   const handleStartNeighborhoods = async (zone: Zone) => {
+    const token = ++neighborhoodRequest.current;
     setNeighborhoodZone(zone);
     setNeighborhoodSearch("");
     setSelectedNeighborhoodIds([]);
     setNeighborhoodError(null);
+    setCatalogStatus("loading");
     setIsLoadingNeighborhoods(true);
 
     try {
       // El listado del backend no informa los barrios de la zona; el detalle sí,
       // así que se pide cuando hace falta en vez de asumir que no tiene ninguno.
       const detail = zone.neighborhoodIds === undefined ? await zonesAdapter.get(zone.id) : zone;
-      const [options, assigned] = await Promise.all([
-        neighborhoodsAdapter.search(),
-        neighborhoodsAdapter.resolveIds(detail.neighborhoodIds ?? []),
-      ]);
+      if (token !== neighborhoodRequest.current) return;
       setNeighborhoodZone(detail);
-      setNeighborhoodOptions(options);
-      setAssignedNeighborhoods(assigned);
     } catch {
-      setNeighborhoodError("No se pudieron cargar los barrios disponibles.");
-    } finally {
-      setIsLoadingNeighborhoods(false);
+      if (token !== neighborhoodRequest.current) return;
+      setNeighborhoodError("No se pudieron cargar los barrios de la zona.");
     }
+    await loadNeighborhoodCatalog(token);
+    if (token === neighborhoodRequest.current) setIsLoadingNeighborhoods(false);
   };
 
-  useEffect(() => {
+  const handleRetryNeighborhoods = async () => {
     if (!neighborhoodZone) return;
+    if (neighborhoodZone.neighborhoodIds === undefined) {
+      await handleStartNeighborhoods(neighborhoodZone);
+      return;
+    }
+    const token = ++neighborhoodRequest.current;
+    setNeighborhoodError(null);
+    setCatalogStatus("loading");
+    setIsLoadingNeighborhoods(true);
+    await loadNeighborhoodCatalog(token);
+    if (token === neighborhoodRequest.current) setIsLoadingNeighborhoods(false);
+  };
 
-    let isCurrent = true;
-    void neighborhoodsAdapter.search({ search: neighborhoodSearch }).then((options) => {
-      if (isCurrent) setNeighborhoodOptions(options);
-    });
+  const assignedNeighborhoods = useMemo(
+    () =>
+      (neighborhoodZone?.neighborhoodIds ?? []).map((id): Neighborhood => {
+        const known = neighborhoodCatalog.find((neighborhood) => neighborhood.id === id);
+        if (known) return known;
+        // Si el catálogo no está, la propia zona suele traer el nombre de su barrio.
+        const ownName = neighborhoodZone?.neighborhood?.id === id ? neighborhoodZone.neighborhood.nombre : undefined;
+        return {
+          id,
+          codigo: id,
+          nombre: ownName ?? neighborhoodName(neighborhoodCatalog, id, catalogStatus),
+          zona: "",
+          zonaNombre: "",
+          activo: true,
+        };
+      }),
+    [neighborhoodZone, neighborhoodCatalog, catalogStatus],
+  );
 
-    return () => {
-      isCurrent = false;
-    };
-  }, [neighborhoodSearch, neighborhoodZone]);
+  // Solo los barrios activos se ofrecen para asignar; los dados de baja siguen visibles en los asignados.
+  const neighborhoodGroups = useMemo(() => {
+    const term = neighborhoodSearch.trim().toLowerCase();
+    return groupNeighborhoodsByCommune(
+      neighborhoodCatalog.filter(
+        (neighborhood) => neighborhood.activo && (!term || `${neighborhood.codigo} ${neighborhood.nombre}`.toLowerCase().includes(term)),
+      ),
+    );
+  }, [neighborhoodCatalog, neighborhoodSearch]);
+  const availableNeighborhoodCount = neighborhoodGroups.reduce((total, group) => total + group.neighborhoods.length, 0);
 
   const handleAssignNeighborhoods = async () => {
     if (!neighborhoodZone || selectedNeighborhoodIds.length === 0) return;
+    const token = neighborhoodRequest.current;
+    const attempted = selectedNeighborhoodIds;
     setNeighborhoodError(null);
     setIsSubmittingNeighborhoods(true);
 
     try {
       const updated = await zonesAdapter.assignNeighborhoods(neighborhoodZone.id, {
-        neighborhoodIds: selectedNeighborhoodIds,
+        neighborhoodIds: attempted,
       });
       updateZoneInState(updated);
-      setNeighborhoodZone(updated);
-      setAssignedNeighborhoods(await neighborhoodsAdapter.resolveIds(updated.neighborhoodIds ?? []));
-      setSelectedNeighborhoodIds([]);
       notifySuccess("Barrios asignados correctamente.");
+      if (token !== neighborhoodRequest.current) return;
+      setNeighborhoodZone(updated);
+      setSelectedNeighborhoodIds([]);
     } catch (caught) {
-      setNeighborhoodError(
-        caught instanceof ZoneRequestError ? caught.message : "No se pudieron asignar los barrios.",
-      );
+      if (token !== neighborhoodRequest.current) return;
+      if (caught instanceof ZoneRequestError && caught.status === 400) {
+        // El 400 también cubre validaciones (tope de 100, ids vacíos): se recarga el catálogo y solo si
+        // algún barrio elegido ya no existe se explica eso; si no, se muestra el mensaje del backend.
+        const reloadToken = ++neighborhoodRequest.current;
+        setCatalogStatus("loading");
+        setIsLoadingNeighborhoods(true);
+        const list = await loadNeighborhoodCatalog(reloadToken);
+        if (reloadToken !== neighborhoodRequest.current) return;
+        setIsLoadingNeighborhoods(false);
+        if (!list) return; // el fallo del reload ya dejó un único mensaje con «Reintentar»
+        const someGone = attempted.some((id) => !list.some((n) => n.id === id && n.activo));
+        setNeighborhoodError(
+          someGone ? "Algún barrio elegido ya no está en el catálogo. La lista se actualizó: revise la selección." : caught.message,
+        );
+      } else {
+        setNeighborhoodError(
+          caught instanceof ZoneRequestError ? caught.message : "No se pudieron asignar los barrios.",
+        );
+      }
     } finally {
       setIsSubmittingNeighborhoods(false);
     }
@@ -341,25 +502,29 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
   const handleRemoveNeighborhood = async (neighborhoodId: string) => {
     if (!neighborhoodZone) return;
+    const token = neighborhoodRequest.current;
     setNeighborhoodError(null);
     setRemovingNeighborhoodId(neighborhoodId);
 
     try {
       const updated = await zonesAdapter.removeNeighborhood(neighborhoodZone.id, neighborhoodId);
       updateZoneInState(updated);
-      setNeighborhoodZone(updated);
-      setAssignedNeighborhoods(await neighborhoodsAdapter.resolveIds(updated.neighborhoodIds ?? []));
       notifySuccess("Barrio quitado de la zona.");
+      if (token === neighborhoodRequest.current) setNeighborhoodZone(updated);
     } catch (caught) {
-      setNeighborhoodError(
-        caught instanceof ZoneRequestError ? caught.message : "No se pudo quitar el barrio de la zona.",
-      );
+      if (token === neighborhoodRequest.current) {
+        setNeighborhoodError(
+          caught instanceof ZoneRequestError ? caught.message : "No se pudo quitar el barrio de la zona.",
+        );
+      }
     } finally {
       setRemovingNeighborhoodId(null);
     }
   };
 
   const closeNeighborhoodDialog = () => {
+    neighborhoodRequest.current += 1;
+    setIsLoadingNeighborhoods(false);
     setNeighborhoodZone(null);
     setNeighborhoodError(null);
     setSelectedNeighborhoodIds([]);
@@ -387,7 +552,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
       {/* Filter and search bar */}
       <Card size="sm">
-      <CardContent className="grid gap-3 sm:grid-cols-[1fr_200px]">
+      <CardContent className={`grid gap-3 ${communes.length > 0 ? "sm:grid-cols-[1fr_220px_200px]" : "sm:grid-cols-[1fr_200px]"}`}>
         <Field>
           <FieldLabel htmlFor="zone-search">Buscar</FieldLabel>
           <div className="relative flex items-center">
@@ -403,6 +568,31 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             />
           </div>
         </Field>
+
+        {communes.length > 0 && (
+          <Field>
+            <FieldLabel htmlFor="zone-commune-filter">Comuna</FieldLabel>
+            <Select
+              value={communeFilter}
+              items={{ all: "Todas", ...Object.fromEntries(communes.map((commune) => [commune.id, commune.name])) }}
+              onValueChange={(value) => setCommuneFilter(value as string)}
+            >
+              <SelectTrigger id="zone-commune-filter" aria-label="Filtrar por comuna">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {communes.map((commune) => (
+                    <SelectItem key={commune.id} value={commune.id}>
+                      {commune.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
 
         <Field>
           <FieldLabel htmlFor="zone-active-filter">Estado</FieldLabel>
@@ -423,6 +613,11 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             </SelectContent>
           </Select>
         </Field>
+        {communesError && (
+          <p role="status" className="text-xs text-muted-foreground sm:col-span-full">
+            {communesError} El filtro y la selección de comuna no están disponibles por ahora.
+          </p>
+        )}
       </CardContent>
       </Card>
 
@@ -464,7 +659,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               <Input
                 id="create-zone-code"
                 required
-                placeholder="Ej. Z-04"
+                placeholder="Ej. palermo"
                 value={createDraft.code}
                 onInvalid={(event) => {
                   event.preventDefault();
@@ -490,7 +685,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               <Input
                 id="create-zone-name"
                 required
-                placeholder="Ej. Zona Centro Este"
+                placeholder="Ej. Palermo"
                 value={createDraft.name}
                 onInvalid={(event) => {
                   event.preventDefault();
@@ -510,6 +705,10 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                 <FieldError id="create-zone-name-error">{createErrors.name}</FieldError>
               )}
             </Field>
+
+            {communes.length > 0 && (
+              <CommuneField id="create-zone-commune" value={createCommuneId} communes={communes} onChange={setCreateCommuneId} />
+            )}
           </FieldGroup>
 
           <div className="mt-5 flex justify-end gap-2">
@@ -597,6 +796,16 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               )}
             </Field>
 
+            {communes.length > 0 && (
+              <CommuneField
+                id="edit-zone-commune"
+                value={editDraft.communeId}
+                communes={communes}
+                current={editingZone.commune}
+                onChange={(communeId) => setEditDraft({ ...editDraft, communeId })}
+              />
+            )}
+
             <Field orientation="horizontal" className="pt-2 sm:col-span-2">
               <Checkbox
                 id="edit-zone-active"
@@ -659,6 +868,12 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
         </Empty>
       )}
 
+      {state.status === "ready" && state.total > state.items.length && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Se muestran {state.items.length} de {state.total} zonas. Use los filtros para acotar la lista.
+        </p>
+      )}
+
       {state.status === "ready" && state.items.length > 0 && (
         <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full text-left text-sm">
@@ -666,6 +881,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <thead className="border-b border-border bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Nombre</th>
+                <th className="px-4 py-3">Comuna</th>
                 <th className="px-4 py-3">Barrios</th>
                 <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3 text-right">
@@ -679,12 +895,9 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   <td className="px-4 py-3 font-medium text-foreground">
                     {zone.name}
                   </td>
+                  <td className="px-4 py-3 text-muted-foreground">{zone.commune?.name ?? "Sin comuna"}</td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {zone.neighborhoodIds === undefined
-                      ? "Ver barrios"
-                      : zone.neighborhoodIds.length > 0
-                      ? `${zone.neighborhoodIds.length} ${zone.neighborhoodIds.length === 1 ? "barrio" : "barrios"}`
-                      : "Sin barrios"}
+                    {neighborhoodCell(zone)}
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={zone.active ? "success" : "secondary"}>
@@ -744,7 +957,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           if (!open) closeNeighborhoodDialog();
         }}
       >
-        <DialogContent className="max-w-2xl" aria-labelledby="manage-neighborhoods-title">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle id="manage-neighborhoods-title" className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" aria-hidden="true" />
@@ -762,6 +975,18 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           {neighborhoodError && (
             <Alert variant="destructive">
               <AlertDescription>{neighborhoodError}</AlertDescription>
+              {(catalogFailed || neighborhoodZone?.neighborhoodIds === undefined) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 gap-1.5"
+                  onClick={() => void handleRetryNeighborhoods()}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                  Reintentar
+                </Button>
+              )}
             </Alert>
           )}
 
@@ -769,7 +994,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
             <section aria-labelledby="assigned-neighborhoods-heading" className="space-y-3">
               <div>
                 <h3 id="assigned-neighborhoods-heading" className="text-sm font-semibold">
-                  Barrios
+                  Barrios asignados
                 </h3>
               </div>
 
@@ -795,7 +1020,15 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                       className="items-center justify-between gap-3 rounded-none border-x-0 border-t-0 last:border-b-0"
                     >
                       <ItemContent className="min-w-0">
-                        <ItemTitle className="truncate">{neighborhood.name}</ItemTitle>
+                        <ItemTitle className="flex items-center gap-2">
+                          <span className="truncate">{neighborhood.nombre}</span>
+                          {!neighborhood.activo && (
+                            <Badge variant="secondary" className="shrink-0">
+                              Inactivo
+                            </Badge>
+                          )}
+                        </ItemTitle>
+                        {neighborhood.zonaNombre && <ItemDescription>{neighborhood.zonaNombre}</ItemDescription>}
                       </ItemContent>
                       <Button
                         type="button"
@@ -804,7 +1037,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                         className="h-10 max-[760px]:h-12 shrink-0 gap-1 text-xs text-destructive hover:text-destructive"
                         onClick={() => void handleRemoveNeighborhood(neighborhood.id)}
                         disabled={removingNeighborhoodId !== null || isSubmittingNeighborhoods}
-                        aria-label={`Quitar ${neighborhood.name}`}
+                        aria-label={`Quitar ${neighborhood.nombre}`}
                       >
                         {removingNeighborhoodId === neighborhood.id ? (
                           <Spinner aria-hidden="true" />
@@ -832,57 +1065,74 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
                   <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   <Input
                     id="neighborhood-search"
+                    type="search"
                     className="pl-9"
                     placeholder="Buscar barrio"
                     value={neighborhoodSearch}
                     onChange={(event) => setNeighborhoodSearch(event.target.value)}
-                    disabled={isLoadingNeighborhoods}
+                    disabled={isLoadingNeighborhoods || !catalogLoaded}
                   />
                 </div>
               </Field>
+              <p role="status" className="sr-only">
+                {catalogLoaded ? `${availableNeighborhoodCount} ${availableNeighborhoodCount === 1 ? "barrio disponible" : "barrios disponibles"}` : ""}
+              </p>
 
-              {neighborhoodOptions.length === 0 ? (
+              {neighborhoodGroups.length === 0 ? (
                 <Empty className="border p-3">
-                  <EmptyDescription>No se encontraron barrios para esta búsqueda.</EmptyDescription>
+                  <EmptyDescription>
+                    {catalogLoaded ? "No se encontraron barrios para esta búsqueda." : catalogFailed ? "El catálogo de barrios no está disponible." : "Cargando barrios…"}
+                  </EmptyDescription>
                 </Empty>
               ) : (
                 <div className="max-h-56 overflow-y-auto rounded-md border border-border" role="group" aria-label="Barrios disponibles">
-                  {neighborhoodOptions.map((neighborhood) => {
-                    const isAssigned = neighborhoodZone?.neighborhoodIds?.includes(neighborhood.id) ?? false;
-                    const isSelected = selectedNeighborhoodIds.includes(neighborhood.id);
-                    const inputId = `neighborhood-${neighborhood.id}`;
-                    return (
-                      <Field
-                        key={neighborhood.id}
-                        orientation="horizontal"
-                        data-disabled={isAssigned || isSubmittingNeighborhoods || undefined}
-                        className={`min-h-11 gap-3 border-b border-border px-3 py-2 last:border-0 ${
-                          isAssigned ? "bg-muted/50" : "hover:bg-muted/40"
-                        }`}
-                      >
-                        <Checkbox
-                          id={inputId}
-                          checked={isAssigned || isSelected}
-                          disabled={isAssigned || isSubmittingNeighborhoods}
-                          onCheckedChange={(checked) => {
-                            setSelectedNeighborhoodIds((current) =>
-                              checked
-                                ? [...current, neighborhood.id]
-                                : current.filter((id) => id !== neighborhood.id),
-                            );
-                          }}
-                        />
-                        <FieldContent>
-                          <FieldLabel htmlFor={inputId} className="min-w-0 cursor-pointer">
-                            <span className="truncate">{neighborhood.name}</span>
-                          </FieldLabel>
-                        </FieldContent>
-                      </Field>
-                    );
-                  })}
+                  {neighborhoodGroups.map((group) => (
+                    <FieldSet key={group.key} className="gap-0">
+                      <FieldLegend variant="label" className="sticky top-0 m-0 w-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                        {group.label}
+                      </FieldLegend>
+                      {group.neighborhoods.map((neighborhood) => {
+                        const isAssigned = neighborhoodZone?.neighborhoodIds?.includes(neighborhood.id) ?? false;
+                        const isSelected = selectedNeighborhoodIds.includes(neighborhood.id);
+                        const inputId = `neighborhood-${neighborhood.id}`;
+                        return (
+                          <Field
+                            key={neighborhood.id}
+                            orientation="horizontal"
+                            data-disabled={isAssigned || isSubmittingNeighborhoods || undefined}
+                            className={`min-h-11 gap-3 border-b border-border px-3 py-2 last:border-0 ${
+                              isAssigned ? "bg-muted/50" : "hover:bg-muted/40"
+                            }`}
+                          >
+                            <Checkbox
+                              id={inputId}
+                              checked={isAssigned || isSelected}
+                              disabled={isAssigned || isSubmittingNeighborhoods}
+                              onCheckedChange={(checked) => {
+                                setSelectedNeighborhoodIds((current) =>
+                                  checked
+                                    ? [...current, neighborhood.id]
+                                    : current.filter((id) => id !== neighborhood.id),
+                                );
+                              }}
+                            />
+                            <FieldContent>
+                              <FieldLabel htmlFor={inputId} className="min-w-0 cursor-pointer">
+                                <span className="truncate">{neighborhood.nombre}</span>
+                              </FieldLabel>
+                              {isAssigned && <FieldDescription>Ya asignado</FieldDescription>}
+                            </FieldContent>
+                          </Field>
+                        );
+                      })}
+                    </FieldSet>
+                  ))}
                 </div>
               )}
 
+              <p role="status" className="text-xs text-muted-foreground">
+                {selectedNeighborhoodIds.length === 1 ? "1 seleccionado" : `${selectedNeighborhoodIds.length} seleccionados`}
+              </p>
               <Button
                 type="button"
                 className="w-full gap-1.5"

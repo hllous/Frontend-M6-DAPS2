@@ -848,7 +848,7 @@ function ZonesMapPanel({
             />}
           >
             <ItemMedia>
-              <span className={`${styles.zoneSwatch} ${styles[zone.code.toLowerCase().replace("-", "")]}`} aria-hidden />
+              <span className={cn(styles.zoneSwatch, styles[zone.code])} aria-hidden />
             </ItemMedia>
             <ItemContent>
               <ItemTitle>{zone.name}</ItemTitle>

@@ -1,15 +1,37 @@
+import catalog from "@/data/m9-neighborhoods.json";
+
+import type { Neighborhood } from "./neighborhoods";
 import type { Zone, ZoneQuery, ZoneReferenceReport } from "./zones";
 
-const INITIAL_ZONE_FIXTURES: Zone[] = [
-  { id: "zone-1", code: "Z-BEL", name: "Belgrano", active: true, neighborhoodIds: ["barrio-1", "barrio-2"] },
-  { id: "zone-2", code: "Z-PAL", name: "Palermo", active: true, neighborhoodIds: ["barrio-3"] },
-  { id: "zone-3", code: "Z-REC", name: "Recoleta", active: true, neighborhoodIds: [] },
-  { id: "zone-4", code: "Z-RET", name: "Retiro", active: true, neighborhoodIds: [] },
-  { id: "zone-5", code: "Z-COL", name: "Colegiales", active: true, neighborhoodIds: [] },
-  { id: "zone-6", code: "Z-SNI", name: "San Nicolás", active: true, neighborhoodIds: [] },
-  { id: "zone-7", code: "Z-PMA", name: "Puerto Madero", active: true, neighborhoodIds: [] },
-  { id: "zone-8", code: "Z-MON", name: "Montserrat", active: true, neighborhoodIds: [] },
+/** UUID determinístico de comuna (mismo formato que el ejemplo del backend). */
+export function communeFixtureId(number: number): string {
+  return `c0a80101-0000-4000-8000-${String(number).padStart(12, "0")}`;
+}
+
+// Una zona por barrio, como el seed del backend (48 zonas, `code` = `codigo` del barrio, 15 comunas).
+// Las primeras ocho conservan los ids `zone-1`..`zone-8` que usan las demás fixtures (recorridos, inventario).
+const LEGACY_ZONE_ORDER = ["belgrano", "palermo", "recoleta", "retiro", "colegiales", "san-nicolas", "puerto-madero", "montserrat"];
+const ZONE_NAME_OVERRIDES: Record<string, string> = { "san-nicolas": "San Nicolás", montserrat: "Montserrat", nunez: "Núñez" };
+
+const activeNeighborhoods = (catalog as Neighborhood[]).filter((neighborhood) => neighborhood.activo);
+const orderedNeighborhoods = [
+  ...LEGACY_ZONE_ORDER.map((codigo) => activeNeighborhoods.find((neighborhood) => neighborhood.codigo === codigo)!),
+  ...activeNeighborhoods.filter((neighborhood) => !LEGACY_ZONE_ORDER.includes(neighborhood.codigo)),
 ];
+
+const INITIAL_ZONE_FIXTURES: Zone[] = orderedNeighborhoods.map((neighborhood, index) => ({
+  id: `zone-${index + 1}`,
+  code: neighborhood.codigo,
+  name: ZONE_NAME_OVERRIDES[neighborhood.codigo] ?? neighborhood.nombre,
+  active: true,
+  commune: {
+    id: communeFixtureId(Number(neighborhood.zona.replace("comuna-", ""))),
+    code: neighborhood.zona,
+    name: neighborhood.zonaNombre,
+  },
+  neighborhood: { id: neighborhood.id, codigo: neighborhood.codigo, nombre: neighborhood.nombre },
+  neighborhoodIds: [neighborhood.id],
+}));
 
 export let zoneFixtures: Zone[] = INITIAL_ZONE_FIXTURES.map((item) => ({ ...item }));
 
@@ -34,6 +56,11 @@ export function updateZoneFixture(id: string, patch: Partial<Zone>): Zone | null
   };
   zoneFixtures[index] = updated;
   return updated;
+}
+
+/** Comuna del seed por id, o null si no existe (el backend responde 400 en ese caso). */
+export function findCommuneFixture(communeId: string): Zone["commune"] {
+  return INITIAL_ZONE_FIXTURES.find((zone) => zone.commune?.id === communeId)?.commune ?? null;
 }
 
 export function getZoneFixture(id: string): Zone | null {
@@ -63,6 +90,7 @@ export const EMPTY_ZONES_QUERY: ZoneQuery = { search: "zzz-sin-resultados" };
 export function filterZoneFixtures(query: ZoneQuery): Zone[] {
   return zoneFixtures.filter((zone) => {
     if (query.active !== undefined && zone.active !== query.active) return false;
+    if (query.communeId && zone.commune?.id !== query.communeId) return false;
     if (query.search && !zone.name.toLowerCase().includes(query.search.toLowerCase())) return false;
     return true;
   });
