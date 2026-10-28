@@ -37,11 +37,13 @@ describe("ConfirmRescheduleDialog", () => {
 
   it("disables days before today in Argentina", async () => {
     const { dateInput } = renderDialog();
-    const day = todayInArgentina().split("-").map(Number)[2];
+    const [year, monthNumber, day] = todayInArgentina().split("-").map(Number);
+    // La grilla muestra también días de los meses vecinos: se ancla al mes de hoy para que el número no coincida dos veces.
+    const month = new Date(Date.UTC(year, monthNumber - 1, day)).toLocaleDateString("es-AR", { month: "long", timeZone: "UTC" });
     await userEvent.click(dateInput);
     const grid = await screen.findByRole("grid");
-    expect(within(grid).getByRole("button", { name: new RegExp(`, ${day} de `, "i") })).toBeEnabled();
-    if (day > 1) expect(within(grid).getByRole("button", { name: new RegExp(`, ${day - 1} de `, "i") })).toBeDisabled();
+    expect(within(grid).getByRole("button", { name: new RegExp(`, ${day} de ${month}`, "i") })).toBeEnabled();
+    if (day > 1) expect(within(grid).getByRole("button", { name: new RegExp(`, ${day - 1} de ${month}`, "i") })).toBeDisabled();
   });
 
   it("asks for a date when none was chosen, without calling the backend", async () => {
