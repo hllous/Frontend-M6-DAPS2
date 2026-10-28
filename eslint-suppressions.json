@@ -4,22 +4,7 @@
       "count": 1
     }
   },
-  "src/components/catalog/disposal-sites-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/components/catalog/route-catalog-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/components/catalog/service-frequencies-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/components/catalog/service-types-panel.tsx": {
     "no-restricted-syntax": {
       "count": 1
     }
