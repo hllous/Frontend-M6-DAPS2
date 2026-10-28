@@ -89,7 +89,7 @@
 .moduleState { min-height: 180px; justify-content: center; padding: var(--space-16); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
 .moduleState > [role="alert"] { display: flex; flex-direction: column; gap: var(--space-8); }
 .moduleState > [data-slot="empty"] { min-height: 140px; border-color: var(--color-border); }
-.moduleSkeleton { width: 100%; min-height: 128px; }
+.moduleSkeleton { display: flex; flex-direction: column; gap: var(--space-12); width: 100%; min-height: 128px; }
 .moduleContent { display: flex; min-width: 0; flex-direction: column; gap: var(--space-16); }
 .detailModules { display: flex; min-width: 0; flex-direction: column; gap: var(--space-20); }
 .mobileTabs { display: none; }
