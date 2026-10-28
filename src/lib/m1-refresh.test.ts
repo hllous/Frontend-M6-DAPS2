@@ -188,10 +188,10 @@ describe("renovación contra M1", () => {
     await expect(fetchBackend(reactive.request, "/services")).rejects.toBeInstanceOf(BackendUnavailableError);
   });
 
-  it("M1 responde 204 sin access token: la sesión termina", async () => {
+  it("M1 responde 204 sin access token: es indisponibilidad, no desloguea", async () => {
     const { request } = healthy();
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(null, { status: 401 })).mockResolvedValueOnce(new Response(null, { status: 204 }));
-    await expect(fetchBackend(request, "/services")).rejects.toBeInstanceOf(InvalidSessionError);
+    await expect(fetchBackend(request, "/services")).rejects.toBeInstanceOf(BackendUnavailableError);
   });
 
   it("si M1 no responde en la renovación preventiva sigue con el token vigente", async () => {
@@ -369,24 +369,56 @@ describe("cuándo se renueva", () => {
 });
 
 describe("límites sobre la respuesta de M1", () => {
-  const big = "x".repeat(2_100);
+  const big = "x".repeat(1_300);
   const cases: [string, () => Response][] = [
+    ["HTML de un gateway (2xx sin tokens)", () => new Response("<html>gateway</html>", { status: 200, headers: { "content-type": "text/html" } })],
     ["body de más de 8 KB", () => new Response("x".repeat(9_000), { status: 200, headers: { authorization: `Bearer ${jwt(inSeconds(900))}` } })],
     ["content-length declarado enorme", () => new Response(null, { status: 200, headers: { "content-length": "99999", authorization: `Bearer ${jwt(inSeconds(900))}` } })],
-    ["access token de más de 2 KB", () => m1Refresh(`${big}.${big}.${big}`)],
+    ["access token de más de 1,2 KB", () => m1Refresh(`${big}.${big}.${big}`)],
     ["access token sin forma de JWT", () => m1Refresh("no-es-un-jwt")],
-    ["sub distinto al de la sesión", () => m1Refresh(jwt(inSeconds(900), 99))],
-    ["vencimiento más allá de 24 h", () => m1Refresh(jwt(inSeconds(25 * 3600)))],
+        ["vencimiento más allá de 24 h", () => m1Refresh(jwt(inSeconds(25 * 3600)))],
     ["token ya vencido", () => m1Refresh(jwt(inSeconds(-10)))],
-    ["refresh token de más de 2 KB", () => m1Refresh(jwt(inSeconds(900)), { refresh: big + big })],
+    ["refresh token de más de 1,2 KB", () => m1Refresh(jwt(inSeconds(900)), { refresh: big + big })],
     ["refresh token vacío", () => m1Refresh(jwt(inSeconds(900)), { refresh: "" })],
   ];
 
-  it.each(cases)("rechaza la renovación: %s", async (_name, m1Response) => {
-    const { request } = near();
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(m1Response()).mockResolvedValue(ok());
+  it.each(cases)("respuesta inutilizable de M1 (%s): indisponibilidad, no desloguea", async (_name, m1Response) => {
+    const reactive = healthy();
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(null, { status: 401 })).mockResolvedValueOnce(m1Response());
+    await expect(fetchBackend(reactive.request, "/services")).rejects.toBeInstanceOf(BackendUnavailableError);
+  });
 
+  it("preventivo con respuesta inutilizable: sigue con el token vigente", async () => {
+    const { request, accessToken } = near();
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(m1Refresh("no-es-un-jwt")).mockResolvedValueOnce(ok());
+    expect((await fetchBackend(request, "/services")).status).toBe(200);
+    expect(authOf(spy.mock.calls[1])).toBe(`Bearer ${accessToken}`);
+  });
+
+  it("un sub distinto al de la sesión sí termina la sesión (señal de seguridad)", async () => {
+    const { request } = near();
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(m1Refresh(jwt(inSeconds(900), 99))).mockResolvedValue(ok());
     await expect(fetchBackend(request, "/services")).rejects.toBeInstanceOf(InvalidSessionError);
+  });
+
+  it("la llamada compartida a M1 no hereda el signal del primer llamador", async () => {
+    const { request } = near();
+    const controller = new AbortController();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => (isM1(input) ? m1Refresh(jwt(inSeconds(900))) : ok()));
+
+    await fetchBackend(request, "/services", undefined, { signal: controller.signal });
+    const m1Init = m1Calls(fetchSpy)[0][1] as RequestInit;
+    controller.abort();
+
+    expect(m1Init.signal?.aborted).toBe(false);
+  });
+
+  it("si la sesión renovada no cabe en la cookie falla con un error explícito (502), no un 500 genérico", async () => {
+    // Entra en la cookie con un refresh corto, pero no con el refresh de 1200 caracteres que devuelve M1.
+    const { request } = build(inSeconds(30), { crew: { id: "c".repeat(900), name: "n".repeat(900) } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(m1Refresh(jwt(inSeconds(900)), { refresh: "r".repeat(1_200) }));
+
+    await expect(fetchBackend(request, "/services")).rejects.toMatchObject({ name: "BackendUnavailableError", status: 502 });
   });
 
   it("falla en voz alta si la cookie sellada supera el límite", () => {

@@ -66,7 +66,7 @@ export async function fetchBackend(
   let accessToken: string = session.accessToken;
   // Renovación preventiva contra M1: el access token vence a los 15 min y M6 solo acepta ese token.
   if (canRenew(session) && isNearExpiry(session)) {
-    const renewed = await renewRequestSession(request, session, { tolerateUnavailable: true, signal: init.signal ?? undefined });
+    const renewed = await renewRequestSession(request, session, { tolerateUnavailable: true });
     session = renewed;
     accessToken = renewed.accessToken;
   }
@@ -96,7 +96,7 @@ export async function fetchBackend(
         response = await send(accessToken);
       } else if (!wasSessionRenewed(request)) {
         void response.body?.cancel().catch(() => undefined);
-        const renewed = await renewRequestSession(request, session, { tolerateUnavailable: false, signal: init.signal ?? undefined });
+        const renewed = await renewRequestSession(request, session, { tolerateUnavailable: false });
         session = renewed;
         accessToken = renewed.accessToken;
         response = await send(accessToken);

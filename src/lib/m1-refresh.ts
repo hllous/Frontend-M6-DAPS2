@@ -13,7 +13,8 @@ export const REFRESH_LEEWAY_MS = 60_000;
 export const PREVENTIVE_TIMEOUT_MS = 4_000;
 export const REACTIVE_TIMEOUT_MS = 15_000;
 const MAX_BODY_CHARS = 8_192;
-const MAX_TOKEN_CHARS = 2_048;
+// Access + refresh tienen que caber juntos en la cookie sellada (3800 bytes).
+const MAX_TOKEN_CHARS = 1_200;
 const MAX_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const JWT_SHAPE = /^[\w-]+\.[\w-]+\.[\w-]+$/;
 // Pedidos en paralelo comparten una sola renovación: si M1 rota el refresh token, un segundo intento con el viejo fallaría.
@@ -61,12 +62,12 @@ export function isNearExpiry(session: Session, now = Date.now()): boolean {
  * cómo se manda el refresh token ni dónde vienen los tokens nuevos. Supuestos, simétricos al login: el refresh viaja en
  * `X-Refresh-Token`; los tokens nuevos vuelven en `Authorization: Bearer` y `X-Refresh-Token` (o, si no, en un JSON
  * `{ accessToken, refreshToken }`); sin `X-Refresh-Token` nuevo se conserva el anterior.
- * Devuelve `null` si M1 rechaza el refresh (400/401/403) o responde algo inutilizable; lanza BackendUnavailableError
- * para cualquier otro estado o si no responde (no desloguea a nadie por una falla de M1).
+ * Devuelve `null` solo si M1 rechaza el refresh (400/401/403) o el `sub` cambió (señal de seguridad); lanza
+ * BackendUnavailableError para cualquier otra cosa (otro estado, no responde, cuerpo inutilizable): una falla de M1 no desloguea.
  */
 export function refreshSession(
   session: RenewableSession,
-  options: { now?: number; timeoutMs?: number; signal?: AbortSignal } = {},
+  options: { now?: number; timeoutMs?: number } = {},
 ): Promise<Session | null> {
   const now = options.now ?? Date.now();
   const key = session.refreshToken;
@@ -74,9 +75,9 @@ export function refreshSession(
 
   let entry = renewals.get(key);
   if (!entry) {
-    const created = { at: now, ttl: MEMO_MS, result: callM1(key, options.timeoutMs ?? REACTIVE_TIMEOUT_MS, options.signal, now) };
+    const created = { at: now, ttl: MEMO_MS, result: callM1(key, options.timeoutMs ?? REACTIVE_TIMEOUT_MS, now) };
     created.result.catch(() => {
-      created.at = now;
+      created.at = Date.now();
       created.ttl = FAILURE_MEMO_MS;
     });
     renewals.set(key, created);
@@ -94,7 +95,6 @@ export function refreshSession(
 async function callM1(
   refreshToken: string,
   timeoutMs: number,
-  signal: AbortSignal | undefined,
   now: number,
 ): Promise<Renewal | null> {
   const unavailable = () => new BackendUnavailableError(503, "M1 no responde. Reintente en unos segundos.");
@@ -102,12 +102,12 @@ async function callM1(
   if (!base) throw unavailable();
   let response: Response;
   try {
-    const timeout = AbortSignal.timeout(timeoutMs);
     response = await fetch(new URL("auth/refresh", base), {
       method: "POST",
       headers: { "X-Refresh-Token": refreshToken },
       redirect: "error",
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      // Sin el signal del primer llamador: la llamada es compartida y, si M1 ya rotó el token, abortarla lo perdería.
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     throw unavailable();
@@ -115,9 +115,9 @@ async function callM1(
   if ([400, 401, 403].includes(response.status)) return null;
   if (!response.ok) throw unavailable();
 
-  if (Number(response.headers.get("content-length")) > MAX_BODY_CHARS) return null;
+  if (Number(response.headers.get("content-length")) > MAX_BODY_CHARS) throw unavailable();
   const text = await response.text().catch(() => "");
-  if (text.length > MAX_BODY_CHARS) return null;
+  if (text.length > MAX_BODY_CHARS) throw unavailable();
   let body: { accessToken?: unknown; refreshToken?: unknown } | undefined;
   try {
     body = text ? JSON.parse(text) : undefined;
@@ -127,7 +127,7 @@ async function callM1(
 
   const bearer = response.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
   const accessToken = bearer ?? (typeof body?.accessToken === "string" ? body.accessToken : undefined);
-  if (!accessToken || accessToken.length > MAX_TOKEN_CHARS || !JWT_SHAPE.test(accessToken)) return null;
+  if (!accessToken || accessToken.length > MAX_TOKEN_CHARS || !JWT_SHAPE.test(accessToken)) throw unavailable();
 
   const expiresIn = Number(response.headers.get("x-token-expires-in"));
   const jwtExpiresAt = readJwtExpiry(accessToken) ?? (expiresIn > 0 ? now + expiresIn * 1000 : undefined);
@@ -137,11 +137,11 @@ async function callM1(
     jwtExpiresAt <= now ||
     jwtExpiresAt > now + MAX_LIFETIME_MS
   ) {
-    return null;
+    throw unavailable();
   }
 
   const next = response.headers.get("x-refresh-token") ?? (typeof body?.refreshToken === "string" ? body.refreshToken : undefined);
-  if (next !== undefined && (next.length === 0 || next.length > MAX_TOKEN_CHARS)) return null;
+  if (next !== undefined && (next.length === 0 || next.length > MAX_TOKEN_CHARS)) throw unavailable();
   return { accessToken, refreshToken: next ?? refreshToken, jwtExpiresAt };
 }
 
@@ -153,13 +153,12 @@ async function callM1(
 export async function renewRequestSession(
   request: Request,
   session: RenewableSession,
-  options: { tolerateUnavailable: boolean; signal?: AbortSignal },
+  options: { tolerateUnavailable: boolean },
 ): Promise<RenewableSession> {
   let next: Session | null;
   try {
     next = await refreshSession(session, {
       timeoutMs: options.tolerateUnavailable ? PREVENTIVE_TIMEOUT_MS : REACTIVE_TIMEOUT_MS,
-      signal: options.signal,
     });
   } catch (error) {
     if (options.tolerateUnavailable && error instanceof BackendUnavailableError) return session;

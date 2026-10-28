@@ -51,8 +51,8 @@ export class AuthUnavailableError extends Error {
 export class BackendUnavailableError extends Error {
   readonly status: number;
 
-  constructor(status: number, message = "El backend no responde. Reintente en unos segundos.") {
-    super(message);
+  constructor(status: number, message = "El backend no responde. Reintente en unos segundos.", options?: { cause?: unknown }) {
+    super(message, options);
     this.name = "BackendUnavailableError";
     this.status = status;
   }
@@ -212,7 +212,13 @@ export function sealSession(session: Session, secret = sessionSecret()): string 
  * enviarla). Fuera de un pedido de Next (tests, scripts) no hay store de cookies y no hace nada.
  */
 export async function persistRenewedSession(session: Session): Promise<void> {
-  const value = sealSession(session);
+  let value: string;
+  try {
+    value = sealSession(session);
+  } catch (error) {
+    // M1 ya rotó los tokens: que quede claro por qué se corta, en vez de un 500 genérico.
+    throw new BackendUnavailableError(502, "La sesión renovada es demasiado grande para la cookie.", { cause: error });
+  }
   try {
     (await cookies()).set({ name: AUTH_COOKIE_NAME, value, ...sessionCookieOptions(session) });
   } catch {
