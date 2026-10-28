@@ -234,7 +234,6 @@ function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { sta
             <span className="text-xs leading-snug text-muted-foreground">{item?.primary.label ?? meta.description}</span>
             <span className="text-xs font-semibold text-primary">{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
           </ToggleGroupItem>
-          {state.status === "loading" ? <Skeleton aria-hidden className={styles.summarySkeleton} /> : null}
           {state.status === "empty" ? <Alert role="status" className={styles.summaryState}>Sin datos</Alert> : null}
           {state.status === "error" ? <Alert variant="danger" className={styles.summaryState}><AlertTitle>No se pudo cargar {meta.label}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></Alert> : null}
         </Card>;
@@ -424,7 +423,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     <section className={styles.dashboard} aria-labelledby="indicator-dashboard-title">
       <div className={styles.heading}>
         <div><h1 id="indicator-dashboard-title">Indicadores operativos</h1></div>
-        {freshness ? <div className={styles.freshness}><Database size={16} aria-hidden /> Actualizado {formatDateTime(freshness)}</div> : null}
+        {freshness ? <div className={styles.freshness}><Database size={16} aria-hidden /> Actualizado {formatDateTime(freshness)}</div> : <div aria-hidden className={`${styles.freshness} invisible`}><Database size={16} aria-hidden /> Actualizado</div>}
       </div>
 
       <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); pendingSignal.current = undefined; const validation = indicatorQuerySchema.safeParse(query); if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; } setFilterError(null); setSelectedSignal(null); setRecordPlan(null); setRecordsStatus("idle"); setFamilyStates(emptyFamilyState()); setAppliedQuery({ ...query }); }}>
@@ -483,13 +482,12 @@ function CatalogFilter({ id, label, allLabel, noun, options, value, onChange }: 
       options={[{ value: "", label: allLabel }, ...(options ?? []).map((option) => ({ value: option.id, label: option.label }))]}
       onChange={(next) => onChange(next || undefined)}
       disabled={!options?.length}
-      busy={!options}
       aria-describedby={hint || !options ? `${id}-hint` : undefined}
       placeholder={allLabel}
       searchPlaceholder={`Buscar ${noun}`}
       emptyText="Sin resultados."
     />
-    {!options ? <LoadingRegion id={`${id}-hint`} label={`Opciones de ${label}`} className={styles.note}><Skeleton aria-hidden className="h-4 w-28" /></LoadingRegion> : null}
+    {!options ? <LoadingRegion id={`${id}-hint`} label={`Opciones de ${label}`} className="sr-only" /> : null}
     {hint ? <FieldDescription id={`${id}-hint`} className={styles.note} role="status">{hint}</FieldDescription> : null}
   </Field>;
 }

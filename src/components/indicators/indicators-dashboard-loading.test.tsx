@@ -91,7 +91,7 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     expect(within(records).queryByText("Cargando")).toBeNull();
   });
 
-  it("shows a skeleton in the catalog filter hint while the options load", async () => {
+  it("keeps the catalog filters in place while the options load: no spinner, no extra bar", async () => {
     server.use(http.get("*/api/service-types", async () => {
       await delay(150);
       return HttpResponse.json({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 });
@@ -101,8 +101,11 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     const filter = screen.getByLabelText("Tipo de servicio");
     const hint = screen.getByRole("region", { name: "Opciones de Tipo de servicio" });
     expectBusy(hint);
-    expect(hint.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+    expect(hint.querySelector('[data-slot="skeleton"]')).toBeNull();
+    expect(hint).toHaveClass("sr-only");
     expect(filter).toBeDisabled();
+    expect(filter.querySelector('[data-slot="spinner"], svg.animate-spin')).toBeNull();
+    expect(filter).not.toHaveAttribute("aria-busy");
 
     await waitFor(() => expect(screen.queryByRole("region", { name: "Opciones de Tipo de servicio" })).toBeNull(), { timeout: 2000 });
   });
