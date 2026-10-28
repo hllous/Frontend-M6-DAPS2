@@ -535,8 +535,10 @@ export const environmentalReportsAdapter = {
     return parsed.data;
   },
 
-  async getViolationNotice(id: string): Promise<ViolationNotice> {
+  /** `null` = la inspección todavía no tiene acta (el backend responde 200 con `null`). */
+  async getViolationNotice(id: string): Promise<ViolationNotice | null> {
     const payload = await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}/violation-notice`);
+    if (payload === null) return null;
     const parsed = violationNoticeSchema.safeParse(resourcePayload(payload));
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });

@@ -2,13 +2,14 @@
 
 import L, { divIcon } from "leaflet";
 import "leaflet.markercluster";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import MarkerClusterGroupComponent from "react-leaflet-cluster";
 import { MapContainer, Marker, Pane, Polygon, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
 
 import { COVERAGE_BAND_PATH_OPTIONS, type CoverageZoneOverlay } from "@/lib/map-coverage";
 import type { OperationalZone, RouteStopOverlay, TodayZoneCoverage } from "@/lib/operational-zones";
 
+import { MapBoundaryControl, MapBoundaryLayers, useMapBoundaries } from "./map-boundaries";
 import styles from "./operational-map-canvas.module.css";
 
 type MarkerCluster = L.MarkerCluster;
@@ -180,7 +181,18 @@ export function OperationalMapCanvas({
   selectedMarkerKey = null,
   onSelectMarker,
 }: OperationalMapCanvasProps) {
-  const selectedMarker = markers.find((marker) => markerKey(marker) === selectedMarkerKey);
+  const boundaries = useMapBoundaries();
+  // La visibilidad de comunas y barrios también filtra los marcadores (#720). Sin filtro se devuelve `markers`
+  // tal cual para que el clúster reciba una identidad estable; el seleccionado nunca se oculta.
+  const { filterActive, isPointVisible } = boundaries;
+  const visibleMarkers = useMemo(
+    () =>
+      filterActive
+        ? markers.filter((marker) => markerKey(marker) === selectedMarkerKey || isPointVisible([marker.lat, marker.lng]))
+        : markers,
+    [markers, filterActive, isPointVisible, selectedMarkerKey],
+  );
+  const selectedMarker = visibleMarkers.find((marker) => markerKey(marker) === selectedMarkerKey);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   const mapLabel =
@@ -195,175 +207,179 @@ export function OperationalMapCanvas({
           : "Mapa de inventario";
 
   return (
-    <MapContainer
-      center={[-34.58, -58.42]}
-      zoom={12}
-      scrollWheelZoom
-      className={styles.map}
-      aria-label={mapLabel}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+    <div className={styles.canvas}>
+      <MapContainer
+        center={[-34.58, -58.42]}
+        zoom={12}
+        scrollWheelZoom
+        className={styles.map}
+        aria-label={mapLabel}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <MapBoundaryLayers state={boundaries} />
 
-      {view === "inventory" ? (
-        <>
-          <Pane name="markerClusterPane" style={{ zIndex: 610 }} />
-          <MarkerClusterGroupComponent
-            clusterPane="markerClusterPane"
-            iconCreateFunction={inventoryClusterIcon}
-            maxClusterRadius={64}
-            zoomToBoundsOnClick
-            spiderfyOnMaxZoom
-            showCoverageOnHover={false}
-            animate={!prefersReducedMotion}
-          >
-            {markers.map((marker) => (
-              <Marker
-                key={markerKey(marker)}
-                position={[marker.lat, marker.lng]}
-                title={`${marker.title}. ${marker.description}`}
-                alt={`${marker.title}. ${marker.description}`}
-                icon={divIcon({
-                  className: styles.marker,
-                  html: `<span class="${styles.markerPin} ${styles[marker.markerTone]} ${marker === selectedMarker ? styles.markerSelected : ""}"><span>${marker.markerSymbol}</span></span>`,
-                  iconSize: [36, 42],
-                  iconAnchor: [18, 40],
-                  popupAnchor: [0, -38],
-                })}
-                eventHandlers={onSelectMarker ? { click: () => onSelectMarker(marker) } : undefined}
-              >
-                <Popup>
-                  <strong>{marker.title}</strong>
-                  <span className={styles.popupDescription}>{marker.description}</span>
-                </Popup>
-              </Marker>
-            ))}
-            <ClusterAccessibility />
-          </MarkerClusterGroupComponent>
-          <FocusMarker lat={selectedMarker?.lat} lng={selectedMarker?.lng} />
-        </>
-      ) : null}
-
-      {view === "zones"
-        ? zones.flatMap((zone) =>
-            zone.coordinates.map((polygon, partIndex) => (
-              <Polygon
-                key={`${zone.code}-${partIndex}`}
-                positions={polygon}
-                pathOptions={zonePathOptions(selectedZoneCode === zone.code)}
-                eventHandlers={onSelectZone ? { click: () => onSelectZone(zone.code) } : undefined}
-              >
-                <Tooltip sticky>
-                  <strong>{zone.name}</strong>
-                </Tooltip>
-              </Polygon>
-            )),
-          )
-        : null}
-
-      {view === "route"
-        ? routeStops.map((stop) => (
-            <Fragment key={stop.id}>
-              {stop.geometry
-                ? stop.geometry.coordinates.map((polygon, partIndex) => (
-                    <Polygon
-                      key={`${stop.id}-${partIndex}`}
-                      positions={polygon}
-                      pathOptions={zonePathOptions(selectedStopSequence === stop.sequence)}
-                      eventHandlers={onSelectStop ? { click: () => onSelectStop(stop.sequence) } : undefined}
-                    >
-                      <Tooltip sticky>
-                        <strong>Parada {stop.sequence}</strong> · {stop.zoneName}
-                      </Tooltip>
-                    </Polygon>
-                  ))
-                : null}
-              {stop.geometry ? (
+        {view === "inventory" ? (
+          <>
+            <Pane name="markerClusterPane" style={{ zIndex: 610 }} />
+            <MarkerClusterGroupComponent
+              clusterPane="markerClusterPane"
+              iconCreateFunction={inventoryClusterIcon}
+              maxClusterRadius={64}
+              zoomToBoundsOnClick
+              spiderfyOnMaxZoom
+              showCoverageOnHover={false}
+              animate={!prefersReducedMotion}
+            >
+              {visibleMarkers.map((marker) => (
                 <Marker
-                  position={stop.geometry.center}
-                  title={`Parada ${stop.sequence}: ${stop.zoneName}`}
-                  alt={`Parada ${stop.sequence}: ${stop.zoneName}`}
-                  icon={routeStopIcon(stop.sequence, selectedStopSequence === stop.sequence)}
-                  eventHandlers={onSelectStop ? { click: () => onSelectStop(stop.sequence) } : undefined}
+                  key={markerKey(marker)}
+                  position={[marker.lat, marker.lng]}
+                  title={`${marker.title}. ${marker.description}`}
+                  alt={`${marker.title}. ${marker.description}`}
+                  icon={divIcon({
+                    className: styles.marker,
+                    html: `<span class="${styles.markerPin} ${styles[marker.markerTone]} ${marker === selectedMarker ? styles.markerSelected : ""}"><span>${marker.markerSymbol}</span></span>`,
+                    iconSize: [36, 42],
+                    iconAnchor: [18, 40],
+                    popupAnchor: [0, -38],
+                  })}
+                  eventHandlers={onSelectMarker ? { click: () => onSelectMarker(marker) } : undefined}
                 >
                   <Popup>
-                    <strong>Parada {stop.sequence} · {stop.zoneName}</strong>
-                    <span className={styles.popupDescription}>
-                      {stop.estimatedDurationMin !== null
-                        ? `${stop.estimatedDurationMin} min`
-                        : "—"}
-                    </span>
+                    <strong>{marker.title}</strong>
+                    <span className={styles.popupDescription}>{marker.description}</span>
                   </Popup>
                 </Marker>
-              ) : null}
-            </Fragment>
-          ))
-        : null}
+              ))}
+              <ClusterAccessibility />
+            </MarkerClusterGroupComponent>
+            <FocusMarker lat={selectedMarker?.lat} lng={selectedMarker?.lng} />
+          </>
+        ) : null}
 
-      {view === "today"
-        ? todayZones.map((zone) =>
-            zone.geometry ? (
-              zone.geometry.coordinates.map((polygon, partIndex) => (
+        {view === "zones"
+          ? zones.flatMap((zone) =>
+              zone.coordinates.map((polygon, partIndex) => (
                 <Polygon
-                  key={`${zone.zoneId}-${partIndex}`}
+                  key={`${zone.code}-${partIndex}`}
                   positions={polygon}
-                  pathOptions={todayStatusPathOptions[zone.status]}
+                  pathOptions={zonePathOptions(selectedZoneCode === zone.code)}
+                  eventHandlers={onSelectZone ? { click: () => onSelectZone(zone.code) } : undefined}
                 >
                   <Tooltip sticky>
-                    <strong>{zone.zoneName}</strong> · {zone.status}
+                    <strong>{zone.name}</strong>
                   </Tooltip>
                 </Polygon>
-              ))
-            ) : null,
-          )
-        : null}
+              )),
+            )
+          : null}
 
-      {view === "coverage"
-        ? coverageZones.flatMap((zone) =>
-            zone.geometry.coordinates.map((polygon, partIndex) => (
-              <Polygon
-                key={`${zone.zoneCode}-${partIndex}`}
-                positions={polygon}
-                pathOptions={coveragePathOptions(zone, selectedZoneCode === zone.zoneCode)}
-                eventHandlers={onSelectZone ? { click: () => onSelectZone(zone.zoneCode) } : undefined}
-              >
-                <Tooltip sticky>
-                  <strong>{zone.zoneName}</strong>
-                  <br />
-                  {zone.rate === null ? "Sin datos" : formatCoverageRate(zone.rate)}
-                  <br />
-                  {zone.note}
-                </Tooltip>
-                <Popup>
-                  <strong>{zone.zoneName}</strong>
-                  <span className={styles.popupDescription}>
-                    {zone.rate === null ? "Sin datos" : `${formatCoverageRate(zone.rate)} · ${zone.note}`}
-                  </span>
-                </Popup>
-              </Polygon>
-            )),
-          )
-        : null}
+        {view === "route"
+          ? routeStops.map((stop) => (
+              <Fragment key={stop.id}>
+                {stop.geometry
+                  ? stop.geometry.coordinates.map((polygon, partIndex) => (
+                      <Polygon
+                        key={`${stop.id}-${partIndex}`}
+                        positions={polygon}
+                        pathOptions={zonePathOptions(selectedStopSequence === stop.sequence)}
+                        eventHandlers={onSelectStop ? { click: () => onSelectStop(stop.sequence) } : undefined}
+                      >
+                        <Tooltip sticky>
+                          <strong>Parada {stop.sequence}</strong> · {stop.zoneName}
+                        </Tooltip>
+                      </Polygon>
+                    ))
+                  : null}
+                {stop.geometry ? (
+                  <Marker
+                    position={stop.geometry.center}
+                    title={`Parada ${stop.sequence}: ${stop.zoneName}`}
+                    alt={`Parada ${stop.sequence}: ${stop.zoneName}`}
+                    icon={routeStopIcon(stop.sequence, selectedStopSequence === stop.sequence)}
+                    eventHandlers={onSelectStop ? { click: () => onSelectStop(stop.sequence) } : undefined}
+                  >
+                    <Popup>
+                      <strong>Parada {stop.sequence} · {stop.zoneName}</strong>
+                      <span className={styles.popupDescription}>
+                        {stop.estimatedDurationMin !== null
+                          ? `${stop.estimatedDurationMin} min`
+                          : "—"}
+                      </span>
+                    </Popup>
+                  </Marker>
+                ) : null}
+              </Fragment>
+            ))
+          : null}
 
-      {view !== "inventory"
-        ? zones.flatMap((zone) => {
-            const isCoveredToday = todayZones.some((todayZone) => todayZone.zoneCode === zone.code);
-            const isRouteZone = routeStops.some((stop) => stop.zoneCode === zone.code);
-            const isCoverageZone = coverageZones.some((coverageZone) => coverageZone.zoneCode === zone.code);
-            if ((view === "today" && isCoveredToday) || (view === "route" && isRouteZone) || view === "zones" || (view === "coverage" && isCoverageZone)) {
-              return [];
-            }
+        {view === "today"
+          ? todayZones.map((zone) =>
+              zone.geometry ? (
+                zone.geometry.coordinates.map((polygon, partIndex) => (
+                  <Polygon
+                    key={`${zone.zoneId}-${partIndex}`}
+                    positions={polygon}
+                    pathOptions={todayStatusPathOptions[zone.status]}
+                  >
+                    <Tooltip sticky>
+                      <strong>{zone.zoneName}</strong> · {zone.status}
+                    </Tooltip>
+                  </Polygon>
+                ))
+              ) : null,
+            )
+          : null}
 
-            return zone.coordinates.map((polygon, partIndex) => (
-              <Polygon key={`context-${zone.code}-${partIndex}`} positions={polygon} pathOptions={zonePathOptions(false)}>
-                <Tooltip sticky>{zone.name}</Tooltip>
-              </Polygon>
-            ));
-          })
-        : null}
-    </MapContainer>
+        {view === "coverage"
+          ? coverageZones.flatMap((zone) =>
+              zone.geometry.coordinates.map((polygon, partIndex) => (
+                <Polygon
+                  key={`${zone.zoneCode}-${partIndex}`}
+                  positions={polygon}
+                  pathOptions={coveragePathOptions(zone, selectedZoneCode === zone.zoneCode)}
+                  eventHandlers={onSelectZone ? { click: () => onSelectZone(zone.zoneCode) } : undefined}
+                >
+                  <Tooltip sticky>
+                    <strong>{zone.zoneName}</strong>
+                    <br />
+                    {zone.rate === null ? "Sin datos" : formatCoverageRate(zone.rate)}
+                    <br />
+                    {zone.note}
+                  </Tooltip>
+                  <Popup>
+                    <strong>{zone.zoneName}</strong>
+                    <span className={styles.popupDescription}>
+                      {zone.rate === null ? "Sin datos" : `${formatCoverageRate(zone.rate)} · ${zone.note}`}
+                    </span>
+                  </Popup>
+                </Polygon>
+              )),
+            )
+          : null}
+
+        {view !== "inventory"
+          ? zones.flatMap((zone) => {
+              const isCoveredToday = todayZones.some((todayZone) => todayZone.zoneCode === zone.code);
+              const isRouteZone = routeStops.some((stop) => stop.zoneCode === zone.code);
+              const isCoverageZone = coverageZones.some((coverageZone) => coverageZone.zoneCode === zone.code);
+              if ((view === "today" && isCoveredToday) || (view === "route" && isRouteZone) || view === "zones" || (view === "coverage" && isCoverageZone)) {
+                return [];
+              }
+
+              return zone.coordinates.map((polygon, partIndex) => (
+                <Polygon key={`context-${zone.code}-${partIndex}`} positions={polygon} pathOptions={zonePathOptions(false)}>
+                  <Tooltip sticky>{zone.name}</Tooltip>
+                </Polygon>
+              ));
+            })
+          : null}
+      </MapContainer>
+      <MapBoundaryControl state={boundaries} />
+    </div>
   );
 }
 
