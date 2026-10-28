@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
     const me = await fetchMe(request);
     const response = NextResponse.json(me);
-    sealRolesIfChanged(response, session, me.roles);
+    sealRolesIfChanged(response, request, me.roles);
     return response;
   } catch (error) {
     return mapSessionError(error, path, "No se pudo consultar la identidad.");
