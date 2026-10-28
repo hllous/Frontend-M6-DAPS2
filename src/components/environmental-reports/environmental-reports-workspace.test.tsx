@@ -799,6 +799,30 @@ describe("EnvironmentalReportsWorkspace", () => {
     await waitFor(() => expect(within(detail).getByRole("heading", { name: "Expediente ER-1008" })).toHaveFocus());
   });
 
+  it.each([
+    ["200 null", () => HttpResponse.json(null)],
+    ["404 (inspección sin acta)", () => HttpResponse.json({ statusCode: 404, message: "La inspección no tiene un acta emitida.", error: "Not Found" }, { status: 404 })],
+  ])("treats %s on the notice read as no notice, without an error alert", async (_label, resolver) => {
+    server.use(http.get("*/api/environmental-inspections/INS-1008/violation-notice", resolver));
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1008/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
+    expect(await within(detail).findByRole("button", { name: "Emitir acta" })).toBeVisible();
+    expect(within(detail).queryByText("No se pudo cargar el acta.")).not.toBeInTheDocument();
+  });
+
+  it("still shows a notice read failure other than 404", async () => {
+    server.use(http.get("*/api/environmental-inspections/INS-1008/violation-notice", () => HttpResponse.json({ statusCode: 500, message: "boom", error: "Internal Server Error" }, { status: 500 })));
+    const user = userEvent.setup();
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+    await user.click(within(list).getByRole("button", { name: /ER-1008/ }));
+    const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
+    expect(await within(detail).findByText(/No se pudo completar la operación ambiental|boom/)).toBeVisible();
+  });
+
   it("keeps issuance disabled until inspection evidence is present", async () => {
     updateEnvironmentalInspectionFixture("INS-1008", { attachments: [] });
     const user = userEvent.setup();
