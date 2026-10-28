@@ -1,4 +1,11 @@
 "use client";
+import {
+  DataTable,
+  useDataTable,
+  type DataTableColumn,
+} from "@/components/ui/data-table";
+import { TableCaption } from "@/components/ui/table";
+
 import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState } from "react";
@@ -87,6 +94,8 @@ const emptyForm: VehicleForm = {
   vehicleType: "COMPACTOR_TRUCK",
   capacity: "",
 };
+
+const NO_VEHICLES: Vehicle[] = [];
 
 export function VehicleCatalogPanel({
   scenario,
@@ -251,6 +260,115 @@ export function VehicleCatalogPanel({
     }
   }
 
+  const columns: DataTableColumn<Vehicle>[] = [
+    {
+      id: "plate",
+      header: "Patente",
+      enableSorting: false,
+      meta: {
+        label: "Patente",
+        rowHeader: true,
+        headClassName: "h-auto whitespace-normal text-inherit font-bold",
+        cellClassName: "h-auto whitespace-normal",
+      },
+      cell: ({ row }) => {
+        const vehicle = row.original;
+        return (
+          <>
+            <Button
+              type="button"
+              variant="link"
+              aria-label={`Ver detalle del vehículo ${vehicle.plate}`}
+              onClick={() => setSelectedVehicle(vehicle)}
+              className="h-auto min-h-0 justify-start p-0 text-left font-semibold text-foreground no-underline after:absolute after:inset-0 after:z-10 after:content-[''] active:not-aria-[haspopup]:translate-none focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] max-[760px]:focus-visible:after:rounded-2xl"
+            >
+              {vehicle.plate}
+            </Button>
+          </>
+        );
+      },
+    },
+    {
+      id: "type",
+      header: "Tipo",
+      enableSorting: false,
+      meta: {
+        label: "Tipo",
+        headClassName: "h-auto whitespace-normal text-inherit font-bold",
+        cellClassName: "h-auto whitespace-normal",
+      },
+      cell: ({ row }) => {
+        const vehicle = row.original;
+        return <>{vehicleTypeLabels[vehicle.vehicleType]}</>;
+      },
+    },
+    {
+      id: "capacity",
+      header: "Capacidad (t)",
+      enableSorting: false,
+      meta: {
+        label: "Capacidad (t)",
+        headClassName: "h-auto whitespace-normal text-inherit font-bold",
+        cellClassName: "h-auto whitespace-normal",
+      },
+      cell: ({ row }) => {
+        const vehicle = row.original;
+        return (
+          <>
+            {vehicle.capacity === null
+              ? "—"
+              : `${vehicle.capacity.toLocaleString("es-AR")} t`}
+          </>
+        );
+      },
+    },
+    {
+      id: "status",
+      header: "Estado",
+      enableSorting: false,
+      meta: {
+        label: "Estado",
+        headClassName: "h-auto whitespace-normal text-inherit font-bold",
+        cellClassName: "h-auto whitespace-normal",
+      },
+      cell: ({ row }) => {
+        const vehicle = row.original;
+        return (
+          <>
+            <Badge variant={vehicle.active ? "success" : "secondary"}>
+              {vehicle.active ? <Check aria-hidden /> : <X aria-hidden />}
+              {vehicle.active ? "Activo" : "Inactivo"}
+            </Badge>
+          </>
+        );
+      },
+    },
+    {
+      id: "detail",
+      header: () => <span className="sr-only">Ver detalle</span>,
+      enableSorting: false,
+      meta: {
+        label: "",
+        ariaHidden: true,
+        headClassName: "h-auto whitespace-normal text-inherit font-bold",
+        cellClassName: "h-auto whitespace-normal text-right",
+      },
+      cell: () => {
+        return (
+          <>
+            <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </>
+        );
+      },
+    },
+  ];
+
+  const table = useDataTable({
+    data: state.status === "ready" ? state.vehicles : NO_VEHICLES,
+    columns,
+    getRowId: (item) => item.id,
+  });
+
   return (
     <section
       aria-labelledby="vehicles-title"
@@ -367,39 +485,21 @@ export function VehicleCatalogPanel({
       ) : null}
       {state.status === "ready" && state.vehicles.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <caption className="sr-only">Vehículos registrados</caption>
-            <thead>
-              <tr>
-                <th scope="col">Patente</th>
-                <th scope="col">Tipo</th>
-                <th scope="col">Capacidad (t)</th>
-                <th scope="col">Estado</th>
-                <th scope="col"><span className="sr-only">Ver detalle</span></th>
-              </tr>
-            </thead>
-            <tbody>{state.vehicles.map((vehicle) => (
-              <tr key={vehicle.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
-                <th scope="row" data-label="Patente">
-                  <Button
-                    type="button"
-                    variant="link"
-                    aria-label={`Ver detalle del vehículo ${vehicle.plate}`}
-                    onClick={() => setSelectedVehicle(vehicle)}
-                    className="h-auto min-h-0 justify-start p-0 text-left font-semibold text-foreground no-underline after:absolute after:inset-0 after:z-10 after:content-[''] active:not-aria-[haspopup]:translate-none focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] max-[760px]:focus-visible:after:rounded-2xl"
-                  >
-                    {vehicle.plate}
-                  </Button>
-                </th>
-                <td data-label="Tipo">{vehicleTypeLabels[vehicle.vehicleType]}</td>
-                <td data-label="Capacidad (t)">{vehicle.capacity === null ? "—" : `${vehicle.capacity.toLocaleString("es-AR")} t`}</td>
-                <td data-label="Estado"><Badge variant={vehicle.active ? "success" : "secondary"}>{vehicle.active ? <Check aria-hidden /> : <X aria-hidden />}{vehicle.active ? "Activo" : "Inactivo"}</Badge></td>
-                <td data-label="" aria-hidden="true" className="text-right">
-                  <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                </td>
-              </tr>
-            ))}</tbody>
-          </table>
+          <DataTable
+            table={table}
+            container={false}
+            className={`${styles.table} leading-[inherit]`}
+            headerClassName=" [&_tr]:border-b-0"
+            bodyClassName=""
+            rowProps={() => ({
+              className:
+                "group relative cursor-pointer transition-colors hover:bg-muted/40 border-b-0",
+            })}
+          >
+            <TableCaption className="sr-only">
+              Vehículos registrados
+            </TableCaption>
+          </DataTable>
         </div>
       ) : null}
 

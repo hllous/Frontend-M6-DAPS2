@@ -1,15 +1,5 @@
 {
-  "src/components/catalog/crew-catalog-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/components/catalog/disposal-sites-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/components/catalog/route-catalog-panel.tsx": {
     "no-restricted-syntax": {
       "count": 1
     }
@@ -20,16 +10,6 @@
     }
   },
   "src/components/catalog/service-types-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/components/catalog/vehicle-catalog-panel.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/components/catalog/zone-catalog-panel.tsx": {
     "no-restricted-syntax": {
       "count": 1
     }
