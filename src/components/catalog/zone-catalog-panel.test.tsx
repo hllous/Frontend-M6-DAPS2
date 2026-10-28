@@ -271,6 +271,8 @@ describe("ZoneCatalogPanel component", () => {
   });
 
   async function openNeighborhoods(user: ReturnType<typeof userEvent.setup>) {
+    // Only the zones this dialog needs: rendering the 48 seed rows behind it made these tests 5-6 s in jsdom.
+    zoneFixtures.splice(3);
     render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = (await screen.findByRole("row", { name: /Belgrano/ }));
     await user.click(within(row).getByRole("button", { name: /^barrios$/i }));
