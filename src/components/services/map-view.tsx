@@ -4,7 +4,8 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { MapPaneSkeleton } from "@/components/ui/loading-skeletons";
 import { operationalMapAdapter, type OperationalMapData } from "@/lib/operational-map";
 import { operationalZonesAdapter, type OperationalZone } from "@/lib/operational-zones";
 import { resolveServiceMapLocations } from "@/lib/services-map";
@@ -18,9 +19,9 @@ const ServicesMapCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className={styles.mapLoading} role="status" aria-label="Cargando mapa…">
-        Cargando mapa…
-      </div>
+      <LoadingRegion label="Mapa" className={styles.mapLoading}>
+        <MapPaneSkeleton className="min-h-0" />
+      </LoadingRegion>
     ),
   },
 );
@@ -99,14 +100,14 @@ export function MapView({
   }, [onRetry]);
 
   return (
-    <div
+    <LoadingRegion
+      label="Mapa de servicios"
+      isLoading={isLoading && !hasError}
       className={cn(
         "relative h-full w-full overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-canvas)]",
         className,
         compact && styles.mapCompact,
       )}
-      role="region"
-      aria-label="Mapa de servicios"
     >
       {!hasError && referenceData.status === "ready" ? (
         <div className={cn(styles.mapLayer, compact && styles.mapLayerCompact)}>
@@ -139,10 +140,7 @@ export function MapView({
           ) : null}
         </div>
       ) : isLoading ? (
-        <div role="status" aria-live="polite" className={cn(styles.stateOverlay, compact && styles.stateOverlayCompact)}>
-          <Spinner className="size-5 text-[var(--color-action)]" aria-hidden="true" role="presentation" />
-          <span>Cargando mapa…</span>
-        </div>
+        <MapPaneSkeleton className="absolute inset-0 z-20 min-h-0" />
       ) : null}
 
       {services.length > 0 ? (
@@ -168,6 +166,6 @@ export function MapView({
         </div>
       ) : null}
 
-    </div>
+    </LoadingRegion>
   );
 }

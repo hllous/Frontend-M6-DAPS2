@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { useState } from "react";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { handlers } from "@/mocks/handlers";
@@ -85,6 +85,22 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("InspectionExecutionPanel", () => {
+  it("shows a layout-matched skeleton while the inspection loads and lands the form where it was", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    server.use(http.get("*/api/environmental-inspections/INS-TEST-1", async () => { await gate; return HttpResponse.json(inspectionResponse()); }));
+    render(<InspectionExecutionPanel service={service} canExecute />);
+
+    const region = await screen.findByRole("region", { name: "Inspección ambiental" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(screen.queryByText(/Cargando\.\.\.|Cargando…/)).not.toBeInTheDocument();
+    release();
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
+    expect(within(region).queryByRole("status")).not.toBeInTheDocument();
+    expect(await within(region).findByText("Verificar la fuente observada")).toBeVisible();
+  });
+
   it("rejects evidence above 4 MB before adding it to the queue", async () => {
     const user = userEvent.setup();
     server.use(http.get("*/api/environmental-inspections/INS-TEST-1", () => HttpResponse.json(inspectionResponse())));

@@ -28,6 +28,8 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
@@ -283,13 +285,6 @@ function AssignCrewForm({
           </Alert>
         )}
 
-        {resources.status === "loading" && (
-          <Alert variant="info" role="status">
-            <Spinner aria-hidden="true" />
-            <AlertDescription>Cargando…</AlertDescription>
-          </Alert>
-        )}
-
         {resources.status === "error" && (
           <Alert variant="danger">
             <AlertCircle aria-hidden />
@@ -312,6 +307,17 @@ function AssignCrewForm({
         )}
 
         <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <LoadingRegion label="Datos de asignación" isLoading={resources.status === "loading"}>
+          {resources.status === "loading" ? (
+            <div aria-hidden="true" className="flex flex-col gap-7">
+              {[0, 1].map((field) => (
+                <div key={field} data-slot="field-skeleton" className="flex flex-col gap-3">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ))}
+            </div>
+          ) : (
           <FieldGroup>
             <Field data-invalid={Boolean(fieldErrors.crew) || undefined}>
               <FieldLabel htmlFor={`${formId}-crew`}>
@@ -391,6 +397,8 @@ function AssignCrewForm({
               {fieldErrors.vehicle && <FieldError id={`${formId}-vehicle-error`}>{fieldErrors.vehicle}</FieldError>}
             </Field>
           </FieldGroup>
+          )}
+          </LoadingRegion>
 
           {needsOverrideNote && (
             <Alert variant="warning" role="alert">

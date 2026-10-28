@@ -98,6 +98,27 @@ describe("ZoneExecutionPanel component", () => {
     expect(requests).toEqual(["?ownerType=ZONE_RESULT&ownerId=ZR-PERSISTED-316"]);
   });
 
+  it("shows an evidence skeleton while the files load and replaces it with the list", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-SKEL-588", serviceId: mockPointService.id, zoneId: "zone-3",
+        status: "SERVICED", reason: null, notes: null, recordedAt: "2026-09-22T10:15:00.000Z",
+      }])),
+      http.get("*/api/evidence", async () => { await gate; return HttpResponse.json([]); }),
+    );
+    render(<ZoneExecutionPanel service={mockPointService} />);
+
+    const region = await screen.findByRole("region", { name: "Evidencia de la zona" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(screen.queryByText(/Cargando\.\.\.|Cargando…/)).not.toBeInTheDocument();
+    release();
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
+    expect(within(region).getByText("Sin archivos.")).toBeVisible();
+  });
+
   it("keeps the empty evidence state for a recorded zone without files", async () => {
     server.use(
       http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{

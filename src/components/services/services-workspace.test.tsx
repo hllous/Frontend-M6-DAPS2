@@ -50,6 +50,24 @@ describe("ServicesWorkspace component", () => {
     expect(screen.getByRole("region", { name: "Mapa de servicios" })).toBeInTheDocument();
   });
 
+  it("shows a table skeleton while the services load and lands the table where it was", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    // Resolving with nothing hands the request on to the default handler once released.
+    server.use(http.get("*/api/services", async () => { await gate; }));
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const region = await screen.findByRole("region", { name: "Listado de servicios" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(screen.queryByText(/Cargando\.\.\.|Cargando…/)).not.toBeInTheDocument();
+    release();
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
+    expect(await within(region).findByRole("region", { name: "Tabla operativa de Servicios" })).toBeInTheDocument();
+    // The map inside keeps its own loading message; only this region's own message must be gone.
+    expect(region.querySelector(":scope > [role=status]")).toBeNull();
+  });
+
   it("hides planning mutation actions for office-limited intake", async () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.officeLimited} />);

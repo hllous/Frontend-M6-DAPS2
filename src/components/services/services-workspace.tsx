@@ -30,6 +30,8 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { MapPaneSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
@@ -1078,17 +1080,6 @@ export function ServicesWorkspace({
         </div>
       </header>
 
-      {/* Loading State */}
-      {loadState.status === "loading" && (
-        <div className="flex flex-1 items-center justify-center p-8">
-          <div className="flex w-full max-w-xl flex-col gap-3">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-48 w-full" />
-            <Skeleton className="h-48 w-full" />
-          </div>
-        </div>
-      )}
-
       {/* Error State */}
       {loadState.status === "error" && (
         <div className="flex flex-1 flex-col items-center justify-center p-6 text-center" role="alert">
@@ -1112,6 +1103,25 @@ export function ServicesWorkspace({
 
       {loadState.status === "error" && periodBar}
 
+      {/* Loading and ready states share one region so the table lands where the skeleton was. */}
+      <LoadingRegion label="Listado de servicios" isLoading={loadState.status === "loading"} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {loadState.status === "loading" && (
+        <div data-slot="services-loading-skeleton" aria-hidden="true" className="flex min-h-0 flex-1 flex-col">
+          <div className="flex items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5">
+            <Skeleton className="h-10 w-48" />
+          </div>
+          <div className="flex min-h-0 flex-1">
+            {!isNarrow && <div className="min-w-0 flex-[4] p-3"><MapPaneSkeleton className="rounded-2xl" /></div>}
+            <TableRowsSkeleton
+              rowCount={8}
+              rowHeight="h-12"
+              columnWidths={isNarrow ? ["w-8", "w-40", "w-20"] : ["w-8", "w-40", "w-20", "w-24", "w-24"]}
+              columnLabels={isNarrow ? ["#", "Servicio", "Estado"] : ["#", "Servicio", "Estado", "Zona", "Equipo"]}
+              className="min-h-0 min-w-0 flex-[6] overflow-hidden"
+            />
+          </div>
+        </div>
+      )}
       {/* Ready State */}
       {outsideDetail?.error && <p role="alert" className="px-4 py-3 text-sm text-[var(--color-danger)]">{outsideDetail.error}</p>}
       {loadState.status === "ready" && <DroppedRecordsAlert count={loadState.dropped} className="mx-4 my-2 w-auto" />}
@@ -1257,6 +1267,7 @@ export function ServicesWorkspace({
           </div>
         </div>
       )}
+      </LoadingRegion>
 
       {/* Schedule Service Dialog (Generic & Linked-create) */}
       <ScheduleServiceDialog

@@ -12,7 +12,7 @@ test.describe.serial("Environmental inspection execution #134", () => {
     await expect(serviceCard).toBeVisible();
     await serviceCard.getByRole("button", { name: "Abrir" }).click();
 
-    const inspection = page.getByRole("region", { name: "Inspección ambiental" });
+    const inspection = page.getByRole("region", { name: /^Detalle completo de Inspección ambiental/ });
     await expect(inspection).toBeVisible();
     await expect(inspection.getByText("Solo consulta")).toBeVisible();
     await expect(inspection.getByRole("button", { name: /Completar inspecci/ })).toHaveCount(0);
@@ -28,7 +28,7 @@ test.describe.serial("Environmental inspection execution #134", () => {
     await expect(serviceCard.getByText("En curso")).toBeVisible();
     await serviceCard.getByRole("button", { name: "Abrir" }).click();
 
-    const inspection = page.getByRole("region", { name: "Inspección ambiental" });
+    const inspection = page.getByRole("region", { name: "Inspección ambiental", exact: true });
     await expect(inspection).toBeVisible();
     await expect(inspection.getByRole("checkbox").first()).toBeVisible();
     await inspection.getByRole("checkbox").all().then(async (checkboxes) => {
