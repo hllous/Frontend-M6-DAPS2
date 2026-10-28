@@ -1,5 +1,6 @@
 import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import {
@@ -11,12 +12,13 @@ import {
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import {
   addZoneFixture,
+  findCommuneFixture,
   filterZoneFixtures,
   paginateZoneFixtures,
   zoneFixtures,
 } from "@/lib/zones-fixtures";
 import { createZoneInputSchema, type Zone, type ZoneQuery } from "@/lib/zones";
-import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
+import { booleanParam, pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 
 
@@ -24,8 +26,9 @@ import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 function parseZoneQuery(url: URL): ZoneQuery {
   return {
-    active: url.searchParams.has("active") ? url.searchParams.get("active") === "true" : undefined,
+    active: booleanParam(url.searchParams, "active"),
     search: searchParam(url.searchParams),
+    communeId: z.uuid().safeParse(url.searchParams.get("communeId")).data,
     page: pageParam(url.searchParams),
     pageSize: pageSizeParam(url.searchParams),
   };
@@ -39,7 +42,7 @@ export async function GET(request: Request) {
     const query = parseZoneQuery(new URL(request.url));
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/zones${backendQuery(query, ["active", "search", "page", "pageSize"])}`);
+      const backendResponse = await fetchBackend(request, `/zones${backendQuery(query, ["active", "search", "communeId", "page", "pageSize"])}`);
             return forwardResponse(backendResponse);
     }
 
@@ -96,11 +99,16 @@ export async function POST(request: Request) {
       );
     }
 
+    const commune = parsed.data.communeId ? findCommuneFixture(parsed.data.communeId) : null;
+    if (parsed.data.communeId && !commune) return errorResponse(400, "La comuna indicada no existe.", path);
+
     const newZone: Zone = {
       id: `zone-${Date.now()}`,
       code: parsed.data.code,
       name: parsed.data.name,
       active: true,
+      commune,
+      neighborhood: null,
       neighborhoodIds: [],
     };
     addZoneFixture(newZone);

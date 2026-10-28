@@ -81,7 +81,7 @@ describe("resolveServiceMapLocations", () => {
 
     expect(location?.locationType).toBe("route");
     expect(location?.zones).toHaveLength(1);
-    expect(location?.zones[0]).toMatchObject({ zoneId: "zone-1", code: "Z-BEL", name: "Belgrano" });
+    expect(location?.zones[0]).toMatchObject({ zoneId: "zone-1", code: "belgrano", name: "Belgrano" });
     expect(location?.coordinates).toEqual(location?.zones[0]?.center);
   });
 
@@ -147,7 +147,7 @@ describe("resolveServiceMapLocations", () => {
 });
 
 describe("new demo seed zones", () => {
-  it("pins a point service in a zone added with the seven-barrio seed (Z-SNI)", () => {
+  it("pins a point service in a zone added with the seven-barrio seed (san-nicolas)", () => {
     const obelisco = { id: "green-space-obelisco", name: "Plaza de la República", lat: -34.6037, lng: -58.3816 };
     const service = makeService({
       id: "SVC-SNI-1",
@@ -164,7 +164,7 @@ describe("new demo seed zones", () => {
     );
 
     expect(location).toMatchObject({ coordinates: [-34.6037, -58.3816], locationType: "point" });
-    expect(location?.zones[0]).toMatchObject({ code: "Z-SNI" });
+    expect(location?.zones[0]).toMatchObject({ code: "san-nicolas" });
   });
 });
 
@@ -182,8 +182,8 @@ describe("summarizeServiceZones", () => {
     );
 
     const summaries = summarizeServiceZones(locations);
-    const belgrano = summaries.find((summary) => summary.zone.code === "Z-BEL");
-    const palermo = summaries.find((summary) => summary.zone.code === "Z-PAL");
+    const belgrano = summaries.find((summary) => summary.zone.code === "belgrano");
+    const palermo = summaries.find((summary) => summary.zone.code === "palermo");
 
     expect(belgrano).toMatchObject({
       serviceIds: ["SVC-ROUTE-1", "SVC-TREE-1", "SVC-GREEN-SPACE-1"],
@@ -199,7 +199,7 @@ describe("summarizeServiceZones", () => {
     );
 
     expect(summarizeServiceZones(locations)).toEqual([
-      expect.objectContaining({ zone: expect.objectContaining({ code: "Z-BEL" }), serviceIds: ["SVC-TREE-1"] }),
+      expect.objectContaining({ zone: expect.objectContaining({ code: "belgrano" }), serviceIds: ["SVC-TREE-1"] }),
     ]);
   });
 });

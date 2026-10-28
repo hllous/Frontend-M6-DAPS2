@@ -233,10 +233,14 @@
   background: var(--color-info-fill);
 }
 
-.zbel { background: var(--color-info-fill); border-color: var(--color-info); }
-.zpal { background: var(--color-success-fill); border-color: var(--color-success); }
-.zrec { background: var(--color-warning-fill); border-color: var(--color-warning); }
-.zret { background: var(--color-danger-fill); border-color: var(--color-danger); }
+.belgrano { background: var(--color-info-fill); border-color: var(--color-info); }
+.palermo { background: var(--color-success-fill); border-color: var(--color-success); }
+.recoleta { background: var(--color-warning-fill); border-color: var(--color-warning); }
+.retiro { background: var(--color-danger-fill); border-color: var(--color-danger); }
+.colegiales { background: var(--color-info-fill); border-color: var(--color-info-line); }
+.montserrat { background: var(--color-success-fill); border-color: var(--color-success-line); }
+.puerto-madero { background: var(--color-warning-fill); border-color: var(--color-warning-line); }
+.san-nicolas { background: var(--color-danger-fill); border-color: var(--color-danger-line); }
 
 .mapHint {
   margin-top: auto;

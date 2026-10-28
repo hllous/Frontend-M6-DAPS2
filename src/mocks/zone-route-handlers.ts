@@ -3,6 +3,8 @@ import { DELETE as deleteZone, GET as getZone, PATCH as updateZone } from "@/app
 import { POST as assignNeighborhoods } from "@/app/api/zones/[id]/neighborhoods/route";
 import { DELETE as removeNeighborhood } from "@/app/api/zones/[id]/neighborhoods/[neighborhoodId]/route";
 import { GET as getZoneReferences } from "@/app/api/zones/[id]/references/route";
+import { GET as listNeighborhoods } from "@/app/api/neighborhoods/route";
+import { GET as listCommunes } from "@/app/api/communes/route";
 import { GET as listRoutes, POST as createRoute } from "@/app/api/routes/route";
 import { DELETE as deleteRoute, GET as getRoute, PATCH as updateRoute } from "@/app/api/routes/[id]/route";
 import { GET as getRouteReferences } from "@/app/api/routes/[id]/references/route";
@@ -15,6 +17,8 @@ const byRouteId = { id: "routeId" };
 
 export function zoneRouteHandlers(fallbackCookie: string) {
   return routeHandlers(fallbackCookie, [
+    { method: "get", path: "*/api/neighborhoods", route: listNeighborhoods },
+    { method: "get", path: "*/api/communes", route: listCommunes },
     { method: "get", path: "*/api/zones", route: listZones },
     { method: "get", path: "*/api/zones/:zoneId", route: getZone, params: byZoneId },
     { method: "post", path: "*/api/zones", route: createZone },
