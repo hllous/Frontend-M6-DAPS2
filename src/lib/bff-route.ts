@@ -10,9 +10,14 @@ import {
   BackendUnavailableError,
   CitizenForbiddenError,
   ForbiddenSessionError,
+  AUTH_COOKIE_NAME,
   InvalidSessionError,
   getRequiredSession,
+  renewedSessionForResponse,
   requireCapability,
+  sealSession,
+  sessionCookieRemovalOptions,
+  sessionCookieOptions,
   type Session,
 } from "./session";
 
@@ -197,7 +202,9 @@ export function errorResponse(status: number, message: string, path: string, cod
 
 export function mapSessionError(error: unknown, path: string, fallbackMessage: string): NextResponse {
   if (error instanceof InvalidSessionError) {
-    return errorResponse(401, "La sesión no está activa.", path);
+    const rejected = errorResponse(401, "La sesión no está activa.", path);
+    rejected.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions());
+    return rejected;
   }
   if (error instanceof CitizenForbiddenError) {
     return errorResponse(403, error.message, path);
@@ -224,11 +231,15 @@ export function forwardResponse(response: Response, path = bffPathForResponse(re
     error.headers.set("X-Content-Type-Options", "nosniff");
     return error;
   }
-  return new NextResponse(response.body, {
+  const forwarded = new NextResponse(response.body, {
     status: response.status,
     headers: {
       "content-type": contentType ?? "application/json",
       "X-Content-Type-Options": "nosniff",
     },
   });
+  // Si el pedido renovó los tokens contra M1, la cookie se resella con el material nuevo (no solo se extiende).
+  const renewed = renewedSessionForResponse(response);
+  if (renewed) forwarded.cookies.set({ name: AUTH_COOKIE_NAME, value: sealSession(renewed), ...sessionCookieOptions(renewed) });
+  return forwarded;
 }

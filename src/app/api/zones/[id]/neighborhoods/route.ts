@@ -9,6 +9,7 @@ import {
   InvalidSessionError,
 } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { neighborhoodFixtures } from "@/lib/neighborhoods-fixtures";
 import { assignNeighborhoodsFixture, getZoneFixture } from "@/lib/zones-fixtures";
 import { assignNeighborhoodsInputSchema } from "@/lib/zones";
 
@@ -46,6 +47,11 @@ export async function POST(
         body: JSON.stringify(parsed.data),
       });
             return forwardResponse(backendResponse);
+    }
+
+    // Como el backend: el id tiene que ser el UUID de un barrio del catálogo de M9 (no el `codigo`).
+    if (parsed.data.neighborhoodIds.some((neighborhoodId) => !neighborhoodFixtures.some((candidate) => candidate.id === neighborhoodId))) {
+      return errorResponse(400, "Algún barrio no figura en el catálogo de M9.", path);
     }
 
     if (!getZoneFixture(id)) {

@@ -50,6 +50,7 @@ La lista para desarrollo está en [`.env.example`](../../.env.example). En Verce
 | `M6_AUTH_MODE` | `mock` para escenarios locales; `backend-development` para integrar con el backend usando un JWT de desarrollo. `real-m1` todavía falla de forma cerrada. Configurar el modo explícitamente en producción: si se omite, el código selecciona `real-m1`. |
 | `M6_BACKEND_ORIGIN` | Origen privado de M6 Backend; requerido en `backend-development`. |
 | `M6_DEV_JWT` | JWT de desarrollo aceptado por el backend; requerido en `backend-development`. Guardar como secreto. |
+| `M1_BASE_URL` | Opcional. Base de M1 para `POST /auth/refresh`; sin ella (o sin refresh token en la sesión) no hay renovación. No verificado contra M1. |
 | `M6_SESSION_SECRET` | Secreto aleatorio de al menos 32 bytes para sellar la cookie del BFF (generalo con `openssl rand -base64 32`). Obligatorio cuando `NODE_ENV=production`; el desarrollo local tiene un valor de respaldo. |
 | `NEXT_PUBLIC_DISABLE_MSW` | Solo para desarrollo y depuración de pruebas; desactiva el service worker de MSW. |
 

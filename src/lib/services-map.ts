@@ -153,7 +153,7 @@ function resolveRouteLocation(service: Service, zones: OperationalZone[]): Omit<
     coordinates,
     locationType: coordinates ? "route" : "unresolved",
     locationLabel: serviceZonesResolved.length > 0
-      ? serviceZonesResolved.map((zone) => `${zone.code} · ${zone.name}`).join(" · ")
+      ? serviceZonesResolved.map((zone) => zone.name).join(" · ")
       : null,
     zones: serviceZonesResolved,
   };

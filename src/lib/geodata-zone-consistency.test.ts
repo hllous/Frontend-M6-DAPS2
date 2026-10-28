@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { containerFixtures } from "./containers-fixtures";
@@ -8,6 +10,7 @@ import {
   isCoordinateInsideOperationalZone,
   parseOperationalZoneGeoJson,
   routeToStopOverlays,
+  zoneGeometryCode,
   safeParseOperationalZoneGeoJson,
 } from "./operational-zones";
 import { treeFixtures } from "./tree-fixtures";
@@ -30,14 +33,33 @@ const inventoryFixtures: LocatedInventoryItem[] = [
 describe("mock geodata", () => {
   it("ships the boundaries of the eight operational zones of the demo seed", () => {
     expect(new Set(getOperationalZoneGeometries().map((geometry) => geometry.code))).toEqual(
-      new Set(["Z-BEL", "Z-COL", "Z-MON", "Z-PAL", "Z-PMA", "Z-REC", "Z-RET", "Z-SNI"]),
+      new Set(["belgrano", "colegiales", "montserrat", "palermo", "puerto-madero", "recoleta", "retiro", "san-nicolas"]),
     );
   });
 
-  it("uses the same canonical zone codes as the boundary GeoJSON", () => {
-    expect(new Set(zoneFixtures.filter((zone) => zone.active).map((zone) => zone.code))).toEqual(
-      new Set(getOperationalZoneGeometries().map((geometry) => geometry.code)),
-    );
+  it("matches every boundary to a zone fixture through the M9 neighborhood codigo", () => {
+    const zoneCodes = new Set(zoneFixtures.filter((zone) => zone.active).map(zoneGeometryCode));
+    for (const geometry of getOperationalZoneGeometries()) expect(zoneCodes, geometry.code).toContain(geometry.code);
+  });
+
+  it("gives every boundary a swatch class in the map stylesheet, so no zone renders unstyled", () => {
+    const css = readFileSync("src/components/map/mapa-operativo.module.css", "utf8");
+    for (const geometry of getOperationalZoneGeometries()) {
+      expect(css, geometry.code).toMatch(new RegExp(`^\\.${geometry.code}\\s*\\{`, "m"));
+    }
+  });
+
+  it("derives the boundary code from the barrio name, not from the GeoJSON zoneCode", () => {
+    const [geometry] = parseOperationalZoneGeoJson({
+      type: "FeatureCollection",
+      features: [{
+        type: "Feature",
+        properties: { id: 1, nombre: "San Nicolas", zoneCode: "Z-SNI", zoneName: "San Nicolás" },
+        geometry: { type: "Polygon", coordinates: [[[0, 0], [0, 1], [1, 1], [0, 0]]] },
+      }],
+    });
+
+    expect(geometry?.code).toBe("san-nicolas");
   });
 
   it("keeps every located inventory fixture inside its assigned operational zone", () => {
@@ -69,7 +91,7 @@ describe("mock geodata", () => {
   it("keeps every GeoJSON ring closed and preserves Puerto Madero's four dock holes", () => {
     const geometries = getOperationalZoneGeometries();
     const rings = geometries.flatMap((geometry) => geometry.coordinates.flatMap((polygon) => polygon));
-    const puertoMadero = geometries.find((geometry) => geometry.code === "Z-PMA");
+    const puertoMadero = geometries.find((geometry) => geometry.code === "puerto-madero");
 
     expect(rings.length).toBeGreaterThan(0);
     for (const ring of rings) expect(ring[0]).toEqual(ring[ring.length - 1]);
@@ -78,8 +100,8 @@ describe("mock geodata", () => {
     expect(isCoordinateInsideOperationalZone([-34.6148330233, -58.3643844330], puertoMadero!)).toBe(false);
   });
 
-  it("treats a Z-BEL boundary vertex as inside the operational zone", () => {
-    const belgrano = getOperationalZoneGeometries().find((geometry) => geometry.code === "Z-BEL");
+  it("treats a belgrano boundary vertex as inside the operational zone", () => {
+    const belgrano = getOperationalZoneGeometries().find((geometry) => geometry.code === "belgrano");
     const boundaryVertex = belgrano?.coordinates[0]?.[0]?.[0];
 
     expect(boundaryVertex).toBeDefined();
@@ -191,9 +213,9 @@ describe("mock geodata", () => {
     );
 
     expect(overlay).toMatchObject({
-      zoneCode: "Z-BEL",
+      zoneCode: "belgrano",
       zoneName: "Belgrano",
-      geometry: { code: "Z-BEL", name: "Belgrano" },
+      geometry: { code: "belgrano", name: "Belgrano" },
     });
   });
 });

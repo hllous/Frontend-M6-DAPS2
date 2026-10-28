@@ -76,6 +76,21 @@ function toLeafletPolygons(geometry: z.infer<typeof geometrySchema>): MapPolygon
     : geometry.coordinates.map(toLeafletPolygon);
 }
 
+// El GeoJSON trae el barrio con su nombre oficial de CABA; el catálogo de M9 lo identifica por `codigo`.
+// Solo difieren los nombres que el catálogo escribe distinto (Monserrat / Montserrat).
+const GEOMETRY_CODE_ALIASES: Record<string, string> = { monserrat: "montserrat" };
+
+/** `codigo` de barrio de M9 (`san-nicolas`) a partir del nombre del barrio en el GeoJSON. */
+function neighborhoodCodeFromName(name: string): string {
+  const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return GEOMETRY_CODE_ALIASES[slug] ?? slug;
+}
+
+/** Clave para cruzar una zona con su geometría: el `codigo` del barrio, no el `code` de la zona. */
+export function zoneGeometryCode(zone: Pick<Zone, "code" | "neighborhood">): string {
+  return zone.neighborhood?.codigo ?? zone.code;
+}
+
 export function parseOperationalZoneGeoJson(value: unknown): OperationalZoneGeometry[] {
   const parsed = safeParseOperationalZoneGeoJson(value);
   if (!parsed.success) {
@@ -86,7 +101,7 @@ export function parseOperationalZoneGeoJson(value: unknown): OperationalZoneGeom
   return parsed.data.features.map((feature) => {
     const coordinates = toLeafletPolygons(feature.geometry);
     return {
-      code: feature.properties.zoneCode,
+      code: neighborhoodCodeFromName(feature.properties.nombre),
       name: feature.properties.zoneName,
       sourceName: feature.properties.nombre,
       coordinates,
@@ -217,7 +232,7 @@ export function resolveOperationalZones(
 ): OperationalZone[] {
   return geometries.map((geometry) => ({
     ...geometry,
-    zone: zones.find((zone) => zone.code === geometry.code) ?? null,
+    zone: zones.find((zone) => zoneGeometryCode(zone) === geometry.code) ?? null,
   }));
 }
 
@@ -247,7 +262,7 @@ export function routeToStopOverlays(route: Route, zones: Zone[]): RouteStopOverl
       // Prefer the current catalog record: the stop's zoneCode/zoneName may be a
       // stale snapshot while the catalog already has the canonical code.
       const zone = zoneById.get(stop.zoneId);
-      const zoneCode = zone?.code ?? stop.zoneCode;
+      const zoneCode = zone ? zoneGeometryCode(zone) : stop.zoneCode;
       const zoneName = zone?.name ?? stop.zoneName;
 
       return {
@@ -302,8 +317,8 @@ export function buildTodayZoneCoverage(
     for (const [index, zoneId] of service.zoneIds.entries()) {
       const zone = zoneById.get(zoneId);
       const result = zoneResults.find((candidate) => candidate.zoneId === zoneId);
-      const zoneCode = zone?.code ?? `Z-${zoneId}`;
-      const zoneName = zone?.name ?? service.zoneNames[index] ?? `Zona ${zoneId}`;
+      const zoneCode = zone ? zoneGeometryCode(zone) : zoneId;
+      const zoneName = zone?.name ?? service.zoneNames[index] ?? "Zona no disponible";
       const current = coverageByZone.get(zoneId);
 
       if (!current) {

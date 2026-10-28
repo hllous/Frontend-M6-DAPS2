@@ -92,6 +92,12 @@ export function pageSizeParam(searchParams: URLSearchParams): number | undefined
   return searchParams.has("pageSize") ? clampPageSize(Number(searchParams.get("pageSize"))) : undefined;
 }
 
+/** Filtro booleano: solo "true"/"false"; cualquier otro valor se ignora en vez de leerse como false. */
+export function booleanParam(searchParams: URLSearchParams, name: string): boolean | undefined {
+  const value = searchParams.get(name);
+  return value === "true" ? true : value === "false" ? false : undefined;
+}
+
 /** Trunca la busqueda al maximo que acepta el backend en lugar de rechazarla con 400. */
 export function searchParam(searchParams: URLSearchParams): string | undefined {
   const value = searchParams.get("search");

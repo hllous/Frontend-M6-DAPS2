@@ -12,9 +12,10 @@ import { recordTelemetryEvent } from "@/lib/telemetry";
 import {
   getZoneFixture,
   updateZoneFixture,
+  findCommuneFixture,
   zoneFixtures,
 } from "@/lib/zones-fixtures";
-import { updateZoneInputSchema } from "@/lib/zones";
+import { updateZoneInputSchema, type Zone } from "@/lib/zones";
 
 
 
@@ -98,7 +99,14 @@ export async function PATCH(
     }
 
     // Code is strictly immutable: updateZoneFixture only patches allowed properties (name, active)
-    const updated = updateZoneFixture(id, parsed.data);
+    const { communeId, ...fields } = parsed.data;
+    const patch: Partial<Zone> = fields;
+    if (communeId !== undefined) {
+      const commune = communeId === null ? null : findCommuneFixture(communeId);
+      if (communeId !== null && !commune) return errorResponse(400, "La comuna indicada no existe.", path);
+      patch.commune = commune;
+    }
+    const updated = updateZoneFixture(id, patch);
     return NextResponse.json(updated);
   } catch (error) {
     if (error instanceof InvalidSessionError) {

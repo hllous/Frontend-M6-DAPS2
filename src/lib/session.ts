@@ -26,13 +26,17 @@ export type Session = {
   absoluteExpiresAt: number;
   jwtExpiresAt: number;
   accessToken?: string;
+  /** Token de renovación de M1 (`X-Refresh-Token`, 7 días). Solo existe si el login lo trajo; nunca llega al navegador. */
+  refreshToken?: string;
+  /** Quién emitió el material de token. Solo `m1` (login real, #145) habilita la renovación; M6_DEV_JWT nunca. */
+  source?: "m1";
   /** Roles de M6 efectivos: en modo backend los trae GET /me (login y refresco); en mock, el fixture del escenario. */
   roles: M6Role[];
   /** Cuadrilla real de un escenario de Campo, resuelta contra GET /crews en el login (sólo modo backend). */
   crew?: ScenarioCrew;
 };
 
-export type PublicSession = Omit<Session, "accessToken"> & {
+export type PublicSession = Omit<Session, "accessToken" | "refreshToken" | "source"> & {
   expiresAt: number;
 };
 
@@ -47,8 +51,8 @@ export class AuthUnavailableError extends Error {
 export class BackendUnavailableError extends Error {
   readonly status: number;
 
-  constructor(status: number, message = "El backend no responde. Reintente en unos segundos.") {
-    super(message);
+  constructor(status: number, message = "El backend no responde. Reintente en unos segundos.", options?: { cause?: unknown }) {
+    super(message, options);
     this.name = "BackendUnavailableError";
     this.status = status;
   }
@@ -168,7 +172,7 @@ export function isSessionActive(session: Session, now = Date.now()): boolean {
 }
 
 export function publicSession(session: Session): PublicSession {
-  const { accessToken: _accessToken, ...safeSession } = session;
+  const { accessToken: _accessToken, refreshToken: _refreshToken, source: _source, ...safeSession } = session;
   return { ...safeSession, expiresAt: effectiveSessionExpiry(session) };
 }
 
@@ -183,6 +187,9 @@ export function requireCapability(session: Session, capability: Capability): Ses
   return session;
 }
 
+/** Un navegador descarta en silencio una cookie de más de ~4 KB; mejor fallar en voz alta. */
+export const MAX_SEALED_SESSION_BYTES = 3800;
+
 export function sealSession(session: Session, secret = sessionSecret()): string {
   const key = deriveKey(secret);
   const iv = randomBytes(12);
@@ -193,7 +200,30 @@ export function sealSession(session: Session, secret = sessionSecret()): string 
   ]);
   const authTag = cipher.getAuthTag();
 
-  return [iv, authTag, ciphertext].map((value) => value.toString("base64url")).join(".");
+  const sealed = [iv, authTag, ciphertext].map((value) => value.toString("base64url")).join(".");
+  if (sealed.length > MAX_SEALED_SESSION_BYTES) {
+    throw new Error(`La sesión sellada (${sealed.length} bytes) supera el límite de la cookie (${MAX_SEALED_SESSION_BYTES}).`);
+  }
+  return sealed;
+}
+
+/**
+ * Deja la cookie renovada en la respuesta del route handler, arme la respuesta que la arme (Next la fusiona al
+ * enviarla). Fuera de un pedido de Next (tests, scripts) no hay store de cookies y no hace nada.
+ */
+export async function persistRenewedSession(session: Session): Promise<void> {
+  let value: string;
+  try {
+    value = sealSession(session);
+  } catch (error) {
+    // M1 ya rotó los tokens: que quede claro por qué se corta, en vez de un 500 genérico.
+    throw new BackendUnavailableError(502, "La sesión renovada es demasiado grande para la cookie.", { cause: error });
+  }
+  try {
+    (await cookies()).set({ name: AUTH_COOKIE_NAME, value, ...sessionCookieOptions(session) });
+  } catch {
+    // Sin contexto de pedido de Next: los caminos explícitos (forwardResponse, /api/session) sellan igual.
+  }
 }
 
 export function getSessionFromCookieValue(
@@ -226,11 +256,35 @@ export function getSessionFromCookieValue(
   }
 }
 
+// Sesión renovada contra M1 durante un pedido: el resto del pedido ve los tokens nuevos, no los de la cookie.
+const renewedRequestSessions = new WeakMap<Request, Session>();
+// Respuesta que debe llevar la cookie resellada con esa sesión (la aplica forwardResponse).
+const renewedResponseSessions = new WeakMap<Response, Session>();
+
+export function rememberRenewedSession(request: Request, session: Session): void {
+  renewedRequestSessions.set(request, session);
+}
+
+export function wasSessionRenewed(request: Request): boolean {
+  return renewedRequestSessions.has(request);
+}
+
+export function rememberRenewedResponse(response: Response, session: Session): void {
+  renewedResponseSessions.set(response, session);
+}
+
+export function renewedSessionForResponse(response: Response): Session | undefined {
+  return renewedResponseSessions.get(response);
+}
+
 export function getSessionFromRequest(
   request: Request,
   secret: string | undefined = undefined,
   now = Date.now(),
 ): Session | undefined {
+  const renewed = renewedRequestSessions.get(request);
+  if (renewed) return renewed;
+
   const cookieHeader = request.headers.get("cookie");
   const cookieValue = cookieHeader
     ?.split(";")
@@ -285,16 +339,26 @@ function deriveKey(secret: string): Buffer {
   ));
 }
 
-function readJwtExpiry(token: string): number | undefined {
+function readJwtPayload(token: string): { exp?: unknown; sub?: unknown } | undefined {
   const [, encodedPayload] = token.split(".");
   if (!encodedPayload) return undefined;
 
   try {
-    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as { exp?: unknown };
-    return typeof payload.exp === "number" ? payload.exp * 1000 : undefined;
+    return JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as { exp?: unknown; sub?: unknown };
   } catch {
     return undefined;
   }
+}
+
+export function readJwtExpiry(token: string): number | undefined {
+  const exp = readJwtPayload(token)?.exp;
+  return typeof exp === "number" ? exp * 1000 : undefined;
+}
+
+/** `sub` como texto (M1 lo manda numérico o string); undefined si no se puede leer. */
+export function readJwtSubject(token: string): string | undefined {
+  const sub = readJwtPayload(token)?.sub;
+  return typeof sub === "string" || typeof sub === "number" ? String(sub) : undefined;
 }
 
 function isSession(value: Partial<Session>): value is Session {
@@ -307,6 +371,8 @@ function isSession(value: Partial<Session>): value is Session {
     typeof value.jwtExpiresAt === "number" &&
     m6RoleSchema.array().safeParse(value.roles).success &&
     (value.mode === "mock" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
+    (value.source === undefined || (value.source === "m1" && value.mode !== "mock")) &&
+    (value.refreshToken === undefined || (value.mode !== "mock" && typeof value.refreshToken === "string")) &&
     (value.crew === undefined || (typeof value.crew?.id === "string" && typeof value.crew?.name === "string"))
   );
 }
