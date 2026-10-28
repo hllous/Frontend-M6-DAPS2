@@ -26,6 +26,8 @@ import {
 } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
+import { cn } from "@/lib/utils";
+
 import { Button } from "./button";
 import { DataTableResizeHandle } from "./data-table-resize-handle";
 import {
@@ -37,7 +39,27 @@ import {
   TableRow,
 } from "./table";
 
+/**
+ * Per-column presentation hints read by the default header and row rendering.
+ * Note: `cell` and `header` renderers that are functions are called inline, not mounted as
+ * components, so they must not call hooks.
+ */
+export type DataTableColumnMeta = {
+  /** Extra classes for the column's `<th>`. */
+  headClassName?: string;
+  /** Extra classes for the column's body cells. */
+  cellClassName?: string;
+  /**
+   * Accessible name of the column: `data-label` on body cells (stacked mobile layouts) and the
+   * "Ordenar por ..." label. Wins over the string header, which wins over the column id.
+   */
+  label?: string;
+  /** Body cells render as `<th scope="row">`. */
+  rowHeader?: boolean;
+};
+
 export const DATA_TABLE_FEATURES = tableFeatures({
+  columnMeta: {} as DataTableColumnMeta,
   columnVisibilityFeature,
   columnOrderingFeature,
   columnSizingFeature,
@@ -197,10 +219,13 @@ export function DataTableSortButton({
   direction,
   onClick,
   children,
+  headerContent,
   operational = false,
   ...props
 }: Omit<ComponentProps<"button">, "onClick"> & {
   label: string;
+  /** Replaces the label text (keeps the direction icon); `label` still names the button. */
+  headerContent?: ReactNode;
   direction: false | "asc" | "desc";
   onClick: () => void;
   operational?: boolean;
@@ -227,7 +252,7 @@ export function DataTableSortButton({
     >
       {children ?? (
         <>
-          {label}
+          {headerContent ?? label}
           {direction === "asc" ? (
             <ArrowUp />
           ) : direction === "desc" ? (
@@ -241,6 +266,20 @@ export function DataTableSortButton({
   );
 }
 
+/**
+ * Cell and header renderers that are functions are called inline, not mounted as components,
+ * so a column array rebuilt on every render (closing over props and handlers) does not remount
+ * its cells or drop focus. Consequence: renderers must not call hooks.
+ */
+function renderDef<C extends { column: { columnDef: object } }>(
+  ctx: C,
+  key: "cell" | "header",
+  fallback: () => ReactNode,
+): ReactNode {
+  const def = (ctx.column.columnDef as Record<string, unknown>)[key];
+  return typeof def === "function" ? (def as (c: C) => ReactNode)(ctx) : fallback();
+}
+
 /** Render overrides preserve a mature table's layout while sharing its row model. */
 export function DataTable<T extends RowData>({
   table,
@@ -251,8 +290,11 @@ export function DataTable<T extends RowData>({
   bodyClassName,
   headerClassName,
   renderEmpty,
+  rowProps,
   ...props
 }: ComponentProps<typeof Table> & {
+  /** Props for each default `<tr>` (className, aria-current, data-*); ignored when `renderRow` is set. */
+  rowProps?: (row: DataTableRow<T>) => Omit<ComponentProps<typeof TableRow>, "children">;
   table: DataTableInstance<T>;
   renderHeader?: () => ReactNode;
   renderRow?: (row: DataTableRow<T>) => ReactNode;
@@ -273,36 +315,45 @@ export function DataTable<T extends RowData>({
             <TableRow key={group.id}>
               {group.headers.map((header) => {
                 const direction = header.column.getIsSorted();
+                const columnDef = header.column.columnDef;
                 const label =
-                  typeof header.column.columnDef.header === "string"
-                    ? header.column.columnDef.header
-                    : header.column.id;
+                  columnDef.meta?.label ||
+                  (typeof columnDef.header === "string"
+                    ? columnDef.header
+                    : header.column.id);
                 return (
                   <TableHead
                     key={header.id}
                     scope="col"
-                    className="relative"
+                    className={cn(header.column.getCanResize() && "relative", header.column.columnDef.meta?.headClassName)}
                     style={
                       table.options.enableColumnResizing
                         ? { width: header.column.getSize() }
                         : undefined
                     }
                     aria-sort={
-                      direction === false
-                        ? "none"
-                        : direction === "asc"
-                          ? "ascending"
-                          : "descending"
+                      !header.column.getCanSort()
+                        ? undefined
+                        : direction === false
+                          ? "none"
+                          : direction === "asc"
+                            ? "ascending"
+                            : "descending"
                     }
                   >
                     {header.isPlaceholder ? null : header.column.getCanSort() ? (
                       <DataTableSortButton
                         label={label}
                         direction={direction}
+                        headerContent={
+                          typeof columnDef.header === "function"
+                            ? renderDef(header.getContext(), "header", () => null)
+                            : undefined
+                        }
                         onClick={() => header.column.toggleSorting()}
                       />
                     ) : (
-                      <table.FlexRender header={header} />
+                      renderDef(header.getContext(), "header", () => <table.FlexRender header={header} />)
                     )}
                     {header.column.getCanResize() && (
                       <DataTableResizeHandle
@@ -338,12 +389,26 @@ export function DataTable<T extends RowData>({
           renderRow ? (
             renderRow(row)
           ) : (
-            <TableRow key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  <table.FlexRender cell={cell} />
-                </TableCell>
-              ))}
+            <TableRow key={row.id} {...rowProps?.(row)}>
+              {row.getVisibleCells().map((cell) => {
+                const meta = cell.column.columnDef.meta;
+                const Cell = meta?.rowHeader ? TableHead : TableCell;
+                return (
+                  <Cell
+                    key={cell.id}
+                    {...(meta?.rowHeader ? { scope: "row" } : {})}
+                    data-label={
+                      meta?.label ??
+                      (typeof cell.column.columnDef.header === "string"
+                        ? cell.column.columnDef.header
+                        : undefined)
+                    }
+                    className={meta?.cellClassName}
+                  >
+                    {renderDef(cell.getContext(), "cell", () => <table.FlexRender cell={cell} />)}
+                  </Cell>
+                );
+              })}
             </TableRow>
           ),
         )}

@@ -47,6 +47,8 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { TableCaption } from "@/components/ui/table";
 import {
   Field,
   FieldSet,
@@ -125,6 +127,10 @@ function pointFormPayload(form: PointForm) {
     active: form.active,
   };
 }
+
+const POINT_HEAD = "h-auto whitespace-normal font-bold";
+const POINT_CELL = "h-auto whitespace-normal";
+const NO_POINTS: GreenPoint[] = [];
 
 export function GreenPointCatalogPanel({
   scenario,
@@ -374,6 +380,20 @@ export function GreenPointCatalogPanel({
     }
   };
 
+  const pointColumns: DataTableColumn<GreenPoint>[] = [
+    { id: "code", header: "Código", accessorFn: (p) => p.code, enableSorting: false, meta: { rowHeader: true, headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => { const point = row.original; return (
+      <Button type="button" variant="ghost" size="sm" aria-label={`Ver detalle de ${point.code}`} onClick={() => void openDetail(point)} className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none">
+        {point.code}
+      </Button>); } },
+    { id: "name", header: "Nombre", accessorFn: (p) => p.name, enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => row.original.name },
+    { id: "zone", header: "Zona", accessorFn: (p) => p.zoneId, enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => zoneLabel(zones, row.original.zoneId, zonesLoaded) },
+    { id: "waste", header: "Residuos aceptados", accessorFn: (p) => p.wasteTypes.join(","), enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => row.original.wasteTypes.map((type) => WASTE_TYPE_LABELS[type]).join(", ") },
+    { id: "address", header: "Ubicación", accessorFn: (p) => p.address, enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: `${POINT_CELL} max-w-[220px]` }, cell: ({ row }) => row.original.address ?? "Sin dirección registrada" },
+    { id: "status", header: "Estado", accessorFn: (p) => p.active, enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => { const point = row.original; return <span className="inline-flex items-center gap-1.5">{point.active ? <Check className="size-4 text-[var(--color-success)]" aria-hidden /> : null}{point.active ? "Activo" : "Inactivo"}</span>; } },
+    { id: "detail", header: () => <span className="sr-only">Abrir detalle</span>, enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: `${styles.rowChevron} ${POINT_CELL} px-4 py-3` }, cell: () => <span aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></span> },
+  ];
+  const pointTable = useDataTable({ data: state.status === "ready" ? state.items : NO_POINTS, columns: pointColumns, getRowId: (p) => p.id });
+
   return (
     <section
       aria-labelledby="green-points-title"
@@ -546,32 +566,13 @@ export function GreenPointCatalogPanel({
               : "puntos verdes encontrados"}
           </p>
           <div className={`${styles.tableWrap} hidden md:block`}>
-            <table className={styles.table}>
-            <caption className="sr-only">Catálogo de puntos verdes</caption>
-            <thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Zona</th><th scope="col">Residuos aceptados</th><th scope="col">Ubicación</th><th scope="col">Estado</th><th scope="col" className="sr-only">Abrir detalle</th></tr></thead>
-            <tbody>{state.items.map((point) => (
-              <tr key={point.id} className={styles.catalogRow}>
-                <th scope="row" data-label="Código">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Ver detalle de ${point.code}`}
-                    onClick={() => void openDetail(point)}
-                    className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none"
-                  >
-                    {point.code}
-                  </Button>
-                </th>
-                <td data-label="Nombre">{point.name}</td>
-                <td data-label="Zona">{zoneLabel(zones, point.zoneId, zonesLoaded)}</td>
-                <td data-label="Residuos aceptados">{point.wasteTypes.map((type) => WASTE_TYPE_LABELS[type]).join(", ")}</td>
-                <td data-label="Ubicación" className="max-w-[220px]">{point.address ?? "Sin dirección registrada"}</td>
-                <td data-label="Estado"><span className="inline-flex items-center gap-1.5">{point.active ? <Check className="size-4 text-[var(--color-success)]" aria-hidden /> : null}{point.active ? "Activo" : "Inactivo"}</span></td>
-                <td className={`${styles.rowChevron} px-4 py-3`} aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></td>
-              </tr>
-            ))}</tbody>
-          </table>
+            <DataTable
+              table={pointTable}
+            headerClassName="[&_tr]:border-b-0"
+              container={false}
+              className={`${styles.table} leading-[inherit]`}
+              rowProps={() => ({ className: `${styles.catalogRow} border-b-0 hover:bg-transparent` })}
+            ><TableCaption className="sr-only">Catálogo de puntos verdes</TableCaption></DataTable>
           </div>
           <div className="grid gap-3 md:hidden">
             {state.items.map((point) => (

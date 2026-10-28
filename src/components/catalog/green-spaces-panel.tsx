@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { TableCaption } from "@/components/ui/table";
 import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty";
 import {
   Select,
@@ -84,6 +86,10 @@ const emptyForm: GreenSpaceForm = {
   areaM2: "",
   zoneId: "",
 };
+
+const SPACE_HEAD = "h-auto whitespace-normal font-bold";
+const SPACE_CELL = "h-auto whitespace-normal";
+const NO_SPACES: GreenSpace[] = [];
 
 export function GreenSpacesPanel({
   scenario,
@@ -277,6 +283,20 @@ export function GreenSpacesPanel({
     }
   }
 
+  const spaceColumns: DataTableColumn<GreenSpace>[] = [
+    { id: "name", header: "Nombre", accessorFn: (g) => g.name, enableSorting: false, meta: { rowHeader: true, headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => { const greenSpace = row.original; return (
+      <Button type="button" variant="ghost" size="sm" aria-label={`Ver detalle de ${greenSpace.name}`} onClick={() => openDetail(greenSpace)} className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none">
+        {greenSpace.name}
+        <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
+      </Button>); } },
+    { id: "type", header: "Tipo", accessorFn: (g) => g.spaceType, enableSorting: false, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => spaceTypeLabels[row.original.spaceType] },
+    { id: "area", header: "Superficie", accessorFn: (g) => g.areaM2, enableSorting: false, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => row.original.areaM2 === null ? "—" : `${row.original.areaM2.toLocaleString("es-AR")} m²` },
+    { id: "zone", header: "Zona", accessorFn: (g) => g.zoneId, enableSorting: false, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => zoneLabel(zones, row.original.zoneId, zonesLoaded) },
+    { id: "status", header: "Estado", accessorFn: (g) => g.active, enableSorting: false, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => { const greenSpace = row.original; return <span className="inline-flex items-center gap-1">{greenSpace.active ? <Check aria-hidden className="size-4 text-[var(--color-success)]" /> : <X aria-hidden className="size-4 text-muted-foreground" />}{greenSpace.active ? "Activo" : "Inactivo"}</span>; } },
+    { id: "detail", header: () => <span className="sr-only">Abrir detalle</span>, enableSorting: false, meta: { headClassName: SPACE_HEAD, cellClassName: `${styles.rowChevron} ${SPACE_CELL} px-4 py-3` }, cell: () => <span aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></span> },
+  ];
+  const spaceTable = useDataTable({ data: state.status === "ready" ? state.greenSpaces : NO_SPACES, columns: spaceColumns, getRowId: (g) => g.id });
+
   return (
     <section
       aria-labelledby="green-spaces-title"
@@ -418,32 +438,13 @@ export function GreenSpacesPanel({
       ) : null}
       {state.status === "ready" && state.greenSpaces.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <caption className="sr-only">Espacios verdes registrados</caption>
-            <thead><tr><th scope="col">Nombre</th><th scope="col">Tipo</th><th scope="col">Superficie</th><th scope="col">Zona</th><th scope="col">Estado</th><th scope="col" className="sr-only">Abrir detalle</th></tr></thead>
-            <tbody>{state.greenSpaces.map((greenSpace) => {
-              return <tr key={greenSpace.id} className={styles.catalogRow}>
-                <th scope="row" data-label="Nombre">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Ver detalle de ${greenSpace.name}`}
-                    onClick={() => openDetail(greenSpace)}
-                    className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none"
-                  >
-                    {greenSpace.name}
-                    <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
-                  </Button>
-                </th>
-                <td data-label="Tipo">{spaceTypeLabels[greenSpace.spaceType]}</td>
-                <td data-label="Superficie">{greenSpace.areaM2 === null ? "—" : `${greenSpace.areaM2.toLocaleString("es-AR")} m²`}</td>
-                <td data-label="Zona">{zoneLabel(zones, greenSpace.zoneId, zonesLoaded)}</td>
-                <td data-label="Estado"><span className="inline-flex items-center gap-1">{greenSpace.active ? <Check aria-hidden className="size-4 text-[var(--color-success)]" /> : <X aria-hidden className="size-4 text-muted-foreground" />}{greenSpace.active ? "Activo" : "Inactivo"}</span></td>
-                <td className={`${styles.rowChevron} px-4 py-3`} aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></td>
-              </tr>;
-            })}</tbody>
-          </table>
+          <DataTable
+            table={spaceTable}
+            headerClassName="[&_tr]:border-b-0"
+            container={false}
+            className={`${styles.table} leading-[inherit]`}
+            rowProps={() => ({ className: `${styles.catalogRow} border-b-0 hover:bg-transparent` })}
+          ><TableCaption className="sr-only">Espacios verdes registrados</TableCaption></DataTable>
         </div>
       ) : null}
 
