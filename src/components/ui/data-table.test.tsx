@@ -200,4 +200,41 @@ describe("DataTable", () => {
     ).toHaveTextContent("Dos");
     expect(rows[0].name).toBe("Diez");
   });
+
+  it("omits aria-sort on columns that cannot sort", () => {
+    function Plain() {
+      const table = useDataTable({
+        data,
+        columns: [
+          { id: "name", accessorKey: "name", header: "Zona", enableSorting: false },
+          { id: "count", accessorKey: "count", header: "Cantidad" },
+        ] satisfies DataTableColumn<Item>[],
+      });
+      return <DataTable table={table} aria-label="Zonas" />;
+    }
+    render(<Plain />);
+    expect(screen.getByRole("columnheader", { name: "Zona" })).not.toHaveAttribute("aria-sort");
+    expect(screen.getByRole("columnheader", { name: /Cantidad/ })).toHaveAttribute("aria-sort", "none");
+  });
+
+  it("keeps a function header on sortable columns and names the sort button with meta.label", () => {
+    function Custom() {
+      const table = useDataTable({
+        data,
+        columns: [
+          {
+            id: "name",
+            accessorKey: "name",
+            header: () => <em>Zona operativa</em>,
+            meta: { label: "Zona", cellClassName: "x", rowHeader: true },
+          },
+        ] satisfies DataTableColumn<Item>[],
+      });
+      return <DataTable table={table} aria-label="Zonas" />;
+    }
+    render(<Custom />);
+    const sort = screen.getByRole("button", { name: "Ordenar por Zona, actualmente sin ordenar" });
+    expect(within(sort).getByText("Zona operativa")).toBeInTheDocument();
+    expect(screen.getAllByRole("rowheader")[0]).toHaveAttribute("data-label", "Zona");
+  });
 });
