@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ZoneRequestError, zonesAdapter, type Zone } from "@/lib/zones";
+import { ZoneRequestError, zoneLocationLabel, zonesAdapter, type Zone } from "@/lib/zones";
 
 import { ShellError, ShellForbidden, ShellUnauthenticated } from "./shell-states";
 
@@ -14,7 +14,7 @@ type ZonesLoadState =
   | { status: "unauthenticated" }
   | { status: "forbidden" }
   | { status: "error" }
-  | { status: "ready"; zones: Zone[] };
+  | { status: "ready"; zones: Zone[]; total: number };
 
 export function ZonesPanel() {
   const [state, setState] = useState<ZonesLoadState>({ status: "loading" });
@@ -25,8 +25,8 @@ export function ZonesPanel() {
     async function requestZones() {
       setState({ status: "loading" });
       try {
-        const page = await zonesAdapter.list();
-        if (isCurrent) setState({ status: "ready", zones: page.zones });
+        const page = await zonesAdapter.list({ pageSize: 100 });
+        if (isCurrent) setState({ status: "ready", zones: page.zones, total: page.total });
       } catch (caught) {
         if (!isCurrent) return;
         if (caught instanceof ZoneRequestError && caught.status === 401) {
@@ -84,11 +84,17 @@ export function ZonesPanel() {
   return (
     <section aria-labelledby="zones-title" className="flex flex-col gap-3">
       <h2 id="zones-title" className="text-sm font-medium">Zonas operativas</h2>
+      {state.total > state.zones.length ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Se muestran {state.zones.length} de {state.total} zonas.
+        </p>
+      ) : null}
       <ItemGroup className="gap-2">
         {state.zones.map((zone) => (
           <Item key={zone.id} variant="outline" size="sm">
             <ItemContent>
               <ItemTitle>{zone.name}</ItemTitle>
+              {zone.commune ? <ItemDescription>{zoneLocationLabel(zone)}</ItemDescription> : null}
             </ItemContent>
           </Item>
         ))}

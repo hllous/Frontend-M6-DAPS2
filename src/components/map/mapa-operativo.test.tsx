@@ -14,14 +14,14 @@ import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 const server = setupServer(...handlers);
 
 const canonicalZones = [
-  { id: "zone-bel", code: "Z-BEL", name: "Belgrano", active: true, neighborhoodIds: [] },
-  { id: "zone-pal", code: "Z-PAL", name: "Palermo", active: true, neighborhoodIds: [] },
-  { id: "zone-rec", code: "Z-REC", name: "Recoleta", active: true, neighborhoodIds: [] },
-  { id: "zone-ret", code: "Z-RET", name: "Retiro", active: true, neighborhoodIds: [] },
-  { id: "zone-col", code: "Z-COL", name: "Colegiales", active: true, neighborhoodIds: [] },
-  { id: "zone-sni", code: "Z-SNI", name: "San Nicolás", active: true, neighborhoodIds: [] },
-  { id: "zone-pma", code: "Z-PMA", name: "Puerto Madero", active: true, neighborhoodIds: [] },
-  { id: "zone-mon", code: "Z-MON", name: "Montserrat", active: true, neighborhoodIds: [] },
+  { id: "zone-bel", code: "belgrano", name: "Belgrano", active: true, neighborhoodIds: [] },
+  { id: "zone-pal", code: "palermo", name: "Palermo", active: true, neighborhoodIds: [] },
+  { id: "zone-rec", code: "recoleta", name: "Recoleta", active: true, neighborhoodIds: [] },
+  { id: "zone-ret", code: "retiro", name: "Retiro", active: true, neighborhoodIds: [] },
+  { id: "zone-col", code: "colegiales", name: "Colegiales", active: true, neighborhoodIds: [] },
+  { id: "zone-sni", code: "san-nicolas", name: "San Nicolás", active: true, neighborhoodIds: [] },
+  { id: "zone-pma", code: "puerto-madero", name: "Puerto Madero", active: true, neighborhoodIds: [] },
+  { id: "zone-mon", code: "montserrat", name: "Montserrat", active: true, neighborhoodIds: [] },
 ];
 
 const canonicalZoneResponse = {
@@ -226,10 +226,10 @@ describe("MapaOperativo", () => {
           period: { from: "2026-08-10", to: "2026-09-10" },
           totals: { scheduled: 382, served: 334, partial: 0, notServiced: 24, pending: 24, coveragePct: 87.4 },
           byZone: [
-            { id: "zone-bel", code: "Z-BEL", name: "Belgrano", scheduled: 160, served: 148, partial: 0, notServiced: 6, pending: 6, coveragePct: 92.5 },
-            { id: "zone-pal", code: "Z-PAL", name: "Palermo", scheduled: 100, served: 88, partial: 0, notServiced: 6, pending: 6, coveragePct: 88 },
-            { id: "zone-rec", code: "Z-REC", name: "Recoleta", scheduled: 80, served: 58, partial: 0, notServiced: 12, pending: 10, coveragePct: 72.5 },
-            { id: "zone-ret", code: "Z-RET", name: "Retiro", scheduled: 42, served: 40, partial: 0, notServiced: 0, pending: 2, coveragePct: 95.2 },
+            { id: "zone-bel", code: "belgrano", name: "Belgrano", scheduled: 160, served: 148, partial: 0, notServiced: 6, pending: 6, coveragePct: 92.5 },
+            { id: "zone-pal", code: "palermo", name: "Palermo", scheduled: 100, served: 88, partial: 0, notServiced: 6, pending: 6, coveragePct: 88 },
+            { id: "zone-rec", code: "recoleta", name: "Recoleta", scheduled: 80, served: 58, partial: 0, notServiced: 12, pending: 10, coveragePct: 72.5 },
+            { id: "zone-ret", code: "retiro", name: "Retiro", scheduled: 42, served: 40, partial: 0, notServiced: 0, pending: 2, coveragePct: 95.2 },
           ],
           byServiceType: [],
         }),
@@ -263,7 +263,7 @@ describe("MapaOperativo", () => {
           sequence: 1,
           zoneId: "zone-bel",
           estimatedDurationMin: 35,
-          zoneCode: "Z-BEL",
+          zoneCode: "belgrano",
           zoneName: "Belgrano",
         },
         {
@@ -271,7 +271,7 @@ describe("MapaOperativo", () => {
           sequence: 2,
           zoneId: "zone-rec",
           estimatedDurationMin: 40,
-          zoneCode: "Z-REC",
+          zoneCode: "recoleta",
           zoneName: "Recoleta",
         },
         {
@@ -279,7 +279,7 @@ describe("MapaOperativo", () => {
           sequence: 3,
           zoneId: "zone-pal",
           estimatedDurationMin: 50,
-          zoneCode: "Z-PAL",
+          zoneCode: "palermo",
           zoneName: "Palermo",
         },
       ],

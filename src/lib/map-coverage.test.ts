@@ -6,20 +6,20 @@ import { buildCoverageZoneOverlays, coverageBandForRate } from "./map-coverage";
 
 const zones: OperationalZone[] = [
   {
-    code: "Z-BEL",
+    code: "belgrano",
     name: "Belgrano",
     sourceName: "Belgrano",
     coordinates: [[[[-34.55, -58.45], [-34.54, -58.45], [-34.54, -58.44], [-34.55, -58.44], [-34.55, -58.45]]]],
     center: [-34.55, -58.45],
-    zone: { id: "zone-bel", code: "Z-BEL", name: "Belgrano", active: true, neighborhoodIds: [] },
+    zone: { id: "zone-bel", code: "belgrano", name: "Belgrano", active: true, neighborhoodIds: [] },
   },
   {
-    code: "Z-PAL",
+    code: "palermo",
     name: "Palermo",
     sourceName: "Palermo",
     coordinates: [[[[-34.57, -58.42], [-34.56, -58.42], [-34.56, -58.41], [-34.57, -58.41], [-34.57, -58.42]]]],
     center: [-34.57, -58.42],
-    zone: { id: "zone-pal", code: "Z-PAL", name: "Palermo", active: true, neighborhoodIds: [] },
+    zone: { id: "zone-pal", code: "palermo", name: "Palermo", active: true, neighborhoodIds: [] },
   },
 ];
 
@@ -53,14 +53,14 @@ describe("map coverage", () => {
 
     expect(result).toEqual([
       expect.objectContaining({
-        zoneCode: "Z-BEL",
+        zoneCode: "belgrano",
         zoneName: "Belgrano",
         rate: 92.5,
         note: "148 de 160 objetivos",
         band: "high",
       }),
       expect.objectContaining({
-        zoneCode: "Z-PAL",
+        zoneCode: "palermo",
         zoneName: "Palermo",
         rate: null,
         note: "Sin datos para el período",

@@ -9,6 +9,8 @@ import { tolerantRecords } from "./tolerant-records";
 export type ZoneQuery = {
   active?: boolean;
   search?: string;
+  /** UUID de la comuna (filtro del listado). */
+  communeId?: string;
   page?: number;
   pageSize?: number;
 };
@@ -39,11 +41,23 @@ export class ZoneRequestError extends Error {
 }
 
 // El listado no trae barrios y el detalle los trae como neighborhoods: [{ neighborhoodId }].
+export const zoneCommuneSchema = z.object({ id: z.string(), code: z.string(), name: z.string() });
+// `codigo` y `nombre` faltan cuando el catálogo de M9 no está cargado en el backend.
+export const zoneNeighborhoodSchema = z.object({
+  id: z.string(),
+  codigo: z.string().optional(),
+  nombre: z.string().optional(),
+});
+
+// Una zona es un barrio: `code` es el `codigo` del barrio. Para cruzarla con el catálogo o con un GeoJSON usar
+// `neighborhood.codigo` / `commune.code`, no el `code` de la zona. Ambos pueden ser null.
 export const zoneSchema = z.object({
   id: z.string(),
   code: z.string(),
   name: z.string(),
   active: z.boolean(),
+  commune: zoneCommuneSchema.nullish(),
+  neighborhood: zoneNeighborhoodSchema.nullish(),
   neighborhoodIds: z.array(z.string()).optional(),
 });
 const zoneWireSchema = z.preprocess(withFlatIds("neighborhoods", "neighborhoodId", "neighborhoodIds"), zoneSchema);
@@ -57,16 +71,26 @@ export function zoneLabel(zones: Zone[], zoneId: string, loaded: boolean): strin
   return loaded ? "Zona no disponible" : "Cargando zona…";
 }
 
+/** Barrio y comuna de una zona, sin ids crudos: "Palermo · Comuna 14". */
+export function zoneLocationLabel(zone: Pick<Zone, "commune" | "neighborhood">): string {
+  return [zone.neighborhood?.nombre, zone.commune?.name].filter(Boolean).join(" · ");
+}
+
+const communeIdInput = z.uuid("La comuna no es válida");
+
 export const createZoneInputSchema = z.object({
-  code: z.string().trim().min(1, "El código es obligatorio"),
-  name: z.string().trim().min(1, "El nombre es obligatorio"),
+  code: z.string().trim().min(1, "El código es obligatorio").max(20, "El código admite hasta 20 caracteres"),
+  name: z.string().trim().min(1, "El nombre es obligatorio").max(100, "El nombre admite hasta 100 caracteres"),
+  communeId: communeIdInput.optional(),
 });
 
 export type CreateZoneInput = z.infer<typeof createZoneInputSchema>;
 
 export const updateZoneInputSchema = z.object({
-  name: z.string().trim().min(1, "El nombre es obligatorio").optional(),
+  name: z.string().trim().min(1, "El nombre es obligatorio").max(100, "El nombre admite hasta 100 caracteres").optional(),
   active: z.boolean().optional(),
+  /** `null` desasigna la comuna. */
+  communeId: communeIdInput.nullable().optional(),
 });
 
 export type UpdateZoneInput = z.infer<typeof updateZoneInputSchema>;
@@ -116,6 +140,7 @@ function buildZonesQueryString(query: ZoneQuery): string {
   const params = new URLSearchParams();
   if (query.active !== undefined) params.set("active", String(query.active));
   if (query.search) params.set("search", query.search);
+  if (query.communeId) params.set("communeId", query.communeId);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
 
