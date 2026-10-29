@@ -11,6 +11,7 @@ import { resetServiceFixtures } from "@/lib/services-fixtures";
 import { scenarios } from "@/lib/scenarios";
 
 import { EnvironmentalReportsWorkspace } from "./environmental-reports-workspace";
+import { reportRowName } from "@/test/row-names";
 
 const server = setupServer(...handlers);
 vi.mock("next/dynamic", () => ({ default: () => () => <div>Mapa</div> }));
@@ -58,7 +59,7 @@ describe("EnvironmentalReportsWorkspace loading skeletons (#591)", () => {
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
 
     server.use(delayed("*/api/environmental-reports/:id/inspections"));
-    await user.click(within(list).getByRole("button", { name: /ER-1008/ }));
+    await user.click(within(list).getByRole("button", { name: reportRowName("ER-1008") }));
 
     const history = await screen.findByRole("region", { name: "Inspecciones" });
     expectBusy(history);
@@ -74,7 +75,7 @@ describe("EnvironmentalReportsWorkspace loading skeletons (#591)", () => {
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
 
     server.use(delayed("*/api/environmental-inspections/:id/violation-notice"));
-    await user.click(within(list).getByRole("button", { name: /ER-1008/ }));
+    await user.click(within(list).getByRole("button", { name: reportRowName("ER-1008") }));
 
     const notice = await screen.findByRole("region", { name: "Acta de infracción" });
     expectBusy(notice);

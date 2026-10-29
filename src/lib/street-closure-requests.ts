@@ -81,22 +81,45 @@ export type CreateStreetClosureRequestInput = z.infer<
   typeof createStreetClosureRequestInputSchema
 >;
 
-export const streetClosureRequestSchema = z.object({
+const streetClosureRequestShape = z.object({
   id: z.string().min(1),
   reason: z.string(),
   sourceType: streetClosureRequestSourceTypeSchema,
   sourceId: z.string().min(1),
   sourceModule: z.literal("M6"),
-  closureType: streetClosureTypeSchema,
-  requestedFrom: z.string(),
-  requestedTo: z.string(),
+  // openapi.json does not mark closureType / closureFrom / closureTo / closureId as required and
+  // the backend sends null when unset: the key may be null or absent. Normalized to null.
+  closureType: streetClosureTypeSchema.nullish().transform((value) => value ?? null),
+  requestedFrom: z.string().nullish().transform((value) => value ?? null),
+  requestedTo: z.string().nullish().transform((value) => value ?? null),
   affectedSections: z.array(affectedSectionSchema).min(1),
   status: streetClosureRequestStatusSchema,
-  closureId: z.string().nullable(),
-  sourceContext: streetClosureSourceContextSchema,
+  closureId: z.string().nullish().transform((value) => value ?? null),
+  // Not part of the backend DTO: only present in fixtures. Consumers fall back to `reason`.
+  sourceContext: streetClosureSourceContextSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+
+/**
+ * Backend's StreetClosureRequestResponseDto names these fields `sections`, `closureFrom` and
+ * `closureTo` and has no `sourceModule` (#735). Map the wire shape onto the internal one; anything
+ * that is already in the internal shape (fixtures, the BFF's own output) passes through untouched.
+ */
+function fromWireShape(record: unknown): unknown {
+  if (!record || typeof record !== "object" || !("sections" in record)) return record;
+  const { sections, closureFrom, closureTo, ...rest } = record as Record<string, unknown>;
+  // Only fill what is absent: a field already in the internal shape wins over its wire alias.
+  return {
+    ...rest,
+    sourceModule: rest.sourceModule ?? "M6",
+    affectedSections: rest.affectedSections ?? sections,
+    requestedFrom: rest.requestedFrom ?? closureFrom,
+    requestedTo: rest.requestedTo ?? closureTo,
+  };
+}
+
+export const streetClosureRequestSchema = z.preprocess(fromWireShape, streetClosureRequestShape);
 export type StreetClosureRequest = z.infer<typeof streetClosureRequestSchema>;
 
 export const approveStreetClosureRequestInputSchema = z.object({

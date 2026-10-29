@@ -70,7 +70,7 @@ const referralSchema = z.discriminatedUnion("kind", [
     request: z.object({
       id: z.string(),
       damageType: z.string(),
-      address: z.string(),
+      address: z.string().nullable(),
       severity: z.string(),
       publicSafetyRisk: z.boolean(),
       detectedInType: z.string(),
@@ -99,9 +99,9 @@ const referralSchema = z.discriminatedUnion("kind", [
       sourceType: streetClosureRequestSourceTypeSchema,
       sourceId: z.string(),
       sourceModule: z.literal("M6"),
-      closureType: z.enum(["TOTAL", "PARTIAL"]),
-      requestedFrom: z.string(),
-      requestedTo: z.string(),
+      closureType: z.enum(["TOTAL", "PARTIAL"]).nullable(),
+      requestedFrom: z.string().nullable(),
+      requestedTo: z.string().nullable(),
       affectedSections: z.array(z.object({
         streetName: z.string(),
         fromCross: z.string(),
@@ -181,7 +181,7 @@ function mapRepairRequest(request: RepairRequest, useFixtures: boolean): Referra
     sourceType: "SERVICE",
     sourceId: request.detectedInId,
     sourceServiceId: request.detectedInId,
-    sourceLabel: source?.label ?? (isInspection ? `Inspección ambiental ${request.detectedInId}` : `Servicio ${request.detectedInId}`),
+    sourceLabel: source?.label ?? (isInspection ? "Inspección ambiental" : "Servicio de origen"),
     sourceHref: source?.href ?? (isInspection
       ? useFixtures ? environmentalInspectionSourceHref(request.detectedInId) : `/app?destination=environment&inspectionId=${encodeURIComponent(request.detectedInId)}`
       : serviceSourceHref(request.detectedInId)),
@@ -202,7 +202,7 @@ export function referralFromStreetClosureRequest(request: StreetClosureRequest):
     ...(request.sourceType === "SERVICE"
       ? { sourceServiceId: request.sourceId }
       : { sourceTreeInterventionId: request.sourceId }),
-    sourceLabel: request.sourceContext.title,
+    sourceLabel: request.sourceContext?.title ?? request.reason,
     sourceHref: request.sourceType === "SERVICE"
       ? serviceSourceHref(request.sourceId)
       : treeInterventionSourceHref(request.sourceId),

@@ -88,7 +88,7 @@ describe("referral anomaly detection", () => {
       ...closure,
       request: {
         ...closure.request,
-        sourceContext: { ...closure.request.sourceContext, scheduledDate: "2026-09-07" },
+        sourceContext: { ...closure.request.sourceContext!, scheduledDate: "2026-09-07" },
       },
     };
     const anomalies = getReferralAnomalies([changed], new Map([[service.id, service]]));
@@ -96,5 +96,14 @@ describe("referral anomaly detection", () => {
     expect(anomalies.get(changed.id)?.sourceChanges).toEqual([
       { field: "Fecha programada", recordedValue: "2026-09-07", currentValue: service.scheduledDate },
     ]);
+  });
+
+  it("does not call two closures without a type duplicates of each other", () => {
+    const closure = fixtureReferrals().find((candidate) => candidate.kind === "STREET_CLOSURE_REQUEST");
+    if (!closure || closure.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a closure fixture");
+    const untyped = (id: string) => ({ ...closure, id, request: { ...closure.request, id, closureType: null } });
+    const [a, b] = [untyped("A"), untyped("B")];
+
+    expect(getReferralAnomalies([a, b], new Map()).get("A")?.duplicateReferralIds).toEqual([]);
   });
 });
