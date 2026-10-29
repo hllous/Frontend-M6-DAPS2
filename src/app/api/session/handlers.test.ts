@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loginWithMe as login } from "@/test/session";
 import { POST as loginRoute } from "./login/route";
-import { getSessionFromRequest } from "@/lib/session";
+import { getSessionFromCookieValue, getSessionFromRequest } from "@/lib/session";
 import { GET as session } from "./route";
 import { POST as logout } from "./logout/route";
 import { GET as listServices } from "../services/route";
@@ -22,6 +22,10 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
+
+function sessionCookieMaxAge(setCookie: string) {
+  return Number(/Max-Age=(\d+)/i.exec(setCookie)?.[1]);
+}
 
 const REAL_CREW_ID = "d907516e-ddb7-46d4-a7d4-cd235cbb1529";
 
@@ -391,6 +395,170 @@ describe("session route handlers", () => {
 
       expect(pulse.status).toBe(200);
       expect((await pulse.json()).session.roles).toEqual(["M6_ADMIN"]);
+    });
+  });
+  describe("signed demo session: the session outlives the token (#745, #740)", () => {
+    function signingEnv() {
+      process.env.M6_AUTH_MODE = "backend-development";
+      process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+      delete process.env.M6_DEV_JWT;
+      vi.stubEnv("M6_JWT_SECRET", Buffer.alloc(32, 9).toString("base64"));
+    }
+    const claims = (call: unknown[]) => {
+      const bearer = new Headers((call[1] as RequestInit).headers).get("authorization") ?? "";
+      return JSON.parse(Buffer.from(bearer.replace("Bearer ", "").split(".")[1], "base64url").toString());
+    };
+
+    it("logs in as the seed person of the profile, keeps no token in the cookie and signs a fresh one per request", async () => {
+      signingEnv();
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        const start = Date.now();
+        const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => String(input).endsWith("/me")
+          ? meResponse(["M6_OFICINA_OPERACIONES"])
+          : Response.json({ data: [], meta: { total: 0, page: 1, pageSize: 20, totalPages: 0 } }));
+        const loginResponse = await loginRoute(loginRequest("office-operations"));
+        const cookie = loginResponse.headers.get("set-cookie") ?? "";
+
+        expect(loginResponse.status).toBe(200);
+        expect(claims(backendFetch.mock.calls[0])).toMatchObject({ sub: "3", rol: "ADMINISTRATIVO", sub_type: "EMPLEADO", typ: "access" });
+        const sealed = getSessionFromRequest(new Request("http://localhost", { headers: { cookie } }));
+        expect(sealed).toMatchObject({ source: "demo", scenarioId: "office-operations" });
+        expect(sealed).not.toHaveProperty("accessToken");
+        expect(JSON.stringify(await loginResponse.json())).not.toMatch(/eyJ/);
+
+        // 20 minutos después (el token del login ya habría vencido) la sesión sigue viva y el pedido lleva un token nuevo.
+        vi.setSystemTime(start + 20 * 60 * 1000);
+        const later = await listServices(new Request("http://localhost/api/services", { headers: { cookie } }));
+        expect(later.status).toBe(200);
+        const servicesCall = backendFetch.mock.calls.at(-1) as unknown[];
+        expect(claims(servicesCall).exp).toBeGreaterThan(Math.floor((start + 20 * 60 * 1000) / 1000));
+        expect(claims(servicesCall).exp).toBeGreaterThan(claims(backendFetch.mock.calls[0]).exp);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("ends a signed demo session only at the 8 hour cap: no 15 minute token expiry and no 30 minute idle cut", async () => {
+      signingEnv();
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () => meResponse(["M6_ADMIN"]));
+      const cookie = (await loginRoute(loginRequest("office-duty-queue"))).headers.get("set-cookie") ?? "";
+      const value = cookie.split(";")[0].replace("m6_session=", "");
+      const now = Date.now();
+
+      expect(getSessionFromCookieValue(value, undefined, now + 20 * 60 * 1000)).toBeDefined();
+      expect(getSessionFromCookieValue(value, undefined, now + 7 * 60 * 60 * 1000)).toBeDefined();
+      expect(getSessionFromCookieValue(value, undefined, now + 8 * 60 * 60 * 1000 + 1000)).toBeUndefined();
+      expect(sessionCookieMaxAge(cookie)).toBeGreaterThan(7 * 60 * 60);
+      expect(cookie).toMatch(/m6_signed_in=1/);
+    });
+
+    describe("Field crew by seed person", () => {
+      const BEL = "11111111-1111-4111-8111-111111111111";
+      const PAL = "22222222-2222-4222-8222-222222222222";
+      const INSP = "33333333-3333-4333-8333-333333333333";
+      const list = [
+        { id: PAL, name: "Cuadrilla Municipal Palermo — Recolección y Barrido", leaderUserId: "111" },
+        { id: BEL, name: "Cuadrilla Belgrano — Recolección", leaderUserId: "101" },
+        { id: INSP, name: "Cuadrilla Municipal Control Ambiental — Inspección", leaderUserId: "601" },
+      ];
+      const members: Record<string, string[]> = { [BEL]: ["101", "102"], [PAL]: ["111", "102"], [INSP]: ["601"] };
+
+      function stubBackend(roles: string[]) {
+        return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+          const url = new URL(String(input));
+          if (url.pathname === "/me") return meResponse(roles);
+          if (url.pathname === "/crews") return Response.json({ data: list, meta: {} });
+          const id = url.pathname.split("/")[2];
+          return Response.json({ id, members: (members[id] ?? []).map((userId) => ({ userId })) });
+        });
+      }
+      const crewOf = async (response: Response) => getSessionFromRequest(new Request("http://localhost", { headers: { cookie: response.headers.get("set-cookie") ?? "" } }))?.crew;
+
+      it("resolves the leader from the list without asking for details", async () => {
+        signingEnv();
+        const backendFetch = stubBackend(["M6_CAMPO_CUADRILLA"]);
+        const response = await loginRoute(loginRequest("field-crew-leader-route"));
+
+        expect(response.status).toBe(200);
+        expect((await crewOf(response))?.id).toBe(BEL);
+        expect(backendFetch.mock.calls.some(([input]) => new URL(String(input)).pathname.startsWith("/crews/"))).toBe(false);
+      });
+
+      it("resolves a member through the crew detail, preferring the scenario crew name when he belongs to several", async () => {
+        signingEnv();
+        stubBackend(["M6_CAMPO_CUADRILLA"]);
+        const response = await loginRoute(loginRequest("field-crew-member-route"));
+
+        // El sub 102 integra Palermo y Belgrano: desempata el nombre del escenario (Belgrano).
+        expect((await crewOf(response))?.id).toBe(BEL);
+      });
+
+      it("falls back to the first match of the list when no candidate has the scenario name", async () => {
+        signingEnv();
+        stubBackend(["M6_CAMPO_CUADRILLA"]);
+        const original = list[1].name;
+        list[1].name = "Otro nombre";
+        try {
+          const response = await loginRoute(loginRequest("field-crew-member-route"));
+          expect((await crewOf(response))?.id).toBe(PAL);
+        } finally {
+          list[1].name = original;
+        }
+      });
+
+      it("with the shared M6_DEV_JWT every Field profile resolves by the scenario name only", async () => {
+        backendSessionEnv();
+        const backendFetch = stubBackend(["M6_CAMPO_CUADRILLA"]);
+        const response = await loginRoute(loginRequest("field-crew-member-route"));
+
+        expect((await crewOf(response))?.id).toBe(BEL);
+        expect(backendFetch.mock.calls.some(([input]) => new URL(String(input)).pathname.startsWith("/crews/"))).toBe(false);
+      });
+
+      it("rejects an unexpected crew list instead of guessing", async () => {
+        signingEnv();
+        vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+          new URL(String(input)).pathname === "/me" ? meResponse(["M6_CAMPO_CUADRILLA"]) : Response.json({ data: "nope" }));
+        const response = await loginRoute(loginRequest("field-crew-leader-route"));
+
+        expect(response.status).toBe(503);
+      });
+    });
+
+    it("treats a live demo session as ended (401) when the signing secret was removed", async () => {
+      signingEnv();
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () => meResponse(["M6_ADMIN"]));
+      const cookie = (await loginRoute(loginRequest("office-duty-queue"))).headers.get("set-cookie") ?? "";
+
+      vi.stubEnv("M6_JWT_SECRET", "");
+      const response = await listServices(new Request("http://localhost/api/services", { headers: { cookie } }));
+
+      expect(response.status).toBe(401);
+    });
+
+    it("sends the citizen profile with a CIUDADANO token and opens no session when the backend rejects it", async () => {
+      signingEnv();
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        Response.json({ statusCode: 403, message: "Este sistema es solo para personal municipal" }, { status: 403 }),
+      );
+
+      const response = await loginRoute(loginRequest("citizen"));
+
+      expect(claims(backendFetch.mock.calls[0])).toMatchObject({ sub: "901", sub_type: "CIUDADANO" });
+      expect(response.status).toBe(403);
+      expect(response.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("opens the employee without a role with roles [] so the UI shows the no-access screen", async () => {
+      signingEnv();
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () => meResponse([]));
+
+      const response = await loginRoute(loginRequest("employee-no-role"));
+      const cookie = response.headers.get("set-cookie") ?? "";
+
+      expect(response.status).toBe(200);
+      expect(getSessionFromRequest(new Request("http://localhost", { headers: { cookie } }))).toMatchObject({ roles: [], source: "demo" });
     });
   });
 });

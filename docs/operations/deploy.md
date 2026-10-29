@@ -49,10 +49,14 @@ La lista para desarrollo está en [`.env.example`](../../.env.example). En Verce
 |---|---|
 | `M6_AUTH_MODE` | `mock` para escenarios locales; `backend-development` para integrar con el backend usando un JWT de desarrollo. `real-m1` todavía falla de forma cerrada. Configurar el modo explícitamente en producción: si se omite, el código selecciona `real-m1`. |
 | `M6_BACKEND_ORIGIN` | Origen privado de M6 Backend; requerido en `backend-development`. |
-| `M6_DEV_JWT` | JWT de desarrollo aceptado por el backend; requerido en `backend-development`. Guardar como secreto. |
+| `M6_JWT_SECRET` | `JWT_SECRET` del backend (base64). Si está, el BFF firma un token HS256 de 5 minutos por petición con la persona del seed del perfil elegido (#740) y la sesión dura horas (#745). Solo servidor, guardar como secreto, nunca `NEXT_PUBLIC_*`. |
+| `M6_JWT_ISSUER` | Emisor (`iss`) de esos tokens; por defecto `modulo1-ciudadanos`. Debe coincidir con `JWT_ISSUER` del backend. |
+| `M6_DEV_JWT` | Alternativa sin `M6_JWT_SECRET`: JWT de desarrollo único, aceptado por el backend (vence a los 15 min salvo fecha límite). Con `M6_JWT_SECRET` se ignora. Guardar como secreto. |
 | `M1_BASE_URL` | Opcional. Base de M1 para `POST /auth/refresh`; sin ella (o sin refresh token en la sesión) no hay renovación. No verificado contra M1. |
 | `M6_SESSION_SECRET` | Secreto aleatorio de al menos 32 bytes para sellar la cookie del BFF (generalo con `openssl rand -base64 32`). Obligatorio cuando `NODE_ENV=production`; el desarrollo local tiene un valor de respaldo. |
 | `NEXT_PUBLIC_DISABLE_MSW` | Solo para desarrollo y depuración de pruebas; desactiva el service worker de MSW. |
+
+> **Solo para la demo desplegada.** `M6_AUTH_MODE=backend-development` con `M6_JWT_SECRET` hace que el login abierto emita, sin credenciales, tokens de cualquier persona del seed (administración incluida) contra el backend. No cargar ese secreto en un ambiente con usuarios reales ni reutilizarlo fuera de la demo: cualquiera que abra la URL puede elegir cualquier perfil. La sesión dura 8 horas desde el login, sin corte por inactividad. Cuando M1 esté hosteado se borra `src/lib/demo-jwt.ts` y el login pasa a ser el de M1.
 
 La cookie de sesión es `httpOnly`, `Secure` en producción y `SameSite=Lax`. La implementación actual la cifra con AES-256-GCM; aún no autentica contra M1. Para una demo aislada, el modo `mock` usa fixtures. Para probar llamadas al backend, usá `backend-development` y un JWT temporal válido. No publiques secretos en el repositorio ni los incluyas en variables públicas.
 

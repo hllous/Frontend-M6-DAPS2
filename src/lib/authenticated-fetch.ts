@@ -10,6 +10,12 @@ export async function readForbiddenCode(response: Response): Promise<string | un
   return typeof body?.code === "string" ? body.code : undefined;
 }
 
+/** Mensaje claro por `code` de un 403 del backend. */
+const FORBIDDEN_MESSAGES: Record<string, string> = {
+  ROLE_REQUIRED: "No tiene el rol necesario para realizar esta acción en Ambiente. Solicite acceso a un administrador.",
+  NOT_ASSIGNED: "Este servicio no está asignado a su cuadrilla: solo la cuadrilla asignada puede operarlo.",
+};
+
 export class NetworkFailureError extends Error {
   constructor(options?: { cause?: unknown }) {
     super("No se pudo conectar con el servidor. Verifique su conexión.", options);
@@ -27,17 +33,19 @@ export async function authenticatedFetch(input: string, init?: RequestInit): Pro
 
   if (response.status === 401) {
     recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-    await broadcastLogout();
+    await broadcastLogout({ expired: true });
   } else if (response.status === 403) {
     recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
-    if ((await readForbiddenCode(response)) === "ROLE_REQUIRED") {
-      if (input !== "/api/me" && typeof window !== "undefined") {
+    const code = await readForbiddenCode(response);
+    const message = code ? FORBIDDEN_MESSAGES[code] : undefined;
+    if (code && message) {
+      if (code === "ROLE_REQUIRED" && input !== "/api/me" && typeof window !== "undefined") {
         window.dispatchEvent(new Event(ROLES_STALE_EVENT));
       }
       const body = await response.json();
       const headers = new Headers(response.headers);
       headers.delete("content-length");
-      response = new Response(JSON.stringify({ ...body, message: "No tenés el rol necesario para realizar esta acción en Ambiente. Solicitá acceso a un administrador." }), { status: 403, headers });
+      response = new Response(JSON.stringify({ ...body, message }), { status: 403, headers });
     }
   }
 

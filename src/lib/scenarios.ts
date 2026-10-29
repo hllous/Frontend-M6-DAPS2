@@ -1,3 +1,5 @@
+import type { Session } from "./session";
+import { DEMO_IDENTITIES } from "./demo-identities";
 import { actorKindForRoles, capabilitiesForRoles, type M6Role } from "./m6-roles";
 
 export type Capability =
@@ -207,11 +209,16 @@ export type ScenarioCrew = { id: string; name: string };
 
 /** Con una sesión, la cuadrilla resuelta contra el backend pisa la de fixture del escenario. */
 export function getScenario(
-  ref: ScenarioId | { scenarioId: ScenarioId; crew?: ScenarioCrew; roles?: readonly M6Role[] },
+  ref: ScenarioId | { scenarioId: ScenarioId; crew?: ScenarioCrew; roles?: readonly M6Role[]; source?: Session["source"] },
 ): OperationalScenario {
   if (typeof ref === "string") return scenariosById[ref];
   let scenario = scenariosById[ref.scenarioId];
   if (ref.roles) scenario = scenarioForRoles(scenario, ref.roles);
+  // Sesión de demo firmada: el actor es la persona real del seed, no el nombre de fixture del escenario.
+  if (ref.source === "demo") {
+    const { sub, name } = DEMO_IDENTITIES[ref.scenarioId];
+    scenario = { ...scenario, actor: { ...scenario.actor, userId: sub, name } };
+  }
   if (!ref.crew) return scenario;
   return { ...scenario, actor: { ...scenario.actor, crewId: ref.crew.id, crewName: ref.crew.name } };
 }

@@ -6,9 +6,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function mockLocationAssign() {
+function mockLocationAssign(location: { pathname?: string; search?: string } = {}) {
   const assign = vi.fn();
-  Object.defineProperty(window, "location", { value: { assign }, writable: true, configurable: true });
+  Object.defineProperty(window, "location", { value: { assign, ...location }, writable: true, configurable: true });
   return assign;
 }
 
@@ -20,7 +20,7 @@ describe("authenticatedFetch", () => {
   });
 
   it("clears the session and redirects the tab on a 401 before returning the response", async () => {
-    const assignMock = mockLocationAssign();
+    const assignMock = mockLocationAssign({ pathname: "/app", search: "?destination=services" });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input).includes("/api/session/logout")) return new Response(null, { status: 200 });
       return new Response(JSON.stringify({ message: "unauthorized" }), { status: 401 });
@@ -30,7 +30,8 @@ describe("authenticatedFetch", () => {
 
     expect(response.status).toBe(401);
     expect(fetchMock).toHaveBeenCalledWith("/api/session/logout", expect.objectContaining({ method: "POST" }));
-    expect(assignMock).toHaveBeenCalledWith("/login");
+    // Vuelve al login con aviso y con la pantalla de origen, en lugar de dejarla vacía.
+    expect(assignMock).toHaveBeenCalledWith("/login?expired=1&destination=services");
   });
 
   it("leaves the session untouched on a 403", async () => {
@@ -56,9 +57,20 @@ describe("403 classification", () => {
     }), { status: 403 }));
     try {
       const response = await authenticatedFetch("/api/services", { method: "POST" });
-      expect(await response.json()).toMatchObject({ code: "ROLE_REQUIRED", message: "No tenés el rol necesario para realizar esta acción en Ambiente. Solicitá acceso a un administrador." });
+      expect(await response.json()).toMatchObject({ code: "ROLE_REQUIRED", message: "No tiene el rol necesario para realizar esta acción en Ambiente. Solicite acceso a un administrador." });
       expect(listener).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally { window.removeEventListener(ROLES_STALE_EVENT, listener); }
+  });
+
+  it("explains NOT_ASSIGNED without asking for a role refresh", async () => {
+    const listener = vi.fn();
+    window.addEventListener(ROLES_STALE_EVENT, listener);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ statusCode: 403, message: "x", code: "NOT_ASSIGNED" }), { status: 403 }));
+    try {
+      const response = await authenticatedFetch("/api/services/s1/start", { method: "POST" });
+      expect(await response.json()).toMatchObject({ code: "NOT_ASSIGNED", message: expect.stringContaining("no está asignado a su cuadrilla") });
+      expect(listener).not.toHaveBeenCalled();
     } finally { window.removeEventListener(ROLES_STALE_EVENT, listener); }
   });
 });

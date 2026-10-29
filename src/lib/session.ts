@@ -6,11 +6,12 @@ import {
 } from "node:crypto";
 import { cookies } from "next/headers";
 
+import { demoSigningConfigured, signDemoJwt } from "./demo-jwt";
 import { m6RoleSchema, type M6Role } from "./m6-roles";
 import { getScenario, type Capability, type ScenarioCrew, type ScenarioId } from "./scenarios";
-import { AUTH_COOKIE_NAME } from "./session-config";
+import { AUTH_COOKIE_NAME, SESSION_MARKER_COOKIE_NAME } from "./session-config";
 
-export { AUTH_COOKIE_NAME } from "./session-config";
+export { AUTH_COOKIE_NAME, SESSION_MARKER_COOKIE_NAME } from "./session-config";
 
 export const SESSION_IDLE_MS = 30 * 60 * 1000;
 export const SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000;
@@ -28,8 +29,11 @@ export type Session = {
   accessToken?: string;
   /** Token de renovación de M1 (`X-Refresh-Token`, 7 días). Solo existe si el login lo trajo; nunca llega al navegador. */
   refreshToken?: string;
-  /** Quién emitió el material de token. Solo `m1` (login real, #145) habilita la renovación; M6_DEV_JWT nunca. */
-  source?: "m1";
+  /**
+   * Quién emite el material de token. `m1` (login real, #145) habilita la renovación; M6_DEV_JWT nunca.
+   * `demo`: la sesión no guarda token, el BFF firma uno corto por pedido (demo-jwt.ts) y el vencimiento del token no la cierra.
+   */
+  source?: "m1" | "demo";
   /** Roles de M6 efectivos: en modo backend los trae GET /me (login y refresco); en mock, el fixture del escenario. */
   roles: M6Role[];
   /** Cuadrilla real de un escenario de Campo, resuelta contra GET /crews en el login (sólo modo backend). */
@@ -85,6 +89,8 @@ type SessionOptions = {
   now?: number;
   devJwt?: string;
   backendOrigin?: string;
+  /** Firmar un token por pedido con M6_JWT_SECRET en lugar de reenviar M6_DEV_JWT. */
+  demoSigning?: boolean;
   /** Roles de GET /me; sin ellos, los del fixture del escenario (mock y tests). */
   roles?: readonly M6Role[];
 };
@@ -133,6 +139,20 @@ export function createSession(
     };
   }
 
+  if (options.demoSigning) {
+    if (!options.backendOrigin) throw new AuthUnavailableError("El backend de desarrollo no está configurado.");
+    return {
+      mode: options.mode,
+      scenarioId,
+      issuedAt: now,
+      lastActivityAt: now,
+      absoluteExpiresAt: now + SESSION_ABSOLUTE_MS,
+      jwtExpiresAt: now + SESSION_ABSOLUTE_MS,
+      source: "demo",
+      roles,
+    };
+  }
+
   const accessToken = options.devJwt;
   if (!accessToken) {
     throw new AuthUnavailableError("El modo de desarrollo requiere M6_DEV_JWT en el servidor.");
@@ -159,7 +179,17 @@ export function createSession(
   };
 }
 
+/** El token con el que el BFF habla con el backend: el de la sesión, o uno recién firmado si la sesión es de demo. */
+export function sessionToken(session: Session): string | undefined {
+  if (session.accessToken || session.source !== "demo") return session.accessToken;
+  // Sesión demo viva pero sin la clave de firma (se quitó la variable): se trata como sesión caída, no como un 500.
+  if (!demoSigningConfigured()) throw new InvalidSessionError("La firma de demo ya no está configurada.");
+  return signDemoJwt(session.scenarioId);
+}
+
 export function effectiveSessionExpiry(session: Session): number {
+  // La sesión de demo no depende del token (se firma por pedido) ni se corta por inactividad: vale el tope absoluto.
+  if (session.source === "demo") return session.absoluteExpiresAt;
   return Math.min(
     session.jwtExpiresAt,
     session.lastActivityAt + SESSION_IDLE_MS,
@@ -317,6 +347,11 @@ export function sessionCookieOptions(session: Session) {
   };
 }
 
+/** Marca de "ya ingresó": vive lo que el tope de la sesión y la lee el proxy. */
+export function sessionMarkerCookieOptions() {
+  return { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: SESSION_ABSOLUTE_MS / 1000 };
+}
+
 export function sessionCookieRemovalOptions() {
   return { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 0 };
 }
@@ -370,8 +405,8 @@ function isSession(value: Partial<Session>): value is Session {
     typeof value.absoluteExpiresAt === "number" &&
     typeof value.jwtExpiresAt === "number" &&
     m6RoleSchema.array().safeParse(value.roles).success &&
-    (value.mode === "mock" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
-    (value.source === undefined || (value.source === "m1" && value.mode !== "mock")) &&
+    (value.mode === "mock" || value.source === "demo" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
+    (value.source === undefined || ((value.source === "m1" || value.source === "demo") && value.mode !== "mock")) &&
     (value.refreshToken === undefined || (value.mode !== "mock" && typeof value.refreshToken === "string")) &&
     (value.crew === undefined || (typeof value.crew?.id === "string" && typeof value.crew?.name === "string"))
   );

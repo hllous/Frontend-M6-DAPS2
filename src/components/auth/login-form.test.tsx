@@ -35,6 +35,23 @@ describe("LoginForm", () => {
     fetchMock.mockRestore();
   });
 
+  it("tells the person that the session ended when the login opens after an expiry", () => {
+    const { rerender } = render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app?destination=services" sessionExpired />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Su sesión terminó. Vuelva a ingresar.");
+
+    rerender(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
+    expect(screen.queryByText("Su sesión terminó. Vuelva a ingresar.")).not.toBeInTheDocument();
+  });
+
+  it("shows the seed id of the profile only against the real backend", () => {
+    const { rerender } = render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
+    expect(screen.getByText(/Entorno de demostración/)).not.toHaveTextContent("del seed del backend");
+
+    rerender(<LoginForm scenarios={Object.values(scenarios)} authMode="backend-development" redirectTo="/app" />);
+    expect(screen.getByText(/Entorno de demostración/)).toHaveTextContent("id 2 del seed del backend");
+    expect(screen.getByRole("combobox", { name: "Perfil" })).toHaveAccessibleDescription(/Entorno de demostración/);
+  });
+
   it("announces a server error from the BFF without leaving the form", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(

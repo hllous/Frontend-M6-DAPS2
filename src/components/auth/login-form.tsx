@@ -3,25 +3,29 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AuthMode } from "@/lib/session";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
+import { DEMO_IDENTITIES } from "@/lib/demo-identities";
 import type { OperationalScenario, ScenarioId } from "@/lib/scenarios";
 
 export function LoginForm({
   scenarios,
   authMode,
   redirectTo,
+  sessionExpired = false,
 }: {
   scenarios: OperationalScenario[];
   authMode: AuthMode;
   redirectTo: string;
+  /** La sesión se cayó sola: se avisa y, al ingresar, se vuelve a la pantalla de origen (`redirectTo`). */
+  sessionExpired?: boolean;
 }) {
   const [scenarioId, setScenarioId] = useState<ScenarioId>(scenarios[0]?.id ?? "office-duty-queue");
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<{ message: string; denied: boolean }>();
   const isUnavailable = authMode === "real-m1";
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -36,12 +40,12 @@ export function LoginForm({
       });
       if (!response.ok) {
         const body = (await response.json()) as { message?: string };
-        setError(body.message ?? "No se pudo ingresar. Intente nuevamente.");
+        setError({ message: body.message ?? "No se pudo ingresar. Intente nuevamente.", denied: response.status === 403 });
         return;
       }
       window.location.assign(redirectTo);
     } catch {
-      setError("No se pudo ingresar. Revise la conexión e intente nuevamente.");
+      setError({ message: "No se pudo ingresar. Revise la conexión e intente nuevamente.", denied: false });
     }
   }
 
@@ -64,6 +68,12 @@ export function LoginForm({
           ) : (
             <form onSubmit={submit}>
               <FieldGroup>
+                {sessionExpired ? (
+                  <Alert role="alert">
+                    <AlertTitle>Sesión terminada</AlertTitle>
+                    <AlertDescription>Su sesión terminó. Vuelva a ingresar.</AlertDescription>
+                  </Alert>
+                ) : null}
                 <Field>
                   <FieldLabel htmlFor="operational-scenario">Perfil</FieldLabel>
                   <Select
@@ -71,7 +81,7 @@ export function LoginForm({
                     items={Object.fromEntries(scenarios.map((scenario) => [scenario.id, scenario.label]))}
                     onValueChange={(value) => setScenarioId(value as ScenarioId)}
                   >
-                    <SelectTrigger id="operational-scenario" aria-label="Perfil">
+                    <SelectTrigger id="operational-scenario" aria-label="Perfil" aria-describedby="operational-scenario-note">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -82,10 +92,15 @@ export function LoginForm({
                       </SelectGroup>
                     </SelectContent>
                   </Select>
+                  <FieldDescription id="operational-scenario-note">
+                    Entorno de demostración: cualquier persona puede elegir un perfil. Este perfil corresponde a
+                    {" "}{DEMO_IDENTITIES[scenarioId].name} {authMode === "backend-development" ? ` (id ${DEMO_IDENTITIES[scenarioId].sub} del seed del backend)` : null}.
+                  </FieldDescription>
                 </Field>
                 {error ? (
                   <Alert variant="danger">
-                    <AlertDescription>{error}</AlertDescription>
+                    {error.denied ? <AlertTitle>Sin acceso</AlertTitle> : null}
+                    <AlertDescription>{error.message}</AlertDescription>
                   </Alert>
                 ) : null}
                 <Button type="submit" className="w-full">Ingresar al sistema</Button>
