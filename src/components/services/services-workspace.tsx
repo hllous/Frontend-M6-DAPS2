@@ -1150,7 +1150,7 @@ export function ServicesWorkspace({
               <ResizableHandle withHandle={false} disabled aria-label="Ajustar ancho del mapa" className={cn(styles.mobileResizeHandle, isNarrow && "hidden")} />
               <ResizablePanel id="table-pane" defaultSize="50%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}>
                 {isNarrow ? (
-                  <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Servicios" snapState="half" className={styles.mobileServiceDrawer}>
+                  <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Listado" snapState="half" className={styles.mobileServiceDrawer}>
                     <div className={styles.mobileDrawerContent}>
                       <div className={styles.mobileTablePane}>{tableSkeleton}</div>
                     </div>
