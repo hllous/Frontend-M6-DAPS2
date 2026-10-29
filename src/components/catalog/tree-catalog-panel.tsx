@@ -9,7 +9,7 @@ import { Check, CircleOff, Eye, MapPinned, Pencil, Plus, Trash2 } from "lucide-r
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
@@ -299,9 +299,13 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
   return (
     <section aria-labelledby="trees-title" className="flex flex-col gap-6">
       <CatalogPageHeader
+        section="inventory"
         title="Árboles"
         titleId="trees-title"
-        actions={canManage ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar árbol</Button> : null}
+        actions={<>
+          <Link className={buttonVariants({ variant: "outline" })} href={TREE_INTERVENTIONS_HREF}>Intervenciones de arbolado</Link>
+          {canManage ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar árbol</Button> : null}
+        </>}
       />
 
       {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Solo consulta</p> : null}

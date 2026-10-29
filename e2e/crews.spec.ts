@@ -45,7 +45,7 @@ test.describe("Crew catalog @smoke", () => {
   test("opens the crew catalog from the landing page", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("link", { name: "Catálogo" }).click();
+    await page.getByRole("link", { name: "Configuración" }).click();
     await page.locator('a[href="/app/catalog/crews"]').click();
 
     await expect(page).toHaveURL(/\/app\/catalog\/crews$/);

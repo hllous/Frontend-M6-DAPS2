@@ -66,7 +66,7 @@ Estado revisado el 01/10/2026 contra el código frontend y Backend `develop` `30
 **Scope note**: mock and dev-JWT (`M6_DEV_JWT`) modes only, per #46's three-mode split. The real M1 JWT mode is explicitly deferred to Phase 8 — do not present capability names or JWT claims as confirmed contracts anywhere in this phase; they're UI-only and optimistic per [ADR-0005](docs/adr/0005-m6-backend-is-the-sole-authorization-authority.md).
 
 **Acceptance evidence**:
-- Shell renders the capability-gated nav (Mi Trabajo / Servicios / Inventario / Control Ambiental / Mapa / Catálogo / Tableros) per #7, hiding items the mock actor's Capabilities don't grant.
+- Shell renders the capability-gated nav (Mi Trabajo / Servicios / Inventario urbano / Control Ambiental / Mapa / Configuración / Tableros) per #7 («Catálogo» se separó en Configuración e Inventario urbano en #739), hiding items the mock actor's Capabilities don't grant.
 - Login works in mock and `backend-development` modes; real-M1 mode is not implemented yet and fails closed if attempted.
 - One resource's adapter (any) round-trips through Zod validation against an MSW fixture with no network call reaching a real host.
 - Design tokens, breakpoints (760px/1024px), and the collapsible sidebar / mobile nav from `DESIGN.md` render correctly.

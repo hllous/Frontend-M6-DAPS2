@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ZoneRequestError, zoneLocationLabel, zonesAdapter, type Zone } from "@/lib/zones";
+import { ZoneRequestError, zonesAdapter, type Zone } from "@/lib/zones";
 
 import { ShellError, ShellForbidden, ShellUnauthenticated } from "./shell-states";
 
@@ -15,6 +15,18 @@ type ZonesLoadState =
   | { status: "forbidden" }
   | { status: "error" }
   | { status: "ready"; zones: Zone[]; total: number };
+
+/** Agrupa zonas ya ordenadas por comuna bajo su encabezado («Comuna 2»); las que no tienen, al final como «Sin comuna». */
+function groupZonesByCommune(zones: Zone[]) {
+  const groups: { label: string; zones: Zone[] }[] = [];
+  for (const zone of zones) {
+    const label = zone.commune?.name ?? "Sin comuna";
+    const last = groups[groups.length - 1];
+    if (last?.label === label) last.zones.push(zone);
+    else groups.push({ label, zones: [zone] });
+  }
+  return groups;
+}
 
 export function ZonesPanel() {
   const [state, setState] = useState<ZonesLoadState>({ status: "loading" });
@@ -89,16 +101,20 @@ export function ZonesPanel() {
           Se muestran {state.zones.length} de {state.total} zonas.
         </p>
       ) : null}
-      <ItemGroup className="gap-2">
-        {state.zones.map((zone) => (
-          <Item key={zone.id} variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>{zone.name}</ItemTitle>
-              {zone.commune ? <ItemDescription>{zoneLocationLabel(zone)}</ItemDescription> : null}
-            </ItemContent>
-          </Item>
-        ))}
-      </ItemGroup>
+      {groupZonesByCommune(state.zones).map(({ label, zones }) => (
+        <div key={label} role="group" aria-labelledby={`zones-commune-${label.replace(/\W+/g, "-")}`} className="flex flex-col gap-2">
+          <h3 id={`zones-commune-${label.replace(/\W+/g, "-")}`} className="text-sm font-semibold text-muted-foreground">{label}</h3>
+          <ItemGroup className="gap-2">
+            {zones.map((zone) => (
+              <Item key={zone.id} variant="outline" size="sm">
+                <ItemContent>
+                  <ItemTitle>{zone.name}</ItemTitle>
+                </ItemContent>
+              </Item>
+            ))}
+          </ItemGroup>
+        </div>
+      ))}
     </section>
   );
 }

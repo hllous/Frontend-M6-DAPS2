@@ -41,7 +41,7 @@ export class ZoneRequestError extends Error {
 }
 
 // El listado no trae barrios y el detalle los trae como neighborhoods: [{ neighborhoodId }].
-export const zoneCommuneSchema = z.object({ id: z.string(), code: z.string(), name: z.string() });
+export const zoneCommuneSchema = z.object({ id: z.string(), code: z.string(), name: z.string(), number: z.number().optional() });
 // `codigo` y `nombre` faltan cuando el catálogo de M9 no está cargado en el backend.
 export const zoneNeighborhoodSchema = z.object({
   id: z.string(),
@@ -64,16 +64,32 @@ const zoneWireSchema = z.preprocess(withFlatIds("neighborhoods", "neighborhoodId
 
 export type Zone = z.infer<typeof zoneSchema>;
 
+/** Número de comuna (1 a 15); `null` si la zona no tiene comuna o no se puede leer el número. */
+export function communeNumber(commune: Zone["commune"]): number | null {
+  if (!commune) return null;
+  if (typeof commune.number === "number") return commune.number;
+  const parsed = Number(/\d+/.exec(commune.name)?.[0]);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Zonas por número de comuna (numérico: la 10 va después de la 2), alfabético por nombre dentro de cada una y
+ * las zonas sin comuna al final. El backend ya lo hace (Backend #457); se repite acá para los datos que no
+ * pasan por él (mocks, cachés) y es idempotente sobre una página ya ordenada.
+ */
+export function sortZonesByCommune(zones: Zone[]): Zone[] {
+  return [...zones].sort((a, b) => {
+    const left = communeNumber(a.commune) ?? Infinity;
+    const right = communeNumber(b.commune) ?? Infinity;
+    return left === right ? a.name.localeCompare(b.name, "es") : left < right ? -1 : 1;
+  });
+}
+
 /** Etiqueta de zona para tablas y detalles: nunca expone el id crudo. */
 export function zoneLabel(zones: Zone[], zoneId: string, loaded: boolean): string {
   const zone = zones.find((candidate) => candidate.id === zoneId);
   if (zone) return zone.name;
   return loaded ? "Zona no disponible" : "Cargando zona…";
-}
-
-/** Barrio y comuna de una zona, sin ids crudos: "Palermo · Comuna 14". */
-export function zoneLocationLabel(zone: Pick<Zone, "commune" | "neighborhood">): string {
-  return [zone.neighborhood?.nombre, zone.commune?.name].filter(Boolean).join(" · ");
 }
 
 const communeIdInput = z.uuid("La comuna no es válida");
@@ -214,7 +230,7 @@ export const zonesAdapter = {
     }
 
     return {
-      zones: parsed.data.data,
+      zones: sortZonesByCommune(parsed.data.data),
       page: parsed.data.meta.page,
       pageSize: parsed.data.meta.pageSize,
       total: parsed.data.meta.total,

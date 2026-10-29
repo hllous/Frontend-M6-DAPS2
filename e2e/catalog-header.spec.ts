@@ -17,6 +17,8 @@ const CATALOG_SCREENS = [
   ["zones", "Zonas operativas"],
 ] as const;
 
+const INVENTORY_ROUTES = ["containers", "green-points", "green-spaces", "trees", "tree-interventions"];
+
 test.describe("catalog screens share one header (#245)", () => {
   for (const [route, title] of CATALOG_SCREENS) {
     test(`/app/catalog/${route}`, async ({ page }) => {
@@ -26,7 +28,10 @@ test.describe("catalog screens share one header (#245)", () => {
       const main = page.getByRole("main");
       await expect(main.getByRole("heading", { level: 1, name: title })).toBeVisible();
       const breadcrumb = main.getByRole("navigation", { name: "Ruta de navegación" });
-      await expect(breadcrumb.getByRole("link", { name: "Catálogo" })).toHaveAttribute("href", "/app?destination=catalog");
+      await expect(breadcrumb.getByRole("link", { name: INVENTORY_ROUTES.includes(route) ? "Inventario urbano" : "Configuración" })).toHaveAttribute(
+        "href",
+        INVENTORY_ROUTES.includes(route) ? "/app?destination=inventory" : "/app?destination=catalog",
+      );
       await expect(breadcrumb.getByText(title)).toHaveAttribute("aria-current", "page");
     });
   }

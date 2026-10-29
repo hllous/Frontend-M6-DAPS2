@@ -303,6 +303,7 @@ export function GreenSpacesPanel({
       className="flex flex-col gap-5"
     >
       <CatalogPageHeader
+        section="inventory"
         title="Espacios verdes"
         titleId="green-spaces-title"
         actions={

@@ -7,7 +7,7 @@ test.describe("Vehicle catalog @smoke", () => {
   test("lists vehicles from the catalog landing", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("link", { name: "Catálogo" }).click();
+    await page.getByRole("link", { name: "Configuración" }).click();
     await page.locator('a[href="/app/catalog/vehicles"]').click();
 
     await expect(page).toHaveURL(/\/app\/catalog\/vehicles$/);

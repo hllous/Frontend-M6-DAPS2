@@ -302,7 +302,7 @@ export function ScheduleServiceDialog({
     setScheduledDateError(null);
 
     if (catalogs.status !== "ready" || !selectedServiceType) {
-      const message = catalogs.status === "ready" && serviceTypes.length > 0 ? "Seleccione un tipo de servicio." : "No hay tipos de servicio activos. Active uno en Catálogo.";
+      const message = catalogs.status === "ready" && serviceTypes.length > 0 ? "Seleccione un tipo de servicio." : "No hay tipos de servicio activos. Active uno en Configuración.";
       if (catalogs.status === "ready") setFieldErrors({ serviceType: message });
       else setErrorMessage(message);
       return;

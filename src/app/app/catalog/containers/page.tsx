@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 
 import { ContainerCatalogPanel } from "@/components/catalog/container-catalog-panel";
 import { getScenario } from "@/lib/scenarios";
 import { getSession } from "@/lib/session";
+
+export const metadata: Metadata = { title: "Inventario urbano — Ambiente e Higiene" };
 
 export default async function ContainersCatalogPage() {
   await connection();
