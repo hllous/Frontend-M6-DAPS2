@@ -6,6 +6,7 @@ import { Check, ChevronRight, Pencil, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import {
   Dialog,
   DialogClose,
@@ -126,6 +127,9 @@ function weekdayLabel(value: number) {
     weekdays.find((weekday) => weekday.value === value)?.short ?? String(value)
   );
 }
+
+const EMPTY_ITEMS: ServiceFrequency[] = [];
+const COLUMNS: DataTableColumn<ServiceFrequency>[] = [{ accessorKey: "serviceTypeId", enableSorting: false }, { accessorKey: "routeId", enableSorting: false }, { accessorKey: "weekdays", enableSorting: false }, { accessorKey: "shift", enableSorting: false }, { accessorKey: "validFrom", enableSorting: false }];
 
 export function ServiceFrequenciesPanel({
   scenario,
@@ -327,6 +331,12 @@ export function ServiceFrequenciesPanel({
       setCloseError(getErrorMessage(error, "No se pudo cerrar la vigencia."));
     }
   }
+
+  const table = useDataTable({
+    data: state.status === "ready" ? state.items : EMPTY_ITEMS,
+    columns: COLUMNS,
+    getRowId: (item) => item.id,
+  });
 
   return (
     <section
@@ -704,11 +714,14 @@ export function ServiceFrequenciesPanel({
       ) : null}
       {state.status === "ready" && state.items.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <caption className="sr-only">Frecuencias de servicio</caption>
-            <thead><tr><th scope="col">Tipo de servicio</th><th scope="col">Recorrido</th><th scope="col">Días</th><th scope="col">Turno</th><th scope="col">Vigencia</th><th scope="col"><span className="sr-only">Ver detalle</span></th></tr></thead>
-            <tbody>{state.items.map((item) => (
-              <tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
+          <DataTable
+            table={table}
+            container={false}
+            className={`${styles.table} leading-[inherit]`}
+            renderHeader={() => (<thead><tr><th scope="col">Tipo de servicio</th><th scope="col">Recorrido</th><th scope="col">Días</th><th scope="col">Turno</th><th scope="col">Vigencia</th><th scope="col"><span className="sr-only">Ver detalle</span></th></tr></thead>)}
+            renderRow={(row) => {
+              const item = row.original;
+              return (<tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
                 <th scope="row" data-label="Tipo de servicio">
                   <Button
                     type="button"
@@ -727,9 +740,11 @@ export function ServiceFrequenciesPanel({
                 <td data-label="" aria-hidden="true" className="text-right">
                   <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </td>
-              </tr>
-            ))}</tbody>
-          </table>
+              </tr>);
+            }}
+          >
+            <caption className="sr-only">Frecuencias de servicio</caption>
+          </DataTable>
         </div>
       ) : null}
 
