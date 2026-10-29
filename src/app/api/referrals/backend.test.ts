@@ -108,6 +108,71 @@ describe("referrals against the backend", () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(unknown.id));
   });
 
+  it("shows every record of the real backend DTOs, one per status, with no drops (#735)", async () => {
+    // Verbatim shape of RepairRequestResponseDto / StreetClosureRequestResponseDto (Backend docs/api/openapi.json).
+    const wireRepair = (n: number, over: Record<string, unknown>) => ({
+      id: `15c86465-54d3-4e0a-83a5-26a3cc5100${n}0`, damageType: "BLOCKED_DRAIN", severity: "HIGH", publicSafetyRisk: true,
+      detectedInType: "INSPECTION", detectedInId: inspectionId, address: null, status: "REQUESTED", workOrderId: null,
+      requestedAt: timestamp, createdAt: timestamp, updatedAt: timestamp, ...over,
+    });
+    const wireClosure = (n: number, over: Record<string, unknown>) => ({
+      id: `ce0bbfaa-8720-4566-b9d1-738cb37a68${n}0`, sourceType: "TREE_INTERVENTION", sourceId: serviceId, reason: "Extracción con riesgo de caída",
+      sections: [{ id: "6f0a6c52-3d0e-4e6b-9d69-2d2c1c0f6a11", streetName: "Rivadavia", fromCross: "Mitre", toCross: "San Martín" }],
+      closureFrom: timestamp, closureTo: "2026-10-01T12:00:00.000Z", closureType: "PARTIAL", status: "REQUESTED", closureId: null,
+      createdAt: timestamp, updatedAt: timestamp, ...over,
+    });
+    const repairs = [
+      wireRepair(1, {}),
+      wireRepair(2, { address: "Rivadavia 4500", status: "IN_PROGRESS", workOrderId: "WO-1", detectedInType: "SERVICE", detectedInId: serviceId }),
+      wireRepair(3, { address: "Rivadavia 4500", status: "CLOSED" }),
+    ];
+    const closures = [
+      wireClosure(1, {}),
+      wireClosure(2, { status: "APPROVED", closureId: "M7-1" }),
+      wireClosure(3, { status: "REJECTED" }),
+      wireClosure(4, { status: "ENDED", closureId: "M7-1" }),
+      wireClosure(5, { status: "EXPIRED", closureId: "M7-2", sourceType: "SERVICE" }),
+      wireClosure(6, { closureType: null, closureFrom: null, closureTo: null }),
+    ];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/repair-requests") return Response.json(page(repairs, repairs.length));
+      if (url.pathname === "/street-closure-requests") return Response.json(page(closures, closures.length));
+      throw new Error(`Unexpected backend URL: ${url}`);
+    });
+    const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie: await loginAs("office-duty-queue") } }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.meta).toEqual({ total: 9 });
+    expect(body.data).toHaveLength(9);
+    expect(body.data.find((r: { id: string }) => r.id === closures[0].id)).toMatchObject({
+      sourceLabel: closures[0].reason,
+      request: { requestedFrom: timestamp, affectedSections: [{ streetName: "Rivadavia" }] },
+    });
+  });
+
+  it("keeps repairs and closures whose optional keys are ABSENT, not just null (#735)", async () => {
+    const { address: _address, workOrderId: _workOrderId, ...bareRepair } = { ...repair, workOrderId: null };
+    const bareClosure = {
+      id: closureId, sourceType: "TREE_INTERVENTION", sourceId: serviceId, reason: "Extracción",
+      sections: [{ id: "6f0a6c52-3d0e-4e6b-9d69-2d2c1c0f6a11", streetName: "Rivadavia", fromCross: "Mitre", toCross: "San Martín" }],
+      status: "REQUESTED", createdAt: timestamp, updatedAt: timestamp,
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/repair-requests") return Response.json(page([bareRepair], 1));
+      if (url.pathname === "/street-closure-requests") return Response.json(page([bareClosure], 1));
+      throw new Error(`Unexpected backend URL: ${url}`);
+    });
+    const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie: await loginAs("office-duty-queue") } }));
+    const body = await response.json();
+
+    expect(body.meta).toEqual({ total: 2 });
+    expect(body.data.find((r: { id: string }) => r.id === repairId).request.address).toBeNull();
+    expect(body.data.find((r: { id: string }) => r.id === closureId).request).toMatchObject({ closureId: null, closureType: null, requestedFrom: null });
+  });
+
   it("keeps the Field scope working when a Service carries an origin or status this version does not know (#638)", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = new URL(String(input));

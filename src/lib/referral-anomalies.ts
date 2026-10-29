@@ -22,8 +22,8 @@ export type ReferralAnomaly = {
 
 const terminalStatuses = new Set(["CLOSED", "REJECTED", "ENDED", "EXPIRED"]);
 
-function normalizedLocation(value: string): string {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
+function normalizedLocation(value: string | null): string {
+  return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function closureSectionsKey(sections: Array<{ streetName: string; fromCross: string; toCross: string }>): string {
@@ -43,6 +43,7 @@ function hasSameDuplicateCriteria(referral: Referral, candidate: Referral): bool
 
   if (referral.kind === "STREET_CLOSURE_REQUEST" && candidate.kind === "STREET_CLOSURE_REQUEST") {
     return referral.sourceType === candidate.sourceType &&
+      referral.request.closureType !== null &&
       referral.request.closureType === candidate.request.closureType &&
       closureSectionsKey(referral.request.affectedSections) === closureSectionsKey(candidate.request.affectedSections);
   }
@@ -86,7 +87,7 @@ function sourceChangesFor(referral: Referral, service: Service | null | undefine
   }
 
   const recorded = referral.request.sourceContext;
-  if (recorded.sourceType !== "SERVICE") return [];
+  if (recorded?.sourceType !== "SERVICE") return [];
   const comparisons: Array<[string, string, string]> = [
     ["Nombre del Servicio", recorded.title, service.title],
     ["Modalidad", recorded.mode, service.mode],

@@ -11,6 +11,7 @@ import {
 } from "./street-closure-request-fixtures";
 import { resetTreeInterventionFixtures } from "./tree-intervention-fixtures";
 import {
+  streetClosureRequestSchema,
   StreetClosureRequestContractError,
   StreetClosureRequestError,
   streetClosureRequestsAdapter,
@@ -70,7 +71,7 @@ describe("street closure request adapter", () => {
 
     expect(created.status).toBe("REQUESTED");
     expect(created.affectedSections).toHaveLength(2);
-    expect(created.sourceContext.sourceId).toBe("SVC-1050");
+    expect(created.sourceContext?.sourceId).toBe("SVC-1050");
   });
 
   it("creates a TreeIntervention-sourced request with a compact canonical context", async () => {
@@ -219,5 +220,56 @@ describe("street closure request adapter", () => {
     await expect(streetClosureRequestsAdapter.create(createInput)).rejects.toBeInstanceOf(
       NetworkFailureError,
     );
+  });
+});
+
+// #735: Backend's real StreetClosureRequestResponseDto, with the keys openapi.json leaves optional absent.
+describe("wire shape of StreetClosureRequestResponseDto", () => {
+  const wire = {
+    id: "ce0bbfaa-8720-4566-b9d1-738cb37a689b", sourceType: "SERVICE", sourceId: "ceec08ae-67e7-4739-9677-150f5085bb1a",
+    reason: "Trabajo en vía pública",
+    sections: [{ id: "6f0a6c52-3d0e-4e6b-9d69-2d2c1c0f6a11", streetName: "Rivadavia", fromCross: "Mitre", toCross: "San Martín" }],
+    status: "REQUESTED", createdAt: "2026-10-01T08:00:00.000Z", updatedAt: "2026-10-01T08:00:00.000Z",
+  };
+
+  it("parses a record with closureId, closureFrom, closureTo and closureType ABSENT", () => {
+    expect(streetClosureRequestSchema.parse(wire)).toMatchObject({
+      sourceModule: "M6", closureId: null, closureType: null, requestedFrom: null, requestedTo: null,
+      affectedSections: [{ streetName: "Rivadavia", fromCross: "Mitre", toCross: "San Martín" }],
+    });
+  });
+
+  it("maps the wire aliases when they are present", () => {
+    expect(streetClosureRequestSchema.parse({ ...wire, closureFrom: "2026-10-01T09:00:00.000Z", closureTo: "2026-10-01T12:00:00.000Z", closureType: "TOTAL", closureId: "M7-1" }))
+      .toMatchObject({ requestedFrom: "2026-10-01T09:00:00.000Z", requestedTo: "2026-10-01T12:00:00.000Z", closureType: "TOTAL", closureId: "M7-1" });
+  });
+
+  it.each([
+    ["empty sections", { sections: [] }],
+    ["sections that is not an array", { sections: "x" }],
+    ["an unknown status", { status: "FOO" }],
+    ["a foreign sourceModule", { sourceModule: "M2" }],
+  ])("rejects %s", (_name, override) => {
+    expect(streetClosureRequestSchema.safeParse({ ...wire, ...override }).success).toBe(false);
+  });
+
+  it("does not overwrite fields already in the internal shape (mixed record)", () => {
+    const parsed = streetClosureRequestSchema.parse({
+      ...wire, sections: [], affectedSections: [{ streetName: "Internal", fromCross: "A", toCross: "B" }],
+      requestedFrom: "2026-10-02T08:00", requestedTo: "2026-10-02T10:00", closureFrom: "ignored", closureTo: "ignored",
+    });
+    expect(parsed).toMatchObject({ affectedSections: [{ streetName: "Internal" }], requestedFrom: "2026-10-02T08:00", requestedTo: "2026-10-02T10:00" });
+  });
+
+  it("resolves a Service dependency from a wire-shaped record (the Servicios workspace path)", async () => {
+    server.use(http.get("*/api/street-closure-requests", () => HttpResponse.json({
+      data: [{ ...wire, status: "APPROVED", closureId: "M7-1" }],
+      meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+    })));
+
+    await expect(streetClosureRequestsAdapter.getForService(wire.sourceId)).resolves.toMatchObject({
+      request: { status: "APPROVED" },
+      outcome: "allowed",
+    });
   });
 });
