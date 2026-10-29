@@ -56,6 +56,8 @@ export type DataTableColumnMeta = {
   label?: string;
   /** Body cells render as `<th scope="row">`. */
   rowHeader?: boolean;
+  /** Hide decorative body cells from the accessibility tree. */
+  ariaHidden?: boolean;
 };
 
 export const DATA_TABLE_FEATURES = tableFeatures({
@@ -396,6 +398,7 @@ export function DataTable<T extends RowData>({
                 return (
                   <Cell
                     key={cell.id}
+                    aria-hidden={meta?.ariaHidden || undefined}
                     {...(meta?.rowHeader ? { scope: "row" } : {})}
                     data-label={
                       meta?.label ??
