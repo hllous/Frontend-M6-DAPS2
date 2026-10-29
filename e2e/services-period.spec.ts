@@ -7,6 +7,8 @@ async function openServices(page: Page) {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=services");
   await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
+  // The loading skeleton has its own drawer; wait for the loaded list so the handle is the final one.
+  await expect(page.getByRole("region", { name: "Listado de servicios" })).toHaveAttribute("aria-busy", "false");
 }
 
 async function dispatchTouchGesture(
