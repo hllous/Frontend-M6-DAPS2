@@ -46,6 +46,7 @@ for (const size of SIZES) {
       await expect(region).toHaveAttribute("aria-busy", "true");
       await expect(region.getByRole("status")).toHaveText("Cargando");
       await expect(page.getByText(/Cargando\.\.\.|Cargando…/)).toHaveCount(0);
+      await expect(page.getByText("Cargando listado")).toHaveCount(0);
       await shot(page, `after2-services-table-loading-${size.name}`);
       const loadingHead = (await page.locator('[data-slot="table-rows-skeleton"] thead th').first().boundingBox())!;
       const loadingPane = (await page.locator('[data-slot="table-rows-skeleton"]').boundingBox())!;
