@@ -1,7 +1,7 @@
 "use client";
 
 import { LoadingRegion } from "@/components/ui/loading-region";
-import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -566,7 +566,7 @@ export function ServiceDetail({
 
               <LoadingRegion label="Carga de derivaciones" isLoading={repairRequestsLoading}>
               {repairRequestsLoading ? (
-                <ListItemsSkeleton itemCount={2} />
+                <Skeleton className="h-5 w-40" />
               ) : repairRequestsError ? (
                 <p role="alert" className="text-sm text-[var(--color-danger)]">{repairRequestsError}</p>
               ) : repairRequests.length === 0 ? (

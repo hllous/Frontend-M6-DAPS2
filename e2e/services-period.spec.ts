@@ -6,7 +6,7 @@ import { chooseServicesPeriod, expectServicesPeriod } from "./support/services-6
 async function openServices(page: Page) {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=services");
-  await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 }
 
 async function dispatchTouchGesture(
@@ -43,7 +43,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await page.setViewportSize(viewport);
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 
     if (viewport.width === 390) {
       const period = page.getByRole("combobox", { name: "Período" });
@@ -78,7 +78,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await page.setViewportSize(viewport);
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Seleccionar servicio Poda de árbol — Av. Rivadavia 2200" }).click();
     await page.getByRole("button", { name: "Ver detalle" }).click();
@@ -202,7 +202,7 @@ test.describe("Services phone preview replaces the list filters", () => {
   test("a touch tap on a service hides the period and category filters until the preview closes", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 
     const period = page.getByRole("combobox", { name: "Período" });
     const categories = page.getByRole("button", { name: "Categorías" });

@@ -1,7 +1,7 @@
 "use client";
 
 import { LoadingRegion } from "@/components/ui/loading-region";
-import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -819,9 +819,7 @@ export function ZoneExecutionPanel({
                       <span className="font-semibold text-[var(--color-text-secondary)] block mb-2">
                         Evidencia adjunta ({totalCount}):
                       </span>
-                      {!currentEvidence && (
-                        <ListItemsSkeleton itemCount={2} />
-                      )}
+                      {!currentEvidence && totalCount === 0 && <Skeleton className="h-5 w-24" />}
                       {currentEvidence?.error && (
                         <Alert variant="danger" role="alert"><AlertTitle>No se pudo cargar la evidencia</AlertTitle><AlertDescription>{currentEvidence.error}</AlertDescription></Alert>
                       )}

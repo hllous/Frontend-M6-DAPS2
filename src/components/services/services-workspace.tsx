@@ -870,6 +870,36 @@ export function ServicesWorkspace({
     </div>
   );
 
+  const filterToolbar = (
+  <div
+    data-services-filter-toolbar
+    hidden={isNarrow && Boolean(selectedService)}
+    className={cn(
+      "flex flex-wrap items-center border-b border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 text-xs text-[var(--color-text-secondary)]",
+      // On phones the period selector shrinks so it never pushes «Categorías» onto a second row.
+      isNarrow ? "gap-2 px-2" : "gap-3 px-4",
+    )}
+  >
+    {periodBar}
+    {refreshError && (
+      <p role="alert" className={cn("px-4 py-1.5 text-xs text-[var(--color-danger)]", isNarrow && "basis-full")}>
+        No se pudo actualizar. Se muestran los datos anteriores.
+      </p>
+    )}
+    <ServicesColumnEditor controller={columnPreferences} />
+  </div>
+  );
+
+  const tableSkeleton = (
+    <TableRowsSkeleton
+      rowCount={8}
+      rowHeight="h-12"
+      columnWidths={isNarrow ? ["w-4", "w-40", "w-20", "w-20"] : ["w-4", "w-40", "w-20", "w-20", "w-20", "w-20"]}
+      columnLabels={isNarrow ? ["#", "Servicio", "Estado", "Zona"] : ["#", "Servicio", "Estado", "Zona", "Equipo", "Fecha"]}
+      className="h-full min-h-0 min-w-0 overflow-hidden"
+    />
+  );
+
   // Full detail view (explicit action)
   if (detailService) {
     return (
@@ -1106,19 +1136,28 @@ export function ServicesWorkspace({
       {/* Loading and ready states share one region so the table lands where the skeleton was. */}
       <LoadingRegion label="Listado de servicios" isLoading={loadState.status === "loading"} className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {loadState.status === "loading" && (
-        <div data-slot="services-loading-skeleton" aria-hidden="true" className="flex min-h-0 flex-1 flex-col">
-          <div className="flex items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5">
-            <Skeleton className="h-10 w-48" />
-          </div>
-          <div className="flex min-h-0 flex-1">
-            {!isNarrow && <div className="min-w-0 flex-[4] p-3"><MapPaneSkeleton className="rounded-2xl" /></div>}
-            <TableRowsSkeleton
-              rowCount={8}
-              rowHeight="h-12"
-              columnWidths={isNarrow ? ["w-8", "w-40", "w-20"] : ["w-8", "w-40", "w-20", "w-24", "w-24"]}
-              columnLabels={isNarrow ? ["#", "Servicio", "Estado"] : ["#", "Servicio", "Estado", "Zona", "Equipo"]}
-              className="min-h-0 min-w-0 flex-[6] overflow-hidden"
-            />
+        <div data-slot="services-loading-skeleton" aria-hidden="true" inert className="flex min-h-0 flex-1 flex-col">
+          {filterToolbar}
+          <div className={cn("relative min-h-0 min-w-0 flex-1", isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout)}>
+            <ResizablePanelGroup
+              orientation="horizontal"
+              defaultLayout={{ "map-pane": 50, "table-pane": 50 }}
+              className={cn("h-full min-w-0 flex-1", styles.panelGroup)}
+            >
+              <ResizablePanel id="map-pane" defaultSize="50%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileMapPanel)}>
+                <div className={cn("h-full min-h-0 min-w-0", !isNarrow && "p-3")}><MapPaneSkeleton className="rounded-2xl" /></div>
+              </ResizablePanel>
+              <ResizableHandle withHandle={false} disabled aria-label="Ajustar ancho del mapa" className={cn(styles.mobileResizeHandle, isNarrow && "hidden")} />
+              <ResizablePanel id="table-pane" defaultSize="50%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}>
+                {isNarrow ? (
+                  <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Cargando listado" snapState="half" className={styles.mobileServiceDrawer}>
+                    <div className={styles.mobileDrawerContent}>
+                      <div className={styles.mobileTablePane}>{tableSkeleton}</div>
+                    </div>
+                  </InventoryMapDrawer>
+                ) : tableSkeleton}
+              </ResizablePanel>
+            </ResizablePanelGroup>
           </div>
         </div>
       )}
@@ -1129,23 +1168,7 @@ export function ServicesWorkspace({
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           <div className="flex min-h-0 flex-1 flex-col">
             {/* On phones the preview covers the list the filters apply to, so the filters go with it. */}
-            <div
-              data-services-filter-toolbar
-              hidden={isNarrow && Boolean(selectedService)}
-              className={cn(
-                "flex flex-wrap items-center border-b border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 text-xs text-[var(--color-text-secondary)]",
-                // On phones the period selector shrinks so it never pushes «Categorías» onto a second row.
-                isNarrow ? "gap-2 px-2" : "gap-3 px-4",
-              )}
-            >
-              {periodBar}
-              {refreshError && (
-                <p role="alert" className={cn("px-4 py-1.5 text-xs text-[var(--color-danger)]", isNarrow && "basis-full")}>
-                  No se pudo actualizar. Se muestran los datos anteriores.
-                </p>
-              )}
-              <ServicesColumnEditor controller={columnPreferences} />
-            </div>
+            {filterToolbar}
 
             <div className={cn(
               "relative min-h-0 min-w-0 flex-1",
