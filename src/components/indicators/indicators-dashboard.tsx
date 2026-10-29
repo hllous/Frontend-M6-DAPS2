@@ -16,7 +16,9 @@ import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/d
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Item, ItemGroup } from "@/components/ui/item";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableCaption, TableCell, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -218,7 +220,7 @@ function useNarrowDashboard() {
 }
 
 function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { states: Record<FamilyKey, FamilyState>; selectedFamily: FamilyKey; onSelect: (family: FamilyKey) => void; onRetry: (family: FamilyKey) => void }) {
-  return <section aria-label="Familias" role="region" aria-busy={familyOrder.some((family) => states[family].status === "loading")}>
+  return <LoadingRegion label="Familias" isLoading={familyOrder.some((family) => states[family].status === "loading")}>
     <ToggleGroup value={[selectedFamily]} onValueChange={(values) => { const family = values[0]; if (family) onSelect(family as FamilyKey); }} aria-label="Familias" className={styles.summaryBand}>
       {familyOrder.map((family) => {
         const state = states[family];
@@ -228,24 +230,23 @@ function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { sta
         return <Card className={styles.summaryCard} data-state={state.status} key={family} size="sm">
           <ToggleGroupItem variant="card" className={styles.summaryCardSelect} value={family} aria-label={`${meta.label}: seleccionar familia`}>
             <span className={styles.summaryCardHeader}><span className="text-sm font-semibold text-muted-foreground">{meta.label}</span><span className={`${styles.summaryIcon} size-8 rounded-lg bg-muted text-primary`}><Icon size={17} aria-hidden /></span></span>
-            <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item && state.status === "ready" ? familySummary(item) : "—"}</span>
+            {state.status === "loading" && !item ? <Skeleton aria-hidden className="h-[30px] w-24" /> : <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item && state.status === "ready" ? familySummary(item) : "—"}</span>}
             <span className="text-xs leading-snug text-muted-foreground">{item?.primary.label ?? meta.description}</span>
             <span className="text-xs font-semibold text-primary">{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
           </ToggleGroupItem>
-          {state.status === "loading" ? <Skeleton className={styles.summarySkeleton} role="status" aria-label={`Cargando ${meta.label}`} /> : null}
           {state.status === "empty" ? <Alert role="status" className={styles.summaryState}>Sin datos</Alert> : null}
           {state.status === "error" ? <Alert variant="danger" className={styles.summaryState}><AlertTitle>No se pudo cargar {meta.label}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></Alert> : null}
         </Card>;
       })}
     </ToggleGroup>
-  </section>;
+  </LoadingRegion>;
 }
 
 function ModuleState({ label, status, onRetry, children }: { label: string; status: LoadStatus; onRetry: () => void; children?: React.ReactNode }) {
   const titleId = `indicator-${label.toLowerCase().replaceAll(" ", "-")}-title`;
   const emptyLabel = label === "Detalle territorial" ? "territoriales" : label.toLowerCase();
   if (status === "ready") return <section className={styles.module} aria-label={label} role="region"><h2 id={titleId}>{label}</h2>{children}</section>;
-  if (status === "loading") return <section className={styles.moduleState} aria-label={label} role="region"><h2 id={titleId}>{label}</h2><Skeleton className={styles.moduleSkeleton} aria-hidden /><Alert role="status">Cargando {label.toLowerCase()}…</Alert></section>;
+  if (status === "loading") return <LoadingRegion label={label} className={styles.moduleState}><h2 id={titleId}>{label}</h2><div aria-hidden className={styles.moduleSkeleton}>{["w-full", "w-4/5", "w-3/5", "w-2/5"].map((width) => <Skeleton key={width} className={`h-6 ${width}`} />)}</div></LoadingRegion>;
   if (status === "empty") return <section className={styles.moduleState} aria-label={label} role="region"><Empty><EmptyHeader><EmptyTitle id={titleId}>Sin resultados {emptyLabel}</EmptyTitle><EmptyDescription>No hay datos para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty></section>;
   return <section className={styles.moduleState} aria-label={label} role="region"><Alert variant="danger"><AlertTitle id={titleId}>No se pudo cargar {label}. Intente nuevamente.</AlertTitle><Button type="button" variant="outline" onClick={onRetry}>Reintentar {label}</Button></Alert></section>;
 }
@@ -422,7 +423,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     <section className={styles.dashboard} aria-labelledby="indicator-dashboard-title">
       <div className={styles.heading}>
         <div><h1 id="indicator-dashboard-title">Indicadores operativos</h1></div>
-        {freshness ? <div className={styles.freshness}><Database size={16} aria-hidden /> Actualizado {formatDateTime(freshness)}</div> : null}
+        {freshness ? <div className={styles.freshness}><Database size={16} aria-hidden /> Actualizado {formatDateTime(freshness)}</div> : <div aria-hidden className={`${styles.freshness} invisible`}><Database size={16} aria-hidden /> Actualizado</div>}
       </div>
 
       <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); pendingSignal.current = undefined; const validation = indicatorQuerySchema.safeParse(query); if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; } setFilterError(null); setSelectedSignal(null); setRecordPlan(null); setRecordsStatus("idle"); setFamilyStates(emptyFamilyState()); setAppliedQuery({ ...query }); }}>
@@ -455,7 +456,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
           <TabsTrigger value="territory">Territorio</TabsTrigger>
           <TabsTrigger value="records">Registros</TabsTrigger>
         </TabsList>
-        <TabsContent value="summary"><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : <p>{selectedFamilyState.status === "loading" ? "Cargando…" : selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}</section></TabsContent>
+        <TabsContent value="summary"><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}</section></TabsContent>
         <TabsContent value="trend">{selectedModuleContent("trend", trendBreakdowns, trendStatus)}</TabsContent>
         <TabsContent value="territory">{selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}</TabsContent>
         <TabsContent value="records">{recordsView}</TabsContent>
@@ -472,7 +473,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 }
 
 function CatalogFilter({ id, label, allLabel, noun, options, value, onChange }: { id: string; label: string; allLabel: string; noun: string; options?: FilterOption[]; value?: string; onChange: (value: string | undefined) => void }) {
-  const hint = !options ? "Cargando…" : options.length === 0 ? "No se pudieron cargar. Intente nuevamente." : null;
+  const hint = !options ? null : options.length === 0 ? "No se pudieron cargar. Intente nuevamente." : null;
   return <Field className={`${styles.field} min-w-0`}>
     <FieldLabel htmlFor={id}>{label}</FieldLabel>
     <Combobox
@@ -481,12 +482,12 @@ function CatalogFilter({ id, label, allLabel, noun, options, value, onChange }: 
       options={[{ value: "", label: allLabel }, ...(options ?? []).map((option) => ({ value: option.id, label: option.label }))]}
       onChange={(next) => onChange(next || undefined)}
       disabled={!options?.length}
-      busy={!options}
-      aria-describedby={hint ? `${id}-hint` : undefined}
+      aria-describedby={hint || !options ? `${id}-hint` : undefined}
       placeholder={allLabel}
       searchPlaceholder={`Buscar ${noun}`}
       emptyText="Sin resultados."
     />
+    {!options ? <LoadingRegion id={`${id}-hint`} label={`Opciones de ${label}`} className="sr-only" /> : null}
     {hint ? <FieldDescription id={`${id}-hint`} className={styles.note} role="status">{hint}</FieldDescription> : null}
   </Field>;
 }
@@ -543,21 +544,26 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
 function AccessibleRecords({ family, plan, selection, breakdown, point, records, status, familyStatus = "ready", open, onOpenChange, onClear }: { family: FamilyKey; plan: RecordPlan | null; selection: SelectedSignal | null; breakdown?: IndicatorBreakdown; point?: IndicatorPoint; records: TraceRecord[]; status: "idle" | "loading" | "ready" | "error"; familyStatus?: LoadStatus; open: boolean; onOpenChange: (open: boolean) => void; onClear: () => void }) {
   const meta = familyMeta[family];
   const hasSelection = Boolean(selection && breakdown && point);
-  return <section className={styles.records} aria-labelledby="indicator-records-title">
+  const loading = (familyStatus === "loading" && !plan) || Boolean(plan?.resource && status === "loading");
+  return <LoadingRegion label="Registros" isLoading={loading} className={styles.records}>
     <Collapsible open={open} onOpenChange={onOpenChange}>
       <h2 className={styles.recordsHeading}><CollapsibleTrigger id="indicator-records-title" render={<Button type="button" variant="ghost" size="lg" className={styles.recordsTrigger} />}>Registros<ChevronDown data-icon="inline-end" aria-hidden /></CollapsibleTrigger></h2>
       <CollapsibleContent className={styles.recordsBody}>
-        {familyStatus === "loading" && !plan ? <Alert role="status" className={styles.recordsMessage}>Cargando registros relacionados…</Alert> : null}
+        {familyStatus === "loading" && !plan ? <RecordsSkeleton /> : null}
         {familyStatus === "error" && !plan ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros.</Alert> : null}
         {plan?.resource ? <Link className={styles.recordsLink} href={plan.href}>{plan.linkLabel}</Link> : null}
         <Alert role="status" variant="info" className={styles.recordsContext}>
           {plan?.resource === null && hasSelection ? <AlertDescription>{plan.reason}</AlertDescription> : hasSelection ? <AlertDescription><strong>Filtro:</strong> {meta.label} · {breakdown?.title} · {point?.label} · {pointText(point!)}</AlertDescription> : plan?.resource ? <AlertDescription>Todos los registros del período.</AlertDescription> : <AlertDescription>Seleccione un dato del gráfico.</AlertDescription>}
           {hasSelection ? <Button type="button" variant="outline" size="sm" onClick={onClear}>Quitar filtro</Button> : null}
         </Alert>
-        {plan?.resource ? status === "loading" ? <Alert role="status" className={styles.recordsMessage}>Cargando…</Alert> : status === "error" ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros.</Alert> : <TraceRecordsTable plan={plan} records={records} /> : <Alert role="status" className={styles.recordsMessage}>Sin registros.</Alert>}
+        {plan?.resource ? status === "loading" ? <RecordsSkeleton /> : status === "error" ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros.</Alert> : <TraceRecordsTable plan={plan} records={records} /> : <Alert role="status" className={styles.recordsMessage}>Sin registros.</Alert>}
       </CollapsibleContent>
     </Collapsible>
-  </section>;
+  </LoadingRegion>;
+}
+
+function RecordsSkeleton() {
+  return <TableRowsSkeleton className={styles.recordsTableWrap} tableClassName={styles.recordsTable} rowCount={3} columnWidths={["w-40", "w-24", "w-20"]} columnLabels={["Registro", "Zona operativa", "Estado"]} />;
 }
 
 function TraceRecordsTable({ plan, records }: { plan: TracePlan; records: TraceRecord[] }) {
