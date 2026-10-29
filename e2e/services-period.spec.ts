@@ -79,7 +79,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
   test(`Service detail keeps crew assignment compact and keyboard accessible at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await loginViaApi(page, "office-duty-queue");
-    await page.goto("/app?destination=services");
+    // La búsqueda deja el servicio en la primera fila: la lista está paginada y ordenada por fecha.
+    await page.goto("/app?destination=services&q=SVC-1043");
     await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Seleccionar servicio Poda de árbol — Av. Rivadavia 2200" }).click();
@@ -203,7 +204,8 @@ test.describe("Services phone preview replaces the list filters", () => {
 
   test("a touch tap on a service hides the period and category filters until the preview closes", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
-    await page.goto("/app?destination=services");
+    // La búsqueda deja el servicio en la primera fila: la lista está paginada y ordenada por fecha.
+    await page.goto("/app?destination=services&q=SVC-1043");
     await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 
     const period = page.getByRole("combobox", { name: "Período" });

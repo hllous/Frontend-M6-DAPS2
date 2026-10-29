@@ -934,7 +934,7 @@ export function ServicesWorkspace({
   const ALL = "__all";
   const MULTI = "__multi";
   const quickFilters = (
-    <div role="group" aria-label="Filtros rápidos" className={cn("flex items-center gap-6", isNarrow && "basis-full gap-3")}>
+    <div role="group" aria-label="Filtros rápidos" className={cn("flex items-center gap-6", isNarrow && "gap-3")}>
      <div className="flex items-center gap-2">
       <Label htmlFor="services-status-filter">Estado</Label>
       <Select
@@ -982,7 +982,7 @@ export function ServicesWorkspace({
         No se pudo actualizar. Se muestran los datos anteriores.
       </p>
     )}
-    {quickFilters}
+    {!isNarrow && quickFilters}
     <ServicesColumnEditor controller={columnPreferences} />
   </div>
   );
@@ -1250,7 +1250,12 @@ export function ServicesWorkspace({
                 {isNarrow ? (
                   <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Listado" snapState="half" className={styles.mobileServiceDrawer}>
                     <div className={styles.mobileDrawerContent}>
-                      <div className={styles.mobileTablePane}>{tableSkeleton}</div>
+                      <div className={styles.mobileTablePane}>
+                        <div className="flex h-full min-h-0 flex-col">
+                          <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-secondary)]">{quickFilters}</div>
+                          <div className="min-h-0 flex-1">{tableSkeleton}</div>
+                        </div>
+                      </div>
                     </div>
                   </InventoryMapDrawer>
                 ) : tableSkeleton}
@@ -1338,7 +1343,10 @@ export function ServicesWorkspace({
                             aria-hidden={Boolean(selectedService)}
                             inert={Boolean(selectedService)}
                           >
-                            {servicesTable}
+                            <div className="flex h-full min-h-0 flex-col">
+                              <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-secondary)]">{quickFilters}</div>
+                              <div className="min-h-0 flex-1">{servicesTable}</div>
+                            </div>
                           </div>
                         </div>
                       </InventoryMapDrawer>

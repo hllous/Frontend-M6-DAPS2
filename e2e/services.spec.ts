@@ -87,11 +87,13 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const firstRowOrdinal = (await firstServiceRow.locator("td").first().innerText()).trim();
     await expect(marker1).toHaveText(firstRowOrdinal);
     await expect(map.locator('.leaflet-marker-icon[aria-pressed="true"]')).toHaveAttribute("data-service-id", "SVC-1043");
-    const marker18Id = await table.locator('tr[data-service-ordinal="18"]').getAttribute("data-service-id");
-    const marker18 = map.locator(`.leaflet-marker-icon[data-service-id="${marker18Id}"]`);
+    // El orden por defecto es cronológico: no todo servicio de la página tiene marcador, así que se compara con todos los demás.
     const selectedMarkerZIndex = await marker1.evaluate((element) => Number(getComputedStyle(element).zIndex));
-    const marker18ZIndex = await marker18.evaluate((element) => Number(getComputedStyle(element).zIndex));
-    expect(selectedMarkerZIndex).toBeGreaterThan(marker18ZIndex);
+    const otherMarkerZIndexes = await map
+      .locator('.leaflet-marker-icon[data-service-id]:not([data-service-id="SVC-1043"])')
+      .evaluateAll((elements) => elements.map((element) => Number(getComputedStyle(element).zIndex)));
+    expect(otherMarkerZIndexes.length).toBeGreaterThan(0);
+    for (const zIndex of otherMarkerZIndexes) expect(selectedMarkerZIndex).toBeGreaterThan(zIndex);
 
     // Close preview to test map interaction directly
     await preview.getByRole("button", { name: "Cerrar", exact: true }).click();
@@ -366,7 +368,10 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("heading", { name: "Programar servicio" })).toBeVisible();
 
-    // Verify derived mode indication is present
+    // El tipo de servicio ya no viene preseleccionado: se elige y recién entonces aparece el modo derivado.
+    await expect(dialog.getByRole("combobox", { name: /Tipo de servicio/ })).toContainText("Seleccione un tipo");
+    await dialog.getByRole("combobox", { name: /Tipo de servicio/ }).click();
+    await page.getByRole("option", { name: /Recolección domiciliaria/ }).click();
     await expect(dialog.getByText("Recorrido", { exact: true }).first()).toBeVisible();
 
     // Enter notes (inside the "Más datos" disclosure)
