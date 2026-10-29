@@ -282,7 +282,19 @@ export const environmentalInspectionScheduleInputSchema = z.object({
 });
 export type EnvironmentalInspectionScheduleInput = z.infer<typeof environmentalInspectionScheduleInputSchema>;
 
+// Backend `AllowedActionsDto` (#451): what can be derived from this inspection now, by report type,
+// outcome and existing notice. The client does not replicate that matrix; it only reads the flags.
+// `suggestedViolationType` is a plain string: the client does not branch on it.
+export const environmentalInspectionAllowedActionsSchema = z.object({
+  repair: z.boolean(),
+  notice: z.boolean(),
+  suggestedViolationType: z.string().nullable().optional(),
+});
+export type EnvironmentalInspectionAllowedActions = z.infer<typeof environmentalInspectionAllowedActionsSchema>;
+
 export const environmentalInspectionSchema = z.object({
+  // Required by the contract; kept optional only so one inspection without it is not discarded. Defensive: absent means no follow-up is offered.
+  allowedActions: environmentalInspectionAllowedActionsSchema.optional(),
   inspectorId: z.string().nullable().optional(),
   completedByUserId: z.string().nullable().optional(),
   id: z.string(),
