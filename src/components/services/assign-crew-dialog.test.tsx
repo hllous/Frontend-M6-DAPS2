@@ -157,12 +157,29 @@ describe("AssignCrewDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
-    expect(await screen.findByText(/Cargando…/i)).toBeInTheDocument();
+    const region = await screen.findByRole("region", { name: "Datos de asignación" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(screen.queryByText(/Cargando…/)).not.toBeInTheDocument();
     const submit = screen.getByRole("button", { name: "Confirmar asignación" });
     expect(submit).toBeDisabled();
     expect(screen.queryByText(/Vehículo opcional/i)).not.toBeInTheDocument();
     await user.click(submit);
     expect(bodies).toHaveLength(0);
+  });
+
+  it("replaces the loading skeleton with the fields once the resources arrive", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    realResources({ serviceType: async () => { await gate; return HttpResponse.json(serviceTypeBody(true)); } });
+    renderDialog();
+
+    const region = await screen.findByRole("region", { name: "Datos de asignación" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    release();
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
+    expect(within(region).queryByRole("status")).not.toBeInTheDocument();
+    expect(within(region).getByRole("combobox", { name: /Cuadrilla asignada/i })).toBeEnabled();
   });
 
   it("shows an error with Reintentar when the service type fails, instead of assuming the vehicle is optional", async () => {

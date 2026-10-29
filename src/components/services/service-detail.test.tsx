@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { serviceFixtures } from "@/lib/services-fixtures";
@@ -6,6 +6,19 @@ import { ServiceDetail } from "./service-detail";
 import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 describe("ServiceDetail", () => {
+  it("shows a skeleton while derivaciones load and the list replaces it", () => {
+    const service = serviceFixtures[0];
+    const { rerender } = render(<ServiceDetail service={service} onBack={vi.fn()} repairRequests={[]} repairRequestsLoading />);
+    const region = screen.getByRole("region", { name: "Carga de derivaciones" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(screen.queryByText(/Cargando\.\.\.|Cargando…/)).not.toBeInTheDocument();
+
+    rerender(<ServiceDetail service={service} onBack={vi.fn()} repairRequests={[]} repairRequestsLoading={false} />);
+    expect(screen.getByRole("region", { name: "Carga de derivaciones" })).toHaveAttribute("aria-busy", "false");
+    expect(screen.getByText("Sin derivaciones.")).toBeVisible();
+  });
+
   it("keeps one primary action and wraps the action row for rescheduled services", () => {
     const service = { ...serviceFixtures[0], status: "RESCHEDULED" as const };
     render(

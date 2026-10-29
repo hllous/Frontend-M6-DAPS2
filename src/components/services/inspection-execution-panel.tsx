@@ -1,4 +1,6 @@
 "use client";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { CardSkeleton } from "@/components/ui/loading-skeletons";
 import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useId, useState } from "react";
@@ -317,7 +319,7 @@ export function InspectionExecutionPanel({
   }
 
   if (!inspection) {
-    return <Alert className="mt-6" variant="info" role="status"><AlertTitle>Cargando inspección ambiental…</AlertTitle></Alert>;
+    return <LoadingRegion label="Inspección ambiental" className="mt-6 flex flex-col gap-4"><CardSkeleton titleClassName="h-5 w-1/3" lineWidths={["w-full", "w-5/6", "w-2/3"]} /><CardSkeleton titleClassName="h-5 w-1/4" lineWidths={["w-full", "w-3/4"]} /></LoadingRegion>;
   }
 
   const completed = Boolean(inspection.outcome);
@@ -325,7 +327,7 @@ export function InspectionExecutionPanel({
   const checklistComplete = inspectionChecklist(inspection).every((item) => checkedItems[item.id] === true);
 
   return (
-    <section className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5" role="region" aria-labelledby={`inspection-execution-heading-${inputId}`}>
+    <LoadingRegion label="Inspección ambiental" isLoading={false} className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
       <div className="flex flex-col gap-3 border-b border-[var(--color-border)] pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-action)]"><FileCheck aria-hidden />Control ambiental</div>
@@ -476,7 +478,7 @@ export function InspectionExecutionPanel({
           {conflict && <DraftConflictView composedAgainst={conflict.composedAgainst} current={conflict.current} onPreserve={() => { setConflict(null); }} onDiscard={() => { discardDraft(); }} />}
         </DialogContent>
       </Dialog>
-    </section>
+    </LoadingRegion>
   );
 }
 

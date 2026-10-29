@@ -30,6 +30,8 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { MapPaneSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
@@ -868,6 +870,36 @@ export function ServicesWorkspace({
     </div>
   );
 
+  const filterToolbar = (
+  <div
+    data-services-filter-toolbar
+    hidden={isNarrow && Boolean(selectedService)}
+    className={cn(
+      "flex flex-wrap items-center border-b border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 text-xs text-[var(--color-text-secondary)]",
+      // On phones the period selector shrinks so it never pushes «Categorías» onto a second row.
+      isNarrow ? "gap-2 px-2" : "gap-3 px-4",
+    )}
+  >
+    {periodBar}
+    {refreshError && (
+      <p role="alert" className={cn("px-4 py-1.5 text-xs text-[var(--color-danger)]", isNarrow && "basis-full")}>
+        No se pudo actualizar. Se muestran los datos anteriores.
+      </p>
+    )}
+    <ServicesColumnEditor controller={columnPreferences} />
+  </div>
+  );
+
+  const tableSkeleton = (
+    <TableRowsSkeleton
+      rowCount={8}
+      rowHeight="h-12"
+      columnWidths={isNarrow ? ["w-4", "w-40", "w-20", "w-20"] : ["w-4", "w-40", "w-20", "w-20", "w-20", "w-20"]}
+      columnLabels={isNarrow ? ["#", "Servicio", "Estado", "Zona"] : ["#", "Servicio", "Estado", "Zona", "Equipo", "Fecha"]}
+      className="h-full min-h-0 min-w-0 overflow-hidden"
+    />
+  );
+
   // Full detail view (explicit action)
   if (detailService) {
     return (
@@ -1078,17 +1110,6 @@ export function ServicesWorkspace({
         </div>
       </header>
 
-      {/* Loading State */}
-      {loadState.status === "loading" && (
-        <div className="flex flex-1 items-center justify-center p-8">
-          <div className="flex w-full max-w-xl flex-col gap-3">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-48 w-full" />
-            <Skeleton className="h-48 w-full" />
-          </div>
-        </div>
-      )}
-
       {/* Error State */}
       {loadState.status === "error" && (
         <div className="flex flex-1 flex-col items-center justify-center p-6 text-center" role="alert">
@@ -1112,6 +1133,34 @@ export function ServicesWorkspace({
 
       {loadState.status === "error" && periodBar}
 
+      {/* Loading and ready states share one region so the table lands where the skeleton was. */}
+      <LoadingRegion label="Listado de servicios" isLoading={loadState.status === "loading"} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {loadState.status === "loading" && (
+        <div data-slot="services-loading-skeleton" aria-hidden="true" inert className="flex min-h-0 flex-1 flex-col">
+          {filterToolbar}
+          <div className={cn("relative min-h-0 min-w-0 flex-1", isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout)}>
+            <ResizablePanelGroup
+              orientation="horizontal"
+              defaultLayout={{ "map-pane": 50, "table-pane": 50 }}
+              className={cn("h-full min-w-0 flex-1", styles.panelGroup)}
+            >
+              <ResizablePanel id="map-pane" defaultSize="50%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileMapPanel)}>
+                <div className={cn("h-full min-h-0 min-w-0", !isNarrow && "p-3")}><MapPaneSkeleton className="rounded-2xl" /></div>
+              </ResizablePanel>
+              <ResizableHandle withHandle={false} disabled aria-label="Ajustar ancho del mapa" className={cn(styles.mobileResizeHandle, isNarrow && "hidden")} />
+              <ResizablePanel id="table-pane" defaultSize="50%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}>
+                {isNarrow ? (
+                  <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Listado" snapState="half" className={styles.mobileServiceDrawer}>
+                    <div className={styles.mobileDrawerContent}>
+                      <div className={styles.mobileTablePane}>{tableSkeleton}</div>
+                    </div>
+                  </InventoryMapDrawer>
+                ) : tableSkeleton}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </div>
+        </div>
+      )}
       {/* Ready State */}
       {outsideDetail?.error && <p role="alert" className="px-4 py-3 text-sm text-[var(--color-danger)]">{outsideDetail.error}</p>}
       {loadState.status === "ready" && <DroppedRecordsAlert count={loadState.dropped} className="mx-4 my-2 w-auto" />}
@@ -1119,23 +1168,7 @@ export function ServicesWorkspace({
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           <div className="flex min-h-0 flex-1 flex-col">
             {/* On phones the preview covers the list the filters apply to, so the filters go with it. */}
-            <div
-              data-services-filter-toolbar
-              hidden={isNarrow && Boolean(selectedService)}
-              className={cn(
-                "flex flex-wrap items-center border-b border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 text-xs text-[var(--color-text-secondary)]",
-                // On phones the period selector shrinks so it never pushes «Categorías» onto a second row.
-                isNarrow ? "gap-2 px-2" : "gap-3 px-4",
-              )}
-            >
-              {periodBar}
-              {refreshError && (
-                <p role="alert" className={cn("px-4 py-1.5 text-xs text-[var(--color-danger)]", isNarrow && "basis-full")}>
-                  No se pudo actualizar. Se muestran los datos anteriores.
-                </p>
-              )}
-              <ServicesColumnEditor controller={columnPreferences} />
-            </div>
+            {filterToolbar}
 
             <div className={cn(
               "relative min-h-0 min-w-0 flex-1",
@@ -1257,6 +1290,7 @@ export function ServicesWorkspace({
           </div>
         </div>
       )}
+      </LoadingRegion>
 
       {/* Schedule Service Dialog (Generic & Linked-create) */}
       <ScheduleServiceDialog

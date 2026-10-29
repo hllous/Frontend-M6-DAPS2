@@ -50,6 +50,41 @@ describe("ServicesWorkspace component", () => {
     expect(screen.getByRole("region", { name: "Mapa de servicios" })).toBeInTheDocument();
   });
 
+  it("shows a table skeleton while the services load and lands the table where it was", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    // Resolving with nothing hands the request on to the default handler once released.
+    server.use(http.get("*/api/services", async () => { await gate; }));
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const region = await screen.findByRole("region", { name: "Listado de servicios" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(screen.queryByText(/Cargando\.\.\.|Cargando…/)).not.toBeInTheDocument();
+    release();
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
+    expect(await within(region).findByRole("region", { name: "Tabla operativa de Servicios" })).toBeInTheDocument();
+    // The map inside keeps its own loading message; only this region's own message must be gone.
+    expect(region.querySelector(":scope > [role=status]")).toBeNull();
+  });
+
+  it("keeps the real toolbar and the loaded column headers while the services load", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    server.use(http.get("*/api/services", async () => { await gate; }));
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const region = await screen.findByRole("region", { name: "Listado de servicios" });
+    expect(within(region).getByLabelText("Período")).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: /Categorías/, hidden: true })).toBeInTheDocument();
+    const loadingHeaders = within(region).getAllByRole("columnheader", { hidden: true }).map((header) => header.textContent?.trim());
+    expect(loadingHeaders).toEqual(["#", "Servicio", "Estado", "Zona", "Equipo", "Fecha"]);
+    release();
+    const table = await within(region).findByRole("region", { name: "Tabla operativa de Servicios" });
+    const loadedHeaders = within(table).getAllByRole("columnheader").map((header) => header.textContent?.trim());
+    expect(loadedHeaders.slice(0, 6)).toEqual(loadingHeaders);
+  });
+
   it("hides planning mutation actions for office-limited intake", async () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.officeLimited} />);
