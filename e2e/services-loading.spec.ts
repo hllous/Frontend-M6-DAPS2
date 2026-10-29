@@ -73,7 +73,8 @@ for (const size of SIZES) {
 
     test("assign-crew dialog shows field skeletons, then the fields", async ({ page }) => {
       await loginViaApi(page, "office-duty-queue");
-      await page.goto("/app?destination=services");
+      // La búsqueda deja el servicio en la primera fila: la lista ya está paginada y ordenada por fecha.
+      await page.goto("/app?destination=services&q=SVC-1043");
       const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
       await expect(table).toBeVisible();
 

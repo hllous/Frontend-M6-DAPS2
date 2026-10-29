@@ -17,9 +17,9 @@ test.describe("Referral workspace", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await list.getByRole("button", { name: /SCR-1001/ }).click();
-    const detail = page.getByRole("region", { name: "Detalle de SCR-1001" });
+    const detail = page.getByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
     await expect(detail).toBeVisible();
-    await expect(detail.getByRole("heading", { name: "Detalle de SCR-1001" })).toBeFocused();
+    await expect(detail.getByRole("heading", { name: "Detalle de Corte de calle · Bulevar Costero" })).toBeFocused();
     const backButton = detail.getByRole("button", { name: "Volver a derivaciones" });
     await expect.poll(async () => (await backButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(48);
     await page.setViewportSize({ width: 760, height: 844 });
@@ -45,7 +45,7 @@ test.describe("Referral workspace", () => {
 
     await list.getByRole("button", { name: /RR-1001/ }).focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("region", { name: "Detalle de RR-1001" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" })).toBeVisible();
   });
 
   test("keeps the workspace usable on a narrow viewport and reports an empty result", async ({ page }) => {

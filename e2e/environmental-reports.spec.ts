@@ -100,10 +100,11 @@ test.describe("EnvironmentalReport case file", () => {
     const status = filters.getByRole("combobox", { name: "Estado" });
     const allReportsResponse = await page.request.get("/api/environmental-reports?pageSize=100");
     expect(allReportsResponse.ok()).toBeTruthy();
-    const allReports = (await allReportsResponse.json()).data as { id: string; status: string }[];
+    const allReports = (await allReportsResponse.json()).data as { id: string; publicId?: string | null; status: string }[];
+    // Queue rows are named by publicId (else the id): #741.
     const expectedIds = allReports
       .filter((report) => ["RECEIVED", "UNDER_REVIEW"].includes(report.status))
-      .map((report) => report.id);
+      .map((report) => report.publicId || report.id);
 
     await status.click();
     await page.getByRole("option", { name: "Recibido" }).click();
@@ -132,14 +133,14 @@ test.describe("EnvironmentalReport case file", () => {
     expect((await filtered).ok()).toBe(true);
     await expect(list.getByRole("button", { name: /ER-1004/ })).toBeVisible();
     await expect(list.getByRole("button", { name: /ER-1006/ })).toBeVisible();
-    await expect(list.getByRole("button", { name: /ER-1003/ })).toHaveCount(0);
+    await expect(list.getByRole("button", { name: /TK-2026-084/ })).toHaveCount(0);
     await expect(page).toHaveURL(/from=2026-09-04.*to=2026-09-05/);
     await page.reload();
     await expect(filters.getByRole("button", { name: "Desde" })).toHaveText(/04\/09\/2026/);
     await expect(filters.getByRole("button", { name: "Hasta" })).toHaveText(/05\/09\/2026/);
-    await expect(list.getByRole("button", { name: /ER-1003/ })).toHaveCount(0);
+    await expect(list.getByRole("button", { name: /TK-2026-084/ })).toHaveCount(0);
     await filters.getByRole("button", { name: "Limpiar fechas" }).click();
-    await expect(list.getByRole("button", { name: /ER-1003/ })).toBeVisible();
+    await expect(list.getByRole("button", { name: /TK-2026-084/ })).toBeVisible();
     await expect(page).not.toHaveURL(/from=|to=/);
   });
 
@@ -191,8 +192,8 @@ test.describe("EnvironmentalReport case file", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=environment");
     const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
-    await list.getByRole("button", { name: /ER-1002/ }).click();
-    const detail = page.getByRole("region", { name: "Detalle de ER-1002" });
+    await list.getByRole("button", { name: /TK-2026-091/ }).click();
+    const detail = page.getByRole("region", { name: "Detalle de TK-2026-091" });
     await detail.getByRole("button", { name: "Programar inspección" }).click();
     const dialog = page.getByRole("dialog");
     await chooseDate(dialog, "Fecha de inspección", "2026-09-10");
@@ -202,7 +203,7 @@ test.describe("EnvironmentalReport case file", () => {
     await chooseOption(dialog, "Cuadrilla", /Cuadrilla A/);
     await dialog.getByRole("button", { name: "Programar inspección" }).click();
     await expect(detail.getByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();
-    await expect(detail.getByText(/^SVC-/)).toBeVisible();
+    await expect(detail.getByText(/^Servicio:/)).toBeVisible();
     await expect(detail.getByText(/Cuadrilla A/)).toBeVisible();
   });
 
@@ -211,8 +212,8 @@ test.describe("EnvironmentalReport case file", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=environment");
     const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
-    await list.getByRole("button", { name: /ER-1013/ }).click();
-    const detail = page.getByRole("region", { name: "Detalle de ER-1013" });
+    await list.getByRole("button", { name: /TK-2026-095/ }).click();
+    const detail = page.getByRole("region", { name: "Detalle de TK-2026-095" });
     await detail.getByRole("button", { name: "Pedir información al vecino" }).click();
     const dialog = page.getByRole("dialog", { name: "Pedir información al vecino" });
     await dialog.getByLabel(/Qué información necesita/).fill("Una foto del frente, de noche.");

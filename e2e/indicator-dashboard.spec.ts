@@ -77,7 +77,12 @@ test.describe("operational indicator dashboard #138", () => {
     await page.goto("/app?destination=dashboards");
 
     await expect(page.getByText(/Unidad de análisis/)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Centro.*89,7.*140.*156/i })).toBeVisible();
+    // La cobertura por zona es una tabla: el nombre es el encabezado de la fila y los conteos están en sus celdas.
+    const centroRow = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "Centro" }) });
+    await expect(centroRow).toBeVisible();
+    await expect(centroRow).toContainText("156");
+    await expect(centroRow).toContainText("140");
+    await expect(centroRow).toContainText("89,7 %");
 
     await page.getByRole("button", { name: "Tabla" }).click();
     const coverageTable = page.getByRole("region", { name: "Tabla de datos de Cobertura" });

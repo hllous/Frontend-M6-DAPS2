@@ -1,3 +1,4 @@
+import { expiredLoginUrl } from "./login-return";
 import { recordTelemetryEvent } from "./telemetry";
 import { SESSION_MUTATION_HEADERS } from "./session-request";
 
@@ -22,7 +23,8 @@ function getChannel(): BroadcastChannel | undefined {
   return channel;
 }
 
-export async function broadcastLogout(): Promise<void> {
+/** `expired`: la sesión cayó sola (401), no la cerró la persona; el login avisa y retoma la pantalla. */
+export async function broadcastLogout(options: { expired?: boolean } = {}): Promise<void> {
   clearSessionClientState();
   recordTelemetryEvent({ name: "auth_logout_broadcast" });
   try {
@@ -36,7 +38,7 @@ export async function broadcastLogout(): Promise<void> {
     // Best-effort: every open tab still redirects to login regardless.
   }
   getChannel()?.postMessage(LOGOUT_MESSAGE);
-  if (typeof window !== "undefined") window.location.assign("/login");
+  if (typeof window !== "undefined") window.location.assign(options.expired ? expiredLoginUrl(window.location) : "/login");
 }
 
 export function onRemoteLogout(callback: () => void): () => void {
