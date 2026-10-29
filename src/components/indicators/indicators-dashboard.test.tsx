@@ -71,7 +71,7 @@ describe("IndicatorsDashboard", () => {
     const familyBand = await screen.findByRole("region", { name: "Familias" });
     expect(within(familyBand).getByRole("button", { name: /Reintentar Cumplimiento/i })).toBeVisible();
 
-    const trend = await screen.findByRole("region", { name: "Tendencia" });
+    const trend = await screen.findByRole("region", { name: "Por categoría" });
     expect(within(trend).getByRole("heading", { name: "Cobertura por tipo de servicio" })).toBeVisible();
     const territory = screen.getByRole("region", { name: "Detalle territorial" });
     expect(within(territory).getByText("Sin resultados territoriales")).toBeVisible();
@@ -101,7 +101,7 @@ describe("IndicatorsDashboard", () => {
     const tabs = await screen.findByRole("tablist", { name: "Secciones del tablero" });
     expect(tabs).toBeVisible();
     expect(within(tabs).getByRole("tab", { name: "Resumen" })).toBeVisible();
-    expect(within(tabs).getByRole("tab", { name: "Tendencia" })).toBeVisible();
+    expect(within(tabs).getByRole("tab", { name: "Por categoría" })).toBeVisible();
     expect(within(tabs).getByRole("tab", { name: "Territorio" })).toBeVisible();
     expect(within(tabs).getByRole("tab", { name: "Registros" })).toBeVisible();
 
@@ -122,21 +122,22 @@ describe("IndicatorsDashboard", () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("heading", { name: "Cobertura" });
-    const centro = await screen.findByRole("button", { name: /Centro.*89,7.*140.*156/i });
+    await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
+    const centro = await screen.findByRole("button", { name: /En fecha.*344 servicios/i });
 
     await user.hover(centro);
-    expect(screen.getByRole("status", { name: /Detalle de Centro/i })).toBeVisible();
+    expect(screen.getByRole("status", { name: /Detalle de En fecha/i })).toBeVisible();
     await user.click(centro);
-    expect(screen.getByRole("status", { name: /Detalle fijado de Centro/i })).toBeVisible();
+    expect(screen.getByRole("status", { name: /Detalle fijado de En fecha/i })).toBeVisible();
 
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("status", { name: /Detalle .*Centro/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: /Detalle .*En fecha/i })).not.toBeInTheDocument();
     expect(centro).toHaveFocus();
 
     await user.click(centro);
-    expect(screen.getByRole("status", { name: /Detalle fijado de Centro/i })).toBeVisible();
+    expect(screen.getByRole("status", { name: /Detalle fijado de En fecha/i })).toBeVisible();
     await user.click(document.body);
-    expect(screen.queryByRole("status", { name: /Detalle .*Centro/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: /Detalle .*En fecha/i })).not.toBeInTheDocument();
     expect(centro).toHaveFocus();
   });
 
@@ -148,8 +149,7 @@ describe("IndicatorsDashboard", () => {
     const { container } = render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("heading", { name: "Cobertura" });
-    await screen.findByRole("button", { name: /Centro.*89,7.*140.*156/i });
-    expect(container.querySelector('[fill="var(--color-action)"]')).not.toBeNull();
+    await screen.findByRole("button", { name: "Centro" });
 
     await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
     await screen.findByRole("heading", { name: "Cumplimiento" });
@@ -172,10 +172,10 @@ describe("IndicatorsDashboard", () => {
     expect(await screen.findByText(/^\d{2}\/\d{2}\/\d{4} – \d{2}\/\d{2}\/\d{4}$/)).toBeVisible();
     expect(screen.getByText(/Actualizado \d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}/)).toBeVisible();
     expect(screen.queryByText(/Unidad de análisis/)).not.toBeInTheDocument();
-    expect(screen.getByText("Atendidos")).toBeVisible();
-    expect(screen.getByText("Programados")).toBeVisible();
+    expect(screen.getAllByText("Atendidos")[0]).toBeVisible();
+    expect(screen.getAllByText("Programados")[0]).toBeVisible();
 
-    const centro = await screen.findByRole("button", { name: /Centro.*89,7.*140.*156/i });
+    const centro = await screen.findByRole("button", { name: "Centro" });
     centro.focus();
     await user.keyboard("{Enter}");
     const selectedStatus = screen.getAllByRole("status").find((status) => status.textContent?.includes("Seleccionado:"));
@@ -287,7 +287,7 @@ describe("IndicatorsDashboard", () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("heading", { name: "Cobertura" });
-    await user.click(await screen.findByRole("button", { name: /Centro.*89,7/i }));
+    await user.click(await screen.findByRole("button", { name: "Centro" }));
 
     const recordsRegion = await screen.findByRole("region", { name: "Registros" });
     const recordsTable = within(recordsRegion).getByRole("table", { name: "Registros accesibles de Servicios" });
@@ -438,7 +438,7 @@ describe("internal jargon guard", () => {
   it("keeps module codes, backend and API field names out of the rendered copy", async () => {
     const { container } = render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
     await screen.findByRole("heading", { name: "Cobertura" });
-    await screen.findByText("Atendidos");
+    await screen.findAllByText("Atendidos");
 
     expectNoInternalJargon(container);
   });

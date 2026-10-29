@@ -552,6 +552,7 @@ describe("ServicesWorkspace component", () => {
 
     // Status sort button
     const statusSortBtn = within(table).getByRole("button", { name: /Ordenar por Estado/ });
+    await user.click(statusSortBtn); // the list starts in chronological order: first click sorts ascending
     await user.click(statusSortBtn); // toggles to desc
 
     const rowsDesc = within(table).getAllByRole("row").slice(1);
@@ -644,6 +645,11 @@ describe("ServicesWorkspace component", () => {
 
     // Dialog opens
     expect(await screen.findByRole("heading", { name: "Programar servicio" })).toBeInTheDocument();
+
+    // El tipo de servicio ya no viene preseleccionado.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Programar servicio" })).toBeEnabled());
+    await user.click(screen.getByRole("combobox", { name: /Tipo de servicio/ }));
+    await user.click(await screen.findByRole("option", { name: /Recolección domiciliaria/ }));
 
     // Select Route 1
     await waitFor(() => expect(screen.getByRole("combobox", { name: /Recorrido asignado/ })).toHaveTextContent(/\(.+\)/));

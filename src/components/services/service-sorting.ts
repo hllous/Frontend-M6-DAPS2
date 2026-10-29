@@ -29,6 +29,8 @@ function compareServices(a: Service, b: Service, key: SortKey): number {
 export function sortServices(services: Service[], key: SortKey, direction: SortDir): Service[] {
   return [...services].sort((a, b) => {
     const comparison = compareServices(a, b, key);
-    return direction === "asc" ? comparison : -comparison;
+    if (comparison !== 0) return direction === "asc" ? comparison : -comparison;
+    // Desempate estable: hora de inicio y después id, para que las páginas no salten entre cargas.
+    return (a.windowFrom ?? "").localeCompare(b.windowFrom ?? "") || a.id.localeCompare(b.id);
   });
 }
