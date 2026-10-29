@@ -7,6 +7,7 @@ import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import {
   Empty,
   EmptyDescription,
@@ -79,6 +80,9 @@ type LoadState =
   | { status: "loading" }
   | { status: "ready"; items: DisposalSite[] }
   | { status: "error"; message: string };
+
+const EMPTY_ITEMS: DisposalSite[] = [];
+const COLUMNS: DataTableColumn<DisposalSite>[] = [{ accessorKey: "code", enableSorting: false }, { accessorKey: "name", enableSorting: false }, { accessorKey: "siteType", enableSorting: false }, { accessorKey: "active", enableSorting: false }];
 
 export function DisposalSitesPanel({
   scenario,
@@ -210,6 +214,12 @@ export function DisposalSitesPanel({
       setIsSubmittingDeactivate(false);
     }
   };
+
+  const table = useDataTable({
+    data: state.status === "ready" ? state.items : EMPTY_ITEMS,
+    columns: COLUMNS,
+    getRowId: (item) => item.id,
+  });
 
   return (
     <section
@@ -453,9 +463,11 @@ export function DisposalSitesPanel({
       ) : null}
       {state.status === "ready" && state.items.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <caption className="sr-only">Sitios de disposición</caption>
-            <thead>
+          <DataTable
+            table={table}
+            container={false}
+            className={`${styles.table} leading-[inherit]`}
+            renderHeader={() => (<thead>
               <tr>
                 <th scope="col">Código</th>
                 <th scope="col">Nombre</th>
@@ -463,9 +475,10 @@ export function DisposalSitesPanel({
                 <th scope="col">Estado</th>
                 <th scope="col"><span className="sr-only">Ver detalle</span></th>
               </tr>
-            </thead>
-            <tbody>{state.items.map((item) => (
-              <tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
+            </thead>)}
+            renderRow={(row) => {
+              const item = row.original;
+              return (<tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
                 <th scope="row" data-label="Código">
                   <Button
                     type="button"
@@ -483,9 +496,11 @@ export function DisposalSitesPanel({
                 <td data-label="" aria-hidden="true" className="text-right">
                   <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </td>
-              </tr>
-            ))}</tbody>
-          </table>
+              </tr>);
+            }}
+          >
+            <caption className="sr-only">Sitios de disposición</caption>
+          </DataTable>
         </div>
       ) : null}
       <Sheet

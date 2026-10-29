@@ -40,6 +40,34 @@ function Editable({ persistenceKey }: { persistenceKey?: string }) {
 }
 
 describe("DataTable", () => {
+  it("hides decorative body cells from the accessibility tree", () => {
+    function DecorativeExample() {
+      const table = useDataTable({
+        data,
+        columns: [
+          ...columns,
+          {
+            id: "detail",
+            header: "Detalle",
+            enableSorting: false,
+            meta: { ariaHidden: true },
+            cell: () => "→",
+          },
+        ],
+      });
+      return <DataTable table={table} />;
+    }
+    render(<DecorativeExample />);
+    expect(
+      screen.getByRole("columnheader", { name: "Detalle" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("cell")).toHaveLength(4);
+    expect(screen.getAllByText("→")[0].closest("td")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+  });
+
   it("sorts with click and keyboard and announces the current direction", async () => {
     const user = userEvent.setup();
     render(<Example />);
@@ -206,15 +234,24 @@ describe("DataTable", () => {
       const table = useDataTable({
         data,
         columns: [
-          { id: "name", accessorKey: "name", header: "Zona", enableSorting: false },
+          {
+            id: "name",
+            accessorKey: "name",
+            header: "Zona",
+            enableSorting: false,
+          },
           { id: "count", accessorKey: "count", header: "Cantidad" },
         ] satisfies DataTableColumn<Item>[],
       });
       return <DataTable table={table} aria-label="Zonas" />;
     }
     render(<Plain />);
-    expect(screen.getByRole("columnheader", { name: "Zona" })).not.toHaveAttribute("aria-sort");
-    expect(screen.getByRole("columnheader", { name: /Cantidad/ })).toHaveAttribute("aria-sort", "none");
+    expect(
+      screen.getByRole("columnheader", { name: "Zona" }),
+    ).not.toHaveAttribute("aria-sort");
+    expect(
+      screen.getByRole("columnheader", { name: /Cantidad/ }),
+    ).toHaveAttribute("aria-sort", "none");
   });
 
   it("keeps a function header on sortable columns and names the sort button with meta.label", () => {
@@ -233,8 +270,13 @@ describe("DataTable", () => {
       return <DataTable table={table} aria-label="Zonas" />;
     }
     render(<Custom />);
-    const sort = screen.getByRole("button", { name: "Ordenar por Zona, actualmente sin ordenar" });
+    const sort = screen.getByRole("button", {
+      name: "Ordenar por Zona, actualmente sin ordenar",
+    });
     expect(within(sort).getByText("Zona operativa")).toBeInTheDocument();
-    expect(screen.getAllByRole("rowheader")[0]).toHaveAttribute("data-label", "Zona");
+    expect(screen.getAllByRole("rowheader")[0]).toHaveAttribute(
+      "data-label",
+      "Zona",
+    );
   });
 });

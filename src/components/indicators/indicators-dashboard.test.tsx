@@ -56,8 +56,8 @@ describe("IndicatorsDashboard", () => {
     const familyBand = screen.getByRole("region", { name: "Familias" });
     expect(familyBand).toBeVisible();
     expect(within(familyBand).getByRole("button", { name: /Cobertura.*seleccionar/i })).toBeVisible();
-    expect(within(familyBand).getByLabelText("Cargando Cobertura")).toBeVisible();
-    expect(within(familyBand).getByLabelText("Cargando Cumplimiento")).toBeVisible();
+    expect(familyBand).toHaveAttribute("aria-busy", "true");
+    expect(within(familyBand).getByText("Cargando")).toHaveClass("sr-only");
   });
 
   it("keeps a ready family usable when another family errors and reports module states independently", async () => {
@@ -410,7 +410,7 @@ describe("IndicatorsDashboard", () => {
 
     expect(screen.getByLabelText("Zona operativa")).toBeDisabled();
     expect(screen.getByLabelText("Tipo de servicio")).toBeDisabled();
-    expect(screen.getByText("Cargando…", { selector: "#indicator-service-type-hint" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Opciones de Tipo de servicio" })).toHaveAttribute("aria-busy", "true");
   });
 
   it("blocks an inverted date range with a message and does not call the backend", async () => {

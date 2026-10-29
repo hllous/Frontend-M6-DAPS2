@@ -1,4 +1,10 @@
 "use client";
+import {
+  DataTable,
+  useDataTable,
+  type DataTableColumn,
+} from "@/components/ui/data-table";
+
 import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useState } from "react";
@@ -88,6 +94,8 @@ function stopSequenceSignature(stops: Route["stops"]) {
       .sort((left, right) => left.order - right.order),
   );
 }
+
+const NO_ROUTES: Route[] = [];
 
 export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario }) {
   const canManage =
@@ -490,6 +498,162 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     setStopEditorError(null);
     setStalenessWarningReason(null);
   }
+
+  const columns: DataTableColumn<Route>[] = [
+    {
+      id: "code",
+      header: "Código",
+      enableSorting: false,
+      meta: {
+        headClassName:
+          "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
+        cellClassName:
+          "h-auto whitespace-normal px-4 py-3 font-mono font-medium text-foreground",
+      },
+      cell: ({ row }) => {
+        const route = row.original;
+        return <>{route.code}</>;
+      },
+    },
+    {
+      id: "name",
+      header: "Nombre",
+      enableSorting: false,
+      meta: {
+        headClassName:
+          "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
+        cellClassName:
+          "h-auto whitespace-normal px-4 py-3 text-foreground font-medium",
+      },
+      cell: ({ row }) => {
+        const route = row.original;
+        return <>{route.name}</>;
+      },
+    },
+    {
+      id: "stops",
+      header: "Paradas",
+      enableSorting: false,
+      meta: {
+        headClassName:
+          "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
+        cellClassName:
+          "h-auto whitespace-normal px-4 py-3 text-muted-foreground text-xs",
+      },
+      cell: ({ row }) => {
+        const route = row.original;
+        return (
+          <>
+            {route.stops.length === 0 ? (
+              <span className="font-medium text-[var(--color-warning)]">
+                Sin paradas
+              </span>
+            ) : (
+              <span>
+                {route.stops.length}{" "}
+                {route.stops.length === 1 ? "parada" : "paradas"}
+              </span>
+            )}
+          </>
+        );
+      },
+    },
+    {
+      id: "status",
+      header: "Estado",
+      enableSorting: false,
+      meta: {
+        headClassName:
+          "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
+        cellClassName: "h-auto whitespace-normal px-4 py-3",
+      },
+      cell: ({ row }) => {
+        const route = row.original;
+        return (
+          <>
+            <Badge variant={route.active ? "success" : "secondary"}>
+              {route.active ? "Activo" : "Inactivo"}
+            </Badge>
+          </>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: "Acciones",
+      enableSorting: false,
+      meta: {
+        headClassName:
+          "h-auto whitespace-normal text-inherit font-bold px-4 py-3 text-right",
+        cellClassName: "h-auto whitespace-normal px-4 py-3 text-right",
+      },
+      cell: ({ row }) => {
+        const route = row.original;
+        return (
+          <>
+            <div className="inline-flex items-center justify-end gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedRoute(route)}
+                className="h-8 max-[760px]:h-10 px-2 text-xs"
+                data-testid={`view-route-${route.id}`}
+              >
+                <Eye className="h-3.5 w-3.5 mr-1" />
+                Detalle
+              </Button>
+              {canManage && (
+                <>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenEdit(route)}
+                          className="h-8 max-[760px]:h-10 px-2 text-xs"
+                          aria-label="Editar recorrido"
+                          data-testid={`edit-route-${route.id}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      }
+                    />
+                    <TooltipContent>Editar recorrido</TooltipContent>
+                  </Tooltip>
+                  {route.active && (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenDeactivate(route)}
+                            className="h-8 max-[760px]:h-10 px-2 text-xs text-destructive hover:bg-destructive/10"
+                            aria-label="Desactivar recorrido"
+                            data-testid={`deactivate-route-${route.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        }
+                      />
+                      <TooltipContent>Desactivar recorrido</TooltipContent>
+                    </Tooltip>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        );
+      },
+    },
+  ];
+
+  const table = useDataTable({
+    data: state.status === "ready" ? state.items : NO_ROUTES,
+    columns,
+    getRowId: (item) => item.id,
+  });
 
   return (
     <div className="space-y-6">
@@ -1037,97 +1201,18 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
         {state.status === "ready" && state.items.length > 0 && (
           <div className="relative overflow-x-auto">
-            <table className="w-full text-left text-sm" data-testid="routes-table">
-              <thead className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3">Código</th>
-                  <th className="px-4 py-3">Nombre</th>
-                  <th className="px-4 py-3">Paradas</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {state.items.map((route) => (
-                  <tr
-                    key={route.id}
-                    className="hover:bg-muted/30 transition-colors"
-                    data-testid={`route-row-${route.id}`}
-                  >
-                    <td className="px-4 py-3 font-mono font-medium text-foreground">
-                      {route.code}
-                    </td>
-                    <td className="px-4 py-3 text-foreground font-medium">
-                      {route.name}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {route.stops.length === 0 ? (
-                        <span className="font-medium text-[var(--color-warning)]">
-                          Sin paradas
-                        </span>
-                      ) : (
-                        <span>{route.stops.length} {route.stops.length === 1 ? "parada" : "paradas"}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={route.active ? "success" : "secondary"}>
-                        {route.active ? "Activo" : "Inactivo"}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedRoute(route)}
-                          className="h-8 max-[760px]:h-10 px-2 text-xs"
-                          data-testid={`view-route-${route.id}`}
-                        >
-                          <Eye className="h-3.5 w-3.5 mr-1" />
-                          Detalle
-                        </Button>
-                        {canManage && (
-                          <>
-                            <Tooltip>
-                              <TooltipTrigger render={
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleOpenEdit(route)}
-                                  className="h-8 max-[760px]:h-10 px-2 text-xs"
-                                  aria-label="Editar recorrido"
-                                  data-testid={`edit-route-${route.id}`}
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                              } />
-                              <TooltipContent>Editar recorrido</TooltipContent>
-                            </Tooltip>
-                            {route.active && (
-                              <Tooltip>
-                                <TooltipTrigger render={
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleOpenDeactivate(route)}
-                                    className="h-8 max-[760px]:h-10 px-2 text-xs text-destructive hover:bg-destructive/10"
-                                    aria-label="Desactivar recorrido"
-                                    data-testid={`deactivate-route-${route.id}`}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                } />
-                                <TooltipContent>Desactivar recorrido</TooltipContent>
-                              </Tooltip>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              table={table}
+              container={false}
+              className="w-full text-left text-sm leading-[inherit]"
+              headerClassName="border-b bg-muted/50 text-xs font-medium text-muted-foreground [&_tr]:border-b-0"
+              bodyClassName="divide-y"
+              rowProps={(row) => ({
+                className: "hover:bg-muted/30 transition-colors",
+                "data-testid": `route-row-${row.original.id}`,
+              })}
+              data-testid="routes-table"
+            ></DataTable>
           </div>
         )}
       </div>
