@@ -5,7 +5,7 @@ import { HttpResponse, http } from "msw";
 import { handlers } from "@/mocks/handlers";
 import { NetworkFailureError } from "./authenticated-fetch";
 import { EMPTY_ZONES_QUERY } from "./zones-fixtures";
-import { ZoneContractError, ZoneRequestError, zoneLabel, zonesAdapter } from "./zones";
+import { ZoneContractError, ZoneRequestError, sortZonesByCommune, zoneLabel, zonesAdapter, type Zone } from "./zones";
 
 const server = setupServer(...handlers);
 
@@ -288,5 +288,39 @@ describe("zoneLabel", () => {
     const label = zoneLabel(zones, "zone-uuid-9", true);
     expect(label).toBe("Zona no disponible");
     expect(label).not.toContain("zone-uuid-9");
+  });
+});
+
+describe("sortZonesByCommune", () => {
+  it("prefers commune.number over the name and keeps names without digits after numbered communes", () => {
+    const z = (name: string, commune: Zone["commune"]): Zone => ({ id: name, code: name, name, active: true, commune });
+    const sorted = sortZonesByCommune([
+      z("D", { id: "x", code: "x", name: "Centro" }),
+      z("B", { id: "b", code: "b", name: "Comuna 1", number: 3 }),
+      z("A", { id: "a", code: "a", name: "Comuna 9", number: 2 }),
+    ]);
+
+    expect(sorted.map((item) => item.name)).toEqual(["A", "B", "D"]);
+  });
+
+  const zone = (name: string, commune?: string): Zone => ({
+    id: name,
+    code: name,
+    name,
+    active: true,
+    commune: commune ? { id: commune, code: commune, name: commune } : null,
+  });
+
+  it("orders by commune number (Comuna 2 before Comuna 10), alphabetically within each and without commune last", () => {
+    const sorted = sortZonesByCommune([
+      zone("Sin asignar"),
+      zone("Palermo", "Comuna 14"),
+      zone("Parque Chacabuco", "Comuna 10"),
+      zone("Recoleta", "Comuna 2"),
+      zone("Retiro", "Comuna 1"),
+      zone("Constitucion", "Comuna 1"),
+    ]);
+
+    expect(sorted.map((item) => item.name)).toEqual(["Constitucion", "Retiro", "Recoleta", "Parque Chacabuco", "Palermo", "Sin asignar"]);
   });
 });

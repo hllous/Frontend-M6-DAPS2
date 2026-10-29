@@ -269,7 +269,7 @@ describe("TreeInterventionsPanel", () => {
     const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
 
-    expect(await within(detail).findByRole("alert")).toHaveTextContent("No hay un tipo de servicio activo de poda de arbolado en el catálogo");
+    expect(await within(detail).findByRole("alert")).toHaveTextContent("No hay un tipo de servicio activo de poda de arbolado en la configuración");
     expect(createSpy).not.toHaveBeenCalled();
     expect(within(detail).getByRole("form", { name: "Programar servicio para la intervención" })).toBeVisible();
     createSpy.mockRestore();

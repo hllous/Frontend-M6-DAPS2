@@ -117,13 +117,13 @@ test.describe("Container catalog management #120", () => {
 
   test("Catalog landing page links to Containers catalog", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
-    await page.goto("/app/catalog");
+    await page.goto("/app?destination=inventory");
 
-    await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Inventario urbano" })).toBeVisible();
     const containerCard = page.locator("li", { hasText: "Contenedores" });
     await expect(containerCard).toBeVisible();
 
-    await containerCard.getByRole("link", { name: "Abrir catálogo" }).click();
+    await containerCard.getByRole("link", { name: /^Abrir/ }).click();
     await expect(page).toHaveURL(/\/app\/catalog\/containers/);
     await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
   });

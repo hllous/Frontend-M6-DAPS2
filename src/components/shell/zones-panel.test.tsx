@@ -32,6 +32,23 @@ describe("ZonesPanel", () => {
     expect(screen.queryByText(/Z-BEL/)).not.toBeInTheDocument();
   });
 
+  it("groups zones under a heading per commune in numeric order, with Comuna 2 before Comuna 10", async () => {
+    const zone = (id: string, name: string, commune: string) => ({ id, code: id, name, active: true, commune: { id: commune, code: commune, name: commune } });
+    server.use(
+      http.get("*/api/zones", () =>
+        HttpResponse.json({
+          data: [zone("a", "Parque Chacabuco", "Comuna 10"), zone("b", "Recoleta", "Comuna 2"), zone("c", "Retiro", "Comuna 1")],
+          meta: { total: 3, page: 1, pageSize: 100, totalPages: 1 },
+        }),
+      ),
+    );
+
+    render(<ZonesPanel />);
+
+    const headings = await screen.findAllByRole("heading", { level: 3 });
+    expect(headings.map((heading) => heading.textContent)).toEqual(["Comuna 1", "Comuna 2", "Comuna 10"]);
+  });
+
   it("renders an empty state when the adapter returns no zones", async () => {
     server.use(
       http.get("*/api/zones", () =>

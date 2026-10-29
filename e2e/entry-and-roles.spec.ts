@@ -3,13 +3,13 @@ import { expect, test } from "@playwright/test";
 import { loginViaApi, loginViaUi } from "./support/auth";
 
 test.describe("Office and Field mock entry and navigation @smoke", () => {
-  test("Office actor enters through the login form and reaches the Catálogo destination", async ({ page }) => {
+  test("Office actor enters through the login form and reaches the Configuración destination", async ({ page }) => {
     await loginViaUi(page, "Oficina · cola de decisiones");
 
     await expect(page.getByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
     await expect(page.getByText("Lucía Fernández")).toBeVisible();
 
-    await page.getByRole("link", { name: "Catálogo" }).click();
+    await page.getByRole("link", { name: "Configuración" }).click();
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
     await expect(page.getByText("Belgrano", { exact: true })).toBeVisible();
     await expect(page.getByText(/^Z-[A-Z]{3}$/)).toHaveCount(0);

@@ -131,6 +131,55 @@ describe("POST /api/evidence BFF route", () => {
     expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
   });
 
+  it("proxies GET /evidence to the backend instead of 404ing on real container ids (#732)", async () => {
+    const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
+    const containerId = "79bcdbd4-e9fe-48e5-b011-643f6d13857b";
+    const attachments = [{ id: "att-1", url: "https://cdn/x.jpg", filename: "x.jpg", contentType: "image/jpeg", uploadedAt: "2026-10-28T12:00:00.000Z" }];
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(attachments));
+
+    const response = await GET(new Request(`http://localhost/api/evidence?ownerType=CONTAINER&ownerId=${containerId}`, { headers: { cookie } }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(attachments);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/evidence?ownerType=CONTAINER&ownerId=${containerId}`);
+  });
+
+  describe("backend GET /evidence", () => {
+    const get = (cookie: string, query: string) => GET(new Request(`http://localhost/api/evidence?${query}`, { headers: { cookie } }));
+    const uuid = "79bcdbd4-e9fe-48e5-b011-643f6d13857b";
+
+    it.each(["a/../b", "a".repeat(101)])("rejects ownerId %s without calling the backend", async (ownerId) => {
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
+      const backendFetch = vi.spyOn(globalThis, "fetch");
+
+      expect((await get(cookie, `ownerType=CONTAINER&ownerId=${encodeURIComponent(ownerId)}`)).status).toBe(400);
+      expect(backendFetch).not.toHaveBeenCalled();
+    });
+
+    it("rejects an invalid ownerType without calling the backend", async () => {
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
+      const backendFetch = vi.spyOn(globalThis, "fetch");
+
+      expect((await get(cookie, `ownerType=NOPE&ownerId=${uuid}`)).status).toBe(400);
+      expect(backendFetch).not.toHaveBeenCalled();
+    });
+
+    it("forwards a backend 404 as 404", async () => {
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ statusCode: 404, message: "No existe", error: "Not Found", timestamp: "2026-10-29T00:00:00.000Z", path: "/evidence" }, { status: 404 }));
+
+      expect((await get(cookie, `ownerType=CONTAINER&ownerId=${uuid}`)).status).toBe(404);
+    });
+
+    it("denies Field reading evidence of a Service assigned to another crew", async () => {
+      const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
+      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id: uuid, crewId: "another-crew" }));
+
+      expect((await get(cookie, `ownerType=SERVICE&ownerId=${uuid}`)).status).toBe(403);
+      expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/services/${uuid}`);
+    });
+  });
+
   describe("backend owner scope", () => {
     const serviceId = "d8a3a8e5-f7d7-4453-9095-e22478e0fc01";
     const ownerId = "79bcdbd4-e9fe-48e5-b011-643f6d13857b";

@@ -116,7 +116,7 @@ export async function resolveServiceType(rule: ServiceTypeMatchRule): Promise<Se
   const candidates = serviceTypes.filter((item) => item.active && item.category === rule.category && item.mode === rule.mode);
   const match = candidates.find((item) => item.code === rule.preferredCode) ?? candidates[0];
   if (!match) {
-    throw new ServiceTypeNotFoundError(`No hay un tipo de servicio activo de ${rule.label} en el catálogo. Cree o active uno en Catálogo > Tipos de servicio antes de continuar.`);
+    throw new ServiceTypeNotFoundError(`No hay un tipo de servicio activo de ${rule.label} en la configuración. Cree o active uno en Configuración > Tipos de servicio antes de continuar.`);
   }
   return match;
 }

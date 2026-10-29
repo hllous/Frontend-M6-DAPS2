@@ -799,9 +799,11 @@ describe("ContainerCatalogPanel", () => {
 
       const activeDetail = await openContainerDetail(user, screen.getByRole("row", { name: /CONT-001/ }));
       expect(within(activeDetail).queryByRole("button", { name: "Reubicar" })).not.toBeInTheDocument();
+      expect(within(activeDetail).getByText("El desborde, el daño y el vaciado los registra la cuadrilla de campo.")).toBeVisible();
       await user.keyboard("{Escape}");
       const overflowDetail = await openContainerDetail(user, screen.getByRole("row", { name: /CONT-002/ }));
       expect(within(overflowDetail).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
+      expect(within(overflowDetail).getByText("El desborde, el daño y el vaciado los registra la cuadrilla de campo.")).toBeVisible();
     });
 
     it("surfaces authoritative backend failure in emptying dialog without false success", async () => {

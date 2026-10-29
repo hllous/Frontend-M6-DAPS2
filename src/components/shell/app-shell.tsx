@@ -27,13 +27,6 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import {
   Item,
   ItemActions,
   ItemContent,
@@ -65,7 +58,7 @@ import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
 import { FieldWorkPanel } from "@/components/services/field-work-panel";
 import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ReferralsWorkspace } from "@/components/referrals/referrals-workspace";
-import { CatalogLanding } from "@/components/catalog/catalog-landing";
+import { CatalogLanding, InventoryLanding } from "@/components/catalog/catalog-landing";
 import { ZonesPanel } from "./zones-panel";
 import { IndicatorsDashboard } from "@/components/indicators/indicators-dashboard";
 import { EnvironmentalReportsWorkspace } from "@/components/environmental-reports/environmental-reports-workspace";
@@ -91,16 +84,19 @@ const navigation: NavigationItem[] = [
   { id: "work", label: "Mi trabajo", icon: ClipboardList },
   { id: "services", label: "Servicios", capability: "service:view", icon: BriefcaseBusiness },
   { id: "referrals", label: "Derivaciones", actorKinds: ["OFFICE", "FIELD"], icon: GitPullRequest },
-  { id: "inventory", label: "Inventario", capability: "inventory:view", icon: PackageSearch },
+  { id: "inventory", label: "Inventario urbano", capability: "inventory:view", icon: PackageSearch },
   { id: "environment", label: "Control Ambiental", capability: "environmentalReport:view", icon: Leaf },
   { id: "map", label: "Mapa", capability: "map:view", icon: Map },
-  { id: "catalog", label: "Catálogo", capability: "catalog:view", icon: Settings2 },
+  { id: "catalog", label: "Configuración", capability: "catalog:view", icon: Settings2 },
   { id: "dashboards", label: "Tableros", capability: "indicator:view", icon: BarChart3 },
 ];
 
 // Una sola URL por pantalla: cada destino vive en /app?destination=<id>. Las rutas
 // /app/dashboard y /app/catalog quedan como alias que redirigen aca.
 const destinationHref = (id: Destination) => `/app?destination=${id}`;
+
+// Las rutas /app/catalog/<recurso> de bienes urbanos pertenecen a «Inventario urbano»; el resto, a «Configuración».
+const inventoryCatalogRoutes = ["containers", "green-points", "green-spaces", "trees", "tree-interventions"].map((slug) => `/app/catalog/${slug}`);
 
 const mobileDestinations: Destination[] = ["work", "services", "map"];
 const tabletNavigationQuery = "(min-width: 761px) and (max-width: 1023px)";
@@ -150,7 +146,7 @@ export function AppShell({
   const searchParams = useSearchParams();
   const requestedDestination = searchParams.get("destination") as Destination | null;
   const destination = pathname.startsWith("/app/catalog")
-    ? "catalog"
+    ? inventoryCatalogRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`)) ? "inventory" : "catalog"
     : requestedDestination && navigation.some((item) => item.id === requestedDestination)
       ? requestedDestination
       : "work";
@@ -255,6 +251,8 @@ export function AppShell({
             <CatalogLanding scenario={scenario} />
             <ZonesPanel />
           </div>
+        ) : destination === "inventory" ? (
+          <InventoryLanding scenario={scenario} />
         ) : destination === "dashboards" ? (
           <IndicatorsDashboard scenario={scenario} />
         ) : destination === "environment" ? (
@@ -262,10 +260,7 @@ export function AppShell({
         ) : destination === "map" ? (
           <MapaOperativo scenario={scenario} />
         ) : (
-          <FoundationPlaceholder
-            item={navigation.find((item) => item.id === destination)!}
-            actor={actorLabel(scenario)}
-          />
+          <p role="status" className="text-sm text-muted-foreground">No hay un módulo disponible para su sesión.</p>
         )}
       </main>
 
@@ -503,18 +498,3 @@ function TreeInterventionWorkItem({
   );
 }
 
-function FoundationPlaceholder({ item, actor }: { item: NavigationItem; actor: string }) {
-  const Icon = item.icon;
-
-  return (
-    <Empty className="min-h-[420px] border bg-card">
-      <EmptyHeader>
-        <EmptyMedia variant="icon"><Icon aria-hidden /></EmptyMedia>
-        <EmptyTitle>{item.label}</EmptyTitle>
-        <EmptyDescription>
-          Este destino estará disponible como flujo operativo en una próxima entrega. Su navegación ya se adapta al alcance de {actor.toLowerCase()}.
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
-}
