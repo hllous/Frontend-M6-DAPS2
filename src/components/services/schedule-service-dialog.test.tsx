@@ -6,6 +6,7 @@ import { HttpResponse, http } from "msw";
 
 import { handlers } from "@/mocks/handlers";
 import { ScheduleServiceDialog } from "./schedule-service-dialog";
+import { crewsAdapter } from "@/lib/crews";
 import { servicesAdapter } from "@/lib/services";
 
 const server = setupServer(...handlers);
@@ -20,7 +21,7 @@ afterAll(() => server.close());
 
 /** El formulario arma sus opciones con GET /service-types, /routes y /zones: se espera a que carguen. */
 async function catalogsLoaded() {
-  await waitFor(() => expect(screen.getByRole("combobox", { name: /Tipo de servicio/ })).toHaveTextContent(/Recolección domiciliaria/));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Programar servicio" })).toBeEnabled());
 }
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -28,6 +29,12 @@ type User = ReturnType<typeof userEvent.setup>;
 async function choose(user: User, name: RegExp, option: string | RegExp) {
   await user.click(screen.getByRole("combobox", { name }));
   await user.click(await screen.findByRole("option", { name: option }));
+}
+
+/** El tipo de servicio ya no viene preseleccionado: los casos que parten de uno lo eligen. */
+async function catalogsLoadedWithRouteType() {
+  await catalogsLoaded();
+  await choose(userEvent.setup(), /Tipo de servicio/, /Recolección domiciliaria/);
 }
 
 describe("ScheduleServiceDialog component", () => {
@@ -43,7 +50,7 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
     expect(screen.getByRole("heading", { name: "Programar servicio" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Tipo de servicio/ })).toHaveAttribute("data-slot", "select-trigger");
     expect(screen.getByText("Recorrido", { exact: true })).toBeInTheDocument();
@@ -51,10 +58,40 @@ describe("ScheduleServiceDialog component", () => {
     expect(screen.getByRole("button", { name: "Programar servicio" })).toBeInTheDocument();
   });
 
-  it("keeps origin and notes inside a collapsed 'Más datos' disclosure", async () => {
+  it("starts without a service type, with the optional crew in the first step, and derives the target kind from the type", async () => {
     const user = userEvent.setup();
     render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
     await catalogsLoaded();
+
+    expect(screen.getByRole("combobox", { name: /Tipo de servicio/ })).toHaveTextContent("Seleccione un tipo");
+    expect(screen.getByRole("combobox", { name: /Cuadrilla/ })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /Tipo de objetivo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /Recorrido asignado/ })).not.toBeInTheDocument();
+
+    await choose(user, /Tipo de servicio/, /Poda de arbolado/);
+    expect(screen.getByRole("combobox", { name: /Tipo de objetivo/ })).toHaveTextContent("Árbol urbano");
+  });
+
+  it("marks required fields, announces the mode and warns visibly when the crews list fails", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(crewsAdapter, "list").mockRejectedValue(new Error("boom"));
+    render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+    await catalogsLoaded();
+
+    expect(screen.getByText("Los campos con * son obligatorios.")).toBeVisible();
+    expect(screen.getByRole("combobox", { name: /Tipo de servicio/ })).toHaveAttribute("aria-required", "true");
+    expect(await screen.findByText(/No se pudo cargar el listado de cuadrillas/)).toBeVisible();
+
+    await choose(user, /Tipo de servicio/, /Poda de arbolado/);
+    expect(screen.getByText("Modo: puntual.")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Datos de la ubicación" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /Zona operativa|Tipo de objetivo/ })).toHaveAttribute("aria-required", "true");
+  });
+
+  it("keeps origin and notes inside a collapsed 'Más datos' disclosure", async () => {
+    const user = userEvent.setup();
+    render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+    await catalogsLoadedWithRouteType();
 
     const trigger = screen.getByRole("button", { name: "Más datos" });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
@@ -78,7 +115,7 @@ describe("ScheduleServiceDialog component", () => {
 
     try {
       render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
-      await catalogsLoaded();
+      await catalogsLoadedWithRouteType();
 
       const dateButton = screen.getByRole("button", { name: /Fecha programada/ });
       expect(dateButton).toHaveTextContent("22/09/2026");
@@ -93,7 +130,7 @@ describe("ScheduleServiceDialog component", () => {
 
   it("shows the window as two 24-hour time pickers", async () => {
     render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
 
     const from = within(screen.getByRole("group", { name: /Desde/ }));
     const to = within(screen.getByRole("group", { name: /Hasta/ }));
@@ -113,7 +150,7 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
     // Initial state: st-waste-route -> ROUTE
     expect(screen.getByText("Recorrido", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Recorrido asignado/ })).toBeInTheDocument();
@@ -162,7 +199,7 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
     const submitBtn = screen.getByRole("button", { name: "Programar servicio" });
     await user.click(submitBtn);
 
@@ -196,7 +233,7 @@ describe("ScheduleServiceDialog component", () => {
     );
 
     // Change to a POINT service type
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
     await choose(user, /Tipo de servicio/, /Mantenimiento de contenedores/);
 
     // Busca y elige el contenedor real del inventario (#319)
@@ -230,9 +267,8 @@ describe("ScheduleServiceDialog component", () => {
     const create = vi.spyOn(servicesAdapter, "create");
 
     render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
     await choose(user, /Tipo de servicio/, /Poda de arbolado/);
-    await choose(user, /Tipo de objetivo/, "Árbol urbano");
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/Debe elegir el árbol urbano/);
@@ -247,15 +283,17 @@ describe("ScheduleServiceDialog component", () => {
     const user = userEvent.setup();
 
     render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
     await choose(user, /Tipo de servicio/, /Poda de arbolado/);
-    await choose(user, /Tipo de objetivo/, "Árbol urbano");
     await choose(user, /Elemento/, /ARB-00442/);
     expect(screen.getByRole("combobox", { name: /Elemento/ })).toHaveTextContent(/ARB-00442/);
     expect(screen.getByText("Zona: Belgrano")).toBeInTheDocument();
 
-    await choose(user, /Tipo de objetivo/, "Contenedor");
+    // El objetivo lo define el tipo de servicio: cambiar el tipo cambia el objetivo y limpia el elemento.
+    expect(screen.getByRole("combobox", { name: /Tipo de objetivo/ })).toBeDisabled();
+    await choose(user, /Tipo de servicio/, /Mantenimiento de contenedores/);
 
+    expect(screen.getByRole("combobox", { name: /Tipo de objetivo/ })).toHaveTextContent("Contenedor");
     expect(screen.getByRole("combobox", { name: /Elemento/ })).toHaveTextContent("Seleccione un elemento");
     await user.click(screen.getByRole("combobox", { name: /Elemento/ }));
     await screen.findByRole("option", { name: /CONT-001/ });
@@ -268,16 +306,17 @@ describe("ScheduleServiceDialog component", () => {
     const props = { onOpenChange: vi.fn(), onCreated: vi.fn() };
 
     const { rerender } = render(<ScheduleServiceDialog open={true} {...props} />);
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
     await choose(user, /Tipo de servicio/, /Poda de arbolado/);
-    await choose(user, /Tipo de objetivo/, "Árbol urbano");
     await choose(user, /Elemento/, /ARB-00442/);
     expect(screen.getByRole("combobox", { name: /Elemento/ })).toHaveTextContent(/ARB-00442/);
 
     rerender(<ScheduleServiceDialog open={false} {...props} />);
     rerender(<ScheduleServiceDialog open={true} {...props} />);
-    await screen.findByRole("combobox", { name: /Tipo de objetivo/ });
-
+    // Al reabrir no queda ni el tipo, ni el elemento, ni la cuadrilla del servicio anterior.
+    expect(await screen.findByRole("combobox", { name: /Tipo de servicio/ })).toHaveTextContent("Seleccione un tipo");
+    expect(screen.getByRole("combobox", { name: /Cuadrilla/ })).toHaveTextContent("Sin asignar");
+    await choose(user, /Tipo de servicio/, /Mantenimiento de contenedores/);
     expect(screen.getByRole("combobox", { name: /Tipo de objetivo/ })).toHaveTextContent("Contenedor");
     expect(screen.getByRole("combobox", { name: /Elemento/ })).toHaveTextContent("Seleccione un elemento");
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
@@ -290,10 +329,15 @@ describe("ScheduleServiceDialog component", () => {
     const create = vi.spyOn(servicesAdapter, "create").mockResolvedValue({ id: "SVC-1" } as never);
 
     render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
-    await catalogsLoaded();
-    await choose(user, /Tipo de servicio/, /Poda de arbolado/);
-    await choose(user, /Tipo de objetivo/, /Otra ubicación/);
+    await catalogsLoadedWithRouteType();
+    await choose(user, /Tipo de servicio/, /Inspección ambiental/);
+    // La zona ya no se completa sola: sin elegirla no se crea.
     await user.type(screen.getByLabelText(/Dirección o referencia/), "Av. Rivadavia 2200");
+    await user.click(screen.getByRole("button", { name: "Programar servicio" }));
+    expect(await screen.findByText("Seleccione al menos una zona.")).toBeVisible();
+    expect(create).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("combobox", { name: /Zona operativa/ }));
+    await user.click((await screen.findAllByRole("option"))[0]);
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
 
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
@@ -317,7 +361,7 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/Nº de reclamo no es válido/i);
@@ -349,7 +393,7 @@ describe("ScheduleServiceDialog component", () => {
       />,
     );
 
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
     const submitBtn = screen.getByRole("button", { name: "Programar servicio" });
     await user.click(submitBtn);
 
@@ -381,7 +425,7 @@ describe("ScheduleServiceDialog component", () => {
     const create = vi.spyOn(servicesAdapter, "create").mockResolvedValue({ id: "SVC-1" } as never);
 
     render(<ScheduleServiceDialog open={true} onOpenChange={vi.fn()} onCreated={vi.fn()} />);
-    await catalogsLoaded();
+    await catalogsLoadedWithRouteType();
     await user.click(screen.getByRole("button", { name: "Programar servicio" }));
 
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1));

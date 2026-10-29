@@ -7,6 +7,8 @@ export function useRevealFirstError<T extends HTMLElement = HTMLDivElement>(...d
   useEffect(() => {
     const target = containerRef.current?.querySelector<HTMLElement>('[role="alert"], [aria-invalid="true"]');
     target?.scrollIntoView?.({ block: "nearest" });
+    // Tras un envío fallido el foco va al primer campo inválido, no se queda en el botón fijo del pie.
+    containerRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus?.({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 

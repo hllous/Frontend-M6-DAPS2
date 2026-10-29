@@ -1,0 +1,29 @@
+/* Paleta validada con dataviz/validate_palette.js (modo claro): #0F7A5C #A86A00 #C2185B + gris neutro para pendientes. */
+.wrap { display: flex; min-width: 0; flex-direction: column; gap: var(--space-8); }
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-16); margin: 0; padding: 0; list-style: none; color: var(--color-text-secondary); font-size: 12px; }
+.legend li { display: inline-flex; align-items: center; gap: var(--space-6); }
+.swatch { width: 12px; height: 12px; border-radius: 3px; }
+.served { background: #0F7A5C; }
+.partial { background: #A86A00; }
+.missed { background: #C2185B; }
+.pending { background: #7A8796; }
+.scroll { overflow-x: auto; }
+.table[data-slot="table"] { width: 100%; border-collapse: collapse; caption-side: top; font-size: 14px; }
+.table caption { margin-bottom: var(--space-8); color: var(--color-text-secondary); font-size: 12px; text-align: left; }
+.table th, .table td { padding: var(--space-4) var(--space-10); border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: middle; }
+.table th { height: auto; background: var(--color-surface-subtle); color: var(--color-text-secondary); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.table tr { border-bottom: 0; }
+.table tr:hover { background-color: transparent; }
+.num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.barColumn { min-width: 220px; }
+.barCell { display: flex; align-items: center; gap: var(--space-10); }
+.bar { display: flex; flex: 1 1 auto; gap: 2px; height: 22px; min-width: 120px; border-radius: 4px; background: var(--color-surface-subtle); overflow: hidden; }
+.bar > span { flex-basis: 0; min-width: 2px; }
+.pct { flex: 0 0 auto; width: 6ch; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.nameButton { height: auto; min-height: 32px; justify-content: flex-start; gap: var(--space-8); text-align: left; white-space: normal; }
+.lowSample { padding: 0 var(--space-6); border: 1px solid var(--color-border-strong); border-radius: 6px; color: var(--color-text-secondary); font-size: 12px; font-weight: 400; }
+.nameCell { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+.noScheduled { color: var(--color-text-secondary); font-size: 13px; }
+.table th.rowHeader { height: auto; background: transparent; color: var(--color-text); font-size: 14px; font-weight: 500; white-space: normal; }
+.footer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-12); color: var(--color-text-secondary); font-size: 12px; }
+.mapLink { margin-inline-start: auto; color: var(--color-action); font-size: 14px; font-weight: 600; text-underline-offset: 3px; }

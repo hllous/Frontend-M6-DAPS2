@@ -61,13 +61,13 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const trend = screen.getByRole("region", { name: "Tendencia" });
+    const trend = screen.getByRole("region", { name: "Por categoría" });
     expectBusy(trend);
     expect(trend.querySelector('[data-slot="skeleton"]')).not.toBeNull();
 
     const loaded = await screen.findByRole("heading", { name: "Cobertura por tipo de servicio" });
     expect(loaded).toBeVisible();
-    expect(screen.getByRole("region", { name: "Tendencia" })).not.toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("region", { name: "Por categoría" })).not.toHaveAttribute("aria-busy", "true");
     expect(screen.queryAllByText("Cargando")).toHaveLength(0);
   });
 
@@ -80,7 +80,7 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
       await delay(300);
       return HttpResponse.json({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 });
     }));
-    await user.click(await screen.findByRole("button", { name: /Centro.*89,7/i }));
+    await user.click(await screen.findByRole("button", { name: "Centro" }));
 
     const records = await screen.findByRole("region", { name: "Registros" });
     expectBusy(records);

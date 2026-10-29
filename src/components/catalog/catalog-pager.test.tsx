@@ -36,4 +36,9 @@ describe("CatalogPager", () => {
     const { container } = render(<CatalogPager page={1} pageSize={20} total={0} totalPages={0} onPageChange={vi.fn()} label="Paginación de vehículos" />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("announces an empty result when asked to, instead of disappearing silently", () => {
+    render(<CatalogPager page={1} pageSize={20} total={0} totalPages={0} onPageChange={vi.fn()} label="Paginación de servicios" announceEmpty="Sin servicios." />);
+    expect(screen.getByRole("status")).toHaveTextContent("Sin servicios.");
+  });
 });

@@ -37,6 +37,7 @@ import type { OperationalScenario } from "@/lib/scenarios";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
 import {
   ServiceRequestError,
+  STATUS_LABEL,
   servicesAdapter,
   type Service,
   type ServiceOrigin,
@@ -66,6 +67,7 @@ import {
   type SortKey,
 } from "./services-table";
 import { createServiceOrdinals, sortServices } from "./service-sorting";
+import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { servicesMobileBreakpoint } from "@/lib/services-layout";
@@ -77,6 +79,27 @@ import {
 } from "./services-column-editor";
 
 type Period = "semana" | "mes" | "todo";
+
+const SERVICES_PAGE_SIZE = 25;
+
+/** Resuelve `count` tareas con a lo sumo `limit` en vuelo y devuelve los resultados en orden; ante un fallo no lanza más. */
+async function mapWithLimit<T>(count: number, limit: number, task: (index: number) => Promise<T>, cancelled: () => boolean): Promise<T[]> {
+  const results = new Array<T>(count);
+  let next = 0;
+  let failed = false;
+  await Promise.all(Array.from({ length: Math.min(limit, count) }, async () => {
+    while (next < count && !failed && !cancelled()) {
+      const index = next++;
+      try {
+        results[index] = await task(index);
+      } catch (cause) {
+        failed = true;
+        throw cause;
+      }
+    }
+  }));
+  return results;
+}
 
 const periodItems: Record<Period, string> = {
   semana: "Esta semana",
@@ -163,7 +186,7 @@ export function ServicesWorkspace({
   // Sorting
   const [sortKey, setSortKey] = useState<SortKey | null>(() => {
     const s = getParam("sort") as SortKey | null;
-    return s && ["service", "zone", "status", "crew", "scheduled"].includes(s) ? s : "status";
+    return s && ["service", "zone", "status", "crew", "scheduled"].includes(s) ? s : "scheduled";
   });
   const [sortDir, setSortDir] = useState<SortDir>(() => {
     const d = getParam("dir") as SortDir | null;
@@ -331,12 +354,15 @@ export function ServicesWorkspace({
         const services = [...page.services];
         let totalPages = page.totalPages;
         let dropped = page.dropped ?? 0;
-        for (let nextPage = 2; nextPage <= Math.min(totalPages, 20); nextPage += 1) {
+        if (totalPages > 1 && totalPages <= 20) {
+          // Las páginas restantes se piden en paralelo: en serie el arranque sumaba una ida y vuelta por página.
+          // Máximo 4 a la vez y en el orden de las páginas. Si una falla, falla la carga entera (no se muestra una lista incompleta).
+          const rest = await mapWithLimit(totalPages - 1, 4, (index) => servicesAdapter.list({ ...query, page: index + 2 }), () => !isCurrent);
           if (!isCurrent) return;
-          const next = await servicesAdapter.list({ ...query, page: nextPage });
-          services.push(...next.services);
-          dropped += next.dropped ?? 0;
-          totalPages = next.totalPages;
+          for (const next of rest) {
+            services.push(...next.services);
+            dropped += next.dropped ?? 0;
+          }
         }
         if (totalPages > 20) throw new RangeError("Hay demasiados servicios en el período. Elija un período más corto.");
         if (isCurrent) {
@@ -411,7 +437,7 @@ export function ServicesWorkspace({
     if (selectedId) newParams.set("selected", selectedId);
     if (detailId) newParams.set("detail", detailId);
     if (periodChoice) newParams.set("periodo", periodChoice);
-    if (sortKey && sortKey !== "status") newParams.set("sort", sortKey);
+    if (sortKey && sortKey !== "scheduled") newParams.set("sort", sortKey);
     if (sortKey && sortDir !== "asc") newParams.set("dir", sortDir);
     columnFilters.zones.forEach((z) => newParams.append("zone", z));
     columnFilters.statuses.forEach((st) => newParams.append("status", st));
@@ -505,6 +531,36 @@ export function ServicesWorkspace({
   const serviceOrdinals = useMemo(
     () => createServiceOrdinals(sortedServices),
     [sortedServices],
+  );
+  // Paginación de la tabla sobre lo ya cargado y filtrado; el mapa sigue mostrando todo el período.
+  // La página vuelve a 1 cuando cambia la búsqueda, un filtro, el orden o el período; también al elegir un servicio que está en otra página.
+  const pageKey = [search, [...columnFilters.statuses].join(","), [...columnFilters.zones].join(","), [...columnFilters.crews].join(","), columnFilters.timeFrom, columnFilters.timeTo, sortKey, sortDir, activePeriod].join("|");
+  const [pageState, setPageState] = useState({ page: 1, key: pageKey, revealedId: null as string | null });
+  const lastPage = Math.max(1, Math.ceil(sortedServices.length / SERVICES_PAGE_SIZE));
+  let nextPageState = pageState;
+  if (nextPageState.key !== pageKey) nextPageState = { page: 1, key: pageKey, revealedId: nextPageState.revealedId };
+  if (selectedId !== nextPageState.revealedId && loadState.status === "ready") {
+    const index = selectedId ? sortedServices.findIndex((service) => service.id === selectedId) : -1;
+    nextPageState = { ...nextPageState, page: index >= 0 ? Math.floor(index / SERVICES_PAGE_SIZE) + 1 : nextPageState.page, revealedId: selectedId };
+  }
+  if (nextPageState !== pageState) setPageState(nextPageState);
+  const page = nextPageState.page;
+  const tableGroupRef = useRef<HTMLDivElement>(null);
+  const setPage = (next: number) => {
+    setPageState({ ...nextPageState, page: next });
+    requestAnimationFrame(() => {
+      const group = tableGroupRef.current;
+      if (!group) return;
+      group.querySelectorAll<HTMLElement>("*").forEach((element) => { if (element.scrollTop > 0) element.scrollTop = 0; });
+      group.scrollTop = 0;
+      group.focus({ preventScroll: true });
+    });
+  };
+  const totalPages = lastPage;
+  const currentPage = Math.min(page, totalPages);
+  const pagedServices = useMemo(
+    () => sortedServices.slice((currentPage - 1) * SERVICES_PAGE_SIZE, currentPage * SERVICES_PAGE_SIZE),
+    [sortedServices, currentPage],
   );
 
   const selectedService = useMemo(() => {
@@ -808,7 +864,7 @@ export function ServicesWorkspace({
     Boolean(columnFilters.timeFrom || columnFilters.timeTo);
 
   const servicesTableProps = {
-    services: sortedServices,
+    services: pagedServices,
     filterOptionsServices: loadState.status === "ready" ? loadState.services : [],
     serviceOrdinals,
     selectedId,
@@ -824,9 +880,10 @@ export function ServicesWorkspace({
     columnPreferences,
   };
   const servicesTable = (
-    <ServicesTable
-      {...servicesTableProps}
-    />
+    <div className="flex h-full min-h-0 flex-col">
+      <div ref={tableGroupRef} role="group" tabIndex={-1} aria-label={`Listado de servicios, página ${currentPage} de ${totalPages}`} className="min-h-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"><ServicesTable {...servicesTableProps} /></div>
+      <div className="shrink-0 border-t border-[var(--color-border)] px-4 py-2 text-sm"><CatalogPager page={currentPage} pageSize={SERVICES_PAGE_SIZE} total={sortedServices.length} totalPages={totalPages} onPageChange={setPage} label="Paginación de servicios" announceEmpty="Sin servicios para los filtros elegidos." /></div>
+    </div>
   );
 
   const periodBar = (
@@ -861,12 +918,51 @@ export function ServicesWorkspace({
         className="inline-flex size-6 items-center justify-center"
         role="status"
         aria-live="polite"
-        aria-label={isRefreshing ? "Actualizando servicios" : refreshError ? "No se pudieron actualizar los servicios" : undefined}
         title={refreshError ?? undefined}
       >
+        <span className="sr-only">{isRefreshing ? "Actualizando servicios" : refreshError ? "No se pudieron actualizar los servicios" : ""}</span>
         {isRefreshing ? <Spinner aria-hidden="true" role="presentation" /> : null}
         {refreshError ? <span aria-hidden="true" className="font-bold text-[var(--color-danger)]">!</span> : null}
       </span>
+    </div>
+  );
+
+  const zoneNames = useMemo(
+    () => loadState.status === "ready" ? [...new Set(loadState.services.flatMap((service) => service.zoneNames))].sort((a, b) => a.localeCompare(b, "es-AR")) : [],
+    [loadState],
+  );
+  const ALL = "__all";
+  const MULTI = "__multi";
+  const quickFilters = (
+    <div role="group" aria-label="Filtros rápidos" className={cn("flex items-center gap-6", isNarrow && "basis-full gap-3")}>
+     <div className="flex items-center gap-2">
+      <Label htmlFor="services-status-filter">Estado</Label>
+      <Select
+        value={columnFilters.statuses.size === 1 ? [...columnFilters.statuses][0] : columnFilters.statuses.size > 1 ? MULTI : ALL}
+        onValueChange={(value) => setColumnFilters((current) => ({ ...current, statuses: value === ALL ? new Set() : new Set([value as ServiceStatus]) }))}
+      >
+        <SelectTrigger id="services-status-filter" size={isNarrow ? "sm" : "default"} className="w-auto"><SelectValue>{columnFilters.statuses.size === 1 ? STATUS_LABEL[[...columnFilters.statuses][0]] : columnFilters.statuses.size > 1 ? `${columnFilters.statuses.size} estados` : "Todos"}</SelectValue></SelectTrigger>
+        <SelectContent><SelectGroup>
+          <SelectItem value={ALL}>Todos</SelectItem>
+          {columnFilters.statuses.size > 1 ? <SelectItem value={MULTI} disabled>{columnFilters.statuses.size} estados</SelectItem> : null}
+          {(Object.keys(STATUS_LABEL) as ServiceStatus[]).map((status) => <SelectItem key={status} value={status}>{STATUS_LABEL[status]}</SelectItem>)}
+        </SelectGroup></SelectContent>
+      </Select>
+     </div>
+     <div className="flex items-center gap-2">
+      <Label htmlFor="services-zone-filter">Zona</Label>
+      <Select
+        value={columnFilters.zones.size === 1 ? [...columnFilters.zones][0] : columnFilters.zones.size > 1 ? MULTI : ALL}
+        onValueChange={(value) => setColumnFilters((current) => ({ ...current, zones: value === ALL ? new Set() : new Set([String(value)]) }))}
+      >
+        <SelectTrigger id="services-zone-filter" size={isNarrow ? "sm" : "default"} className="w-auto"><SelectValue>{columnFilters.zones.size === 1 ? [...columnFilters.zones][0] : columnFilters.zones.size > 1 ? `${columnFilters.zones.size} zonas` : "Todas"}</SelectValue></SelectTrigger>
+        <SelectContent><SelectGroup>
+          <SelectItem value={ALL}>Todas</SelectItem>
+          {columnFilters.zones.size > 1 ? <SelectItem value={MULTI} disabled>{columnFilters.zones.size} zonas</SelectItem> : null}
+          {zoneNames.map((zone) => <SelectItem key={zone} value={zone}>{zone}</SelectItem>)}
+        </SelectGroup></SelectContent>
+      </Select>
+     </div>
     </div>
   );
 
@@ -886,6 +982,7 @@ export function ServicesWorkspace({
         No se pudo actualizar. Se muestran los datos anteriores.
       </p>
     )}
+    {quickFilters}
     <ServicesColumnEditor controller={columnPreferences} />
   </div>
   );
@@ -1134,6 +1231,7 @@ export function ServicesWorkspace({
       {loadState.status === "error" && periodBar}
 
       {/* Loading and ready states share one region so the table lands where the skeleton was. */}
+      <p role="status" className="sr-only">{loadState.status === "ready" ? (sortedServices.length === 0 ? "Sin servicios para los filtros elegidos." : `${sortedServices.length} servicios`) : ""}</p>
       <LoadingRegion label="Listado de servicios" isLoading={loadState.status === "loading"} className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {loadState.status === "loading" && (
         <div data-slot="services-loading-skeleton" aria-hidden="true" inert className="flex min-h-0 flex-1 flex-col">

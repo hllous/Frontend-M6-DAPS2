@@ -30,6 +30,7 @@ import { serviceSourceHref } from "@/lib/referrals";
 import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
+import { CoverageBreakdownTable } from "./coverage-breakdown-table";
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 
 import styles from "./indicators-dashboard.module.css";
@@ -413,7 +414,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
   const visibleRecordsStatus = activeRecordPlan?.resource && recordsStatus === "idle" ? "loading" : recordsStatus;
   const recordsView = <AccessibleRecords family={selectedFamily} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} open={recordsOpen} onOpenChange={setRecordsOpen} onClear={clearSignal} />;
-  const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Tendencia" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} /></ModuleState>;
+  const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Por categoría" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} /></ModuleState>;
 
   if (!canView) {
     return <section className={styles.empty} aria-labelledby="indicator-forbidden-title"><div><h2 id="indicator-forbidden-title">No tiene permiso para ver los indicadores.</h2></div></section>;
@@ -452,7 +453,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       {isNarrow ? <Tabs defaultValue="summary" className={styles.mobileTabs}>
         <TabsList aria-label="Secciones del tablero" className={styles.tabList}>
           <TabsTrigger value="summary">Resumen</TabsTrigger>
-          <TabsTrigger value="trend">Tendencia</TabsTrigger>
+          <TabsTrigger value="trend">Por categoría</TabsTrigger>
           <TabsTrigger value="territory">Territorio</TabsTrigger>
           <TabsTrigger value="records">Registros</TabsTrigger>
         </TabsList>
@@ -535,7 +536,7 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
     {hasSummaryMetrics ? <div className={styles.summaryMetrics} aria-label={`Resumen exacto de ${meta.label}`}>{data.summaryMetrics.map((metric) => <div className={styles.summaryMetric} key={metric.label}><strong>{metricText(metric)}</strong><span>{metric.label}</span></div>)}</div> : null}
     {detailContext(data)}
     <div className={styles.detailModules} role={requestedViewMode === "table" ? "region" : undefined} aria-label={requestedViewMode === "table" ? `Tabla de datos de ${meta.label}` : undefined}>
-      <ModuleState label="Tendencia" status={trendStatus} onRetry={onRetry}><IndicatorModuleContent breakdowns={trendBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} /></ModuleState>
+      <ModuleState label="Por categoría" status={trendStatus} onRetry={onRetry}><IndicatorModuleContent breakdowns={trendBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} /></ModuleState>
       <ModuleState label="Detalle territorial" status={territoryStatus} onRetry={onRetry}><IndicatorModuleContent breakdowns={territoryBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} /></ModuleState>
     </div>
   </section>;
@@ -582,7 +583,8 @@ function BreakdownView({ breakdown, viewMode, selectedId: controlledSelectedId, 
   const selectedId = controlledSelectedId ?? localSelectedId;
   const selected = controlledSelectedId ? breakdown.points.find((point) => point.id === selectedId) : undefined;
   const setSelectedId = (pointId: string) => { setLocalSelectedId(pointId); onSelect(pointId); };
-  return <div className={styles.breakdown}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{viewMode === "bars" ? <BarView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />}</div>;
+  const wide = viewMode === "bars" && (breakdown.id === "zones" || breakdown.id === "service-types");
+  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{viewMode === "bars" && breakdown.id === "zones" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" /> : viewMode === "bars" && breakdown.id === "service-types" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} /> : viewMode === "bars" ? <BarView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />}</div>;
 }
 
 function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
@@ -652,7 +654,8 @@ function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoi
         <span>{point.label}</span><span className="text-muted-foreground tabular-nums text-right">{pointText(point)}</span>
       </Item>)}
     </ItemGroup>
-    {activePoint ? <Alert role="status" variant="info" className={styles.chartPinnedDetail} aria-label={`${pinnedId ? "Detalle fijado" : "Detalle"} de ${activePoint.label}`}><strong>{activePoint.label}</strong><span>{pointText(activePoint)}{activePoint.note ? ` · ${activePoint.note}` : ""}</span>{pinnedId ? <Button type="button" variant="link" size="sm" className="ms-auto" onClick={dismissDetail}>Cerrar detalle</Button> : null}</Alert> : null}
+    {/* La región de estado queda montada siempre: así el lector anuncia el detalle cuando aparece. */}
+    <Alert role="status" variant="info" className={activePoint ? styles.chartPinnedDetail : "sr-only"} aria-label={activePoint ? `${pinnedId ? "Detalle fijado" : "Detalle"} de ${activePoint.label}` : undefined}>{activePoint ? <><strong>{activePoint.label}</strong><span>{pointText(activePoint)}{activePoint.note ? ` · ${activePoint.note}` : ""}</span>{pinnedId ? <Button type="button" variant="link" size="sm" className="ms-auto" onClick={dismissDetail}>Cerrar detalle</Button> : null}</> : null}</Alert>
   </div>;
 }
 
