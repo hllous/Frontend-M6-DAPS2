@@ -21,6 +21,8 @@ export const meSchema = z.object({
   subType: z.enum(["CIUDADANO", "EMPLEADO"]),
   m1Role: z.string(),
   roles: z.array(m6RoleSchema),
+  crews: z.array(z.object({ id: z.string(), name: z.string(), role: z.enum(["LEADER", "MEMBER"]) })).default([]),
+  isAssignedInspector: z.boolean().optional(),
 });
 export type Me = z.infer<typeof meSchema>;
 

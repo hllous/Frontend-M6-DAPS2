@@ -569,10 +569,8 @@ describe("POST /api/evidence BFF route", () => {
   });
 
   it("forwards only the UploadEvidenceDto fields to the backend (no fileName or fileSize)", async () => {
-    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({
-      data: [{ id: "crew-real", name: "Cuadrilla Belgrano — Recolección" }],
-    }));
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch");
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "crew-real", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     backendFetch.mockClear();
     let sentKeys: string[] = [];
     backendFetch.mockImplementation(async (input, init) => {

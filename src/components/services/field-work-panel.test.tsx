@@ -238,6 +238,13 @@ describe("FieldWorkPanel component", () => {
     expect(screen.queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument();
   });
 
+  it("explains when Field has no assigned crew", () => {
+    const scenario = { ...scenarios.fieldCrewLeader, actor: { ...scenarios.fieldCrewLeader.actor, crewId: undefined, crewName: undefined } };
+    render(<FieldWorkPanel scenario={scenario} />);
+    expect(screen.getByText("Sin cuadrilla asignada. Pida a un administrador que lo agregue a una cuadrilla.")).toBeInTheDocument();
+    expect(screen.queryByText("Sin servicios asignados.")).not.toBeInTheDocument();
+  });
+
   it("uses the real crew resolved for the session and shows a clear error when its services fail to load", async () => {
     const realCrewId = "d907516e-ddb7-46d4-a7d4-cd235cbb1529";
     const requested: string[] = [];

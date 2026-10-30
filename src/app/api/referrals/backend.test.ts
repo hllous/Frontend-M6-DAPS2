@@ -73,13 +73,12 @@ describe("referrals against the backend", () => {
       if (url.pathname === "/street-closure-requests") return Response.json(page([], 0, 1, 0));
       throw new Error(`Unexpected backend URL: ${url}`);
     });
-    const cookie = await loginAs("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
     const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: [{ id: repairId, sourceId: inspectionId }], meta: { total: 1 } });
     expect(backendFetch.mock.calls.map(([url]) => String(url)).sort()).toEqual([
-      "https://backend.internal/crews?active=true&pageSize=100",
       "https://backend.internal/repair-requests?page=1&pageSize=100",
       `https://backend.internal/services/${serviceId}`,
       `https://backend.internal/services?crewId=${crewId}&page=1&pageSize=100`,
@@ -182,7 +181,7 @@ describe("referrals against the backend", () => {
       if (url.pathname === "/street-closure-requests") return Response.json(page([], 0, 1, 0));
       throw new Error(`Unexpected backend URL: ${url}`);
     });
-    const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie: await loginAs("field-crew-leader-route") } }));
+    const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie: await loginAs("field-crew-leader-route", { crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } }) } }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: [{ id: repairId }], meta: { total: 1 } });
@@ -227,11 +226,10 @@ describe("referrals against the backend", () => {
       if (url.pathname === `/repair-requests/${repairId}`) return Response.json({ ...repair, detectedInType: sourceType, detectedInId: sourceId });
       throw new Error(`Unexpected backend URL: ${url}`);
     });
-    const response = await getDetail(await loginAs("field-crew-leader-route"));
+    const response = await getDetail(await loginAs("field-crew-leader-route", { crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } }));
     expect(response.status).toBe(status);
     if (status === 200) expect(await response.json()).toMatchObject({ id: repairId, sourceId });
     expect(backendFetch.mock.calls.map(([url]) => String(url))).toEqual([
-      "https://backend.internal/crews?active=true&pageSize=100",
       `https://backend.internal/repair-requests/${repairId}`,
       `https://backend.internal/services?crewId=${crewId}&page=1&pageSize=100`,
     ]);
@@ -248,7 +246,7 @@ describe("referrals against the backend", () => {
         sourceContext: { sourceType: "TREE_INTERVENTION", sourceId: serviceId, title: "Poda", interventionType: "SAFETY_PRUNING", address: "Rivadavia 2200" },
       } : closure);
     });
-    const response = await getDetail(await loginAs("field-crew-leader-route"), closureId);
+    const response = await getDetail(await loginAs("field-crew-leader-route", { crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } }), closureId);
     expect(response.status).toBe(treeSource ? 404 : 200);
   });
 
@@ -273,7 +271,7 @@ describe("referrals against the backend", () => {
       ], 3));
       throw new Error(`Unexpected backend URL: ${url}`);
     });
-    const cookie = await loginAs("field-crew-leader-route");
+    const cookie = await loginAs("field-crew-leader-route", { crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
     const response = await list(new Request("http://localhost/api/referrals", { headers: { cookie } }));
     const body = await response.json();
 
@@ -285,7 +283,6 @@ describe("referrals against the backend", () => {
       expect.objectContaining({ sourceId: inspectionId }),
     ]));
     expect(backendFetch.mock.calls.map(([url]) => String(url)).sort()).toEqual([
-      "https://backend.internal/crews?active=true&pageSize=100",
       "https://backend.internal/repair-requests?page=1&pageSize=100",
       `https://backend.internal/services?crewId=${crewId}&page=1&pageSize=100`,
       "https://backend.internal/street-closure-requests?page=1&pageSize=100",

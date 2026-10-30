@@ -194,10 +194,13 @@ export type ScenarioCrew = { id: string; name: string };
 
 /** Con una sesión, la cuadrilla resuelta contra el backend pisa la de fixture del escenario. */
 export function getScenario(
-  ref: ScenarioId | { scenarioId: ScenarioId; crew?: ScenarioCrew; roles?: readonly M6Role[]; source?: Session["source"] },
+  ref: ScenarioId | { scenarioId: ScenarioId; crew?: ScenarioCrew; roles?: readonly M6Role[]; source?: Session["source"]; mode?: Session["mode"]; fieldRole?: Session["fieldRole"] },
 ): OperationalScenario {
   if (typeof ref === "string") return scenariosById[ref];
   let scenario = scenariosById[ref.scenarioId];
+  if (ref.mode === "backend-development") {
+    scenario = { ...scenario, actor: { ...scenario.actor, crewId: ref.crew?.id, crewName: ref.crew?.name, fieldRole: ref.fieldRole } };
+  }
   if (ref.roles) scenario = scenarioForRoles(scenario, ref.roles);
   // Sesión de demo firmada: el actor es la persona real del seed, no el nombre de fixture del escenario.
   if (ref.source === "demo") {
