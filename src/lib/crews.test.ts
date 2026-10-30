@@ -4,7 +4,7 @@ import { HttpResponse, http } from "msw";
 
 import { handlers } from "@/mocks/handlers";
 import { NetworkFailureError } from "./authenticated-fetch";
-import { crewsAdapter, CrewContractError, CrewRequestError, updateCrewInputSchema } from "./crews";
+import { crewsAdapter, createCrewInputSchema, crewSpecialtyLabel, CrewContractError, CrewRequestError, updateCrewInputSchema } from "./crews";
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -17,6 +17,8 @@ const createInput = {
   leaderUserId: "user-maria",
   organizationId: "org-municipal",
   defaultShift: "MORNING" as const,
+  specialty: "TREES" as const,
+  homeZoneId: "zone-2",
 };
 
 describe("crews adapter", () => {
@@ -124,4 +126,27 @@ describe("crews adapter", () => {
 it("preserves crew names and new nullable contract fields", async () => {
   server.use(http.get("*/api/crews/contract", () => HttpResponse.json({ id: "contract", name: "Equipo", crewType: "MUNICIPAL", leaderUserId: "101", leaderName: "Ana", organizationId: null, defaultShift: "MORNING", active: true, specialty: "TREES", homeZoneId: "1", effectiveZoneId: "2", membersCount: 1, members: [{ userId: "101", displayName: "Ana" }] })));
   await expect(crewsAdapter.get("contract")).resolves.toMatchObject({ leaderName: "Ana", organizationName: null, specialty: "TREES", homeZoneId: "1", effectiveZoneId: "2", membersCount: 1, members: [{ userId: "101", displayName: "Ana" }], memberUserIds: ["101"] });
+});
+
+describe("crew specialty contract", () => {
+  it("requires a specialty to create, with a Spanish message, and keeps the home zone optional", () => {
+    const { specialty: _specialty, homeZoneId: _homeZoneId, ...withoutBoth } = createInput;
+    const missing = createCrewInputSchema.safeParse(withoutBoth);
+    expect(missing.success ? [] : missing.error.issues.map((issue) => issue.message)).toEqual(["La especialidad es obligatoria."]);
+    expect(createCrewInputSchema.safeParse({ ...withoutBoth, specialty: "SWEEPING" }).success).toBe(true);
+  });
+
+  it("labels specialties in Spanish and reads null as Sin especialidad", () => {
+    expect(crewSpecialtyLabel("GREEN_SPACES")).toBe("Espacios verdes");
+    expect(crewSpecialtyLabel(null)).toBe("Sin especialidad");
+  });
+
+  it("sends zoneId and specialty in the list query", async () => {
+    const urls: string[] = [];
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => { urls.push(String(input)); return Response.json({ data: [], meta: { total: 0, page: 1, pageSize: 20, totalPages: 1 } }); });
+    await crewsAdapter.list({ zoneId: "zone-3", specialty: "TREES" });
+    spy.mockRestore();
+    expect(urls[0]).toContain("zoneId=zone-3");
+    expect(urls[0]).toContain("specialty=TREES");
+  });
 });

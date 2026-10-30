@@ -11,6 +11,11 @@ export type CrewType = z.infer<typeof crewTypeSchema>;
 export type Shift = z.infer<typeof shiftSchema>;
 
 export const crewSpecialtySchema = z.enum(["COLLECTION", "SWEEPING", "CLEANING", "RECYCLING", "TREES", "GREEN_SPACES", "INSPECTION"]);
+export type CrewSpecialty = z.infer<typeof crewSpecialtySchema>;
+export const crewSpecialtyLabels: Record<CrewSpecialty, string> = {
+  COLLECTION: "Recolección", SWEEPING: "Barrido", CLEANING: "Limpieza", RECYCLING: "Reciclaje", TREES: "Arbolado", GREEN_SPACES: "Espacios verdes", INSPECTION: "Inspección",
+};
+export function crewSpecialtyLabel(specialty: CrewSpecialty | null) { return specialty ? crewSpecialtyLabels[specialty] : "Sin especialidad"; }
 const crewMemberSchema = z.object({ userId: z.string(), displayName: z.string().nullable().default(null) });
 export const crewSchema = z.object({
   id: z.string(), name: z.string(), crewType: crewTypeSchema, leaderUserId: z.string().nullable(), leaderName: z.string().nullable().default(null),
@@ -22,15 +27,16 @@ export const crewSchema = z.object({
 });
 const crewWireSchema = crewSchema;
 export type Crew = z.infer<typeof crewSchema>;
-export type CrewQuery = { active?: boolean; crewType?: CrewType; defaultShift?: Shift; page?: number; pageSize?: number };
+export type CrewQuery = { active?: boolean; crewType?: CrewType; defaultShift?: Shift; zoneId?: string; specialty?: CrewSpecialty; page?: number; pageSize?: number };
 export type CrewsPage = { crews: Crew[]; page: number; pageSize: number; total: number; totalPages: number };
 
 export const createCrewInputSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio."), crewType: crewTypeSchema, leaderUserId: externalIdInput(), organizationId: externalIdInput(), defaultShift: shiftSchema,
+  specialty: z.enum(crewSpecialtySchema.options, { error: "La especialidad es obligatoria." }), homeZoneId: z.string().trim().min(1).nullish(),
 });
 export type CreateCrewInput = z.infer<typeof createCrewInputSchema>;
 // crewType is immutable in the backend (UpdateCrewDto has no such field), so an edit never carries it.
-export const updateCrewInputSchema = createCrewInputSchema.omit({ crewType: true }).extend({ active: z.boolean() }).strict();
+export const updateCrewInputSchema = createCrewInputSchema.omit({ crewType: true, specialty: true }).extend({ active: z.boolean(), specialty: crewSpecialtySchema.optional() }).strict();
 export type UpdateCrewInput = z.infer<typeof updateCrewInputSchema>;
 export const addCrewMembersInputSchema = z.object({
   memberUserIds: externalIdListInput({ emptyMessage: "Seleccione al menos un integrante." }).optional(),
@@ -50,6 +56,8 @@ function queryString(query: CrewQuery) {
   if (query.active !== undefined) params.set("active", String(query.active));
   if (query.crewType) params.set("crewType", query.crewType);
   if (query.defaultShift) params.set("defaultShift", query.defaultShift);
+  if (query.zoneId) params.set("zoneId", query.zoneId);
+  if (query.specialty) params.set("specialty", query.specialty);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
   const value = params.toString(); return value ? `?${value}` : "";
