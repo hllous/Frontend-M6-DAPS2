@@ -426,6 +426,27 @@ describe("CrewCatalogPanel: reubicar cuadrilla e historial", () => {
     expect(items[1]).toHaveTextContent("Refuerzo de poda por temporal");
   });
 
+  it("marca en la tabla la cuadrilla reubicada con su zona temporal y el fin de la reubicación", async () => {
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /Cuadrilla C/ });
+    expect(within(row).getByText("Retiro")).toBeVisible();
+    expect(within(row).getByText("Reubicada")).toBeVisible();
+    expect(await within(row).findByText(/^(Hasta el \d{2}\/\d{2}\/\d{4}|Hasta nuevo aviso)$/)).toBeVisible();
+    expect(within(await screen.findByRole("row", { name: /Cuadrilla A/ })).queryByText("Reubicada")).not.toBeInTheDocument();
+  });
+
+  it("muestra Reubicada y Vigente con el tratamiento de estado operativo (fondo suave, ícono y texto)", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeDutyQueue, "Cuadrilla C · Ibáñez");
+    const history = await within(sheet).findByRole("list", { name: "Historial de reubicaciones" });
+    const current = await within(history).findByText("Vigente");
+    const relocated = within(sheet).getByText("Reubicada");
+    expect(current).toHaveAttribute("data-variant", "success");
+    expect(relocated).toHaveAttribute("data-variant", "warning");
+    expect(current.querySelector("svg")).not.toBeNull();
+    expect(relocated.querySelector("svg")).not.toBeNull();
+  });
+
   it("dice que no hay reubicaciones cuando la cuadrilla nunca fue movida", async () => {
     const user = userEvent.setup();
     const sheet = await openDetail(user, scenarios.officeDutyQueue, "Cuadrilla A · López");

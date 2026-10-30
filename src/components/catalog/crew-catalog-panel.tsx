@@ -10,7 +10,9 @@ import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
+  ArrowRightLeft,
   Check,
+  CircleCheck,
   ChevronRight,
   ChevronsUpDown,
   MapPinned,
@@ -72,6 +74,7 @@ import { Input } from "@/components/ui/input";
 import { notifySuccess } from "@/components/ui/feedback";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import {
   Empty,
   EmptyDescription,
@@ -177,6 +180,8 @@ export function CrewCatalogPanel({
   const [moves, setMoves] = useState<{ crewId: string; items: CrewZoneAssignment[] | null }>({ crewId: "", items: null });
   const [movesError, setMovesError] = useState<string | null>(null);
   const [movesVersion, setMovesVersion] = useState(0);
+  // Fin de la reubicación vigente por cuadrilla (null = hasta nuevo aviso), para el marcador de la tabla.
+  const [relocationEnds, setRelocationEnds] = useState<Record<string, string | null>>({});
   const [relocating, setRelocating] = useState<Crew | null>(null);
   const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
 
@@ -257,6 +262,23 @@ export function CrewCatalogPanel({
       current = false;
     };
   }, [query, requestVersion, scenario, page]);
+
+  const listedCrews = state.status === "ready" ? state.crews : NO_CREWS;
+  useEffect(() => {
+    let current = true;
+    for (const crew of listedCrews.filter((item) => item.effectiveZoneId !== item.homeZoneId)) {
+      void crewZoneAssignmentsAdapter
+        .list(crew.id)
+        .then((items) => {
+          const move = activeMove(items);
+          if (current && move) setRelocationEnds((ends) => ({ ...ends, [crew.id]: move.validTo }));
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      current = false;
+    };
+  }, [listedCrews, movesVersion]);
 
   const selectedId = selected?.id ?? null;
   useEffect(() => {
@@ -486,7 +508,22 @@ export function CrewCatalogPanel({
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
         cellClassName: "h-auto whitespace-normal",
       },
-      cell: ({ row }) => <>{zoneName(row.original.effectiveZoneId)}</>,
+      cell: ({ row }) => {
+        const crew = row.original;
+        if (crew.effectiveZoneId === crew.homeZoneId) return <>{zoneName(crew.effectiveZoneId)}</>;
+        const end = relocationEnds[crew.id];
+        return (
+          <div className="flex flex-col items-start gap-1">
+            {zoneName(crew.effectiveZoneId)}
+            <RelocatedBadge />
+            {end === undefined ? null : (
+              <span className="text-xs text-muted-foreground">
+                {end ? `Hasta el ${formatArgentinaCalendarDate(end)}` : "Hasta nuevo aviso"}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       id: "leader",
@@ -619,7 +656,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-active-filter" className="bg-card">
+                <SelectTrigger id="crew-active-filter" surface="card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -648,7 +685,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-type-filter" className="bg-card">
+                <SelectTrigger id="crew-type-filter" surface="card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -678,7 +715,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-shift-filter" className="bg-card">
+                <SelectTrigger id="crew-shift-filter" surface="card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -705,7 +742,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-zone-filter" className="bg-card">
+                <SelectTrigger id="crew-zone-filter" surface="card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -732,7 +769,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-specialty-filter" className="bg-card">
+                <SelectTrigger id="crew-specialty-filter" surface="card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -843,7 +880,7 @@ export function CrewCatalogPanel({
                     <dd className="flex flex-wrap items-center gap-2">
                       {zoneName(selected.effectiveZoneId)}
                       {selected.effectiveZoneId !== selected.homeZoneId ? (
-                        <Badge variant="secondary">Reubicada</Badge>
+                        <RelocatedBadge />
                       ) : null}
                     </dd>
                   </div>
@@ -1072,7 +1109,7 @@ export function CrewCatalogPanel({
                     if (value !== null) setForm({ ...form, specialty: value as CrewSpecialty });
                   }}
                 >
-                  <SelectTrigger id="crew-specialty-form" className="bg-card" aria-required>
+                  <SelectTrigger id="crew-specialty-form" surface="card" aria-required>
                     <SelectValue placeholder="Seleccione una especialidad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1095,7 +1132,7 @@ export function CrewCatalogPanel({
                     if (value !== null) setForm({ ...form, homeZoneId: value === NO_ZONE ? "" : value });
                   }}
                 >
-                  <SelectTrigger id="crew-home-zone-form" className="bg-card">
+                  <SelectTrigger id="crew-home-zone-form" surface="card">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1157,7 +1194,7 @@ export function CrewCatalogPanel({
                     }
                   }}
                 >
-                  <SelectTrigger id="crew-shift-form" className="bg-card">
+                  <SelectTrigger id="crew-shift-form" surface="card">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1323,41 +1360,68 @@ function CrewMemberMultiSelect({
   );
 }
 
+function activeMove(moves: CrewZoneAssignment[], today = todayInArgentina()) {
+  return moves.find((move) => move.validFrom <= today && (move.validTo ?? "9999-12-31") >= today);
+}
+
+function RelocatedBadge() {
+  return (
+    <Badge variant="warning">
+      <ArrowRightLeft data-icon="inline-start" aria-hidden />
+      Reubicada
+    </Badge>
+  );
+}
+
+function CurrentMoveBadge() {
+  return (
+    <Badge variant="success">
+      <CircleCheck data-icon="inline-start" aria-hidden />
+      Vigente
+    </Badge>
+  );
+}
+
 function CrewMovesSection({ moves, error, zoneName }: {
   moves: CrewZoneAssignment[] | null;
   error: string | null;
   zoneName: (id: string | null) => string;
 }) {
-  const today = todayInArgentina();
   const period = (move: CrewZoneAssignment) =>
     move.validTo ? `Del ${formatArgentinaCalendarDate(move.validFrom)} al ${formatArgentinaCalendarDate(move.validTo)}` : `Desde el ${formatArgentinaCalendarDate(move.validFrom)}, hasta nuevo aviso`;
-  const active = moves?.find((move) => move.validFrom <= today && (move.validTo ?? "9999-12-31") >= today);
+  const active = moves ? activeMove(moves) : undefined;
   return (
     <section aria-labelledby="crew-moves-heading" className="grid gap-3">
       <h3 id="crew-moves-heading" className="font-semibold">Reubicaciones</h3>
       {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       {active ? (
-        <section aria-label="Reubicación vigente" className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
-          <p className="font-medium">Reubicación vigente: {zoneName(active.zoneId)}</p>
-          <p className="text-muted-foreground">{period(active)}</p>
-          <p className="mt-1">{active.reason}</p>
+        <section aria-label="Reubicación vigente">
+          <Item variant="muted">
+            <ItemContent>
+              <ItemTitle>Reubicación vigente: {zoneName(active.zoneId)}</ItemTitle>
+              <ItemDescription>{period(active)}</ItemDescription>
+              <p>{active.reason}</p>
+            </ItemContent>
+          </Item>
         </section>
       ) : null}
       {moves === null ? (error ? null : <p className="text-sm text-muted-foreground">Cargando reubicaciones…</p>) : moves.length === 0 ? (
         <p className="text-sm text-muted-foreground">Esta cuadrilla no tiene reubicaciones registradas.</p>
       ) : (
-        <ul aria-label="Historial de reubicaciones" className="flex flex-col gap-2">
+        <ItemGroup aria-label="Historial de reubicaciones" className="gap-2">
           {moves.map((move) => (
-            <li key={move.id} className="rounded-lg border border-border p-3 text-sm">
-              <p className="flex flex-wrap items-center gap-2 font-medium">
-                {zoneName(move.zoneId)}
-                {move === active ? <Badge variant="secondary">Vigente</Badge> : null}
-              </p>
-              <p className="text-muted-foreground">{period(move)}</p>
-              <p>{move.reason}</p>
-            </li>
+            <Item key={move.id} variant="outline">
+              <ItemContent>
+                <ItemTitle>
+                  {zoneName(move.zoneId)}
+                  {move === active ? <CurrentMoveBadge /> : null}
+                </ItemTitle>
+                <ItemDescription>{period(move)}</ItemDescription>
+                <p>{move.reason}</p>
+              </ItemContent>
+            </Item>
           ))}
-        </ul>
+        </ItemGroup>
       )}
     </section>
   );

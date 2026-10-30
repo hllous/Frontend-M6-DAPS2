@@ -79,7 +79,7 @@ function CrewRelocationContent({ crew, zones, onOpenChange, onSuccess }: {
           <Field data-invalid={Boolean(errors.zoneId)}>
             <FieldLabel htmlFor="crew-relocation-zone">Zona de destino</FieldLabel>
             <Select items={zoneItems} value={zoneId || null} onValueChange={(value) => { if (value !== null) { setZoneId(value); clear("zoneId"); } }}>
-              <SelectTrigger id="crew-relocation-zone" className="bg-card" aria-invalid={Boolean(errors.zoneId)} aria-describedby={errors.zoneId ? "crew-relocation-zone-error" : undefined}>
+              <SelectTrigger id="crew-relocation-zone" surface="card" aria-invalid={Boolean(errors.zoneId)} aria-describedby={errors.zoneId ? "crew-relocation-zone-error" : undefined}>
                 <SelectValue placeholder="Elija una zona" />
               </SelectTrigger>
               <SelectContent>
