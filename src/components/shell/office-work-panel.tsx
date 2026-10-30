@@ -383,7 +383,7 @@ function WorkTile({ group, state }: { group: WorkGroupDefinition; state: GroupSt
       </span>
     </>
   );
-  const shape = "flex w-full items-center gap-3 rounded-xl p-3 ring-1 ring-foreground/10";
+  const shape = "flex w-full items-start gap-3 rounded-xl p-3 ring-1 ring-foreground/10";
 
   return (
     <li className="flex">
@@ -474,7 +474,7 @@ function WorkItemRow({ item }: { item: WorkItem }) {
         <ItemTitle>
           <Link href={item.href} className="hover:underline focus-visible:underline">{item.title}</Link>
         </ItemTitle>
-        <ItemDescription className={cn(isStale && "font-medium text-[var(--color-warning)]")}>{item.detail}</ItemDescription>
+        <ItemDescription className={cn(isStale && "text-[var(--color-warning)]")}>{item.detail}</ItemDescription>
       </ItemContent>
       {item.status ? (
         <ItemActions className="max-sm:basis-full">
