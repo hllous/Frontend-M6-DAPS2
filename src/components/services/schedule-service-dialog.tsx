@@ -28,7 +28,7 @@ import { TimePicker } from "@/components/ui/time-picker";
 import { servicesAdapter, ServiceRequestError, OVERRIDE_NOTE_MIN, OVERRIDE_NOTE_MAX, type CreateServiceInput, type Service, type ServiceMode, type ServiceOrigin } from "@/lib/services";
 import { routesAdapter, type Route } from "@/lib/routes";
 import { serviceTypesAdapter, type ServiceType, type ServiceTypeCategory } from "@/lib/service-types";
-import { crewFit, crewsInZoneFirst } from "@/lib/crew-fit";
+import { asksForOverrideNote, crewFit, crewFitWarnings, crewsInZoneFirst } from "@/lib/crew-fit";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import { zonesAdapter, type Zone } from "@/lib/zones";
 import { containersAdapter } from "@/lib/containers";
@@ -421,7 +421,7 @@ export function ScheduleServiceDialog({
       onCreated(createdService);
       handleOpenChange(false);
     } catch (cause) {
-      if (cause instanceof ServiceRequestError && cause.status === 409) { setBackendConflict(true); return; }
+      if (cause instanceof ServiceRequestError && cause.status === 409 && asksForOverrideNote(cause.message)) { setBackendConflict(true); return; }
       const msg =
         getErrorMessage(cause, "No se pudo programar el servicio. Verifique los datos ingresados.");
       setErrorMessage(msg);
@@ -557,7 +557,7 @@ export function ScheduleServiceDialog({
               {crewsFailed ? <FieldError role="status">No se pudo cargar el listado de cuadrillas; puede asignarla después.</FieldError> : null}
             </Field>
 
-            {needsNote && <Field><FieldLabel htmlFor="service-override-note">Justificación de la asignación <span aria-hidden="true">*</span></FieldLabel><FieldDescription id="service-override-help" role="status">{fit.zone && "La cuadrilla trabaja en una zona distinta. "}{fit.specialty && "La cuadrilla tiene una especialidad distinta. "}{backendConflict && "La asignación presenta un conflicto de horario, zona o especialidad. "}Indique el motivo (mínimo {OVERRIDE_NOTE_MIN} caracteres).</FieldDescription><Textarea id="service-override-note" aria-required="true" aria-describedby="service-override-help" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} maxLength={OVERRIDE_NOTE_MAX} /></Field>}
+            {needsNote && <Field><FieldLabel htmlFor="service-override-note">Justificación de la asignación <span aria-hidden="true">*</span></FieldLabel><FieldDescription id="service-override-help" role="status">{crewFitWarnings(fit).join(" ")} {backendConflict && "La asignación presenta un conflicto de horario, zona o especialidad. "}Indique el motivo (mínimo {OVERRIDE_NOTE_MIN} caracteres).</FieldDescription><Textarea id="service-override-note" aria-required="true" aria-describedby="service-override-help" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} maxLength={OVERRIDE_NOTE_MAX} /></Field>}
 
             {!selectedServiceType ? null : derivedMode === "ROUTE" ? (
               <Card size="sm" role="group" aria-labelledby="schedule-route-heading">

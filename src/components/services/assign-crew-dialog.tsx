@@ -33,7 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
-import { crewFit, crewsInZoneFirst, isCrewFitConflict } from "@/lib/crew-fit";
+import { asksForOverrideNote, crewFit, crewFitWarnings, crewsInZoneFirst } from "@/lib/crew-fit";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import {
   checkAssignmentConflicts,
@@ -197,14 +197,11 @@ function AssignCrewForm({
       onOpenChange(false);
     } catch (cause) {
       if (cause instanceof ServiceRequestError && cause.status === 409) {
-        const hasAdvisoryOverlap = Boolean(conflicts.crewConflict || conflicts.vehicleConflict || fit.zone || fit.specialty);
-        if (hasAdvisoryOverlap || isCrewFitConflict(cause.message)) {
+        if (asksForOverrideNote(cause.message)) {
           setBackendConflict("La asignación presenta un conflicto de horario, zona o especialidad.");
         } else {
           setBackendConflict(null);
-          setErrorMessage(
-            "El servicio cambió. Actualice la lista e intente nuevamente.",
-          );
+          setErrorMessage(getErrorMessage(cause, "El servicio cambió. Actualice la lista e intente nuevamente."));
         }
         return;
       }
@@ -408,8 +405,7 @@ function AssignCrewForm({
               <AlertTriangle aria-hidden />
               <AlertTitle className="font-semibold uppercase tracking-wider">Revise la asignación</AlertTitle>
               <AlertDescription className="flex flex-col gap-2">
-                {fit.zone && <p>La cuadrilla trabaja en una zona distinta.</p>}
-                {fit.specialty && <p>La cuadrilla tiene una especialidad distinta.</p>}
+                {crewFitWarnings(fit).map((warning) => <p key={warning}>{warning}</p>)}
                 {conflicts.crewConflict && (
                   <p>
                     La cuadrilla{" "}

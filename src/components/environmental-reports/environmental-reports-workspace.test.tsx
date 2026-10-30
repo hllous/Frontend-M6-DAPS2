@@ -715,7 +715,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     updateEnvironmentalReportFixture("ER-1002", { status: "INSPECTION_SCHEDULED" });
     addEnvironmentalInspectionFixture({ id: inspectionId, reportId: "ER-1002", serviceId: null, inspectedAt: null, checklistVersion: "ambiental-v1", checklist: [], attachments: [], findings: null, outcome: null, nextStep: null, notes: null, createdAt: "2026-09-06T11:00:00.000Z", updatedAt: "2026-09-06T11:00:00.000Z" });
     const create = vi.spyOn(servicesAdapter, "create");
-    server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla ya está tomada en esa franja.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 }), { once: true }));
+    server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla ya está tomada en esa franja; hace falta overrideNote.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 }), { once: true }));
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
@@ -1042,4 +1042,22 @@ it("un 409 de zona durante la inspección abre la justificación sin repetir el 
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   expect(schedule).toHaveBeenCalledTimes(1);
   expect(await within(detail).findByText(/^Servicio:/)).toBeVisible();
+});
+
+it("un 409 que no pide justificación durante la inspección muestra su error y no abre la justificación", { timeout: 15000 }, async () => {
+  compatibleInspectionCrew();
+  server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla está inactiva.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 }), { once: true }));
+  const user = userEvent.setup();
+  render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+  const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+  await user.click(within(list).getByRole("button", { name: reportRowName("ER-1002") }));
+  const detail = await screen.findByRole("region", { name: "Detalle de TK-2026-091" });
+  await user.click(within(detail).getByRole("button", { name: "Programar inspección" }));
+  const dialog = screen.getByRole("dialog");
+  await chooseDate(user, within(dialog), "Fecha de inspección", "2026-09-10");
+  await chooseOption(user, within(dialog), "Zona operativa", /Belgrano/);
+  await chooseOption(user, within(dialog), "Cuadrilla", /Cuadrilla A/);
+  await user.click(within(dialog).getByRole("button", { name: "Programar inspección" }));
+  expect(await screen.findByText(/Inspección programada, pero no se creó el servicio/)).toBeVisible();
+  expect(screen.queryByLabelText(/Justificación/)).not.toBeInTheDocument();
 });

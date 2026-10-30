@@ -20,6 +20,14 @@ export function crewsInZoneFirst(crews: Crew[], zones: string[]) {
   return [...crews].sort((a, b) => Number(Boolean(b.effectiveZoneId && zones.includes(b.effectiveZoneId))) - Number(Boolean(a.effectiveZoneId && zones.includes(a.effectiveZoneId))));
 }
 
-export function isCrewFitConflict(message: string) {
-  return /overrideNote|cuadrilla|especialidad|zona/i.test(message);
+// El backend no manda un código en el 409 de asignación: siempre pide `overrideNote` en el mensaje, sea por solape, zona o especialidad.
+export function asksForOverrideNote(message: string) {
+  return /overrideNote/.test(message);
+}
+
+export function crewFitWarnings(fit: { zone: boolean; specialty: boolean }) {
+  return [
+    ...(fit.zone ? ["La cuadrilla trabaja en una zona distinta."] : []),
+    ...(fit.specialty ? ["La cuadrilla tiene una especialidad distinta."] : []),
+  ];
 }

@@ -348,3 +348,18 @@ it("exige justificación al programar con zona o especialidad distinta", async (
     expect((await send({ ...input, overrideNote: "Refuerzo coordinado para la zona" })).status).toBe(201);
   } finally { resetCrewFixtures(); }
 });
+
+it("la inspección programada con una cuadrilla de otra zona o especialidad pide justificación (409)", async () => {
+  const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+  const crew = crewFixtures.find((item) => item.id === "crew-a")!;
+  crew.effectiveZoneId = "zone-2";
+  crew.specialty = "INSPECTION";
+  const input = { serviceTypeId: "st-env-inspection", origin: "INSPECTION", inspectionId: "3f1c2b4a-5d6e-4f70-8a9b-0c1d2e3f4a5b", zoneIds: ["zone-1"], scheduledDate: "2026-09-10", timeWindow: { start: "08:00", end: "12:00" }, crewId: crew.id };
+  const send = (body: object) => POST(new Request("http://localhost/api/services", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(body) }));
+  try {
+    const refused = await send(input);
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).message).toContain("overrideNote");
+    expect((await send({ ...input, overrideNote: "Refuerzo coordinado para la zona" })).status).toBe(201);
+  } finally { resetCrewFixtures(); }
+});

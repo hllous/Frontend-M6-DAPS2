@@ -389,6 +389,20 @@ describe("especialidad y zona de cuadrilla", () => {
     await waitFor(() => expect(within(row).getByText("Barrido")).toBeVisible());
     expect(within(row).getByText("Palermo")).toBeVisible();
   });
+
+  it("quita la zona base de una cuadrilla y envía null", async () => {
+    const update = vi.spyOn(crewsAdapter, "update");
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla A · López" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Detalle de cuadrilla" })).getByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar cuadrilla" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Zona base" }));
+    await user.click(await screen.findByRole("option", { name: "Sin zona base" }));
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cuadrilla" }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith("crew-a", expect.objectContaining({ homeZoneId: null })));
+    expect(await screen.findByRole("row", { name: /Cuadrilla A/ })).toHaveTextContent("Sin zona");
+  });
 });
 
 describe("CrewCatalogPanel: reubicar cuadrilla e historial", () => {

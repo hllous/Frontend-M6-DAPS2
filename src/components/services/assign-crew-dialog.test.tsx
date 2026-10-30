@@ -264,7 +264,7 @@ describe("AssignCrewDialog", () => {
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "El servicio cambió. Actualice la lista e intente nuevamente.",
+      "La asignacion se solapa con 1 servicio/s ya programado/s.",
     );
     expect(screen.queryByText(/Se superpone con otro servicio/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Justificación de la asignación/i)).not.toBeInTheDocument();
@@ -277,7 +277,7 @@ describe("AssignCrewDialog", () => {
     realResources({ requiresVehicle: false });
     const bodies = captureAssign([{
       status: 409,
-      body: { statusCode: 409, message: "Conflicto de asignación.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services/x/assign-crew" },
+      body: { statusCode: 409, message: "La asignacion tiene reparos: hace falta 'overrideNote' explicando por que.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services/x/assign-crew" },
     }]);
     const onAssigned = vi.fn();
     const user = userEvent.setup();
@@ -327,4 +327,29 @@ it("un 409 de zona abre la justificación aun si el aviso local no detectó dife
   await choose(user, /cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
   await user.click(screen.getByRole("button", { name: /confirmar asignación/i }));
   expect(await screen.findByLabelText(/Justificación de la asignación/i)).toBeVisible();
+});
+
+it("un 409 que no pide justificación muestra su propio error y no abre el paso de justificación", async () => {
+  realResources({ requiresVehicle: false });
+  captureAssign([{ status: 409, body: { statusCode: 409, message: "La cuadrilla está inactiva.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services/x/assign-crew" } }]);
+  renderDialog();
+  const user = userEvent.setup();
+  await screen.findByRole("combobox", { name: /cuadrilla asignada/i });
+  await choose(user, /cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
+  await user.click(screen.getByRole("button", { name: /confirmar asignación/i }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("La cuadrilla está inactiva.");
+  expect(screen.queryByLabelText(/Justificación de la asignación/i)).not.toBeInTheDocument();
+});
+
+it("una diferencia sólo local muestra el aviso de zona y no un conflicto informado por el backend", async () => {
+  realResources({ requiresVehicle: false });
+  server.use(http.get("*/api/crews", () => HttpResponse.json({ data: [
+    { id: CREW_ID, name: "Cuadrilla de otra zona", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-2", specialty: "COLLECTION" },
+  ], meta })));
+  renderDialog();
+  const user = userEvent.setup();
+  await screen.findByRole("combobox", { name: /cuadrilla asignada/i });
+  await choose(user, /cuadrilla asignada/i, "Cuadrilla de otra zona");
+  expect(screen.getByText(/zona distinta/i)).toBeInTheDocument();
+  expect(screen.queryByText(/conflicto de horario, zona o especialidad/i)).not.toBeInTheDocument();
 });

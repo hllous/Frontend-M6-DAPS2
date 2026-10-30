@@ -740,7 +740,7 @@ export function assignCrewFixture(
   if ((overlapping.length > 0 || fit.zone || fit.specialty) && !input.overrideNote) {
     return {
       status: 409,
-      message: overlapping.length ? `La asignación se solapa con ${overlapping.map((s) => s.id).join(", ")}. Se puede asignar igual, pero hace falta una justificación.` : "La zona o especialidad de la cuadrilla no coincide. Se necesita una justificación.",
+      message: overlapping.length ? `La asignación se solapa con ${overlapping.map((s) => s.id).join(", ")}. La asignacion tiene reparos: hace falta 'overrideNote' explicando por que.` : "La asignacion tiene reparos: la zona o especialidad de la cuadrilla no coincide; hace falta 'overrideNote' explicando por que.",
     };
   }
 

@@ -77,7 +77,7 @@ import {
 } from "@/lib/environmental-reports";
 import { establishmentDirectoryAdapter, type Establishment } from "@/lib/establishment-directory";
 import { OVERRIDE_NOTE_MAX, OVERRIDE_NOTE_MIN, ServiceRequestError, servicesAdapter, type Service } from "@/lib/services";
-import { crewFit, crewsInZoneFirst } from "@/lib/crew-fit";
+import { asksForOverrideNote, crewFit, crewFitWarnings, crewsInZoneFirst } from "@/lib/crew-fit";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import { ENVIRONMENTAL_INSPECTION_SERVICE_TYPE_RULE, resolveServiceType } from "@/lib/service-types";
 import { zonesAdapter, type Zone } from "@/lib/zones";
@@ -665,7 +665,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
       setScheduledService(await createInspectionService(draft, overrideNote));
       setServiceDraft(null);
     } catch (error) {
-      const conflict = error instanceof ServiceRequestError && error.status === 409 ? error.message : undefined;
+      const conflict = error instanceof ServiceRequestError && error.status === 409 && asksForOverrideNote(error.message) ? error.message : undefined;
       setServiceDraft({ ...draft, conflict });
       if (conflict) {
         await refreshAfterScheduling();
@@ -1018,7 +1018,7 @@ function InspectionSchedulingDialog({ open, mode, initial, onOpenChange, onSubmi
       setCrewId("");
       setZoneId("");
     } catch (submitError) {
-      if (submitError instanceof ServiceRequestError && submitError.status === 409 && !conflict) {
+      if (submitError instanceof ServiceRequestError && submitError.status === 409 && !conflict && asksForOverrideNote(submitError.message)) {
         setConflict(submitError.message);
         return;
       }
@@ -1041,7 +1041,7 @@ function InspectionSchedulingDialog({ open, mode, initial, onOpenChange, onSubmi
           </div>
           <Field><FieldLabel htmlFor="inspection-zone">Zona operativa <span aria-hidden="true">*</span></FieldLabel><Combobox id="inspection-zone" value={zoneId} onChange={setZoneId} disabled={submitting} aria-required="true" invalid={missingZone} aria-describedby={missingZone ? "inspection-zone-error" : undefined} placeholder="Seleccione una zona" searchPlaceholder="Buscar zonas" emptyText="No se encontraron zonas." options={[{ value: "", label: "Seleccione una zona" }, ...zones.map((zone) => ({ value: zone.id, label: zone.name }))]} />{missingZone && <FieldError id="inspection-zone-error">Seleccione una zona.</FieldError>}</Field>
           <Field><FieldLabel htmlFor="inspection-crew">Cuadrilla <span aria-hidden="true">*</span></FieldLabel><Combobox id="inspection-crew" value={crewId} onChange={setCrewId} disabled={submitting} aria-required="true" invalid={missingCrew} aria-describedby={missingCrew ? "inspection-crew-error" : undefined} placeholder="Seleccione una cuadrilla" searchPlaceholder="Buscar cuadrillas" emptyText="No se encontraron cuadrillas." options={[{ value: "", label: "Seleccione una cuadrilla" }, ...crewsInZoneFirst(crews, zoneId ? [zoneId] : []).map((crew) => ({ value: crew.id, label: crew.name }))]} />{missingCrew && <FieldError id="inspection-crew-error">Seleccione una cuadrilla.</FieldError>}</Field>
-          {needsNote && <Field><FieldLabel htmlFor="inspection-override-note">Justificación <span aria-hidden="true">*</span></FieldLabel><FieldDescription id="inspection-override-note-help" role="status">{fit.zone && "La cuadrilla trabaja en una zona distinta. "}{fit.specialty && "La cuadrilla tiene una especialidad distinta. "}{conflict} Elija otra cuadrilla o justifique (mínimo {OVERRIDE_NOTE_MIN} caracteres).</FieldDescription><Textarea id="inspection-override-note" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} disabled={submitting} rows={3} maxLength={OVERRIDE_NOTE_MAX} aria-required="true" aria-invalid={shortNote || undefined} aria-describedby={shortNote ? "inspection-override-note-help inspection-override-note-error" : "inspection-override-note-help"} className="resize-y" />{shortNote && <FieldError id="inspection-override-note-error">Mínimo {OVERRIDE_NOTE_MIN} caracteres.</FieldError>}</Field>}
+          {needsNote && <Field><FieldLabel htmlFor="inspection-override-note">Justificación <span aria-hidden="true">*</span></FieldLabel><FieldDescription id="inspection-override-note-help" role="status">{crewFitWarnings(fit).join(" ")} {conflict} Elija otra cuadrilla o justifique (mínimo {OVERRIDE_NOTE_MIN} caracteres).</FieldDescription><Textarea id="inspection-override-note" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} disabled={submitting} rows={3} maxLength={OVERRIDE_NOTE_MAX} aria-required="true" aria-invalid={shortNote || undefined} aria-describedby={shortNote ? "inspection-override-note-help inspection-override-note-error" : "inspection-override-note-help"} className="resize-y" />{shortNote && <FieldError id="inspection-override-note-error">Mínimo {OVERRIDE_NOTE_MIN} caracteres.</FieldError>}</Field>}
         </FieldGroup>
       </form>
       <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancelar</Button><Button type="submit" form="inspection-scheduling-form" disabled={submitting} className="gap-2">{submitting && <Spinner data-icon="inline-start" aria-hidden />}{submitting ? "Programando…" : title}</Button></DialogFooter>

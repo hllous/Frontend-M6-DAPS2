@@ -25,7 +25,7 @@ import Link from "next/link";
 import { servicesAdapter, ServiceRequestError, OVERRIDE_NOTE_MIN, OVERRIDE_NOTE_MAX, type CreateServiceInput, type Service } from "@/lib/services";
 import { resolveServiceType, TREE_PRUNING_SERVICE_TYPE_RULE } from "@/lib/service-types";
 import { treeInterventionCreateInputSchema, treeInterventionsAdapter, TreeInterventionRequestError, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionPriority, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
-import { isCrewFitConflict } from "@/lib/crew-fit";
+import { asksForOverrideNote } from "@/lib/crew-fit";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import { vehiclesAdapter, type Vehicle } from "@/lib/vehicles";
 import { todayInArgentina } from "@/lib/argentina-date";
@@ -442,7 +442,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       setNotice(action === "submit" ? "Extracción enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
       if (action === "reject") setRejectConfirmOpen(false);
     } catch (caught) {
-      if (action === "schedule" && caught instanceof ServiceRequestError && caught.status === 409 && isCrewFitConflict(caught.message)) { setCrewConflict(true); return; }
+      if (action === "schedule" && caught instanceof ServiceRequestError && caught.status === 409 && asksForOverrideNote(caught.message)) { setCrewConflict(true); return; }
       setActionError(errorMessage(caught, "No se pudo actualizar la intervención."));
     } finally { setActiveAction(null); }
   };

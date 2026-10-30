@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     });
 
     const fit = crewFit(crewFixtures.find((crew) => crew.id === input.crewId), input.zoneIds, serviceTypeFixtures.find((type) => type.id === input.serviceTypeId)?.code);
-    if ((fit.zone || fit.specialty) && !input.overrideNote) return errorResponse(409, "La zona o especialidad de la cuadrilla no coincide. Justifique la asignación.", path);
+    if ((fit.zone || fit.specialty) && !input.overrideNote) return errorResponse(409, "La asignacion tiene reparos: la zona o especialidad de la cuadrilla no coincide; hace falta 'overrideNote' explicando por que.", path);
 
     const newService: Service = {
       id: `SVC-${Math.floor(1000 + Math.random() * 9000)}`,

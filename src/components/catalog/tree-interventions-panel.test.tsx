@@ -418,6 +418,16 @@ describe("TreeInterventionsPanel", () => {
     expect(within(detail).getByRole("link", { name: /SVC-\d+/ })).toHaveAttribute("href", expect.stringContaining(`detail=${serviceId}`));
   });
 
+  it("un 409 que no pide justificación muestra su error y no abre la justificación", async () => {
+    server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla está inactiva.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 })));
+    const user = userEvent.setup();
+    const { detail, form } = await openScheduleForm(user, /intervention-2|Tratamiento/i);
+    await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Cuadrilla (opcional)" }), /Cuadrilla A/);
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+    expect(await within(detail).findByText("La cuadrilla está inactiva.")).toBeVisible();
+    expect(within(form).queryByLabelText(/Justificación de la asignación/i)).not.toBeInTheDocument();
+  });
+
   it("re-reads the intervention after a 409 and treats an existing link as done", async () => {
     server.use(
       http.post("*/api/tree-interventions/:interventionId/assign-service", ({ params }) => {
