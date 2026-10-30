@@ -4,11 +4,77 @@ import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
 
 const DEMO_TICKET_ID = "550e8400-e29b-41d4-a716-446655440000";
+const PUBLIC_GREEN_POINTS_CENTRO_ID = "7b0c4f1e-2d3a-4b5c-8d6e-0a1b2c3d4e5f";
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 async function expectNoViolations(page: import("@playwright/test").Page) {
   const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
   expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
+}
+
+async function clickOptionByMouse(
+  page: import("@playwright/test").Page,
+  optionName: string,
+) {
+  const option = page.getByRole("option", { name: optionName, exact: true });
+  const optionBox = await option.boundingBox();
+  expect(optionBox, `${optionName} should be rendered`).not.toBeNull();
+
+  const x = optionBox!.x + optionBox!.width / 2;
+  const y = optionBox!.y + optionBox!.height / 2;
+  await page.mouse.click(x, y);
+}
+
+async function clickOptionOverZoomControl(
+  page: import("@playwright/test").Page,
+  optionToClick: string,
+) {
+  const popup = page.locator('[data-slot="select-content"]');
+  await popup.evaluate(async (element) => {
+    await Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => undefined)));
+  });
+
+  const zoomControl = page.locator(".leaflet-control-zoom");
+  const zoomBox = await zoomControl.boundingBox();
+  expect(zoomBox, "the map zoom control should be visible").not.toBeNull();
+
+  const options = page.getByRole("option");
+  const optionCount = await options.count();
+  let intersectionCount = 0;
+  let selectedIntersection: { x: number; y: number } | undefined;
+
+  for (let index = 0; index < optionCount; index += 1) {
+    const option = options.nth(index);
+    const optionName = (await option.textContent())?.trim() ?? "";
+    const optionBox = await option.boundingBox();
+    if (!optionBox) continue;
+
+    const left = Math.max(optionBox.x, zoomBox!.x);
+    const right = Math.min(optionBox.x + optionBox.width, zoomBox!.x + zoomBox!.width);
+    const top = Math.max(optionBox.y, zoomBox!.y);
+    const bottom = Math.min(optionBox.y + optionBox.height, zoomBox!.y + zoomBox!.height);
+    if (left >= right || top >= bottom) continue;
+
+    intersectionCount += 1;
+    const x = left + (right - left) / 2;
+    const y = top + (bottom - top) / 2;
+    const hitTarget = await page.evaluate(({ pointX, pointY }) => {
+      const hit = document.elementFromPoint(pointX, pointY);
+      return {
+        optionName: hit?.closest('[role="option"]')?.textContent?.trim(),
+        isZoomControl: Boolean(hit?.closest(".leaflet-control-zoom")),
+      };
+    }, { pointX: x, pointY: y });
+
+    expect(hitTarget.optionName, `${optionName} should receive the pointer where it overlaps the zoom control`).toBe(optionName);
+    expect(hitTarget.isZoomControl, `${optionName} should not be covered by the zoom control`).toBe(false);
+
+    if (optionName === optionToClick) selectedIntersection = { x, y };
+  }
+
+  expect(intersectionCount, "at least one dropdown option should overlap the map zoom control").toBeGreaterThan(0);
+  expect(selectedIntersection, `${optionToClick} should overlap the map zoom control`).toBeDefined();
+  await page.mouse.click(selectedIntersection!.x, selectedIntersection!.y);
 }
 
 test.describe("public complaint tracking @smoke", () => {
@@ -107,4 +173,28 @@ test.describe("public complaint tracking @smoke", () => {
     await page.getByRole("link", { name: "Volver a consultas", exact: true }).click();
     await expect(page).toHaveURL(/\/consulta$/);
   });
+
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    test(`green-points filters stay clickable above the map at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto(`/consulta/puntos-verdes?zona=${PUBLIC_GREEN_POINTS_CENTRO_ID}`);
+
+      const pointsList = page.getByRole("list", { name: "Puntos verdes" });
+      await expect(pointsList.getByText("Punto verde Plaza Mitre")).toBeVisible();
+      await expect(page.locator(".leaflet-container")).toBeVisible();
+
+      await page.getByRole("combobox", { name: "Tipo de residuo" }).click();
+      if (viewport.width === 1440) {
+        await clickOptionOverZoomControl(page, "Verdes");
+      } else {
+        await clickOptionByMouse(page, "Verdes");
+      }
+      await expect(pointsList.locator("li")).toHaveCount(1);
+
+      await page.getByRole("combobox", { name: "Tu zona" }).click();
+      await clickOptionByMouse(page, "Norte");
+      await expect(pointsList.getByText("Punto verde Parque del Bicentenario")).toBeVisible();
+      await expect(pointsList.getByText("Punto verde Plaza Mitre")).toHaveCount(0);
+    });
+  }
 });

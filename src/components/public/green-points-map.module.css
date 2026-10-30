@@ -1,5 +1,6 @@
 .canvas {
   position: relative;
+  isolation: isolate;
   height: 100%;
 }
 
