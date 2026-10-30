@@ -65,7 +65,7 @@ describe("Mi trabajo de Oficina · cola de decisiones (Admin)", () => {
 
     const trees = await group(/Intervenciones de arbolado: 2 pendientes/);
     expect(within(trees).getAllByRole("listitem")).toHaveLength(2);
-    expect(within(trees).getAllByRole("link")[0]).toHaveAttribute("href", "/app/catalog/tree-interventions");
+    expect(hrefs(trees)).toEqual(["/app/catalog/tree-interventions?detail=intervention-1", "/app/catalog/tree-interventions?detail=intervention-3"]);
 
     const containers = await group(/Contenedores desbordados: 1 pendiente/);
     expect(hrefs(containers)).toEqual(["/app/catalog/containers?detail=cont-2"]);

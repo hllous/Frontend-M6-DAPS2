@@ -58,6 +58,11 @@ afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); re
 afterAll(() => server.close());
 
 describe("EnvironmentalReportsWorkspace", () => {
+  it("opens the linked report even when it is outside the filtered queue", async () => {
+    window.history.replaceState(null, "", "/app?destination=environment&status=CLOSED&detail=ER-1013");
+    render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByRole("heading", { name: reportRowName("ER-1013") })).toBeVisible();
+  });
   it("lets an auditor read a report without offering review or scheduling actions", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeLimited} />);

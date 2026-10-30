@@ -214,7 +214,7 @@ const workGroups: WorkGroupDefinition[] = [
           const since = intervention.createdAt ? argentinaDay(intervention.createdAt) ?? undefined : undefined;
           return {
             id: intervention.id,
-            href: "/app/catalog/tree-interventions",
+            href: `/app/catalog/tree-interventions?detail=${encodeURIComponent(intervention.id)}`,
             title: `${treeInterventionLabels[intervention.interventionType]} · ${intervention.address ?? "sin dirección"}`,
             detail: since
               ? `Solicitada el ${formatArgentinaCalendarDate(since)} · ${waitingLabel(since, today)}`
