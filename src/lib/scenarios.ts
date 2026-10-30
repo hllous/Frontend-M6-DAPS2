@@ -45,6 +45,7 @@ export type Capability =
   | "tree:survey"
   | "treeIntervention:request"
   | "treeIntervention:authorize"
+  | "treeIntervention:authorizeRemoval"
   | "service:assign"
   | "service:cancel"
   | "service:reschedule"

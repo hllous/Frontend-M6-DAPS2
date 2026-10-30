@@ -510,6 +510,35 @@ describe("TreeInterventionsPanel", () => {
     expect(within(detail).getByRole("button", { name: "Rechazar intervención" })).toBeVisible();
   });
 
+  it("hides authorize and reject on a pending removal for Operations, who still authorizes other types", async () => {
+    const user = userEvent.setup();
+    updateTreeInterventionFixture("intervention-3", { status: "PENDING_AUTHORIZATION" });
+    render(<TreeInterventionsPanel scenario={scenarios.officeOperations} />);
+    const removal = await screen.findByRole("article", { name: /intervention-3|Extracción/i });
+    await user.click(within(removal).getByRole("button", { name: "Ver detalle" }));
+    const removalDetail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    expect(await within(removalDetail).findByText("Pendiente de autorización")).toBeVisible();
+    expect(within(removalDetail).queryByRole("button", { name: "Autorizar intervención" })).not.toBeInTheDocument();
+    expect(within(removalDetail).queryByRole("button", { name: "Rechazar intervención" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    const pruning = await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i });
+    await user.click(within(pruning).getByRole("button", { name: "Ver detalle" }));
+    const pruningDetail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    expect(await within(pruningDetail).findByRole("button", { name: "Autorizar intervención" })).toBeVisible();
+  });
+
+  it("shows authorize and reject on a pending removal to the Admin", async () => {
+    const user = userEvent.setup();
+    updateTreeInterventionFixture("intervention-3", { status: "PENDING_AUTHORIZATION" });
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const removal = await screen.findByRole("article", { name: /intervention-3|Extracción/i });
+    await user.click(within(removal).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    expect(await within(detail).findByRole("button", { name: "Autorizar intervención" })).toBeVisible();
+    expect(within(detail).getByRole("button", { name: "Rechazar intervención" })).toBeVisible();
+  });
+
   it("rejects a removal terminally and offers a fresh request with its original values", async () => {
     const user = userEvent.setup();
     render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);

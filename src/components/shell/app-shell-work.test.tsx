@@ -88,6 +88,15 @@ describe("Mi trabajo de Oficina · cola de decisiones (Admin)", () => {
     expect(within(trees).getAllByText("Pendiente de autorización")).toHaveLength(1);
   });
 
+  it("does not count a pending extraction as Operations work, since only the Admin resolves it", async () => {
+    updateTreeInterventionFixture("intervention-3", { status: "PENDING_AUTHORIZATION" });
+    render(<AppShell scenario={scenarios.officeOperations} />);
+
+    const trees = await group(/Intervenciones de arbolado: 1 pendiente/);
+    expect(within(trees).getAllByText("Solicitada")).toHaveLength(1);
+    expect(within(trees).queryByText("Pendiente de autorización")).not.toBeInTheDocument();
+  });
+
   it("carries no explanatory lines under the group headings", async () => {
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
     await group(/Contenedores desbordados/);
