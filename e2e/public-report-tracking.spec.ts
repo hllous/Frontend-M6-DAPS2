@@ -24,6 +24,11 @@ test.describe("public complaint tracking @smoke", () => {
     await expect(page).toHaveURL(/\/consulta\/denuncia$/);
     await expectNoViolations(page);
 
+    await page.getByRole("link", { name: "← Volver a consultas" }).click();
+    await expect(page).toHaveURL(/\/consulta$/);
+    await page.getByRole("link", { name: /Seguir mi denuncia/ }).click();
+    await expect(page).toHaveURL(/\/consulta\/denuncia$/);
+
     await page.getByLabel("Código de seguimiento").fill(DEMO_TICKET_ID);
     await page.getByRole("button", { name: "Consultar" }).click();
 
@@ -60,5 +65,46 @@ test.describe("public complaint tracking @smoke", () => {
     await expect(page).toHaveURL(/\?zona=/);
     await expect(page.getByRole("listbox")).toHaveCount(0);
     await expectNoViolations(page);
+
+    await page.getByRole("link", { name: "← Volver a consultas" }).click();
+    await expect(page).toHaveURL(/\/consulta$/);
+  });
+
+  test("a resident filters green points and opens a map marker", async ({ page }) => {
+    await page.goto("/consulta");
+    await page.getByRole("link", { name: /Puntos verdes/ }).click();
+
+    await expect(page).toHaveURL(/\/consulta\/puntos-verdes$/);
+    await expect(page.getByRole("heading", { name: "Puntos verdes" })).toBeVisible();
+    await expectNoViolations(page);
+
+    await page.getByRole("combobox", { name: "Tu zona" }).click();
+    await page.getByRole("option", { name: "Centro" }).click();
+
+    const pointsList = page.getByRole("list", { name: "Puntos verdes" });
+    await expect(pointsList.getByText("Punto verde Estación Centro")).toBeVisible();
+    await expect(pointsList.getByText("Punto verde Plaza Mitre")).toBeVisible();
+    await expect(page.getByTitle("Punto verde Estación Centro · Av. de Mayo 1200")).toHaveCount(0);
+
+    const marker = page.getByTitle("Punto verde Plaza Mitre · Av. Cabildo 2100");
+    await expect(marker).toBeVisible();
+    await expect(page.getByRole("button", { name: "Acercar" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Alejar" })).toBeVisible();
+    await marker.click();
+    await expect(page.getByText("Reciclables, Verdes", { exact: true })).toBeVisible();
+    const closePopup = page.getByRole("button", { name: "Cerrar información de Punto verde Plaza Mitre" });
+    await expect(closePopup).toBeVisible();
+    await expectNoViolations(page);
+    await closePopup.click();
+    await expect(page.getByText("Reciclables, Verdes", { exact: true })).toHaveCount(0);
+
+    await page.getByRole("combobox", { name: "Tipo de residuo" }).click();
+    await page.getByRole("option", { name: "Domiciliarios" }).click();
+    await expect(pointsList.getByText("Punto verde Estación Centro")).toBeVisible();
+    await expect(pointsList.getByText("Punto verde Plaza Mitre")).toHaveCount(0);
+    await expect(page.getByText("No hay puntos con ubicación disponible para mostrar en el mapa.")).toBeVisible();
+
+    await page.getByRole("link", { name: "← Volver a consultas" }).click();
+    await expect(page).toHaveURL(/\/consulta$/);
   });
 });

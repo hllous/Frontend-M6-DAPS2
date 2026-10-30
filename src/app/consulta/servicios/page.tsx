@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PublicPageHeader } from "@/components/public/public-page-header";
 import { ServiceSchedule } from "@/components/public/service-schedule";
 
 export const metadata: Metadata = { title: "¿Cuándo pasa el servicio? · Ambiente e Higiene" };
@@ -12,10 +13,10 @@ export default async function ServicesPage({ searchParams }: { searchParams: Ser
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <h1 className="text-[28px] leading-[34px]">¿Cuándo pasa el servicio?</h1>
-        <p className="max-w-[60ch] text-muted-foreground">Elegí tu zona y mirá los servicios programados para los próximos 30 días.</p>
-      </div>
+      <PublicPageHeader
+        title="¿Cuándo pasa el servicio?"
+        introduction="Elegí tu zona y mirá los servicios programados para los próximos 30 días."
+      />
       <ServiceSchedule initialZoneId={initialZoneId} />
     </>
   );

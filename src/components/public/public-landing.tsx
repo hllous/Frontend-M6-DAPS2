@@ -16,7 +16,7 @@ type Entry = {
 const ENTRIES: Entry[] = [
   { title: "Seguir mi denuncia", description: "Mirá en qué etapa está tu denuncia con el código de tu comprobante.", icon: FileSearchIcon, href: "/consulta/denuncia" },
   { title: "Servicios", description: "Consultá cuándo pasa cada servicio por tu zona.", icon: Trash2Icon, href: "/consulta/servicios" },
-  { title: "Puntos verdes", description: "Encontrá dónde llevar tus residuos y cuáles recibe cada punto.", icon: MapPinIcon },
+  { title: "Puntos verdes", description: "Encontrá dónde llevar tus residuos y cuáles recibe cada punto.", icon: MapPinIcon, href: "/consulta/puntos-verdes" },
 ];
 
 export function PublicLanding() {

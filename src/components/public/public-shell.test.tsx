@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
 import { PublicLanding } from "./public-landing";
 import { PublicShell } from "./public-shell";
@@ -17,7 +17,7 @@ describe("PublicShell", () => {
 });
 
 describe("PublicLanding", () => {
-  it("links the tracking and services pages and shows green points as coming soon", () => {
+  it("links to all three public consultations", () => {
     render(<PublicLanding />);
 
     expect(screen.getByRole("heading", { level: 1 })).toBeVisible();
@@ -26,8 +26,7 @@ describe("PublicLanding", () => {
 
     expect(screen.getByRole("link", { name: /Servicios/ })).toHaveAttribute("href", "/consulta/servicios");
 
-    const greenPoints = screen.getByRole("heading", { name: "Puntos verdes" }).closest("[data-slot=card]") as HTMLElement;
-    expect(within(greenPoints).getByText("Próximamente")).toBeVisible();
-    expect(within(greenPoints).queryByRole("link")).not.toBeInTheDocument();
+    const greenPoints = screen.getByRole("link", { name: /Puntos verdes/ });
+    expect(greenPoints).toHaveAttribute("href", "/consulta/puntos-verdes");
   });
 });

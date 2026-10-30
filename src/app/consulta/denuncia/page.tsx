@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PublicPageHeader } from "@/components/public/public-page-header";
 import { ReportTracker } from "@/components/public/report-tracker";
 
 export const metadata: Metadata = { title: "Seguir mi denuncia · Ambiente e Higiene" };
@@ -12,10 +13,10 @@ export default async function TrackReportPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <h1 className="text-[28px] leading-[34px]">Seguir mi denuncia</h1>
-        <p className="max-w-[60ch] text-muted-foreground">Ingresá el código de seguimiento de tu comprobante para ver en qué etapa está.</p>
-      </div>
+      <PublicPageHeader
+        title="Seguir mi denuncia"
+        introduction="Ingresá el código de seguimiento de tu comprobante para ver en qué etapa está."
+      />
       <ReportTracker initialCode={initialCode} />
     </>
   );
