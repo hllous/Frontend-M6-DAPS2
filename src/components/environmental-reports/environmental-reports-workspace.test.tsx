@@ -1019,3 +1019,27 @@ it("prioriza la cuadrilla de la zona de inspección y advierte una especialidad 
   expect(within(dialog).getByText(/zona distinta/i)).toBeVisible();
   expect(within(dialog).getByLabelText(/Justificación/i)).toBeVisible();
 });
+
+
+it("un 409 de zona durante la inspección abre la justificación sin repetir el alta de inspección", { timeout: 15000 }, async () => {
+  compatibleInspectionCrew();
+  server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla trabaja en otra zona; hace falta overrideNote", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 }), { once: true }));
+  const user = userEvent.setup();
+  const schedule = vi.spyOn(environmentalReportsAdapter, "schedule");
+  render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+  const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+  await user.click(within(list).getByRole("button", { name: reportRowName("ER-1002") }));
+  const detail = await screen.findByRole("region", { name: "Detalle de TK-2026-091" });
+  await user.click(within(detail).getByRole("button", { name: "Programar inspección" }));
+  const dialog = screen.getByRole("dialog");
+  await chooseDate(user, within(dialog), "Fecha de inspección", "2026-09-10");
+  await chooseOption(user, within(dialog), "Zona operativa", /Belgrano/);
+  await chooseOption(user, within(dialog), "Cuadrilla", /Cuadrilla A/);
+  await user.click(within(dialog).getByRole("button", { name: "Programar inspección" }));
+  const retry = await screen.findByRole("dialog", { name: "Programar servicio" });
+  await user.type(within(retry).getByLabelText(/Justificación/), "Refuerzo coordinado para la zona.");
+  await user.click(within(retry).getByRole("button", { name: "Programar servicio" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(schedule).toHaveBeenCalledTimes(1);
+  expect(await within(detail).findByText(/^Servicio:/)).toBeVisible();
+});
