@@ -88,6 +88,14 @@ describe("Mi trabajo de Oficina · cola de decisiones (Admin)", () => {
     expect(within(trees).getAllByText("Pendiente de autorización")).toHaveLength(1);
   });
 
+  it("carries no explanatory lines under the group headings", async () => {
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+    await group(/Contenedores desbordados/);
+
+    expect(screen.queryByText(/próximos 7 días/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/solo los servicios cargados/)).not.toBeInTheDocument();
+  });
+
   it("shows no simulated text and no button that does nothing", async () => {
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
     await group(/Contenedores desbordados/);
@@ -144,6 +152,7 @@ describe("Mi trabajo de Oficina · cola de decisiones (Admin)", () => {
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
 
     expect(await screen.findByText("No tenés tareas pendientes")).toBeVisible();
+    expect(screen.queryByText(/va a aparecer en esta pantalla/)).not.toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
 });

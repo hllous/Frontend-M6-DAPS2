@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Clock3, Leaf, ShieldAlert, Trash2, Trees, UsersRound, type LucideIcon } from "lucide-react";
+import { ArrowRight, CalendarClock, CircleCheck, Clock3, Leaf, ShieldAlert, Trash2, Trees, UsersRound, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 
@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
 import { LoadingRegion } from "@/components/ui/loading-region";
@@ -36,7 +36,7 @@ type WorkItem = {
   id: string;
   href: string;
   title: string;
-  detail: string;
+  detail?: string;
   /** Día o instante ISO desde el que espera; ordena el grupo, el más antiguo primero. */
   waitingSince?: string;
   status?: PendingTreeStatus;
@@ -53,7 +53,6 @@ type WorkGroupDefinition = {
   /** El mismo ícono que usa la app para ese dominio (Control Ambiental, cuadrillas, calendario, arbolado, contenedores). */
   icon: LucideIcon;
   tone: WorkTone;
-  description?: string;
   errorMessage: string;
   seeAllHref: string;
   seeAllLabel: string;
@@ -141,7 +140,6 @@ const workGroups: WorkGroupDefinition[] = [
     icon: UsersRound,
     tone: "warning",
     title: "Servicios sin cuadrilla",
-    description: `Programados en los próximos ${UPCOMING_DAYS} días. El total cuenta solo los servicios cargados sin cuadrilla.`,
     errorMessage: "No se pudieron cargar los servicios sin cuadrilla.",
     seeAllHref: "/app?destination=services&status=SCHEDULED",
     seeAllLabel: "Ver todos los servicios sin cuadrilla",
@@ -220,7 +218,7 @@ const workGroups: WorkGroupDefinition[] = [
             title: `${treeInterventionLabels[intervention.interventionType]} · ${intervention.address ?? "sin dirección"}`,
             detail: since
               ? `Solicitada el ${formatArgentinaCalendarDate(since)} · ${waitingLabel(since, today)}`
-              : "Intervención de arbolado",
+              : undefined,
             waitingSince: intervention.createdAt,
             status: statuses[index],
           };
@@ -321,13 +319,15 @@ export function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario })
       {allEmpty ? (
         <Empty>
           <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <CircleCheck aria-hidden />
+            </EmptyMedia>
             <EmptyTitle>No tenés tareas pendientes</EmptyTitle>
-            <EmptyDescription>Cuando haya algo que resolver, va a aparecer en esta pantalla.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : visibleGroups.length > 0 ? (
         <>
-          <ul aria-label="Pendientes por grupo" className="grid list-none grid-cols-2 gap-3 p-0 md:grid-cols-3 xl:grid-cols-5">
+          <ul aria-label="Pendientes por grupo" className="grid list-none grid-cols-2 gap-3 p-0 max-md:[&>li:last-child:nth-child(odd)]:col-span-2 md:grid-cols-3 xl:grid-cols-5">
             {visibleGroups.map((group) => (
               <WorkTile key={group.id} group={group} state={stateOf(group)} />
             ))}
@@ -427,7 +427,6 @@ function WorkGroup({
             </h2>
             {state.status === "ready" ? <Badge variant="secondary">{state.load.total}</Badge> : null}
           </div>
-          {group.description ? <p className="text-sm text-muted-foreground">{group.description}</p> : null}
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {state.status === "loading" ? <ListItemsSkeleton itemCount={3} /> : null}
@@ -449,9 +448,10 @@ function WorkGroup({
               <Link
                 href={group.seeAllHref}
                 aria-label={group.seeAllLabel}
-                className="self-start text-sm font-medium underline-offset-4 hover:underline focus-visible:underline"
+                className="inline-flex items-center gap-1 self-start text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:underline [&_svg]:size-4"
               >
                 Ver todos
+                <ArrowRight aria-hidden />
               </Link>
             </>
           ) : null}
@@ -474,7 +474,9 @@ function WorkItemRow({ item }: { item: WorkItem }) {
         <ItemTitle>
           <Link href={item.href} className="hover:underline focus-visible:underline">{item.title}</Link>
         </ItemTitle>
-        <ItemDescription className={cn(isStale && "text-[var(--color-warning)]")}>{item.detail}</ItemDescription>
+        {item.detail ? (
+          <ItemDescription className={cn(isStale && "text-[var(--color-warning)]")}>{item.detail}</ItemDescription>
+        ) : null}
       </ItemContent>
       {item.status ? (
         <ItemActions className="max-sm:basis-full">
