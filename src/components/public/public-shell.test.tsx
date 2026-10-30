@@ -17,17 +17,17 @@ describe("PublicShell", () => {
 });
 
 describe("PublicLanding", () => {
-  it("links the tracking page and shows services and green points as coming soon", () => {
+  it("links the tracking and services pages and shows green points as coming soon", () => {
     render(<PublicLanding />);
 
     expect(screen.getByRole("heading", { level: 1 })).toBeVisible();
     const tracking = screen.getByRole("link", { name: /Seguir mi denuncia/ });
     expect(tracking).toHaveAttribute("href", "/consulta/denuncia");
 
-    for (const name of ["Servicios", "Puntos verdes"]) {
-      const entry = screen.getByRole("heading", { name }).closest("[data-slot=card]") as HTMLElement;
-      expect(within(entry).getByText("Próximamente")).toBeVisible();
-      expect(within(entry).queryByRole("link")).not.toBeInTheDocument();
-    }
+    expect(screen.getByRole("link", { name: /Servicios/ })).toHaveAttribute("href", "/consulta/servicios");
+
+    const greenPoints = screen.getByRole("heading", { name: "Puntos verdes" }).closest("[data-slot=card]") as HTMLElement;
+    expect(within(greenPoints).getByText("Próximamente")).toBeVisible();
+    expect(within(greenPoints).queryByRole("link")).not.toBeInTheDocument();
   });
 });

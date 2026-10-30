@@ -47,4 +47,17 @@ test.describe("public complaint tracking @smoke", () => {
     await expect(page).toHaveURL(/\/consulta\/denuncia/);
     await expect(page.getByRole("region", { name: /TK-2026-000123/ })).toBeVisible();
   });
+
+  test("the services page has no accessibility violations before and after choosing a zone", async ({ page }) => {
+    await page.goto("/consulta");
+    await page.getByRole("link", { name: /Servicios/ }).click();
+    await expect(page).toHaveURL(/\/consulta\/servicios$/);
+    await expectNoViolations(page);
+
+    await page.getByRole("combobox", { name: "Tu zona" }).click();
+    await page.getByRole("option", { name: "Centro" }).click();
+    await expect(page.getByText("Recolección domiciliaria").first()).toBeVisible();
+    await expect(page).toHaveURL(/\?zona=/);
+    await expectNoViolations(page);
+  });
 });
