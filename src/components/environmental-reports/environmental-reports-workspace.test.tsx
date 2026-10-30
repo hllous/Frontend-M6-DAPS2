@@ -988,3 +988,25 @@ describe("internal jargon guard", () => {
     expectNoInternalJargon(container);
   });
 });
+
+
+it("prioriza la cuadrilla de la zona de inspección y advierte una especialidad distinta", { timeout: 15000 }, async () => {
+  server.use(http.get("*/api/crews", () => HttpResponse.json({ data: [
+    { id: "other", name: "Otra zona", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-2", specialty: "TREES" },
+    { id: "local", name: "Zona elegida", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-1", specialty: "INSPECTION" },
+  ], meta: { total: 2, page: 1, pageSize: 100, totalPages: 1 } })));
+  const user = userEvent.setup();
+  render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
+  const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
+  await user.click(within(list).getByRole("button", { name: reportRowName("ER-1002") }));
+  const detail = await screen.findByRole("region", { name: "Detalle de TK-2026-091" });
+  await user.click(within(detail).getByRole("button", { name: "Programar inspección" }));
+  const dialog = screen.getByRole("dialog");
+  await chooseOption(user, within(dialog), "Zona operativa", /Belgrano/);
+  await user.click(within(dialog).getByRole("combobox", { name: "Cuadrilla" }));
+  const options = await screen.findAllByRole("option");
+  expect(options.findIndex((option) => option.textContent?.includes("Zona elegida"))).toBeLessThan(options.findIndex((option) => option.textContent?.includes("Otra zona")));
+  await user.click(screen.getByRole("option", { name: "Otra zona" }));
+  expect(within(dialog).getByText(/zona distinta/i)).toBeVisible();
+  expect(within(dialog).getByLabelText(/Justificación/i)).toBeVisible();
+});

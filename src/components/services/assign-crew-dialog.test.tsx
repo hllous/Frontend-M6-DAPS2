@@ -218,7 +218,7 @@ describe("AssignCrewDialog", () => {
     await screen.findByText(/Vehículo opcional/i);
     await choose(user, /Cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
 
-    const warning = screen.getByText(/Se superpone con otro servicio$/i).closest("[role=alert]") as HTMLElement;
+    const warning = screen.getByText(/Revise la asignación$/i).closest("[role=alert]") as HTMLElement;
     expect(within(warning).getByText(overlapping.id)).toBeInTheDocument();
     expect(screen.queryByText(/No se requiere justificación/i)).not.toBeInTheDocument();
 
@@ -226,7 +226,7 @@ describe("AssignCrewDialog", () => {
     expect(screen.getByText(/Escriba al menos 10 caracteres/i)).toBeInTheDocument();
     expect(bodies).toHaveLength(0);
 
-    await user.type(screen.getByLabelText(/Justificación del solapamiento/i), "  Núñez termina antes; coordinado por radio.  ");
+    await user.type(screen.getByLabelText(/Justificación de la asignación/i), "  Núñez termina antes; coordinado por radio.  ");
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
 
     await waitFor(() => expect(onAssigned).toHaveBeenCalledTimes(1));
@@ -242,7 +242,7 @@ describe("AssignCrewDialog", () => {
 
     await screen.findByText(/Vehículo opcional/i);
     await choose(user, /Cuadrilla asignada/i, "Cuadrilla Palermo — Recolección");
-    expect(screen.queryByLabelText(/Justificación del solapamiento/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Justificación de la asignación/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
 
     await waitFor(() => expect(onAssigned).toHaveBeenCalledTimes(1));
@@ -267,7 +267,7 @@ describe("AssignCrewDialog", () => {
       "El servicio cambió. Actualice la lista e intente nuevamente.",
     );
     expect(screen.queryByText(/Se superpone con otro servicio/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Justificación del solapamiento/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Justificación de la asignación/i)).not.toBeInTheDocument();
     expect(onAssigned).not.toHaveBeenCalled();
     expect(bodies).toEqual([{ crewId: CREW_ID, vehicleId: null }]);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -286,18 +286,45 @@ describe("AssignCrewDialog", () => {
     await screen.findByText(/Vehículo opcional/i);
     await choose(user, /Cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
     await user.type(
-      screen.getByLabelText(/Justificación del solapamiento/i),
+      screen.getByLabelText(/Justificación de la asignación/i),
       "Se coordinó con el jefe de cuadrilla.",
     );
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
 
     await waitFor(() => expect(bodies).toHaveLength(1));
-    const warning = screen.getByText(/Se superpone con otro servicio$/i).closest("[role=alert]") as HTMLElement;
+    const warning = screen.getByText(/Revise la asignación$/i).closest("[role=alert]") as HTMLElement;
     expect(within(warning).getByText(overlapping.id)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Justificación del solapamiento/i)).toBeVisible();
+    expect(screen.getByLabelText(/Justificación de la asignación/i)).toBeVisible();
     expect(onAssigned).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
 
     expect(bodies[0]).toEqual({ crewId: CREW_ID, vehicleId: null, overrideNote: "Se coordinó con el jefe de cuadrilla." });
   });
+});
+
+it("prioriza la zona del servicio y pide justificación ante una cuadrilla de otra zona", async () => {
+  realResources({ requiresVehicle: false });
+  server.use(http.get("*/api/crews", () => HttpResponse.json({ data: [
+    { id: OTHER_CREW_ID, name: "Cuadrilla de otra zona", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-2", specialty: "COLLECTION" },
+    { id: CREW_ID, name: "Cuadrilla de la zona", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-3", specialty: "COLLECTION" },
+  ], meta })));
+  renderDialog();
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("combobox", { name: /cuadrilla asignada/i }));
+  const options = await screen.findAllByRole("option");
+  expect(options.map((option) => option.textContent)).toEqual(["Cuadrilla de la zona", "Cuadrilla de otra zona"]);
+  await user.click(screen.getByRole("option", { name: "Cuadrilla de otra zona" }));
+  expect(screen.getByText(/zona distinta/i)).toBeInTheDocument();
+  expect(screen.getByLabelText(/justificación/i)).toBeInTheDocument();
+});
+
+it("un 409 de zona abre la justificación aun si el aviso local no detectó diferencias", async () => {
+  realResources({ requiresVehicle: false });
+  captureAssign([{ status: 409, body: { statusCode: 409, message: "La cuadrilla trabaja en otra zona; hace falta overrideNote", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services/x/assign-crew" } }]);
+  renderDialog();
+  const user = userEvent.setup();
+  await screen.findByRole("combobox", { name: /cuadrilla asignada/i });
+  await choose(user, /cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
+  await user.click(screen.getByRole("button", { name: /confirmar asignación/i }));
+  expect(await screen.findByLabelText(/Justificación de la asignación/i)).toBeVisible();
 });

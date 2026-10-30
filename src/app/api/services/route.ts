@@ -1,3 +1,5 @@
+import { crewFit } from "@/lib/crew-fit";
+import { serviceTypeFixtures } from "@/lib/service-type-fixtures";
 import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -146,6 +148,9 @@ export async function POST(request: Request) {
       const z = zoneFixtures.find((zone) => zone.id === zid);
       return z ? z.name : zid;
     });
+
+    const fit = crewFit(crewFixtures.find((crew) => crew.id === input.crewId), input.zoneIds, serviceTypeFixtures.find((type) => type.id === input.serviceTypeId)?.code);
+    if ((fit.zone || fit.specialty) && !input.overrideNote) return errorResponse(409, "La zona o especialidad de la cuadrilla no coincide. Justifique la asignación.", path);
 
     const newService: Service = {
       id: `SVC-${Math.floor(1000 + Math.random() * 9000)}`,

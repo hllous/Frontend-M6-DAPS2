@@ -1,3 +1,5 @@
+import { crewFit } from "./crew-fit";
+import { serviceTypeFixtures } from "./service-type-fixtures";
 import { crewFixtures } from "./crew-fixtures";
 import {
   checkAssignmentConflicts,
@@ -734,10 +736,11 @@ export function assignCrewFixture(
     allServices: serviceFixtures,
   });
   const overlapping = [crewConflict, vehicleConflict].filter((s): s is Service => Boolean(s));
-  if (overlapping.length > 0 && !input.overrideNote) {
+  const fit = crewFit(crew, service.zoneIds, serviceTypeFixtures.find((type) => type.id === service.serviceTypeId)?.code);
+  if ((overlapping.length > 0 || fit.zone || fit.specialty) && !input.overrideNote) {
     return {
       status: 409,
-      message: `La asignación se solapa con ${overlapping.map((s) => s.id).join(", ")}. Se puede asignar igual, pero hace falta una justificación.`,
+      message: overlapping.length ? `La asignación se solapa con ${overlapping.map((s) => s.id).join(", ")}. Se puede asignar igual, pero hace falta una justificación.` : "La zona o especialidad de la cuadrilla no coincide. Se necesita una justificación.",
     };
   }
 

@@ -33,6 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
+import { crewFit, crewsInZoneFirst } from "@/lib/crew-fit";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import {
   checkAssignmentConflicts,
@@ -108,7 +109,7 @@ function AssignCrewForm({
   const [resources, setResources] = useState<
     | { status: "loading" }
     | { status: "error"; message: string }
-    | { status: "ready"; crews: Crew[]; vehicles: Vehicle[]; requiresVehicle: boolean }
+    | { status: "ready"; crews: Crew[]; vehicles: Vehicle[]; requiresVehicle: boolean; code: string }
   >({ status: "loading" });
   const [loadVersion, setLoadVersion] = useState(0);
 
@@ -126,6 +127,7 @@ function AssignCrewForm({
             crews: crewsPage.crews,
             vehicles: vehiclesPage.vehicles,
             requiresVehicle: type.requiresVehicle,
+            code: type.code,
           });
         }
       })
@@ -156,7 +158,8 @@ function AssignCrewForm({
       allServices,
     });
   }, [service, crewId, vehicleId, allServices]);
-  const needsOverrideNote = Boolean(conflicts.crewConflict || conflicts.vehicleConflict || backendConflict);
+  const fit = crewFit(crews.find((crew) => crew.id === crewId), service.zoneIds, ready ? resources.code : undefined);
+  const needsOverrideNote = Boolean(conflicts.crewConflict || conflicts.vehicleConflict || backendConflict || fit.zone || fit.specialty);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -194,9 +197,9 @@ function AssignCrewForm({
       onOpenChange(false);
     } catch (cause) {
       if (cause instanceof ServiceRequestError && cause.status === 409) {
-        const hasAdvisoryOverlap = Boolean(conflicts.crewConflict || conflicts.vehicleConflict);
-        if (hasAdvisoryOverlap) {
-          setBackendConflict("Otra asignación ocupa esa cuadrilla en el mismo horario.");
+        const hasAdvisoryOverlap = Boolean(conflicts.crewConflict || conflicts.vehicleConflict || fit.zone || fit.specialty);
+        if (hasAdvisoryOverlap || /overrideNote|cuadrilla|especialidad|zona/i.test(cause.message)) {
+          setBackendConflict("La asignación presenta un conflicto de horario, zona o especialidad.");
         } else {
           setBackendConflict(null);
           setErrorMessage(
@@ -344,7 +347,7 @@ function AssignCrewForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {crews.map((c) => (
+                    {crewsInZoneFirst(crews, service.zoneIds).map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
                       </SelectItem>
@@ -403,8 +406,10 @@ function AssignCrewForm({
           {needsOverrideNote && (
             <Alert variant="warning" role="alert">
               <AlertTriangle aria-hidden />
-              <AlertTitle className="font-semibold uppercase tracking-wider">Se superpone con otro servicio</AlertTitle>
+              <AlertTitle className="font-semibold uppercase tracking-wider">Revise la asignación</AlertTitle>
               <AlertDescription className="flex flex-col gap-2">
+                {fit.zone && <p>La cuadrilla trabaja en una zona distinta.</p>}
+                {fit.specialty && <p>La cuadrilla tiene una especialidad distinta.</p>}
                 {conflicts.crewConflict && (
                   <p>
                     La cuadrilla{" "}
@@ -436,7 +441,7 @@ function AssignCrewForm({
           {needsOverrideNote && (
             <Field data-invalid={Boolean(fieldErrors.overrideNote) || undefined}>
               <FieldLabel htmlFor={`${formId}-override-note`}>
-                Justificación del solapamiento <span aria-hidden>*</span>
+                Justificación de la asignación <span aria-hidden>*</span>
               </FieldLabel>
               <Textarea
                 id={`${formId}-override-note`}

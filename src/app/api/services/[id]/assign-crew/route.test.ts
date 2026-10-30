@@ -1,3 +1,4 @@
+import { crewFixtures, resetCrewFixtures } from "@/lib/crew-fixtures";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetServiceFixtures } from "@/lib/services-fixtures";
@@ -242,4 +243,17 @@ it.each([401, 403, 409, 503])("preserves backend error status and body (%s)", as
   const forwards = backendFetch.mock.calls.filter(([, init]) => init?.method === "POST");
   expect(forwards).toHaveLength(1);
   expect(String(forwards[0][0])).toBe("https://backend.internal/services/real-service/assign-crew");
+});
+
+
+it("exige justificación al asignar una cuadrilla de otra zona o especialidad", async () => {
+  const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+  const crew = crewFixtures.find((item) => item.id === "crew-a")!;
+  crew.effectiveZoneId = "zone-2";
+  crew.specialty = "COLLECTION";
+  const send = (body: object) => POST(new Request("http://localhost/api/services/SVC-1043/assign-crew", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ id: "SVC-1043" }) });
+  try {
+    expect((await send({ crewId: crew.id })).status).toBe(409);
+    expect((await send({ crewId: crew.id, overrideNote: "Refuerzo coordinado para la zona" })).status).toBe(200);
+  } finally { resetCrewFixtures(); }
 });
