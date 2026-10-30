@@ -31,10 +31,9 @@ describe("AppShell", () => {
       ["Mi trabajo", "/app?destination=work"],
       ["Servicios", "/app?destination=services"],
       ["Derivaciones", "/app?destination=referrals"],
-      ["Inventario urbano", "/app?destination=inventory"],
       ["Control Ambiental", "/app?destination=environment"],
       ["Mapa", "/app?destination=map"],
-      ["Configuración", "/app?destination=catalog"],
+      ["Catálogo", "/app?destination=catalog"],
       ["Tableros", "/app?destination=dashboards"],
     ]);
     expect(within(moduleNavigation).queryAllByRole("button")).toHaveLength(0);
@@ -60,33 +59,21 @@ describe("AppShell", () => {
     await waitFor(() => expect(main).toHaveFocus());
   });
 
-  it("keeps the Configuración destination active on nested catalog routes", () => {
-    window.history.replaceState(null, "", "/app/catalog/zones");
+  it.each(["zones", "trees"])("keeps Catálogo active on the %s catalog route", (route) => {
+    window.history.replaceState(null, "", `/app/catalog/${route}`);
     render(<AppShell scenario={scenarios.officeDutyQueue} routeContent={<p>Zonas</p>} />);
 
     const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
-    expect(within(moduleNavigation).getByRole("link", { name: "Configuración" })).toHaveAttribute("aria-current", "page");
+    expect(within(moduleNavigation).getByRole("link", { name: "Catálogo" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("keeps Inventario urbano active on urban-asset routes and lists its four cards without a vacant destination", () => {
-    window.history.replaceState(null, "", "/app/catalog/trees");
-    const { unmount } = render(<AppShell scenario={scenarios.officeDutyQueue} routeContent={<p>Árboles</p>} />);
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
-    expect(within(moduleNavigation).getByRole("link", { name: "Inventario urbano" })).toHaveAttribute("aria-current", "page");
-    expect(within(moduleNavigation).getByRole("link", { name: "Configuración" })).not.toHaveAttribute("aria-current");
-    unmount();
-
-    window.history.replaceState(null, "", "/app?destination=inventory");
+  it.each(["catalog", "inventory"])("shows all catalog cards from %s", (destination) => {
+    window.history.replaceState(null, "", `/app?destination=${destination}`);
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
-    expect(screen.getByRole("heading", { level: 1, name: "Inventario urbano" })).toBeVisible();
-    expect(screen.queryByText(/próxima entrega/)).not.toBeInTheDocument();
-    const hrefs = screen.getAllByRole("link", { name: /^Abrir/ }).map((link) => link.getAttribute("href"));
-    expect(hrefs).toEqual([
-      "/app/catalog/green-spaces",
-      "/app/catalog/containers",
-      "/app/catalog/green-points",
-      "/app/catalog/trees",
-    ]);
+    expect(screen.getByRole("heading", { level: 1, name: "Catálogo" })).toBeVisible();
+    for (const name of ["Cuadrillas", "Espacios verdes", "Contenedores", "Puntos verdes", "Árboles"]) {
+      expect(screen.getByRole("link", { name: `Abrir ${name}` })).toBeVisible();
+    }
   });
 
   it("navigates client-side on a plain click but leaves modified clicks to the browser", async () => {
@@ -126,7 +113,8 @@ describe("AppShell", () => {
 
     expect(within(sheet).getByRole("button", { name: "Cerrar" })).toBeVisible();
     expect(within(sheet).queryByText("Seleccione un módulo disponible para su sesión.")).not.toBeInTheDocument();
-    expect(within(sheet).getByRole("link", { name: "Configuración" })).toHaveAttribute("href", "/app?destination=catalog");
+    expect(within(sheet).getByRole("link", { name: "Catálogo" })).toHaveAttribute("href", "/app?destination=catalog");
+    expect(within(sheet).queryByRole("link", { name: "Inventario urbano" })).not.toBeInTheDocument();
     expect(within(sheet).getByRole("link", { name: "Tableros" })).toHaveAttribute("href", "/app?destination=dashboards");
   });
 

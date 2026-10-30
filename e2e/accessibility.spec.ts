@@ -46,7 +46,7 @@ test.describe("automated WCAG checks @smoke", () => {
   test("the live app shell with the Zones success state has no axe violations", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("link", { name: "Configuración" }).click();
+    await page.getByRole("link", { name: "Catálogo" }).click();
     await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
 
     await expectNoViolations(page);

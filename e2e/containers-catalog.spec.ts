@@ -119,7 +119,7 @@ test.describe("Container catalog management #120", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=inventory");
 
-    await expect(page.getByRole("heading", { name: "Inventario urbano" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
     const containerCard = page.locator("li", { hasText: "Contenedores" });
     await expect(containerCard).toBeVisible();
 

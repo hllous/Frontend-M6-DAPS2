@@ -7,7 +7,7 @@ test.describe("ServiceType catalog management #102", () => {
   test("Office can create, edit, and logically deactivate a ServiceType while locked fields stay read-only", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("link", { name: "Configuración" }).click();
+    await page.getByRole("link", { name: "Catálogo" }).click();
     await page.getByRole("link", { name: /^Abrir/ }).first().click();
     await expect(page).toHaveURL(/\/app\/catalog\/service-types$/);
 

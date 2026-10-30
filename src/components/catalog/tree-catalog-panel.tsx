@@ -299,7 +299,6 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
   return (
     <section aria-labelledby="trees-title" className="flex flex-col gap-6">
       <CatalogPageHeader
-        section="inventory"
         title="Árboles"
         titleId="trees-title"
         actions={<>

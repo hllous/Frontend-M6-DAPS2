@@ -6,7 +6,7 @@ import { TreeInterventionsPanel } from "@/components/catalog/tree-interventions-
 import { getScenario } from "@/lib/scenarios";
 import { getSession } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Inventario urbano — Ambiente e Higiene" };
+export const metadata: Metadata = { title: "Catálogo — Ambiente e Higiene" };
 
 export default async function TreeInterventionsCatalogPage() {
   await connection();

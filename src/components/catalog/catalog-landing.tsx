@@ -115,12 +115,7 @@ function LandingGrid({ id, title, cards, scenario }: { id: string; title: string
   );
 }
 
-/** Sección «Configuración»: datos maestros con los que se planifica el servicio. */
+/** Catálogo de datos maestros y bienes urbanos. */
 export function CatalogLanding({ scenario }: { scenario: OperationalScenario }) {
-  return <LandingGrid id="catalog-title" title="Configuración" cards={configurationCards} scenario={scenario} />;
-}
-
-/** Sección «Inventario urbano»: bienes de la ciudad (las intervenciones de arbolado se abren desde Árboles). */
-export function InventoryLanding({ scenario }: { scenario: OperationalScenario }) {
-  return <LandingGrid id="inventory-title" title="Inventario urbano" cards={inventoryCards} scenario={scenario} />;
+  return <LandingGrid id="catalog-title" title="Catálogo" cards={[...configurationCards, ...inventoryCards]} scenario={scenario} />;
 }

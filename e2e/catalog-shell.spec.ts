@@ -8,8 +8,8 @@ test.describe("Catalog shell navigation regression #231", () => {
     await page.goto("/app?destination=inventory");
 
     const sidebar = page.locator("aside[aria-label='Navegación principal']");
-    await expect(page).toHaveTitle("Inventario urbano — Ambiente e Higiene");
-    await expect(page.getByRole("heading", { name: "Inventario urbano" })).toBeVisible();
+    await expect(page).toHaveTitle("Catálogo — Ambiente e Higiene");
+    await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
     await expect(sidebar).toBeVisible();
 
     await page.getByRole("button", { name: "Contraer navegación" }).click();
@@ -17,14 +17,14 @@ test.describe("Catalog shell navigation regression #231", () => {
 
     await page.locator('a[href="/app/catalog/containers"]').click();
     await expect(page).toHaveURL(/\/app\/catalog\/containers$/);
-    await expect(page).toHaveTitle("Inventario urbano — Ambiente e Higiene");
+    await expect(page).toHaveTitle("Catálogo — Ambiente e Higiene");
     await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
     await expect(sidebar).toBeVisible();
     await expect(page.getByRole("button", { name: "Expandir navegación" })).toBeVisible();
 
     await page.goBack();
     await expect(page).toHaveURL(/\/app\?destination=inventory$/);
-    await expect(page.getByRole("heading", { name: "Inventario urbano" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
     await expect(sidebar).toBeVisible();
 
     await page.goForward();
@@ -76,6 +76,6 @@ test.describe("Catalog shell navigation regression #231", () => {
     await page.goto("/app/catalog");
 
     await expect(page).toHaveURL(/\/app\?destination=catalog$/);
-    await expect(page.getByRole("link", { name: "Configuración" }).first()).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Catálogo" }).first()).toHaveAttribute("aria-current", "page");
   });
 });

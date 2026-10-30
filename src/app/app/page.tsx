@@ -4,10 +4,10 @@ const destinationTitles = {
   work: "Mi trabajo",
   services: "Servicios",
   referrals: "Derivaciones",
-  inventory: "Inventario urbano",
+  inventory: "Catálogo",
   environment: "Control Ambiental",
   map: "Mapa",
-  catalog: "Configuración",
+  catalog: "Catálogo",
   dashboards: "Tableros",
 } as const;
 

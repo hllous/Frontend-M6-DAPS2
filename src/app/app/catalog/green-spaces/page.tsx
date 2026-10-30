@@ -6,7 +6,7 @@ import { GreenSpacesPanel } from "@/components/catalog/green-spaces-panel";
 import { getScenario } from "@/lib/scenarios";
 import { getSession } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Inventario urbano — Ambiente e Higiene" };
+export const metadata: Metadata = { title: "Catálogo — Ambiente e Higiene" };
 
 export default async function GreenSpacesPage() {
   await connection();

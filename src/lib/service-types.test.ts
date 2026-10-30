@@ -139,6 +139,6 @@ describe("resolveServiceType", () => {
 
     const failure = await resolveServiceType(TREE_PRUNING_SERVICE_TYPE_RULE).catch((caught: unknown) => caught);
     expect(failure).toBeInstanceOf(ServiceTypeNotFoundError);
-    expect((failure as Error).message).toBe("No hay un tipo de servicio activo de poda de arbolado en la configuración. Cree o active uno en Configuración > Tipos de servicio antes de continuar.");
+    expect((failure as Error).message).toBe("No hay un tipo de servicio activo de poda de arbolado en la configuración. Cree o active uno en Catálogo > Tipos de servicio antes de continuar.");
   });
 });

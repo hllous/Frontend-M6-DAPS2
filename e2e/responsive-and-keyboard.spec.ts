@@ -25,7 +25,7 @@ test.describe("responsive shell navigation @smoke", () => {
 
     await page.getByRole("button", { name: "Más" }).click();
     await expect(page.getByRole("dialog", { name: "Más" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Configuración" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Catálogo" })).toBeVisible();
   });
 
   test("wide viewport shows the full sidebar and supports collapsing it", async ({ page }) => {
