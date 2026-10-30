@@ -73,9 +73,9 @@ function CrewRelocationContent({ crew, zones, onOpenChange, onSuccess }: {
         <DialogTitle>Reubicar cuadrilla</DialogTitle>
         <DialogDescription>{crew.name} trabajará en otra zona durante el período indicado.</DialogDescription>
       </DialogHeader>
-      {failure ? <Alert variant="destructive"><AlertDescription>{failure}</AlertDescription></Alert> : null}
-      <form id="crew-relocation-form" noValidate onSubmit={(event) => void submit(event)}>
+      <form id="crew-relocation-form" className="pb-2" noValidate onSubmit={(event) => void submit(event)}>
         <FieldGroup>
+          {failure ? <Alert variant="destructive"><AlertDescription>{failure}</AlertDescription></Alert> : null}
           <Field data-invalid={Boolean(errors.zoneId)}>
             <FieldLabel htmlFor="crew-relocation-zone">Zona de destino</FieldLabel>
             <Select items={zoneItems} value={zoneId || null} onValueChange={(value) => { if (value !== null) { setZoneId(value); clear("zoneId"); } }}>

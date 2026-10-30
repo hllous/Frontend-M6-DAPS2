@@ -1349,7 +1349,10 @@ function CrewMovesSection({ moves, error, zoneName }: {
         <ul aria-label="Historial de reubicaciones" className="flex flex-col gap-2">
           {moves.map((move) => (
             <li key={move.id} className="rounded-lg border border-border p-3 text-sm">
-              <p className="font-medium">{zoneName(move.zoneId)}</p>
+              <p className="flex flex-wrap items-center gap-2 font-medium">
+                {zoneName(move.zoneId)}
+                {move === active ? <Badge variant="secondary">Vigente</Badge> : null}
+              </p>
               <p className="text-muted-foreground">{period(move)}</p>
               <p>{move.reason}</p>
             </li>
