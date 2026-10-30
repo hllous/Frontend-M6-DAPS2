@@ -120,3 +120,8 @@ describe("crews adapter", () => {
     expect(updateCrewInputSchema.safeParse({ ...editable, crewType: "MUNICIPAL" }).success).toBe(false);
   });
 });
+
+it("preserves crew names and new nullable contract fields", async () => {
+  server.use(http.get("*/api/crews/contract", () => HttpResponse.json({ id: "contract", name: "Equipo", crewType: "MUNICIPAL", leaderUserId: "101", leaderName: "Ana", organizationId: null, defaultShift: "MORNING", active: true, specialty: "TREES", homeZoneId: "1", effectiveZoneId: "2", membersCount: 1, members: [{ userId: "101", displayName: "Ana" }] })));
+  await expect(crewsAdapter.get("contract")).resolves.toMatchObject({ leaderName: "Ana", organizationName: null, specialty: "TREES", homeZoneId: "1", effectiveZoneId: "2", membersCount: 1, members: [{ userId: "101", displayName: "Ana" }], memberUserIds: ["101"] });
+});

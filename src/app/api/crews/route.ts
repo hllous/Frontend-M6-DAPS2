@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { addCrewFixture, filterCrewFixtures, paginateCrewFixtures } from "@/lib/crew-fixtures";
 import { createCrewInputSchema, type CrewQuery, crewSchema, crewTypeSchema, shiftSchema } from "@/lib/crews";
+import { m1IdentityAdapter } from "@/lib/m1-identity";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -98,7 +99,8 @@ export async function POST(request: Request) {
     const parsed = createCrewInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) return forwardResponse(await fetchBackend(request, "/crews", "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }));
-    const crew = { id: `crew-${Date.now()}`, ...parsed.data, memberUserIds: [parsed.data.leaderUserId], active: true };
+    const [users, organizations] = await Promise.all([m1IdentityAdapter.listUsers(), m1IdentityAdapter.listOrganizations()]);
+    const crew = crewSchema.parse({ leaderName: users.find((user) => user.id === parsed.data.leaderUserId)?.displayName ?? null, organizationName: organizations.find((organization) => organization.id === parsed.data.organizationId)?.displayName ?? null, members: [{ userId: parsed.data.leaderUserId, displayName: users.find((user) => user.id === parsed.data.leaderUserId)?.displayName ?? null }], id: `crew-${Date.now()}`, ...parsed.data, memberUserIds: [parsed.data.leaderUserId], active: true });
     addCrewFixture(crew);
     return NextResponse.json(crew, { status: 201 });
   } catch (error) {

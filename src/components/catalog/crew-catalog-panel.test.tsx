@@ -144,7 +144,7 @@ describe("CrewCatalogPanel", () => {
 
 describe("CrewCatalogPanel pagination", () => {
   it("pages through backend results and resets the page when filtering", async () => {
-    const list = vi.spyOn(crewsAdapter, "list").mockImplementation(async (query) => ({ crews: Array.from({ length: 20 }, (_, index) => ({ ...{ id: "a358142e-a427-46b3-8b36-fb13091e023f", name: "Equipo remoto", crewType: "MUNICIPAL" as const, leaderUserId: null, organizationId: null, memberUserIds: [], defaultShift: "MORNING" as const, active: true }, id: `remote-${index}` })), page: query?.page ?? 1, pageSize: 20, total: 57, totalPages: 3 }));
+    const list = vi.spyOn(crewsAdapter, "list").mockImplementation(async (query) => ({ crews: Array.from({ length: 20 }, (_, index) => ({ ...{ id: "a358142e-a427-46b3-8b36-fb13091e023f", name: "Equipo remoto", crewType: "MUNICIPAL" as const, leaderUserId: null, leaderName: null, organizationId: null, organizationName: null, members: [], memberUserIds: [], specialty: null, homeZoneId: null, effectiveZoneId: null, membersCount: null, defaultShift: "MORNING" as const, active: true }, id: `remote-${index}` })), page: query?.page ?? 1, pageSize: 20, total: 57, totalPages: 3 }));
     const user = userEvent.setup();
     render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
     expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
@@ -164,7 +164,7 @@ describe("CrewCatalogPanel pagination", () => {
 
 
 it("clamps the current page after its last active record is deactivated", async () => {
-  const vehicle = { id: "a358142e-a427-46b3-8b36-fb13091e023f", name: "Equipo remoto", crewType: "MUNICIPAL" as const, leaderUserId: null, organizationId: null, memberUserIds: [], defaultShift: "MORNING" as const, active: true };
+  const vehicle = { id: "a358142e-a427-46b3-8b36-fb13091e023f", name: "Equipo remoto", crewType: "MUNICIPAL" as const, leaderUserId: null, leaderName: null, organizationId: null, organizationName: null, members: [], memberUserIds: [], specialty: null, homeZoneId: null, effectiveZoneId: null, membersCount: null, defaultShift: "MORNING" as const, active: true };
   let removed = false;
   vi.spyOn(crewsAdapter, "remove").mockImplementation(async () => { removed = true; return { ...vehicle, active: false }; });
   vi.spyOn(crewsAdapter, "get").mockResolvedValue(vehicle);
@@ -187,4 +187,20 @@ it("clamps the current page after its last active record is deactivated", async 
   await user.click(within(dialog).getByRole("button", { name: "Dar de baja" }));
   expect(await screen.findByText("Página 2 de 2")).toBeVisible();
   await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, active: true })));
+});
+
+ it("shows response names and neutral identifiers in the table and detail", async () => {
+  const user = userEvent.setup();
+  render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+  const row = await screen.findByRole("row", { name: /Cuadrilla B/ });
+  expect(within(row).getByText("Usuario user-maria")).toBeVisible();
+  expect(within(row).getByText("Organizaci\u00f3n sin nombre (id org-cooperativa)")).toBeVisible();
+  const emptyRow = screen.getByRole("row", { name: /Cuadrilla D/ });
+  expect(within(emptyRow).getByText("\u2014")).toBeVisible();
+  expect(within(emptyRow).getByText("Sin organizaci\u00f3n externa")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Ver detalle de Cuadrilla A \u00b7 L\u00f3pez" }));
+  const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+  expect(within(sheet).getByRole("button", { name: "Quitar a Carlos L\u00f3pez" })).toBeVisible();
+  expect(within(sheet).getByRole("button", { name: "Quitar a Usuario user-lucia" })).toBeVisible();
+  expect(within(sheet).getByText(/lista de ejemplo/)).toBeVisible();
 });

@@ -20,6 +20,7 @@ export async function DELETE(request: Request, routeContext: Context) {
     if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}/members/${pathId(userId)}`, "crew:manage", { method: "DELETE" }));
     const crew = crewFixtures.find((item) => item.id === id);
     if (!crew) return errorResponse(404, `La cuadrilla ${id} no existe.`, path);
+    crew.members = crew.members.filter((member) => member.userId !== userId);
     crew.memberUserIds = crew.memberUserIds.filter((memberUserId) => memberUserId !== userId);
     return NextResponse.json(crew);
   } catch (error) {

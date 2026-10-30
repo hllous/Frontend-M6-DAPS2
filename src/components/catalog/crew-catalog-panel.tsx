@@ -228,16 +228,8 @@ export function CrewCatalogPanel({
     return () => media.removeEventListener("change", updateSheetSide);
   }, []);
 
-  const userName = (id: string | null) =>
-    id === null
-      ? "—"
-      : (users.find((user) => user.id === id)?.displayName ??
-        "Persona no encontrada");
-  const organizationName = (id: string | null) =>
-    id === null
-      ? "Sin organización externa"
-      : (organizations.find((organization) => organization.id === id)
-          ?.displayName ?? "Organización no encontrada");
+  const userName = (id: string | null, name: string | null) => id === null ? "—" : name?.trim() || `Usuario ${id}`;
+  const organizationName = (id: string | null, name: string | null) => id === null ? "Sin organización externa" : name?.trim() || `Organización sin nombre (id ${id})`;
   function openCreate() {
     setEditing(null);
     setForm({
@@ -305,7 +297,7 @@ export function CrewCatalogPanel({
     }
     setMemberError(null);
     try {
-      setSelected(await crewsAdapter.addMembers(selected.id, memberSelection));
+      setSelected(await crewsAdapter.addMembers(selected.id, memberSelection.map((userId) => ({ userId, displayName: users.find((user) => user.id === userId)?.displayName }))));
       setMemberSelection([]);
       setMemberPickerOpen(false);
       notifySuccess("Integrantes agregados.");
@@ -399,7 +391,7 @@ export function CrewCatalogPanel({
       },
       cell: ({ row }) => {
         const crew = row.original;
-        return <>{userName(crew.leaderUserId)}</>;
+        return <>{userName(crew.leaderUserId, crew.leaderName)}</>;
       },
     },
     {
@@ -413,7 +405,7 @@ export function CrewCatalogPanel({
       },
       cell: ({ row }) => {
         const crew = row.original;
-        return <>{organizationName(crew.organizationId)}</>;
+        return <>{organizationName(crew.organizationId, crew.organizationName)}</>;
       },
     },
     {
@@ -678,11 +670,11 @@ export function CrewCatalogPanel({
                 <dl className="mt-3 grid gap-2 text-sm">
                   <div>
                     <dt className="text-xs text-muted-foreground">Responsable</dt>
-                    <dd>{userName(selected.leaderUserId)}</dd>
+                    <dd>{userName(selected.leaderUserId, selected.leaderName)}</dd>
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">Organización</dt>
-                    <dd>{organizationName(selected.organizationId)}</dd>
+                    <dd>{organizationName(selected.organizationId, selected.organizationName)}</dd>
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">Turno</dt>
@@ -702,19 +694,19 @@ export function CrewCatalogPanel({
                   aria-label="Integrantes de la cuadrilla"
                   className="flex flex-col gap-2"
                 >
-                  {selected.memberUserIds.map((memberUserId) => (
+                  {selected.members.map((member) => (
                     <li
-                      key={memberUserId}
+                      key={member.userId}
                       className="flex items-center justify-between gap-2"
                     >
-                      {userName(memberUserId)}
+                      {userName(member.userId, member.displayName)}
                       {canManage ? (
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          aria-label={`Quitar a ${userName(memberUserId)}`}
-                          onClick={() => void removeMember(memberUserId)}
+                          aria-label={`Quitar a ${userName(member.userId, member.displayName)}`}
+                          onClick={() => void removeMember(member.userId)}
                         >
                           <UserMinus data-icon="inline-start" aria-hidden />
                           Quitar
@@ -732,6 +724,8 @@ export function CrewCatalogPanel({
                       <FieldLabel htmlFor="crew-members">
                         Agregar integrantes
                       </FieldLabel>
+                      <FieldDescription>Los candidatos provienen de una lista de ejemplo de personas.</FieldDescription>
+                      {users.every((user) => selected.memberUserIds.includes(user.id)) ? <FieldDescription>No hay integrantes disponibles para agregar.</FieldDescription> : null}
                       <CrewMemberMultiSelect
                         id="crew-members"
                         open={memberPickerOpen}
@@ -883,10 +877,7 @@ export function CrewCatalogPanel({
                   onChange={(value) =>
                     setForm({ ...form, leaderUserId: value })
                   }
-                  options={users.map((user) => ({
-                    value: user.id,
-                    label: user.displayName,
-                  }))}
+                  options={[...(editing?.leaderUserId ? [{ value: editing.leaderUserId, label: userName(editing.leaderUserId, editing.leaderName) }] : []), ...users.filter((user) => user.id !== editing?.leaderUserId).map((user) => ({ value: user.id, label: user.displayName }))]}
                   aria-required
                   placeholder="Seleccione una persona"
                 />
@@ -902,10 +893,7 @@ export function CrewCatalogPanel({
                   onChange={(value) =>
                     setForm({ ...form, organizationId: value })
                   }
-                  options={organizations.map((organization) => ({
-                    value: organization.id,
-                    label: organization.displayName,
-                  }))}
+                  options={[...(editing?.organizationId ? [{ value: editing.organizationId, label: organizationName(editing.organizationId, editing.organizationName) }] : []), ...organizations.filter((organization) => organization.id !== editing?.organizationId).map((organization) => ({ value: organization.id, label: organization.displayName }))]}
                   aria-required
                   placeholder="Seleccione una organización"
                 />
