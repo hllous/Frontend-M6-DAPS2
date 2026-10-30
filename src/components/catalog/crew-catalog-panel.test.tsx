@@ -276,3 +276,116 @@ describe("nombres de referencias de cuadrilla", () => {
     expect(screen.queryByRole("option")).not.toBeInTheDocument();
   });
 });
+
+describe("especialidad y zona de cuadrilla", () => {
+  async function pick(user: ReturnType<typeof userEvent.setup>, name: string | RegExp, option: string) {
+    await user.click(screen.getByRole("combobox", { name }));
+    await user.click(await screen.findByRole("option", { name: option }));
+  }
+
+  it("muestra especialidad y zona vigente en la tabla, con el identificador de zonas desconocidas", async () => {
+    crewFixtures.find((crew) => crew.id === "crew-d")!.effectiveZoneId = "zone-inexistente";
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const table = await screen.findByRole("table");
+    expect(within(table).getByRole("columnheader", { name: "Especialidad" })).toBeVisible();
+    expect(within(table).getByRole("columnheader", { name: "Zona" })).toBeVisible();
+    const a = await screen.findByRole("row", { name: /Cuadrilla A/ });
+    expect(within(a).getByText("Recolección")).toBeVisible();
+    expect(await within(a).findByText("Belgrano")).toBeVisible();
+    const d = screen.getByRole("row", { name: /Cuadrilla D/ });
+    expect(within(d).getByText("Sin especialidad")).toBeVisible();
+    expect(within(d).getByText("zone-inexistente")).toBeVisible();
+    expect(within(screen.getByRole("row", { name: /Cuadrilla E/ })).getByText("Sin zona")).toBeVisible();
+  });
+
+  it("filtra por zona y por especialidad y conserva los filtros al paginar", async () => {
+    const list = vi.spyOn(crewsAdapter, "list");
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("row", { name: /Cuadrilla A/ });
+    await pick(user, "Zona", "Retiro");
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ zoneId: "zone-4" })));
+    expect(await screen.findByRole("row", { name: /Cuadrilla C/ })).toBeVisible();
+    expect(screen.queryByRole("row", { name: /Cuadrilla A/ })).not.toBeInTheDocument();
+    await pick(user, "Especialidad", "Arbolado");
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ zoneId: "zone-4", specialty: "TREES", page: 1 })));
+    await pick(user, "Turno", "Mañana");
+    expect(await screen.findByText("No hay cuadrillas que coincidan con los filtros.")).toBeVisible();
+  });
+
+  it("muestra en el detalle especialidad, zona base, zona vigente y la marca de reubicada", async () => {
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla C · Ibáñez" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    const field = (label: string) => within(sheet).getByText(label, { selector: "dt" }).nextElementSibling as HTMLElement;
+    expect(field("Especialidad")).toHaveTextContent("Arbolado");
+    await waitFor(() => expect(field("Zona base")).toHaveTextContent("Recoleta"));
+    expect(field("Zona vigente hoy")).toHaveTextContent("Retiro");
+    expect(within(sheet).getByText("Reubicada")).toBeVisible();
+  });
+
+  it("no marca como reubicada a una cuadrilla en su zona base", async () => {
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla A · López" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    expect(within(sheet).queryByText("Reubicada")).not.toBeInTheDocument();
+  });
+
+  it("muestra a Campo la especialidad y la zona de su cuadrilla sin acciones", async () => {
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.fieldCrewMember} />);
+    const row = await screen.findByRole("row", { name: /Cuadrilla B/ });
+    expect(within(row).getByText("Barrido")).toBeVisible();
+    expect(await within(row).findByText("Palermo")).toBeVisible();
+    await user.click(within(row).getByRole("button", { name: /Ver detalle/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    expect(within(sheet).getByText("Barrido", { selector: "dd" })).toBeVisible();
+    expect(within(sheet).queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+  });
+
+  it("exige la especialidad al registrar, en español y antes de enviar", async () => {
+    const create = vi.spyOn(crewsAdapter, "create");
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Registrar cuadrilla" }));
+    const dialog = await screen.findByRole("dialog", { name: "Registrar cuadrilla" });
+    await user.type(within(dialog).getByLabelText("Nombre"), "Cuadrilla nueva");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cuadrilla" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("La especialidad es obligatoria.");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("registra con especialidad y zona base opcional", async () => {
+    const create = vi.spyOn(crewsAdapter, "create");
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Registrar cuadrilla" }));
+    const dialog = await screen.findByRole("dialog", { name: "Registrar cuadrilla" });
+    await user.type(within(dialog).getByLabelText("Nombre"), "Cuadrilla nueva");
+    await user.click(within(dialog).getByRole("combobox", { name: "Especialidad" }));
+    await user.click(await screen.findByRole("option", { name: "Reciclaje" }));
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cuadrilla" }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ specialty: "RECYCLING", homeZoneId: undefined })));
+    const row = await screen.findByRole("row", { name: /Cuadrilla nueva/ });
+    expect(within(row).getByText("Reciclaje")).toBeVisible();
+    expect(within(row).getByText("Sin zona")).toBeVisible();
+  });
+
+  it("edita especialidad y zona base", async () => {
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla A · López" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Detalle de cuadrilla" })).getByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar cuadrilla" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Especialidad" }));
+    await user.click(await screen.findByRole("option", { name: "Barrido" }));
+    await user.click(within(dialog).getByRole("combobox", { name: "Zona base" }));
+    await user.click(await screen.findByRole("option", { name: "Palermo" }));
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cuadrilla" }));
+    const row = await screen.findByRole("row", { name: /Cuadrilla A/ });
+    await waitFor(() => expect(within(row).getByText("Barrido")).toBeVisible());
+    expect(within(row).getByText("Palermo")).toBeVisible();
+  });
+});
