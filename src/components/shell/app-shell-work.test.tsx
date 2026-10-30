@@ -148,6 +148,42 @@ describe("Mi trabajo de Oficina · cola de decisiones (Admin)", () => {
   });
 });
 
+describe("Mi trabajo de Oficina · tablero de cifras", () => {
+  it("shows one tile per group with its backend total", async () => {
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+    await group(/Contenedores desbordados/);
+
+    const tiles = screen.getByRole("list", { name: "Pendientes por grupo" });
+    expect(within(tiles).getAllByRole("listitem").map((tile) => tile.textContent)).toEqual([
+      "3Expedientes por clasificar",
+      "1Servicios sin cuadrilla",
+      "2Servicios por reprogramar",
+      "2Intervenciones de arbolado",
+      "1Contenedores desbordados",
+    ]);
+  });
+
+  it("takes the focus to the group card when its tile is clicked", async () => {
+    const user = userEvent.setup();
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+    await group(/Contenedores desbordados/);
+
+    await user.click(screen.getByRole("link", { name: "Contenedores desbordados: 1 pendiente" }));
+    expect(screen.getByRole("heading", { level: 2, name: "Contenedores desbordados" })).toHaveFocus();
+  });
+
+  it("keeps a group with nothing pending as a plain zero tile without a card", async () => {
+    server.use(http.get("*/api/containers*", () => HttpResponse.json(emptyPage)));
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+    await group(/Expedientes por clasificar/);
+
+    const tiles = screen.getByRole("list", { name: "Pendientes por grupo" });
+    expect(within(tiles).getByText("Contenedores desbordados").closest("li")).toHaveTextContent("0");
+    expect(within(tiles).queryByRole("link", { name: /Contenedores desbordados/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: "Contenedores desbordados" })).not.toBeInTheDocument();
+  });
+});
+
 describe("Mi trabajo por rol", () => {
   it("shows Operaciones its groups and not the environmental one", async () => {
     render(<AppShell scenario={scenarios.officeOperations} />);
@@ -162,7 +198,9 @@ describe("Mi trabajo por rol", () => {
     render(<AppShell scenario={scenarios.officeEnvironmental} />);
 
     await group(/Expedientes por clasificar/);
-    expect(screen.getAllByRole("list")).toHaveLength(1);
+    const tiles = screen.getByRole("list", { name: "Pendientes por grupo" });
+    expect(within(tiles).getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getAllByRole("list")).toHaveLength(2);
   });
 
   it("tells the auditor the profile is read-only and points to Tableros", () => {

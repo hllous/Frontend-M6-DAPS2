@@ -1,16 +1,18 @@
 "use client";
 
-import { Clock3, ShieldAlert } from "lucide-react";
+import { CalendarClock, Clock3, Leaf, ShieldAlert, Trash2, Trees, UsersRound, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
 import { LoadingRegion } from "@/components/ui/loading-region";
+import { cn } from "@/lib/utils";
 import { argentinaDay, formatArgentinaCalendarDate, todayInArgentina } from "@/lib/argentina-date";
 import { containersAdapter, CONTAINER_TYPE_LABELS } from "@/lib/containers";
 import { reportLabel } from "@/lib/display-ids";
@@ -42,9 +44,15 @@ type WorkItem = {
 
 type WorkLoad = { items: WorkItem[]; total: number };
 
+/** Qué significa el color del grupo: info = espera una decisión, warning = la agenda está en riesgo, danger = problema en la calle. */
+type WorkTone = "info" | "warning" | "danger";
+
 type WorkGroupDefinition = {
   id: string;
   title: string;
+  /** El mismo ícono que usa la app para ese dominio (Control Ambiental, cuadrillas, calendario, arbolado, contenedores). */
+  icon: LucideIcon;
+  tone: WorkTone;
   description?: string;
   errorMessage: string;
   seeAllHref: string;
@@ -102,6 +110,8 @@ function toLoad(items: WorkItem[], total: number): WorkLoad {
 const workGroups: WorkGroupDefinition[] = [
   {
     id: "reports",
+    icon: Leaf,
+    tone: "info",
     title: "Expedientes por clasificar",
     errorMessage: "No se pudieron cargar los expedientes por clasificar.",
     seeAllHref: `/app?destination=environment&${PENDING_REPORT_STATUSES.map((status) => `status=${status}`).join("&")}`,
@@ -128,6 +138,8 @@ const workGroups: WorkGroupDefinition[] = [
   },
   {
     id: "services-without-crew",
+    icon: UsersRound,
+    tone: "warning",
     title: "Servicios sin cuadrilla",
     description: `Programados en los próximos ${UPCOMING_DAYS} días. El total cuenta solo los servicios cargados sin cuadrilla.`,
     errorMessage: "No se pudieron cargar los servicios sin cuadrilla.",
@@ -157,6 +169,8 @@ const workGroups: WorkGroupDefinition[] = [
   },
   {
     id: "services-to-reschedule",
+    icon: CalendarClock,
+    tone: "warning",
     title: "Servicios por reprogramar",
     errorMessage: "No se pudieron cargar los servicios por reprogramar.",
     seeAllHref: "/app?destination=services&status=RESCHEDULED",
@@ -181,6 +195,8 @@ const workGroups: WorkGroupDefinition[] = [
   },
   {
     id: "tree-interventions",
+    icon: Trees,
+    tone: "info",
     title: "Intervenciones de arbolado",
     errorMessage: "No se pudieron cargar las intervenciones de arbolado.",
     seeAllHref: "/app/catalog/tree-interventions",
@@ -215,6 +231,8 @@ const workGroups: WorkGroupDefinition[] = [
   },
   {
     id: "containers",
+    icon: Trash2,
+    tone: "danger",
     title: "Contenedores desbordados",
     errorMessage: "No se pudieron cargar los contenedores desbordados.",
     seeAllHref: "/app/catalog/containers",
@@ -275,6 +293,7 @@ export function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario })
       const state = states[group.id];
       return state?.status === "ready" && state.load.total === 0;
     });
+  const stateOf = (group: WorkGroupDefinition): GroupState => states[group.id] ?? { status: "loading" };
 
   return (
     <section aria-labelledby="work-title" className={styles.workPanel}>
@@ -306,12 +325,81 @@ export function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario })
             <EmptyDescription>Cuando haya algo que resolver, va a aparecer en esta pantalla.</EmptyDescription>
           </EmptyHeader>
         </Empty>
-      ) : (
-        visibleGroups.map((group) => (
-          <WorkGroup key={group.id} group={group} state={states[group.id] ?? { status: "loading" }} onRetry={retryGroup} />
-        ))
-      )}
+      ) : visibleGroups.length > 0 ? (
+        <>
+          <ul aria-label="Pendientes por grupo" className="grid list-none grid-cols-2 gap-3 p-0 md:grid-cols-3 xl:grid-cols-5">
+            {visibleGroups.map((group) => (
+              <WorkTile key={group.id} group={group} state={stateOf(group)} />
+            ))}
+          </ul>
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            {visibleGroups.map((group) => (
+              <WorkGroup key={group.id} group={group} state={stateOf(group)} onRetry={retryGroup} />
+            ))}
+          </div>
+        </>
+      ) : null}
     </section>
+  );
+}
+
+const toneClasses: Record<WorkTone, { chip: string; count: string }> = {
+  info: { chip: "bg-[var(--color-info-fill)] text-[var(--color-info)]", count: "text-[var(--color-info)]" },
+  warning: { chip: "bg-[var(--color-warning-fill)] text-[var(--color-warning)]", count: "text-[var(--color-warning)]" },
+  danger: { chip: "bg-[var(--color-danger-fill)] text-[var(--color-danger)]", count: "text-[var(--color-danger)]" },
+};
+
+function pendingLabel(total: number) {
+  return `${total} ${total === 1 ? "pendiente" : "pendientes"}`;
+}
+
+function focusGroup(event: MouseEvent<HTMLAnchorElement>, groupId: string) {
+  const heading = document.getElementById(`work-group-${groupId}`);
+  if (!heading) return;
+  event.preventDefault();
+  heading.focus();
+}
+
+function WorkTile({ group, state }: { group: WorkGroupDefinition; state: GroupState }) {
+  const Icon = group.icon;
+  const total = state.status === "ready" ? state.load.total : null;
+  const hasItems = state.status !== "ready" || state.load.total > 0;
+  const tone = state.status === "error" ? toneClasses.danger : toneClasses[group.tone];
+  const body = (
+    <>
+      <span
+        className={cn(
+          "flex size-9 shrink-0 items-center justify-center rounded-lg [&_svg]:size-5",
+          hasItems ? tone.chip : "bg-muted text-muted-foreground",
+        )}
+      >
+        <Icon aria-hidden />
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className={cn("text-3xl leading-none font-semibold tabular-nums", hasItems ? tone.count : "text-muted-foreground")}>
+          {total ?? "–"}
+        </span>
+        <span className="mt-1 text-sm text-muted-foreground">{group.title}</span>
+      </span>
+    </>
+  );
+  const shape = "flex w-full items-center gap-3 rounded-xl p-3 ring-1 ring-foreground/10";
+
+  return (
+    <li className="flex">
+      {hasItems ? (
+        <a
+          href={`#work-group-${group.id}`}
+          aria-label={total === null ? group.title : `${group.title}: ${pendingLabel(total)}`}
+          onClick={(event) => focusGroup(event, group.id)}
+          className={cn(shape, "bg-card hover:bg-muted focus-visible:bg-muted focus-visible:outline-2 focus-visible:outline-ring")}
+        >
+          {body}
+        </a>
+      ) : (
+        <div className={shape}>{body}</div>
+      )}
+    </li>
   );
 }
 
@@ -324,56 +412,69 @@ function WorkGroup({
   state: GroupState;
   onRetry: (group: WorkGroupDefinition) => void;
 }) {
-  const headingId = `work-group-${group.id}`;
+  const Icon = group.icon;
 
   if (state.status === "ready" && state.load.total === 0) return null;
 
   return (
-    <LoadingRegion label={group.title} isLoading={state.status === "loading"} className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 id={headingId} className="text-base font-semibold">{group.title}</h2>
-        {state.status === "ready" ? <Badge variant="secondary">{state.load.total}</Badge> : null}
-        {group.description ? <p className="text-sm text-muted-foreground">{group.description}</p> : null}
-      </div>
-      {state.status === "loading" ? <ListItemsSkeleton itemCount={3} /> : null}
-      {state.status === "error" ? (
-        <Alert variant="danger">
-          <AlertDescription className="flex flex-wrap items-center gap-3">
-            {group.errorMessage} Intente nuevamente.
-            <Button variant="outline" size="sm" onClick={() => onRetry(group)}>Reintentar</Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {state.status === "ready" ? (
-        <>
-          <ItemGroup aria-label={`${group.title}: ${state.load.total} ${state.load.total === 1 ? "pendiente" : "pendientes"}`}>
-            {state.load.items.map((item) => (
-              <WorkItemRow key={item.id} item={item} />
-            ))}
-          </ItemGroup>
-          <Link
-            href={group.seeAllHref}
-            aria-label={group.seeAllLabel}
-            className="self-start text-sm font-medium underline-offset-4 hover:underline focus-visible:underline"
-          >
-            Ver todos
-          </Link>
-        </>
-      ) : null}
+    <LoadingRegion label={group.title} isLoading={state.status === "loading"} className="min-w-0">
+      <Card size="sm">
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Icon aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+            <h2 id={`work-group-${group.id}`} tabIndex={-1} className="scroll-mt-4 font-heading text-base font-semibold outline-none focus-visible:underline">
+              {group.title}
+            </h2>
+            {state.status === "ready" ? <Badge variant="secondary">{state.load.total}</Badge> : null}
+          </div>
+          {group.description ? <p className="text-sm text-muted-foreground">{group.description}</p> : null}
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {state.status === "loading" ? <ListItemsSkeleton itemCount={3} /> : null}
+          {state.status === "error" ? (
+            <Alert variant="danger">
+              <AlertDescription className="flex flex-wrap items-center gap-3">
+                {group.errorMessage} Intente nuevamente.
+                <Button variant="outline" size="sm" onClick={() => onRetry(group)}>Reintentar</Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {state.status === "ready" ? (
+            <>
+              <ItemGroup aria-label={`${group.title}: ${pendingLabel(state.load.total)}`}>
+                {state.load.items.map((item) => (
+                  <WorkItemRow key={item.id} item={item} />
+                ))}
+              </ItemGroup>
+              <Link
+                href={group.seeAllHref}
+                aria-label={group.seeAllLabel}
+                className="self-start text-sm font-medium underline-offset-4 hover:underline focus-visible:underline"
+              >
+                Ver todos
+              </Link>
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
     </LoadingRegion>
   );
 }
 
+const STALE_AFTER_DAYS = 7;
+
 function WorkItemRow({ item }: { item: WorkItem }) {
   const StatusIcon = item.status === "REQUESTED" ? Clock3 : ShieldAlert;
+  const since = item.waitingSince ? argentinaDay(item.waitingSince) : null;
+  const isStale = since !== null && daysBetween(since, todayInArgentina()) >= STALE_AFTER_DAYS;
 
   return (
-    <Item variant="outline">
+    <Item variant="outline" size="sm">
       <ItemContent>
         <ItemTitle>
           <Link href={item.href} className="hover:underline focus-visible:underline">{item.title}</Link>
         </ItemTitle>
-        <ItemDescription>{item.detail}</ItemDescription>
+        <ItemDescription className={cn(isStale && "font-medium text-[var(--color-warning)]")}>{item.detail}</ItemDescription>
       </ItemContent>
       {item.status ? (
         <ItemActions className="max-sm:basis-full">
