@@ -51,7 +51,12 @@ export async function PATCH(request: Request, routeContext: Context) {
     const [users, organizations] = await Promise.all([m1IdentityAdapter.listUsers(), m1IdentityAdapter.listOrganizations()]);
     if (crew.leaderUserId !== parsed.data.leaderUserId) crew.leaderName = users.find((user) => user.id === parsed.data.leaderUserId)?.displayName ?? null;
     if (crew.organizationId !== parsed.data.organizationId) crew.organizationName = organizations.find((organization) => organization.id === parsed.data.organizationId)?.displayName ?? null;
-    Object.assign(crew, parsed.data);
+    const { homeZoneId, ...rest } = parsed.data;
+    Object.assign(crew, rest);
+    if (homeZoneId !== undefined) {
+      if (crew.effectiveZoneId === crew.homeZoneId) crew.effectiveZoneId = homeZoneId;
+      crew.homeZoneId = homeZoneId;
+    }
     return NextResponse.json(crew);
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);

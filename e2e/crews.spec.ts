@@ -14,9 +14,11 @@ test.describe("Crew catalog @smoke", () => {
     await chooseCatalogBOption(page, createDialog.getByRole("combobox", { name: "Responsable de cuadrilla" }), "Carlos López");
     await chooseCatalogBOption(page, createDialog.getByRole("combobox", { name: "Organización" }), "Municipalidad");
     await chooseCatalogBOption(page, createDialog.getByRole("combobox", { name: "Turno predeterminado" }), "Tarde");
+    await chooseCatalogBOption(page, createDialog.getByRole("combobox", { name: "Especialidad" }), "Arbolado");
+    await chooseCatalogBOption(page, createDialog.getByRole("combobox", { name: "Zona base" }), "Palermo");
     const creation = page.waitForRequest(request => request.url().endsWith("/api/crews") && request.method() === "POST");
     await createDialog.getByRole("button", { name: "Guardar cuadrilla" }).click();
-    expect((await creation).postDataJSON()).toEqual({ name, crewType: "MUNICIPAL", leaderUserId: "user-carlos", organizationId: "org-municipal", defaultShift: "AFTERNOON" });
+    expect((await creation).postDataJSON()).toEqual({ name, crewType: "MUNICIPAL", leaderUserId: "user-carlos", organizationId: "org-municipal", defaultShift: "AFTERNOON", specialty: "TREES", homeZoneId: "zone-2" });
     const row = page.getByRole("row", { name: new RegExp(name) });
     await openCatalogBRowDetail(row);
     const sheet = page.getByRole("dialog", { name: "Detalle de cuadrilla" });

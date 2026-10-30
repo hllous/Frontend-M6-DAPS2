@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { addCrewFixture, filterCrewFixtures, paginateCrewFixtures } from "@/lib/crew-fixtures";
-import { createCrewInputSchema, type CrewQuery, crewSchema, crewTypeSchema, shiftSchema } from "@/lib/crews";
+import { createCrewInputSchema, type CrewQuery, crewSchema, crewSpecialtySchema, crewTypeSchema, shiftSchema } from "@/lib/crews";
 import { m1IdentityAdapter } from "@/lib/m1-identity";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
@@ -18,7 +18,11 @@ function parseQuery(url: URL): CrewQuery {
   const active = url.searchParams.get("active");
   const crewType = crewTypeSchema.safeParse(url.searchParams.get("crewType"));
   const defaultShift = shiftSchema.safeParse(url.searchParams.get("defaultShift"));
+  const specialty = crewSpecialtySchema.safeParse(url.searchParams.get("specialty"));
+  const zoneId = url.searchParams.get("zoneId")?.trim();
   return {
+    zoneId: zoneId || undefined,
+    specialty: specialty.success ? specialty.data : undefined,
     active: active === null ? undefined : active === "true",
     crewType: crewType.success ? crewType.data : undefined,
     defaultShift: defaultShift.success ? defaultShift.data : undefined,
@@ -55,7 +59,7 @@ export async function GET(request: Request) {
     const query = parseQuery(new URL(request.url));
     const scenario = getScenario(session);
     if (backendMode(session)) {
-      if (scenario.actor.kind !== "FIELD") return forwardResponse(await fetchBackend(request, `/crews${backendQuery(query, ["active", "crewType", "defaultShift", "page", "pageSize"])}`));
+      if (scenario.actor.kind !== "FIELD") return forwardResponse(await fetchBackend(request, `/crews${backendQuery(query, ["active", "crewType", "defaultShift", "zoneId", "specialty", "page", "pageSize"])}`));
 
       const crewId = session.crew?.id;
       if (!crewId) return errorResponse(403, "La sesión no tiene una cuadrilla asignada.", path);
@@ -72,7 +76,9 @@ export async function GET(request: Request) {
       const crew = parsedCrew.data;
       const matches = (query.active === undefined || crew.active === query.active)
         && (!query.crewType || crew.crewType === query.crewType)
-        && (!query.defaultShift || crew.defaultShift === query.defaultShift);
+        && (!query.defaultShift || crew.defaultShift === query.defaultShift)
+        && (!query.zoneId || crew.effectiveZoneId === query.zoneId)
+        && (!query.specialty || crew.specialty === query.specialty);
       const page = query.page ?? 1;
       const pageSize = query.pageSize ?? 20;
       const total = matches ? 1 : 0;
@@ -100,7 +106,7 @@ export async function POST(request: Request) {
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
     if (backendMode(session)) return forwardResponse(await fetchBackend(request, "/crews", "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }));
     const [users, organizations] = await Promise.all([m1IdentityAdapter.listUsers(), m1IdentityAdapter.listOrganizations()]);
-    const crew = crewSchema.parse({ leaderName: users.find((user) => user.id === parsed.data.leaderUserId)?.displayName ?? null, organizationName: organizations.find((organization) => organization.id === parsed.data.organizationId)?.displayName ?? null, members: [{ userId: parsed.data.leaderUserId, displayName: users.find((user) => user.id === parsed.data.leaderUserId)?.displayName ?? null }], id: `crew-${Date.now()}`, ...parsed.data, memberUserIds: [parsed.data.leaderUserId], active: true });
+    const crew = crewSchema.parse({ leaderName: users.find((user) => user.id === parsed.data.leaderUserId)?.displayName ?? null, organizationName: organizations.find((organization) => organization.id === parsed.data.organizationId)?.displayName ?? null, members: [{ userId: parsed.data.leaderUserId, displayName: users.find((user) => user.id === parsed.data.leaderUserId)?.displayName ?? null }], id: `crew-${Date.now()}`, ...parsed.data, homeZoneId: parsed.data.homeZoneId ?? null, effectiveZoneId: parsed.data.homeZoneId ?? null, memberUserIds: [parsed.data.leaderUserId], active: true });
     addCrewFixture(crew);
     return NextResponse.json(crew, { status: 201 });
   } catch (error) {

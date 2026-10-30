@@ -41,13 +41,18 @@ import {
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   crewsAdapter,
+  crewSpecialtyLabel,
+  crewSpecialtyLabels,
+  crewSpecialtySchema,
   crewTypeSchema,
   shiftSchema,
   type Crew,
   type CrewQuery,
+  type CrewSpecialty,
   type CrewType,
   type Shift,
 } from "@/lib/crews";
+import { sortZonesByCommune, zonesAdapter, type Zone } from "@/lib/zones";
 import { m1IdentityAdapter, type M1IdentityReference } from "@/lib/m1-identity";
 
 import {
@@ -91,6 +96,8 @@ import styles from "./catalog-panel.module.css";
 
 const crewTypes = crewTypeSchema.options;
 const shifts = shiftSchema.options;
+const specialties = crewSpecialtySchema.options;
+const NO_ZONE = "none";
 const crewTypeLabels: Record<CrewType, string> = {
   MUNICIPAL: "Municipal",
   COOPERATIVE: "Cooperativa",
@@ -111,6 +118,8 @@ type CrewForm = {
   leaderUserId: string;
   organizationId: string;
   defaultShift: Shift;
+  specialty: CrewSpecialty | "";
+  homeZoneId: string;
 };
 const emptyForm: CrewForm = {
   name: "",
@@ -118,6 +127,8 @@ const emptyForm: CrewForm = {
   leaderUserId: "",
   organizationId: "",
   defaultShift: "MORNING",
+  specialty: "",
+  homeZoneId: "",
 };
 
 const NO_CREWS: Crew[] = [];
@@ -135,6 +146,10 @@ export function CrewCatalogPanel({
   );
   const [typeFilter, setTypeFilter] = useState<CrewType | "all">("all");
   const [shiftFilter, setShiftFilter] = useState<Shift | "all">("all");
+  const [zoneFilter, setZoneFilter] = useState<string>("all");
+  const [specialtyFilter, setSpecialtyFilter] = useState<CrewSpecialty | "all">("all");
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [zonesLoaded, setZonesLoaded] = useState(false);
   const [requestVersion, setRequestVersion] = useState(0);
   const [page, setPage] = useState(1);
   const [state, setState] = useState<LoadState>({ status: "loading" });
@@ -159,8 +174,10 @@ export function CrewCatalogPanel({
       active: activeFilter === "all" ? undefined : activeFilter === "true",
       crewType: typeFilter === "all" ? undefined : typeFilter,
       defaultShift: shiftFilter === "all" ? undefined : shiftFilter,
+      zoneId: zoneFilter === "all" ? undefined : zoneFilter,
+      specialty: specialtyFilter === "all" ? undefined : specialtyFilter,
     }),
-    [activeFilter, typeFilter, shiftFilter],
+    [activeFilter, typeFilter, shiftFilter, zoneFilter, specialtyFilter],
   );
 
   useEffect(() => {
@@ -174,6 +191,21 @@ export function CrewCatalogPanel({
         setOrganizations(nextOrganizations);
       }
     });
+    return () => {
+      current = false;
+    };
+  }, []);
+  useEffect(() => {
+    let current = true;
+    void zonesAdapter
+      .list()
+      .then((result) => {
+        if (current) setZones(sortZonesByCommune(result.zones));
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (current) setZonesLoaded(true);
+      });
     return () => {
       current = false;
     };
@@ -230,6 +262,13 @@ export function CrewCatalogPanel({
 
   const userName = (id: string | null, name: string | null) => id === null ? "—" : name?.trim() || `Usuario ${id}`;
   const organizationName = (id: string | null, name: string | null) => id === null ? "Sin organización externa" : name?.trim() || `Organización sin nombre (id ${id})`;
+  const zoneName = (id: string | null) => {
+    if (id === null) return "Sin zona";
+    const zone = zones.find((candidate) => candidate.id === id);
+    if (zone) return zone.name;
+    return zonesLoaded ? id : "Cargando zona…";
+  };
+  const zoneItems = Object.fromEntries(zones.map((zone) => [zone.id, zone.name]));
   function openCreate() {
     setEditing(null);
     setForm({
@@ -248,6 +287,8 @@ export function CrewCatalogPanel({
       leaderUserId: crew.leaderUserId ?? "",
       organizationId: crew.organizationId ?? "",
       defaultShift: crew.defaultShift,
+      specialty: crew.specialty ?? "",
+      homeZoneId: crew.homeZoneId ?? "",
     });
     setFormError(null);
     setFormOpen(true);
@@ -259,6 +300,10 @@ export function CrewCatalogPanel({
       setFormError("Complete el nombre, responsable y organización.");
       return;
     }
+    if (!editing && !form.specialty) {
+      setFormError("La especialidad es obligatoria.");
+      return;
+    }
     try {
       if (editing)
         await crewsAdapter.update(editing.id, {
@@ -266,9 +311,20 @@ export function CrewCatalogPanel({
           leaderUserId: form.leaderUserId,
           organizationId: form.organizationId,
           defaultShift: form.defaultShift,
+          specialty: form.specialty || undefined,
+          homeZoneId: form.homeZoneId || null,
           active: editing.active,
         });
-      else await crewsAdapter.create({ ...form, name: form.name.trim() });
+      else if (form.specialty)
+        await crewsAdapter.create({
+          name: form.name.trim(),
+          crewType: form.crewType,
+          leaderUserId: form.leaderUserId,
+          organizationId: form.organizationId,
+          defaultShift: form.defaultShift,
+          specialty: form.specialty,
+          homeZoneId: form.homeZoneId || undefined,
+        });
       setFormOpen(false);
       notifySuccess(
         editing ? "Cuadrilla actualizada." : "Cuadrilla registrada.",
@@ -379,6 +435,28 @@ export function CrewCatalogPanel({
         const crew = row.original;
         return <>{crewTypeLabels[crew.crewType]}</>;
       },
+    },
+    {
+      id: "specialty",
+      header: "Especialidad",
+      enableSorting: false,
+      meta: {
+        label: "Especialidad",
+        headClassName: "h-auto whitespace-normal text-inherit font-bold",
+        cellClassName: "h-auto whitespace-normal",
+      },
+      cell: ({ row }) => <>{crewSpecialtyLabel(row.original.specialty)}</>,
+    },
+    {
+      id: "zone",
+      header: "Zona",
+      enableSorting: false,
+      meta: {
+        label: "Zona",
+        headClassName: "h-auto whitespace-normal text-inherit font-bold",
+        cellClassName: "h-auto whitespace-normal",
+      },
+      cell: ({ row }) => <>{zoneName(row.original.effectiveZoneId)}</>,
     },
     {
       id: "leader",
@@ -494,7 +572,7 @@ export function CrewCatalogPanel({
       ) : null}
       <Card aria-label="Filtros de cuadrillas">
         <CardContent>
-          <FieldGroup className="grid max-w-full gap-3 md:w-fit md:grid-cols-[repeat(3,minmax(0,16rem))]">
+          <FieldGroup className="grid max-w-full gap-3 md:w-fit md:grid-cols-[repeat(3,minmax(0,16rem))] lg:grid-cols-[repeat(5,minmax(0,14rem))]">
             <Field>
               <FieldLabel htmlFor="crew-active-filter">Estado</FieldLabel>
               <Select
@@ -585,6 +663,60 @@ export function CrewCatalogPanel({
                 </SelectContent>
               </Select>
             </Field>
+            <Field>
+              <FieldLabel htmlFor="crew-zone-filter">Zona</FieldLabel>
+              <Select
+                items={{ all: "Todas las zonas", ...zoneItems }}
+                value={zoneFilter}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setZoneFilter(value as never);
+                    setPage(1);
+                  }
+                }}
+              >
+                <SelectTrigger id="crew-zone-filter" className="bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">Todas las zonas</SelectItem>
+                    {zones.map((zone) => (
+                      <SelectItem key={zone.id} value={zone.id}>
+                        {zone.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="crew-specialty-filter">Especialidad</FieldLabel>
+              <Select
+                items={{ all: "Todas las especialidades", ...crewSpecialtyLabels }}
+                value={specialtyFilter}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setSpecialtyFilter(value as never);
+                    setPage(1);
+                  }
+                }}
+              >
+                <SelectTrigger id="crew-specialty-filter" className="bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">Todas las especialidades</SelectItem>
+                    {specialties.map((specialty) => (
+                      <SelectItem key={specialty} value={specialty}>
+                        {crewSpecialtyLabels[specialty]}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
           </FieldGroup>
         </CardContent>
       </Card>
@@ -668,6 +800,23 @@ export function CrewCatalogPanel({
                   {selected.name}
                 </h3>
                 <dl className="mt-3 grid gap-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Especialidad</dt>
+                    <dd>{crewSpecialtyLabel(selected.specialty)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Zona base</dt>
+                    <dd>{zoneName(selected.homeZoneId)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Zona vigente hoy</dt>
+                    <dd className="flex flex-wrap items-center gap-2">
+                      {zoneName(selected.effectiveZoneId)}
+                      {selected.effectiveZoneId !== selected.homeZoneId ? (
+                        <Badge variant="secondary">Reubicada</Badge>
+                      ) : null}
+                    </dd>
+                  </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">Responsable</dt>
                     <dd>{userName(selected.leaderUserId, selected.leaderName)}</dd>
@@ -865,6 +1014,53 @@ export function CrewCatalogPanel({
                     No se puede cambiar después.
                   </FieldDescription>
                 ) : null}
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="crew-specialty-form">Especialidad</FieldLabel>
+                <Select
+                  items={crewSpecialtyLabels}
+                  value={form.specialty || null}
+                  onValueChange={(value) => {
+                    if (value !== null) setForm({ ...form, specialty: value as CrewSpecialty });
+                  }}
+                >
+                  <SelectTrigger id="crew-specialty-form" className="bg-card" aria-required>
+                    <SelectValue placeholder="Seleccione una especialidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {specialties.map((specialty) => (
+                        <SelectItem key={specialty} value={specialty}>
+                          {crewSpecialtyLabels[specialty]}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="crew-home-zone-form">Zona base</FieldLabel>
+                <Select
+                  items={{ [NO_ZONE]: "Sin zona base", ...zoneItems }}
+                  value={form.homeZoneId || NO_ZONE}
+                  onValueChange={(value) => {
+                    if (value !== null) setForm({ ...form, homeZoneId: value === NO_ZONE ? "" : value });
+                  }}
+                >
+                  <SelectTrigger id="crew-home-zone-form" className="bg-card">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value={NO_ZONE}>Sin zona base</SelectItem>
+                      {zones.map((zone) => (
+                        <SelectItem key={zone.id} value={zone.id}>
+                          {zone.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </Field>
               <Field>
                 <FieldLabel htmlFor="crew-leader">
