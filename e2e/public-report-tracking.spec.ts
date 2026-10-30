@@ -58,6 +58,7 @@ test.describe("public complaint tracking @smoke", () => {
     await page.getByRole("option", { name: "Centro" }).click();
     await expect(page.getByText("Recolección domiciliaria").first()).toBeVisible();
     await expect(page).toHaveURL(/\?zona=/);
+    await expect(page.getByRole("listbox")).toHaveCount(0);
     await expectNoViolations(page);
   });
 });
