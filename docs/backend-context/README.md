@@ -8,7 +8,7 @@ Esta carpeta contiene un espejo de referencia del contrato HTTP y del modelo de 
 
 **Copia del 27/10/2026 (`7ba0d71`, [#708](https://github.com/hllous/Frontend-M6-DAPS2/issues/708)):** reemplaza a la de `97809ec` (21/10) y a la sincronización parcial de abajo; el Backend documenta ahora 142 rutas en 27 tags. Suma `GET /communes` (comunas con sus zonas y barrios), `GET /neighborhoods` (catálogo de M9 cacheado) y la entidad `Commune`; `GET /zones` devuelve `commune` y `neighborhood`, y `Zone.code` es el `codigo` (slug) del barrio en M9. Las zonas operativas pasan a ser una por barrio. Los GeoJSON de comunas y barrios viven en [`public/geo/`](../../public/geo/README.md), no acá.
 
-**Copia del 30/10/2026 (`374f66e`):** se actualizaron los documentos de dominio y API desde Backend `develop`, incluyendo las cuadrillas y `isAssignedInspector` de `GET /me`.
+**Copia del 30/10/2026 (`374f66e`):** se actualizaron los documentos de dominio y API desde Backend `develop`, incluyendo las cuadrillas y `isAssignedInspector` de `GET /me`. Verificada página por página el mismo día ([#769](https://github.com/hllous/Frontend-M6-DAPS2/issues/769)): coincide con Backend salvo los finales de línea; se corrigió un `\u0000` que la copia había convertido en `^@`. La sección «Lo que todavía no existe» de [`api/endpoints.md`](api/endpoints.md) quedó desactualizada en el Backend (el `RolesGuard` global ya está en uso): se reportó en [Backend #471](https://github.com/hllous/Backend-M6-DAPS2/issues/471) y no se corrige acá. El efecto de los cambios en el frontend está en [`CONTRACTS.md`](../../CONTRACTS.md).
 
 ## Contenido
 
@@ -24,6 +24,6 @@ Esta carpeta contiene un espejo de referencia del contrato HTTP y del modelo de 
 
 El repositorio Backend es la fuente de verdad. Este espejo es de solo lectura: cuando cambie un contrato, actualizá el original en Backend y luego volvé a copiar las páginas correspondientes; no corrijas aquí una diferencia.
 
-El artefacto OpenAPI versionado de este snapshot se encuentra disponible en [Backend `docs/api/openapi.json`](https://github.com/hllous/Backend-M6-DAPS2/blob/7ba0d71/docs/api/openapi.json); este espejo no lo duplica.
+El artefacto OpenAPI versionado de este snapshot se encuentra disponible en [Backend `docs/api/openapi.json`](https://github.com/hllous/Backend-M6-DAPS2/blob/374f66e/docs/api/openapi.json); este espejo no lo duplica.
 
 El espejo cubre el dominio y la API que consume el frontend. No incluye `eventos/`, `bloqueantes.md`, el despliegue ni los acuerdos de integración backend-a-backend; por eso, algunos enlaces relativos heredados de las páginas copiadas pueden apuntar fuera de este espejo. Para las hipótesis y los flujos del frontend, consultá [`CONTRACTS.md`](../../CONTRACTS.md); para el estado general del proyecto, [`ROADMAP.md`](../../ROADMAP.md). Los bloqueantes completos están en el [repositorio Backend](https://github.com/hllous/Backend-M6-DAPS2/blob/develop/docs/bloqueantes.md).
