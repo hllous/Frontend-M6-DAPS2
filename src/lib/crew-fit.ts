@@ -19,3 +19,7 @@ export function crewFit(crew: Crew | undefined, zones: string[], code?: string) 
 export function crewsInZoneFirst(crews: Crew[], zones: string[]) {
   return [...crews].sort((a, b) => Number(Boolean(b.effectiveZoneId && zones.includes(b.effectiveZoneId))) - Number(Boolean(a.effectiveZoneId && zones.includes(a.effectiveZoneId))));
 }
+
+export function isCrewFitConflict(message: string) {
+  return /overrideNote|cuadrilla|especialidad|zona/i.test(message);
+}

@@ -7,9 +7,11 @@ import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetServiceFixtures();
+  crewFixtures.find((crew) => crew.id === "crew-membership")!.specialty = null;
 });
 
 afterEach(() => {
+  resetCrewFixtures();
   delete process.env.M6_AUTH_MODE;
   delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;

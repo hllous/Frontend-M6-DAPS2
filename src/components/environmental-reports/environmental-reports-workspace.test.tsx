@@ -1,3 +1,4 @@
+import { crewFixtures, resetCrewFixtures } from "@/lib/crew-fixtures";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -54,8 +55,13 @@ async function chooseTime(user: ReturnType<typeof userEvent.setup>, scope: Retur
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => { server.resetHandlers(); resetEnvironmentalReportFixtures(); resetRepairRequestFixtures(); resetServiceFixtures(); window.localStorage.clear(); window.history.replaceState(null, "", "/app?destination=environment"); server.events.removeAllListeners("request:start"); vi.useRealTimers(); });
+afterEach(() => { resetCrewFixtures(); server.resetHandlers(); resetEnvironmentalReportFixtures(); resetRepairRequestFixtures(); resetServiceFixtures(); window.localStorage.clear(); window.history.replaceState(null, "", "/app?destination=environment"); server.events.removeAllListeners("request:start"); vi.useRealTimers(); });
 afterAll(() => server.close());
+
+function compatibleInspectionCrew() {
+  crewFixtures.find((crew) => crew.id === "crew-a")!.specialty = "INSPECTION";
+  server.use(http.get("*/api/crews", () => HttpResponse.json({ data: crewFixtures.filter((crew) => crew.active), meta: { total: crewFixtures.length, page: 1, pageSize: 100, totalPages: 1 } })));
+}
 
 describe("EnvironmentalReportsWorkspace", () => {
   it("lets an auditor read a report without offering review or scheduling actions", async () => {
@@ -626,6 +632,7 @@ describe("EnvironmentalReportsWorkspace", () => {
   });
 
   it("lets Office schedule and assign an inspection from a report under review", { timeout: 15000 }, async () => {
+    compatibleInspectionCrew();
     const user = userEvent.setup();
     const create = vi.spyOn(servicesAdapter, "create");
     const assignCrew = vi.spyOn(servicesAdapter, "assignCrew");
@@ -663,6 +670,7 @@ describe("EnvironmentalReportsWorkspace", () => {
   });
 
   it("keeps the inspection and offers to retry only the Service when its creation fails (#320)", async () => {
+    compatibleInspectionCrew();
     const user = userEvent.setup();
     const schedule = vi.spyOn(environmentalReportsAdapter, "schedule");
     const create = vi.spyOn(servicesAdapter, "create");
@@ -702,6 +710,7 @@ describe("EnvironmentalReportsWorkspace", () => {
   });
 
   it("offers to schedule the Service of an open inspection left without one and justifies an overlap (#320)", async () => {
+    compatibleInspectionCrew();
     const inspectionId = "3f1c2b4a-5d6e-4f70-8a9b-0c1d2e3f4a5b";
     updateEnvironmentalReportFixture("ER-1002", { status: "INSPECTION_SCHEDULED" });
     addEnvironmentalInspectionFixture({ id: inspectionId, reportId: "ER-1002", serviceId: null, inspectedAt: null, checklistVersion: "ambiental-v1", checklist: [], attachments: [], findings: null, outcome: null, nextStep: null, notes: null, createdAt: "2026-09-06T11:00:00.000Z", updatedAt: "2026-09-06T11:00:00.000Z" });

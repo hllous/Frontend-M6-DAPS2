@@ -201,6 +201,8 @@ test.describe("EnvironmentalReport case file", () => {
     await chooseTime(dialog, "Fin", "10:30");
     await chooseOption(dialog, "Zona operativa", /Belgrano/);
     await chooseOption(dialog, "Cuadrilla", /Cuadrilla A/);
+    await expect(dialog.getByText(/especialidad distinta/i)).toBeVisible();
+    await dialog.getByLabel(/Justificación/).fill("Refuerzo coordinado para la inspección.");
     await dialog.getByRole("button", { name: "Programar inspección" }).click();
     await expect(detail.getByRole("status", { name: "Estado: Inspección programada" })).toBeVisible();
     await expect(detail.getByText(/^Servicio:/)).toBeVisible();

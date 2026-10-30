@@ -22,9 +22,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
 import { CreateStreetClosureRequestDialog } from "@/components/services/create-street-closure-request-dialog";
 import Link from "next/link";
-import { servicesAdapter, type CreateServiceInput, type Service } from "@/lib/services";
+import { servicesAdapter, ServiceRequestError, OVERRIDE_NOTE_MIN, OVERRIDE_NOTE_MAX, type CreateServiceInput, type Service } from "@/lib/services";
 import { resolveServiceType, TREE_PRUNING_SERVICE_TYPE_RULE } from "@/lib/service-types";
 import { treeInterventionCreateInputSchema, treeInterventionsAdapter, TreeInterventionRequestError, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionPriority, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
+import { isCrewFitConflict } from "@/lib/crew-fit";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import { vehiclesAdapter, type Vehicle } from "@/lib/vehicles";
 import { todayInArgentina } from "@/lib/argentina-date";
@@ -384,6 +385,8 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     void Promise.resolve().then(() => openDetail(intervention));
   }, [state, initialDetailId, detail, openDetail]);
   const treeById = (id: string) => trees.find((tree) => tree.id === id);
+  const [crewConflict, setCrewConflict] = useState(false);
+  const [overrideNote, setOverrideNote] = useState("");
   const runAction = async (action: "submit" | "authorize" | "reject" | "schedule", input?: ReturnType<typeof emptySchedule>) => {
     if (!detail) return;
     setActionError(null); setActiveAction(action);
@@ -406,6 +409,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           targetRef: treeTargetRef(treesForService, detail.treeIds),
           scheduledDate: input.scheduledDate,
           crewId: input.crewId || undefined,
+          overrideNote: crewConflict ? overrideNote.trim() : undefined,
           vehicleId: input.vehicleId || undefined,
           timeWindow: { start: input.windowFrom, end: input.windowTo },
           notes: `Intervención de arbolado ${detail.id}.`,
@@ -438,6 +442,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       setNotice(action === "submit" ? "Extracción enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
       if (action === "reject") setRejectConfirmOpen(false);
     } catch (caught) {
+      if (action === "schedule" && caught instanceof ServiceRequestError && caught.status === 409 && isCrewFitConflict(caught.message)) { setCrewConflict(true); return; }
       setActionError(errorMessage(caught, "No se pudo actualizar la intervención."));
     } finally { setActiveAction(null); }
   };
@@ -617,6 +622,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                         setActionError(SCHEDULE_REQUIRED_ERROR);
                         return;
                       }
+                      if (crewConflict && overrideNote.trim().length < OVERRIDE_NOTE_MIN) { setActionError(`Escriba al menos ${OVERRIDE_NOTE_MIN} caracteres de justificación.`); return; }
                       setActionError(null);
                       void runAction("schedule", scheduleForm);
                     }}
@@ -642,7 +648,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                     <FieldGroup className="grid gap-3 sm:grid-cols-2">
                       <Field>
                         <FieldLabel htmlFor="tree-service-crew">Cuadrilla (opcional)</FieldLabel>
-                        <Select items={{ __none__: "Sin asignar", ...Object.fromEntries(resources && resources !== "error" ? resources.crews.map((crew) => [crew.id, crew.name]) : []) }} value={scheduleForm.crewId || "__none__"} disabled={!resources || resources === "error"} onValueChange={(value) => setScheduleForm({ ...scheduleForm, crewId: value === "__none__" ? "" : String(value ?? "") })}>
+                        <Select items={{ __none__: "Sin asignar", ...Object.fromEntries(resources && resources !== "error" ? resources.crews.map((crew) => [crew.id, crew.name]) : []) }} value={scheduleForm.crewId || "__none__"} disabled={!resources || resources === "error"} onValueChange={(value) => { setScheduleForm({ ...scheduleForm, crewId: value === "__none__" ? "" : String(value ?? "") }); setCrewConflict(false); setOverrideNote(""); }}>
                           <SelectTrigger id="tree-service-crew" aria-label="Cuadrilla (opcional)"><SelectValue /></SelectTrigger>
                           <SelectContent><SelectGroup><SelectItem value="__none__">Sin asignar</SelectItem>{resources && resources !== "error" ? resources.crews.map((crew) => <SelectItem key={crew.id} value={crew.id}>{crew.name}</SelectItem>) : null}</SelectGroup></SelectContent>
                         </Select>
@@ -656,6 +662,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                         {resources === "error" ? <FieldDescription className="text-xs leading-4">No se pudieron cargar. Asigne luego desde Servicios.</FieldDescription> : null}
                       </Field>
                     </FieldGroup>
+                    {crewConflict && <Field><FieldLabel htmlFor="tree-service-override">Justificación de la asignación <span aria-hidden="true">*</span></FieldLabel><FieldDescription id="tree-service-override-help" role="status">La asignación presenta un conflicto de horario, zona o especialidad. Indique el motivo.</FieldDescription><Textarea id="tree-service-override" aria-required="true" aria-describedby="tree-service-override-help" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} maxLength={OVERRIDE_NOTE_MAX} /></Field>}
                     <p className="text-xs text-muted-foreground">{"Se crear\u00e1 un servicio de punto, con el primer \u00e1rbol como objetivo t\u00e9cnico y el listado completo de \u00e1rboles como contexto relacionado."}</p>
                     <div className="flex flex-wrap justify-end gap-2">
                       <Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => setScheduleOpen(false)}>{"Cancelar programaci\u00f3n"}</Button>
@@ -671,7 +678,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
             <Button type="button" variant="outline" className="w-full min-w-0 whitespace-normal sm:w-auto" onClick={() => setDetail(null)}>Cerrar detalle</Button>
             {detail && !detailLoading && !detailError ? <>
               {canRequest && detail.status === "AUTHORIZED" ? <Button type="button" variant="outline" className="w-full min-w-0 whitespace-normal sm:w-auto" onClick={() => { setDetail(null); setStreetClosureIntervention(detail); }}>Solicitar corte de calle</Button> : null}
-              {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && !scheduleOpen ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} onClick={() => { setScheduleForm(emptySchedule()); setScheduleFieldErrors([]); setActionError(null); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
+              {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && !scheduleOpen ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} onClick={() => { setScheduleForm(emptySchedule()); setScheduleFieldErrors([]); setActionError(null); setCrewConflict(false); setOverrideNote(""); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
               {detail.interventionType === "REMOVAL" && detail.status === "REQUESTED" && canRequest ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} aria-busy={activeAction === "submit"} onClick={() => void runAction("submit")}><Send data-icon="inline-start" aria-hidden />{activeAction === "submit" ? "Enviando a autorización…" : "Enviar a autorización"}</Button> : null}
               {detail.status === "REJECTED" && canRequest ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" onClick={() => { setDetail(null); openRequest({ initialTreeIds: detail.treeIds, initialType: detail.interventionType, initialAddress: detail.address ?? undefined, initialRequiresStreetClosure: detail.requiresStreetClosure, initialPriority: detail.priority ?? undefined, initialJustification: detail.justification ?? "" }); }}>Crear nueva solicitud</Button> : null}
               {canAuthorize && ((detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <>

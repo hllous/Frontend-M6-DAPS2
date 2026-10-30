@@ -401,12 +401,18 @@ describe("TreeInterventionsPanel", () => {
   }
 
   it("assigns the chosen crew and vehicle when it creates the Service", async () => {
+    const create = vi.spyOn(servicesAdapter, "create");
     const user = userEvent.setup();
     const { detail, form } = await openScheduleForm(user, /intervention-2|Tratamiento/i);
     await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Cuadrilla (opcional)" }), /Cuadrilla A/);
     await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Vehículo (opcional)" }), /AA 123 AA/);
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+    const note = await within(form).findByLabelText(/Justificación de la asignación/i);
+    await user.type(note, "Refuerzo coordinado para la intervención.");
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
 
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ overrideNote: "Refuerzo coordinado para la intervención." }));
     const serviceId = (await within(detail).findByRole("link", { name: /SVC-\d+/ })).textContent;
     expect(serviceFixtures.find((service) => service.id === serviceId)).toMatchObject({ crewId: "crew-a", vehicleId: "vehicle-1" });
     expect(within(detail).getByRole("link", { name: /SVC-\d+/ })).toHaveAttribute("href", expect.stringContaining(`detail=${serviceId}`));

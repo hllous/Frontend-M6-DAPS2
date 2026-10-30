@@ -284,9 +284,17 @@ export function ScheduleServiceDialog({
 
   // Selected Route for ROUTE mode
   const selectedRoute = routes.find((r) => r.id === routeId);
+  const [routeDetail, setRouteDetail] = useState<Route | null>(null);
+  useEffect(() => {
+    if (!open || !selectedRoute || selectedRoute.stops.length) return;
+    let active = true;
+    routesAdapter.get(selectedRoute.id).then((route) => { if (active) setRouteDetail(route); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [open, selectedRoute]);
+  const routeWithStops = selectedRoute?.stops.length ? selectedRoute : routeDetail?.id === routeId ? routeDetail : selectedRoute;
   const selectedRouteZones = useMemo(
-    () => [...(selectedRoute?.stops ?? [])].sort((a, b) => a.sequence - b.sequence).map((stop) => ({ id: stop.zoneId, name: stop.zoneName })),
-    [selectedRoute],
+    () => [...(routeWithStops?.stops ?? [])].sort((a, b) => a.sequence - b.sequence).map((stop) => ({ id: stop.zoneId, name: stop.zoneName })),
+    [routeWithStops],
   );
 
   const fitZones = derivedMode === "ROUTE" ? selectedRouteZones.map((zone) => zone.id) : [inventoryType && selectedTarget ? selectedTarget.zoneId : pointZoneId].filter(Boolean);
@@ -549,7 +557,7 @@ export function ScheduleServiceDialog({
               {crewsFailed ? <FieldError role="status">No se pudo cargar el listado de cuadrillas; puede asignarla después.</FieldError> : null}
             </Field>
 
-            {needsNote && <Field><FieldLabel htmlFor="service-override-note">Justificación de la asignación</FieldLabel><FieldDescription role="status">{fit.zone && "La cuadrilla trabaja en una zona distinta. "}{fit.specialty && "La cuadrilla tiene una especialidad distinta. "}{backendConflict && "La asignación presenta un conflicto de horario, zona o especialidad. "}Indique el motivo.</FieldDescription><Textarea id="service-override-note" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} maxLength={OVERRIDE_NOTE_MAX} /></Field>}
+            {needsNote && <Field><FieldLabel htmlFor="service-override-note">Justificación de la asignación <span aria-hidden="true">*</span></FieldLabel><FieldDescription id="service-override-help" role="status">{fit.zone && "La cuadrilla trabaja en una zona distinta. "}{fit.specialty && "La cuadrilla tiene una especialidad distinta. "}{backendConflict && "La asignación presenta un conflicto de horario, zona o especialidad. "}Indique el motivo (mínimo {OVERRIDE_NOTE_MIN} caracteres).</FieldDescription><Textarea id="service-override-note" aria-required="true" aria-describedby="service-override-help" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} maxLength={OVERRIDE_NOTE_MAX} /></Field>}
 
             {!selectedServiceType ? null : derivedMode === "ROUTE" ? (
               <Card size="sm" role="group" aria-labelledby="schedule-route-heading">

@@ -455,7 +455,8 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
 
     // Select a crew with no other service that day (crew catalog, not a fixture list)
     await chooseDialogOption(dialog, /Cuadrilla asignada/i, "Cuadrilla E - Membresia");
-    await expect(dialog.getByLabel(/Justificación del solapamiento/i)).toHaveCount(0);
+    await expect(dialog.getByText(/especialidad distinta/i)).toBeVisible();
+    await dialog.getByLabel(/Justificación de la asignación/i).fill("Refuerzo coordinado para esta tarea.");
 
     // Submit assignment
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
@@ -503,11 +504,11 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await chooseDialogOption(dialog, /Vehículo operativo/i, "AA 123 AA");
 
     // Double-booking warning appears and asks for a justification (backend: overrideNote)
-    await expect(dialog.getByText(/^Se superpone con otro servicio$/i)).toBeVisible();
+    await expect(dialog.getByText(/^Revise la asignación$/i)).toBeVisible();
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
     await expect(dialog.getByText(/Escriba al menos 10 caracteres/i)).toBeVisible();
 
-    await dialog.getByLabel(/Justificación del solapamiento/i).fill("SVC-1042 libera el camión antes de las 11:30.");
+    await dialog.getByLabel(/Justificación de la asignación/i).fill("SVC-1042 libera el camión antes de las 11:30.");
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
 
     // Dialog closes upon successful assignment

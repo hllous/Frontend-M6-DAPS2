@@ -33,7 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
-import { crewFit, crewsInZoneFirst } from "@/lib/crew-fit";
+import { crewFit, crewsInZoneFirst, isCrewFitConflict } from "@/lib/crew-fit";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import {
   checkAssignmentConflicts,
@@ -198,7 +198,7 @@ function AssignCrewForm({
     } catch (cause) {
       if (cause instanceof ServiceRequestError && cause.status === 409) {
         const hasAdvisoryOverlap = Boolean(conflicts.crewConflict || conflicts.vehicleConflict || fit.zone || fit.specialty);
-        if (hasAdvisoryOverlap || /overrideNote|cuadrilla|especialidad|zona/i.test(cause.message)) {
+        if (hasAdvisoryOverlap || isCrewFitConflict(cause.message)) {
           setBackendConflict("La asignación presenta un conflicto de horario, zona o especialidad.");
         } else {
           setBackendConflict(null);
