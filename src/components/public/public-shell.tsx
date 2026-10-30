@@ -16,7 +16,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           </Link>
           <Link
             href="/login"
-            className={buttonVariants({ variant: "ghost", className: "text-[var(--color-on-institutional)] hover:bg-white/10 hover:text-[var(--color-on-institutional)]" })}
+            className={buttonVariants({ variant: "ghost", className: "text-[var(--color-on-institutional)] hover:bg-[var(--color-on-institutional)]/10 hover:text-[var(--color-on-institutional)]" })}
           >
             Ingreso del personal
           </Link>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { fetchPublicBackend, publicError, publicMockMode, relayPublicResponse, withCacheControl } from "@/lib/public-bff";
 import { findPublicReportFixture } from "@/lib/public-report-fixtures";
-import { isTicketId } from "@/lib/public-reports";
+import { isTicketId, publicReportSchema } from "@/lib/public-reports";
 
 export async function GET(request: Request, { params }: { params: Promise<{ ticketId: string }> }) {
   const path = new URL(request.url).pathname;
@@ -15,5 +15,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ tick
   }
 
   const response = await fetchPublicBackend(request, `/public/reports/${ticketId.toLowerCase()}`);
-  return relayPublicResponse(response, path);
+  return relayPublicResponse(response, path, publicReportSchema);
 }

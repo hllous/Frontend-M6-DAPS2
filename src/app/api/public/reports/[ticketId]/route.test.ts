@@ -81,6 +81,28 @@ describe("GET /api/public/reports/:ticketId", () => {
     expect(await response.json()).toMatchObject({ ticketId: unknownTicketId });
   });
 
+  it("returns only the public contract fields, dropping anything extra the backend sends", async () => {
+    restoreEnv = backendEnv();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ...backendReport, inspectorName: "Ana Pérez" }));
+
+    const response = await call(unknownTicketId);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ ticketId: unknownTicketId });
+    expect(body).not.toHaveProperty("inspectorName");
+  });
+
+  it("answers 502 when the backend body does not match the public contract", async () => {
+    restoreEnv = backendEnv();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ticketId: unknownTicketId, stage: "NO_EXISTE" }));
+
+    const response = await call(unknownTicketId);
+
+    expect(response.status).toBe(502);
+    expect((await response.json()).message).toBe("El servicio no responde en este momento.");
+  });
+
   it("passes the backend 404 through", async () => {
     restoreEnv = backendEnv();
     vi.spyOn(globalThis, "fetch").mockResolvedValue(

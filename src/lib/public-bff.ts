@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { ZodType } from "zod";
 
 import { errorResponse } from "./bff-route";
 import { getAuthMode } from "./session";
@@ -53,13 +54,24 @@ export async function fetchPublicBackend(request: Request, resourcePath: string)
   }
 }
 
-/** Pasa 404 y 429 (con `Retry-After`) y convierte cualquier otro fallo en 502 sin filtrar el cuerpo del backend. */
-export async function relayPublicResponse(response: Response, path: string, cacheControl = "no-store"): Promise<NextResponse> {
+/**
+ * Pasa 404 y 429 (con `Retry-After`) y convierte cualquier otro fallo en 502 sin filtrar el cuerpo del backend.
+ * El cuerpo exitoso se parsea con el contrato público de la ruta: solo sale lo que el contrato declara, y un
+ * cuerpo que no lo cumple es un 502.
+ */
+export async function relayPublicResponse<T>(
+  response: Response,
+  path: string,
+  schema: ZodType<T>,
+  cacheControl = "no-store",
+): Promise<NextResponse> {
   if (response instanceof NextResponse && !response.ok) return response;
   if (response.ok) {
     const body: unknown = await response.json().catch(() => undefined);
     if (body === undefined) return publicError(502, UNAVAILABLE_MESSAGE, path);
-    return withCacheControl(NextResponse.json(body), cacheControl);
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) return publicError(502, UNAVAILABLE_MESSAGE, path);
+    return withCacheControl(NextResponse.json(parsed.data), cacheControl);
   }
   void response.body?.cancel().catch(() => undefined);
   if (response.status === 404) return publicError(404, "No se encontró lo que buscabas.", path);
