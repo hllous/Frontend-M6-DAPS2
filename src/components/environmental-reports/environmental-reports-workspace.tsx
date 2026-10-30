@@ -573,7 +573,8 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
 
   const activeInspection = inspections.find((inspection) => !inspection.outcome) ?? null;
   const completedViolationInspection = inspections.find((inspection) => inspection.outcome === "VIOLATION_FOUND") ?? null;
-  const showNoticeIssuance = canIssueViolationNotice && report.status === "VIOLATION_FOUND" && Boolean(completedViolationInspection);
+  // #733: el backend decide si corresponde un acta (`allowedActions.notice`, Backend-M6-DAPS2#451); sin ese dato no se ofrece.
+  const showNoticeIssuance = canIssueViolationNotice && report.status === "VIOLATION_FOUND" && completedViolationInspection?.allowedActions?.notice === true;
   const hasInspectionEvidence = Boolean(completedViolationInspection?.attachments?.length);
   const canSubmitNotice = showNoticeIssuance && hasInspectionEvidence && !violationNotice && !noticeLoading;
   // #639: una sola solicitud abierta por expediente; mientras está pendiente el backend responde 409
@@ -764,6 +765,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
          report={report}
          service={repairRequestInspection ? inspectionServices[repairRequestInspection.id] ?? undefined : undefined}
          onOpenChange={(open) => { if (!open) setRepairRequestInspectionId(null); }}
+         onRefused={() => { void loadInspections().catch(() => undefined); }}
          onCreated={(request) => {
            setInspectionRepairRequests((current) => ({
              ...current,
@@ -863,7 +865,10 @@ function IssueViolationNoticeDialog({ open, inspection, onOpenChange, onSubmit, 
   const [nonForwarded, setNonForwarded] = useState(false);
   const [lookupState, setLookupState] = useState<"idle" | "loading" | "resolved" | "not-found">("idle");
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
-  const [violationType, setViolationType] = useState<IssueViolationNoticeInput["violationType"] | "">(inspection?.violationType ?? "");
+  const [violationType, setViolationType] = useState<IssueViolationNoticeInput["violationType"] | "">(() => {
+    const suggested = inspection?.allowedActions?.suggestedViolationType;
+    return suggested && Object.hasOwn(violationTypeLabels, suggested) ? suggested as IssueViolationNoticeInput["violationType"] : "";
+  });
   const [severity, setSeverity] = useState<IssueViolationNoticeInput["severity"] | "">(inspection?.severity ?? "");
   const [suggestedAction, setSuggestedAction] = useState<IssueViolationNoticeInput["suggestedAction"] | "">(inspection?.suggestedAction ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
