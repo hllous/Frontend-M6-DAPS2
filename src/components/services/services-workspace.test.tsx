@@ -712,9 +712,10 @@ describe("ServicesWorkspace component", () => {
     await user.click(within(dialog).getByRole("combobox", { name: /Cuadrilla asignada/i }));
     await user.click(await screen.findByRole("option", { name: "Cuadrilla C · Ibáñez" }));
 
-    // crew-c already holds SVC-1072 (13:00–16:00) that day: the backend requires a justification
+    // La cuadrilla está reubicada y también tiene un servicio en esa franja.
+    expect(within(dialog).getByText(/zona distinta/i)).toBeVisible();
     await user.type(
-      within(dialog).getByLabelText(/Justificación del solapamiento/i),
+      within(dialog).getByLabelText(/Justificación de la asignación/i),
       "La poda termina antes de la inspección de las 16.",
     );
 

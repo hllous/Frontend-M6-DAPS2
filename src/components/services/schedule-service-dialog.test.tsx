@@ -443,3 +443,39 @@ describe("ScheduleServiceDialog component", () => {
     expect(create).not.toHaveBeenCalled();
   });
 });
+
+
+it("prioriza cuadrillas de la zona y avisa si la especialidad no corresponde", async () => {
+  server.use(http.get("*/api/crews", () => HttpResponse.json({ data: [
+    { id: "other", name: "Otra zona", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-3", specialty: "TREES" },
+    { id: "local", name: "Zona elegida", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-1", specialty: "TREES" },
+  ], meta: { total: 2, page: 1, pageSize: 100, totalPages: 1 } })));
+  const user = userEvent.setup();
+  render(<ScheduleServiceDialog open onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+  await catalogsLoadedWithRouteType();
+  await user.click(screen.getByRole("combobox", { name: /Cuadrilla/ }));
+  expect((await screen.findAllByRole("option")).map((option) => option.textContent)).toEqual(["Sin asignar", "Zona elegida", "Otra zona"]);
+  await user.click(screen.getByRole("option", { name: "Otra zona" }));
+  expect(screen.getByText(/zona distinta/i)).toBeVisible();
+  expect(screen.getByLabelText(/Justificación de la asignación/i)).toBeVisible();
+});
+
+
+it("un 409 por especialidad abre la justificación", async () => {
+  server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La especialidad no coincide; hace falta overrideNote", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 })));
+  const user = userEvent.setup();
+  render(<ScheduleServiceDialog open onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+  await catalogsLoadedWithRouteType();
+  await user.click(screen.getByRole("button", { name: "Programar servicio" }));
+  expect(await screen.findByLabelText(/Justificación de la asignación/i)).toBeVisible();
+});
+
+it("un 409 que no pide justificación muestra su error y no abre la justificación", async () => {
+  server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla está inactiva.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 })));
+  const user = userEvent.setup();
+  render(<ScheduleServiceDialog open onOpenChange={vi.fn()} onCreated={vi.fn()} />);
+  await catalogsLoadedWithRouteType();
+  await user.click(screen.getByRole("button", { name: "Programar servicio" }));
+  expect(await screen.findByText("La cuadrilla está inactiva.")).toBeVisible();
+  expect(screen.queryByLabelText(/Justificación de la asignación/i)).not.toBeInTheDocument();
+});

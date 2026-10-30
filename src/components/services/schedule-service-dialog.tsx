@@ -25,9 +25,10 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
-import { servicesAdapter, type CreateServiceInput, type Service, type ServiceMode, type ServiceOrigin } from "@/lib/services";
+import { servicesAdapter, ServiceRequestError, OVERRIDE_NOTE_MIN, OVERRIDE_NOTE_MAX, type CreateServiceInput, type Service, type ServiceMode, type ServiceOrigin } from "@/lib/services";
 import { routesAdapter, type Route } from "@/lib/routes";
 import { serviceTypesAdapter, type ServiceType, type ServiceTypeCategory } from "@/lib/service-types";
+import { asksForOverrideNote, crewFit, crewFitWarnings, crewsInZoneFirst } from "@/lib/crew-fit";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import { zonesAdapter, type Zone } from "@/lib/zones";
 import { containersAdapter } from "@/lib/containers";
@@ -155,6 +156,8 @@ export function ScheduleServiceDialog({
   const [chosenZoneId, setPointZoneId] = useState("");
   const [targetType, setTargetType] = useState<TargetKind>("CONTAINER");
   const [crewId, setCrewId] = useState("");
+  const [overrideNote, setOverrideNote] = useState("");
+  const [backendConflict, setBackendConflict] = useState(false);
   const [targetRef, setTargetRef] = useState<string>("");
   const [targetSearch, setTargetSearch] = useState("");
   const [targetOptions, setTargetOptions] = useState<TargetOptions>({ status: "idle" });
@@ -174,6 +177,8 @@ export function ScheduleServiceDialog({
       setServiceTypeId("");
       setPointZoneId("");
       setCrewId("");
+      setOverrideNote("");
+      setBackendConflict(false);
     }
   }
 
@@ -279,10 +284,22 @@ export function ScheduleServiceDialog({
 
   // Selected Route for ROUTE mode
   const selectedRoute = routes.find((r) => r.id === routeId);
+  const [routeDetail, setRouteDetail] = useState<Route | null>(null);
+  useEffect(() => {
+    if (!open || !selectedRoute || selectedRoute.stops.length) return;
+    let active = true;
+    routesAdapter.get(selectedRoute.id).then((route) => { if (active) setRouteDetail(route); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [open, selectedRoute]);
+  const routeWithStops = selectedRoute?.stops.length ? selectedRoute : routeDetail?.id === routeId ? routeDetail : selectedRoute;
   const selectedRouteZones = useMemo(
-    () => [...(selectedRoute?.stops ?? [])].sort((a, b) => a.sequence - b.sequence).map((stop) => ({ id: stop.zoneId, name: stop.zoneName })),
-    [selectedRoute],
+    () => [...(routeWithStops?.stops ?? [])].sort((a, b) => a.sequence - b.sequence).map((stop) => ({ id: stop.zoneId, name: stop.zoneName })),
+    [routeWithStops],
   );
+
+  const fitZones = derivedMode === "ROUTE" ? selectedRouteZones.map((zone) => zone.id) : [inventoryType && selectedTarget ? selectedTarget.zoneId : pointZoneId].filter(Boolean);
+  const fit = crewFit(crews.find((crew) => crew.id === crewId), fitZones, selectedServiceType?.code);
+  const needsNote = fit.zone || fit.specialty || backendConflict;
 
   // Reset form when dialog opens
   const handleOpenChange = (nextOpen: boolean) => {
@@ -353,6 +370,7 @@ export function ScheduleServiceDialog({
       return;
     }
 
+    if (needsNote && overrideNote.trim().length < OVERRIDE_NOTE_MIN) { setErrorMessage(`Escriba al menos ${OVERRIDE_NOTE_MIN} caracteres de justificación.`); return; }
     setIsSubmitting(true);
 
     // Build zone snapshot. El listado de recorridos puede no traer las paradas: entonces se pide el detalle.
@@ -386,6 +404,7 @@ export function ScheduleServiceDialog({
       routeId: derivedMode === "ROUTE" ? routeId : undefined,
       zoneIds,
       crewId: crewId || undefined,
+      overrideNote: needsNote ? overrideNote.trim() : undefined,
       targetType: inventoryType ?? undefined,
       targetId: inventoryType ? selectedTarget?.id : undefined,
       targetRef: derivedMode !== "POINT" ? undefined : inventoryType ? selectedTarget?.label : targetRef.trim(),
@@ -402,6 +421,7 @@ export function ScheduleServiceDialog({
       onCreated(createdService);
       handleOpenChange(false);
     } catch (cause) {
+      if (cause instanceof ServiceRequestError && cause.status === 409 && asksForOverrideNote(cause.message)) { setBackendConflict(true); return; }
       const msg =
         getErrorMessage(cause, "No se pudo programar el servicio. Verifique los datos ingresados.");
       setErrorMessage(msg);
@@ -524,18 +544,20 @@ export function ScheduleServiceDialog({
               <Select
                 value={crewId || NO_CREW}
                 items={crewItems}
-                onValueChange={(value) => setCrewId(value === NO_CREW ? "" : String(value))}
+                onValueChange={(value) => { setCrewId(value === NO_CREW ? "" : String(value)); setBackendConflict(false); }}
               >
                 <SelectTrigger id="service-crew"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value={NO_CREW}>Sin asignar</SelectItem>
-                    {crews.map((crew) => <SelectItem key={crew.id} value={crew.id}>{crew.name}</SelectItem>)}
+                    {crewsInZoneFirst(crews, fitZones).map((crew) => <SelectItem key={crew.id} value={crew.id}>{crew.name}</SelectItem>)}
                   </SelectGroup>
                 </SelectContent>
               </Select>
               {crewsFailed ? <FieldError role="status">No se pudo cargar el listado de cuadrillas; puede asignarla después.</FieldError> : null}
             </Field>
+
+            {needsNote && <Field><FieldLabel htmlFor="service-override-note">Justificación de la asignación <span aria-hidden="true">*</span></FieldLabel><FieldDescription id="service-override-help" role="status">{crewFitWarnings(fit).join(" ")} {backendConflict && "La asignación presenta un conflicto de horario, zona o especialidad. "}Indique el motivo (mínimo {OVERRIDE_NOTE_MIN} caracteres).</FieldDescription><Textarea id="service-override-note" aria-required="true" aria-describedby="service-override-help" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} maxLength={OVERRIDE_NOTE_MAX} /></Field>}
 
             {!selectedServiceType ? null : derivedMode === "ROUTE" ? (
               <Card size="sm" role="group" aria-labelledby="schedule-route-heading">

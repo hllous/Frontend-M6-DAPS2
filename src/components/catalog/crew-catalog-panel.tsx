@@ -10,9 +10,12 @@ import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
+  ArrowRightLeft,
   Check,
+  CircleCheck,
   ChevronRight,
   ChevronsUpDown,
+  MapPinned,
   Pencil,
   Plus,
   Trash2,
@@ -41,13 +44,21 @@ import {
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   crewsAdapter,
+  crewSpecialtyLabel,
+  crewSpecialtyLabels,
+  crewSpecialtySchema,
   crewTypeSchema,
   shiftSchema,
   type Crew,
   type CrewQuery,
+  type CrewSpecialty,
   type CrewType,
   type Shift,
 } from "@/lib/crews";
+import { CrewRelocationDialog } from "@/components/catalog/crew-relocation-dialog";
+import { formatArgentinaCalendarDate, todayInArgentina } from "@/lib/argentina-date";
+import { crewZoneAssignmentsAdapter, type CrewZoneAssignment } from "@/lib/crew-zone-assignments";
+import { sortZonesByCommune, zonesAdapter, type Zone } from "@/lib/zones";
 import { m1IdentityAdapter, type M1IdentityReference } from "@/lib/m1-identity";
 
 import {
@@ -63,6 +74,7 @@ import { Input } from "@/components/ui/input";
 import { notifySuccess } from "@/components/ui/feedback";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import {
   Empty,
   EmptyDescription,
@@ -91,6 +103,8 @@ import styles from "./catalog-panel.module.css";
 
 const crewTypes = crewTypeSchema.options;
 const shifts = shiftSchema.options;
+const specialties = crewSpecialtySchema.options;
+const NO_ZONE = "none";
 const crewTypeLabels: Record<CrewType, string> = {
   MUNICIPAL: "Municipal",
   COOPERATIVE: "Cooperativa",
@@ -111,6 +125,8 @@ type CrewForm = {
   leaderUserId: string;
   organizationId: string;
   defaultShift: Shift;
+  specialty: CrewSpecialty | "";
+  homeZoneId: string;
 };
 const emptyForm: CrewForm = {
   name: "",
@@ -118,6 +134,8 @@ const emptyForm: CrewForm = {
   leaderUserId: "",
   organizationId: "",
   defaultShift: "MORNING",
+  specialty: "",
+  homeZoneId: "",
 };
 
 const NO_CREWS: Crew[] = [];
@@ -130,11 +148,18 @@ export function CrewCatalogPanel({
   const canManage =
     scenario.actor.kind === "OFFICE" &&
     scenario.capabilities.includes("crew:manage");
+  const canRelocate =
+    scenario.actor.kind === "OFFICE" &&
+    scenario.capabilities.includes("service:assign");
   const [activeFilter, setActiveFilter] = useState<"all" | "true" | "false">(
     "all",
   );
   const [typeFilter, setTypeFilter] = useState<CrewType | "all">("all");
   const [shiftFilter, setShiftFilter] = useState<Shift | "all">("all");
+  const [zoneFilter, setZoneFilter] = useState<string>("all");
+  const [specialtyFilter, setSpecialtyFilter] = useState<CrewSpecialty | "all">("all");
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [zonesLoaded, setZonesLoaded] = useState(false);
   const [requestVersion, setRequestVersion] = useState(0);
   const [page, setPage] = useState(1);
   const [state, setState] = useState<LoadState>({ status: "loading" });
@@ -152,6 +177,12 @@ export function CrewCatalogPanel({
   const [memberSelection, setMemberSelection] = useState<string[]>([]);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
+  const [moves, setMoves] = useState<{ crewId: string; items: CrewZoneAssignment[] | null }>({ crewId: "", items: null });
+  const [movesError, setMovesError] = useState<string | null>(null);
+  const [movesVersion, setMovesVersion] = useState(0);
+  // Fin de la reubicación vigente por cuadrilla (null = hasta nuevo aviso), para el marcador de la tabla.
+  const [relocationEnds, setRelocationEnds] = useState<Record<string, string | null>>({});
+  const [relocating, setRelocating] = useState<Crew | null>(null);
   const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
 
   const query = useMemo<CrewQuery>(
@@ -159,8 +190,10 @@ export function CrewCatalogPanel({
       active: activeFilter === "all" ? undefined : activeFilter === "true",
       crewType: typeFilter === "all" ? undefined : typeFilter,
       defaultShift: shiftFilter === "all" ? undefined : shiftFilter,
+      zoneId: zoneFilter === "all" ? undefined : zoneFilter,
+      specialty: specialtyFilter === "all" ? undefined : specialtyFilter,
     }),
-    [activeFilter, typeFilter, shiftFilter],
+    [activeFilter, typeFilter, shiftFilter, zoneFilter, specialtyFilter],
   );
 
   useEffect(() => {
@@ -174,6 +207,21 @@ export function CrewCatalogPanel({
         setOrganizations(nextOrganizations);
       }
     });
+    return () => {
+      current = false;
+    };
+  }, []);
+  useEffect(() => {
+    let current = true;
+    void zonesAdapter
+      .list()
+      .then((result) => {
+        if (current) setZones(sortZonesByCommune(result.zones));
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (current) setZonesLoaded(true);
+      });
     return () => {
       current = false;
     };
@@ -215,6 +263,42 @@ export function CrewCatalogPanel({
     };
   }, [query, requestVersion, scenario, page]);
 
+  const listedCrews = state.status === "ready" ? state.crews : NO_CREWS;
+  useEffect(() => {
+    let current = true;
+    for (const crew of listedCrews.filter((item) => item.effectiveZoneId !== item.homeZoneId)) {
+      void crewZoneAssignmentsAdapter
+        .list(crew.id)
+        .then((items) => {
+          const move = activeMove(items);
+          if (current && move) setRelocationEnds((ends) => ({ ...ends, [crew.id]: move.validTo }));
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      current = false;
+    };
+  }, [listedCrews, movesVersion]);
+
+  const selectedId = selected?.id ?? null;
+  useEffect(() => {
+    if (selectedId === null) return;
+    let current = true;
+    void crewZoneAssignmentsAdapter
+      .list(selectedId)
+      .then((items) => {
+        if (!current) return;
+        setMovesError(null);
+        setMoves({ crewId: selectedId, items });
+      })
+      .catch((caught: unknown) => {
+        if (current) setMovesError(errorMessage(caught, "No se pudo cargar el historial de reubicaciones."));
+      });
+    return () => {
+      current = false;
+    };
+  }, [selectedId, movesVersion]);
+
   useEffect(() => {
     const media =
       typeof window.matchMedia === "function"
@@ -228,16 +312,15 @@ export function CrewCatalogPanel({
     return () => media.removeEventListener("change", updateSheetSide);
   }, []);
 
-  const userName = (id: string | null) =>
-    id === null
-      ? "—"
-      : (users.find((user) => user.id === id)?.displayName ??
-        "Persona no encontrada");
-  const organizationName = (id: string | null) =>
-    id === null
-      ? "Sin organización externa"
-      : (organizations.find((organization) => organization.id === id)
-          ?.displayName ?? "Organización no encontrada");
+  const userName = (id: string | null, name: string | null) => id === null ? "—" : name?.trim() || `Usuario ${id}`;
+  const organizationName = (id: string | null, name: string | null) => id === null ? "Sin organización externa" : name?.trim() || `Organización sin nombre (id ${id})`;
+  const zoneName = (id: string | null) => {
+    if (id === null) return "Sin zona";
+    const zone = zones.find((candidate) => candidate.id === id);
+    if (zone) return zone.name;
+    return zonesLoaded ? id : "Cargando zona…";
+  };
+  const zoneItems = Object.fromEntries(zones.map((zone) => [zone.id, zone.name]));
   function openCreate() {
     setEditing(null);
     setForm({
@@ -256,6 +339,8 @@ export function CrewCatalogPanel({
       leaderUserId: crew.leaderUserId ?? "",
       organizationId: crew.organizationId ?? "",
       defaultShift: crew.defaultShift,
+      specialty: crew.specialty ?? "",
+      homeZoneId: crew.homeZoneId ?? "",
     });
     setFormError(null);
     setFormOpen(true);
@@ -267,6 +352,10 @@ export function CrewCatalogPanel({
       setFormError("Complete el nombre, responsable y organización.");
       return;
     }
+    if (!editing && !form.specialty) {
+      setFormError("La especialidad es obligatoria.");
+      return;
+    }
     try {
       if (editing)
         await crewsAdapter.update(editing.id, {
@@ -274,9 +363,20 @@ export function CrewCatalogPanel({
           leaderUserId: form.leaderUserId,
           organizationId: form.organizationId,
           defaultShift: form.defaultShift,
+          specialty: form.specialty || undefined,
+          homeZoneId: form.homeZoneId || null,
           active: editing.active,
         });
-      else await crewsAdapter.create({ ...form, name: form.name.trim() });
+      else if (form.specialty)
+        await crewsAdapter.create({
+          name: form.name.trim(),
+          crewType: form.crewType,
+          leaderUserId: form.leaderUserId,
+          organizationId: form.organizationId,
+          defaultShift: form.defaultShift,
+          specialty: form.specialty,
+          homeZoneId: form.homeZoneId || undefined,
+        });
       setFormOpen(false);
       notifySuccess(
         editing ? "Cuadrilla actualizada." : "Cuadrilla registrada.",
@@ -305,7 +405,7 @@ export function CrewCatalogPanel({
     }
     setMemberError(null);
     try {
-      setSelected(await crewsAdapter.addMembers(selected.id, memberSelection));
+      setSelected(await crewsAdapter.addMembers(selected.id, memberSelection.map((userId) => ({ userId, displayName: users.find((user) => user.id === userId)?.displayName }))));
       setMemberSelection([]);
       setMemberPickerOpen(false);
       notifySuccess("Integrantes agregados.");
@@ -389,6 +489,43 @@ export function CrewCatalogPanel({
       },
     },
     {
+      id: "specialty",
+      header: "Especialidad",
+      enableSorting: false,
+      meta: {
+        label: "Especialidad",
+        headClassName: "h-auto whitespace-normal text-inherit font-bold",
+        cellClassName: "h-auto whitespace-normal",
+      },
+      cell: ({ row }) => <>{crewSpecialtyLabel(row.original.specialty)}</>,
+    },
+    {
+      id: "zone",
+      header: "Zona",
+      enableSorting: false,
+      meta: {
+        label: "Zona",
+        headClassName: "h-auto whitespace-normal text-inherit font-bold",
+        cellClassName: "h-auto whitespace-normal",
+      },
+      cell: ({ row }) => {
+        const crew = row.original;
+        if (crew.effectiveZoneId === crew.homeZoneId) return <>{zoneName(crew.effectiveZoneId)}</>;
+        const end = relocationEnds[crew.id];
+        return (
+          <div className="flex flex-col items-start gap-1">
+            {zoneName(crew.effectiveZoneId)}
+            <RelocatedBadge />
+            {end === undefined ? null : (
+              <span className="text-xs text-muted-foreground">
+                {end ? `Hasta el ${formatArgentinaCalendarDate(end)}` : "Hasta nuevo aviso"}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       id: "leader",
       header: "Responsable",
       enableSorting: false,
@@ -399,7 +536,7 @@ export function CrewCatalogPanel({
       },
       cell: ({ row }) => {
         const crew = row.original;
-        return <>{userName(crew.leaderUserId)}</>;
+        return <>{userName(crew.leaderUserId, crew.leaderName)}</>;
       },
     },
     {
@@ -413,7 +550,7 @@ export function CrewCatalogPanel({
       },
       cell: ({ row }) => {
         const crew = row.original;
-        return <>{organizationName(crew.organizationId)}</>;
+        return <>{organizationName(crew.organizationId, crew.organizationName)}</>;
       },
     },
     {
@@ -502,7 +639,7 @@ export function CrewCatalogPanel({
       ) : null}
       <Card aria-label="Filtros de cuadrillas">
         <CardContent>
-          <FieldGroup className="grid max-w-full gap-3 md:w-fit md:grid-cols-[repeat(3,minmax(0,16rem))]">
+          <FieldGroup className="grid max-w-full gap-3 md:w-fit md:grid-cols-[repeat(3,minmax(0,16rem))] lg:grid-cols-[repeat(5,minmax(0,14rem))]">
             <Field>
               <FieldLabel htmlFor="crew-active-filter">Estado</FieldLabel>
               <Select
@@ -519,7 +656,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-active-filter" className="bg-card">
+                <SelectTrigger id="crew-active-filter" surface="card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -548,7 +685,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-type-filter" className="bg-card">
+                <SelectTrigger id="crew-type-filter" surface="card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -578,7 +715,7 @@ export function CrewCatalogPanel({
                   }
                 }}
               >
-                <SelectTrigger id="crew-shift-filter" className="bg-card">
+                <SelectTrigger id="crew-shift-filter" surface="card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -587,6 +724,60 @@ export function CrewCatalogPanel({
                     {shifts.map((shift) => (
                       <SelectItem key={shift} value={shift}>
                         {shiftLabels[shift]}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="crew-zone-filter">Zona</FieldLabel>
+              <Select
+                items={{ all: "Todas las zonas", ...zoneItems }}
+                value={zoneFilter}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setZoneFilter(value as never);
+                    setPage(1);
+                  }
+                }}
+              >
+                <SelectTrigger id="crew-zone-filter" surface="card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">Todas las zonas</SelectItem>
+                    {zones.map((zone) => (
+                      <SelectItem key={zone.id} value={zone.id}>
+                        {zone.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="crew-specialty-filter">Especialidad</FieldLabel>
+              <Select
+                items={{ all: "Todas las especialidades", ...crewSpecialtyLabels }}
+                value={specialtyFilter}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    setSpecialtyFilter(value as never);
+                    setPage(1);
+                  }
+                }}
+              >
+                <SelectTrigger id="crew-specialty-filter" surface="card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">Todas las especialidades</SelectItem>
+                    {specialties.map((specialty) => (
+                      <SelectItem key={specialty} value={specialty}>
+                        {crewSpecialtyLabels[specialty]}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -677,12 +868,29 @@ export function CrewCatalogPanel({
                 </h3>
                 <dl className="mt-3 grid gap-2 text-sm">
                   <div>
+                    <dt className="text-xs text-muted-foreground">Especialidad</dt>
+                    <dd>{crewSpecialtyLabel(selected.specialty)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Zona base</dt>
+                    <dd>{zoneName(selected.homeZoneId)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Zona vigente hoy</dt>
+                    <dd className="flex flex-wrap items-center gap-2">
+                      {zoneName(selected.effectiveZoneId)}
+                      {selected.effectiveZoneId !== selected.homeZoneId ? (
+                        <RelocatedBadge />
+                      ) : null}
+                    </dd>
+                  </div>
+                  <div>
                     <dt className="text-xs text-muted-foreground">Responsable</dt>
-                    <dd>{userName(selected.leaderUserId)}</dd>
+                    <dd>{userName(selected.leaderUserId, selected.leaderName)}</dd>
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">Organización</dt>
-                    <dd>{organizationName(selected.organizationId)}</dd>
+                    <dd>{organizationName(selected.organizationId, selected.organizationName)}</dd>
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">Turno</dt>
@@ -694,6 +902,11 @@ export function CrewCatalogPanel({
                   </div>
                 </dl>
               </section>
+              <CrewMovesSection
+                moves={moves.crewId === selected.id ? moves.items : null}
+                error={movesError}
+                zoneName={zoneName}
+              />
               <section aria-labelledby="crew-members-heading" className="grid gap-3">
                 <h3 id="crew-members-heading" className="font-semibold">
                   Integrantes
@@ -702,19 +915,19 @@ export function CrewCatalogPanel({
                   aria-label="Integrantes de la cuadrilla"
                   className="flex flex-col gap-2"
                 >
-                  {selected.memberUserIds.map((memberUserId) => (
+                  {selected.members.map((member) => (
                     <li
-                      key={memberUserId}
+                      key={member.userId}
                       className="flex items-center justify-between gap-2"
                     >
-                      {userName(memberUserId)}
+                      {userName(member.userId, member.displayName)}
                       {canManage ? (
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          aria-label={`Quitar a ${userName(memberUserId)}`}
-                          onClick={() => void removeMember(memberUserId)}
+                          aria-label={`Quitar a ${userName(member.userId, member.displayName)}`}
+                          onClick={() => void removeMember(member.userId)}
                         >
                           <UserMinus data-icon="inline-start" aria-hidden />
                           Quitar
@@ -732,6 +945,8 @@ export function CrewCatalogPanel({
                       <FieldLabel htmlFor="crew-members">
                         Agregar integrantes
                       </FieldLabel>
+                      <FieldDescription>Los candidatos provienen de una lista de ejemplo de personas.</FieldDescription>
+                      {users.every((user) => selected.memberUserIds.includes(user.id)) ? <FieldDescription>No hay integrantes disponibles para agregar.</FieldDescription> : null}
                       <CrewMemberMultiSelect
                         id="crew-members"
                         open={memberPickerOpen}
@@ -765,24 +980,37 @@ export function CrewCatalogPanel({
                 ) : null}
               </section>
             </div>
-            {canManage ? (
+            {canManage || canRelocate ? (
               <SheetFooter className="border-t border-border pt-4">
                 <section aria-label="Acciones de la cuadrilla" className="grid gap-2">
                   <h3 className="text-sm font-semibold">Acciones disponibles</h3>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start bg-card"
-                    onClick={() => {
-                      const crew = selected;
-                      setSelected(null);
-                      openEdit(crew);
-                    }}
-                  >
-                    <Pencil data-icon="inline-start" aria-hidden />
-                    Editar
-                  </Button>
-                  {selected.active ? (
+                  {canRelocate && selected.active ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start bg-card"
+                      onClick={() => setRelocating(selected)}
+                    >
+                      <MapPinned data-icon="inline-start" aria-hidden />
+                      Reubicar cuadrilla
+                    </Button>
+                  ) : null}
+                  {canManage ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start bg-card"
+                      onClick={() => {
+                        const crew = selected;
+                        setSelected(null);
+                        openEdit(crew);
+                      }}
+                    >
+                      <Pencil data-icon="inline-start" aria-hidden />
+                      Editar
+                    </Button>
+                  ) : null}
+                  {canManage && selected.active ? (
                     <Button
                       type="button"
                       variant="destructive"
@@ -873,6 +1101,53 @@ export function CrewCatalogPanel({
                 ) : null}
               </Field>
               <Field>
+                <FieldLabel htmlFor="crew-specialty-form">Especialidad</FieldLabel>
+                <Select
+                  items={crewSpecialtyLabels}
+                  value={form.specialty || null}
+                  onValueChange={(value) => {
+                    if (value !== null) setForm({ ...form, specialty: value as CrewSpecialty });
+                  }}
+                >
+                  <SelectTrigger id="crew-specialty-form" surface="card" aria-required>
+                    <SelectValue placeholder="Seleccione una especialidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {specialties.map((specialty) => (
+                        <SelectItem key={specialty} value={specialty}>
+                          {crewSpecialtyLabels[specialty]}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="crew-home-zone-form">Zona base</FieldLabel>
+                <Select
+                  items={{ [NO_ZONE]: "Sin zona base", ...zoneItems }}
+                  value={form.homeZoneId || NO_ZONE}
+                  onValueChange={(value) => {
+                    if (value !== null) setForm({ ...form, homeZoneId: value === NO_ZONE ? "" : value });
+                  }}
+                >
+                  <SelectTrigger id="crew-home-zone-form" surface="card">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value={NO_ZONE}>Sin zona base</SelectItem>
+                      {zones.map((zone) => (
+                        <SelectItem key={zone.id} value={zone.id}>
+                          {zone.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
                 <FieldLabel htmlFor="crew-leader">
                   Responsable de cuadrilla
                 </FieldLabel>
@@ -883,10 +1158,7 @@ export function CrewCatalogPanel({
                   onChange={(value) =>
                     setForm({ ...form, leaderUserId: value })
                   }
-                  options={users.map((user) => ({
-                    value: user.id,
-                    label: user.displayName,
-                  }))}
+                  options={[...(editing?.leaderUserId ? [{ value: editing.leaderUserId, label: userName(editing.leaderUserId, editing.leaderName) }] : []), ...users.filter((user) => user.id !== editing?.leaderUserId).map((user) => ({ value: user.id, label: user.displayName }))]}
                   aria-required
                   placeholder="Seleccione una persona"
                 />
@@ -902,10 +1174,7 @@ export function CrewCatalogPanel({
                   onChange={(value) =>
                     setForm({ ...form, organizationId: value })
                   }
-                  options={organizations.map((organization) => ({
-                    value: organization.id,
-                    label: organization.displayName,
-                  }))}
+                  options={[...(editing?.organizationId ? [{ value: editing.organizationId, label: organizationName(editing.organizationId, editing.organizationName) }] : []), ...organizations.filter((organization) => organization.id !== editing?.organizationId).map((organization) => ({ value: organization.id, label: organization.displayName }))]}
                   aria-required
                   placeholder="Seleccione una organización"
                 />
@@ -925,7 +1194,7 @@ export function CrewCatalogPanel({
                     }
                   }}
                 >
-                  <SelectTrigger id="crew-shift-form" className="bg-card">
+                  <SelectTrigger id="crew-shift-form" surface="card">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -955,6 +1224,21 @@ export function CrewCatalogPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CrewRelocationDialog
+        crew={relocating}
+        zones={zones}
+        onOpenChange={(open) => {
+          if (!open) setRelocating(null);
+        }}
+        onSuccess={() => {
+          const crew = relocating;
+          setRelocating(null);
+          notifySuccess("Cuadrilla reubicada.");
+          setMovesVersion((version) => version + 1);
+          setRequestVersion((version) => version + 1);
+          if (crew) void crewsAdapter.get(crew.id).then((updated) => setSelected(updated)).catch(() => undefined);
+        }}
+      />
       <CatalogDeactivationDialog
         open={Boolean(deactivating)}
         onOpenChange={(open) => {
@@ -1073,5 +1357,72 @@ function CrewMemberMultiSelect({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function activeMove(moves: CrewZoneAssignment[], today = todayInArgentina()) {
+  return moves.find((move) => move.validFrom <= today && (move.validTo ?? "9999-12-31") >= today);
+}
+
+function RelocatedBadge() {
+  return (
+    <Badge variant="warning">
+      <ArrowRightLeft data-icon="inline-start" aria-hidden />
+      Reubicada
+    </Badge>
+  );
+}
+
+function CurrentMoveBadge() {
+  return (
+    <Badge variant="success">
+      <CircleCheck data-icon="inline-start" aria-hidden />
+      Vigente
+    </Badge>
+  );
+}
+
+function CrewMovesSection({ moves, error, zoneName }: {
+  moves: CrewZoneAssignment[] | null;
+  error: string | null;
+  zoneName: (id: string | null) => string;
+}) {
+  const period = (move: CrewZoneAssignment) =>
+    move.validTo ? `Del ${formatArgentinaCalendarDate(move.validFrom)} al ${formatArgentinaCalendarDate(move.validTo)}` : `Desde el ${formatArgentinaCalendarDate(move.validFrom)}, hasta nuevo aviso`;
+  const active = moves ? activeMove(moves) : undefined;
+  return (
+    <section aria-labelledby="crew-moves-heading" className="grid gap-3">
+      <h3 id="crew-moves-heading" className="font-semibold">Reubicaciones</h3>
+      {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {active ? (
+        <section aria-label="Reubicación vigente">
+          <Item variant="muted">
+            <ItemContent>
+              <ItemTitle>Reubicación vigente: {zoneName(active.zoneId)}</ItemTitle>
+              <ItemDescription>{period(active)}</ItemDescription>
+              <p>{active.reason}</p>
+            </ItemContent>
+          </Item>
+        </section>
+      ) : null}
+      {moves === null ? (error ? null : <p className="text-sm text-muted-foreground">Cargando reubicaciones…</p>) : moves.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Esta cuadrilla no tiene reubicaciones registradas.</p>
+      ) : (
+        <ItemGroup aria-label="Historial de reubicaciones" className="gap-2">
+          {moves.map((move) => (
+            <Item key={move.id} variant="outline">
+              <ItemContent>
+                <ItemTitle>
+                  {zoneName(move.zoneId)}
+                  {move === active ? <CurrentMoveBadge /> : null}
+                </ItemTitle>
+                <ItemDescription>{period(move)}</ItemDescription>
+                <p>{move.reason}</p>
+              </ItemContent>
+            </Item>
+          ))}
+        </ItemGroup>
+      )}
+    </section>
   );
 }

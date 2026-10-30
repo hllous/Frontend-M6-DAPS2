@@ -13,7 +13,7 @@ const service = {
   scheduledDate: "2026-09-25",
   timeWindow: { start: "08:00", end: "12:00" },
 };
-const crew = { name: "Cuadrilla", crewType: "MUNICIPAL", leaderUserId: "user-1", organizationId: "org-1", defaultShift: "MORNING" };
+const crew = { name: "Cuadrilla", crewType: "MUNICIPAL", leaderUserId: "user-1", organizationId: "org-1", defaultShift: "MORNING", specialty: "TREES" };
 
 describe("service notes, ticketId and reasons (#251)", () => {
   it("notes: 2000 caracteres si, 2001 no", () => {

@@ -409,15 +409,31 @@ describe("TreeInterventionsPanel", () => {
   }
 
   it("assigns the chosen crew and vehicle when it creates the Service", async () => {
+    const create = vi.spyOn(servicesAdapter, "create");
     const user = userEvent.setup();
     const { detail, form } = await openScheduleForm(user, /intervention-2|Tratamiento/i);
     await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Cuadrilla (opcional)" }), /Cuadrilla A/);
     await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Vehículo (opcional)" }), /AA 123 AA/);
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+    const note = await within(form).findByLabelText(/Justificación de la asignación/i);
+    await user.type(note, "Refuerzo coordinado para la intervención.");
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
 
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ overrideNote: "Refuerzo coordinado para la intervención." }));
     const serviceId = (await within(detail).findByRole("link", { name: /SVC-\d+/ })).textContent;
     expect(serviceFixtures.find((service) => service.id === serviceId)).toMatchObject({ crewId: "crew-a", vehicleId: "vehicle-1" });
     expect(within(detail).getByRole("link", { name: /SVC-\d+/ })).toHaveAttribute("href", expect.stringContaining(`detail=${serviceId}`));
+  });
+
+  it("un 409 que no pide justificación muestra su error y no abre la justificación", async () => {
+    server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla está inactiva.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 })));
+    const user = userEvent.setup();
+    const { detail, form } = await openScheduleForm(user, /intervention-2|Tratamiento/i);
+    await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Cuadrilla (opcional)" }), /Cuadrilla A/);
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+    expect(await within(detail).findByText("La cuadrilla está inactiva.")).toBeVisible();
+    expect(within(form).queryByLabelText(/Justificación de la asignación/i)).not.toBeInTheDocument();
   });
 
   it("re-reads the intervention after a 409 and treats an existing link as done", async () => {

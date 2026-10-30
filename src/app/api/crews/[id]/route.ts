@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { crewFixtures } from "@/lib/crew-fixtures";
 import { updateCrewInputSchema } from "@/lib/crews";
+import { m1IdentityAdapter } from "@/lib/m1-identity";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
@@ -47,7 +48,15 @@ export async function PATCH(request: Request, routeContext: Context) {
     if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}`, "crew:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }));
     const crew = crewFixtures.find((item) => item.id === id);
     if (!crew) return errorResponse(404, `La cuadrilla ${id} no existe.`, path);
-    Object.assign(crew, parsed.data);
+    const [users, organizations] = await Promise.all([m1IdentityAdapter.listUsers(), m1IdentityAdapter.listOrganizations()]);
+    if (crew.leaderUserId !== parsed.data.leaderUserId) crew.leaderName = users.find((user) => user.id === parsed.data.leaderUserId)?.displayName ?? null;
+    if (crew.organizationId !== parsed.data.organizationId) crew.organizationName = organizations.find((organization) => organization.id === parsed.data.organizationId)?.displayName ?? null;
+    const { homeZoneId, ...rest } = parsed.data;
+    Object.assign(crew, rest);
+    if (homeZoneId !== undefined) {
+      if (crew.effectiveZoneId === crew.homeZoneId) crew.effectiveZoneId = homeZoneId;
+      crew.homeZoneId = homeZoneId;
+    }
     return NextResponse.json(crew);
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
