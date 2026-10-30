@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -108,6 +109,12 @@ export function LoginForm({
             </form>
           )}
         </CardContent>
+        <p className="mt-6 text-sm text-muted-foreground">
+          ¿Hiciste una denuncia?{" "}
+          <Link href="/consulta" className="inline-flex min-h-10 items-center font-medium text-[var(--color-action)] underline underline-offset-4 max-[760px]:min-h-12">
+            Consultar una denuncia
+          </Link>
+        </p>
       </Card>
     </main>
   );

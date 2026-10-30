@@ -365,6 +365,19 @@ Drawn from [Prototype the operational indicator dashboards](https://github.com/h
 
 `from` and `to` default to the last 30 days when omitted. The frontend owns `IndicatorQuery` and one adapter method per family (`getCoverage`, `getCompliance`, `getIncidents`, `getWaste`), validates each response with Zod, and keeps the accessible data-table schema independent from chart rendering. The read-only mirror does not include complete DTO schemas, but the pinned OpenAPI document publishes them. Reconcile the frontend's nested series, ranking, target, freshness, and empty-result schemas against that source; until then those frontend shapes remain unverified, not unpublished Backend contracts.
 
+## Worked example: Citizen portal (`/consulta`, #743)
+
+Public, unauthenticated pages for residents. The BFF routes under `/api/public/` never read the session cookie and never send `Authorization`; they forward the resident's IP in `X-Forwarded-For`, pass 404 and 429 (with `Retry-After`) through, and parse every backend body with the public contract, returning only its fields (a body that fails the contract becomes 502). In mock mode (`M6_AUTH_MODE=mock`) they serve fixtures.
+
+| Endpoint | BFF route | Query forwarded | Contract | Status |
+|---|---|---|---|---|
+| `GET /public/reports/:ticketId` | `/api/public/reports/[ticketId]` | none; `ticketId` must be a UUID (400 before any backend call) | `PublicReport`: `ticketId`, `publicId?`, `reportType`, `stage`, `stageLabel`, `address?`, `openedAt`, `lastUpdateAt`, `inspectedAt?`, `closed`. Same 404 whether or not the ticket exists; `TK-…` is never accepted | confirmed, OpenAPI `PublicReportResponseDto`; `no-store` |
+| `GET /public/services` | `/api/public/services` | `zoneId`, `from`, `to`, `page`, `pageSize` | `PublicService`: `id`, `serviceTypeName`, `category`, `scheduledDate`, `windowFrom?`, `windowTo?`, `stage` (`PROGRAMADO\|EN_CURSO\|REALIZADO\|REPROGRAMADO`), `zones`; paginated, next 30 days by default | confirmed, OpenAPI `PublicServiceResponseDto`; `no-store` |
+| `GET /public/green-points` | `/api/public/green-points` | `zoneId`, `page`, `pageSize` | `PublicGreenPoint`: `id`, `code`, `name`, `address?`, `lat?`, `lng?`, `zoneName`, `wasteTypes[]`; paginated. No `wasteType` filter: the page filters in the browser | confirmed, OpenAPI `PublicGreenPointResponseDto`; short cache |
+| `GET /public/zones` | `/api/public/zones` | none | `PublicZone`: `id`, `code`, `name`; plain array | confirmed, OpenAPI `PublicZoneResponseDto`; 60 s cache |
+
+Backend rate limits per IP (20/min tracking, 60/min the rest). Until [Backend #470](https://github.com/hllous/Backend-M6-DAPS2/issues/470) keys the limit on the forwarded resident IP, every resident shares the BFF's counter. Where residents get the `ticketId` (M2 receipt link or QR) is still open.
+
 ## Remaining contract gaps for these resources
 
 | Area | Gap and frontend posture |

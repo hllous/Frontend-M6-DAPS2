@@ -35,6 +35,11 @@ describe("LoginForm", () => {
     fetchMock.mockRestore();
   });
 
+  it("links to the public tracking section", () => {
+    render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
+    expect(screen.getByRole("link", { name: "Consultar una denuncia" })).toHaveAttribute("href", "/consulta");
+  });
+
   it("tells the person that the session ended when the login opens after an expiry", () => {
     const { rerender } = render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app?destination=services" sessionExpired />);
     expect(screen.getByRole("alert")).toHaveTextContent("Su sesión terminó. Vuelva a ingresar.");
