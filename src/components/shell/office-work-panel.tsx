@@ -280,7 +280,6 @@ export function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario })
     <section aria-labelledby="work-title" className={styles.workPanel}>
       <div className={styles.pageHeading}>
         <h1 id="work-title">{scenario.work.title}</h1>
-        <span>{scenario.work.summary}</span>
       </div>
       {visibleGroups.length === 0 ? (
         <Alert>

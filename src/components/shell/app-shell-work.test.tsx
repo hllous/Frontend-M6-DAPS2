@@ -71,6 +71,14 @@ describe("Mi trabajo de Oficina · cola de decisiones (Admin)", () => {
     expect(hrefs(containers)).toEqual(["/app/catalog/containers?detail=cont-2"]);
   });
 
+  it("keeps the page heading without a subtitle under it", async () => {
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+    await group(/Contenedores desbordados/);
+
+    expect(screen.getByRole("heading", { level: 1, name: scenarios.officeDutyQueue.work.title })).toBeInTheDocument();
+    expect(screen.queryByText(/lo más antiguo primero/)).not.toBeInTheDocument();
+  });
+
   it("shows the interventions waiting for authorization next to the requested ones", async () => {
     updateTreeInterventionFixture("intervention-3", { status: "PENDING_AUTHORIZATION" });
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
