@@ -1,7 +1,9 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { setupServer } from "msw/node";
 
-import { resetEnvironmentalReportFixtures, ingestSanctionOutcomeFixture, getEnvironmentalReportFixture, environmentalReportFixtures } from "@/lib/environmental-report-fixtures";
+import { resetEnvironmentalReportFixtures, ingestSanctionOutcomeFixture, getEnvironmentalReportFixture, environmentalReportFixtures, updateEnvironmentalInspectionFixture, updateEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
+import type { EnvironmentalReportType } from "@/lib/environmental-reports";
+import { resetServiceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import { createSessionCookie } from "@/test/session";
 
@@ -117,5 +119,35 @@ describe("environmental control handlers delegate to the real BFF routes", () =>
     expect(list.meta.total).toBe(list.data.length);
     const missing = await call("GET", "/api/referrals/REF-UNKNOWN");
     expect(missing.status).toBe(404);
+  });
+});
+
+// #733: the mock mirrors the backend matrix (Backend-M6-DAPS2#451) when an inspection is completed.
+describe("completing an inspection recomputes its allowed actions like the backend", () => {
+  const evidence = [{ id: "att-t", url: "/mock/evidence/t.jpg", filename: "t.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-05T10:00:00.000Z" }];
+  const checklist = [
+    { id: "emission-source", label: "Identificar la fuente de emisión", completed: true },
+    { id: "visible-impact", label: "Registrar el impacto visible", completed: true },
+  ];
+  const violation = { outcome: "VIOLATION_FOUND", nextStep: "NOTICE_TO_BE_ISSUED", findings: "Hallazgo.", violationType: "ILLEGAL_DUMPING", severity: "HIGH", suggestedAction: "FORMAL_NOTICE" };
+
+  afterEach(() => resetServiceFixtures());
+
+  async function complete(reportType: EnvironmentalReportType, body: Record<string, unknown>) {
+    updateEnvironmentalReportFixture("ER-1005", { reportType });
+    updateServiceFixture("SVC-1072", { crewId: "crew-b", status: "IN_PROGRESS" });
+    updateEnvironmentalInspectionFixture("INS-1005", { attachments: evidence });
+    const response = await call("POST", "/api/environmental-inspections/INS-1005/complete", crewCookie, { inspectedAt: new Date().toISOString(), checklist, ...body });
+    expect(response.status).toBe(200);
+    return (await response.json()).allowedActions;
+  }
+
+  it.each([
+    ["ILLEGAL_DUMPSITE", violation, { repair: true, notice: true, suggestedViolationType: "ILLEGAL_DUMPING" }],
+    ["ODOR", violation, { repair: false, notice: true, suggestedViolationType: null }],
+    ["ILLEGAL_DUMPSITE", { outcome: "INCONCLUSIVE", conclusion: "No se pudo constatar." }, { repair: true, notice: false, suggestedViolationType: null }],
+    ["ILLEGAL_DUMPSITE", { outcome: "NO_VIOLATION", conclusion: "Sin infracción." }, { repair: false, notice: false, suggestedViolationType: null }],
+  ] as const)("%s with %j gives %j", async (reportType, body, expected) => {
+    expect(await complete(reportType, body)).toEqual(expected);
   });
 });
