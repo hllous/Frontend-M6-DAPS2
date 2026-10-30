@@ -952,6 +952,76 @@ describe("EnvironmentalReportsWorkspace", () => {
     else expect(button).not.toBeInTheDocument();
   });
 
+  async function openReport(user: ReturnType<typeof userEvent.setup>, scenario: typeof scenarios.officeDutyQueue, id: string, label: string) {
+    render(<EnvironmentalReportsWorkspace scenario={scenario} />);
+    const list = await screen.findByRole("region", { name: label });
+    await user.click(within(list).getByRole("button", { name: reportRowName(id) }));
+    return screen.findByRole("region", { name: `Detalle de ${id}` });
+  }
+
+  it.each([
+    ["shows the notice when the backend allows it", { repair: false, notice: true, suggestedViolationType: null }, true],
+    ["hides the notice when the backend does not allow it", { repair: true, notice: false, suggestedViolationType: null }, false],
+    ["hides the notice defensively if the response lacks allowedActions", undefined, false],
+  ] as const)("inspection %s (#733)", async (_name, allowedActions, expected) => {
+    updateEnvironmentalInspectionFixture("INS-1008", { allowedActions });
+    const user = userEvent.setup();
+    const detail = await openReport(user, scenarios.officeDutyQueue, "ER-1008", "Cola de expedientes ambientales");
+    await within(detail).findByText(/^Inspección 1 · /);
+
+    const button = within(detail).queryByRole("button", { name: "Emitir acta" });
+    if (expected) expect(button).toBeVisible();
+    else expect(button).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["opens with the suggested violation type selected, still editable", "UNTREATED_DISCHARGE", "Descarga sin tratamiento"],
+    ["leaves the type empty when nothing is suggested", null, "Seleccione el tipo"],
+    ["leaves the type empty when the suggestion is unknown", "SOMETHING_NEW", "Seleccione el tipo"],
+  ] as const)("notice form %s (#733)", async (_name, suggestedViolationType, shown) => {
+    updateEnvironmentalInspectionFixture("INS-1008", { allowedActions: { repair: false, notice: true, suggestedViolationType } });
+    const user = userEvent.setup();
+    const detail = await openReport(user, scenarios.officeDutyQueue, "ER-1008", "Cola de expedientes ambientales");
+    await user.click(await within(detail).findByRole("button", { name: "Emitir acta" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("combobox", { name: /Tipo de infracción/ })).toHaveTextContent(shown);
+    await chooseOption(user, within(dialog), /Tipo de infracción/, "Vertido ilegal");
+    expect(within(dialog).getByRole("combobox", { name: /Tipo de infracción/ })).toHaveTextContent("Vertido ilegal");
+  });
+
+  it("explains a refused repair referral, keeps the values and refreshes the inspection (#733)", async () => {
+    updateEnvironmentalInspectionFixture("INS-1012", { outcome: "VIOLATION_FOUND", allowedActions: { repair: true, notice: false, suggestedViolationType: null } });
+    server.use(http.post("*/api/repair-requests", () => {
+      updateEnvironmentalInspectionFixture("INS-1012", { allowedActions: { repair: false, notice: false, suggestedViolationType: null } });
+      return HttpResponse.json({ statusCode: 409, message: "INSPECTION_NOT_CLOSED 6f1c0000-0000-0000-0000-000000000000", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/repair-requests" }, { status: 409 });
+    }));
+    const user = userEvent.setup();
+    const detail = await openReport(user, scenarios.officeDutyQueue, "ER-1012", "Cola de expedientes ambientales");
+    await user.click(await within(detail).findByRole("button", { name: "Crear derivación de reparación" }));
+    const dialog = screen.getByRole("dialog");
+    await user.clear(within(dialog).getByLabelText(/Ubicación del daño/));
+    await user.type(within(dialog).getByLabelText(/Ubicación del daño/), "Av. Brasil 2500");
+    await user.click(within(dialog).getByRole("button", { name: "Derivar" }));
+
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert).toHaveTextContent("No se puede derivar esta reparación: la inspección no la justifica, el tipo de expediente no la admite o ya hay una reparación abierta para este origen y tipo de daño. Revise Derivaciones.");
+    expect(alert).not.toHaveTextContent(/INSPECTION_NOT_CLOSED|6f1c0000/);
+    expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2500");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(within(detail).queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument());
+  });
+
+  it("offers no follow-up action to the auditor (#733)", async () => {
+    updateEnvironmentalInspectionFixture("INS-1008", { allowedActions: { repair: true, notice: true, suggestedViolationType: "ILLEGAL_DUMPING" } });
+    const user = userEvent.setup();
+    const detail = await openReport(user, scenarios.officeLimited, "ER-1008", "Cola de expedientes ambientales");
+    await within(detail).findByText(/^Inspección 1 · /);
+
+    expect(within(detail).queryByRole("button", { name: "Emitir acta" })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument();
+  });
+
   it("names the inspection card by order and agenda, with the UUID only as copyable secondary data (#741)", async () => {
     const user = userEvent.setup();
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
