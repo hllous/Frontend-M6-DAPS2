@@ -584,6 +584,49 @@ describe("TreeInterventionsPanel", () => {
     expect(within(detail).getByText("Solicitada")).toBeVisible();
   });
 
+  it("lets Operations submit a requested removal for authorization", async () => {
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeOperations} />);
+    const removal = await screen.findByRole("article", { name: /Extracción/i });
+    await user.click(within(removal).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+
+    await user.click(within(detail).getByRole("button", { name: "Enviar a autorización" }));
+
+    expect(await within(detail).findByText("Pendiente de autorización")).toBeVisible();
+    expect(within(detail).queryByRole("button", { name: "Autorizar intervención" })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("button", { name: "Rechazar intervención" })).not.toBeInTheDocument();
+  });
+
+  it("shows the role denial and asks for a fresh GET /me when the backend refuses a removal decision", async () => {
+    const roleStale = vi.fn();
+    window.addEventListener("m6:roles-stale", roleStale);
+    updateTreeInterventionFixture("intervention-3", { status: "PENDING_AUTHORIZATION" });
+    server.use(
+      http.post("*/api/tree-interventions/:interventionId/reject", () => HttpResponse.json({
+        statusCode: 403,
+        message: "Requiere M6_ADMIN.",
+        error: "Forbidden",
+        code: "ROLE_REQUIRED",
+        timestamp: new Date().toISOString(),
+        path: "/api/tree-interventions/intervention-3/reject",
+      }, { status: 403 })),
+    );
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const removal = await screen.findByRole("article", { name: /Extracción/i });
+    await user.click(within(removal).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    await user.click(await within(detail).findByRole("button", { name: "Rechazar intervención" }));
+    const confirmation = await screen.findByRole("dialog", { name: /Confirmar rechazo/ });
+    await user.click(within(confirmation).getByRole("button", { name: "Confirmar rechazo de intervención" }));
+
+    await waitFor(() => expect(roleStale).toHaveBeenCalled());
+    expect(await within(confirmation).findByRole("alert")).toHaveTextContent(/No tiene el rol necesario/);
+    expect(within(detail).getByText("Pendiente de autorización")).toBeVisible();
+    window.removeEventListener("m6:roles-stale", roleStale);
+  });
+
   it("does not expose authorization controls to Field", async () => {
     const user = userEvent.setup();
     render(<TreeInterventionsPanel scenario={scenarios.fieldCrewMember} />);
