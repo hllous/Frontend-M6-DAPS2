@@ -101,9 +101,6 @@ export function ReportTracker({ initialCode }: { initialCode?: string }) {
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader>
-          <CardTitle role="heading" aria-level={2}>Código de seguimiento</CardTitle>
-        </CardHeader>
         <CardContent>
           <form
             noValidate

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { InfoIcon } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 /** Marco de la sección pública: sin shell del personal, sin navegación ni pulso de sesión. */
 export function PublicShell({ children }: { children: React.ReactNode }) {
@@ -14,13 +14,12 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <span className="text-xs text-[var(--color-on-institutional-secondary)]">Ambiente e Higiene</span>
             <span className="font-semibold">Consulta ciudadana</span>
           </Link>
-          <Button
-            variant="ghost"
-            className="text-[var(--color-on-institutional)] hover:bg-white/10 hover:text-[var(--color-on-institutional)]"
-            render={<Link href="/login" />}
+          <Link
+            href="/login"
+            className={buttonVariants({ variant: "ghost", className: "text-[var(--color-on-institutional)] hover:bg-white/10 hover:text-[var(--color-on-institutional)]" })}
           >
             Ingreso del personal
-          </Button>
+          </Link>
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
