@@ -166,8 +166,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
       }
       return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
     });
-    // El login resuelve la cuadrilla de Campo contra GET /crews antes de la llamada bajo prueba.
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     backendFetch.mockClear();
 
     const response = await POST(
@@ -197,7 +196,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
       }
       return Response.json({ id: "SVC-1050", statusNote: null });
     });
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     backendFetch.mockClear();
 
     const response = await POST(
@@ -233,7 +232,7 @@ it.each([403, 409, 500, 503])("preserves backend error status and body (%s)", as
     if ((init?.method ?? "GET") === "GET") return Response.json({ id: "real-service", crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
-  const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+  const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/suspend", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(suspendBody),
