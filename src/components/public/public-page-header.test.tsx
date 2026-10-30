@@ -16,7 +16,7 @@ describe("public page headers", () => {
 
     for (const page of pages) {
       const { unmount } = render(page);
-      expect(screen.getByRole("link", { name: "← Volver a consultas" })).toHaveAttribute("href", "/consulta");
+      expect(screen.getByRole("link", { name: "Volver a consultas" })).toHaveAttribute("href", "/consulta");
       unmount();
     }
   });

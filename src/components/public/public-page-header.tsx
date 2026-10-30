@@ -13,7 +13,6 @@ export function PublicPageHeader({ title, introduction }: PublicPageHeaderProps)
     <header className="flex flex-col items-start gap-2">
       <Link
         href="/consulta"
-        aria-label="← Volver a consultas"
         className={buttonVariants({
           variant: "link",
           size: "lg",

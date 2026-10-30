@@ -24,7 +24,7 @@ test.describe("public complaint tracking @smoke", () => {
     await expect(page).toHaveURL(/\/consulta\/denuncia$/);
     await expectNoViolations(page);
 
-    await page.getByRole("link", { name: "← Volver a consultas" }).click();
+    await page.getByRole("link", { name: "Volver a consultas", exact: true }).click();
     await expect(page).toHaveURL(/\/consulta$/);
     await page.getByRole("link", { name: /Seguir mi denuncia/ }).click();
     await expect(page).toHaveURL(/\/consulta\/denuncia$/);
@@ -66,7 +66,7 @@ test.describe("public complaint tracking @smoke", () => {
     await expect(page.getByRole("listbox")).toHaveCount(0);
     await expectNoViolations(page);
 
-    await page.getByRole("link", { name: "← Volver a consultas" }).click();
+    await page.getByRole("link", { name: "Volver a consultas", exact: true }).click();
     await expect(page).toHaveURL(/\/consulta$/);
   });
 
@@ -104,7 +104,7 @@ test.describe("public complaint tracking @smoke", () => {
     await expect(pointsList.getByText("Punto verde Plaza Mitre")).toHaveCount(0);
     await expect(page.getByText("No hay puntos con ubicación disponible para mostrar en el mapa.")).toBeVisible();
 
-    await page.getByRole("link", { name: "← Volver a consultas" }).click();
+    await page.getByRole("link", { name: "Volver a consultas", exact: true }).click();
     await expect(page).toHaveURL(/\/consulta$/);
   });
 });
