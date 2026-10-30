@@ -6,6 +6,8 @@ import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
 import { crewsAdapter } from "@/lib/crews";
+import { crewFixtures, resetCrewFixtures } from "@/lib/crew-fixtures";
+import { m1IdentityAdapter } from "@/lib/m1-identity";
 import { CrewCatalogPanel } from "./crew-catalog-panel";
 
 const server = setupServer(...handlers);
@@ -13,7 +15,7 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
   server.listen({ onUnhandledRequest: "error" });
 });
-afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
+afterEach(() => { server.resetHandlers(); resetCrewFixtures(); vi.restoreAllMocks(); });
 afterAll(() => server.close());
 
 describe("CrewCatalogPanel", () => {
@@ -203,4 +205,74 @@ it("clamps the current page after its last active record is deactivated", async 
   expect(within(sheet).getByRole("button", { name: "Quitar a Carlos L\u00f3pez" })).toBeVisible();
   expect(within(sheet).getByRole("button", { name: "Quitar a Usuario user-lucia" })).toBeVisible();
   expect(within(sheet).getByText(/lista de ejemplo/)).toBeVisible();
+});
+
+
+describe("nombres de referencias de cuadrilla", () => {
+  it("muestra nombres, identificadores y ausencia en tabla y detalle", async () => {
+    const empty = crewFixtures.find((crew) => crew.id === "crew-d")!;
+    empty.members = [];
+    empty.memberUserIds = [];
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const named = await screen.findByRole("row", { name: /Cuadrilla A/ });
+    expect(within(named).getByText("Carlos López")).toBeVisible();
+    expect(within(named).getByText("Municipalidad")).toBeVisible();
+    const unnamed = screen.getByRole("row", { name: /Cuadrilla B/ });
+    expect(within(unnamed).getByText("Usuario user-maria")).toBeVisible();
+    expect(within(unnamed).getByText("Organización sin nombre (id org-cooperativa)")).toBeVisible();
+    const absent = screen.getByRole("row", { name: /Cuadrilla D/ });
+    expect(within(absent).getByText("—")).toBeVisible();
+    expect(within(absent).getByText("Sin organización externa")).toBeVisible();
+    await user.click(within(named).getByRole("button", { name: /Ver detalle/ }));
+    let sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    const members = within(sheet).getByRole("list", { name: "Integrantes de la cuadrilla" });
+    expect(within(members).getByText("Carlos López")).toBeVisible();
+    expect(within(members).getByText("Usuario user-lucia")).toBeVisible();
+    expect(within(members).getByRole("button", { name: "Quitar a Carlos López" })).toBeVisible();
+    expect(within(members).getByRole("button", { name: "Quitar a Usuario user-lucia" })).toBeVisible();
+    await user.keyboard("{Escape}");
+    await user.click(within(absent).getByRole("button", { name: /Ver detalle/ }));
+    sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    expect(within(sheet).getByRole("list", { name: "Integrantes de la cuadrilla" })).toBeEmptyDOMElement();
+    expect(within(sheet).queryByRole("button", { name: /^Quitar/ })).not.toBeInTheDocument();
+  });
+
+  it("envía el nombre del integrante seleccionado al BFF", async () => {
+    let payload: unknown;
+    const listener = async ({ request }: { request: Request }) => {
+      if (request.method === "POST" && new URL(request.url).pathname === "/api/crews/crew-membership/members") {
+        payload = await request.clone().json();
+      }
+    };
+    server.events.on("request:start", listener);
+    try {
+      const user = userEvent.setup();
+      render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla E - Membresia" }));
+      const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+      await user.click(within(sheet).getByRole("combobox", { name: /^Agregar integrantes/ }));
+      await user.click(await screen.findByRole("option", { name: "Pedro Ruiz, no seleccionado" }));
+      await user.keyboard("{Escape}");
+      await user.click(within(sheet).getByRole("button", { name: "Agregar integrantes" }));
+      await screen.findByRole("button", { name: "Quitar a Pedro Ruiz" });
+      expect(payload).toEqual({ members: [{ userId: "user-pedro", displayName: "Pedro Ruiz" }] });
+    } finally {
+      server.events.removeListener("request:start", listener);
+    }
+  });
+
+  it("explica la fuente y la ausencia de candidatos disponibles", async () => {
+    const crew = crewFixtures.find((item) => item.id === "crew-membership")!;
+    crew.members = (await m1IdentityAdapter.listUsers()).map(({ id, displayName }) => ({ userId: id, displayName }));
+    crew.memberUserIds = crew.members.map(({ userId }) => userId);
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla E - Membresia" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    expect(within(sheet).getByText("Los candidatos provienen de una lista de ejemplo de personas.")).toBeVisible();
+    expect(within(sheet).getByText("No hay integrantes disponibles para agregar.")).toBeVisible();
+    await user.click(within(sheet).getByRole("combobox", { name: /^Agregar integrantes/ }));
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+  });
 });
