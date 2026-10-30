@@ -48,6 +48,7 @@ type WorkGroupDefinition = {
   description?: string;
   errorMessage: string;
   seeAllHref: string;
+  seeAllLabel: string;
   isVisibleTo: (capabilities: readonly Capability[]) => boolean;
   load: (capabilities: readonly Capability[], today: string) => Promise<WorkLoad>;
 };
@@ -104,6 +105,7 @@ const workGroups: WorkGroupDefinition[] = [
     title: "Expedientes por clasificar",
     errorMessage: "No se pudieron cargar los expedientes por clasificar.",
     seeAllHref: `/app?destination=environment&${PENDING_REPORT_STATUSES.map((status) => `status=${status}`).join("&")}`,
+    seeAllLabel: "Ver todos los expedientes por clasificar",
     isVisibleTo: (capabilities) => capabilities.includes("environmentalReport:review"),
     async load(_capabilities, today) {
       const page = await environmentalReportsAdapter.list({ status: PENDING_REPORT_STATUSES, pageSize: FETCH_SIZE });
@@ -127,9 +129,10 @@ const workGroups: WorkGroupDefinition[] = [
   {
     id: "services-without-crew",
     title: "Servicios sin cuadrilla",
-    description: `Programados en los próximos ${UPCOMING_DAYS} días`,
+    description: `Programados en los próximos ${UPCOMING_DAYS} días. El total cuenta solo los servicios cargados sin cuadrilla.`,
     errorMessage: "No se pudieron cargar los servicios sin cuadrilla.",
     seeAllHref: "/app?destination=services&status=SCHEDULED",
+    seeAllLabel: "Ver todos los servicios sin cuadrilla",
     isVisibleTo: (capabilities) => capabilities.includes("service:assign"),
     async load(_capabilities, today) {
       const page = await servicesAdapter.list({
@@ -157,6 +160,7 @@ const workGroups: WorkGroupDefinition[] = [
     title: "Servicios por reprogramar",
     errorMessage: "No se pudieron cargar los servicios por reprogramar.",
     seeAllHref: "/app?destination=services&status=RESCHEDULED",
+    seeAllLabel: "Ver todos los servicios por reprogramar",
     isVisibleTo: (capabilities) => capabilities.includes("service:reschedule"),
     async load(_capabilities, today) {
       const page = await servicesAdapter.list({ status: "RESCHEDULED", pageSize: FETCH_SIZE });
@@ -180,6 +184,7 @@ const workGroups: WorkGroupDefinition[] = [
     title: "Intervenciones de arbolado",
     errorMessage: "No se pudieron cargar las intervenciones de arbolado.",
     seeAllHref: "/app/catalog/tree-interventions",
+    seeAllLabel: "Ver todas las intervenciones de arbolado",
     isVisibleTo: (capabilities) =>
       capabilities.includes("treeIntervention:request") || capabilities.includes("treeIntervention:authorize"),
     async load(capabilities, today) {
@@ -213,6 +218,7 @@ const workGroups: WorkGroupDefinition[] = [
     title: "Contenedores desbordados",
     errorMessage: "No se pudieron cargar los contenedores desbordados.",
     seeAllHref: "/app/catalog/containers",
+    seeAllLabel: "Ver todos los contenedores desbordados",
     isVisibleTo: (capabilities) => capabilities.includes("container:manage"),
     async load() {
       const page = await containersAdapter.list({ status: "OVERFLOWED", pageSize: FETCH_SIZE });
@@ -348,7 +354,7 @@ function WorkGroup({
           </ItemGroup>
           <Link
             href={group.seeAllHref}
-            aria-label={`Ver todos los ${group.title.charAt(0).toLowerCase()}${group.title.slice(1)}`}
+            aria-label={group.seeAllLabel}
             className="self-start text-sm font-medium underline-offset-4 hover:underline focus-visible:underline"
           >
             Ver todos
