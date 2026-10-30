@@ -10,7 +10,7 @@ const WIDE_VIEWPORT = { width: 1280, height: 900 };
 async function openServices(page: import("@playwright/test").Page) {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=services");
-  await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 }
 
 async function expectTablePaneScrollingToKeepPageAndOrdinalVisible(
@@ -217,7 +217,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
 
     // Return back to services workspace
     await page.getByRole("button", { name: "Volver a Servicios" }).click();
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
     await expect(table).toBeVisible();
     await expect(page.locator("main")).toHaveCount(1);
     await expect(row.locator("button[data-service-select]")).toBeFocused();
@@ -603,7 +603,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
 
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
 
     // Select row for SVC-1096 in table
