@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
 import { crewsAdapter } from "@/lib/crews";
+import { crewZoneAssignmentsAdapter } from "@/lib/crew-zone-assignments";
 import { crewFixtures, resetCrewFixtures } from "@/lib/crew-fixtures";
 import { m1IdentityAdapter } from "@/lib/m1-identity";
 import { CrewCatalogPanel } from "./crew-catalog-panel";
@@ -387,5 +388,92 @@ describe("especialidad y zona de cuadrilla", () => {
     const row = await screen.findByRole("row", { name: /Cuadrilla A/ });
     await waitFor(() => expect(within(row).getByText("Barrido")).toBeVisible());
     expect(within(row).getByText("Palermo")).toBeVisible();
+  });
+});
+
+describe("CrewCatalogPanel: reubicar cuadrilla e historial", () => {
+  async function openDetail(user: ReturnType<typeof userEvent.setup>, scenario: typeof scenarios.officeDutyQueue, crew: string) {
+    render(<CrewCatalogPanel scenario={scenario} />);
+    await user.click(await screen.findByRole("button", { name: `Ver detalle de ${crew}` }));
+    return screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+  }
+
+  it("muestra la reubicación vigente y el historial, la más reciente primero", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeDutyQueue, "Cuadrilla C · Ibáñez");
+    const active = await within(sheet).findByRole("region", { name: "Reubicación vigente" });
+    await waitFor(() => expect(active).toHaveTextContent("Retiro"));
+    expect(active).toHaveTextContent("Operativo de arbolado en la zona 4");
+    expect(active).toHaveTextContent(/\d{2}\/\d{2}\/\d{4}/);
+    const history = within(sheet).getByRole("list", { name: "Historial de reubicaciones" });
+    const items = within(history).getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    await waitFor(() => expect(items[0]).toHaveTextContent("Retiro"));
+    expect(items[1]).toHaveTextContent("Refuerzo de poda por temporal");
+  });
+
+  it("dice que no hay reubicaciones cuando la cuadrilla nunca fue movida", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeDutyQueue, "Cuadrilla A · López");
+    expect(await within(sheet).findByText("Esta cuadrilla no tiene reubicaciones registradas.")).toBeVisible();
+    expect(within(sheet).queryByRole("region", { name: "Reubicación vigente" })).not.toBeInTheDocument();
+  });
+
+  it("reubica la cuadrilla: Operaciones elige zona y motivo y el historial lo refleja", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeOperations, "Cuadrilla A · López");
+    await user.click(within(sheet).getByRole("button", { name: "Reubicar cuadrilla" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reubicar cuadrilla" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Zona de destino" }));
+    await user.click(await screen.findByRole("option", { name: "Palermo" }));
+    await user.type(within(dialog).getByRole("textbox", { name: /Motivo/ }), "Refuerzo por evento masivo");
+    await user.click(within(dialog).getByRole("button", { name: "Reubicar" }));
+
+    const detail = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    const history = await within(detail).findByRole("list", { name: "Historial de reubicaciones" });
+    expect(within(history).getByText("Refuerzo por evento masivo")).toBeVisible();
+    expect(within(detail).getByRole("region", { name: "Reubicación vigente" })).toHaveTextContent("Palermo");
+    expect(within(detail).getByText("Reubicada")).toBeVisible();
+  });
+
+  it("exige el motivo antes de enviar", async () => {
+    const user = userEvent.setup();
+    const create = vi.spyOn(crewZoneAssignmentsAdapter, "create");
+    const sheet = await openDetail(user, scenarios.officeOperations, "Cuadrilla A · López");
+    await user.click(within(sheet).getByRole("button", { name: "Reubicar cuadrilla" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reubicar cuadrilla" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Zona de destino" }));
+    await user.click(await screen.findByRole("option", { name: "Palermo" }));
+    await user.click(within(dialog).getByRole("button", { name: "Reubicar" }));
+    expect(await within(dialog).findByText("El motivo es obligatorio.")).toBeVisible();
+    expect(within(dialog).getByRole("textbox", { name: /Motivo/ })).toHaveAttribute("aria-invalid", "true");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("avisa en español cuando el período se superpone con otra reubicación", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeOperations, "Cuadrilla C · Ibáñez");
+    await user.click(within(sheet).getByRole("button", { name: "Reubicar cuadrilla" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reubicar cuadrilla" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Zona de destino" }));
+    await user.click(await screen.findByRole("option", { name: "Palermo" }));
+    await user.type(within(dialog).getByRole("textbox", { name: /Motivo/ }), "Pisa la vigente");
+    await user.click(within(dialog).getByRole("button", { name: "Reubicar" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("se superpone con otra reubicación");
+    expect(dialog).toBeVisible();
+  });
+
+  it("oculta la acción a quien no tiene la capacidad de Operaciones pero muestra el historial", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeEnvironmental, "Cuadrilla C · Ibáñez");
+    expect(await within(sheet).findByRole("list", { name: "Historial de reubicaciones" })).toBeVisible();
+    expect(within(sheet).queryByRole("button", { name: "Reubicar cuadrilla" })).not.toBeInTheDocument();
+  });
+
+  it("muestra el historial a Campo en su propia cuadrilla, sin acción", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.fieldCrewMember, "Cuadrilla B · Fernández");
+    expect(await within(sheet).findByText("Esta cuadrilla no tiene reubicaciones registradas.")).toBeVisible();
+    expect(within(sheet).queryByRole("button", { name: "Reubicar cuadrilla" })).not.toBeInTheDocument();
   });
 });

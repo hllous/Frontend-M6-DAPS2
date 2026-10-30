@@ -13,6 +13,7 @@ import {
   Check,
   ChevronRight,
   ChevronsUpDown,
+  MapPinned,
   Pencil,
   Plus,
   Trash2,
@@ -52,6 +53,9 @@ import {
   type CrewType,
   type Shift,
 } from "@/lib/crews";
+import { CrewRelocationDialog } from "@/components/catalog/crew-relocation-dialog";
+import { formatArgentinaCalendarDate, todayInArgentina } from "@/lib/argentina-date";
+import { crewZoneAssignmentsAdapter, type CrewZoneAssignment } from "@/lib/crew-zone-assignments";
 import { sortZonesByCommune, zonesAdapter, type Zone } from "@/lib/zones";
 import { m1IdentityAdapter, type M1IdentityReference } from "@/lib/m1-identity";
 
@@ -141,6 +145,9 @@ export function CrewCatalogPanel({
   const canManage =
     scenario.actor.kind === "OFFICE" &&
     scenario.capabilities.includes("crew:manage");
+  const canRelocate =
+    scenario.actor.kind === "OFFICE" &&
+    scenario.capabilities.includes("service:assign");
   const [activeFilter, setActiveFilter] = useState<"all" | "true" | "false">(
     "all",
   );
@@ -167,6 +174,10 @@ export function CrewCatalogPanel({
   const [memberSelection, setMemberSelection] = useState<string[]>([]);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
+  const [moves, setMoves] = useState<{ crewId: string; items: CrewZoneAssignment[] | null }>({ crewId: "", items: null });
+  const [movesError, setMovesError] = useState<string | null>(null);
+  const [movesVersion, setMovesVersion] = useState(0);
+  const [relocating, setRelocating] = useState<Crew | null>(null);
   const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
 
   const query = useMemo<CrewQuery>(
@@ -246,6 +257,25 @@ export function CrewCatalogPanel({
       current = false;
     };
   }, [query, requestVersion, scenario, page]);
+
+  const selectedId = selected?.id ?? null;
+  useEffect(() => {
+    if (selectedId === null) return;
+    let current = true;
+    void crewZoneAssignmentsAdapter
+      .list(selectedId)
+      .then((items) => {
+        if (!current) return;
+        setMovesError(null);
+        setMoves({ crewId: selectedId, items });
+      })
+      .catch((caught: unknown) => {
+        if (current) setMovesError(errorMessage(caught, "No se pudo cargar el historial de reubicaciones."));
+      });
+    return () => {
+      current = false;
+    };
+  }, [selectedId, movesVersion]);
 
   useEffect(() => {
     const media =
@@ -835,6 +865,11 @@ export function CrewCatalogPanel({
                   </div>
                 </dl>
               </section>
+              <CrewMovesSection
+                moves={moves.crewId === selected.id ? moves.items : null}
+                error={movesError}
+                zoneName={zoneName}
+              />
               <section aria-labelledby="crew-members-heading" className="grid gap-3">
                 <h3 id="crew-members-heading" className="font-semibold">
                   Integrantes
@@ -908,24 +943,37 @@ export function CrewCatalogPanel({
                 ) : null}
               </section>
             </div>
-            {canManage ? (
+            {canManage || canRelocate ? (
               <SheetFooter className="border-t border-border pt-4">
                 <section aria-label="Acciones de la cuadrilla" className="grid gap-2">
                   <h3 className="text-sm font-semibold">Acciones disponibles</h3>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start bg-card"
-                    onClick={() => {
-                      const crew = selected;
-                      setSelected(null);
-                      openEdit(crew);
-                    }}
-                  >
-                    <Pencil data-icon="inline-start" aria-hidden />
-                    Editar
-                  </Button>
-                  {selected.active ? (
+                  {canRelocate && selected.active ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start bg-card"
+                      onClick={() => setRelocating(selected)}
+                    >
+                      <MapPinned data-icon="inline-start" aria-hidden />
+                      Reubicar cuadrilla
+                    </Button>
+                  ) : null}
+                  {canManage ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start bg-card"
+                      onClick={() => {
+                        const crew = selected;
+                        setSelected(null);
+                        openEdit(crew);
+                      }}
+                    >
+                      <Pencil data-icon="inline-start" aria-hidden />
+                      Editar
+                    </Button>
+                  ) : null}
+                  {canManage && selected.active ? (
                     <Button
                       type="button"
                       variant="destructive"
@@ -1139,6 +1187,21 @@ export function CrewCatalogPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CrewRelocationDialog
+        crew={relocating}
+        zones={zones}
+        onOpenChange={(open) => {
+          if (!open) setRelocating(null);
+        }}
+        onSuccess={() => {
+          const crew = relocating;
+          setRelocating(null);
+          notifySuccess("Cuadrilla reubicada.");
+          setMovesVersion((version) => version + 1);
+          setRequestVersion((version) => version + 1);
+          if (crew) void crewsAdapter.get(crew.id).then((updated) => setSelected(updated)).catch(() => undefined);
+        }}
+      />
       <CatalogDeactivationDialog
         open={Boolean(deactivating)}
         onOpenChange={(open) => {
@@ -1257,5 +1320,45 @@ function CrewMemberMultiSelect({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function CrewMovesSection({ moves, error, zoneName }: {
+  moves: CrewZoneAssignment[] | null;
+  error: string | null;
+  zoneName: (id: string | null) => string;
+}) {
+  const today = todayInArgentina();
+  const period = (move: CrewZoneAssignment) =>
+    move.validTo ? `Del ${formatArgentinaCalendarDate(move.validFrom)} al ${formatArgentinaCalendarDate(move.validTo)}` : `Desde el ${formatArgentinaCalendarDate(move.validFrom)}, hasta nuevo aviso`;
+  const active = moves?.find((move) => move.validFrom <= today && (move.validTo ?? "9999-12-31") >= today);
+  return (
+    <section aria-labelledby="crew-moves-heading" className="grid gap-3">
+      <h3 id="crew-moves-heading" className="font-semibold">Reubicaciones</h3>
+      {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {active ? (
+        <section aria-label="Reubicación vigente" className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+          <p className="font-medium">Reubicación vigente: {zoneName(active.zoneId)}</p>
+          <p className="text-muted-foreground">{period(active)}</p>
+          <p className="mt-1">{active.reason}</p>
+        </section>
+      ) : null}
+      {moves === null ? (error ? null : <p className="text-sm text-muted-foreground">Cargando reubicaciones…</p>) : moves.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Esta cuadrilla no tiene reubicaciones registradas.</p>
+      ) : (
+        <ul aria-label="Historial de reubicaciones" className="flex flex-col gap-2">
+          {moves.map((move) => (
+            <li key={move.id} className="rounded-lg border border-border p-3 text-sm">
+              <p className="flex flex-wrap items-center gap-2 font-medium">
+                {zoneName(move.zoneId)}
+                {move === active ? <Badge variant="secondary">Vigente</Badge> : null}
+              </p>
+              <p className="text-muted-foreground">{period(move)}</p>
+              <p>{move.reason}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
