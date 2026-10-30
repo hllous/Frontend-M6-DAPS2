@@ -23,6 +23,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
@@ -226,9 +227,10 @@ function StatusBadge({ status }: { status: EnvironmentalReport["status"] }) {
 }
 
 export function EnvironmentalReportsWorkspace({ scenario }: { scenario: OperationalScenario }) {
+  const searchParams = useSearchParams();
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
-  const [selectedId, setSelectedId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("detail"));
-  const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("inspectionId"));
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams?.get("detail") ?? null);
+  const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(() => searchParams?.get("inspectionId") ?? null);
   const [createOpen, setCreateOpen] = useState(false);
   const canCreateReport = scenario.capabilities.includes("environmentalReport:create");
   const [initialParams] = useState(initialQueueParams);
@@ -297,9 +299,20 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
 
   const filteredReports = loadState.status === "ready" ? loadState.reports : [];
 
-  const selectedReport = loadState.status === "ready" && selectedId ? loadState.reports.find((report) => report.id === selectedId) ?? null : null;
+  const [resolvedReport, setResolvedReport] = useState<EnvironmentalReport | null>(null);
+  const queueReport = loadState.status === "ready" && selectedId ? loadState.reports.find((report) => report.id === selectedId) ?? null : null;
+  useEffect(() => {
+    if (!selectedId || loadState.status !== "ready" || queueReport) return;
+    let current = true;
+    void environmentalReportsAdapter.get(selectedId).then((report) => {
+      if (current && visibleToScenario(report, scenario)) setResolvedReport(report);
+    }).catch(() => undefined);
+    return () => { current = false; };
+  }, [selectedId, loadState.status, queueReport, scenario]);
+  const selectedReport = queueReport ?? (resolvedReport?.id === selectedId ? resolvedReport : null);
 
   const replaceReport = useCallback((updated: EnvironmentalReport) => {
+    setResolvedReport((report) => report?.id === updated.id ? mergeEnvironmentalReportRead(report, updated) : report);
     setLoadState((state) => state.status === "ready" ? { ...state, reports: state.reports.map((report) => report.id === updated.id ? mergeEnvironmentalReportRead(report, updated) : report) } : state);
   }, []);
 

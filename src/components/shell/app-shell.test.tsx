@@ -1,13 +1,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 import { AppShell } from "./app-shell";
 import { scenarios } from "@/lib/scenarios";
 import { handlers } from "@/mocks/handlers";
-import { resetTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
+import { resetTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
 import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
@@ -138,7 +137,6 @@ describe("AppShell", () => {
     expect(moduleNavigation).toBeVisible();
     expect(within(moduleNavigation).getByRole("link", { name: "Servicios" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
-    expect(screen.getByText("Revisar reprogramación de barrido")).toBeVisible();
     expect(screen.queryByText("Sesión operativa")).not.toBeInTheDocument();
     expect(screen.queryByText("Priorice y coordine")).not.toBeInTheDocument();
     expect(screen.queryByText("Requiere revisión")).not.toBeInTheDocument();
@@ -151,31 +149,6 @@ describe("AppShell", () => {
     expect(screen.getByText("Integrante de cuadrilla")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
     expect(screen.queryByText("Requiere revisión")).not.toBeInTheDocument();
-  });
-
-  it("adds requested and pending tree interventions to the Office My Work queue", async () => {
-    updateTreeInterventionFixture("intervention-3", { status: "PENDING_AUTHORIZATION" });
-    render(<AppShell scenario={scenarios.officeDutyQueue} />);
-
-    expect(await screen.findByText(/Poda de seguridad · Parque del Bicentenario/)).toBeVisible();
-    expect(screen.getAllByText("Solicitada")).toHaveLength(1);
-    expect(screen.getByText("Pendiente de autorización")).toBeVisible();
-    expect(screen.getByText(/Extracción · Paseo de la Costa 220/)).toBeVisible();
-  });
-
-  it("keeps the queue loading and error messages outside the work item list", async () => {
-    server.use(http.get("*/tree-interventions*", () => HttpResponse.json({ message: "boom" }, { status: 500 })));
-    render(<AppShell scenario={scenarios.officeDutyQueue} />);
-
-    const list = screen.getByRole("list");
-    const loading = screen.getByText("Cargando intervenciones de arbolado…");
-    expect(list).not.toContainElement(loading);
-    expect(within(list).getAllByRole("listitem")).toHaveLength(scenarios.officeDutyQueue.work.items.length);
-
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("No se pudieron cargar las autorizaciones pendientes. Intente nuevamente.");
-    expect(list).not.toContainElement(alert);
-    expect(within(list).getAllByRole("listitem")).toHaveLength(scenarios.officeDutyQueue.work.items.length);
   });
 
   it("hides a module an actor is not optimistically permitted to see", () => {

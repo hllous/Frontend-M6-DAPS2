@@ -8,13 +8,10 @@ import {
   ChevronLeft,
   CircleHelp,
   ClipboardList,
-  Clock3,
   GitPullRequest,
   Leaf,
   Map,
   PackageSearch,
-  Play,
-  ShieldAlert,
   Settings2,
   Sprout,
 } from "lucide-react";
@@ -24,18 +21,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item";
-import { Spinner } from "@/components/ui/spinner";
 import {
   Sheet,
   SheetContent,
@@ -62,7 +47,7 @@ import { CatalogLanding, InventoryLanding } from "@/components/catalog/catalog-l
 import { ZonesPanel } from "./zones-panel";
 import { IndicatorsDashboard } from "@/components/indicators/indicators-dashboard";
 import { EnvironmentalReportsWorkspace } from "@/components/environmental-reports/environmental-reports-workspace";
-import { treeInterventionsAdapter, type TreeIntervention } from "@/lib/tree-interventions";
+import { OfficeWorkPanel } from "./office-work-panel";
 
 const MapaOperativo = dynamic(
   () => import("@/components/map/mapa-operativo").then((module) => module.MapaOperativo),
@@ -366,135 +351,3 @@ function WorkPanel({ scenario }: { scenario: OperationalScenario }) {
 
   return <OfficeWorkPanel scenario={scenario} />;
 }
-
-const treeInterventionLabels = {
-  FORMATION_PRUNING: "Poda de formación",
-  SAFETY_PRUNING: "Poda de seguridad",
-  REMOVAL: "Extracción",
-  PLANTING: "Plantación",
-  TREATMENT: "Tratamiento",
-} satisfies Record<TreeIntervention["interventionType"], string>;
-
-type PendingTreeIntervention = TreeIntervention & { status: "REQUESTED" | "PENDING_AUTHORIZATION" };
-
-const treeInterventionStatusLabels = {
-  REQUESTED: "Solicitada",
-  PENDING_AUTHORIZATION: "Pendiente de autorización",
-} satisfies Record<Extract<TreeIntervention["status"], "REQUESTED" | "PENDING_AUTHORIZATION">, string>;
-
-function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
-  const mayExecuteService = scenario.capabilities.includes("service:execute");
-  const [queue, setQueue] = useState<
-    | { status: "loading" }
-    | { status: "ready"; interventions: PendingTreeIntervention[] }
-    | { status: "error"; message: string }
-  >({ status: "loading" });
-
-  useEffect(() => {
-    let isCurrent = true;
-
-    void treeInterventionsAdapter
-      .list({ pageSize: 100 })
-      .then((page) => {
-        if (!isCurrent) return;
-        setQueue({
-          status: "ready",
-          interventions: page.interventions.filter(
-            (item): item is PendingTreeIntervention =>
-              item.status === "REQUESTED" || item.status === "PENDING_AUTHORIZATION",
-          ),
-        });
-      })
-      .catch(() => {
-        if (!isCurrent) return;
-        setQueue({
-          status: "error",
-          message: "No se pudieron cargar las autorizaciones pendientes. Intente nuevamente.",
-        });
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, []);
-
-  return (
-    <section aria-labelledby="work-title" className={styles.workPanel}>
-      <div className={styles.pageHeading}>
-        <h1 id="work-title">{scenario.work.title}</h1>
-        <span>{scenario.work.summary}</span>
-      </div>
-      <ItemGroup>
-        {scenario.work.items.map((item, index) => (
-          <Item key={item} variant="outline">
-            <ItemMedia className="w-6 text-xs text-muted-foreground tabular-nums">{String(index + 1).padStart(2, "0")}</ItemMedia>
-            <ItemContent>
-              <ItemTitle>{item}</ItemTitle>
-            </ItemContent>
-            {mayExecuteService && index === 0 ? (
-              <ItemActions className="max-sm:basis-full max-sm:pl-[calc(1.5rem+0.625rem)]">
-                <Button className="max-sm:w-full" onClick={() => undefined}>
-                  <Play data-icon="inline-start" aria-hidden />
-                  Iniciar servicio
-                </Button>
-              </ItemActions>
-            ) : null}
-          </Item>
-        ))}
-        {queue.status === "ready"
-          ? queue.interventions.map((intervention, index) => (
-              <TreeInterventionWorkItem
-                key={intervention.id}
-                intervention={intervention}
-                index={scenario.work.items.length + index + 1}
-              />
-            ))
-          : null}
-      </ItemGroup>
-      {queue.status === "loading" ? (
-        <Item variant="muted" aria-live="polite">
-          <ItemMedia><Spinner aria-hidden role="presentation" /></ItemMedia>
-          <ItemContent>
-            <ItemDescription>Cargando intervenciones de arbolado…</ItemDescription>
-          </ItemContent>
-        </Item>
-      ) : null}
-      {queue.status === "error" ? (
-        <Alert variant="danger">
-          <AlertDescription>{queue.message}</AlertDescription>
-        </Alert>
-      ) : null}
-    </section>
-  );
-}
-
-function TreeInterventionWorkItem({
-  intervention,
-  index,
-}: {
-  intervention: PendingTreeIntervention;
-  index: number;
-}) {
-  const StatusIcon = intervention.status === "REQUESTED" ? Clock3 : ShieldAlert;
-
-  return (
-    <Item variant="outline">
-      <ItemMedia className="w-6 text-xs text-muted-foreground tabular-nums">{String(index).padStart(2, "0")}</ItemMedia>
-      <ItemContent>
-        <ItemTitle>
-          <Link href="/app/catalog/tree-interventions" className="hover:underline focus-visible:underline">
-            {treeInterventionLabels[intervention.interventionType]} · {intervention.address}
-          </Link>
-        </ItemTitle>
-        <ItemDescription>Intervención de arbolado</ItemDescription>
-      </ItemContent>
-      <ItemActions className="max-sm:basis-full max-sm:pl-[calc(1.5rem+0.625rem)]">
-        <Badge variant={intervention.status === "PENDING_AUTHORIZATION" ? "warning" : "info"}>
-          <StatusIcon data-icon="inline-start" aria-hidden />
-          {treeInterventionStatusLabels[intervention.status]}
-        </Badge>
-      </ItemActions>
-    </Item>
-  );
-}
-

@@ -14,7 +14,7 @@ test.describe("Emptying (crew) and relocation (Office) dispatch #123", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/catalog/containers");
 
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
 
     // Register a fresh container to avoid mutating fixtures used by other tests
     await page.getByRole("button", { name: "Registrar contenedor" }).click();
@@ -82,7 +82,7 @@ test.describe("Emptying (crew) and relocation (Office) dispatch #123", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/catalog/containers");
 
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
 
     // Register a fresh container for relocation test
     await page.getByRole("button", { name: "Registrar contenedor" }).click();
@@ -166,7 +166,7 @@ test.describe("Emptying (crew) and relocation (Office) dispatch #123", () => {
     await loginViaApi(page, "field-crew-member-route");
     await page.goto("/app/catalog/containers");
 
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
     await expect(page.getByText("CONT-001")).toBeVisible();
 
     // Field actors lack container:manage: relocation is not rendered. They do hold container:empty.
@@ -184,7 +184,7 @@ test.describe("Emptying (crew) and relocation (Office) dispatch #123", () => {
     await loginViaApi(page, "office-limited-intake");
     await page.goto("/app/catalog/containers");
 
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
     await expect(page.getByText("CONT-001")).toBeVisible();
 
     // Actors lacking container:manage cannot empty or relocate

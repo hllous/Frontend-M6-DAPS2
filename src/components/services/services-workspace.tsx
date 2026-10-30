@@ -625,10 +625,18 @@ export function ServicesWorkspace({
     };
   }, [detailService, fieldCanViewRepairRequests]);
 
-  const assigningService = useMemo(() => {
-    if (!assigningServiceId || loadState.status !== "ready") return null;
-    return loadState.services.find((s) => s.id === assigningServiceId) ?? null;
-  }, [assigningServiceId, loadState]);
+  const [resolvedAssignment, setResolvedAssignment] = useState<Service | null>(null);
+  const windowAssignment = loadState.status === "ready" && assigningServiceId
+    ? loadState.services.find((service) => service.id === assigningServiceId) ?? null : null;
+  useEffect(() => {
+    if (!assigningServiceId || loadState.status !== "ready" || windowAssignment) return;
+    let current = true;
+    void servicesAdapter.get(assigningServiceId).then((service) => {
+      if (current && (scenario?.actor.kind !== "FIELD" || service.crewId === scenario.actor.crewId)) setResolvedAssignment(service);
+    }).catch(() => undefined);
+    return () => { current = false; };
+  }, [assigningServiceId, loadState.status, windowAssignment, scenario]);
+  const assigningService = windowAssignment ?? (resolvedAssignment?.id === assigningServiceId ? resolvedAssignment : null);
 
   const repairRequestService = useMemo(() => {
     if (!repairRequestServiceId || loadState.status !== "ready") return null;

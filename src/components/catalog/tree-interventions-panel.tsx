@@ -2,6 +2,7 @@
 import { errorMessage } from "@/lib/error-message";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3, Eye, Info, Plus, RefreshCw, Send, ShieldAlert, UserRound } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -283,10 +284,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const serviceLookupRequest = useRef(0);
   const [streetClosureIntervention, setStreetClosureIntervention] = useState<TreeInterventionDetail | null>(null);
   const detailOpenedFromUrl = useRef(false);
-  const [initialDetailId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return new URLSearchParams(window.location.search).get("detail");
-  });
+  const initialDetailId = useSearchParams()?.get("detail") ?? null;
   const [notice, setNotice] = useState<string | null>(null);
   const query = useMemo<TreeInterventionQuery>(() => ({ interventionType: interventionType || undefined, status: status || undefined, priority: priority || undefined, page, pageSize: 10 }), [interventionType, page, priority, status]);
 
@@ -379,9 +377,9 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   useEffect(() => {
     if (state.status !== "ready" || !initialDetailId || detail || detailOpenedFromUrl.current) return;
     const intervention = state.page.interventions.find((item) => item.id === initialDetailId);
-    if (!intervention) return;
     detailOpenedFromUrl.current = true;
-    void Promise.resolve().then(() => openDetail(intervention));
+    if (intervention) void Promise.resolve().then(() => openDetail(intervention));
+    else void treeInterventionsAdapter.get(initialDetailId).then(openDetail).catch(() => undefined);
   }, [state, initialDetailId, detail, openDetail]);
   const treeById = (id: string) => trees.find((tree) => tree.id === id);
   const runAction = async (action: "submit" | "authorize" | "reject" | "schedule", input?: ReturnType<typeof emptySchedule>) => {
