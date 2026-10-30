@@ -1,0 +1,18 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - paragraph [ref=e5]: Ambiente e Higiene
+        - heading "Ingresar" [level=1] [ref=e6]
+      - generic [ref=e9]:
+        - group [ref=e10]:
+          - generic [ref=e11]: Perfil
+          - combobox "Perfil" [ref=e12] [cursor=pointer]:
+            - generic [ref=e13]: Oficina · cola de decisiones
+            - img [aria-hidden]: ▼
+          - textbox [aria-hidden] [ref=e14]: office-duty-queue
+          - paragraph [ref=e15]: "Entorno de demostración: cualquier persona puede elegir un perfil. Este perfil corresponde a Carlos Rodríguez ."
+        - button "Ingresar al sistema" [ref=e16] [cursor=pointer]
+  - region "Notificaciones alt+T"
+  - button "Open Next.js Dev Tools" [ref=e22] [cursor=pointer]
+  - alert [ref=e26]
