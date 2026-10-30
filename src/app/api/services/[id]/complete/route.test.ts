@@ -309,6 +309,7 @@ describe("POST /api/services/[id]/complete backend forward path", () => {
     const backendFetch = mockFieldBackend();
     const cookie = await loginAs("field-crew-leader-route", {
       mode: "backend-development",
+      crew: { ...backendCrew, role: "LEADER" },
       devJwt: backendDevJwt,
       backendOrigin,
     });
@@ -334,6 +335,7 @@ describe("POST /api/services/[id]/complete backend forward path", () => {
     const backendFetch = mockFieldBackend("22222222-2222-4222-8222-222222222222");
     const cookie = await loginAs("field-crew-leader-route", {
       mode: "backend-development",
+      crew: { ...backendCrew, role: "LEADER" },
       devJwt: backendDevJwt,
       backendOrigin,
     });

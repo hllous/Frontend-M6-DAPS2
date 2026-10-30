@@ -36,8 +36,9 @@ export type Session = {
   source?: "m1" | "demo";
   /** Roles de M6 efectivos: en modo backend los trae GET /me (login y refresco); en mock, el fixture del escenario. */
   roles: M6Role[];
-  /** Cuadrilla real de un escenario de Campo, resuelta contra GET /crews en el login (sólo modo backend). */
+  /** Cuadrilla y función informadas por GET /me en modo backend. */
   crew?: ScenarioCrew;
+  fieldRole?: "CREW_LEADER" | "CREW_MEMBER";
 };
 
 export type PublicSession = Omit<Session, "accessToken" | "refreshToken" | "source"> & {
@@ -408,6 +409,7 @@ function isSession(value: Partial<Session>): value is Session {
     (value.mode === "mock" || value.source === "demo" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
     (value.source === undefined || ((value.source === "m1" || value.source === "demo") && value.mode !== "mock")) &&
     (value.refreshToken === undefined || (value.mode !== "mock" && typeof value.refreshToken === "string")) &&
+    (value.fieldRole === undefined || value.fieldRole === "CREW_LEADER" || value.fieldRole === "CREW_MEMBER") &&
     (value.crew === undefined || (typeof value.crew?.id === "string" && typeof value.crew?.name === "string"))
   );
 }

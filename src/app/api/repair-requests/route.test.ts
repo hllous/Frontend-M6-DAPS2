@@ -122,10 +122,6 @@ describe("repair request BFF collection routes", () => {
     process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json({ data: [{
-        id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516",
-        name: "Cuadrilla Belgrano — Recolección",
-      }] }))
       .mockResolvedValueOnce(Response.json({
         id: "ceec08ae-67e7-4739-9677-150f5085bb1a",
         serviceTypeId: "6e704e6e-8884-48f3-a930-4138703613c0",
@@ -135,15 +131,15 @@ describe("repair request BFF collection routes", () => {
         vehicleId: null, windowFrom: "08:00", windowTo: "12:00",
       }))
       .mockResolvedValueOnce(Response.json({ data: [], meta: { total: 0, page: 1, pageSize: 20 } }));
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ data: [], meta: { total: 0, page: 1, pageSize: 20 } });
-    expect(String(backendFetch.mock.calls[1]?.[0])).toBe("https://backend.internal/services/ceec08ae-67e7-4739-9677-150f5085bb1a");
-    expect(String(backendFetch.mock.calls[2]?.[0])).toBe("https://backend.internal/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a");
-    expect(new Headers(backendFetch.mock.calls[1]?.[1]?.headers).get("authorization")).toMatch(/^Bearer /);
+    expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/services/ceec08ae-67e7-4739-9677-150f5085bb1a");
+    expect(String(backendFetch.mock.calls[1]?.[0])).toBe("https://backend.internal/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a");
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toMatch(/^Bearer /);
   });
 
   it.each(["901159c1-3230-440a-ba3d-d7baf55fab24", "crew-b", null])(
@@ -151,18 +147,14 @@ describe("repair request BFF collection routes", () => {
       process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
       process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
       const backendFetch = vi.spyOn(globalThis, "fetch")
-        .mockResolvedValueOnce(Response.json({ data: [{
-          id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516",
-          name: "Cuadrilla Belgrano — Recolección",
-        }] }))
         .mockResolvedValueOnce(Response.json({ id: "ceec08ae-67e7-4739-9677-150f5085bb1a", crewId }));
-      const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
+      const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
 
       const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
       expect(response.status).toBe(403);
       expect((await response.json()).message).toBe("Solo puede consultar derivaciones de su cuadrilla.");
-      expect(backendFetch).toHaveBeenCalledTimes(2);
+      expect(backendFetch).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -171,18 +163,14 @@ describe("repair request BFF collection routes", () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const error = { statusCode: status, message: "No se pudo consultar el servicio." };
     const backendFetch = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json({ data: [{
-        id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516",
-        name: "Cuadrilla Belgrano — Recolección",
-      }] }))
       .mockResolvedValueOnce(Response.json(error, { status }));
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual(error);
-    expect(backendFetch).toHaveBeenCalledTimes(2);
+    expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 
   it("Oficina consulta el backend sin validar la cuadrilla del servicio", async () => {

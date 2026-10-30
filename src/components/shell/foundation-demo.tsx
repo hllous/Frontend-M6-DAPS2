@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { authenticatedFetch, NetworkFailureError, ROLES_STALE_EVENT } from "@/lib/authenticated-fetch";
 import { loadRoles, loadScenario, ScenarioRequestError } from "@/lib/scenario-client";
 import { scenarioForRoles, type OperationalScenario, type ScenarioId } from "@/lib/scenarios";
+import type { PublicSession } from "@/lib/session";
 import { onRemoteLogout } from "@/lib/session-client";
 import { ensureMockWorkerStarted } from "@/mocks/ensure-worker-started";
 
@@ -68,7 +69,19 @@ export function FoundationDemo({
       const now = Date.now();
       if (now - lastRefreshAt < 60_000) return;
       lastRefreshAt = now;
-      void authenticatedFetch("/api/session").catch(() => undefined);
+      void authenticatedFetch("/api/session").then(async (response) => {
+        if (!response.ok) return;
+        const body = await response.json() as { session?: PublicSession };
+        const session = body.session;
+        if (!session || session.mode !== "backend-development" || !Array.isArray(session.roles)) return;
+        setState((current) => {
+          if (current.status !== "ready") return current;
+          const actor = current.scenario.actor;
+          if (current.scenario.roles.length === session.roles.length && current.scenario.roles.every((role, index) => role === session.roles[index]) && actor.crewId === session.crew?.id && actor.crewName === session.crew?.name && actor.fieldRole === session.fieldRole) return current;
+          const scenario = { ...current.scenario, actor: { ...actor, crewId: session.crew?.id, crewName: session.crew?.name, fieldRole: session.fieldRole } };
+          return { status: "ready", scenario: scenarioForRoles(scenario, session.roles) };
+        });
+      }).catch(() => undefined);
     };
     window.addEventListener("pointerdown", refreshActivity);
     window.addEventListener("keydown", refreshActivity);

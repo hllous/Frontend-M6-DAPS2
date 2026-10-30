@@ -35,9 +35,7 @@ function detail(cookie: string) {
 }
 
 function fieldBackend() {
-  return vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ data: [{
-    id: crewId, name: "Cuadrilla Belgrano — Recolección",
-  }] }));
+  return vi.spyOn(globalThis, "fetch");
 }
 
 describe("GET /api/environmental-inspections/:id en backend-development", () => {
@@ -61,7 +59,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
       .mockResolvedValueOnce(Response.json({ ...inspection, serviceId: "servicio-real-1" }))
       .mockResolvedValueOnce(Response.json({ crewId }))
       .mockResolvedValueOnce(Response.json({ message: "Evidencia no disponible." }, { status: 503 }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -70,14 +68,14 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
     expect(body).not.toHaveProperty("reporterSnapshot");
     expect(body).not.toHaveProperty("violationNotice");
     expect(body).not.toHaveProperty("attachments");
-    expect(String(backendFetch.mock.calls[2]?.[0])).toBe("https://backend.internal/services/servicio-real-1");
+    expect(String(backendFetch.mock.calls[1]?.[0])).toBe("https://backend.internal/services/servicio-real-1");
   });
 
   it.each(["901159c1-3230-440a-ba3d-d7baf55fab24", null, undefined])("Campo no recibe inspecciones de otra cuadrilla (%s)", async (otherCrewId) => {
     const backendFetch = fieldBackend()
       .mockResolvedValueOnce(Response.json(inspection))
       .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: otherCrewId }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
@@ -85,23 +83,23 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
       timestamp: expect.any(String),
       path: `/api/environmental-inspections/${inspectionId}`,
     });
-    expect(backendFetch).toHaveBeenCalledTimes(3);
+    expect(backendFetch).toHaveBeenCalledTimes(2);
   });
 
   it.each([null, undefined])("Campo no recibe una inspección sin servicio (%s)", async (missingServiceId) => {
     const backendFetch = fieldBackend().mockResolvedValueOnce(Response.json({ ...inspection, serviceId: missingServiceId }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
     expect((await response.json()).message).toBe("Inspección no encontrada.");
-    expect(backendFetch).toHaveBeenCalledTimes(2);
+    expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 
   it("Oficina recibe todos los campos y la evidencia sin consultar el servicio", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json(inspection))
       .mockResolvedValueOnce(Response.json([]));
-    const response = await detail(await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("office-duty-queue", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ...inspection, attachments: [] });
@@ -114,16 +112,16 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
   it("conserva el 404 del backend sin consultar servicio ni evidencia", async () => {
     const error = { statusCode: 404, message: "Inspección no encontrada en el backend." };
     const backendFetch = fieldBackend().mockResolvedValueOnce(Response.json(error, { status: 404 }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual(error);
-    expect(backendFetch).toHaveBeenCalledTimes(2);
+    expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 
   it("returns 503 with the shared message when the backend request fails", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
-    const response = await detail(await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("office-duty-queue", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
@@ -136,7 +134,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
   it.each(["field-crew-leader-route", "office-duty-queue"])("rechaza un payload inválido para %s", async (scenarioId) => {
     const backendFetch = scenarioId.startsWith("field") ? fieldBackend() : vi.spyOn(globalThis, "fetch");
     backendFetch.mockResolvedValueOnce(Response.json({ ...inspection, reportId: 123 }));
-    const response = await detail(await loginAs(scenarioId, { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs(scenarioId, { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
@@ -144,16 +142,16 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
       timestamp: expect.any(String),
       path: `/api/environmental-inspections/${inspectionId}`,
     });
-    expect(backendFetch).toHaveBeenCalledTimes(scenarioId.startsWith("field") ? 2 : 1);
+    expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 
   it("rechaza JSON malformado sin reenviarlo a Campo", async () => {
     const backendFetch = fieldBackend().mockResolvedValueOnce(new Response('{"inspectorId":"reservado"'));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(502);
     expect((await response.json()).message).toBe("La respuesta del backend no contiene una inspección válida.");
-    expect(backendFetch).toHaveBeenCalledTimes(2);
+    expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 
   it("Campo recibe su inspección con evidencia y sin datos reservados de Oficina", async () => {
@@ -162,7 +160,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
       .mockResolvedValueOnce(Response.json(inspection))
       .mockResolvedValueOnce(Response.json({ id: serviceId, crewId }))
       .mockResolvedValueOnce(Response.json(evidence));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
@@ -170,12 +168,12 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
       createdAt: inspection.createdAt, updatedAt: inspection.updatedAt,
       findings: "Emisión visible", attachments: evidence,
     });
-    expect(backendFetch.mock.calls.slice(1).map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual([
+    expect(backendFetch.mock.calls.slice(0).map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual([
       [`https://backend.internal/environmental-inspections/${inspectionId}`, "GET"],
       [`https://backend.internal/services/${serviceId}`, "GET"],
       [`https://backend.internal/evidence?ownerType=INSPECTION&ownerId=${inspectionId}`, "GET"],
     ]);
-    expect(new Headers(backendFetch.mock.calls[2]?.[1]?.headers).get("authorization")).toMatch(/^Bearer /);
+    expect(new Headers(backendFetch.mock.calls[1]?.[1]?.headers).get("authorization")).toMatch(/^Bearer /);
   });
 });
 

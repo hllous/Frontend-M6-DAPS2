@@ -8,6 +8,8 @@ Esta carpeta contiene un espejo de referencia del contrato HTTP y del modelo de 
 
 **Copia del 27/10/2026 (`7ba0d71`, [#708](https://github.com/hllous/Frontend-M6-DAPS2/issues/708)):** reemplaza a la de `97809ec` (21/10) y a la sincronización parcial de abajo; el Backend documenta ahora 142 rutas en 27 tags. Suma `GET /communes` (comunas con sus zonas y barrios), `GET /neighborhoods` (catálogo de M9 cacheado) y la entidad `Commune`; `GET /zones` devuelve `commune` y `neighborhood`, y `Zone.code` es el `codigo` (slug) del barrio en M9. Las zonas operativas pasan a ser una por barrio. Los GeoJSON de comunas y barrios viven en [`public/geo/`](../../public/geo/README.md), no acá.
 
+**Copia del 30/10/2026 (`374f66e`):** se actualizaron los documentos de dominio y API desde Backend `develop`, incluyendo las cuadrillas y `isAssignedInspector` de `GET /me`.
+
 ## Contenido
 
 **Sincronización parcial (21/10/2026):** se actualizó la fila de `GET /environmental-reports` en [`api/endpoints.md`](api/endpoints.md) desde Backend `develop`, commit `e6153f903bba5af7f576252bad2cb4df2c9a3f12`, tras [Backend PR #357](https://github.com/hllous/Backend-M6-DAPS2/pull/357). El filtro `status` acepta varios valores y el formato canónico usa parámetros repetidos.
