@@ -400,7 +400,6 @@ export function GreenPointCatalogPanel({
       className="flex flex-col gap-6"
     >
       <CatalogPageHeader
-        section="inventory"
         title="Puntos verdes"
         titleId="green-points-title"
         actions={

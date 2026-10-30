@@ -94,7 +94,7 @@ test.describe("session lifecycle failure journeys @smoke", () => {
 
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("link", { name: "Configuración" }).click();
+    await page.getByRole("link", { name: "Catálogo" }).click();
 
     await expect(page.getByText("No se pudieron cargar las zonas")).toBeVisible();
   });
@@ -111,7 +111,7 @@ test.describe("session lifecycle failure journeys @smoke", () => {
 
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
-    await page.getByRole("link", { name: "Configuración" }).click();
+    await page.getByRole("link", { name: "Catálogo" }).click();
 
     await expect(page.getByText("No se pudieron cargar las zonas")).toBeVisible();
     const retryButton = page.getByRole("button", { name: "Reintentar carga" });

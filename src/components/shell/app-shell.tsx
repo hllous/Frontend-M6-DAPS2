@@ -11,7 +11,6 @@ import {
   GitPullRequest,
   Leaf,
   Map,
-  PackageSearch,
   Settings2,
   Sprout,
 } from "lucide-react";
@@ -43,7 +42,7 @@ import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
 import { FieldWorkPanel } from "@/components/services/field-work-panel";
 import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ReferralsWorkspace } from "@/components/referrals/referrals-workspace";
-import { CatalogLanding, InventoryLanding } from "@/components/catalog/catalog-landing";
+import { CatalogLanding } from "@/components/catalog/catalog-landing";
 import { ZonesPanel } from "./zones-panel";
 import { IndicatorsDashboard } from "@/components/indicators/indicators-dashboard";
 import { EnvironmentalReportsWorkspace } from "@/components/environmental-reports/environmental-reports-workspace";
@@ -69,19 +68,15 @@ const navigation: NavigationItem[] = [
   { id: "work", label: "Mi trabajo", icon: ClipboardList },
   { id: "services", label: "Servicios", capability: "service:view", icon: BriefcaseBusiness },
   { id: "referrals", label: "Derivaciones", actorKinds: ["OFFICE", "FIELD"], icon: GitPullRequest },
-  { id: "inventory", label: "Inventario urbano", capability: "inventory:view", icon: PackageSearch },
   { id: "environment", label: "Control Ambiental", capability: "environmentalReport:view", icon: Leaf },
   { id: "map", label: "Mapa", capability: "map:view", icon: Map },
-  { id: "catalog", label: "Configuración", capability: "catalog:view", icon: Settings2 },
+  { id: "catalog", label: "Catálogo", capability: "catalog:view", icon: Settings2 },
   { id: "dashboards", label: "Tableros", capability: "indicator:view", icon: BarChart3 },
 ];
 
 // Una sola URL por pantalla: cada destino vive en /app?destination=<id>. Las rutas
 // /app/dashboard y /app/catalog quedan como alias que redirigen aca.
 const destinationHref = (id: Destination) => `/app?destination=${id}`;
-
-// Las rutas /app/catalog/<recurso> de bienes urbanos pertenecen a «Inventario urbano»; el resto, a «Configuración».
-const inventoryCatalogRoutes = ["containers", "green-points", "green-spaces", "trees", "tree-interventions"].map((slug) => `/app/catalog/${slug}`);
 
 const mobileDestinations: Destination[] = ["work", "services", "map"];
 const tabletNavigationQuery = "(min-width: 761px) and (max-width: 1023px)";
@@ -131,7 +126,8 @@ export function AppShell({
   const searchParams = useSearchParams();
   const requestedDestination = searchParams.get("destination") as Destination | null;
   const destination = pathname.startsWith("/app/catalog")
-    ? inventoryCatalogRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`)) ? "inventory" : "catalog"
+    ? "catalog"
+    : requestedDestination === "inventory" ? "catalog"
     : requestedDestination && navigation.some((item) => item.id === requestedDestination)
       ? requestedDestination
       : "work";
@@ -236,8 +232,6 @@ export function AppShell({
             <CatalogLanding scenario={scenario} />
             <ZonesPanel />
           </div>
-        ) : destination === "inventory" ? (
-          <InventoryLanding scenario={scenario} />
         ) : destination === "dashboards" ? (
           <IndicatorsDashboard scenario={scenario} />
         ) : destination === "environment" ? (

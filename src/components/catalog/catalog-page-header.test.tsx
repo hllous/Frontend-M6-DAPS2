@@ -4,7 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import { CatalogPageHeader } from "./catalog-page-header";
 
 describe("CatalogPageHeader", () => {
-  it("renders a breadcrumb back to Configuración, the page title and its actions", () => {
+  it("renders a breadcrumb back to Catálogo, the page title and its actions", () => {
     render(
       <CatalogPageHeader
         title="Vehículos"
@@ -15,7 +15,7 @@ describe("CatalogPageHeader", () => {
     );
 
     const breadcrumb = screen.getByRole("navigation", { name: "Ruta de navegación" });
-    expect(within(breadcrumb).getByRole("link", { name: "Configuración" })).toHaveAttribute("href", "/app?destination=catalog");
+    expect(within(breadcrumb).getByRole("link", { name: "Catálogo" })).toHaveAttribute("href", "/app?destination=catalog");
     expect(within(breadcrumb).getByText("Vehículos")).toHaveAttribute("aria-current", "page");
     const title = screen.getByRole("heading", { level: 1, name: "Vehículos" });
     expect(title).toHaveAttribute("id", "vehicles-title");
@@ -24,10 +24,10 @@ describe("CatalogPageHeader", () => {
     expect(screen.getByRole("button", { name: "Registrar vehículo" })).toBeVisible();
   });
 
-  it("points the breadcrumb to Inventario urbano for urban-asset screens", () => {
-    render(<CatalogPageHeader title="Árboles" section="inventory" />);
+  it("points the breadcrumb to Catálogo for urban-asset screens", () => {
+    render(<CatalogPageHeader title="Árboles" />);
 
-    expect(screen.getByRole("link", { name: "Inventario urbano" })).toHaveAttribute("href", "/app?destination=inventory");
+    expect(screen.getByRole("link", { name: "Catálogo" })).toHaveAttribute("href", "/app?destination=catalog");
   });
 
   it("omits the description and the actions slot when they are not provided", () => {

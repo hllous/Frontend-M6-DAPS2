@@ -7,10 +7,10 @@ describe("AppPage metadata", () => {
     ["work", "Mi trabajo"],
     ["services", "Servicios"],
     ["referrals", "Derivaciones"],
-    ["inventory", "Inventario urbano"],
+    ["inventory", "Catálogo"],
     ["environment", "Control Ambiental"],
     ["map", "Mapa"],
-    ["catalog", "Configuración"],
+    ["catalog", "Catálogo"],
     ["dashboards", "Tableros"],
   ])("uses a title for the %s destination", async (destination, label) => {
     const metadata = await generateMetadata({

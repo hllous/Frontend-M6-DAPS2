@@ -527,7 +527,6 @@ export function ContainerCatalogPanel({
   return (
     <section aria-labelledby="containers-title" className="flex flex-col gap-5">
       <CatalogPageHeader
-        section="inventory"
         title="Contenedores"
         titleId="containers-title"
         actions={

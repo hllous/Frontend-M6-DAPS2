@@ -481,7 +481,6 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   return (
     <section aria-labelledby="tree-interventions-title" className="flex flex-col gap-5">
       <CatalogPageHeader
-        section="inventory"
         title="Intervenciones de arbolado"
         titleId="tree-interventions-title"
         actions={canRequest ? <Button type="button" onClick={() => openRequest()}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención</Button> : null}

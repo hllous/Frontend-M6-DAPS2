@@ -6,7 +6,7 @@ import { GreenPointCatalogPanel } from "@/components/catalog/green-point-catalog
 import { getScenario } from "@/lib/scenarios";
 import { getSession } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Inventario urbano — Ambiente e Higiene" };
+export const metadata: Metadata = { title: "Catálogo — Ambiente e Higiene" };
 
 export default async function GreenPointsCatalogPage() {
   await connection();
