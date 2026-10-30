@@ -16,7 +16,7 @@ test.describe("shared control density", () => {
     ]) {
       await page.setViewportSize({ width, height });
       await page.goto("/app?destination=services");
-      await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 
       await expect.poll(() => heightOf(page.getByRole("button", { name: "Cerrar sesión" }))).toBe(expected);
       await expect.poll(() => heightOf(page.getByRole("button", { name: "Programar servicio" }))).toBe(expected);

@@ -10,6 +10,7 @@ import {
   type ServiceQuery,
   type ZoneResult,
 } from "./services";
+import { todayInArgentina } from "./argentina-date";
 import { vehicleFixtures } from "./vehicles-fixtures";
 
 const INITIAL_SERVICE_FIXTURES: Service[] = [
@@ -662,6 +663,30 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
     notes: "Reservado para pruebas de bloqueo de inicio por corte de calle pendiente (#117) — SVC-1051 es reasignado a otra cuadrilla por services.spec.ts, por lo que ya no sirve para este caso.",
   },
 ];
+
+// Programado para mañana y sin cuadrilla: siempre cae en la ventana de «Servicios sin cuadrilla» de Mi trabajo.
+const tomorrow = new Date(`${todayInArgentina()}T00:00:00Z`);
+tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+INITIAL_SERVICE_FIXTURES.push({
+  id: "SVC-1099",
+  serviceTypeId: "st-waste-route",
+  serviceTypeName: "Recolección de residuos",
+  title: "Recolección de residuos — Av. Cabildo 3100",
+  mode: "POINT",
+  status: "SCHEDULED",
+  statusReason: null,
+  origin: "MANUAL",
+  zoneIds: ["zone-1"],
+  zoneNames: ["Zona Norte"],
+  scheduledDate: tomorrow.toISOString().slice(0, 10),
+  windowFrom: "08:00",
+  windowTo: "11:00",
+  crewId: null,
+  crewName: null,
+  coordinates: { x: 30, y: 26 },
+  attachments: [],
+  history: [{ label: "Programado", at: "2026-09-05 08:00", done: true }],
+});
 
 INITIAL_SERVICE_FIXTURES.push({
   id: "SVC-1112",

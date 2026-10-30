@@ -90,7 +90,6 @@ export type OperationalScenario = {
   work: {
     title: string;
     summary: string;
-    items: string[];
   };
 };
 
@@ -107,12 +106,7 @@ const scenarioFixtures: Record<
     roles: ["M6_ADMIN"],
     work: {
       title: "Acciones de la jornada",
-      summary: "Prioridades que requieren una decisión de Oficina.",
-      items: [
-        "Revisar reprogramación de barrido",
-        "Confirmar cuadrilla para plaza del Parque",
-        "Clasificar aviso ambiental recibido",
-      ],
+      summary: "Lo que espera una decisión de su parte, con lo más antiguo primero.",
     },
   },
   fieldCrewLeader: {
@@ -131,10 +125,6 @@ const scenarioFixtures: Record<
     work: {
       title: "Servicios asignados",
       summary: "Recorrido de higiene urbana para el turno actual.",
-      items: [
-        "Recorrido de higiene urbana — corredor costero",
-        "Revisión de punto verde — Plaza de las Artes",
-      ],
     },
   },
   fieldCrewMember: {
@@ -153,10 +143,6 @@ const scenarioFixtures: Record<
     work: {
       title: "Servicios asignados",
       summary: "Tareas del recorrido que integran su turno.",
-      items: [
-        "Recorrido de higiene urbana — corredor costero",
-        "Control de contenedores — avenida central",
-      ],
     },
   },
   officeLimited: {
@@ -166,8 +152,7 @@ const scenarioFixtures: Record<
     roles: ["M6_AUDITOR"],
     work: {
       title: "Acciones de la jornada",
-      summary: "Ingreso de avisos con permisos acotados para esta sesión.",
-      items: ["Clasificar aviso ambiental recibido"],
+      summary: "Su perfil consulta información y no tiene tareas asignadas.",
     },
   },
 };

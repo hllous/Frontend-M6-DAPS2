@@ -33,6 +33,14 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("TreeInterventionsPanel", () => {
+  it("opens a linked intervention outside the current page", async () => {
+    window.history.replaceState(null, "", "/app/catalog/tree-interventions?detail=intervention-1");
+    server.use(http.get("*/api/tree-interventions", () => HttpResponse.json({ data: [], meta: { page: 1, pageSize: 10, total: 0, totalPages: 0 } })));
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const dialog = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    expect(await within(dialog).findByText("Poda de seguridad")).toBeVisible();
+    window.history.replaceState(null, "", "/app");
+  });
   it("filters priority on the server and restores all requests", async () => {
     const user = userEvent.setup();
     render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);

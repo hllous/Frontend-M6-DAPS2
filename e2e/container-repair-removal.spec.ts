@@ -122,7 +122,7 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app/catalog/containers");
 
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
     const damagedDetail = await openCatalogRowDetail(page.getByRole("row", { name: /CONT-003/ }));
     await expect(damagedDetail.getByRole("button", { name: /reparación/i })).toHaveCount(0);
     await expect(damagedDetail.getByRole("button", { name: "Retirar contenedor" })).toHaveCount(0);

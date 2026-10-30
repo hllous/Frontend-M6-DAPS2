@@ -16,7 +16,7 @@ test.describe("Container catalog management #120", () => {
   test("Office actor lists containers and filters by search, type, and status", async ({ page }) => {
     await openContainersCatalog(page, "office-duty-queue");
 
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
     await expect(page.getByText("CONT-001")).toBeVisible();
     await expect(page.getByText("CONT-002")).toBeVisible();
 
@@ -94,7 +94,7 @@ test.describe("Container catalog management #120", () => {
   test("Field actor has read-only access and can inspect damage details", async ({ page }) => {
     await openContainersCatalog(page, "field-crew-leader-route");
 
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
     await expect(page.getByText("CONT-003")).toBeVisible();
 
     // Management buttons should not be present
@@ -125,6 +125,6 @@ test.describe("Container catalog management #120", () => {
 
     await containerCard.getByRole("link", { name: /^Abrir/ }).click();
     await expect(page).toHaveURL(/\/app\/catalog\/containers/);
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
   });
 });

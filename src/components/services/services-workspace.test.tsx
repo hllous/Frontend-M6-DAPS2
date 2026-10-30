@@ -737,6 +737,13 @@ describe("ServicesWorkspace component", () => {
     expect(within(row).getByText("Cuadrilla C · Ibáñez")).toBeInTheDocument();
   });
 
+  it("opens assignment for a service outside the loaded window", async () => {
+    window.history.replaceState(null, "", "/app?destination=services&action=assign&serviceId=SVC-1043");
+    server.use(http.get("*/api/services", () => HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 } })));
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Poda de árbol — Av. Rivadavia 2200")).toBeVisible();
+  });
   it("opens assign crew dialog via URL parameters and updates the service", async () => {
     window.history.replaceState(null, "", "/app?destination=services&action=assign&serviceId=SVC-1043");
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
