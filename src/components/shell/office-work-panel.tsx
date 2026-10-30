@@ -24,13 +24,14 @@ import { servicesAdapter } from "@/lib/services";
 import { treeInterventionsAdapter, type TreeIntervention } from "@/lib/tree-interventions";
 
 import styles from "./app-shell.module.css";
+import { PrototypeSwitcher, useVariant, VariantA, VariantB, VariantC } from "./office-work-variants.prototype";
 
 const MAX_ITEMS = 5;
 const FETCH_SIZE = 100;
 const UPCOMING_DAYS = 7;
 const PENDING_REPORT_STATUSES: EnvironmentalReportStatus[] = ["RECEIVED", "UNDER_REVIEW"];
 
-type WorkItem = {
+export type WorkItem = {
   id: string;
   href: string;
   title: string;
@@ -42,7 +43,7 @@ type WorkItem = {
 
 type WorkLoad = { items: WorkItem[]; total: number };
 
-type WorkGroupDefinition = {
+export type WorkGroupDefinition = {
   id: string;
   title: string;
   description?: string;
@@ -53,7 +54,7 @@ type WorkGroupDefinition = {
   load: (capabilities: readonly Capability[], today: string) => Promise<WorkLoad>;
 };
 
-type GroupState = { status: "loading" } | { status: "ready"; load: WorkLoad } | { status: "error" };
+export type GroupState = { status: "loading" } | { status: "ready"; load: WorkLoad } | { status: "error" };
 
 type PendingTreeStatus = "REQUESTED" | "PENDING_AUTHORIZATION";
 
@@ -236,6 +237,7 @@ const workGroups: WorkGroupDefinition[] = [
 ];
 
 export function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario }) {
+  const variant = useVariant();
   const visibleGroups = workGroups.filter((group) => group.isVisibleTo(scenario.capabilities));
   const [states, setStates] = useState<Record<string, GroupState>>({});
   const isCurrent = useRef(true);
@@ -307,10 +309,13 @@ export function OfficeWorkPanel({ scenario }: { scenario: OperationalScenario })
           </EmptyHeader>
         </Empty>
       ) : (
-        visibleGroups.map((group) => (
-          <WorkGroup key={group.id} group={group} state={states[group.id] ?? { status: "loading" }} onRetry={retryGroup} />
-        ))
+        (() => {
+          const views = visibleGroups.map((group) => ({ group, state: states[group.id] ?? ({ status: "loading" } as const) }));
+          const Variant = { A: VariantA, B: VariantB, C: VariantC }[variant];
+          return <Variant groups={views} onRetry={retryGroup} />;
+        })()
       )}
+      <PrototypeSwitcher current={variant} />
     </section>
   );
 }
