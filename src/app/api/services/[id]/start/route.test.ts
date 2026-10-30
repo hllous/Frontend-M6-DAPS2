@@ -240,6 +240,7 @@ describe("POST /api/services/[id]/start backend forward path", () => {
     const backendFetch = mockFieldBackend();
     const cookie = await loginAs("field-crew-leader-route", {
       mode: "backend-development",
+      crew: { ...backendCrew, role: "LEADER" },
       devJwt: backendDevJwt,
       backendOrigin,
     });
@@ -265,6 +266,7 @@ describe("POST /api/services/[id]/start backend forward path", () => {
     const backendFetch = mockFieldBackend("22222222-2222-4222-8222-222222222222");
     const cookie = await loginAs("field-crew-leader-route", {
       mode: "backend-development",
+      crew: { ...backendCrew, role: "LEADER" },
       devJwt: backendDevJwt,
       backendOrigin,
     });
@@ -285,6 +287,7 @@ describe("POST /api/services/[id]/start backend forward path", () => {
     const backendFetch = mockFieldBackend();
     const cookie = await loginAs("field-crew-member-route", {
       mode: "backend-development",
+      crew: { ...backendCrew, role: "MEMBER" },
       devJwt: backendDevJwt,
       backendOrigin,
     });
@@ -302,6 +305,7 @@ describe("POST /api/services/[id]/start backend forward path", () => {
   it("fails closed when backend mode has no backend origin", async () => {
     const cookie = createSessionCookie("field-crew-leader-route", {
       mode: "backend-development",
+      crew: backendCrew,
       devJwt: backendDevJwt,
       backendOrigin,
     });

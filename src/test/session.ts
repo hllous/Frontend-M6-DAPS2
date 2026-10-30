@@ -16,21 +16,24 @@ export type LoginAsOptions = {
   backendOrigin?: string;
   /** Roles que devuelve el GET /me de prueba; por defecto, los del fixture del escenario. */
   roles?: readonly M6Role[];
+  crew?: ScenarioCrew & { role: "LEADER" | "MEMBER" };
 };
 
-function configureSessionEnvironment(options: LoginAsOptions): void {
+function configureSessionEnvironment(options: Omit<LoginAsOptions, "crew">): void {
   if (options.mode !== undefined) process.env.M6_AUTH_MODE = options.mode;
   if (options.devJwt !== undefined) process.env.M6_DEV_JWT = options.devJwt;
   if (options.backendOrigin !== undefined) process.env.M6_BACKEND_ORIGIN = options.backendOrigin;
 }
 
 /** Responde GET /me aparte mientras corre `run`, sin tocar la cola de respuestas que el test armó para el resto. */
-async function withMeStub<T>(roles: readonly M6Role[], run: () => Promise<T>): Promise<T> {
+async function withMeStub<T>(roles: readonly M6Role[], scenarioId: ScenarioId | undefined, crew: LoginAsOptions["crew"], run: () => Promise<T>): Promise<T> {
+  const actor = scenarioId ? getScenario(scenarioId).actor : undefined;
+  const crews = crew ? [crew] : actor?.crewId && actor.crewName ? [{ id: actor.crewId, name: actor.crewName, role: actor.fieldRole === "CREW_MEMBER" ? "MEMBER" : "LEADER" }] : [];
   const currentFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = input instanceof Request ? input.url : String(input);
     if (new URL(url, "http://localhost").pathname === "/me") {
-      return Promise.resolve(Response.json({ userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles }));
+      return Promise.resolve(Response.json({ userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles, crews }));
     }
     return currentFetch(input, init);
   }) as typeof fetch;
@@ -42,13 +45,13 @@ async function withMeStub<T>(roles: readonly M6Role[], run: () => Promise<T>): P
 }
 
 /** El handler de login con un GET /me de prueba: por defecto, los roles del fixture del escenario pedido. */
-export async function loginWithMe(request: Request, roles?: readonly M6Role[]): Promise<Response> {
+export async function loginWithMe(request: Request, roles?: readonly M6Role[], crew?: LoginAsOptions["crew"]): Promise<Response> {
   const body = (await request.clone().json().catch(() => ({}))) as { scenarioId?: unknown };
   const meRoles = roles ?? (isScenarioId(body.scenarioId) ? getScenario(body.scenarioId).roles : []);
-  return withMeStub(meRoles, () => login(request));
+  return withMeStub(meRoles, isScenarioId(body.scenarioId) ? body.scenarioId : undefined, crew, () => login(request));
 }
 
-/** Uses the login handler; backend Field logins need a stubbed /crews response. */
+/** Uses the login handler with a stubbed backend identity. */
 export async function loginAs(scenarioId: string, options: LoginAsOptions = {}): Promise<string> {
   configureSessionEnvironment(options);
 
@@ -56,7 +59,7 @@ export async function loginAs(scenarioId: string, options: LoginAsOptions = {}):
     method: "POST",
     headers: SESSION_MUTATION_HEADERS,
     body: JSON.stringify({ scenarioId }),
-  }), options.roles);
+  }), options.roles, options.crew);
   const cookie = response.headers.get("set-cookie")?.split(";")[0];
   if (!response.ok || !cookie) {
     throw new Error(`No se pudo iniciar la sesión de prueba (HTTP ${response.status}).`);
@@ -67,7 +70,7 @@ export async function loginAs(scenarioId: string, options: LoginAsOptions = {}):
 /** Creates a sealed session directly when a test needs a state the login route cannot select. */
 export function createSessionCookie(
   scenarioId: ScenarioId,
-  options: LoginAsOptions & { crew?: ScenarioCrew },
+  options: Omit<LoginAsOptions, "crew"> & { crew?: ScenarioCrew },
 ): string {
   configureSessionEnvironment(options);
   const session = createSession(scenarioId, {
@@ -76,7 +79,7 @@ export function createSessionCookie(
     backendOrigin: options.backendOrigin ?? process.env.M6_BACKEND_ORIGIN,
     roles: options.roles,
   });
-  return `${AUTH_COOKIE_NAME}=${sealSession(options.crew ? { ...session, crew: options.crew } : session)}`;
+  return `${AUTH_COOKIE_NAME}=${sealSession(options.crew ? { ...session, crew: options.crew, fieldRole: getScenario(scenarioId).actor.fieldRole } : session)}`;
 }
 
 /** Configure beforeEach with this helper and invoke its returned teardown in afterEach. */

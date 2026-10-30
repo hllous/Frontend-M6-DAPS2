@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { fetchMe, sameRoles } from "@/lib/me";
+import { fetchMe, sessionFromMe } from "@/lib/me";
 import {
   AUTH_COOKIE_NAME,
   InvalidSessionError,
@@ -21,10 +21,10 @@ export async function GET(request: Request) {
   }
 
   // En modo backend el pulso de actividad también releé los roles de M6: un cambio de asignación rige sin volver a ingresar.
-  let roles = session.roles;
+  let refreshed = session;
   if (session.mode === "backend-development") {
     try {
-      roles = (await fetchMe(request)).roles;
+      refreshed = sessionFromMe(session, await fetchMe(request));
     } catch (error) {
       if (error instanceof InvalidSessionError) {
         const rejected = NextResponse.json({ message: "La sesión no está activa." }, { status: 401 });
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
   // fetchMe pudo renovar los tokens contra M1: la cookie resellada lleva el material nuevo.
   const current = getSessionFromRequest(request, undefined, now) ?? session;
-  const activeSession = { ...current, lastActivityAt: now, roles: sameRoles(session.roles, roles) ? session.roles : roles };
+  const activeSession = { ...current, lastActivityAt: now, roles: refreshed.roles, crew: refreshed.crew, fieldRole: refreshed.fieldRole };
   const response = NextResponse.json({ session: publicSession(activeSession) });
   response.cookies.set({
     name: AUTH_COOKIE_NAME,

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as navigation from "next/navigation";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 import { HttpResponse, http } from "msw";
@@ -111,6 +111,19 @@ describe("FoundationDemo", () => {
     expect(screen.queryByText("Oficina")).not.toBeInTheDocument();
     expect(refresh).toHaveBeenCalledTimes(1);
     vi.restoreAllMocks();
+  });
+
+  it("updates the Field crew and member actions after an activity pulse", async () => {
+    server.use(
+      http.get("*/api/mock/scenarios/field-crew-leader-route", () => HttpResponse.json(scenarios.fieldCrewLeader)),
+      http.get("*/api/session", () => HttpResponse.json({ session: { mode: "backend-development", roles: ["M6_CAMPO_CUADRILLA"], crew: { id: "crew-c", name: "Cuadrilla nueva" }, fieldRole: "CREW_MEMBER" } })),
+    );
+    render(<FoundationDemo scenarioId="field-crew-leader-route" />);
+    expect(await screen.findByText(/Cuadrilla B · Fernández/)).toBeVisible();
+    fireEvent.pointerDown(window);
+    expect(await screen.findByText(/Cuadrilla nueva/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
+    expect(screen.getByText("Solo consulta")).toBeVisible();
   });
 
   it("recovers to the normal shell after a retryable network failure", async () => {

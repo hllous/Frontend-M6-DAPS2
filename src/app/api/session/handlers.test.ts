@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { loginWithMe as login } from "@/test/session";
 import { POST as loginRoute } from "./login/route";
 import { getSessionFromCookieValue, getSessionFromRequest } from "@/lib/session";
+import { getScenario } from "@/lib/scenarios";
 import { GET as session } from "./route";
 import { POST as logout } from "./logout/route";
 import { GET as listServices } from "../services/route";
@@ -25,15 +26,6 @@ afterEach(() => {
 
 function sessionCookieMaxAge(setCookie: string) {
   return Number(/Max-Age=(\d+)/i.exec(setCookie)?.[1]);
-}
-
-const REAL_CREW_ID = "d907516e-ddb7-46d4-a7d4-cd235cbb1529";
-
-function backendCrews(crews: { id: string; name: string }[]) {
-  return new Response(JSON.stringify({ data: crews, meta: { total: crews.length, page: 1, pageSize: 100, totalPages: 1 } }), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
 }
 
 function meResponse(roles: string[], init: { subType?: string } = {}) {
@@ -141,9 +133,6 @@ describe("session route handlers", () => {
     const token = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_DEV_JWT = token;
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(backendCrews([
-      { id: REAL_CREW_ID, name: "Cuadrilla Belgrano — Recolección" },
-    ]));
     const response = await login(loginRequest("field-crew-leader-route"));
     const cookie = response.headers.get("set-cookie") ?? "";
     const body = await response.json();
@@ -169,91 +158,46 @@ describe("session route handlers", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  describe("Field crew in backend-development mode (#293)", () => {
-    function backendMode() {
-      process.env.M6_AUTH_MODE = "backend-development";
-      process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-      process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    }
-
-    it.each(["field-crew-leader-route", "field-crew-member-route"])(
-      "%s resolves its crew by name against GET /crews and filters services by the real UUID",
-      async (scenarioId) => {
-        backendMode();
-        const backendFetch = vi
-          .spyOn(globalThis, "fetch")
-          .mockResolvedValueOnce(
-            backendCrews([
-              { id: "901159c1-3230-440a-ba3d-d7baf55fab24", name: "Cuadrilla Palermo — Recolección" },
-              { id: REAL_CREW_ID, name: "Cuadrilla Belgrano — Recolección" },
-            ]),
-          )
-          .mockResolvedValue(new Response(JSON.stringify({ data: [], meta: {} }), { status: 200 }));
-
-        const response = await login(loginRequest(scenarioId));
-        expect(response.status).toBe(200);
-        expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/crews?active=true&pageSize=100");
-        expect(new Headers((backendFetch.mock.calls[0]?.[1] as RequestInit).headers).get("authorization")).toMatch(/^Bearer /);
-        const cookie = response.headers.get("set-cookie") ?? "";
-
-        await listServices(new Request("http://localhost/api/services", { headers: { cookie } }));
-        const servicesUrl = new URL(String(backendFetch.mock.calls[1]?.[0]));
-        expect(servicesUrl.searchParams.get("crewId")).toBe(REAL_CREW_ID);
-        expect(servicesUrl.searchParams.get("crewId")).not.toBe("crew-b");
-
-        backendFetch.mockResolvedValueOnce(meResponse(["M6_CAMPO_CUADRILLA"]));
-        const scenarioResponse = await scenarioRoute(new Request(`http://localhost/api/mock/scenarios/${scenarioId}`, { headers: { cookie } }), {
-          params: Promise.resolve({ scenarioId }),
-        });
-        const scenario = await scenarioResponse.json();
-        expect(scenario.actor).toMatchObject({ crewId: REAL_CREW_ID, crewName: "Cuadrilla Belgrano — Recolección" });
-      },
-    );
-
-    it("rejects the Field login with a clear message when the crew is not in the backend", async () => {
-      backendMode();
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(backendCrews([{ id: "901159c1-3230-440a-ba3d-d7baf55fab24", name: "Otra cuadrilla" }]));
-
-      const response = await login(loginRequest("field-crew-leader-route"));
-
-      expect(response.status).toBe(503);
-      expect(response.headers.get("set-cookie")).toBeNull();
-      expect((await response.json()).message).toMatch(/Cuadrilla Belgrano — Recolección.*no existe o está inactiva/);
-    });
-
-    it("rejects the Field login with a clear message when GET /crews fails", async () => {
-      backendMode();
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 500 }));
-
-      const response = await login(loginRequest("field-crew-leader-route"));
-
-      expect(response.status).toBe(503);
-      expect((await response.json()).message).toMatch(/No se pudo resolver la cuadrilla.*HTTP 500/);
-    });
-
-    it("returns the shared unavailable response when the timed crew lookup rejects", async () => {
-      backendMode();
-      const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
-      vi.spyOn(globalThis, "fetch").mockRejectedValue(new DOMException("Timed out", "TimeoutError"));
-
-      const response = await login(loginRequest("field-crew-leader-route"));
-
-      expect(timeoutSpy).toHaveBeenCalledWith(15_000);
-      expect(response.status).toBe(503);
-      expect((await response.json()).message).toBe("El backend no responde. Reintente en unos segundos.");
-      expect(response.headers.get("set-cookie")).toBeNull();
-    });
-
-    it("does not look up crews for Office nor in mock mode", async () => {
-      const backendFetch = vi.spyOn(globalThis, "fetch");
-      backendMode();
-      expect((await login(loginRequest("office-duty-queue"))).status).toBe(200);
-
-      process.env.M6_AUTH_MODE = "mock";
-      const response = await login(loginRequest("field-crew-leader-route"));
+  describe("Crew from GET /me (#469)", () => {
+    it.each([
+      [[{ id: "a", name: "Otra", role: "MEMBER" }, { id: "b", name: "Cuadrilla Belgrano — Recolección", role: "MEMBER" }], "b", "CREW_MEMBER"],
+      [[{ id: "a", name: "Otra", role: "LEADER" }, { id: "b", name: "Distinta", role: "LEADER" }], "a", "CREW_LEADER"],
+      [[], undefined, undefined],
+    ])("selects the expected crew among memberships", async (crews, id, fieldRole) => {
+      backendSessionEnv();
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles: ["M6_CAMPO_CUADRILLA"], crews }));
+      const response = await loginRoute(loginRequest("field-crew-leader-route"));
       expect(response.status).toBe(200);
-      expect(backendFetch).not.toHaveBeenCalled();
-      expect((await response.json()).session).not.toHaveProperty("crew");
+      const value = (await response.json()).session;
+      expect(value.crew?.id).toBe(id);
+      expect(value.fieldRole).toBe(fieldRole);
+      const scenario = getScenario({ ...value, mode: "backend-development" });
+      expect(scenario.capabilities.includes("service:execute")).toBe(fieldRole !== "CREW_MEMBER");
+    });
+
+    it("keeps membership on outage and accepts older backend responses without crews", async () => {
+      backendSessionEnv();
+      const backend = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "a", name: "Una", role: "MEMBER" }] }));
+      const cookie = (await loginRoute(loginRequest("field-crew-leader-route"))).headers.get("set-cookie") ?? "";
+      backend.mockRejectedValueOnce(new TypeError("offline"));
+      const pulse = await session(new Request("http://localhost/api/session", { headers: { cookie } }));
+      expect((await pulse.json()).session).toMatchObject({ crew: { id: "a" }, fieldRole: "CREW_MEMBER" });
+      backend.mockResolvedValueOnce(meResponse(["M6_CAMPO_CUADRILLA"]));
+      const old = await loginRoute(loginRequest("field-crew-leader-route"));
+      expect(old.status).toBe(200);
+      expect((await old.json()).session.crew).toBeUndefined();
+    });
+
+    it("uses backend membership and role at login and refreshes both on the activity pulse", async () => {
+      backendSessionEnv();
+      const backend = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "a", name: "Primera", role: "MEMBER" }, { id: "b", name: "Segunda", role: "LEADER" }] }));
+      const loginResponse = await loginRoute(loginRequest("field-crew-member-route"));
+      const cookie = loginResponse.headers.get("set-cookie") ?? "";
+      expect((await loginResponse.json()).session).toMatchObject({ crew: { id: "b", name: "Segunda" }, fieldRole: "CREW_LEADER" });
+      backend.mockResolvedValueOnce(Response.json({ userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "a", name: "Primera", role: "MEMBER" }] }));
+      const pulse = await session(new Request("http://localhost/api/session", { headers: { cookie } }));
+      expect((await pulse.json()).session).toMatchObject({ crew: { id: "a", name: "Primera" }, fieldRole: "CREW_MEMBER" });
+      expect(backend.mock.calls.every(([input]) => new URL(String(input)).pathname === "/me")).toBe(true);
     });
   });
 
@@ -451,79 +395,6 @@ describe("session route handlers", () => {
       expect(getSessionFromCookieValue(value, undefined, now + 8 * 60 * 60 * 1000 + 1000)).toBeUndefined();
       expect(sessionCookieMaxAge(cookie)).toBeGreaterThan(7 * 60 * 60);
       expect(cookie).toMatch(/m6_signed_in=1/);
-    });
-
-    describe("Field crew by seed person", () => {
-      const BEL = "11111111-1111-4111-8111-111111111111";
-      const PAL = "22222222-2222-4222-8222-222222222222";
-      const INSP = "33333333-3333-4333-8333-333333333333";
-      const list = [
-        { id: PAL, name: "Cuadrilla Municipal Palermo — Recolección y Barrido", leaderUserId: "111" },
-        { id: BEL, name: "Cuadrilla Belgrano — Recolección", leaderUserId: "101" },
-        { id: INSP, name: "Cuadrilla Municipal Control Ambiental — Inspección", leaderUserId: "601" },
-      ];
-      const members: Record<string, string[]> = { [BEL]: ["101", "102"], [PAL]: ["111", "102"], [INSP]: ["601"] };
-
-      function stubBackend(roles: string[]) {
-        return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-          const url = new URL(String(input));
-          if (url.pathname === "/me") return meResponse(roles);
-          if (url.pathname === "/crews") return Response.json({ data: list, meta: {} });
-          const id = url.pathname.split("/")[2];
-          return Response.json({ id, members: (members[id] ?? []).map((userId) => ({ userId })) });
-        });
-      }
-      const crewOf = async (response: Response) => getSessionFromRequest(new Request("http://localhost", { headers: { cookie: response.headers.get("set-cookie") ?? "" } }))?.crew;
-
-      it("resolves the leader from the list without asking for details", async () => {
-        signingEnv();
-        const backendFetch = stubBackend(["M6_CAMPO_CUADRILLA"]);
-        const response = await loginRoute(loginRequest("field-crew-leader-route"));
-
-        expect(response.status).toBe(200);
-        expect((await crewOf(response))?.id).toBe(BEL);
-        expect(backendFetch.mock.calls.some(([input]) => new URL(String(input)).pathname.startsWith("/crews/"))).toBe(false);
-      });
-
-      it("resolves a member through the crew detail, preferring the scenario crew name when he belongs to several", async () => {
-        signingEnv();
-        stubBackend(["M6_CAMPO_CUADRILLA"]);
-        const response = await loginRoute(loginRequest("field-crew-member-route"));
-
-        // El sub 102 integra Palermo y Belgrano: desempata el nombre del escenario (Belgrano).
-        expect((await crewOf(response))?.id).toBe(BEL);
-      });
-
-      it("falls back to the first match of the list when no candidate has the scenario name", async () => {
-        signingEnv();
-        stubBackend(["M6_CAMPO_CUADRILLA"]);
-        const original = list[1].name;
-        list[1].name = "Otro nombre";
-        try {
-          const response = await loginRoute(loginRequest("field-crew-member-route"));
-          expect((await crewOf(response))?.id).toBe(PAL);
-        } finally {
-          list[1].name = original;
-        }
-      });
-
-      it("with the shared M6_DEV_JWT every Field profile resolves by the scenario name only", async () => {
-        backendSessionEnv();
-        const backendFetch = stubBackend(["M6_CAMPO_CUADRILLA"]);
-        const response = await loginRoute(loginRequest("field-crew-member-route"));
-
-        expect((await crewOf(response))?.id).toBe(BEL);
-        expect(backendFetch.mock.calls.some(([input]) => new URL(String(input)).pathname.startsWith("/crews/"))).toBe(false);
-      });
-
-      it("rejects an unexpected crew list instead of guessing", async () => {
-        signingEnv();
-        vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-          new URL(String(input)).pathname === "/me" ? meResponse(["M6_CAMPO_CUADRILLA"]) : Response.json({ data: "nope" }));
-        const response = await loginRoute(loginRequest("field-crew-leader-route"));
-
-        expect(response.status).toBe(503);
-      });
     });
 
     it("treats a live demo session as ended (401) when the signing secret was removed", async () => {

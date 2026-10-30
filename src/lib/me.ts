@@ -1,3 +1,5 @@
+import { getScenario } from "./scenarios";
+
 import type { NextResponse } from "next/server";
 
 import { fetchBackend } from "./bff-backend";
@@ -59,4 +61,13 @@ export function sealRolesIfChanged(response: NextResponse, request: Request, rol
   if (sameRoles(session.roles, roles)) return;
   const next = { ...session, roles: [...roles] };
   response.cookies.set({ name: AUTH_COOKIE_NAME, value: sealSession(next), ...sessionCookieOptions(next) });
+}
+
+/** Selecciona la cuadrilla del backend, priorizando liderazgo y luego el nombre del perfil. */
+export function sessionFromMe(session: Session, me: Me): Session {
+  const isFieldCrew = me.roles.includes("M6_CAMPO_CUADRILLA");
+  const candidates = isFieldCrew ? me.crews.filter((crew) => crew.role === (me.crews.some((item) => item.role === "LEADER") ? "LEADER" : "MEMBER")) : [];
+  const preferredName = getScenario(session.scenarioId).actor.backendCrewName;
+  const selected = candidates.find((crew) => crew.name === preferredName) ?? candidates[0];
+  return { ...session, roles: me.roles, crew: selected ? { id: selected.id, name: selected.name } : undefined, fieldRole: selected ? (selected.role === "LEADER" ? "CREW_LEADER" : "CREW_MEMBER") : undefined };
 }
