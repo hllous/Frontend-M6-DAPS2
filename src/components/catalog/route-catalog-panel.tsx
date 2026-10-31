@@ -60,7 +60,6 @@ import {
   type CreateRouteInput,
   type Route,
   type RouteReferenceReport,
-  type RouteStopInput,
   RouteRequestError,
   routesAdapter,
 } from "@/lib/routes";
