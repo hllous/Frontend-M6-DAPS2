@@ -789,7 +789,7 @@ export function CrewCatalogPanel({
           </FieldGroup>
         </CardContent>
       </Card>
-      {state.status === "loading" ? <LoadingRegion label="Listado de cuadrillas"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-32","w-20","w-24","w-24","w-28","w-28","w-16","w-16","w-4"]} columnLabels={["Nombre","Tipo","Especialidad","Zona","Responsable","Organización","Turno","Estado","Ver detalle"]} actionColumn className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de cuadrillas"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-32","w-20","w-24","w-24","w-28","w-28","w-16","w-16","w-4"]} columnLabels={["Nombre","Tipo","Especialidad","Zona","Responsable","Organización","Turno","Estado","Ver detalle"]} actionColumn actionCount={1} className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>

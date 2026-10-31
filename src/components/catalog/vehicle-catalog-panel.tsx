@@ -459,7 +459,7 @@ export function VehicleCatalogPanel({
         </CardContent>
       </Card>
 
-      {state.status === "loading" ? <LoadingRegion label="Listado de vehículos"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-24","w-28","w-16","w-16","w-4"]} columnLabels={["Patente","Tipo","Capacidad (t)","Estado","Ver detalle"]} actionColumn className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de vehículos"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-24","w-28","w-16","w-16","w-4"]} columnLabels={["Patente","Tipo","Capacidad (t)","Estado","Ver detalle"]} actionColumn actionCount={1} className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>

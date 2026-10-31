@@ -979,7 +979,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
       {/* Main content table / states */}
       {state.status === "loading" && (
-        <LoadingRegion label="Listado de zonas operativas"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-40","w-28","w-16","w-16","w-4"]} columnLabels={["Nombre","Comuna","Barrios","Estado","Acciones"]} actionColumn actionCount={1} className="relative overflow-x-auto rounded-xl border border-border bg-card" tableClassName="w-full text-left text-sm leading-[inherit]" /></LoadingRegion>
+        <LoadingRegion label="Listado de zonas operativas"><TableRowsSkeleton rowCount={5} rowHeight="h-[65px]" columnWidths={["w-40", "w-28", "w-36", "w-16", "w-72"]} columnLabels={["NOMBRE", "COMUNA", "BARRIOS", "ESTADO", ""]} className="relative overflow-x-auto rounded-xl border border-border bg-card" /></LoadingRegion>
       )}
 
       {state.status === "error" && (

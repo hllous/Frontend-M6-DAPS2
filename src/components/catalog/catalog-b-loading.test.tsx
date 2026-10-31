@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
+import { RouteCatalogPanel } from "./route-catalog-panel";
 import { RoutesPanel } from "@/components/shell/routes-panel";
 import { resetZoneFixtures, zoneFixtures } from "@/lib/zones-fixtures";
 import { ZonesPanel } from "@/components/shell/zones-panel";
@@ -113,6 +114,14 @@ describe("Catalogo B loading skeletons (#590)", () => {
     expectBusy(within(dialog).getByRole("region", { name: "Barrios de la zona" }));
     await waitFor(() => expect(within(dialog).queryByRole("region", { name: "Barrios de la zona" })).toBeNull(), { timeout: 3000 });
     expect(await within(dialog).findByRole("list", { name: "Barrios" })).toBeVisible();
+  });
+
+  it("routes catalog: busy table skeleton, then the rows", async () => {
+    server.use(delayed("*/api/routes"));
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    expectBusy(screen.getByRole("region", { name: "Listado de recorridos" }));
+    await gone("Listado de recorridos");
+    expect((await screen.findAllByRole("row")).length).toBeGreaterThan(1);
   });
 
   it("routes: busy list skeleton, then the routes", async () => {

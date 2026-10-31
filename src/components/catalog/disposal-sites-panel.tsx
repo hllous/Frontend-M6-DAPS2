@@ -435,7 +435,7 @@ export function DisposalSitesPanel({
           </FieldGroup>
         </CardContent>
       </Card>
-      {state.status === "loading" ? <LoadingRegion label="Listado de sitios de disposición"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-16","w-40","w-28","w-16","w-4"]} columnLabels={["Código","Nombre","Tipo","Estado","Ver detalle"]} actionColumn className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de sitios de disposición"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-16","w-40","w-28","w-16","w-4"]} columnLabels={["Código","Nombre","Tipo","Estado","Ver detalle"]} actionColumn actionCount={1} className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>
