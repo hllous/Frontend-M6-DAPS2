@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { DataTableResizeHandle } from "@/components/ui/data-table-resize-handle";
 import { DataTable, DataTableSortButton, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import {
@@ -31,6 +33,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TimePicker } from "@/components/ui/time-picker";
 import { formatCalendarDay } from "@/lib/argentina-date";
 import type { Service, ServiceStatus } from "@/lib/services";
 import { STATUS_LABEL } from "@/lib/services";
@@ -143,13 +146,13 @@ function ColumnFilterPopover({
         <div className="mb-2 flex items-center justify-between border-b border-[var(--color-border)] pb-2 text-xs font-semibold text-[var(--color-text)]">
           <span className="capitalize">{label}</span>
           {active && (
-            <button
+            <Button variant="link" size="xs"
               type="button"
               onClick={onClear}
               className="text-[11px] text-[var(--color-action)] hover:underline"
             >
               Limpiar
-            </button>
+            </Button>
           )}
         </div>
         {children}
@@ -172,24 +175,20 @@ function ScheduledFilterPopover({
       onClear={() => onColumnFiltersChange({ ...columnFilters, timeFrom: "", timeTo: "" })}
     >
       <div className="space-y-2 py-1 text-xs">
-        <label className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <span className="text-[var(--color-text-secondary)]">Desde</span>
-          <input
-            type="time"
+          <TimePicker aria-label="Desde"
             value={columnFilters.timeFrom}
-            onChange={(event) => onColumnFiltersChange({ ...columnFilters, timeFrom: event.target.value })}
-            className="rounded border border-[var(--color-border-strong)] px-1.5 py-0.5 text-xs text-[var(--color-text)]"
+            onChange={(value) => onColumnFiltersChange({ ...columnFilters, timeFrom: value })}
           />
-        </label>
-        <label className="flex items-center justify-between gap-2">
+        </div>
+        <div className="flex items-center justify-between gap-2">
           <span className="text-[var(--color-text-secondary)]">Hasta</span>
-          <input
-            type="time"
+          <TimePicker aria-label="Hasta"
             value={columnFilters.timeTo}
-            onChange={(event) => onColumnFiltersChange({ ...columnFilters, timeTo: event.target.value })}
-            className="rounded border border-[var(--color-border-strong)] px-1.5 py-0.5 text-xs text-[var(--color-text)]"
+            onChange={(value) => onColumnFiltersChange({ ...columnFilters, timeTo: value })}
           />
-        </label>
+        </div>
       </div>
     </ColumnFilterPopover>
   );
@@ -679,15 +678,13 @@ export function ServicesTable({
                         >
                           <div className="max-h-48 overflow-y-auto space-y-1.5 py-1">
                             {availableZones.map((z) => (
-                              <label key={z} className="flex items-center gap-2 text-xs text-[var(--color-text)] cursor-pointer">
-                                <input
-                                  type="checkbox"
+                              <Label key={z} className="flex items-center gap-2 text-xs text-[var(--color-text)] cursor-pointer">
+                                <Checkbox
                                   checked={columnFilters.zones.has(z)}
-                                  onChange={() => toggleZone(z)}
-                                  className="h-3.5 w-3.5 rounded border-[var(--color-border-strong)] text-[var(--color-action)] focus:ring-[var(--color-focus)]"
+                                  onCheckedChange={() => toggleZone(z)}
                                 />
                                 <span>{z}</span>
-                              </label>
+                              </Label>
                             ))}
                           </div>
                         </ColumnFilterPopover>
@@ -701,17 +698,15 @@ export function ServicesTable({
                         >
                           <div className="max-h-56 overflow-y-auto space-y-1.5 py-1">
                             {ALL_STATUSES.map((st) => (
-                              <label key={st} className="flex items-center gap-2 text-xs text-[var(--color-text)] cursor-pointer">
-                                <input
-                                  type="checkbox"
+                              <Label key={st} className="flex items-center gap-2 text-xs text-[var(--color-text)] cursor-pointer">
+                                <Checkbox
                                   checked={columnFilters.statuses.has(st)}
-                                  onChange={() => toggleStatus(st)}
-                                  className="h-3.5 w-3.5 rounded border-[var(--color-border-strong)] text-[var(--color-action)] focus:ring-[var(--color-focus)]"
+                                  onCheckedChange={() => toggleStatus(st)}
                                 />
                                 <span data-status-filter-option={st}>
                                   <StatusBadge status={st} className="gap-1 px-1.5 py-0 text-[10px]" />
                                 </span>
-                              </label>
+                              </Label>
                             ))}
                           </div>
                         </ColumnFilterPopover>
@@ -725,15 +720,13 @@ export function ServicesTable({
                         >
                           <div className="max-h-48 overflow-y-auto space-y-1.5 py-1">
                             {availableCrews.map((c) => (
-                              <label key={c} className="flex items-center gap-2 text-xs text-[var(--color-text)] cursor-pointer">
-                                <input
-                                  type="checkbox"
+                              <Label key={c} className="flex items-center gap-2 text-xs text-[var(--color-text)] cursor-pointer">
+                                <Checkbox
                                   checked={columnFilters.crews.has(c)}
-                                  onChange={() => toggleCrew(c)}
-                                  className="h-3.5 w-3.5 rounded border-[var(--color-border-strong)] text-[var(--color-action)] focus:ring-[var(--color-focus)]"
+                                  onCheckedChange={() => toggleCrew(c)}
                                 />
                                 <span>{c}</span>
-                              </label>
+                              </Label>
                             ))}
                           </div>
                         </ColumnFilterPopover>
@@ -810,7 +803,7 @@ export function ServicesTable({
                       switch (column.key) {
                         case "service":
                           return (
-                            <button
+                            <Button variant="ghost"
                               type="button"
                               data-service-select="true"
                               data-service-id={service.id}
@@ -820,7 +813,7 @@ export function ServicesTable({
                                 event.stopPropagation();
                                 onSelect(service.id);
                               }}
-                              className="flex min-w-0 w-full items-start gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                              className="flex h-auto min-w-0 w-full items-start justify-start gap-2 whitespace-normal px-0 py-1 text-left"
                             >
                               {service.mode === "ROUTE" ? (
                                 <Route className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
@@ -832,7 +825,7 @@ export function ServicesTable({
                                   {service.title}
                                 </span>
                               </span>
-                            </button>
+                            </Button>
                           );
                         case "status":
                           return (

@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { Button } from "./button";
 import { Checkbox } from "./checkbox";
-import { FormControl } from "./form-control";
+import { Input } from "./input";
+import { Textarea } from "./textarea";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./resizable";
 import { Tabs, TabsList, TabsTrigger } from "./tabs";
 
@@ -19,8 +20,8 @@ describe("shared UI primitive targets", () => {
     render(
       <>
         <Button>Acción</Button>
-        <FormControl aria-label="Buscar" />
-        <FormControl as="textarea" aria-label="Notas" rows={3} />
+        <Input aria-label="Buscar" />
+        <Textarea aria-label="Notas" rows={3} />
         <Tabs defaultValue="summary">
           <TabsList aria-label="Secciones">
             <TabsTrigger value="summary">Resumen</TabsTrigger>
@@ -38,7 +39,7 @@ describe("shared UI primitive targets", () => {
     expect(button).toHaveClass("h-10", "min-h-10", "min-w-10");
     expect(button).toHaveClass("[@media(max-width:760px)]:min-h-12", "[@media(max-width:760px)]:min-w-12");
     expect(field).toHaveClass("h-10", "[@media(max-width:760px)]:h-12");
-    expect(notes).toHaveAttribute("data-slot", "form-control");
+    expect(notes).toHaveAttribute("data-slot", "textarea");
     expect(notes).toHaveClass("min-h-24", ...focusClasses);
     expect(tabsList).toHaveClass("group-data-horizontal/tabs:h-10", "[@media(max-width:760px)]:group-data-horizontal/tabs:min-h-12");
     expect(tab).toHaveClass("min-h-10", "[@media(max-width:760px)]:min-h-12");
@@ -53,8 +54,8 @@ describe("shared UI primitive targets", () => {
             <TabsTrigger value="summary">Resumen</TabsTrigger>
           </TabsList>
         </Tabs>
-        <FormControl aria-label="Buscar" />
-        <FormControl as="textarea" aria-label="Notas" rows={3} />
+        <Input aria-label="Buscar" />
+        <Textarea aria-label="Notas" rows={3} />
         <Checkbox aria-label="Confirmar" />
         <ResizablePanelGroup>
           <ResizablePanel defaultSize={50}>Panel</ResizablePanel>

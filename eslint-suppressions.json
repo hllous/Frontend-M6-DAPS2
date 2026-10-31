@@ -1,7 +1,2 @@
 {
-  "src/components/services/services-table.tsx": {
-    "no-restricted-syntax": {
-      "count": 14
-    }
-  }
 }
