@@ -114,3 +114,7 @@
 .viewToggle [data-slot="toggle-group-item"], .mobileViewToggle [data-slot="toggle-group-item"] { min-height: 40px; }
 @media (max-width: 760px) { .viewToggle [data-slot="toggle-group-item"], .mobileViewToggle [data-slot="toggle-group-item"] { min-height: 48px; } }
 .breakdownWide { grid-template-columns: minmax(0, 1fr); }
+
+.periodShortcuts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--space-8); }
+.previousData { opacity: 0.6; }
+@media (max-width: 760px) { .periodShortcuts > button { min-height: 48px; flex: 1 1 auto; } }
