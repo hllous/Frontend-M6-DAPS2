@@ -1,4 +1,6 @@
 "use client";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -24,7 +26,6 @@ import {
 } from "@/components/ui/empty";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -32,7 +33,6 @@ import {
   FieldLegend,
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Skeleton } from "@/components/ui/skeleton";
 import { routesAdapter, type Route } from "@/lib/routes";
 import { serviceTypesAdapter, type ServiceType } from "@/lib/service-types";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -684,7 +684,7 @@ export function ServiceFrequenciesPanel({
         </CardContent>
       </Card>
 
-      {state.status === "loading" ? <div role="status" aria-label="Cargando frecuencias" className="flex flex-col gap-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de frecuencias de servicio"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-32","w-28","w-24","w-16","w-28","w-4"]} columnLabels={["Tipo de servicio","Recorrido","Días","Turno","Vigencia","Ver detalle"]} actionColumn actionCount={1} className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>

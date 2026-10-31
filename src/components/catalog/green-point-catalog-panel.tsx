@@ -58,7 +58,9 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import {
   greenPointCreateInputSchema,
   greenPointUpdateInputSchema,
@@ -76,6 +78,7 @@ import type { OperationalScenario } from "@/lib/scenarios";
 import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
+import { DetailFieldsSkeleton, GreenPointCardSkeleton } from "./catalog-a-loading";
 import styles from "./catalog-panel.module.css";
 
 const wasteTypes = wasteTypeSchema.options;
@@ -523,14 +526,11 @@ export function GreenPointCatalogPanel({
       </div>
 
       {state.status === "loading" ? (
-        <div
-          role="status"
-          aria-label="Cargando puntos verdes"
-          className="flex flex-col gap-3"
-        >
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
-        </div>
+        <LoadingRegion label="Puntos verdes registrados" className="flex flex-col gap-6">
+          <Skeleton className="h-5 w-36" />
+          <TableRowsSkeleton className={`${styles.tableWrap} hidden md:block`} tableClassName={styles.table} rowCount={6} rowHeight="h-[61px] max-[760px]:h-auto" actionColumn actionCount={1} actionsClassName={styles.rowChevron} columnLabels={["Código", "Nombre", "Zona", "Residuos aceptados", "Ubicación", "Estado", "Abrir detalle"]} columnWidths={["w-20", "w-32", "w-24", "w-36", "w-40", "w-16", "w-6"]} />
+          <div className="grid gap-3 md:hidden">{Array.from({ length: 10 }, (_, card) => <GreenPointCardSkeleton key={card} />)}</div>
+        </LoadingRegion>
       ) : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
@@ -931,9 +931,9 @@ export function GreenPointCatalogPanel({
             </SheetTitle>
           </SheetHeader>
           {detailLoading ? (
-            <Alert role="status">
-              <AlertDescription>Cargando detalle…</AlertDescription>
-            </Alert>
+            <LoadingRegion label="Detalle del punto verde" className="px-4">
+              <DetailFieldsSkeleton fieldCount={6} />
+            </LoadingRegion>
           ) : null}
           {detailError ? (
             <Alert variant="destructive">

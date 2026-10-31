@@ -1,4 +1,6 @@
 "use client";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import {
   DataTable,
   useDataTable,
@@ -50,7 +52,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { notifySuccess } from "@/components/ui/feedback";
@@ -59,7 +60,6 @@ import {
   type CreateRouteInput,
   type Route,
   type RouteReferenceReport,
-  type RouteStopInput,
   RouteRequestError,
   routesAdapter,
 } from "@/lib/routes";
@@ -1154,11 +1154,9 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
       {/* Routes list table / content */}
       <div className="rounded-lg border bg-card overflow-hidden">
         {state.status === "loading" && (
-          <div className="p-6 space-y-4" data-testid="routes-loading">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
+          <LoadingRegion label="Listado de recorridos" data-testid="routes-loading">
+            <TableRowsSkeleton rowCount={5} rowHeight="h-[65px]" columnWidths={["w-16", "w-48", "w-16", "w-16", "w-28"]} columnLabels={["Código", "Nombre", "Paradas", "Estado", "Acciones"]} className="relative overflow-x-auto" />
+          </LoadingRegion>
         )}
 
         {state.status === "error" && (

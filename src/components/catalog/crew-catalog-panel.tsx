@@ -1,4 +1,7 @@
 "use client";
+import { ListItemsSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import {
   DataTable,
   useDataTable,
@@ -8,7 +11,7 @@ import { TableCaption } from "@/components/ui/table";
 
 import { errorMessage } from "@/lib/error-message";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowRightLeft,
   Check,
@@ -314,11 +317,11 @@ export function CrewCatalogPanel({
 
   const userName = (id: string | null, name: string | null) => id === null ? "—" : name?.trim() || `Usuario ${id}`;
   const organizationName = (id: string | null, name: string | null) => id === null ? "Sin organización externa" : name?.trim() || `Organización sin nombre (id ${id})`;
-  const zoneName = (id: string | null) => {
+  const zoneName = (id: string | null): ReactNode => {
     if (id === null) return "Sin zona";
     const zone = zones.find((candidate) => candidate.id === id);
     if (zone) return zone.name;
-    return zonesLoaded ? id : "Cargando zona…";
+    return zonesLoaded ? id : <Skeleton data-slot="zone-name-skeleton" aria-hidden="true" className="inline-block h-4 w-24 align-middle" />;
   };
   const zoneItems = Object.fromEntries(zones.map((zone) => [zone.id, zone.name]));
   function openCreate() {
@@ -787,7 +790,7 @@ export function CrewCatalogPanel({
           </FieldGroup>
         </CardContent>
       </Card>
-      {state.status === "loading" ? <p className={styles.muted} aria-label="Cargando cuadrillas">Cargando cuadrillas…</p> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de cuadrillas"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-32","w-20","w-24","w-24","w-28","w-28","w-16","w-16","w-4"]} columnLabels={["Nombre","Tipo","Especialidad","Zona","Responsable","Organización","Turno","Estado","Ver detalle"]} actionColumn actionCount={1} className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>
@@ -1385,7 +1388,7 @@ function CurrentMoveBadge() {
 function CrewMovesSection({ moves, error, zoneName }: {
   moves: CrewZoneAssignment[] | null;
   error: string | null;
-  zoneName: (id: string | null) => string;
+  zoneName: (id: string | null) => ReactNode;
 }) {
   const period = (move: CrewZoneAssignment) =>
     move.validTo ? `Del ${formatArgentinaCalendarDate(move.validFrom)} al ${formatArgentinaCalendarDate(move.validTo)}` : `Desde el ${formatArgentinaCalendarDate(move.validFrom)}, hasta nuevo aviso`;
@@ -1405,7 +1408,7 @@ function CrewMovesSection({ moves, error, zoneName }: {
           </Item>
         </section>
       ) : null}
-      {moves === null ? (error ? null : <p className="text-sm text-muted-foreground">Cargando reubicaciones…</p>) : moves.length === 0 ? (
+      {moves === null ? (error ? null : <LoadingRegion label="Historial de reubicaciones"><ListItemsSkeleton itemCount={2} /></LoadingRegion>) : moves.length === 0 ? (
         <p className="text-sm text-muted-foreground">Esta cuadrilla no tiene reubicaciones registradas.</p>
       ) : (
         <ItemGroup aria-label="Historial de reubicaciones" className="gap-2">

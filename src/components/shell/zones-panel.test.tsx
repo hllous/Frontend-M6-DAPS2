@@ -21,7 +21,7 @@ describe("ZonesPanel", () => {
   it("shows a loading state before the read resolves", () => {
     render(<ZonesPanel />);
 
-    expect(screen.getByLabelText("Cargando zonas operativas")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Zonas operativas" })).toBeVisible();
   });
 
   it("renders the fixture zones on a successful read", async () => {
