@@ -53,6 +53,8 @@ import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { MAX_DECIMAL_10_2 } from "@/lib/input-limits";
 
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { CardSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import styles from "./catalog-panel.module.css";
 
 type LoadState =
@@ -407,12 +409,9 @@ export function GreenSpacesPanel({
       </div>
 
       {state.status === "loading" ? (
-        <p
-          aria-label="Cargando espacios verdes"
-          className="text-sm text-muted-foreground"
-        >
-          Cargando espacios verdes…
-        </p>
+        <LoadingRegion label="Espacios verdes registrados">
+          <TableRowsSkeleton className={styles.tableWrap} tableClassName={styles.table} rowCount={6} rowHeight="h-[61px]" actionColumn actionCount={1} actionsClassName={styles.rowChevron} columnLabels={["Nombre", "Tipo", "Superficie", "Zona", "Estado", "Abrir detalle"]} columnWidths={["w-40", "w-20", "w-20", "w-24", "w-16", "w-6"]} />
+        </LoadingRegion>
       ) : null}
       {state.status === "error" ? (
         <Alert variant="destructive">

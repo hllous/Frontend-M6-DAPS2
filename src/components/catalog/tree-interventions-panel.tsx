@@ -18,7 +18,9 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Item, ItemGroup } from "@/components/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { CardSkeleton } from "@/components/ui/loading-skeletons";
+import { DetailFieldsSkeleton } from "./catalog-a-loading";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
 import { CreateStreetClosureRequestDialog } from "@/components/services/create-street-closure-request-dialog";
@@ -511,7 +513,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           </Select>
         </Field>
       </FieldGroup>
-      {state.status === "loading" ? <div role="status" aria-label="Cargando intervenciones" className="flex flex-col gap-3"><Skeleton className="h-28 w-full" /><Skeleton className="h-28 w-full" /></div> : null}
+      {state.status === "loading" ? <LoadingRegion label="Solicitudes de intervención" className="grid gap-3">{[0, 1, 2].map((card) => <CardSkeleton key={card} lineWidths={["w-1/2", "w-3/4"]} />)}</LoadingRegion> : null}
       {state.status === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{state.message}</span><Button type="button" variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></AlertDescription></Alert> : null}
       {state.status === "ready" && state.page.interventions.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin solicitudes de intervención</EmptyTitle><EmptyDescription>{interventionType || status || priority ? "No hay solicitudes para los filtros seleccionados. Quite uno o más filtros para consultar el registro completo." : "Todavía no hay solicitudes de intervención registradas."}</EmptyDescription></EmptyHeader></Empty> : null}
       {state.status === "ready" && state.page.interventions.length > 0 ? <>
@@ -588,7 +590,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { serviceLookupRequest.current += 1; setDetail(null); setUnsyncedService(null); setServiceLookupStatus("idle"); setRejectConfirmOpen(false); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle></DialogHeader>
-          {detailLoading ? <Alert role="status"><AlertDescription>Cargando detalle…</AlertDescription></Alert> : null}
+          {detailLoading ? <LoadingRegion label="Detalle de la intervención"><DetailFieldsSkeleton fieldCount={6} /></LoadingRegion> : null}
           {detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}
           {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <Item key={tree?.id ?? detail.treeIds[index]} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</Item>)}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
           {detail && !detailLoading && !detailError ? (
