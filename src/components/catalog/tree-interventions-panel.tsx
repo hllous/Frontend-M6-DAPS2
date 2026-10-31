@@ -20,8 +20,7 @@ import { Item, ItemGroup } from "@/components/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CardSkeleton } from "@/components/ui/loading-skeletons";
-import { DetailFieldsSkeleton } from "./catalog-a-loading";
+import { DetailFieldsSkeleton, InterventionCardSkeleton } from "./catalog-a-loading";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
 import { CreateStreetClosureRequestDialog } from "@/components/services/create-street-closure-request-dialog";
@@ -97,7 +96,6 @@ type RequestDialogProps = {
   onCreated?: (intervention: TreeInterventionDetail) => void;
 };
 
-const emptyForm: RequestForm = { interventionType: "", treeIds: [], address: "", requiresStreetClosure: false, priority: "MEDIUM", justification: "" };
 
 function formFor(props: RequestDialogProps): RequestForm {
   const selectedTrees = props.trees.filter((tree) => props.initialTreeIds?.includes(tree.id));
@@ -514,7 +512,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           </Select>
         </Field>
       </FieldGroup>
-      {state.status === "loading" ? <LoadingRegion label="Solicitudes de intervención" className="flex flex-col gap-5"><Skeleton className="h-5 w-28" /><div className="grid gap-3">{[0, 1, 2].map((card) => <CardSkeleton key={card} lineWidths={["w-3/4"]} />)}</div></LoadingRegion> : null}
+      {state.status === "loading" ? <LoadingRegion label="Solicitudes de intervención" className="flex flex-col gap-5"><Skeleton className="h-5 w-28" /><div className="grid gap-3">{Array.from({ length: 10 }, (_, card) => <InterventionCardSkeleton key={card} />)}</div></LoadingRegion> : null}
       {state.status === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{state.message}</span><Button type="button" variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></AlertDescription></Alert> : null}
       {state.status === "ready" && state.page.interventions.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin solicitudes de intervención</EmptyTitle><EmptyDescription>{interventionType || status || priority ? "No hay solicitudes para los filtros seleccionados. Quite uno o más filtros para consultar el registro completo." : "Todavía no hay solicitudes de intervención registradas."}</EmptyDescription></EmptyHeader></Empty> : null}
       {state.status === "ready" && state.page.interventions.length > 0 ? <>

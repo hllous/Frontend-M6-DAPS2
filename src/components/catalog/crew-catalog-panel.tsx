@@ -1,5 +1,6 @@
 "use client";
 import { ListItemsSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import {
   DataTable,
@@ -10,7 +11,7 @@ import { TableCaption } from "@/components/ui/table";
 
 import { errorMessage } from "@/lib/error-message";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowRightLeft,
   Check,
@@ -316,11 +317,11 @@ export function CrewCatalogPanel({
 
   const userName = (id: string | null, name: string | null) => id === null ? "—" : name?.trim() || `Usuario ${id}`;
   const organizationName = (id: string | null, name: string | null) => id === null ? "Sin organización externa" : name?.trim() || `Organización sin nombre (id ${id})`;
-  const zoneName = (id: string | null) => {
+  const zoneName = (id: string | null): ReactNode => {
     if (id === null) return "Sin zona";
     const zone = zones.find((candidate) => candidate.id === id);
     if (zone) return zone.name;
-    return zonesLoaded ? id : "Cargando zona…";
+    return zonesLoaded ? id : <Skeleton data-slot="zone-name-skeleton" aria-hidden="true" className="inline-block h-4 w-24 align-middle" />;
   };
   const zoneItems = Object.fromEntries(zones.map((zone) => [zone.id, zone.name]));
   function openCreate() {
@@ -1387,7 +1388,7 @@ function CurrentMoveBadge() {
 function CrewMovesSection({ moves, error, zoneName }: {
   moves: CrewZoneAssignment[] | null;
   error: string | null;
-  zoneName: (id: string | null) => string;
+  zoneName: (id: string | null) => ReactNode;
 }) {
   const period = (move: CrewZoneAssignment) =>
     move.validTo ? `Del ${formatArgentinaCalendarDate(move.validFrom)} al ${formatArgentinaCalendarDate(move.validTo)}` : `Desde el ${formatArgentinaCalendarDate(move.validFrom)}, hasta nuevo aviso`;

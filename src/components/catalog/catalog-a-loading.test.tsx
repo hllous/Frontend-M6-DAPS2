@@ -166,4 +166,32 @@ describe("Catalogo A loading skeletons (#589)", () => {
     expectBusy(within(dialog).getByRole("region", { name: "Evidencias adjuntas" }));
     await gone("Evidencias adjuntas");
   });
+
+  it("explains the disabled container actions while the services lookup is pending", async () => {
+    const user = userEvent.setup();
+    server.use(delayed("*/api/services", 600));
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const table = await screen.findByRole("table", { name: "Inventario de contenedores registrados" }, { timeout: 3000 });
+    await user.click(within(table).getAllByRole("button", { name: /^Ver detalle de / })[0]);
+
+    const dialog = await screen.findByRole("dialog");
+    const status = await within(dialog).findByText("Verificando servicios en curso…");
+    expect(status).toHaveAttribute("role", "status");
+    await waitFor(() => expect(within(dialog).queryByText("Verificando servicios en curso…")).toBeNull(), { timeout: 3000 });
+  });
+
+  it("holds the whole first page of mobile cards while the lists load", async () => {
+    server.use(delayed("*/api/trees"), delayed("*/api/tree-interventions"), delayed("*/api/green-points"));
+    const { unmount } = render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const trees = await screen.findByRole("region", { name: "Árboles registrados" });
+    const cards = trees.querySelectorAll('[data-slot="record-card-skeleton"]');
+    expect(cards).toHaveLength(20);
+    expect(cards[0].querySelectorAll('[data-slot="card-fields-skeleton"] > div')).toHaveLength(3);
+    expect(cards[0].querySelectorAll('[data-slot="card-actions-skeleton"] > [data-slot="skeleton"]')).toHaveLength(3);
+    unmount();
+
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const interventions = await screen.findByRole("region", { name: "Solicitudes de intervención" });
+    expect(interventions.querySelectorAll('[data-slot="intervention-card-skeleton"]')).toHaveLength(10);
+  });
 });

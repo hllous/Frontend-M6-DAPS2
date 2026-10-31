@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/empty";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -34,7 +33,6 @@ import {
   FieldLegend,
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Skeleton } from "@/components/ui/skeleton";
 import { routesAdapter, type Route } from "@/lib/routes";
 import { serviceTypesAdapter, type ServiceType } from "@/lib/service-types";
 import type { OperationalScenario } from "@/lib/scenarios";

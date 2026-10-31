@@ -63,7 +63,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { notifySuccess } from "@/components/ui/feedback";
 import { communesAdapter, type Commune } from "@/lib/communes";
@@ -78,7 +77,6 @@ import {
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   type CreateZoneInput,
-  type UpdateZoneInput,
   type Zone,
   type ZoneReferenceReport,
   ZoneRequestError,
@@ -1254,7 +1252,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           </Alert>
         ) : null}
         {isLoadingReferences ? (
-          <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+          <div role="status" className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
             <Spinner aria-hidden="true" />
             Verificando…
           </div>

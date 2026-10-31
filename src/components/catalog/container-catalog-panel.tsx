@@ -1,5 +1,6 @@
 "use client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -24,22 +25,15 @@ import {
   Pencil,
   Plus,
   RotateCcw,
-  Upload,
   Wrench,
-  X,
 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { LoadingRegion } from "@/components/ui/loading-region";
-import { CardSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
 import styles from "@/components/catalog/catalog-panel.module.css";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { TableCaption } from "@/components/ui/table";
 import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty";
@@ -1117,6 +1111,12 @@ export function ContainerCatalogPanel({
                     </Button>
                   </AlertDescription>
                 </Alert>
+              ) : null}
+              {(canManage || canEmpty) && servicesStatus === "loading" ? (
+                <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Spinner aria-hidden="true" />
+                  Verificando servicios en curso…
+                </div>
               ) : null}
               {canManage ? (
                 <section aria-label="Gestión" className="flex flex-col gap-2">

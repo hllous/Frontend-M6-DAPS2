@@ -54,7 +54,7 @@ import type { OperationalScenario } from "@/lib/scenarios";
 import { MAX_DECIMAL_10_2 } from "@/lib/input-limits";
 
 import { LoadingRegion } from "@/components/ui/loading-region";
-import { CardSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import styles from "./catalog-panel.module.css";
 
 type LoadState =

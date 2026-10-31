@@ -139,4 +139,26 @@ describe("Catalogo B loading skeletons (#590)", () => {
     await screen.findByRole("heading", { name: "Zonas operativas" });
     expect(screen.queryByRole("region", { name: "Zonas operativas" })?.getAttribute("aria-busy")).not.toBe("true");
   });
+
+  it("crews: unresolved zone cells show a skeleton, not a loading message, until the zones arrive", async () => {
+    server.use(delayed("*/api/zones*", 600));
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Listado de cuadrillas" })).toBeNull(), { timeout: 3000 });
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('[data-slot="zone-name-skeleton"]').length).toBeGreaterThan(0);
+    expect(visibleLoadingText()).toHaveLength(0);
+    await waitFor(() => expect(document.querySelectorAll('[data-slot="zone-name-skeleton"]')).toHaveLength(0), { timeout: 3000 });
+  });
+
+  it("zones: the reference check before deactivating is announced as a status", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<ZoneCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /Belgrano/ });
+    server.use(delayed("*/api/zones/:id/references"));
+    await user.click(within(row).getByRole("button", { name: "Dar de baja" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("status")).toHaveTextContent("Verificando…");
+    await waitFor(() => expect(within(dialog).queryByRole("status")).toBeNull(), { timeout: 3000 });
+  });
 });
