@@ -417,4 +417,16 @@ export const getCompliance = indicatorsAdapter.getCompliance;
 export const getIncidents = indicatorsAdapter.getIncidents;
 export const getWaste = indicatorsAdapter.getWaste;
 
+export type IndicatorTargetDefinition = {
+  target: { comparator: "≥" | "≤"; value: number; unit: "%" | "días" } | null;
+  direction: "more-is-better" | "less-is-better";
+};
+
+export const INDICATOR_TARGETS = {
+  coverage: { target: { comparator: "≥", value: 95, unit: "%" }, direction: "more-is-better" },
+  compliance: { target: { comparator: "≥", value: 90, unit: "%" }, direction: "more-is-better" },
+  incidents: { target: { comparator: "≤", value: 5, unit: "días" }, direction: "less-is-better" },
+  waste: { target: null, direction: "more-is-better" },
+} as const satisfies Record<IndicatorFamily, IndicatorTargetDefinition>;
+
 export type IndicatorData = Awaited<ReturnType<typeof indicatorsAdapter.getCoverage>> | Awaited<ReturnType<typeof indicatorsAdapter.getCompliance>> | Awaited<ReturnType<typeof indicatorsAdapter.getIncidents>> | Awaited<ReturnType<typeof indicatorsAdapter.getWaste>>;

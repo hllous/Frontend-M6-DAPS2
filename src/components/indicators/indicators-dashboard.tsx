@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { TableCaption, TableCell, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime } from "@/lib/argentina-date";
+import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime, todayInArgentina } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
 import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
 import { serviceSourceHref } from "@/lib/referrals";
@@ -219,9 +219,9 @@ function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { sta
         const meta = familyMeta[family];
         const Icon = meta.icon;
         return <Card className={styles.summaryCard} data-state={state.status} key={family} size="sm">
-          <ToggleGroupItem variant="card" className={styles.summaryCardSelect} value={family} aria-label={`${meta.label}: seleccionar familia`}>
+          <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`}>
             <span className={styles.summaryCardHeader}><span className="text-sm font-semibold text-muted-foreground">{meta.label}</span><span className={`${styles.summaryIcon} size-8 rounded-lg bg-muted text-primary`}><Icon size={17} aria-hidden /></span></span>
-            {state.status === "loading" && !item ? <Skeleton aria-hidden className="h-[30px] w-24" /> : <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item && state.status === "ready" ? familySummary(item) : "—"}</span>}
+            {state.status === "loading" && !item ? <Skeleton aria-hidden className="h-[30px] w-24" /> : <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item ? familySummary(item) : "—"}</span>}
             <span className="text-xs leading-snug text-muted-foreground">{item?.primary.label ?? meta.description}</span>
             <span className="text-xs font-semibold text-primary">{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
           </ToggleGroupItem>
@@ -305,9 +305,9 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     return values.sort().at(-1);
   }, [familyStates]);
   const selectedFamilyState = familyStates[selectedFamily];
-  const selectedData = selectedFamilyState.status === "ready" ? selectedFamilyState.data : undefined;
-  const selectedPeriodFrom = selectedData?.period.from;
-  const selectedPeriodTo = selectedData?.period.to;
+  const selectedData = selectedFamilyState.status === "empty" ? undefined : selectedFamilyState.data;
+  const selectedPeriodFrom = selectedFamilyState.status === "ready" ? selectedData?.period.from : undefined;
+  const selectedPeriodTo = selectedFamilyState.status === "ready" ? selectedData?.period.to : undefined;
   const planPeriodFrom = selectedPeriodFrom ?? appliedQuery.from;
   const planPeriodTo = selectedPeriodTo ?? appliedQuery.to;
   const defaultRecordsPlan = useMemo(
@@ -349,8 +349,8 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   }, [appliedQuery, canView, selectedFamily, selectedSignal, viewMode]);
   const trendBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "trend") : [];
   const territoryBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "territory") : [];
-  const trendStatus = moduleStatus(selectedFamilyState, selectedFamilyState.data, "trend");
-  const territoryStatus = moduleStatus(selectedFamilyState, selectedFamilyState.data, "territory");
+  const trendStatus = moduleStatus(selectedFamilyState.data ? { ...selectedFamilyState, status: "ready" } : selectedFamilyState, selectedFamilyState.data, "trend");
+  const territoryStatus = moduleStatus(selectedFamilyState.data ? { ...selectedFamilyState, status: "ready" } : selectedFamilyState, selectedFamilyState.data, "territory");
   const dashboardStatus = familyOrder.some((family) => familyStates[family].status === "loading")
     ? "loading"
     : familyOrder.every((family) => familyStates[family].status === "error") ? "error" : "ready";
@@ -402,6 +402,25 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     setRecordsOpen(true);
   };
 
+  const applyQuery = (nextQuery: IndicatorQuery) => {
+    pendingSignal.current = undefined;
+    const validation = indicatorQuerySchema.safeParse(nextQuery);
+    if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; }
+    setFilterError(null);
+    setSelectedSignal(null);
+    setRecordPlan(null);
+    setRecordsStatus("idle");
+    setAppliedQuery({ ...nextQuery });
+  };
+  const applyPeriod = (days: number) => {
+    const to = todayInArgentina();
+    const fromDate = new Date(`${to}T00:00:00Z`);
+    fromDate.setUTCDate(fromDate.getUTCDate() - days + 1);
+    const nextQuery = { ...query, from: fromDate.toISOString().slice(0, 10), to };
+    setQuery(nextQuery);
+    applyQuery(nextQuery);
+  };
+
   const visibleRecordsStatus = activeRecordPlan?.resource && recordsStatus === "idle" ? "loading" : recordsStatus;
   const recordsView = <AccessibleRecords family={selectedFamily} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} open={recordsOpen} onOpenChange={setRecordsOpen} onClear={clearSignal} />;
   const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Por categoría" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} /></ModuleState>;
@@ -417,9 +436,12 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
         {freshness ? <div className={styles.freshness}><Database size={16} aria-hidden /> Actualizado {formatDateTime(freshness)}</div> : <div aria-hidden className={`${styles.freshness} invisible`}><Database size={16} aria-hidden /> Actualizado</div>}
       </div>
 
-      <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); pendingSignal.current = undefined; const validation = indicatorQuerySchema.safeParse(query); if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; } setFilterError(null); setSelectedSignal(null); setRecordPlan(null); setRecordsStatus("idle"); setFamilyStates(emptyFamilyState()); setAppliedQuery({ ...query }); }}>
+      <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); applyQuery(query); }}>
         <Field className={styles.field}><FieldLabel htmlFor="indicator-from">Desde</FieldLabel><DatePicker id="indicator-from" value={query.from ?? ""} onChange={(from) => { setFilterError(null); setQuery((current) => ({ ...current, from: from || undefined })); }} /></Field>
         <Field className={styles.field}><FieldLabel htmlFor="indicator-to">Hasta</FieldLabel><DatePicker id="indicator-to" value={query.to ?? ""} invalid={Boolean(filterError)} aria-describedby={filterError ? "indicator-to-error" : undefined} onChange={(to) => { setFilterError(null); setQuery((current) => ({ ...current, to: to || undefined })); }} /></Field>
+        <div className={styles.periodShortcuts} role="group" aria-label="Períodos rápidos">
+          {([["Última semana", 7], ["Último mes", 30], ["Último trimestre", 90]] as const).map(([label, days]) => <Button key={days} type="button" variant="outline" onClick={() => applyPeriod(days)}>{label}</Button>)}
+        </div>
         <Field className={styles.field}>
           <FieldLabel htmlFor="indicator-family">Familia</FieldLabel>
           <Select value={selectedFamily} onValueChange={(family) => selectFamily(String(family) as FamilyKey)}>
@@ -447,12 +469,12 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
           <TabsTrigger value="territory">Territorio</TabsTrigger>
           <TabsTrigger value="records">Registros</TabsTrigger>
         </TabsList>
-        <TabsContent value="summary"><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}</section></TabsContent>
-        <TabsContent value="trend">{selectedModuleContent("trend", trendBreakdowns, trendStatus)}</TabsContent>
-        <TabsContent value="territory">{selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}</TabsContent>
+        <TabsContent value="summary"><LoadingRegion label={`Datos del resumen de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}</section></LoadingRegion></TabsContent>
+        <TabsContent value="trend"><LoadingRegion label="Datos por categoría" isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}>{selectedModuleContent("trend", trendBreakdowns, trendStatus)}</LoadingRegion></TabsContent>
+        <TabsContent value="territory"><LoadingRegion label="Datos territoriales" isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}>{selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}</LoadingRegion></TabsContent>
         <TabsContent value="records">{recordsView}</TabsContent>
       </Tabs> : selectedData ? <>
-        <IndicatorDetail data={selectedData} viewMode={viewMode} selection={selectedSignal} onViewModeChange={setViewMode} onSelect={selectSignal} trendBreakdowns={trendBreakdowns} territoryBreakdowns={territoryBreakdowns} trendStatus={trendStatus} territoryStatus={territoryStatus} onRetry={() => retryFamily(selectedFamily)} />
+        <LoadingRegion label={`Detalle de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading"} className={selectedFamilyState.status === "loading" ? styles.previousData : undefined}><IndicatorDetail data={selectedData} viewMode={viewMode} selection={selectedSignal} onViewModeChange={setViewMode} onSelect={selectSignal} trendBreakdowns={trendBreakdowns} territoryBreakdowns={territoryBreakdowns} trendStatus={trendStatus} territoryStatus={territoryStatus} onRetry={() => retryFamily(selectedFamily)} /></LoadingRegion>
         {recordsView}
       </> : <div className={styles.desktopModules}>
         {selectedModuleContent("trend", trendBreakdowns, trendStatus)}
