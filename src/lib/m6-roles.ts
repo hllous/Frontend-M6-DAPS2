@@ -63,6 +63,7 @@ const ROLES_BY_CAPABILITY: Record<Capability, readonly M6Role[] | null> = {
   "tree:manage": ["M6_ADMIN", "M6_OFICINA_OPERACIONES"],
   "treeIntervention:request": ["M6_ADMIN", "M6_OFICINA_OPERACIONES"],
   "treeIntervention:authorize": ["M6_ADMIN", "M6_OFICINA_OPERACIONES"],
+  "treeIntervention:authorizeRemoval": ["M6_ADMIN"],
   "repairRequest:create": ["M6_ADMIN", "M6_OFICINA_OPERACIONES"],
   "streetClosureRequest:create": ["M6_ADMIN", "M6_OFICINA_OPERACIONES"],
   "referral:reconcile": ["M6_ADMIN"],

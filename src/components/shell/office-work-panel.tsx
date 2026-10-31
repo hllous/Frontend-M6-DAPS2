@@ -204,7 +204,7 @@ const workGroups: WorkGroupDefinition[] = [
     async load(capabilities, today) {
       const statuses: PendingTreeStatus[] = [
         ...(capabilities.includes("treeIntervention:request") ? (["REQUESTED"] as const) : []),
-        ...(capabilities.includes("treeIntervention:authorize") ? (["PENDING_AUTHORIZATION"] as const) : []),
+        ...(capabilities.includes("treeIntervention:authorizeRemoval") ? (["PENDING_AUTHORIZATION"] as const) : []),
       ];
       const pages = await Promise.all(
         statuses.map((status) => treeInterventionsAdapter.list({ status, pageSize: FETCH_SIZE })),
