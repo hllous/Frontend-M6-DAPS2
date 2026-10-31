@@ -1,4 +1,5 @@
 "use client";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useState, type FormEvent } from "react";
@@ -563,7 +564,7 @@ export function ServiceTypesPanel({
         </CardContent>
       </Card>
 
-      {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio"><TableRowsSkeleton rowCount={state.rowCount} rowHeight="" columnClasses={tableColumnClasses} columnWidths={["w-16", "w-40", "w-28", "w-20", "w-8", "w-12", "w-4"]} columnLabels={["Código", "Nombre", "Categoría", "Modo", "Vehículo", "Estado", "Ver detalle"]} className={styles.tableWrap} tableClassName={`${styles.table} min-[761px]:table-fixed`} /></div> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de tipos de servicio"><TableRowsSkeleton rowCount={state.rowCount} rowHeight="" columnClasses={tableColumnClasses} columnWidths={["w-16", "w-40", "w-28", "w-20", "w-8", "w-12", "w-4"]} columnLabels={["Código", "Nombre", "Categoría", "Modo", "Vehículo", "Estado", "Ver detalle"]} className={styles.tableWrap} tableClassName={`${styles.table} min-[761px]:table-fixed`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>

@@ -1,4 +1,6 @@
 "use client";
+import { ListItemsSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import {
   DataTable,
   useDataTable,
@@ -787,7 +789,7 @@ export function CrewCatalogPanel({
           </FieldGroup>
         </CardContent>
       </Card>
-      {state.status === "loading" ? <p className={styles.muted} aria-label="Cargando cuadrillas">Cargando cuadrillas…</p> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de cuadrillas"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-32","w-20","w-24","w-24","w-28","w-28","w-16","w-16","w-4"]} columnLabels={["Nombre","Tipo","Especialidad","Zona","Responsable","Organización","Turno","Estado","Ver detalle"]} actionColumn className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>
@@ -1405,7 +1407,7 @@ function CrewMovesSection({ moves, error, zoneName }: {
           </Item>
         </section>
       ) : null}
-      {moves === null ? (error ? null : <p className="text-sm text-muted-foreground">Cargando reubicaciones…</p>) : moves.length === 0 ? (
+      {moves === null ? (error ? null : <LoadingRegion label="Historial de reubicaciones"><ListItemsSkeleton itemCount={2} /></LoadingRegion>) : moves.length === 0 ? (
         <p className="text-sm text-muted-foreground">Esta cuadrilla no tiene reubicaciones registradas.</p>
       ) : (
         <ItemGroup aria-label="Historial de reubicaciones" className="gap-2">

@@ -1,4 +1,6 @@
 "use client";
+import { ListItemsSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import {
   DataTable,
   useDataTable,
@@ -977,11 +979,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
       {/* Main content table / states */}
       {state.status === "loading" && (
-        <div aria-label="Cargando zonas operativas" className="flex flex-col gap-3">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
+        <LoadingRegion label="Listado de zonas operativas"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-40","w-28","w-16","w-16","w-4"]} columnLabels={["Nombre","Comuna","Barrios","Estado","Acciones"]} actionColumn actionCount={1} className="relative overflow-x-auto rounded-xl border border-border bg-card" tableClassName="w-full text-left text-sm leading-[inherit]" /></LoadingRegion>
       )}
 
       {state.status === "error" && (
@@ -1082,10 +1080,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               </div>
 
               {isLoadingNeighborhoods ? (
-                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                  <Spinner aria-hidden="true" />
-                  Cargando barrios...
-                </div>
+                <LoadingRegion label="Barrios de la zona"><ListItemsSkeleton itemCount={2} /></LoadingRegion>
               ) : assignedNeighborhoods.length === 0 ? (
                 <Empty className="border p-3">
                   <EmptyDescription>Esta zona todavía no tiene barrios asignados.</EmptyDescription>
@@ -1164,7 +1159,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               {neighborhoodGroups.length === 0 ? (
                 <Empty className="border p-3">
                   <EmptyDescription>
-                    {catalogLoaded ? "No se encontraron barrios para esta búsqueda." : catalogFailed ? "El catálogo de barrios no está disponible." : "Cargando barrios…"}
+                    {catalogLoaded ? "No se encontraron barrios para esta búsqueda." : catalogFailed ? "El catálogo de barrios no está disponible." : <LoadingRegion label="Barrios disponibles"><ListItemsSkeleton itemCount={3} /></LoadingRegion>}
                   </EmptyDescription>
                 </Empty>
               ) : (
