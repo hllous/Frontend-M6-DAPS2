@@ -19,7 +19,10 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Item, ItemGroup } from "@/components/ui/item";
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CardSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { DetailFieldsSkeleton } from "./catalog-a-loading";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   treeCreateInputSchema,
@@ -338,7 +341,10 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
         </Field>
       </FieldGroup>
 
-      {state.status === "loading" ? <div role="status" aria-label="Cargando árboles" className="flex flex-col gap-3"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div> : null}
+      {state.status === "loading" ? <LoadingRegion label="Árboles registrados" className="flex flex-col gap-6"><Skeleton className="h-5 w-36" />
+        <TableRowsSkeleton className="relative hidden overflow-x-auto rounded-xl border border-border bg-card md:block [&_th]:px-4 [&_th]:py-3 [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:px-4 [&_td]:py-3" rowCount={4} rowHeight="h-[65px]" actionsClassName="whitespace-nowrap text-right [&>*]:!inline-block [&>*]:!h-8 [&>*]:ml-2" actionColumn actionCount={3} columnLabels={["Código de relevamiento", "Especie", "Zona", "Ubicación", "Medidas", "Estado", "Acciones"]} columnWidths={["w-24", "w-28", "w-24", "w-40", "w-24", "w-16", "w-40"]} />
+        <div className="grid gap-3 md:hidden">{[0, 1, 2].map((card) => <CardSkeleton key={card} lineWidths={["w-1/2", "w-3/4", "w-2/3"]} />)}</div>
+      </LoadingRegion> : null}
       {state.status === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{state.message}</span><Button type="button" variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></AlertDescription></Alert> : null}
       {state.status === "ready" && state.items.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin árboles</EmptyTitle><EmptyDescription>No hay resultados para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty> : null}
       {state.status === "ready" && state.items.length > 0 ? <>
@@ -438,7 +444,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
       <Dialog open={Boolean(detailId)} onOpenChange={(open) => !open && closeDetail()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalle del árbol {detailTree?.surveyCode ?? ""}</DialogTitle></DialogHeader>
-          {detail.status === "loading" ? <Alert role="status"><AlertDescription>Cargando detalle…</AlertDescription></Alert> : null}
+          {detail.status === "loading" ? <LoadingRegion label="Detalle del árbol"><DetailFieldsSkeleton fieldCount={9} /></LoadingRegion> : null}
           {detail.status === "error" ? <Alert variant="destructive"><AlertDescription>{detail.message}</AlertDescription></Alert> : null}
           {detail.status === "ready" ? <TreeDetailBody tree={detail.tree} surveys={detail.surveys} zoneText={zoneLabel(zones, detail.tree.zoneId, zonesLoaded)} onOpenSurveys={() => openSurveyHistory(detail.tree)} /> : null}
           <DialogFooter><Button type="button" variant="outline" onClick={closeDetail}>Cerrar detalle</Button></DialogFooter>

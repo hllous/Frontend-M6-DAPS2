@@ -30,6 +30,9 @@ import {
 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { CardSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import styles from "@/components/catalog/catalog-panel.module.css";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -654,12 +657,9 @@ export function ContainerCatalogPanel({
       </div>
 
       {state.status === "loading" && (
-        <p
-          aria-label="Cargando contenedores"
-          className="text-sm text-muted-foreground"
-        >
-          Cargando contenedores…
-        </p>
+        <LoadingRegion label="Contenedores registrados">
+          <TableRowsSkeleton className={`${styles.tableWrap} [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground`} tableClassName={styles.table} rowCount={6} rowHeight="h-[61px] max-[760px]:h-auto" actionColumn actionCount={1} actionsClassName={styles.rowChevron} columnLabels={["Código", "Tipo", "Zona", "Dirección", "Capacidad", "Estado", "Abrir detalle"]} columnWidths={["w-20", "w-24", "w-24", "w-40", "w-20", "w-20", "w-6"]} />
+        </LoadingRegion>
       )}
 
       {state.status === "error" && (
@@ -1055,9 +1055,10 @@ export function ContainerCatalogPanel({
                 </dt>
                 <dd className="mt-1">
                   {isLoadingEvidence ? (
-                    <p className="text-xs text-muted-foreground">
-                      Cargando evidencias…
-                    </p>
+                    <LoadingRegion label="Evidencias adjuntas" className="flex flex-col gap-2">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                    </LoadingRegion>
                   ) : detailEvidence.length === 0 ? (
                     <p className="text-xs text-muted-foreground">
                       No registra evidencias adjuntas.
