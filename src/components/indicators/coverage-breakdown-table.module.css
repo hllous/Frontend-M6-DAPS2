@@ -17,6 +17,7 @@
 .table tr { border-bottom: 0; }
 .table tr:hover { background-color: transparent; }
 .num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.statusCell { min-width: 120px; white-space: nowrap; }
 .barColumn { min-width: 220px; }
 .barCell { display: flex; align-items: center; gap: var(--space-10); }
 .bar { position: relative; display: flex; flex: 1 1 auto; gap: 2px; height: 22px; min-width: 120px; border-radius: 4px; background: var(--color-surface-subtle); overflow: hidden; }
