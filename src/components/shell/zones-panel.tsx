@@ -1,5 +1,7 @@
 "use client";
 
+import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { useCallback, useEffect, useState } from "react";
 
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -62,11 +64,10 @@ export function ZonesPanel() {
 
   if (state.status === "loading") {
     return (
-      <div role="status" aria-label="Cargando zonas operativas" className="flex max-w-2xl flex-col gap-3">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-      </div>
+      <LoadingRegion label="Zonas operativas" className="flex max-w-2xl flex-col gap-3">
+        <Skeleton className="h-5 w-32" />
+        <ListItemsSkeleton itemCount={3} />
+      </LoadingRegion>
     );
   }
 

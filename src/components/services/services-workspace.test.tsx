@@ -386,6 +386,21 @@ describe("ServicesWorkspace component", () => {
     });
   });
 
+  it("sets and clears a schedule filter through the time picker", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    await user.click(screen.getByRole("button", { name: "Filtrar por horario" }));
+    const from = screen.getByRole("group", { name: "Desde" });
+    await user.click(within(from).getByRole("combobox", { name: "Hora" }));
+    await user.click(await screen.findByRole("option", { name: "08" }));
+    await user.click(within(from).getByRole("combobox", { name: "Minutos" }));
+    await user.click(await screen.findByRole("option", { name: "30" }));
+    expect(within(from).getByRole("combobox", { name: "Hora" })).toHaveTextContent("08");
+    await user.click(screen.getByRole("button", { name: "Limpiar" }));
+    expect(within(from).getByRole("combobox", { name: "Hora" })).toHaveTextContent("hh");
+  });
+
   it("keeps loaded zones available while column filters narrow the service list", async () => {
     resetServiceFixtures();
     updateServiceFixture("SVC-1042", { zoneNames: ["Zona A"], status: "SCHEDULED", crewName: "Cuadrilla A" });

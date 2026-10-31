@@ -1,4 +1,6 @@
 "use client";
+import { ListItemsSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import {
   DataTable,
   useDataTable,
@@ -61,7 +63,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { notifySuccess } from "@/components/ui/feedback";
 import { communesAdapter, type Commune } from "@/lib/communes";
@@ -76,7 +77,6 @@ import {
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   type CreateZoneInput,
-  type UpdateZoneInput,
   type Zone,
   type ZoneReferenceReport,
   ZoneRequestError,
@@ -977,11 +977,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
       {/* Main content table / states */}
       {state.status === "loading" && (
-        <div aria-label="Cargando zonas operativas" className="flex flex-col gap-3">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
+        <LoadingRegion label="Listado de zonas operativas"><TableRowsSkeleton rowCount={5} rowHeight="h-[65px]" columnWidths={["w-40", "w-28", "w-36", "w-16", "w-72"]} columnLabels={["NOMBRE", "COMUNA", "BARRIOS", "ESTADO", ""]} className="relative overflow-x-auto rounded-xl border border-border bg-card" /></LoadingRegion>
       )}
 
       {state.status === "error" && (
@@ -1082,10 +1078,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               </div>
 
               {isLoadingNeighborhoods ? (
-                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                  <Spinner aria-hidden="true" />
-                  Cargando barrios...
-                </div>
+                <LoadingRegion label="Barrios de la zona"><ListItemsSkeleton itemCount={2} /></LoadingRegion>
               ) : assignedNeighborhoods.length === 0 ? (
                 <Empty className="border p-3">
                   <EmptyDescription>Esta zona todavía no tiene barrios asignados.</EmptyDescription>
@@ -1164,7 +1157,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               {neighborhoodGroups.length === 0 ? (
                 <Empty className="border p-3">
                   <EmptyDescription>
-                    {catalogLoaded ? "No se encontraron barrios para esta búsqueda." : catalogFailed ? "El catálogo de barrios no está disponible." : "Cargando barrios…"}
+                    {catalogLoaded ? "No se encontraron barrios para esta búsqueda." : catalogFailed ? "El catálogo de barrios no está disponible." : <LoadingRegion label="Barrios disponibles"><ListItemsSkeleton itemCount={3} /></LoadingRegion>}
                   </EmptyDescription>
                 </Empty>
               ) : (
@@ -1259,7 +1252,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           </Alert>
         ) : null}
         {isLoadingReferences ? (
-          <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+          <div role="status" className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
             <Spinner aria-hidden="true" />
             Verificando…
           </div>

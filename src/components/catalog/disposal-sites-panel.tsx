@@ -1,4 +1,6 @@
 "use client";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useState, type FormEvent } from "react";
@@ -16,7 +18,6 @@ import {
 } from "@/components/ui/empty";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -28,7 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   disposalSiteTypeSchema,
   disposalSitesAdapter,
@@ -433,7 +433,7 @@ export function DisposalSitesPanel({
           </FieldGroup>
         </CardContent>
       </Card>
-      {state.status === "loading" ? <div role="status" aria-label="Cargando sitios de disposición" className="flex flex-col gap-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de sitios de disposición"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-16","w-40","w-28","w-16","w-4"]} columnLabels={["Código","Nombre","Tipo","Estado","Ver detalle"]} actionColumn actionCount={1} className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>
