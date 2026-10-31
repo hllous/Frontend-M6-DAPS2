@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { FormControl } from "@/components/ui/form-control";
+import { Input } from "@/components/ui/input";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -1158,8 +1158,7 @@ export function ServicesWorkspace({
             {/* Global search */}
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden />
-              <FormControl
-                as="input"
+              <Input
                 type="search"
                 value={search}
                 maxLength={MAX_SEARCH_LENGTH}

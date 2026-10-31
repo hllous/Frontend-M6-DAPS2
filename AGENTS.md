@@ -36,6 +36,8 @@ Read `GLOSSARY.md` and the `docs/adr/` entries that touch your area before worki
 
 ## UI components: shadcn-first
 
+For every UI PR, the code-review standards check must verify this rule.
+
 Build each UI element from its shadcn equivalent in `src/components/ui/`. A custom component is an exception: allowed only when shadcn has no equivalent, composed from shadcn primitives, approved by the PO, and documented.
 
 Adapt in order: app-wide visuals through theme tokens in `src/app/globals.css`, project variants in `src/components/ui/`, then shared project compositions there. Screens import from `src/components/ui/` and add layout only. Keep shadcn structure, `data-slot` attributes, and accessibility behavior intact. Use CSS Modules for layout only; style appearance through theme tokens or UI variants.
