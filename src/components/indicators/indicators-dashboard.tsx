@@ -25,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime, todayInArgentina } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
-import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
+import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPeriod, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
 import { serviceSourceHref } from "@/lib/referrals";
 import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
@@ -433,7 +433,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
   const visibleRecordsStatus = activeRecordPlan?.resource && recordsStatus === "idle" ? "loading" : recordsStatus;
   const recordsView = <AccessibleRecords family={selectedFamily} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} open={recordsOpen} onOpenChange={setRecordsOpen} onClear={clearSignal} />;
-  const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Por categoría" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} /></ModuleState>;
+  const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Por categoría" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} period={selectedData?.period ?? appliedQuery} /></ModuleState>;
 
   if (!canView) {
     return <section className={styles.empty} aria-labelledby="indicator-forbidden-title"><div><h2 id="indicator-forbidden-title">No tiene permiso para ver los indicadores.</h2></div></section>;
@@ -537,8 +537,8 @@ function detailContext(data: IndicatorData) {
   return null;
 }
 
-function IndicatorModuleContent({ breakdowns, viewMode, selection, onSelect }: { breakdowns: IndicatorBreakdown[]; viewMode: ViewMode; selection: SelectedSignal | null; onSelect: (breakdownId: string, pointId: string) => void }) {
-  return <div className={styles.moduleContent}>{breakdowns.map((breakdown) => <BreakdownView key={breakdown.id} breakdown={breakdown} viewMode={viewMode} selectedId={selection?.breakdownId === breakdown.id ? selection.pointId : undefined} onSelect={(pointId) => onSelect(breakdown.id, pointId)} />)}</div>;
+function IndicatorModuleContent({ breakdowns, viewMode, selection, onSelect, period }: { breakdowns: IndicatorBreakdown[]; viewMode: ViewMode; selection: SelectedSignal | null; onSelect: (breakdownId: string, pointId: string) => void; period: IndicatorPeriod }) {
+  return <div className={styles.moduleContent}>{breakdowns.map((breakdown) => <BreakdownView key={breakdown.id} breakdown={breakdown} viewMode={viewMode} period={period} selectedId={selection?.breakdownId === breakdown.id ? selection.pointId : undefined} onSelect={(pointId) => onSelect(breakdown.id, pointId)} />)}</div>;
 }
 
 function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection, onViewModeChange, onSelect, trendBreakdowns, territoryBreakdowns, trendStatus, territoryStatus, onRetry }: { data: IndicatorData; viewMode: ViewMode; selection: SelectedSignal | null; onViewModeChange: (mode: ViewMode) => void; onSelect: (breakdownId: string, pointId: string) => void; trendBreakdowns: IndicatorBreakdown[]; territoryBreakdowns: IndicatorBreakdown[]; trendStatus: LoadStatus; territoryStatus: LoadStatus; onRetry: () => void }) {
@@ -558,8 +558,8 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
     {hasSummaryMetrics ? <div className={styles.summaryMetrics} aria-label={`Resumen exacto de ${meta.label}`}>{data.summaryMetrics.map((metric) => <div className={styles.summaryMetric} key={metric.label}><strong>{metricText(metric)}</strong><span>{metric.label}</span></div>)}</div> : null}
     {detailContext(data)}
     <div className={styles.detailModules} role={requestedViewMode === "table" ? "region" : undefined} aria-label={requestedViewMode === "table" ? `Tabla de datos de ${meta.label}` : undefined}>
-      <ModuleState label="Por categoría" status={trendStatus} onRetry={onRetry}><IndicatorModuleContent breakdowns={trendBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} /></ModuleState>
-      <ModuleState label="Detalle territorial" status={territoryStatus} onRetry={onRetry}><IndicatorModuleContent breakdowns={territoryBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} /></ModuleState>
+      <ModuleState label="Por categoría" status={trendStatus} onRetry={onRetry}><IndicatorModuleContent breakdowns={trendBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} period={data.period} /></ModuleState>
+      <ModuleState label="Detalle territorial" status={territoryStatus} onRetry={onRetry}><IndicatorModuleContent breakdowns={territoryBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} period={data.period} /></ModuleState>
     </div>
   </section>;
 }
@@ -600,13 +600,13 @@ function TraceRecordsTable({ plan, records }: { plan: TracePlan; records: TraceR
   ><TableCaption>Registros accesibles de {plan.title}</TableCaption></DataTable></div>;
 }
 
-function BreakdownView({ breakdown, viewMode, selectedId: controlledSelectedId, onSelect }: { breakdown: IndicatorBreakdown; viewMode: ViewMode; selectedId?: string; onSelect: (pointId: string) => void }) {
+function BreakdownView({ breakdown, viewMode, period, selectedId: controlledSelectedId, onSelect }: { breakdown: IndicatorBreakdown; viewMode: ViewMode; period: IndicatorPeriod; selectedId?: string; onSelect: (pointId: string) => void }) {
   const [localSelectedId, setLocalSelectedId] = useState(controlledSelectedId);
   const selectedId = controlledSelectedId ?? localSelectedId;
   const selected = controlledSelectedId ? breakdown.points.find((point) => point.id === selectedId) : undefined;
   const setSelectedId = (pointId: string) => { setLocalSelectedId(pointId); onSelect(pointId); };
   const wide = viewMode === "bars" && (breakdown.id === "zones" || breakdown.id === "service-types");
-  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{viewMode === "bars" && breakdown.id === "zones" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" /> : viewMode === "bars" && breakdown.id === "service-types" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} /> : viewMode === "bars" ? <BarView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />}</div>;
+  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{viewMode === "bars" && breakdown.id === "zones" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" period={period} selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" /> : viewMode === "bars" && breakdown.id === "service-types" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" period={period} limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} /> : viewMode === "bars" ? <BarView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />}</div>;
 }
 
 function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {

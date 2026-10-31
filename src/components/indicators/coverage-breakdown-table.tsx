@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { TableCaption, TableCell, TableHead, TableRow } from "@/components/ui/table";
-import { INDICATOR_TARGETS, type IndicatorPoint } from "@/lib/indicators";
+import { coverageRowsToCsv, INDICATOR_TARGETS, type IndicatorPeriod, type IndicatorPoint } from "@/lib/indicators";
 
 import styles from "./coverage-breakdown-table.module.css";
 
@@ -53,7 +53,7 @@ function StackedBar({ row }: { row: Row }) {
 }
 
 /** Cobertura por zona o por tipo: tabla ordenable con barra apilada por fila (alto fijo) y cantidades. */
-export function CoverageBreakdownTable({ points, nameHeading, noun, title, initialDirection, limit = TOP, selectedId, onSelect, mapHref }: { points: IndicatorPoint[]; nameHeading: string; noun: string; title: string; initialDirection: "asc" | "desc"; limit?: number; selectedId?: string; onSelect: (id: string) => void; mapHref?: string }) {
+export function CoverageBreakdownTable({ points, nameHeading, noun, title, initialDirection, period, limit = TOP, selectedId, onSelect, mapHref }: { points: IndicatorPoint[]; nameHeading: string; noun: string; title: string; initialDirection: "asc" | "desc"; period: IndicatorPeriod; limit?: number; selectedId?: string; onSelect: (id: string) => void; mapHref?: string }) {
   const [showAll, setShowAll] = useState(false);
   const tableId = useId();
   const data = useMemo(() => points.map(toRow), [points]);
@@ -77,6 +77,29 @@ export function CoverageBreakdownTable({ points, nameHeading, noun, title, initi
   const visibleIds = new Set((showAll ? sorted : sorted.slice(0, limit)).map((row) => row.id));
   const hidden = sorted.length - visibleIds.size;
 
+  function exportCsv() {
+    const content = coverageRowsToCsv(sorted.map(({ original }) => ({
+      name: original.name,
+      scheduled: original.scheduled,
+      served: original.counts.Atendidos,
+      partial: original.counts.Parciales,
+      notServiced: original.counts["No atendidos"],
+      pending: original.counts.Pendientes,
+      coveragePct: original.pct,
+    })), nameHeading);
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const csvKind = nameHeading === "Zona" ? "zonas" : "tipos";
+    anchor.href = url;
+    anchor.download = `cobertura-${csvKind}-${period.from}_${period.to}.csv`;
+    anchor.hidden = true;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   return <div className={styles.wrap}>
     <ul className={styles.legend}>
       {STATES.map(({ key, className }) => <li key={key}><span aria-hidden className={`${styles.swatch} ${styles[className]}`} />{key}</li>)}
@@ -94,6 +117,7 @@ export function CoverageBreakdownTable({ points, nameHeading, noun, title, initi
     <div className={styles.footer}>
       <span role="status">Mostrando {visibleIds.size} de {sorted.length}</span>
       {sorted.length > limit ? <Button type="button" variant="outline" size="sm" aria-label={`Mostrar todas las ${noun}`} aria-expanded={showAll} aria-controls={tableId} onClick={() => setShowAll((current) => !current)}>{showAll ? `Ver solo ${limit}` : `Ver todas (${hidden} más)`}</Button> : null}
+      <Button type="button" variant="outline" size="sm" className={styles.exportButton} onClick={exportCsv}>Exportar CSV</Button>
       {mapHref ? <Link className={styles.mapLink} href={mapHref}>Ver en el mapa</Link> : null}
     </div>
   </div>;

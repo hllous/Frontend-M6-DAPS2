@@ -31,4 +31,5 @@
 .table th.rowHeader { height: auto; background: transparent; color: var(--color-text); font-size: 14px; font-weight: 500; white-space: normal; }
 .table tr.belowTargetRow > .rowHeader { border-inline-start: 1px solid var(--color-warning); }
 .footer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-12); color: var(--color-text-secondary); font-size: 12px; }
+.exportButton { flex: 0 0 auto; }
 .mapLink { margin-inline-start: auto; color: var(--color-action); font-size: 14px; font-weight: 600; text-underline-offset: 3px; }
