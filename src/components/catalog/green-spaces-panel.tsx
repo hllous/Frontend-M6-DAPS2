@@ -410,7 +410,7 @@ export function GreenSpacesPanel({
 
       {state.status === "loading" ? (
         <LoadingRegion label="Espacios verdes registrados">
-          <TableRowsSkeleton className={styles.tableWrap} tableClassName={styles.table} rowCount={6} rowHeight="h-[61px]" actionColumn actionCount={1} actionsClassName={styles.rowChevron} columnLabels={["Nombre", "Tipo", "Superficie", "Zona", "Estado", "Abrir detalle"]} columnWidths={["w-40", "w-20", "w-20", "w-24", "w-16", "w-6"]} />
+          <TableRowsSkeleton className={styles.tableWrap} tableClassName={styles.table} rowCount={6} rowHeight="h-[61px] max-[760px]:h-auto" actionColumn actionCount={1} actionsClassName={styles.rowChevron} columnLabels={["Nombre", "Tipo", "Superficie", "Zona", "Estado", "Abrir detalle"]} columnWidths={["w-40", "w-20", "w-20", "w-24", "w-16", "w-6"]} />
         </LoadingRegion>
       ) : null}
       {state.status === "error" ? (

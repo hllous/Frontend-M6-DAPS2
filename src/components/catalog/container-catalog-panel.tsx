@@ -658,7 +658,7 @@ export function ContainerCatalogPanel({
 
       {state.status === "loading" && (
         <LoadingRegion label="Contenedores registrados">
-          <TableRowsSkeleton className={styles.tableWrap} tableClassName={styles.table} rowCount={6} rowHeight="h-[61px]" actionColumn actionCount={1} actionsClassName={styles.rowChevron} columnLabels={["Código", "Tipo", "Zona", "Dirección", "Capacidad", "Estado", "Abrir detalle"]} columnWidths={["w-20", "w-24", "w-24", "w-40", "w-20", "w-20", "w-6"]} />
+          <TableRowsSkeleton className={`${styles.tableWrap} [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground`} tableClassName={styles.table} rowCount={6} rowHeight="h-[61px] max-[760px]:h-auto" actionColumn actionCount={1} actionsClassName={styles.rowChevron} columnLabels={["Código", "Tipo", "Zona", "Dirección", "Capacidad", "Estado", "Abrir detalle"]} columnWidths={["w-20", "w-24", "w-24", "w-40", "w-20", "w-20", "w-6"]} />
         </LoadingRegion>
       )}
 
