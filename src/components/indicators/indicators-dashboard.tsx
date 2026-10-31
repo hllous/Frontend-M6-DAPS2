@@ -191,9 +191,8 @@ function indicatorSummaryDetails(family: FamilyKey, value: number | null | undef
   return { targetLabel, directionLabel, status };
 }
 
-function indicatorSummaryDescription(data: IndicatorData | undefined, targetLabel: string, directionLabel: string, status?: IndicatorSummaryStatus) {
+function indicatorSummaryDescription(targetLabel: string, directionLabel: string, status?: IndicatorSummaryStatus) {
   return [
-    data ? `${data.primary.label}: ${familySummary(data)}.` : null,
     `${targetLabel}.`,
     `${directionLabel}.`,
     status ? `Estado: ${status.label}.` : null,
@@ -267,7 +266,7 @@ function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { sta
             </span>
             <span className="text-xs font-semibold text-primary">{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
           </ToggleGroupItem>
-          <span className="sr-only" id={descriptionId}>{indicatorSummaryDescription(item, summary.targetLabel, summary.directionLabel, summary.status)}</span>
+          <span className="sr-only" id={descriptionId}>{indicatorSummaryDescription(summary.targetLabel, summary.directionLabel, summary.status)}</span>
           {state.status === "empty" ? <Alert role="status" className={styles.summaryState}>Sin datos</Alert> : null}
           {state.status === "error" ? <Alert variant="danger" className={styles.summaryState}><AlertTitle>No se pudo cargar {meta.label}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></Alert> : null}
         </Card>;
