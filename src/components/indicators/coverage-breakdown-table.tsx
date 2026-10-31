@@ -1,18 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { TriangleAlert } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { TableCaption, TableCell, TableHead, TableRow } from "@/components/ui/table";
-import type { IndicatorPoint } from "@/lib/indicators";
+import { INDICATOR_TARGETS, type IndicatorPoint } from "@/lib/indicators";
 
 import styles from "./coverage-breakdown-table.module.css";
 
 const TOP = 10;
 // ponytail: umbral local fijo; reemplazar por `lowSample` del backend (Backend #461) cuando llegue.
 const LOW_SAMPLE_BELOW = 5;
+const COVERAGE_TARGET = INDICATOR_TARGETS.coverage.target;
 
 const STATES = [
   { key: "Atendidos", className: "served" },
@@ -31,6 +34,10 @@ function toRow(point: IndicatorPoint): Row {
   return { id: point.id, name: point.label, scheduled: detail("Programados"), counts: Object.fromEntries(STATES.map(({ key }) => [key, detail(key)])), pct: point.value };
 }
 
+function isBelowTarget(row: Row) {
+  return row.scheduled > 0 && row.pct < COVERAGE_TARGET.value;
+}
+
 const numeric = (id: string) => (a: { getValue: (id: string) => unknown }, b: { getValue: (id: string) => unknown }) => Number(a.getValue(id)) - Number(b.getValue(id));
 
 function StackedBar({ row }: { row: Row }) {
@@ -39,6 +46,7 @@ function StackedBar({ row }: { row: Row }) {
   return <div className={styles.barCell}>
     <div aria-hidden="true" className={styles.bar}>
       {STATES.map(({ key, className }) => row.counts[key] > 0 ? <span key={key} className={styles[className]} style={{ flexGrow: row.counts[key] }} /> : null)}
+      <span className={styles.targetLine} style={{ left: `${COVERAGE_TARGET.value}%` }} />
     </div>
     <span className={styles.pct}>{pctFormat.format(row.pct)} %</span>
   </div>;
@@ -56,7 +64,7 @@ export function CoverageBreakdownTable({ points, nameHeading, noun, title, initi
       header: nameHeading,
       sortFn: "text",
       meta: { label: nameHeading },
-      cell: ({ row }) => <div className={styles.nameCell}><Button type="button" variant={selectedId === row.original.id ? "secondary" : "ghost"} size="sm" className={styles.nameButton} aria-pressed={selectedId === row.original.id} onClick={() => onSelect(row.original.id)}>{row.original.name}</Button>{row.original.scheduled > 0 && row.original.scheduled < LOW_SAMPLE_BELOW ? <span className={styles.lowSample}><span className="sr-only">. </span>Pocos programados</span> : null}</div>,
+      cell: ({ row }) => <div className={styles.nameCell}><Button type="button" variant={selectedId === row.original.id ? "secondary" : "ghost"} size="sm" className={styles.nameButton} aria-pressed={selectedId === row.original.id} onClick={() => onSelect(row.original.id)}>{row.original.name}</Button>{isBelowTarget(row.original) ? <Badge variant="warning"><TriangleAlert aria-hidden="true" data-icon="inline-start" />Bajo la meta</Badge> : null}{row.original.scheduled > 0 && row.original.scheduled < LOW_SAMPLE_BELOW ? <span className={styles.lowSample}><span className="sr-only">. </span>Pocos programados</span> : null}</div>,
     },
     { id: "scheduled", accessorFn: (row) => row.scheduled, header: "Programados", sortFn: numeric("scheduled"), meta: { cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }) => int.format(row.original.scheduled) },
     ...STATES.map(({ key }) => ({ id: key, accessorFn: (row: Row) => row.counts[key], header: key, sortFn: numeric(key), meta: { cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }: { row: { original: Row } }) => int.format(row.original.counts[key]) })),
@@ -69,8 +77,9 @@ export function CoverageBreakdownTable({ points, nameHeading, noun, title, initi
   const hidden = sorted.length - visibleIds.size;
 
   return <div className={styles.wrap}>
-    <ul className={styles.legend} aria-hidden="true">
+    <ul className={styles.legend}>
       {STATES.map(({ key, className }) => <li key={key}><span aria-hidden className={`${styles.swatch} ${styles[className]}`} />{key}</li>)}
+      <li><span aria-hidden className={styles.targetSwatch} />Meta {COVERAGE_TARGET.comparator} {int.format(COVERAGE_TARGET.value)} {COVERAGE_TARGET.unit}</li>
     </ul>
     <div className={styles.scroll}>
       <DataTable
@@ -78,7 +87,7 @@ export function CoverageBreakdownTable({ points, nameHeading, noun, title, initi
         id={tableId}
         container={false}
         className={styles.table}
-        renderRow={(row) => visibleIds.has(row.id) ? <TableRow key={row.id}>{row.getVisibleCells().map((cell) => cell.column.id === "name" ? <TableHead key={cell.id} scope="row" className={styles.rowHeader}><table.FlexRender cell={cell} /></TableHead> : <TableCell key={cell.id} className={cell.column.columnDef.meta?.cellClassName}><table.FlexRender cell={cell} /></TableCell>)}</TableRow> : null}
+        renderRow={(row) => visibleIds.has(row.id) ? <TableRow key={row.id} className={isBelowTarget(row.original) ? styles.belowTargetRow : undefined}>{row.getVisibleCells().map((cell) => cell.column.id === "name" ? <TableHead key={cell.id} scope="row" className={styles.rowHeader}><table.FlexRender cell={cell} /></TableHead> : <TableCell key={cell.id} className={cell.column.columnDef.meta?.cellClassName}><table.FlexRender cell={cell} /></TableCell>)}</TableRow> : null}
       ><TableCaption>{title}: {visibleIds.size} de {sorted.length}</TableCaption></DataTable>
     </div>
     <div className={styles.footer}>

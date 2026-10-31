@@ -12,11 +12,19 @@ export const coverageIndicatorFixture: CoverageWire = {
     { id: "zone-1", code: "Z-CEN", name: "Centro", scheduled: 156, served: 140, partial: 6, notServiced: 4, pending: 6, coveragePct: 89.7 },
     { id: "zone-2", code: "Z-COS", name: "Costera", scheduled: 154, served: 126, partial: 12, notServiced: 8, pending: 8, coveragePct: 81.8 },
     { id: "zone-3", code: "Z-NOR", name: "Norte", scheduled: 108, served: 82, partial: 8, notServiced: 10, pending: 8, coveragePct: 75.9 },
+    { id: "zone-below-target", code: "Z-META-BAJA", name: "Zona con cobertura baja", scheduled: 4, served: 2, partial: 0, notServiced: 0, pending: 2, coveragePct: 50 },
+    { id: "zone-at-target", code: "Z-META-EXACTA", name: "Zona en meta", scheduled: 20, served: 19, partial: 0, notServiced: 0, pending: 1, coveragePct: 95 },
+    { id: "zone-above-target", code: "Z-META-ALTA", name: "Zona sobre meta", scheduled: 100, served: 98, partial: 0, notServiced: 0, pending: 2, coveragePct: 98 },
+    { id: "zone-no-scheduled", code: "Z-SIN-PROGRAMAR", name: "Zona sin programados", scheduled: 0, served: 0, partial: 0, notServiced: 0, pending: 0, coveragePct: 0 },
   ],
   byServiceType: [
     { id: "st-waste-route", code: "REC-DOM", name: "Recolección domiciliaria", scheduled: 198, served: 176, partial: 10, notServiced: 6, pending: 6, coveragePct: 88.9 },
     { id: "st-cleaning-route", code: "BAR-CAL", name: "Barrido de calles", scheduled: 168, served: 132, partial: 12, notServiced: 12, pending: 12, coveragePct: 78.6 },
     { id: "st-green-point", code: "ESP-VER", name: "Mantenimiento de espacios verdes", scheduled: 106, served: 80, partial: 8, notServiced: 6, pending: 12, coveragePct: 75.5 },
+    { id: "st-below-target", code: "META-BAJA", name: "Tipo con cobertura baja", scheduled: 4, served: 2, partial: 0, notServiced: 0, pending: 2, coveragePct: 50 },
+    { id: "st-at-target", code: "META-EXACTA", name: "Tipo en meta", scheduled: 20, served: 19, partial: 0, notServiced: 0, pending: 1, coveragePct: 95 },
+    { id: "st-above-target", code: "META-ALTA", name: "Tipo sobre meta", scheduled: 100, served: 98, partial: 0, notServiced: 0, pending: 2, coveragePct: 98 },
+    { id: "st-no-scheduled", code: "SIN-PROGRAMAR", name: "Tipo sin programados", scheduled: 0, served: 0, partial: 0, notServiced: 0, pending: 0, coveragePct: 0 },
   ],
 };
 
