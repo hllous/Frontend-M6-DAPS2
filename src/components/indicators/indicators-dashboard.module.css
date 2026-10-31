@@ -14,6 +14,7 @@
 .summaryBand { display: grid; width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-12); }
 .summaryCard { min-width: 0; padding-block: 0; }
 .summaryCardHeader { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); }
+.summaryTargetDetails { display: flex; width: 100%; flex-wrap: wrap; align-items: center; gap: var(--space-6) var(--space-10); }
 .summaryIcon { display: grid; place-items: center; }
 .detail { display: flex; flex-direction: column; gap: var(--space-16); padding: var(--space-14); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
 .detailHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-16); }
@@ -98,6 +99,7 @@
 .mobileSummary h2, .mobileSummary p { margin: 0; }
 .mobileSummary h2 { font-size: 19px; }
 .mobileSummary p { color: var(--color-text-secondary); line-height: 1.5; }
+.mobileSummaryDetails { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8) var(--space-12); }
 .desktopModules { display: flex; min-width: 0; flex-direction: column; gap: var(--space-20); }
 .chartPinnedDetail { display: flex; align-items: baseline; gap: var(--space-8); }
 .chartPinnedDetail span { color: var(--color-text-secondary); }
