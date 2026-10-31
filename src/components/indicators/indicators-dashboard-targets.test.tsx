@@ -34,7 +34,8 @@ describe("metas de las tablas de cobertura", () => {
     const zones = await screen.findByRole("table", { name: /Cobertura por zona/ });
     const serviceTypes = await screen.findByRole("table", { name: /Cobertura por tipo de servicio/ });
 
-    expect(screen.getAllByText("Meta ≥ 95 %")).toHaveLength(2);
+    const detailRegion = screen.getByRole("region", { name: "Detalle de Cobertura" });
+    expect(within(detailRegion).getAllByText("Meta ≥ 95 %")).toHaveLength(2);
 
     for (const [table, belowLabel, atLabel, aboveLabel, noScheduledLabel] of [
       [zones, "Zona con cobertura baja", "Zona en meta", "Zona sobre meta", "Zona sin programados"],

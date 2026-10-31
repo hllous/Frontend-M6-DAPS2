@@ -6,6 +6,7 @@ import { Activity, CheckCheck, ChevronDown, Database, RefreshCw, Recycle, Triang
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime, todayInArgentina } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
-import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPeriod, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
+import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, INDICATOR_TARGETS, type IndicatorBreakdown, type IndicatorData, type IndicatorPeriod, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
 import { serviceSourceHref } from "@/lib/referrals";
 import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
@@ -168,6 +169,36 @@ function familySummary(data: IndicatorData) {
   return metricText(data.primary);
 }
 
+type IndicatorSummaryStatus = { label: string; variant: "success" | "danger" };
+
+function indicatorSummaryDetails(family: FamilyKey, value: number | null | undefined, showStatus: boolean) {
+  const definition = INDICATOR_TARGETS[family];
+  const targetLabel = definition.target
+    ? `Meta ${definition.target.comparator} ${formatNumber(definition.target.value, definition.target.unit)} ${definition.target.unit}`
+    : "Sin meta definida";
+  const directionLabel = definition.direction === "more-is-better" ? "más es mejor" : "menos es mejor";
+  let status: IndicatorSummaryStatus | undefined;
+
+  if (showStatus && value !== null && value !== undefined && definition.target) {
+    const meetsTarget = definition.target.comparator === "≥"
+      ? value >= definition.target.value
+      : value <= definition.target.value;
+    status = meetsTarget
+      ? { label: "Cumple la meta", variant: "success" }
+      : { label: definition.direction === "less-is-better" ? "Sobre la meta" : "Bajo la meta", variant: "danger" };
+  }
+
+  return { targetLabel, directionLabel, status };
+}
+
+function indicatorSummaryDescription(targetLabel: string, directionLabel: string, status?: IndicatorSummaryStatus) {
+  return [
+    `${targetLabel}.`,
+    `${directionLabel}.`,
+    status ? `Estado: ${status.label}.` : null,
+  ].filter(Boolean).join(" ");
+}
+
 function emptyFamilyState(): Record<FamilyKey, FamilyState> {
   return familyOrder.reduce((states, family) => {
     states[family] = { status: "loading" };
@@ -218,13 +249,24 @@ function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { sta
         const item = state.data;
         const meta = familyMeta[family];
         const Icon = meta.icon;
+        const summary = indicatorSummaryDetails(family, item?.primary.value, state.status === "ready");
+        const descriptionId = `indicator-${family}-summary-description`;
         return <Card className={styles.summaryCard} data-state={state.status} key={family} size="sm">
-          <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`}>
+          <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`} aria-describedby={descriptionId}>
             <span className={styles.summaryCardHeader}><span className="text-sm font-semibold text-muted-foreground">{meta.label}</span><span className={`${styles.summaryIcon} size-8 rounded-lg bg-muted text-primary`}><Icon size={17} aria-hidden /></span></span>
             {state.status === "loading" && !item ? <Skeleton aria-hidden className="h-[30px] w-24" /> : <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item ? familySummary(item) : "—"}</span>}
             <span className="text-xs leading-snug text-muted-foreground">{item?.primary.label ?? meta.description}</span>
+            <span className={styles.summaryTargetDetails}>
+              <span className="text-xs font-semibold text-foreground">{summary.targetLabel}</span>
+              <span className="text-xs text-muted-foreground">{summary.directionLabel}</span>
+              {summary.status ? <Badge variant={summary.status.variant} aria-hidden="true">
+                {summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}
+                {summary.status.label}
+              </Badge> : null}
+            </span>
             <span className="text-xs font-semibold text-primary">{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
           </ToggleGroupItem>
+          <span className="sr-only" id={descriptionId}>{indicatorSummaryDescription(summary.targetLabel, summary.directionLabel, summary.status)}</span>
           {state.status === "empty" ? <Alert role="status" className={styles.summaryState}>Sin datos</Alert> : null}
           {state.status === "error" ? <Alert variant="danger" className={styles.summaryState}><AlertTitle>No se pudo cargar {meta.label}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></Alert> : null}
         </Card>;
@@ -469,7 +511,19 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
           <TabsTrigger value="territory">Territorio</TabsTrigger>
           <TabsTrigger value="records">Registros</TabsTrigger>
         </TabsList>
-        <TabsContent value="summary"><LoadingRegion label={`Datos del resumen de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}</section></LoadingRegion></TabsContent>
+        <TabsContent value="summary"><LoadingRegion label={`Datos del resumen de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}
+          {(() => {
+            const summary = indicatorSummaryDetails(selectedFamily, selectedData?.primary.value, selectedFamilyState.status === "ready");
+            return <div className={styles.mobileSummaryDetails}>
+              <span className="text-sm font-semibold text-foreground">{summary.targetLabel}</span>
+              <span className="text-sm text-muted-foreground">{summary.directionLabel}</span>
+              {summary.status ? <Badge variant={summary.status.variant} role="status" aria-label={`Estado: ${summary.status.label}`}>
+                {summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}
+                {summary.status.label}
+              </Badge> : null}
+            </div>;
+          })()}
+        </section></LoadingRegion></TabsContent>
         <TabsContent value="trend"><LoadingRegion label="Datos por categoría" isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}>{selectedModuleContent("trend", trendBreakdowns, trendStatus)}</LoadingRegion></TabsContent>
         <TabsContent value="territory"><LoadingRegion label="Datos territoriales" isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}>{selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}</LoadingRegion></TabsContent>
         <TabsContent value="records">{recordsView}</TabsContent>
