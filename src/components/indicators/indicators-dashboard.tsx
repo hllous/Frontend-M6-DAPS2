@@ -10,13 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { Item, ItemGroup } from "@/components/ui/item";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
@@ -32,12 +30,11 @@ import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { CoverageBreakdownTable } from "./coverage-breakdown-table";
-import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
+import { BreakdownBarChart } from "./breakdown-bar-chart";
 
 import styles from "./indicators-dashboard.module.css";
 
 type FamilyKey = IndicatorData["family"];
-type IndicatorTone = NonNullable<IndicatorPoint["tone"]>;
 type ViewMode = "bars" | "table";
 type LoadStatus = "loading" | "ready" | "empty" | "error";
 type DashboardModule = "trend" | "territory";
@@ -53,12 +50,6 @@ type TracePlan = {
   linkLabel: string;
 };
 
-const indicatorToneColors: Record<IndicatorTone, string> = {
-  primary: "var(--color-action)",
-  success: "var(--color-success)",
-  warning: "var(--color-warning)",
-  danger: "var(--color-danger)",
-};
 type UnsupportedTrace = { resource: null; reason: string };
 type RecordPlan = TracePlan | UnsupportedTrace;
 type TraceRecord = {
@@ -94,7 +85,6 @@ const familyMeta: Record<FamilyKey, { label: string; icon: typeof Activity; desc
 
 const familyOrder: FamilyKey[] = ["coverage", "compliance", "incidents", "waste"];
 const territorialBreakdownIds = new Set(["zones", "unattended-zones", "containers"]);
-const chartConfig: ChartConfig = { value: { label: "Valor", color: "var(--color-action)" } };
 type FilterOption = { id: string; label: string };
 // Opciones reales de GET /zones y GET /service-types: el backend exige UUID en los filtros.
 type FilterCatalog = { zones: FilterOption[]; serviceTypes: FilterOption[] };
@@ -660,80 +650,8 @@ function BreakdownView({ breakdown, viewMode, selectedId: controlledSelectedId, 
   const selectedId = controlledSelectedId ?? localSelectedId;
   const selected = controlledSelectedId ? breakdown.points.find((point) => point.id === selectedId) : undefined;
   const setSelectedId = (pointId: string) => { setLocalSelectedId(pointId); onSelect(pointId); };
-  const wide = viewMode === "bars" && (breakdown.id === "zones" || breakdown.id === "service-types");
-  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{viewMode === "bars" && breakdown.id === "zones" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" /> : viewMode === "bars" && breakdown.id === "service-types" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} /> : viewMode === "bars" ? <BarView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />}</div>;
-}
-
-function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
-  const data = points.map((point) => ({ ...point, valueLabel: metricText(point) }));
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const [hoveredId, setHoveredId] = useState<string>();
-  const [pinnedId, setPinnedId] = useState<string>();
-  const activeId = pinnedId ?? hoveredId;
-  const activePoint = points.find((point) => point.id === activeId);
-
-  const dismissDetail = useCallback(() => {
-    const trigger = activeId ? triggerRefs.current[activeId] : undefined;
-    if (pinnedId && selectedId === pinnedId) onSelect(pinnedId);
-    setPinnedId(undefined);
-    setHoveredId(undefined);
-    trigger?.focus();
-  }, [activeId, onSelect, pinnedId, selectedId]);
-
-  useEffect(() => {
-    if (!activeId) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") dismissDetail();
-    };
-    const handlePointerDown = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node) && pinnedId) {
-        event.preventDefault();
-        dismissDetail();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [activeId, dismissDetail, pinnedId]);
-
-  const pointFromEntry = (entry: unknown) => (entry as { activePayload?: Array<{ payload?: IndicatorPoint }> })?.activePayload?.[0]?.payload;
-  const previewPoint = (entry: unknown) => {
-    const point = pointFromEntry(entry);
-    if (point?.id && !pinnedId) setHoveredId(point.id);
-  };
-  const pinPoint = (id: string) => {
-    setPinnedId(id);
-    setHoveredId(undefined);
-    onSelect(id);
-  };
-
-  return <div className={styles.chartView} ref={rootRef}>
-    <ChartContainer className={styles.chart} config={chartConfig} initialDimension={{ width: 480, height: Math.max(220, points.length * 56 + 40) }}><BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 8, right: 24, top: 12, bottom: 8 }} onMouseMove={previewPoint} onMouseLeave={() => { if (!pinnedId) setHoveredId(undefined); }} onClick={(entry) => { const point = pointFromEntry(entry); if (point?.id) pinPoint(point.id); }}><CartesianGrid horizontal={false} stroke="var(--color-border)" /><XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => formatNumber(Number(value), points[0]?.unit ?? "")} /><YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={104} /><ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => <span>{formatNumber(Number(value), points[0]?.unit ?? "")} {points[0]?.unit}</span>} />} /><Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--color-action)" isAnimationActive={false}>{points.map((point) => <Cell key={point.id} fill={indicatorToneColors[point.tone ?? "primary"]} />)}</Bar></BarChart></ChartContainer>
-    <ItemGroup className={styles.chartDetails} aria-label={`Valores exactos de ${title.toLowerCase()}`}>
-      {points.map((point) => <Item
-        key={point.id}
-        className={styles.chartDetailButton}
-        render={<Button
-          ref={(element) => { triggerRefs.current[point.id] = element; }}
-          type="button"
-          variant={selectedId === point.id ? "secondary" : "outline"}
-          aria-pressed={selectedId === point.id}
-          onFocus={() => { if (!pinnedId) setHoveredId(point.id); }}
-          onMouseEnter={() => { if (!pinnedId) setHoveredId(point.id); }}
-          onMouseLeave={() => { if (!pinnedId) setHoveredId(undefined); }}
-          onClick={() => pinPoint(point.id)}
-        />}
-      >
-        <span>{point.label}</span><span className="text-muted-foreground tabular-nums text-right">{pointText(point)}</span>
-      </Item>)}
-    </ItemGroup>
-    {/* La región de estado queda montada siempre: así el lector anuncia el detalle cuando aparece. */}
-    <Alert role="status" variant="info" className={activePoint ? styles.chartPinnedDetail : "sr-only"} aria-label={activePoint ? `${pinnedId ? "Detalle fijado" : "Detalle"} de ${activePoint.label}` : undefined}>{activePoint ? <><strong>{activePoint.label}</strong><span>{pointText(activePoint)}{activePoint.note ? ` · ${activePoint.note}` : ""}</span>{pinnedId ? <Button type="button" variant="link" size="sm" className="ms-auto" onClick={dismissDetail}>Cerrar detalle</Button> : null}</> : null}</Alert>
-  </div>;
+  const wide = viewMode === "bars";
+  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{viewMode === "bars" && breakdown.id === "zones" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" /> : viewMode === "bars" && breakdown.id === "service-types" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} /> : viewMode === "bars" ? <BreakdownBarChart points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} formatValue={metricText} formatDetail={pointText} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />}</div>;
 }
 
 function TableView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
