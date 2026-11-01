@@ -12,6 +12,7 @@ export const coverageIndicatorFixture: CoverageWire = {
     { id: "zone-1", code: "Z-CEN", name: "Centro", scheduled: 156, served: 140, partial: 6, notServiced: 4, pending: 6, coveragePct: 89.7 },
     { id: "zone-2", code: "Z-COS", name: "Costera", scheduled: 154, served: 126, partial: 12, notServiced: 8, pending: 8, coveragePct: 81.8 },
     { id: "zone-3", code: "Z-NOR", name: "Norte", scheduled: 108, served: 82, partial: 8, notServiced: 10, pending: 8, coveragePct: 75.9 },
+    { id: "zone-4", code: "Z-OES", name: "Oeste", scheduled: 54, served: 40, partial: 4, notServiced: 2, pending: 8, coveragePct: 74.1 },
   ],
   byServiceType: [
     { id: "st-waste-route", code: "REC-DOM", name: "Recolección domiciliaria", scheduled: 198, served: 176, partial: 10, notServiced: 6, pending: 6, coveragePct: 88.9 },

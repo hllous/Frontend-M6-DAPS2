@@ -6,16 +6,15 @@ import { Activity, CheckCheck, ChevronDown, Database, RefreshCw, Recycle, Triang
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { Item, ItemGroup } from "@/components/ui/item";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
@@ -23,20 +22,19 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { TableCaption, TableCell, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime } from "@/lib/argentina-date";
+import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime, todayInArgentina } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
-import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
+import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, INDICATOR_TARGETS, type IndicatorBreakdown, type IndicatorData, type IndicatorPeriod, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
 import { serviceSourceHref } from "@/lib/referrals";
 import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { CoverageBreakdownTable } from "./coverage-breakdown-table";
-import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
+import { BreakdownBarChart } from "./breakdown-bar-chart";
 
 import styles from "./indicators-dashboard.module.css";
 
 type FamilyKey = IndicatorData["family"];
-type IndicatorTone = NonNullable<IndicatorPoint["tone"]>;
 type ViewMode = "bars" | "table";
 type LoadStatus = "loading" | "ready" | "empty" | "error";
 type DashboardModule = "trend" | "territory";
@@ -52,12 +50,6 @@ type TracePlan = {
   linkLabel: string;
 };
 
-const indicatorToneColors: Record<IndicatorTone, string> = {
-  primary: "var(--color-action)",
-  success: "var(--color-success)",
-  warning: "var(--color-warning)",
-  danger: "var(--color-danger)",
-};
 type UnsupportedTrace = { resource: null; reason: string };
 type RecordPlan = TracePlan | UnsupportedTrace;
 type TraceRecord = {
@@ -93,7 +85,6 @@ const familyMeta: Record<FamilyKey, { label: string; icon: typeof Activity; desc
 
 const familyOrder: FamilyKey[] = ["coverage", "compliance", "incidents", "waste"];
 const territorialBreakdownIds = new Set(["zones", "unattended-zones", "containers"]);
-const chartConfig: ChartConfig = { value: { label: "Valor", color: "var(--color-action)" } };
 type FilterOption = { id: string; label: string };
 // Opciones reales de GET /zones y GET /service-types: el backend exige UUID en los filtros.
 type FilterCatalog = { zones: FilterOption[]; serviceTypes: FilterOption[] };
@@ -178,6 +169,36 @@ function familySummary(data: IndicatorData) {
   return metricText(data.primary);
 }
 
+type IndicatorSummaryStatus = { label: string; variant: "success" | "danger" };
+
+function indicatorSummaryDetails(family: FamilyKey, value: number | null | undefined, showStatus: boolean) {
+  const definition = INDICATOR_TARGETS[family];
+  const targetLabel = definition.target
+    ? `Meta ${definition.target.comparator} ${formatNumber(definition.target.value, definition.target.unit)} ${definition.target.unit}`
+    : "Sin meta definida";
+  const directionLabel = definition.direction === "more-is-better" ? "más es mejor" : "menos es mejor";
+  let status: IndicatorSummaryStatus | undefined;
+
+  if (showStatus && value !== null && value !== undefined && definition.target) {
+    const meetsTarget = definition.target.comparator === "≥"
+      ? value >= definition.target.value
+      : value <= definition.target.value;
+    status = meetsTarget
+      ? { label: "Cumple la meta", variant: "success" }
+      : { label: definition.direction === "less-is-better" ? "Sobre la meta" : "Bajo la meta", variant: "danger" };
+  }
+
+  return { targetLabel, directionLabel, status };
+}
+
+function indicatorSummaryDescription(targetLabel: string, directionLabel: string, status?: IndicatorSummaryStatus) {
+  return [
+    `${targetLabel}.`,
+    `${directionLabel}.`,
+    status ? `Estado: ${status.label}.` : null,
+  ].filter(Boolean).join(" ");
+}
+
 function emptyFamilyState(): Record<FamilyKey, FamilyState> {
   return familyOrder.reduce((states, family) => {
     states[family] = { status: "loading" };
@@ -228,13 +249,24 @@ function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { sta
         const item = state.data;
         const meta = familyMeta[family];
         const Icon = meta.icon;
+        const summary = indicatorSummaryDetails(family, item?.primary.value, state.status === "ready");
+        const descriptionId = `indicator-${family}-summary-description`;
         return <Card className={styles.summaryCard} data-state={state.status} key={family} size="sm">
-          <ToggleGroupItem variant="card" className={styles.summaryCardSelect} value={family} aria-label={`${meta.label}: seleccionar familia`}>
+          <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`} aria-describedby={descriptionId}>
             <span className={styles.summaryCardHeader}><span className="text-sm font-semibold text-muted-foreground">{meta.label}</span><span className={`${styles.summaryIcon} size-8 rounded-lg bg-muted text-primary`}><Icon size={17} aria-hidden /></span></span>
-            {state.status === "loading" && !item ? <Skeleton aria-hidden className="h-[30px] w-24" /> : <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item && state.status === "ready" ? familySummary(item) : "—"}</span>}
+            {state.status === "loading" && !item ? <Skeleton aria-hidden className="h-[30px] w-24" /> : <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item ? familySummary(item) : "—"}</span>}
             <span className="text-xs leading-snug text-muted-foreground">{item?.primary.label ?? meta.description}</span>
+            <span className={styles.summaryTargetDetails}>
+              <span className="text-xs font-semibold text-foreground">{summary.targetLabel}</span>
+              <span className="text-xs text-muted-foreground">{summary.directionLabel}</span>
+              {summary.status ? <Badge variant={summary.status.variant} aria-hidden="true">
+                {summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}
+                {summary.status.label}
+              </Badge> : null}
+            </span>
             <span className="text-xs font-semibold text-primary">{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
           </ToggleGroupItem>
+          <span className="sr-only" id={descriptionId}>{indicatorSummaryDescription(summary.targetLabel, summary.directionLabel, summary.status)}</span>
           {state.status === "empty" ? <Alert role="status" className={styles.summaryState}>Sin datos</Alert> : null}
           {state.status === "error" ? <Alert variant="danger" className={styles.summaryState}><AlertTitle>No se pudo cargar {meta.label}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></Alert> : null}
         </Card>;
@@ -315,9 +347,9 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     return values.sort().at(-1);
   }, [familyStates]);
   const selectedFamilyState = familyStates[selectedFamily];
-  const selectedData = selectedFamilyState.status === "ready" ? selectedFamilyState.data : undefined;
-  const selectedPeriodFrom = selectedData?.period.from;
-  const selectedPeriodTo = selectedData?.period.to;
+  const selectedData = selectedFamilyState.status === "empty" ? undefined : selectedFamilyState.data;
+  const selectedPeriodFrom = selectedFamilyState.status === "ready" ? selectedData?.period.from : undefined;
+  const selectedPeriodTo = selectedFamilyState.status === "ready" ? selectedData?.period.to : undefined;
   const planPeriodFrom = selectedPeriodFrom ?? appliedQuery.from;
   const planPeriodTo = selectedPeriodTo ?? appliedQuery.to;
   const defaultRecordsPlan = useMemo(
@@ -359,8 +391,8 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   }, [appliedQuery, canView, selectedFamily, selectedSignal, viewMode]);
   const trendBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "trend") : [];
   const territoryBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "territory") : [];
-  const trendStatus = moduleStatus(selectedFamilyState, selectedFamilyState.data, "trend");
-  const territoryStatus = moduleStatus(selectedFamilyState, selectedFamilyState.data, "territory");
+  const trendStatus = moduleStatus(selectedFamilyState.data ? { ...selectedFamilyState, status: "ready" } : selectedFamilyState, selectedFamilyState.data, "trend");
+  const territoryStatus = moduleStatus(selectedFamilyState.data ? { ...selectedFamilyState, status: "ready" } : selectedFamilyState, selectedFamilyState.data, "territory");
   const dashboardStatus = familyOrder.some((family) => familyStates[family].status === "loading")
     ? "loading"
     : familyOrder.every((family) => familyStates[family].status === "error") ? "error" : "ready";
@@ -412,9 +444,28 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     setRecordsOpen(true);
   };
 
+  const applyQuery = (nextQuery: IndicatorQuery) => {
+    pendingSignal.current = undefined;
+    const validation = indicatorQuerySchema.safeParse(nextQuery);
+    if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; }
+    setFilterError(null);
+    setSelectedSignal(null);
+    setRecordPlan(null);
+    setRecordsStatus("idle");
+    setAppliedQuery({ ...nextQuery });
+  };
+  const applyPeriod = (days: number) => {
+    const to = todayInArgentina();
+    const fromDate = new Date(`${to}T00:00:00Z`);
+    fromDate.setUTCDate(fromDate.getUTCDate() - days + 1);
+    const nextQuery = { ...query, from: fromDate.toISOString().slice(0, 10), to };
+    setQuery(nextQuery);
+    applyQuery(nextQuery);
+  };
+
   const visibleRecordsStatus = activeRecordPlan?.resource && recordsStatus === "idle" ? "loading" : recordsStatus;
   const recordsView = <AccessibleRecords family={selectedFamily} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} open={recordsOpen} onOpenChange={setRecordsOpen} onClear={clearSignal} />;
-  const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Por categoría" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} /></ModuleState>;
+  const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Por categoría" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent family={selectedFamily} breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} period={selectedData?.period ?? { from: appliedQuery.from ?? "", to: appliedQuery.to ?? "" }} /></ModuleState>;
 
   if (!canView) {
     return <section className={styles.empty} aria-labelledby="indicator-forbidden-title"><div><h2 id="indicator-forbidden-title">No tiene permiso para ver los indicadores.</h2></div></section>;
@@ -427,9 +478,12 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
         {freshness ? <div className={styles.freshness}><Database size={16} aria-hidden /> Actualizado {formatDateTime(freshness)}</div> : <div aria-hidden className={`${styles.freshness} invisible`}><Database size={16} aria-hidden /> Actualizado</div>}
       </div>
 
-      <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); pendingSignal.current = undefined; const validation = indicatorQuerySchema.safeParse(query); if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; } setFilterError(null); setSelectedSignal(null); setRecordPlan(null); setRecordsStatus("idle"); setFamilyStates(emptyFamilyState()); setAppliedQuery({ ...query }); }}>
+      <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); applyQuery(query); }}>
         <Field className={styles.field}><FieldLabel htmlFor="indicator-from">Desde</FieldLabel><DatePicker id="indicator-from" value={query.from ?? ""} onChange={(from) => { setFilterError(null); setQuery((current) => ({ ...current, from: from || undefined })); }} /></Field>
         <Field className={styles.field}><FieldLabel htmlFor="indicator-to">Hasta</FieldLabel><DatePicker id="indicator-to" value={query.to ?? ""} invalid={Boolean(filterError)} aria-describedby={filterError ? "indicator-to-error" : undefined} onChange={(to) => { setFilterError(null); setQuery((current) => ({ ...current, to: to || undefined })); }} /></Field>
+        <div className={styles.periodShortcuts} role="group" aria-label="Períodos rápidos">
+          {([["Última semana", 7], ["Último mes", 30], ["Último trimestre", 90]] as const).map(([label, days]) => <Button key={days} type="button" variant="outline" onClick={() => applyPeriod(days)}>{label}</Button>)}
+        </div>
         <Field className={styles.field}>
           <FieldLabel htmlFor="indicator-family">Familia</FieldLabel>
           <Select value={selectedFamily} onValueChange={(family) => selectFamily(String(family) as FamilyKey)}>
@@ -457,12 +511,24 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
           <TabsTrigger value="territory">Territorio</TabsTrigger>
           <TabsTrigger value="records">Registros</TabsTrigger>
         </TabsList>
-        <TabsContent value="summary"><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}</section></TabsContent>
-        <TabsContent value="trend">{selectedModuleContent("trend", trendBreakdowns, trendStatus)}</TabsContent>
-        <TabsContent value="territory">{selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}</TabsContent>
+        <TabsContent value="summary"><LoadingRegion label={`Datos del resumen de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}
+          {(() => {
+            const summary = indicatorSummaryDetails(selectedFamily, selectedData?.primary.value, selectedFamilyState.status === "ready");
+            return <div className={styles.mobileSummaryDetails}>
+              <span className="text-sm font-semibold text-foreground">{summary.targetLabel}</span>
+              <span className="text-sm text-muted-foreground">{summary.directionLabel}</span>
+              {summary.status ? <Badge variant={summary.status.variant} role="status" aria-label={`Estado: ${summary.status.label}`}>
+                {summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}
+                {summary.status.label}
+              </Badge> : null}
+            </div>;
+          })()}
+        </section></LoadingRegion></TabsContent>
+        <TabsContent value="trend"><LoadingRegion label="Datos por categoría" isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}>{selectedModuleContent("trend", trendBreakdowns, trendStatus)}</LoadingRegion></TabsContent>
+        <TabsContent value="territory"><LoadingRegion label="Datos territoriales" isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}>{selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}</LoadingRegion></TabsContent>
         <TabsContent value="records">{recordsView}</TabsContent>
       </Tabs> : selectedData ? <>
-        <IndicatorDetail data={selectedData} viewMode={viewMode} selection={selectedSignal} onViewModeChange={setViewMode} onSelect={selectSignal} trendBreakdowns={trendBreakdowns} territoryBreakdowns={territoryBreakdowns} trendStatus={trendStatus} territoryStatus={territoryStatus} onRetry={() => retryFamily(selectedFamily)} />
+        <LoadingRegion label={`Detalle de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading"} className={selectedFamilyState.status === "loading" ? styles.previousData : undefined}><IndicatorDetail data={selectedData} viewMode={viewMode} selection={selectedSignal} onViewModeChange={setViewMode} onSelect={selectSignal} trendBreakdowns={trendBreakdowns} territoryBreakdowns={territoryBreakdowns} trendStatus={trendStatus} territoryStatus={territoryStatus} onRetry={() => retryFamily(selectedFamily)} /></LoadingRegion>
         {recordsView}
       </> : <div className={styles.desktopModules}>
         {selectedModuleContent("trend", trendBreakdowns, trendStatus)}
@@ -515,8 +581,8 @@ function detailContext(data: IndicatorData) {
   return null;
 }
 
-function IndicatorModuleContent({ breakdowns, viewMode, selection, onSelect }: { breakdowns: IndicatorBreakdown[]; viewMode: ViewMode; selection: SelectedSignal | null; onSelect: (breakdownId: string, pointId: string) => void }) {
-  return <div className={styles.moduleContent}>{breakdowns.map((breakdown) => <BreakdownView key={breakdown.id} breakdown={breakdown} viewMode={viewMode} selectedId={selection?.breakdownId === breakdown.id ? selection.pointId : undefined} onSelect={(pointId) => onSelect(breakdown.id, pointId)} />)}</div>;
+function IndicatorModuleContent({ family, breakdowns, viewMode, selection, onSelect, period }: { family: IndicatorData["family"]; breakdowns: IndicatorBreakdown[]; viewMode: ViewMode; selection: SelectedSignal | null; onSelect: (breakdownId: string, pointId: string) => void; period: IndicatorPeriod }) {
+  return <div className={styles.moduleContent}>{breakdowns.map((breakdown) => <BreakdownView key={breakdown.id} family={family} breakdown={breakdown} viewMode={viewMode} period={period} selectedId={selection?.breakdownId === breakdown.id ? selection.pointId : undefined} onSelect={(pointId) => onSelect(breakdown.id, pointId)} />)}</div>;
 }
 
 function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection, onViewModeChange, onSelect, trendBreakdowns, territoryBreakdowns, trendStatus, territoryStatus, onRetry }: { data: IndicatorData; viewMode: ViewMode; selection: SelectedSignal | null; onViewModeChange: (mode: ViewMode) => void; onSelect: (breakdownId: string, pointId: string) => void; trendBreakdowns: IndicatorBreakdown[]; territoryBreakdowns: IndicatorBreakdown[]; trendStatus: LoadStatus; territoryStatus: LoadStatus; onRetry: () => void }) {
@@ -536,8 +602,8 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
     {hasSummaryMetrics ? <div className={styles.summaryMetrics} aria-label={`Resumen exacto de ${meta.label}`}>{data.summaryMetrics.map((metric) => <div className={styles.summaryMetric} key={metric.label}><strong>{metricText(metric)}</strong><span>{metric.label}</span></div>)}</div> : null}
     {detailContext(data)}
     <div className={styles.detailModules} role={requestedViewMode === "table" ? "region" : undefined} aria-label={requestedViewMode === "table" ? `Tabla de datos de ${meta.label}` : undefined}>
-      <ModuleState label="Por categoría" status={trendStatus} onRetry={onRetry}><IndicatorModuleContent breakdowns={trendBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} /></ModuleState>
-      <ModuleState label="Detalle territorial" status={territoryStatus} onRetry={onRetry}><IndicatorModuleContent breakdowns={territoryBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} /></ModuleState>
+      <ModuleState label="Por categoría" status={trendStatus} onRetry={onRetry}><IndicatorModuleContent family={data.family} breakdowns={trendBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} period={data.period} /></ModuleState>
+      <ModuleState label="Detalle territorial" status={territoryStatus} onRetry={onRetry}><IndicatorModuleContent family={data.family} breakdowns={territoryBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} period={data.period} /></ModuleState>
     </div>
   </section>;
 }
@@ -578,85 +644,19 @@ function TraceRecordsTable({ plan, records }: { plan: TracePlan; records: TraceR
   ><TableCaption>Registros accesibles de {plan.title}</TableCaption></DataTable></div>;
 }
 
-function BreakdownView({ breakdown, viewMode, selectedId: controlledSelectedId, onSelect }: { breakdown: IndicatorBreakdown; viewMode: ViewMode; selectedId?: string; onSelect: (pointId: string) => void }) {
+function BreakdownView({ family, breakdown, viewMode, period, selectedId: controlledSelectedId, onSelect }: { family: IndicatorData["family"]; breakdown: IndicatorBreakdown; viewMode: ViewMode; period: IndicatorPeriod; selectedId?: string; onSelect: (pointId: string) => void }) {
   const [localSelectedId, setLocalSelectedId] = useState(controlledSelectedId);
   const selectedId = controlledSelectedId ?? localSelectedId;
   const selected = controlledSelectedId ? breakdown.points.find((point) => point.id === selectedId) : undefined;
   const setSelectedId = (pointId: string) => { setLocalSelectedId(pointId); onSelect(pointId); };
-  const wide = viewMode === "bars" && (breakdown.id === "zones" || breakdown.id === "service-types");
-  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{viewMode === "bars" && breakdown.id === "zones" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" /> : viewMode === "bars" && breakdown.id === "service-types" ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} /> : viewMode === "bars" ? <BarView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />}</div>;
-}
-
-function BarView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
-  const data = points.map((point) => ({ ...point, valueLabel: metricText(point) }));
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const [hoveredId, setHoveredId] = useState<string>();
-  const [pinnedId, setPinnedId] = useState<string>();
-  const activeId = pinnedId ?? hoveredId;
-  const activePoint = points.find((point) => point.id === activeId);
-
-  const dismissDetail = useCallback(() => {
-    const trigger = activeId ? triggerRefs.current[activeId] : undefined;
-    if (pinnedId && selectedId === pinnedId) onSelect(pinnedId);
-    setPinnedId(undefined);
-    setHoveredId(undefined);
-    trigger?.focus();
-  }, [activeId, onSelect, pinnedId, selectedId]);
-
-  useEffect(() => {
-    if (!activeId) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") dismissDetail();
-    };
-    const handlePointerDown = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node) && pinnedId) {
-        event.preventDefault();
-        dismissDetail();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [activeId, dismissDetail, pinnedId]);
-
-  const pointFromEntry = (entry: unknown) => (entry as { activePayload?: Array<{ payload?: IndicatorPoint }> })?.activePayload?.[0]?.payload;
-  const previewPoint = (entry: unknown) => {
-    const point = pointFromEntry(entry);
-    if (point?.id && !pinnedId) setHoveredId(point.id);
-  };
-  const pinPoint = (id: string) => {
-    setPinnedId(id);
-    setHoveredId(undefined);
-    onSelect(id);
-  };
-
-  return <div className={styles.chartView} ref={rootRef}>
-    <ChartContainer className={styles.chart} config={chartConfig} initialDimension={{ width: 480, height: Math.max(220, points.length * 56 + 40) }}><BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 8, right: 24, top: 12, bottom: 8 }} onMouseMove={previewPoint} onMouseLeave={() => { if (!pinnedId) setHoveredId(undefined); }} onClick={(entry) => { const point = pointFromEntry(entry); if (point?.id) pinPoint(point.id); }}><CartesianGrid horizontal={false} stroke="var(--color-border)" /><XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => formatNumber(Number(value), points[0]?.unit ?? "")} /><YAxis type="category" dataKey="label" tickLine={false} axisLine={false} tickMargin={8} width={104} /><ChartTooltip cursor={false} content={<ChartTooltipContent formatter={(value) => <span>{formatNumber(Number(value), points[0]?.unit ?? "")} {points[0]?.unit}</span>} />} /><Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--color-action)" isAnimationActive={false}>{points.map((point) => <Cell key={point.id} fill={indicatorToneColors[point.tone ?? "primary"]} />)}</Bar></BarChart></ChartContainer>
-    <ItemGroup className={styles.chartDetails} aria-label={`Valores exactos de ${title.toLowerCase()}`}>
-      {points.map((point) => <Item
-        key={point.id}
-        className={styles.chartDetailButton}
-        render={<Button
-          ref={(element) => { triggerRefs.current[point.id] = element; }}
-          type="button"
-          variant={selectedId === point.id ? "secondary" : "outline"}
-          aria-pressed={selectedId === point.id}
-          onFocus={() => { if (!pinnedId) setHoveredId(point.id); }}
-          onMouseEnter={() => { if (!pinnedId) setHoveredId(point.id); }}
-          onMouseLeave={() => { if (!pinnedId) setHoveredId(undefined); }}
-          onClick={() => pinPoint(point.id)}
-        />}
-      >
-        <span>{point.label}</span><span className="text-muted-foreground tabular-nums text-right">{pointText(point)}</span>
-      </Item>)}
-    </ItemGroup>
-    {/* La región de estado queda montada siempre: así el lector anuncia el detalle cuando aparece. */}
-    <Alert role="status" variant="info" className={activePoint ? styles.chartPinnedDetail : "sr-only"} aria-label={activePoint ? `${pinnedId ? "Detalle fijado" : "Detalle"} de ${activePoint.label}` : undefined}>{activePoint ? <><strong>{activePoint.label}</strong><span>{pointText(activePoint)}{activePoint.note ? ` · ${activePoint.note}` : ""}</span>{pinnedId ? <Button type="button" variant="link" size="sm" className="ms-auto" onClick={dismissDetail}>Cerrar detalle</Button> : null}</> : null}</Alert>
-  </div>;
+  const isCoverageBreakdown = family === "coverage" && (breakdown.id === "zones" || breakdown.id === "service-types");
+  const wide = viewMode === "bars" || isCoverageBreakdown;
+  const coverageTable = family === "coverage" && breakdown.id === "zones"
+    ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" period={period} selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" />
+    : family === "coverage" && breakdown.id === "service-types"
+      ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" period={period} limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} />
+      : null;
+  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{coverageTable ?? (viewMode === "bars" ? <BreakdownBarChart points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} formatValue={metricText} formatDetail={pointText} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />)}</div>;
 }
 
 function TableView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {

@@ -62,7 +62,9 @@ test.describe("operational indicator dashboard #138", () => {
 
     await page.getByRole("button", { name: "Tabla", exact: true }).click();
     await expect(page.getByRole("table").first()).toBeVisible();
-    await expect(page.getByText("Valores exactos de cobertura por zona")).toBeVisible();
+    await expect(page.getByText("Objetivos atendidos sobre objetivos programados.")).toBeVisible();
+    await expect(page.getByText("Bajo la meta").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Exportar CSV" }).last()).toBeVisible();
   });
 
   test("the dashboard alias opens the same gated Office surface", async ({ page }) => {
@@ -88,7 +90,11 @@ test.describe("operational indicator dashboard #138", () => {
     const coverageTable = page.getByRole("region", { name: "Tabla de datos de Cobertura" });
     await expect(coverageTable).toBeVisible();
     await expect(coverageTable.getByRole("columnheader", { name: "Atendidos" }).first()).toBeVisible();
-    await expect(coverageTable.getByText("140 objetivos").first()).toBeVisible();
+    const zoneTable = coverageTable.getByRole("table", { name: /Cobertura por zona/ });
+    const centroCoverageRow = zoneTable.getByRole("row", { name: /Centro/ });
+    await expect(centroCoverageRow).toContainText("156");
+    await expect(centroCoverageRow).toContainText("140");
+    await expect(centroCoverageRow).toContainText("89,7 %");
 
     await page.getByRole("button", { name: /Cumplimiento/ }).click();
     await expect(page.getByText("Cuadrilla no disponible").first()).toBeVisible();

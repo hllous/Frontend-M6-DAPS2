@@ -417,4 +417,61 @@ export const getCompliance = indicatorsAdapter.getCompliance;
 export const getIncidents = indicatorsAdapter.getIncidents;
 export const getWaste = indicatorsAdapter.getWaste;
 
+export type IndicatorTargetDefinition = {
+  target: { comparator: "≥" | "≤"; value: number; unit: "%" | "días" } | null;
+  direction: "more-is-better" | "less-is-better";
+};
+
+export const INDICATOR_TARGETS = {
+  coverage: { target: { comparator: "≥", value: 95, unit: "%" }, direction: "more-is-better" },
+  compliance: { target: { comparator: "≥", value: 90, unit: "%" }, direction: "more-is-better" },
+  incidents: { target: { comparator: "≤", value: 5, unit: "días" }, direction: "less-is-better" },
+  waste: { target: null, direction: "more-is-better" },
+} as const satisfies Record<IndicatorFamily, IndicatorTargetDefinition>;
+
+export type CoverageCsvRow = {
+  name: string;
+  scheduled: number;
+  served: number;
+  partial: number;
+  notServiced: number;
+  pending: number;
+  coveragePct: number;
+};
+
+export function isCoverageBelowTarget(scheduled: number, coveragePct: number) {
+  return scheduled > 0 && coveragePct < INDICATOR_TARGETS.coverage.target.value;
+}
+
+const coverageCsvIntegerFormat = new Intl.NumberFormat("es-AR");
+const coverageCsvDecimalFormat = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
+
+function csvCell(value: string) {
+  return /[;"\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+function csvTextValue(value: string) {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+/** Serializa las filas ordenadas de cobertura para Excel con configuración regional argentina. */
+export function coverageRowsToCsv(rows: CoverageCsvRow[], nameHeading: string) {
+  const header = [nameHeading, "Programados", "Atendidos", "Parciales", "No atendidos", "Pendientes", "Cobertura %", "Bajo la meta"];
+  const lines = [
+    header,
+    ...rows.map((row) => [
+      csvTextValue(row.name),
+      coverageCsvIntegerFormat.format(row.scheduled),
+      coverageCsvIntegerFormat.format(row.served),
+      coverageCsvIntegerFormat.format(row.partial),
+      coverageCsvIntegerFormat.format(row.notServiced),
+      coverageCsvIntegerFormat.format(row.pending),
+      row.scheduled === 0 ? "Sin programados" : coverageCsvDecimalFormat.format(row.coveragePct),
+      isCoverageBelowTarget(row.scheduled, row.coveragePct) ? "Sí" : "No",
+    ]),
+  ];
+
+  return `\uFEFF${lines.map((line) => line.map(csvCell).join(";")).join("\r\n")}`;
+}
+
 export type IndicatorData = Awaited<ReturnType<typeof indicatorsAdapter.getCoverage>> | Awaited<ReturnType<typeof indicatorsAdapter.getCompliance>> | Awaited<ReturnType<typeof indicatorsAdapter.getIncidents>> | Awaited<ReturnType<typeof indicatorsAdapter.getWaste>>;

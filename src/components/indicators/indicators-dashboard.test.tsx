@@ -32,6 +32,13 @@ async function chooseDate(user: ReturnType<typeof userEvent.setup>, label: strin
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
+  const getBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const chart = this.closest<HTMLElement>('[data-slot="chart"]');
+    if (!chart) return getBoundingClientRect.call(this);
+    const height = Number.parseFloat(chart.style.height) || 56;
+    return { x: 0, y: 0, width: 720, height, top: 0, right: 720, bottom: height, left: 0, toJSON: () => ({}) } as DOMRect;
+  });
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-04T15:00:00.000Z"));
 });
@@ -41,6 +48,7 @@ afterEach(() => {
   window.history.replaceState(null, "", "/"); // el tablero escribe su estado en la URL
   olvidarCatalogoDeEtiquetas();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 afterAll(() => server.close());
 
@@ -183,13 +191,14 @@ describe("IndicatorsDashboard", () => {
 
     await user.click(screen.getByRole("button", { name: "Tabla" }));
     const coverageTable = screen.getByRole("region", { name: "Tabla de datos de Cobertura" });
-    const categoryHeader = within(coverageTable).getAllByRole("columnheader", { name: "Categoría" })[0];
-    expect(categoryHeader).not.toHaveAttribute("aria-sort");
-    expect(within(categoryHeader).queryByRole("button")).not.toBeInTheDocument();
-    expect(within(coverageTable).getAllByRole("columnheader", { name: "Atendidos" })[0]).toBeVisible();
-    expect(within(coverageTable).getAllByRole("columnheader", { name: "Programados" })[0]).toBeVisible();
-    expect(within(coverageTable).getAllByText("140 objetivos")[0]).toBeVisible();
-    expect(within(coverageTable).getAllByText("156 objetivos")[0]).toBeVisible();
+    const zonesTable = within(coverageTable).getByRole("table", { name: /Cobertura por zona/ });
+    expect(within(coverageTable).getByRole("table", { name: /Cobertura por tipo de servicio/ })).toBeVisible();
+    expect(within(zonesTable).getByRole("columnheader", { name: "Zona" })).toBeVisible();
+    expect(within(zonesTable).getByRole("columnheader", { name: "Atendidos" })).toBeVisible();
+    expect(within(zonesTable).getByRole("columnheader", { name: "Programados" })).toBeVisible();
+    const centroRow = within(zonesTable).getByRole("row", { name: /Centro/ });
+    expect(centroRow).toHaveTextContent("140");
+    expect(centroRow).toHaveTextContent("156");
 
     await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
     expect((await screen.findAllByText("344 servicios"))[0]).toBeVisible();

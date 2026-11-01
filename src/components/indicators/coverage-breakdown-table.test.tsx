@@ -22,7 +22,7 @@ const point = (index: number, scheduled = 20): IndicatorPoint => ({
 
 const points = Array.from({ length: 12 }, (_, index) => point(index + 1));
 const names = () => screen.getAllByRole("rowheader").map((header) => header.textContent);
-const props = { nameHeading: "Zona", noun: "zonas", title: "Cobertura por zona", initialDirection: "asc" as const, onSelect: () => {} };
+const props = { nameHeading: "Zona", noun: "zonas", title: "Cobertura por zona", initialDirection: "asc" as const, period: { from: "2026-08-08", to: "2026-09-06" }, onSelect: () => {} };
 
 describe("CoverageBreakdownTable", () => {
   it("shows the 10 worst first, expands to all and re-sorts by any column", async () => {
