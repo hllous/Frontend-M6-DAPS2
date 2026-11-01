@@ -78,7 +78,13 @@ const eslintConfig = [
       ],
     },
   },
-  { ignores: ["public/mockServiceWorker.js", ".agents/**", ".claude/**", ".codex*/**", ".codex/**"] },
+  {
+    files: ["**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none", ignoreRestSiblings: true }],
+    },
+  },
+  { ignores: ["public/mockServiceWorker.js", ".agents/**", ".claude/**", ".codex*/**", ".codex/**", ".orca/**"] },
 ];
 
 export default eslintConfig;

@@ -18,7 +18,7 @@ Read the one whose trigger applies:
 
 - Opening a PR, branch protection, or a `hotfix/*`: [`docs/agents/git-flow.md`](docs/agents/git-flow.md)
 - Creating, triaging or splitting issues (`to-spec`, `to-tickets`, labels): [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md)
-- Reproducing a CI e2e failure against your own `pnpm dev`: [`docs/agents/e2e-local-debugging.md`](docs/agents/e2e-local-debugging.md)
+- Running e2e against your own `pnpm dev` (one spec, resetting mock data, reproducing a CI failure) or passing args to `pnpm test`: [`docs/agents/e2e-local-debugging.md`](docs/agents/e2e-local-debugging.md)
 - Checking a UI change in the running app (screenshots, `playwright-cli`): [`docs/agents/visual-verification.md`](docs/agents/visual-verification.md)
 - Diagnosing slowness, memory growth, Lighthouse audits or runtime errors in the browser (`chrome-devtools` CLI): [`docs/agents/browser-diagnostics.md`](docs/agents/browser-diagnostics.md)
 - Adding or changing a `src/mocks` handler, or testing a BFF route: [`docs/agents/msw-bff-tests.md`](docs/agents/msw-bff-tests.md)
