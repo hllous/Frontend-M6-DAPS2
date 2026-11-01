@@ -58,6 +58,32 @@ mutates will pass locally under parallel workers and fail in CI — grep
 a fixture file's on-paper status. The same accumulation happens across
 separate manual `pnpm test:e2e` calls against a server you didn't
 restart in between: if two otherwise-identical local runs disagree,
-suspect leftover state first. Restart the server fresh, then run every
+suspect leftover state first. Reset the mock data (below), then run every
 spec file relevant to the change in a single command rather than
 iterating call-by-call.
+
+## Reset the mock data without restarting
+
+In mock mode on a non-production server, `POST /api/mock/reset` restores
+every seeded fixture (it answers `404` anywhere else). Run it before an e2e
+run on a server that earlier runs have changed:
+
+```bash
+curl -s -X POST http://127.0.0.1:<port>/api/mock/reset -H "content-type: application/json" -H "x-requested-with: XMLHttpRequest" -d '{}'
+```
+
+A new `reset*Fixtures` function in `src/lib` belongs in the route's
+`FIXTURE_RESETS` list (`src/app/api/mock/reset/route.ts`).
+
+## Commands that pass arguments correctly
+
+`pnpm <script> -- <args>` hands the literal `--` to the tool, which then
+treats the rest as file filters instead of options:
+
+- One e2e spec: `pnpm exec playwright test e2e/<file>.spec.ts`. With
+  `pnpm test:e2e -- e2e/<file>`, Playwright runs every spec, including the
+  ones that change mock data.
+- Full Vitest suite with a worker cap: `pnpm test:full` (`vitest run
+  --maxWorkers=2`). `pnpm test -- --maxWorkers=2` runs uncapped.
+- Run Vitest, `tsc` and ESLint from the worktree you are testing. All three
+  skip `.orca/**`, so the main clone never picks up worktree copies.

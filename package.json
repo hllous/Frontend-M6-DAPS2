@@ -13,6 +13,7 @@
     "lint": "eslint . --cache",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:full": "vitest run --maxWorkers=2",
     "test:e2e": "playwright test"
   },
   "dependencies": {

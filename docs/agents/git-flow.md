@@ -6,6 +6,8 @@ Skeleton lives in `AGENTS.md`. This is the reference for the cases that come up 
 
 The checklist lives in the PR template, [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md), and GitHub pre-fills it on every PR. Edit the template, not a copy of it here.
 
+GitHub closes `Closes #n` issues only on merges into `main`, the default branch. For PRs merged into `develop`, the `Close linked issues` workflow (`.github/workflows/close-linked-issues.yml`) reads `Closes`/`Fixes`/`Resolves #n` from the PR body and closes those issues with a comment, so write the keywords in the PR body, one issue per keyword.
+
 ## Branch protection
 
 Classic branch protection (not rulesets) on `main`/`test`/`develop`: required `build`+`test`+`docs` checks, strict, linear history, no force-push, no deletion; admins are not enforced. `Backend-M6-DAPS2` has no `docs` job, so its rules differ. The `docs` job has no path filter on purpose: a required check that never reports blocks the merge.
