@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
@@ -12,14 +12,36 @@ import { IndicatorsDashboard } from "./indicators-dashboard";
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => {
+  const getBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const chart = this.closest<HTMLElement>('[data-slot="chart"]');
+    if (!chart) return getBoundingClientRect.call(this);
+    const height = Number.parseFloat(chart.style.height) || 56;
+    return { x: 0, y: 0, width: 720, height, top: 0, right: 720, bottom: height, left: 0, toJSON: () => ({}) } as DOMRect;
+  });
+});
 afterEach(() => {
   server.resetHandlers();
   olvidarCatalogoDeEtiquetas();
+  vi.restoreAllMocks();
   window.history.replaceState(null, "", "/");
 });
 afterAll(() => server.close());
 
 describe("IndicatorsDashboard: barras accesibles (#778)", () => {
+  it("muestra la pista textual del tono junto a cada categoría", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const familyBand = await screen.findByRole("region", { name: "Familias" });
+    await user.click(within(familyBand).getByRole("button", { name: "Cumplimiento: seleccionar familia" }));
+
+    const chart = await screen.findByRole("group", { name: "Barras de finalización en fecha" });
+    expect(within(chart).getByText("Favorable")).toBeVisible();
+    expect(within(chart).getByText("Atención")).toBeVisible();
+  });
+
   it("permite seleccionar una barra de Cumplimiento con el teclado y cerrar su detalle con Escape", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);

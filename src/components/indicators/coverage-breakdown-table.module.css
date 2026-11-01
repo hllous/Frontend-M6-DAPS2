@@ -24,9 +24,9 @@
 .bar > span { flex-basis: 0; min-width: 2px; }
 .bar > .targetLine { position: absolute; z-index: 1; top: 0; bottom: 0; width: 2px; border-inline: 1px solid var(--color-surface); background: var(--color-text); }
 .pct { flex: 0 0 auto; width: 6ch; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-.nameButton { height: auto; min-height: 32px; justify-content: flex-start; gap: var(--space-8); text-align: left; white-space: normal; }
+.nameButton { height: auto; min-height: 32px; min-width: 0; max-width: 100%; flex: 0 1 auto; justify-content: flex-start; gap: var(--space-8); text-align: left; white-space: normal; }
 .lowSample { padding: 0 var(--space-6); border: 1px solid var(--color-border-strong); border-radius: 6px; color: var(--color-text-secondary); font-size: 12px; font-weight: 400; }
-.nameCell { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+.nameCell { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
 .noScheduled { color: var(--color-text-secondary); font-size: 13px; }
 .table th.rowHeader { height: auto; background: transparent; color: var(--color-text); font-size: 14px; font-weight: 500; white-space: normal; }
 .table tr.belowTargetRow > .rowHeader { border-inline-start: 1px solid var(--color-warning); }

@@ -439,11 +439,19 @@ export type CoverageCsvRow = {
   coveragePct: number;
 };
 
+export function isCoverageBelowTarget(scheduled: number, coveragePct: number) {
+  return scheduled > 0 && coveragePct < INDICATOR_TARGETS.coverage.target.value;
+}
+
 const coverageCsvIntegerFormat = new Intl.NumberFormat("es-AR");
 const coverageCsvDecimalFormat = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
 
 function csvCell(value: string) {
   return /[;"\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+function csvTextValue(value: string) {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }
 
 /** Serializa las filas ordenadas de cobertura para Excel con configuración regional argentina. */
@@ -452,14 +460,14 @@ export function coverageRowsToCsv(rows: CoverageCsvRow[], nameHeading: string) {
   const lines = [
     header,
     ...rows.map((row) => [
-      row.name,
+      csvTextValue(row.name),
       coverageCsvIntegerFormat.format(row.scheduled),
       coverageCsvIntegerFormat.format(row.served),
       coverageCsvIntegerFormat.format(row.partial),
       coverageCsvIntegerFormat.format(row.notServiced),
       coverageCsvIntegerFormat.format(row.pending),
       row.scheduled === 0 ? "Sin programados" : coverageCsvDecimalFormat.format(row.coveragePct),
-      row.scheduled > 0 && row.coveragePct < INDICATOR_TARGETS.coverage.target.value ? "Sí" : "No",
+      isCoverageBelowTarget(row.scheduled, row.coveragePct) ? "Sí" : "No",
     ]),
   ];
 

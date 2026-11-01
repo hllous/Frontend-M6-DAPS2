@@ -1,7 +1,11 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
+import { coverageIndicatorFixture } from "@/lib/indicator-fixtures";
+import type { CoverageWire } from "@/lib/indicators";
 import { scenarios } from "@/lib/scenarios";
 import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
 import { handlers } from "@/mocks/handlers";
@@ -10,7 +14,31 @@ import { IndicatorsDashboard } from "./indicators-dashboard";
 
 const server = setupServer(...handlers);
 
+const targetBoundaryRows = {
+  byZone: [
+    { id: "zone-below-target", code: "TEST-BAJO", name: "Zona con cobertura baja", scheduled: 4, served: 2, partial: 0, notServiced: 0, pending: 2, coveragePct: 50 },
+    { id: "zone-at-target", code: "TEST-META", name: "Zona en meta", scheduled: 20, served: 19, partial: 0, notServiced: 0, pending: 1, coveragePct: 95 },
+    { id: "zone-above-target", code: "TEST-SOBRE", name: "Zona sobre meta", scheduled: 100, served: 98, partial: 0, notServiced: 0, pending: 2, coveragePct: 98 },
+    { id: "zone-no-scheduled", code: "TEST-SIN-PROGRAMAR", name: "Zona sin programados", scheduled: 0, served: 0, partial: 0, notServiced: 0, pending: 0, coveragePct: 0 },
+  ],
+  byServiceType: [
+    { id: "st-below-target", code: "TEST-BAJO", name: "Tipo con cobertura baja", scheduled: 4, served: 2, partial: 0, notServiced: 0, pending: 2, coveragePct: 50 },
+    { id: "st-at-target", code: "TEST-META", name: "Tipo en meta", scheduled: 20, served: 19, partial: 0, notServiced: 0, pending: 1, coveragePct: 95 },
+    { id: "st-above-target", code: "TEST-SOBRE", name: "Tipo sobre meta", scheduled: 100, served: 98, partial: 0, notServiced: 0, pending: 2, coveragePct: 98 },
+    { id: "st-no-scheduled", code: "TEST-SIN-PROGRAMAR", name: "Tipo sin programados", scheduled: 0, served: 0, partial: 0, notServiced: 0, pending: 0, coveragePct: 0 },
+  ],
+} satisfies Pick<CoverageWire, "byZone" | "byServiceType">;
+
+const targetCoverageFixture: CoverageWire = {
+  ...coverageIndicatorFixture,
+  byZone: [...coverageIndicatorFixture.byZone, ...targetBoundaryRows.byZone],
+  byServiceType: [...coverageIndicatorFixture.byServiceType, ...targetBoundaryRows.byServiceType],
+};
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => {
+  server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(targetCoverageFixture)));
+});
 afterEach(() => {
   server.resetHandlers();
   window.history.replaceState(null, "", "/");
@@ -58,5 +86,22 @@ describe("metas de las tablas de cobertura", () => {
       expect(withoutScheduled.getByText("Sin programados")).toBeVisible();
       expect(withoutScheduled.queryByText("Bajo la meta")).not.toBeInTheDocument();
     }
+  });
+
+  it("conserva el estado de cobertura y la exportación al cambiar a Tabla", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("table", { name: /Cobertura por zona/ });
+    const coverageRegion = screen.getByRole("region", { name: "Detalle de Cobertura" });
+    const viewToggle = within(coverageRegion).getByRole("group", { name: "Vista del detalle" });
+
+    await user.click(within(viewToggle).getByRole("button", { name: "Tabla" }));
+
+    const zones = within(coverageRegion).getByRole("table", { name: /Cobertura por zona/ });
+    const serviceTypes = within(coverageRegion).getByRole("table", { name: /Cobertura por tipo de servicio/ });
+    expect(rowFor(zones, "Zona con cobertura baja").getByText("Bajo la meta")).toBeVisible();
+    expect(rowFor(serviceTypes, "Tipo con cobertura baja").getByText("Bajo la meta")).toBeVisible();
+    expect(within(coverageRegion).getAllByRole("button", { name: "Exportar CSV" })).toHaveLength(2);
   });
 });

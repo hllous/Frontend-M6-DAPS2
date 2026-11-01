@@ -146,4 +146,28 @@ describe("IndicatorsDashboard CSV export", () => {
     expect(serviceTypeLines[8]).toBe('"Tipo; ""especial""";10;6;1;1;2;75,5;Sí');
     expect(serviceTypeLines[12]).toBe("Tipo sin programados;0;0;0;0;0;Sin programados;No");
   });
+
+  it("neutraliza los prefijos de fórmula solo en los nombres exportados", async () => {
+    const user = userEvent.setup();
+    const riskyNames = ["=Zona", "+Zona", "-Zona", undefined, "@Zona", "\tZona", "\rZona"];
+    const injectionFixture: CoverageWire = {
+      ...csvCoverageFixture,
+      byZone: csvCoverageFixture.byZone.map((row, index) => riskyNames[index] ? { ...row, name: riskyNames[index]! } : row),
+    };
+    server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(injectionFixture)));
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Exportar CSV" })).toHaveLength(2));
+    const territoryRegion = await screen.findByRole("region", { name: "Detalle territorial" });
+    await user.click(await within(territoryRegion).findByRole("button", { name: "Exportar CSV" }));
+
+    const csv = await readBlob(downloads[0].blob);
+    expect(csv).toContain("'=Zona;10;5;0;5;0;50;Sí");
+    expect(csv).toContain("'+Zona;10;6;0;4;0;60;Sí");
+    expect(csv).toContain("'-Zona;10;7;0;3;0;70;Sí");
+    expect(csv).toContain("'@Zona;10;8;0;2;0;80;Sí");
+    expect(csv).toContain("'\tZona;10;8;0;2;0;85;Sí");
+    expect(csv).toContain("\"'\rZona\";10;9;0;1;0;90;Sí");
+  });
 });
