@@ -44,6 +44,16 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(territory.getByRole("table").first()).toBeVisible();
   });
 
+  test("Coverage distinguishes upcoming work and flags low samples", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=dashboards");
+    const detail = page.locator("section[aria-labelledby='indicator-detail-title']");
+    await expect(detail.getByText("Programado a futuro").first()).toBeVisible();
+    const small = detail.getByRole("row").filter({ hasText: "Intervención puntual" });
+    await expect(small).toContainText("Muestra baja");
+    await expect(small).toContainText("1");
+  });
+
   test("Office sees the four families, filters, and the visual table companion", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=dashboards");

@@ -10,6 +10,7 @@ const point = (index: number, scheduled = 20): IndicatorPoint => ({
   id: `z${index}`,
   label: `Zona ${String(index).padStart(2, "0")}`,
   value: scheduled === 0 ? 0 : index * 5,
+  lowSample: scheduled === 2,
   unit: "%",
   details: [
     { label: "Atendidos", value: index, unit: "objetivos" },
@@ -70,7 +71,7 @@ describe("CoverageBreakdownTable", () => {
     const onSelect = vi.fn();
     render(<CoverageBreakdownTable {...props} points={[point(1, 2)]} onSelect={onSelect} />);
 
-    expect(screen.getByText("Pocos programados")).toBeVisible();
+    expect(screen.getByText("Muestra baja")).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Zona 01" }));
     expect(onSelect).toHaveBeenCalledWith("z1");
   });

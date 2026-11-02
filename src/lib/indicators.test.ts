@@ -83,10 +83,10 @@ describe("indicatorsAdapter", () => {
     await indicatorsAdapter.getWaste({ from: "2026-08-08", to: "2026-09-06", zoneId: "zone-2", serviceTypeId: "service-sweeping" });
 
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
-      "/api/indicators/coverage?from=2026-08-08&to=2026-09-06&zoneId=zone-2&serviceTypeId=service-sweeping",
-      "/api/indicators/compliance?from=2026-08-08&to=2026-09-06&zoneId=zone-2&serviceTypeId=service-sweeping",
-      "/api/indicators/incidents?from=2026-08-08&to=2026-09-06",
-      "/api/indicators/waste?from=2026-08-08&to=2026-09-06",
+      "/api/indicators/coverage?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week&zoneId=zone-2&serviceTypeId=service-sweeping",
+      "/api/indicators/compliance?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week&zoneId=zone-2&serviceTypeId=service-sweeping",
+      "/api/indicators/incidents?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week",
+      "/api/indicators/waste?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week",
     ]);
   });
 
@@ -99,8 +99,8 @@ describe("indicatorsAdapter", () => {
     await indicatorsAdapter.getCoverage({ from: "2026-09-01", to: "2026-09-30", serviceTypeId: "service-sweeping" });
 
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
-      "/api/indicators/coverage?from=2026-09-01&to=2026-09-30&zoneId=zone-2",
-      "/api/indicators/coverage?from=2026-09-01&to=2026-09-30&serviceTypeId=service-sweeping",
+      "/api/indicators/coverage?from=2026-09-01&to=2026-09-30&compare=previous&bucket=week&zoneId=zone-2",
+      "/api/indicators/coverage?from=2026-09-01&to=2026-09-30&compare=previous&bucket=week&serviceTypeId=service-sweeping",
     ]);
   });
 
@@ -125,6 +125,7 @@ describe("indicatorsAdapter", () => {
       { label: "Atendidos", value: 388, unit: "objetivos" },
       { label: "Parciales", value: 30, unit: "objetivos" },
       { label: "Pendientes", value: 30, unit: "objetivos" },
+      { label: "Programado a futuro", value: 14, unit: "objetivos" },
       { label: "Programados", value: 472, unit: "objetivos" },
     ]);
     // El punto conserva el id de zona del backend: el mapa cruza la cobertura por ese id.
@@ -138,6 +139,7 @@ describe("indicatorsAdapter", () => {
         { label: "Parciales", value: 6, unit: "objetivos" },
         { label: "No atendidos", value: 4, unit: "objetivos" },
         { label: "Pendientes", value: 6, unit: "objetivos" },
+        { label: "Programado a futuro", value: 4, unit: "objetivos" },
         { label: "Programados", value: 156, unit: "objetivos" },
       ],
     });

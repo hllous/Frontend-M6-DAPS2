@@ -12,15 +12,15 @@
 .scroll { overflow-x: auto; }
 .table[data-slot="table"] { width: 100%; border-collapse: collapse; caption-side: top; font-size: 14px; }
 .table caption { margin-bottom: var(--space-8); color: var(--color-text-secondary); font-size: 12px; text-align: left; }
-.table th, .table td { padding: var(--space-4) var(--space-10); border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: middle; }
+.table th, .table td { padding: var(--space-4); border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: middle; }
 .table th { height: auto; background: var(--color-surface-subtle); color: var(--color-text-secondary); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .table tr { border-bottom: 0; }
 .table tr:hover { background-color: transparent; }
 .num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.statusCell { min-width: 120px; white-space: nowrap; }
-.barColumn { min-width: 220px; }
+.statusCell { min-width: 100px; white-space: nowrap; }
+.barColumn { min-width: 130px; }
 .barCell { display: flex; align-items: center; gap: var(--space-10); }
-.bar { position: relative; display: flex; flex: 1 1 auto; gap: 2px; height: 22px; min-width: 120px; border-radius: 4px; background: var(--color-surface-subtle); overflow: hidden; }
+.bar { position: relative; display: flex; flex: 1 1 auto; gap: 2px; height: 22px; min-width: 45px; border-radius: 4px; background: var(--color-surface-subtle); overflow: hidden; }
 .bar > span { flex-basis: 0; min-width: 2px; }
 .bar > .targetLine { position: absolute; z-index: 1; top: 0; bottom: 0; width: 2px; border-inline: 1px solid var(--color-surface); background: var(--color-text); }
 .pct { flex: 0 0 auto; width: 6ch; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }

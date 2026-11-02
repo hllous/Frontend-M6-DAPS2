@@ -65,7 +65,7 @@ describe("metas de las tarjetas de indicadores", () => {
 
     const waste = familyCard("Residuos");
     expect(await within(waste).findByText("Sin meta definida")).toBeVisible();
-    expect(within(waste).getByText("más es mejor")).toBeVisible();
+    expect(within(waste).queryByText("más es mejor")).not.toBeInTheDocument();
     expect(within(waste).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
   });
 

@@ -16,13 +16,13 @@ const server = setupServer(...handlers);
 
 const targetBoundaryRows = {
   byZone: [
-    { id: "zone-below-target", code: "TEST-BAJO", name: "Zona con cobertura baja", scheduled: 4, served: 2, partial: 0, notServiced: 0, pending: 2, coveragePct: 50 },
+    { id: "zone-below-target", code: "TEST-BAJO", name: "Zona con cobertura baja", scheduled: 4, served: 2, partial: 0, notServiced: 0, pending: 2, upcoming: 3, lowSample: true, coveragePct: 50 },
     { id: "zone-at-target", code: "TEST-META", name: "Zona en meta", scheduled: 20, served: 19, partial: 0, notServiced: 0, pending: 1, coveragePct: 95 },
     { id: "zone-above-target", code: "TEST-SOBRE", name: "Zona sobre meta", scheduled: 100, served: 98, partial: 0, notServiced: 0, pending: 2, coveragePct: 98 },
     { id: "zone-no-scheduled", code: "TEST-SIN-PROGRAMAR", name: "Zona sin programados", scheduled: 0, served: 0, partial: 0, notServiced: 0, pending: 0, coveragePct: 0 },
   ],
   byServiceType: [
-    { id: "st-below-target", code: "TEST-BAJO", name: "Tipo con cobertura baja", scheduled: 4, served: 2, partial: 0, notServiced: 0, pending: 2, coveragePct: 50 },
+    { id: "st-below-target", code: "TEST-BAJO", name: "Tipo con cobertura baja", scheduled: 4, served: 2, partial: 0, notServiced: 0, pending: 2, upcoming: 3, lowSample: true, coveragePct: 50 },
     { id: "st-at-target", code: "TEST-META", name: "Tipo en meta", scheduled: 20, served: 19, partial: 0, notServiced: 0, pending: 1, coveragePct: 95 },
     { id: "st-above-target", code: "TEST-SOBRE", name: "Tipo sobre meta", scheduled: 100, served: 98, partial: 0, notServiced: 0, pending: 2, coveragePct: 98 },
     { id: "st-no-scheduled", code: "TEST-SIN-PROGRAMAR", name: "Tipo sin programados", scheduled: 0, served: 0, partial: 0, notServiced: 0, pending: 0, coveragePct: 0 },
@@ -71,7 +71,7 @@ describe("metas de las tablas de cobertura", () => {
     ] as const) {
       const below = rowFor(table, belowLabel);
       expect(below.getByText("Bajo la meta")).toBeVisible();
-      expect(below.getByText("Pocos programados")).toBeVisible();
+      expect(below.getByText("Muestra baja")).toBeVisible();
       expect(below.getByText("50 %")).toBeVisible();
 
       const at = rowFor(table, atLabel);
@@ -86,6 +86,16 @@ describe("metas de las tablas de cobertura", () => {
       expect(withoutScheduled.getByText("Sin programados")).toBeVisible();
       expect(withoutScheduled.queryByText("Bajo la meta")).not.toBeInTheDocument();
     }
+  });
+
+  it("usa la meta recibida del backend para la tarjeta y las filas", async () => {
+    server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json({ ...targetCoverageFixture, targets: { coveragePct: { value: 80, direction: "min" } } })));
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    const card = await screen.findByRole("button", { name: "Cobertura: seleccionar familia" });
+    expect(await within(card).findByText("Meta ≥ 80 %")).toBeVisible();
+    const zones = await screen.findByRole("table", { name: /Cobertura por zona/ });
+    expect(rowFor(zones, "Zona con cobertura baja").getByText("Bajo la meta")).toBeVisible();
+    expect(rowFor(zones, "Centro").queryByText("Bajo la meta")).not.toBeInTheDocument();
   });
 
   it("conserva el estado de cobertura y la exportación al cambiar a Tabla", async () => {

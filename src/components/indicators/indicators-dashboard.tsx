@@ -171,12 +171,16 @@ function familySummary(data: IndicatorData) {
 
 type IndicatorSummaryStatus = { label: string; variant: "success" | "danger" };
 
-function indicatorSummaryDetails(family: FamilyKey, value: number | null | undefined, showStatus: boolean) {
-  const definition = INDICATOR_TARGETS[family];
+function indicatorSummaryDetails(family: FamilyKey, value: number | null | undefined, showStatus: boolean, data?: IndicatorData) {
+  const backend = data?.family === "coverage" ? data.targets?.coveragePct : data?.family === "compliance" ? data.targets?.compliancePct : data?.family === "incidents" ? data.targets?.resolutionBusinessDays : data?.targets?.landfillDiversionPct;
+  const definition = backend === undefined && data?.targets === undefined ? INDICATOR_TARGETS[family] : {
+    target: backend?.value != null && (backend.direction === "min" || backend.direction === "max") ? { comparator: backend.direction === "min" ? "≥" as const : "≤" as const, value: backend.value, unit: family === "incidents" ? "días" as const : "%" as const } : null,
+    direction: backend?.direction === "max" ? "less-is-better" as const : "more-is-better" as const,
+  };
   const targetLabel = definition.target
     ? `Meta ${definition.target.comparator} ${formatNumber(definition.target.value, definition.target.unit)} ${definition.target.unit}`
-    : "Sin meta definida";
-  const directionLabel = definition.direction === "more-is-better" ? "más es mejor" : "menos es mejor";
+    : backend?.direction === "down" ? "Tendencia descendente" : "Sin meta definida";
+  const directionLabel = definition.target ? (definition.direction === "more-is-better" ? "más es mejor" : "menos es mejor") : "";
   let status: IndicatorSummaryStatus | undefined;
 
   if (showStatus && value !== null && value !== undefined && definition.target) {
@@ -194,7 +198,7 @@ function indicatorSummaryDetails(family: FamilyKey, value: number | null | undef
 function indicatorSummaryDescription(targetLabel: string, directionLabel: string, status?: IndicatorSummaryStatus) {
   return [
     `${targetLabel}.`,
-    `${directionLabel}.`,
+    directionLabel ? `${directionLabel}.` : null,
     status ? `Estado: ${status.label}.` : null,
   ].filter(Boolean).join(" ");
 }
@@ -249,7 +253,7 @@ function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { sta
         const item = state.data;
         const meta = familyMeta[family];
         const Icon = meta.icon;
-        const summary = indicatorSummaryDetails(family, item?.primary.value, state.status === "ready");
+        const summary = indicatorSummaryDetails(family, item?.primary.value, state.status === "ready", item);
         const descriptionId = `indicator-${family}-summary-description`;
         return <Card className={styles.summaryCard} data-state={state.status} key={family} size="sm">
           <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`} aria-describedby={descriptionId}>
@@ -512,8 +516,9 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
           <TabsTrigger value="records">Registros</TabsTrigger>
         </TabsList>
         <TabsContent value="summary"><LoadingRegion label={`Datos del resumen de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}
+          {selectedData?.family === "coverage" ? <p><strong>Programado a futuro:</strong> {metricText(selectedData.summaryMetrics.find((metric) => metric.label === "Programado a futuro")!)}</p> : null}
           {(() => {
-            const summary = indicatorSummaryDetails(selectedFamily, selectedData?.primary.value, selectedFamilyState.status === "ready");
+            const summary = indicatorSummaryDetails(selectedFamily, selectedData?.primary.value, selectedFamilyState.status === "ready", selectedData);
             return <div className={styles.mobileSummaryDetails}>
               <span className="text-sm font-semibold text-foreground">{summary.targetLabel}</span>
               <span className="text-sm text-muted-foreground">{summary.directionLabel}</span>
@@ -652,9 +657,9 @@ function BreakdownView({ family, breakdown, viewMode, period, selectedId: contro
   const isCoverageBreakdown = family === "coverage" && (breakdown.id === "zones" || breakdown.id === "service-types");
   const wide = viewMode === "bars" || isCoverageBreakdown;
   const coverageTable = family === "coverage" && breakdown.id === "zones"
-    ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" period={period} selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" />
+    ? <CoverageBreakdownTable points={breakdown.points} target={breakdown.target} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" period={period} selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" />
     : family === "coverage" && breakdown.id === "service-types"
-      ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" period={period} limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} />
+      ? <CoverageBreakdownTable points={breakdown.points} target={breakdown.target} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" period={period} limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} />
       : null;
   return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{coverageTable ?? (viewMode === "bars" ? <BreakdownBarChart points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} formatValue={metricText} formatDetail={pointText} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />)}</div>;
 }
