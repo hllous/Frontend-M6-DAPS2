@@ -28,6 +28,20 @@ function call(method: string, path: string, cookie?: string, body?: unknown) {
 }
 
 describe("environmental control handlers delegate to the real BFF routes", () => {
+  it("validates indicator buckets and returns generated series through the shared fixture route", async () => {
+    const invalid = await call("GET", "/api/indicators/coverage?bucket=quarter", officeCookie);
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({ message: "Intervalo de indicadores inválido." });
+    expect((await call("GET", "/api/indicators/coverage?bucket=", officeCookie)).status).toBe(400);
+
+    const response = await call("GET", "/api/indicators/coverage?from=2026-08-08&to=2026-09-06&bucket=week", officeCookie);
+    const payload = await response.json();
+    expect(response.status).toBe(200);
+    expect(payload.series).toHaveLength(5);
+    expect(payload.series[0]).toMatchObject({ from: "2026-08-08", to: "2026-08-09" });
+    expect(payload.series.reduce((total: number, point: { scheduled: number }) => total + point.scheduled, 0)).toBe(payload.totals.scheduled);
+  });
+
   it.each([
     ["from=2026-09-06", ["ER-1001", "ER-1002", "ER-1003", "ER-1012"]],
     ["to=2026-08-31", ["ER-1011"]],

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -24,13 +24,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime, todayInArgentina } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
-import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, INDICATOR_TARGETS, type IndicatorBreakdown, type IndicatorData, type IndicatorPeriod, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
+import { defaultIndicatorTarget, familyAppliesCatalogFilters, hasNumericThreshold, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPeriod, type IndicatorPoint, type IndicatorQuery, type IndicatorTarget } from "@/lib/indicators";
 import { serviceSourceHref } from "@/lib/referrals";
 import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { CoverageBreakdownTable } from "./coverage-breakdown-table";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
+import { CoverageTrend } from "./coverage-trend";
+import { IndicatorVariation, type IndicatorVariationDirection, type IndicatorVariationProps } from "./indicator-variation";
+import { formatIndicatorNumber } from "./number-format";
 
 import styles from "./indicators-dashboard.module.css";
 
@@ -154,7 +157,7 @@ function containerToTraceRecord(container: Container, zones: Map<string, string>
 }
 
 function formatNumber(value: number, unit: string) {
-  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: unit === "%" || unit === "h" || unit === "m³" || unit === "días" ? 1 : 0 }).format(value);
+  return formatIndicatorNumber(value, { maximumFractionDigits: unit === "%" || unit === "h" || unit === "m³" || unit.startsWith("días") ? 1 : 0 });
 }
 
 function formatDate(value: string) {
@@ -171,12 +174,29 @@ function familySummary(data: IndicatorData) {
 
 type IndicatorSummaryStatus = { label: string; variant: "success" | "danger" };
 
-function indicatorSummaryDetails(family: FamilyKey, value: number | null | undefined, showStatus: boolean) {
-  const definition = INDICATOR_TARGETS[family];
+function primaryTarget(family: FamilyKey, data?: IndicatorData): IndicatorTarget | undefined {
+  if (!data) return defaultIndicatorTarget(family);
+  if (data.family === "incidents") {
+    if (data.targets?.resolutionBusinessDays !== undefined) return data.targets.resolutionBusinessDays;
+    if (data.reports.deadlineBusinessDays !== undefined) return { value: data.reports.deadlineBusinessDays, direction: "max" };
+    return data.targets === undefined ? defaultIndicatorTarget(family) : undefined;
+  }
+  if (data.targets === undefined) return defaultIndicatorTarget(family);
+  if (data.family === "coverage") return data.targets?.coveragePct;
+  if (data.family === "compliance") return data.targets?.compliancePct;
+  return data.targets?.landfillDiversionPct;
+}
+
+function indicatorSummaryDetails(family: FamilyKey, value: number | null | undefined, showStatus: boolean, data?: IndicatorData) {
+  const target = primaryTarget(family, data);
+  const definition = {
+    target: hasNumericThreshold(target) ? { comparator: target.direction === "min" ? "≥" as const : "≤" as const, value: target.value, unit: family === "incidents" ? "días hábiles" as const : "%" as const } : null,
+    direction: target?.direction === "max" || target?.direction === "down" ? "less-is-better" as const : "more-is-better" as const,
+  };
   const targetLabel = definition.target
     ? `Meta ${definition.target.comparator} ${formatNumber(definition.target.value, definition.target.unit)} ${definition.target.unit}`
-    : "Sin meta definida";
-  const directionLabel = definition.direction === "more-is-better" ? "más es mejor" : "menos es mejor";
+    : target?.direction === "down" ? "Tendencia descendente" : "Sin meta definida";
+  const directionLabel = definition.target ? (definition.direction === "more-is-better" ? "más es mejor" : "menos es mejor") : "";
   let status: IndicatorSummaryStatus | undefined;
 
   if (showStatus && value !== null && value !== undefined && definition.target) {
@@ -191,12 +211,134 @@ function indicatorSummaryDetails(family: FamilyKey, value: number | null | undef
   return { targetLabel, directionLabel, status };
 }
 
+function knownVariationDirection(target: { direction: string } | null | undefined): IndicatorVariationDirection | undefined {
+  return target?.direction === "min" || target?.direction === "max" || target?.direction === "down"
+    ? target.direction
+    : undefined;
+}
+
+function computedPreviousPeriod(period: IndicatorPeriod) {
+  const start = new Date(`${period.from}T00:00:00.000Z`);
+  const end = new Date(`${period.to}T00:00:00.000Z`);
+  const day = 86400000;
+  const duration = (end.getTime() - start.getTime()) / day + 1;
+  if (!Number.isInteger(duration) || duration < 1 || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return undefined;
+
+  const previousTo = new Date(start);
+  previousTo.setUTCDate(previousTo.getUTCDate() - 1);
+  const previousFrom = new Date(previousTo);
+  previousFrom.setUTCDate(previousFrom.getUTCDate() - duration + 1);
+  return { from: previousFrom.toISOString().slice(0, 10), to: previousTo.toISOString().slice(0, 10) };
+}
+
+function comparisonPeriod(data: IndicatorData, delta: number | null | undefined) {
+  return data.previous?.period ?? (delta === null || delta === undefined ? undefined : computedPreviousPeriod(data.period));
+}
+
+function indicatorVariationDetails(data: IndicatorData): Omit<IndicatorVariationProps, "id"> {
+  if (data.family === "coverage") {
+    const delta = data.delta?.coveragePct;
+    const direction = knownVariationDirection(primaryTarget(data.family, data));
+    const previousPeriod = comparisonPeriod(data, delta);
+    return { delta, unitKind: "percentage-points", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
+  }
+
+  if (data.family === "compliance") {
+    const delta = data.delta?.onTimePct;
+    const direction = knownVariationDirection(primaryTarget(data.family, data));
+    const previousPeriod = comparisonPeriod(data, delta);
+    return { delta, unitKind: "percentage-points", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
+  }
+
+  if (data.family === "incidents") {
+    const delta = data.reports.avgResolutionBusinessDays === undefined ? data.delta?.avgResolutionDays : data.delta?.avgResolutionBusinessDays;
+    const direction = knownVariationDirection(primaryTarget(data.family, data));
+    const previousPeriod = comparisonPeriod(data, delta);
+    return { delta, unitKind: "days", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
+  }
+
+  const delta = data.delta?.divertedPct;
+  const direction = knownVariationDirection(primaryTarget(data.family, data));
+  const previousPeriod = comparisonPeriod(data, delta);
+  return { delta, unitKind: "percentage-points", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
+}
+
 function indicatorSummaryDescription(targetLabel: string, directionLabel: string, status?: IndicatorSummaryStatus) {
   return [
     `${targetLabel}.`,
-    `${directionLabel}.`,
+    directionLabel ? `${directionLabel}.` : null,
     status ? `Estado: ${status.label}.` : null,
   ].filter(Boolean).join(" ");
+}
+
+function indicatorTargetLabel(target: { direction: string; value: number | null } | null | undefined, unit: string) {
+  if (target?.direction === "down") return "Meta: tendencia descendente";
+  if (!hasNumericThreshold(target)) return "Sin meta definida";
+  const comparator = target.direction === "min" ? "≥" : "≤";
+  return `Meta ${comparator} ${formatNumber(target.value, unit)} ${unit}`;
+}
+
+function AdditionalIndicators({ data }: { data: IndicatorData }) {
+  if (data.family === "compliance") {
+    const deviation = data.schedulingDeviation;
+    if (!deviation) return null;
+
+    return <section className={styles.indicatorMetricGrid} aria-label="Indicadores complementarios de Cumplimiento">
+      <Card role="group" aria-labelledby="indicator-scheduling-deviation-title" size="sm" className={styles.indicatorMetricCard}>
+        <CardHeader><CardTitle id="indicator-scheduling-deviation-title">Desvío de programación</CardTitle></CardHeader>
+        <CardContent className={styles.indicatorMetricContent}>
+          <strong className="text-2xl font-semibold leading-none tabular-nums">{formatNumber(deviation.deviatedPct, "%")} %</strong>
+          <p className="text-sm leading-snug text-muted-foreground">{formatNumber(deviation.deviated, "servicios")} de {formatNumber(deviation.total, "servicios")} servicios se desviaron de la programación.</p>
+          <p className="text-xs font-semibold text-foreground">{indicatorTargetLabel(data.targets?.schedulingDeviationPct, "%")}</p>
+          <IndicatorVariation delta={data.delta?.deviatedPct} unitKind="percentage-points" direction={knownVariationDirection(data.targets?.schedulingDeviationPct)} previousPeriod={comparisonPeriod(data, data.delta?.deviatedPct)} />
+        </CardContent>
+      </Card>
+    </section>;
+  }
+
+  if (data.family !== "incidents") return null;
+  const { reports, containers } = data;
+  const history = containers.history;
+
+  return <section className={styles.indicatorMetricGrid} aria-label="Indicadores complementarios de Incidencias">
+    {reports.withinDeadline ? <Card role="group" aria-labelledby="indicator-within-deadline-title" size="sm" className={styles.indicatorMetricCard}>
+      <CardHeader><CardTitle id="indicator-within-deadline-title">Reportes resueltos en plazo</CardTitle></CardHeader>
+      <CardContent className={styles.indicatorMetricContent}>
+        <strong className="text-2xl font-semibold leading-none tabular-nums">{reports.withinDeadline.pct === null ? "Sin datos" : `${formatNumber(reports.withinDeadline.pct, "%")} %`}</strong>
+        <p className="text-sm leading-snug text-muted-foreground">{reports.withinDeadline.resolved === 0 ? "No hubo reportes resueltos." : `${formatNumber(reports.withinDeadline.withinDeadline, "reportes")} de ${formatNumber(reports.withinDeadline.resolved, "reportes")} reportes se resolvieron en plazo.`}</p>
+        <p className="text-xs font-semibold text-foreground">{indicatorTargetLabel(data.targets?.reportsWithinDeadlinePct, "%")}</p>
+        <IndicatorVariation delta={data.delta?.withinDeadlinePct} unitKind="percentage-points" direction={knownVariationDirection(data.targets?.reportsWithinDeadlinePct)} previousPeriod={comparisonPeriod(data, data.delta?.withinDeadlinePct)} />
+      </CardContent>
+    </Card> : null}
+    {reports.overdue ? <Card role="group" aria-labelledby="indicator-overdue-title" size="sm" className={styles.indicatorMetricCard}>
+      <CardHeader><CardTitle id="indicator-overdue-title">Reportes vencidos hoy</CardTitle></CardHeader>
+      <CardContent className={styles.indicatorMetricContent}>
+        <strong className="text-2xl font-semibold leading-none tabular-nums">{reports.overdue.pct === null ? "Sin datos" : `${formatNumber(reports.overdue.pct, "%")} %`}</strong>
+        <p className="text-sm leading-snug text-muted-foreground">{reports.overdue.open === 0 ? "No hay reportes abiertos hoy." : `${formatNumber(reports.overdue.overdue, "reportes")} de ${formatNumber(reports.overdue.open, "reportes")} reportes abiertos.`}</p>
+        <p className="text-xs font-semibold text-foreground">{indicatorTargetLabel(data.targets?.reportsOverduePct, "%")}</p>
+      </CardContent>
+    </Card> : null}
+    <Card role="group" aria-labelledby="indicator-container-overflows-title" size="sm" className={styles.indicatorMetricCard}>
+      <CardHeader><CardTitle id="indicator-container-overflows-title">Desbordes de contenedores</CardTitle></CardHeader>
+      <CardContent className={styles.indicatorMetricContent}>
+        <strong className="text-2xl font-semibold leading-none tabular-nums">{history ? `${formatNumber(history.overflowIncidents, "incidentes")} incidentes` : "Sin dato"}</strong>
+        <p className="text-sm leading-snug text-muted-foreground">{history ? "Eventos de desborde durante el período." : "No hay datos del historial para el período."}</p>
+        <p className="text-xs font-semibold text-foreground">{indicatorTargetLabel(data.targets?.overflowTrend, "incidentes")}</p>
+        <IndicatorVariation delta={data.delta?.overflowIncidents} unitKind="count" direction={knownVariationDirection(data.targets?.overflowTrend)} previousPeriod={comparisonPeriod(data, data.delta?.overflowIncidents)} />
+      </CardContent>
+    </Card>
+    <Card role="group" aria-labelledby="indicator-pending-container-damage-title" size="sm" className={styles.indicatorMetricCard}>
+      <CardHeader><CardTitle id="indicator-pending-container-damage-title">Contenedores con daños pendientes</CardTitle></CardHeader>
+      <CardContent className={styles.indicatorMetricContent}>
+        <strong className="text-2xl font-semibold leading-none tabular-nums">{history?.pendingDamage == null ? "Sin dato" : `${formatNumber(history.pendingDamage, "contenedores")} contenedores`}</strong>
+        <p className="text-sm leading-snug text-muted-foreground">{history?.pendingDamage == null
+          ? history?.trackingSince ? `Historial disponible desde ${formatArgentinaCalendarDate(history.trackingSince)}.` : "No se informó cuándo comienza el historial."
+          : "Contenedores dañados o en reparación al cierre del período."}</p>
+        <p className="text-xs font-semibold text-foreground">{indicatorTargetLabel(data.targets?.pendingDamageTrend, "contenedores")}</p>
+        <IndicatorVariation delta={data.delta?.pendingDamage} unitKind="count" direction={knownVariationDirection(data.targets?.pendingDamageTrend)} previousPeriod={comparisonPeriod(data, data.delta?.pendingDamage)} />
+      </CardContent>
+    </Card>
+  </section>;
 }
 
 function emptyFamilyState(): Record<FamilyKey, FamilyState> {
@@ -249,21 +391,25 @@ function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { sta
         const item = state.data;
         const meta = familyMeta[family];
         const Icon = meta.icon;
-        const summary = indicatorSummaryDetails(family, item?.primary.value, state.status === "ready");
+        const summary = indicatorSummaryDetails(family, item?.primary.value, state.status === "ready", item);
         const descriptionId = `indicator-${family}-summary-description`;
+        const variation = item ? indicatorVariationDetails(item) : null;
+        const variationId = `indicator-${family}-variation-description`;
         return <Card className={styles.summaryCard} data-state={state.status} key={family} size="sm">
-          <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`} aria-describedby={descriptionId}>
+          <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`} aria-describedby={variation ? `${descriptionId} ${variationId}` : descriptionId}>
             <span className={styles.summaryCardHeader}><span className="text-sm font-semibold text-muted-foreground">{meta.label}</span><span className={`${styles.summaryIcon} size-8 rounded-lg bg-muted text-primary`}><Icon size={17} aria-hidden /></span></span>
             {state.status === "loading" && !item ? <Skeleton aria-hidden className="h-[30px] w-24" /> : <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item ? familySummary(item) : "—"}</span>}
             <span className="text-xs leading-snug text-muted-foreground">{item?.primary.label ?? meta.description}</span>
+            {variation ? <IndicatorVariation id={variationId} {...variation} /> : null}
             <span className={styles.summaryTargetDetails}>
               <span className="text-xs font-semibold text-foreground">{summary.targetLabel}</span>
               <span className="text-xs text-muted-foreground">{summary.directionLabel}</span>
-              {summary.status ? <Badge variant={summary.status.variant} aria-hidden="true">
+              {summary.status ? <Badge className="h-auto min-h-6 py-1" variant={summary.status.variant} aria-hidden="true">
                 {summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}
                 {summary.status.label}
               </Badge> : null}
             </span>
+            {item?.family === "incidents" ? <span className="text-xs leading-snug text-muted-foreground">Resolución media en días corridos: {item.reports.avgResolutionDays === null ? "Sin reportes cerrados" : `${formatNumber(item.reports.avgResolutionDays, "días")} días`}</span> : null}
             <span className="text-xs font-semibold text-primary">{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
           </ToggleGroupItem>
           <span className="sr-only" id={descriptionId}>{indicatorSummaryDescription(summary.targetLabel, summary.directionLabel, summary.status)}</span>
@@ -512,8 +658,9 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
           <TabsTrigger value="records">Registros</TabsTrigger>
         </TabsList>
         <TabsContent value="summary"><LoadingRegion label={`Datos del resumen de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}
+          {selectedData?.family === "coverage" ? <p><strong>Programado a futuro:</strong> {metricText(selectedData.summaryMetrics.find((metric) => metric.label === "Programado a futuro")!)}</p> : null}
           {(() => {
-            const summary = indicatorSummaryDetails(selectedFamily, selectedData?.primary.value, selectedFamilyState.status === "ready");
+            const summary = indicatorSummaryDetails(selectedFamily, selectedData?.primary.value, selectedFamilyState.status === "ready", selectedData);
             return <div className={styles.mobileSummaryDetails}>
               <span className="text-sm font-semibold text-foreground">{summary.targetLabel}</span>
               <span className="text-sm text-muted-foreground">{summary.directionLabel}</span>
@@ -523,7 +670,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
               </Badge> : null}
             </div>;
           })()}
-        </section></LoadingRegion></TabsContent>
+        </section>{selectedData ? <AdditionalIndicators data={selectedData} /> : null}{selectedData ? detailContext(selectedData) : null}{selectedData?.family === "coverage" ? <CoverageTrend data={selectedData} viewMode={viewMode} /> : null}</LoadingRegion></TabsContent>
         <TabsContent value="trend"><LoadingRegion label="Datos por categoría" isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}>{selectedModuleContent("trend", trendBreakdowns, trendStatus)}</LoadingRegion></TabsContent>
         <TabsContent value="territory"><LoadingRegion label="Datos territoriales" isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}>{selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}</LoadingRegion></TabsContent>
         <TabsContent value="records">{recordsView}</TabsContent>
@@ -560,20 +707,19 @@ function CatalogFilter({ id, label, allLabel, noun, options, value, onChange }: 
 }
 
 function metricText(metric: { value: number | null; unit: string }) {
-  // Hoy sólo la resolución media de reportes puede venir null (ningún reporte cerrado en el período).
-  if (metric.value === null) return "Sin reportes cerrados";
+  if (metric.value === null) return metric.unit.startsWith("días") ? "Sin reportes cerrados" : "Sin dato";
   return `${formatNumber(metric.value, metric.unit)} ${metric.unit}`;
 }
 
 function pointText(point: IndicatorPoint) {
   const value = metricText(point);
-  const details = point.details?.map((detail) => `${formatNumber(detail.value, detail.unit)} ${detail.label.toLowerCase()}`).join(" · ");
+  const details = point.details?.map((detail) => detail.value === null ? "Sin dato" : `${formatNumber(detail.value, detail.unit)} ${detail.label.toLowerCase()}`).join(" · ");
   return details ? `${value} · ${details}` : value;
 }
 
 function detailContext(data: IndicatorData) {
   if (data.family === "incidents") {
-    return <p className={styles.detailContext}>Contenedores y arbolado: situación actual.</p>;
+    return <p className={styles.detailContext}>Desbordes y daños: eventos del período.<br />Estados de contenedores y riesgo de arbolado: situación actual.</p>;
   }
   if (data.family === "waste") {
     return <p className={styles.detailContext}>Volúmenes en kg y m³. Desvío: porcentaje que no fue a relleno sanitario.</p>;
@@ -600,7 +746,9 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
       </div>
     </div>
     {hasSummaryMetrics ? <div className={styles.summaryMetrics} aria-label={`Resumen exacto de ${meta.label}`}>{data.summaryMetrics.map((metric) => <div className={styles.summaryMetric} key={metric.label}><strong>{metricText(metric)}</strong><span>{metric.label}</span></div>)}</div> : null}
+    <AdditionalIndicators data={data} />
     {detailContext(data)}
+    {data.family === "coverage" ? <CoverageTrend data={data} viewMode={requestedViewMode} /> : null}
     <div className={styles.detailModules} role={requestedViewMode === "table" ? "region" : undefined} aria-label={requestedViewMode === "table" ? `Tabla de datos de ${meta.label}` : undefined}>
       <ModuleState label="Por categoría" status={trendStatus} onRetry={onRetry}><IndicatorModuleContent family={data.family} breakdowns={trendBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} period={data.period} /></ModuleState>
       <ModuleState label="Detalle territorial" status={territoryStatus} onRetry={onRetry}><IndicatorModuleContent family={data.family} breakdowns={territoryBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} period={data.period} /></ModuleState>
@@ -652,9 +800,9 @@ function BreakdownView({ family, breakdown, viewMode, period, selectedId: contro
   const isCoverageBreakdown = family === "coverage" && (breakdown.id === "zones" || breakdown.id === "service-types");
   const wide = viewMode === "bars" || isCoverageBreakdown;
   const coverageTable = family === "coverage" && breakdown.id === "zones"
-    ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" period={period} selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" />
+    ? <CoverageBreakdownTable points={breakdown.points} target={breakdown.target} nameHeading="Zona" noun="zonas" title={breakdown.title} initialDirection="asc" period={period} selectedId={selected?.id} onSelect={setSelectedId} mapHref="/app?destination=map" />
     : family === "coverage" && breakdown.id === "service-types"
-      ? <CoverageBreakdownTable points={breakdown.points} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" period={period} limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} />
+      ? <CoverageBreakdownTable points={breakdown.points} target={breakdown.target} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" period={period} limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} />
       : null;
   return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{coverageTable ?? (viewMode === "bars" ? <BreakdownBarChart points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} formatValue={metricText} formatDetail={pointText} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />)}</div>;
 }
