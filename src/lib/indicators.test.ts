@@ -22,14 +22,15 @@ describe("indicatorsAdapter", () => {
     });
   });
 
-  it("accepts avgResolutionDays null when no report was closed in the period (#302)", async () => {
+  it("keeps the calendar-day average nullable without replacing the business-day primary (#302)", async () => {
     const response = structuredClone(incidentsIndicatorFixture);
     (response.reports as { avgResolutionDays: number | null }).avgResolutionDays = null;
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(response)));
 
     const result = await indicatorsAdapter.getIncidents({});
 
-    expect(result.primary).toEqual({ value: null, label: "Resolución media de reportes", unit: "días" });
+    expect(result.primary).toEqual({ value: 1.8, label: "Resolución media de reportes", unit: "días hábiles" });
+    expect(result.reports.avgResolutionDays).toBeNull();
   });
 
   it("rejects an inverted date range with a message on the `to` field", () => {
@@ -154,7 +155,8 @@ describe("indicatorsAdapter", () => {
       { label: "En fecha", value: 344, unit: "servicios" },
       { label: "Demorados", value: 46, unit: "servicios" },
     ]);
-    expect(incidents.primary).toMatchObject({ value: 2.4, unit: "días" });
+    expect(incidents.primary).toMatchObject({ value: 1.8, unit: "días hábiles" });
+    expect(incidents.reports.avgResolutionDays).toBe(2.4);
     // El riesgo de arbolado se ordena de crítico a sin riesgo, no como llega.
     expect(incidents.breakdowns.find((item) => item.id === "tree-risk")?.points.map((point) => point.label))
       .toEqual(["Crítico", "Alto", "Medio", "Bajo", "Sin riesgo"]);

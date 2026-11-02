@@ -33,7 +33,7 @@ function incidentsWithDelta(delta: number | null) {
   return {
     ...incidentsIndicatorFixture,
     previous: { ...incidentsIndicatorFixture.previous!, period: previousPeriod },
-    delta: { ...incidentsIndicatorFixture.delta!, avgResolutionDays: delta },
+    delta: { ...incidentsIndicatorFixture.delta!, avgResolutionBusinessDays: delta },
   };
 }
 
@@ -93,7 +93,7 @@ describe("variación de las tarjetas de indicadores", () => {
     { delta: -0.6, amount: "-0,6 días", label: "Mejor" },
     { delta: 0.6, amount: "+0,6 días", label: "Peor" },
     { delta: 0, amount: "0 días", label: "Sin cambios" },
-  ])("interprets $delta días for a max target as $label", async ({ delta, amount, label }) => {
+  ])("interprets $delta business days for a max target as $label", async ({ delta, amount, label }) => {
     server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json(incidentsWithDelta(delta))));
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
