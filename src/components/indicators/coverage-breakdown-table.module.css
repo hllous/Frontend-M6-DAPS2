@@ -30,6 +30,33 @@
 .noScheduled { color: var(--color-text-secondary); font-size: 13px; }
 .table th.rowHeader { height: auto; background: transparent; color: var(--color-text); font-size: 14px; font-weight: 500; white-space: normal; }
 .table tr.belowTargetRow > .rowHeader { border-inline-start: 1px solid var(--color-warning); }
+.mobileSort { display: none; }
 .footer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-12); color: var(--color-text-secondary); font-size: 12px; }
 .exportButton { flex: 0 0 auto; }
 .mapLink { margin-inline-start: auto; color: var(--color-action); font-size: 14px; font-weight: 600; text-underline-offset: 3px; }
+
+@media (max-width: 760px) {
+  .mobileSort { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-8); }
+  .mobileSortLabel { grid-column: 1 / -1; color: var(--color-text); font-size: 14px; font-weight: 600; }
+  .mobileSortSelect { min-width: 0; }
+  .mobileSort > button { min-height: 48px; }
+  .scroll { overflow: visible; }
+  .table[data-slot="table"], .table thead, .table tbody, .table tr, .table th, .table td { display: block; }
+  .table[data-slot="table"] { border-collapse: separate; font-size: 14px; }
+  .table caption { display: block; width: 100%; min-width: 0; }
+  .table thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+  .table thead:focus-within { position: static; width: auto; height: auto; margin: 0 0 var(--space-8); overflow: visible; clip: auto; clip-path: none; white-space: normal; }
+  .table tbody { display: flex; flex-direction: column; gap: var(--space-12); }
+  .table tbody > tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-12); padding: var(--space-12); border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
+  .table th.rowHeader { grid-column: 1 / -1; display: block; padding: 0 0 var(--space-8); border-bottom: 1px solid var(--color-border); }
+  .table td { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: var(--space-4); padding: var(--space-6) 0; border: 0; white-space: normal; }
+  .table td::before { color: var(--color-text-secondary); font-size: 12px; font-weight: 500; content: attr(data-label); }
+  .table td.num { flex-direction: row; justify-content: space-between; text-align: right !important; font-variant-numeric: tabular-nums; }
+  .table td.num::before { max-width: calc(100% - 2.5rem); }
+  .table td.statusCell { grid-column: 1 / -1; flex-direction: row; align-items: center; }
+  .table td.statusCell:empty { display: none; }
+  .table td.barColumn { grid-column: 1 / -1; min-width: 0; }
+  .table .barCell { width: 100%; }
+  .table .nameButton { min-height: 48px; }
+  .table tr.belowTargetRow > .rowHeader { border-inline-start: 0; }
+}

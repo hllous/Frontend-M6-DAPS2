@@ -18,6 +18,7 @@ const point = (index: number, scheduled = 20): IndicatorPoint => ({
     { label: "No atendidos", value: 2, unit: "objetivos" },
     { label: "Pendientes", value: 3, unit: "objetivos" },
     { label: "Programados", value: scheduled, unit: "objetivos" },
+    { label: "Programado a futuro", value: 13 - index, unit: "objetivos" },
   ],
 });
 
@@ -74,5 +75,20 @@ describe("CoverageBreakdownTable", () => {
     expect(screen.getByText("Muestra baja")).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Zona 01" }));
     expect(onSelect).toHaveBeenCalledWith("z1");
+  });
+
+  it("sorts the stacked mobile rows by future programming and labels each value", async () => {
+    const user = userEvent.setup();
+    render(<CoverageBreakdownTable {...props} points={points} />);
+
+    const sortBy = screen.getByRole("combobox", { name: "Ordenar por" });
+    await user.click(sortBy);
+    await user.click(screen.getByRole("option", { name: "Programado a futuro" }));
+
+    const firstRow = screen.getByRole("row", { name: /Zona 12/ });
+    expect(sortBy).toHaveTextContent("Programado a futuro");
+    expect(names()[0]).toBe("Zona 12");
+    expect(firstRow.querySelector('td[data-label="Programado a futuro"]')).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: "Cambiar a orden descendente" })).toBeVisible();
   });
 });

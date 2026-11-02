@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { TriangleAlert } from "lucide-react";
+import { ArrowDown, ArrowUp, TriangleAlert } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableCaption, TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { coverageRowsToCsv, isCoverageBelowTarget, type IndicatorPeriod, type IndicatorPoint, type IndicatorTarget } from "@/lib/indicators";
 
@@ -60,12 +61,20 @@ export function CoverageBreakdownTable({ points, nameHeading, noun, title, initi
       cell: ({ row }) => <div className={styles.nameCell}><Button type="button" variant={selectedId === row.original.id ? "secondary" : "ghost"} size="sm" className={styles.nameButton} aria-pressed={selectedId === row.original.id} onClick={() => onSelect(row.original.id)}>{row.original.name}</Button>{row.original.lowSample ? <span className={styles.lowSample}><span className="sr-only">. </span>Muestra baja</span> : null}</div>,
     },
     { id: "targetStatus", accessorFn: (row) => isCoverageBelowTarget(row.scheduled, row.pct, target) ? "Bajo la meta" : "", header: "Estado", enableSorting: false, meta: { label: "Estado", cellClassName: styles.statusCell, headClassName: styles.statusCell }, cell: ({ row }) => isCoverageBelowTarget(row.original.scheduled, row.original.pct, target) ? <Badge variant="warning"><TriangleAlert aria-hidden="true" data-icon="inline-start" />Bajo la meta</Badge> : null },
-    { id: "scheduled", accessorFn: (row) => row.scheduled, header: "Programados", sortFn: numeric("scheduled"), meta: { cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }) => int.format(row.original.scheduled) },
-    { id: "upcoming", accessorFn: (row) => row.upcoming, header: "Programado a futuro", sortFn: numeric("upcoming"), meta: { cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }) => int.format(row.original.upcoming) },
-    ...STATES.map(({ key }) => ({ id: key, accessorFn: (row: Row) => row.counts[key], header: key, sortFn: numeric(key), meta: { cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }: { row: { original: Row } }) => int.format(row.original.counts[key]) })),
-    { id: "pct", accessorFn: (row) => row.scheduled === 0 ? undefined : row.pct, header: "Cobertura", sortFn: numeric("pct"), sortUndefined: "last", meta: { cellClassName: styles.barColumn }, cell: ({ row }) => <StackedBar row={row.original} target={target} /> },
+    { id: "scheduled", accessorFn: (row) => row.scheduled, header: "Programados", sortFn: numeric("scheduled"), meta: { label: "Programados", cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }) => int.format(row.original.scheduled) },
+    { id: "upcoming", accessorFn: (row) => row.upcoming, header: "Programado a futuro", sortFn: numeric("upcoming"), meta: { label: "Programado a futuro", cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }) => int.format(row.original.upcoming) },
+    ...STATES.map(({ key }) => ({ id: key, accessorFn: (row: Row) => row.counts[key], header: key, sortFn: numeric(key), meta: { label: key, cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }: { row: { original: Row } }) => int.format(row.original.counts[key]) })),
+    { id: "pct", accessorFn: (row) => row.scheduled === 0 ? undefined : row.pct, header: "Cobertura", sortFn: numeric("pct"), sortUndefined: "last", meta: { label: "Cobertura", cellClassName: styles.barColumn }, cell: ({ row }) => <StackedBar row={row.original} target={target} /> },
   ], [nameHeading, onSelect, selectedId, target]);
   const table = useDataTable({ data, columns, getRowId: (row) => row.id, initialState: { sorting: [{ id: "pct", desc: initialDirection === "desc" }] } });
+  const sorting = table.state.sorting[0];
+  const sortOptions = [
+    { value: "name", label: nameHeading },
+    { value: "scheduled", label: "Programados" },
+    { value: "upcoming", label: "Programado a futuro" },
+    ...STATES.map(({ key }) => ({ value: key, label: key })),
+    { value: "pct", label: "Cobertura" },
+  ];
 
   const sorted = table.getRowModel().rows;
   const visibleIds = new Set((showAll ? sorted : sorted.slice(0, limit)).map((row) => row.id));
@@ -101,13 +110,33 @@ export function CoverageBreakdownTable({ points, nameHeading, noun, title, initi
       {STATES.map(({ key, className }) => <li key={key}><span aria-hidden className={`${styles.swatch} ${styles[className]}`} />{key}</li>)}
       {target?.value != null && (target.direction === "min" || target.direction === "max") ? <li><span aria-hidden className={styles.targetSwatch} />Meta {target.direction === "min" ? "≥" : "≤"} {int.format(target.value)} %</li> : null}
     </ul>
+    <div className={styles.mobileSort}>
+      <span className={styles.mobileSortLabel}>Ordenar por</span>
+      <Select items={sortOptions} value={sorting?.id ?? "pct"} onValueChange={(value) => {
+        if (!value) return;
+        table.setSorting([{ id: value, desc: value === sorting?.id ? sorting.desc : false }]);
+      }}>
+        <SelectTrigger aria-label="Ordenar por" className={styles.mobileSortSelect}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {sortOptions.map(({ value, label }) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <Button type="button" variant="outline" size="sm" aria-label={sorting?.desc ? "Cambiar a orden ascendente" : "Cambiar a orden descendente"} onClick={() => table.setSorting([{ id: sorting?.id ?? "pct", desc: !sorting?.desc }])}>
+        {sorting?.desc ? <ArrowDown aria-hidden="true" data-icon="inline-start" /> : <ArrowUp aria-hidden="true" data-icon="inline-start" />}
+        {sorting?.desc ? "Descendente" : "Ascendente"}
+      </Button>
+    </div>
     <div className={styles.scroll}>
       <DataTable
         table={table}
         id={tableId}
         container={false}
         className={styles.table}
-        renderRow={(row) => visibleIds.has(row.id) ? <TableRow key={row.id} className={isCoverageBelowTarget(row.original.scheduled, row.original.pct, target) ? styles.belowTargetRow : undefined}>{row.getVisibleCells().map((cell) => cell.column.id === "name" ? <TableHead key={cell.id} scope="row" className={styles.rowHeader}><table.FlexRender cell={cell} /></TableHead> : <TableCell key={cell.id} className={cell.column.columnDef.meta?.cellClassName}><table.FlexRender cell={cell} /></TableCell>)}</TableRow> : null}
+        renderRow={(row) => visibleIds.has(row.id) ? <TableRow key={row.id} className={isCoverageBelowTarget(row.original.scheduled, row.original.pct, target) ? styles.belowTargetRow : undefined}>{row.getVisibleCells().map((cell) => cell.column.id === "name" ? <TableHead key={cell.id} scope="row" className={styles.rowHeader}><table.FlexRender cell={cell} /></TableHead> : <TableCell key={cell.id} data-label={cell.column.columnDef.meta?.label} className={cell.column.columnDef.meta?.cellClassName}><table.FlexRender cell={cell} /></TableCell>)}</TableRow> : null}
       ><TableCaption>{title}: {visibleIds.size} de {sorted.length}</TableCaption></DataTable>
     </div>
     <div className={styles.footer}>
