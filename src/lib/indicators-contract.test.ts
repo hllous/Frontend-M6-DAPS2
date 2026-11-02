@@ -41,6 +41,21 @@ describe("contrato de indicadores", () => {
     expect(result.targets?.coveragePct?.direction).toBe("future");
   });
 
+  it("usa la meta local cuando faltan los bloques opcionales", async () => {
+    const { series, previous, delta, targets, ...old } = coverageIndicatorFixture;
+    void series; void previous; void delta; void targets;
+    server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(old)));
+    const result = await indicatorsAdapter.getCoverage();
+    expect(result.targets?.coveragePct).toEqual({ value: 95, direction: "min" });
+    expect(result.previous).toBeUndefined();
+    expect(result.delta).toBeUndefined();
+  });
+
+  it("propaga el mensaje del servidor cuando el rango supera el límite", async () => {
+    server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json({ statusCode: 400, message: "Demasiados intervalos" }, { status: 400 })));
+    await expect(indicatorsAdapter.getCoverage()).rejects.toThrow("Demasiados intervalos");
+  });
+
   it("solicita comparación y elige meses para más de noventa semanas", async () => {
     let actual = "";
     server.use(http.get("*/api/indicators/coverage", ({ request }) => { actual = request.url; return HttpResponse.json(coverageIndicatorFixture); }));
