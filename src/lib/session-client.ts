@@ -25,8 +25,6 @@ function getChannel(): BroadcastChannel | undefined {
 
 /** `expired`: la sesión cayó sola (401), no la cerró la persona; el login avisa y retoma la pantalla. */
 export async function broadcastLogout(options: { expired?: boolean } = {}): Promise<void> {
-  clearSessionClientState();
-  recordTelemetryEvent({ name: "auth_logout_broadcast" });
   try {
     await fetch("/api/session/logout", {
       method: "POST",
@@ -37,6 +35,13 @@ export async function broadcastLogout(options: { expired?: boolean } = {}): Prom
   } catch {
     // Best-effort: every open tab still redirects to login regardless.
   }
+  finishSessionLogout(options);
+}
+
+/** Call after a caller has confirmed the server-side session cookie was cleared. */
+export function finishSessionLogout(options: { expired?: boolean } = {}): void {
+  clearSessionClientState();
+  recordTelemetryEvent({ name: "auth_logout_broadcast" });
   getChannel()?.postMessage(LOGOUT_MESSAGE);
   if (typeof window !== "undefined") window.location.assign(options.expired ? expiredLoginUrl(window.location) : "/login");
 }

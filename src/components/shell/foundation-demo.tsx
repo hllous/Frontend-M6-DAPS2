@@ -30,11 +30,13 @@ function errorDescription(caught: unknown): string | undefined {
 
 export function FoundationDemo({
   scenarioId,
+  identity,
   logoutAction,
   children,
   contentReady = true,
 }: {
   scenarioId: ScenarioId;
+  identity?: { userId: string; label: string };
   logoutAction?: (formData: FormData) => void | Promise<void>;
   children?: ReactNode;
   contentReady?: boolean;
@@ -73,7 +75,7 @@ export function FoundationDemo({
         if (!response.ok) return;
         const body = await response.json() as { session?: PublicSession };
         const session = body.session;
-        if (!session || session.mode !== "backend-development" || !Array.isArray(session.roles)) return;
+        if (!session || session.mode === "mock" || !Array.isArray(session.roles)) return;
         setState((current) => {
           if (current.status !== "ready") return current;
           const actor = current.scenario.actor;
@@ -130,6 +132,6 @@ export function FoundationDemo({
   if (state.status === "ready" && state.scenario.roles.length === 0) return <ShellNoRole logoutAction={logoutAction} />;
   if (state.status === "error") return <main className="p-6"><ShellError onRetry={retry} description={state.description} /></main>;
   return (
-    <AppShell scenario={state.status === "ready" ? state.scenario : undefined} logoutAction={logoutAction} routeContent={children} contentReady={contentReady} />
+    <AppShell scenario={state.status === "ready" ? state.scenario : undefined} identity={identity} logoutAction={logoutAction} routeContent={children} contentReady={contentReady} />
   );
 }

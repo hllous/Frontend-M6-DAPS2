@@ -117,11 +117,13 @@ function useTabletNavigation() {
 
 export function AppShell({
   scenario,
+  identity,
   logoutAction,
   routeContent,
   contentReady = true,
 }: {
   scenario?: OperationalScenario;
+  identity?: { userId: string; label: string };
   logoutAction?: LogoutAction;
   routeContent?: ReactNode;
   contentReady?: boolean;
@@ -199,7 +201,7 @@ export function AppShell({
           {scenario ? (
             <>
               <p className={styles.contextLabel}>{actorLabel(scenario)}</p>
-              <p className={styles.actorName}>{scenario.actor.name}</p>
+              <p className={styles.actorName}>{identity ? `${identity.label} · ${identity.userId}` : scenario.actor.name}</p>
             </>
           ) : (
             <div className="flex h-10 flex-col justify-center gap-1">

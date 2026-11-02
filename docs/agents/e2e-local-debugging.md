@@ -30,6 +30,15 @@ session routes (`SESSION_MUTATION_HEADERS` in `src/lib/session-request.ts`):
 without it the route answers `403`, and without a JSON `content-type`, `415`,
 even when the server is healthy.
 
+When another Next dev server already uses the worktree's `.next/dev` lock,
+give the second server its own build directory. `M6_NEXT_DIST_DIR` defaults
+to `.next`; directories matching `.next-*` are ignored by Git:
+
+```powershell
+$env:M6_NEXT_DIST_DIR = ".next-real-m1"
+pnpm dev --port 3121
+```
+
 ## Killing a manually-started server on Windows
 
 Stopping a backgrounded `pnpm dev` does not reliably kill the
