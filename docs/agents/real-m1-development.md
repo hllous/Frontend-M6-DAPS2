@@ -21,9 +21,9 @@ El servidor solo escucha en `127.0.0.1`, rechaza la ejecución con `NODE_ENV=pro
 | Oficina · operaciones | `julian.lopez@m6.local` |
 | Oficina · ambiental | `diego.sosa@m6.local` |
 | Oficina · auditoría | `camila.medina@m6.local` |
-| Campo · responsable de cuadrilla | `diego.dominguez@m6.local` |
-| Campo · integrante de cuadrilla | `valeria.aguirre@m6.local` |
-| Campo · inspector | `lucia.lopez@m6.local` |
+| Campo · responsable de cuadrilla | `sofia.lopez@m6.local` |
+| Campo · integrante de cuadrilla | `diego.martinez@m6.local` |
+| Campo · inspector | `carlos.medina@m6.local` |
 | Empleado sin rol de M6 | `sin-rol@m6.local` |
 | Ciudadano (sin acceso a M6) | `ciudadano@m6.local` |
 | Cuenta inactiva | `inactivo@m6.local` |
@@ -43,6 +43,8 @@ $env:NODE_OPTIONS = "--import=./scripts/msw-real-m1-backend.mjs"
 $env:NEXT_PUBLIC_DISABLE_MSW = "true"
 pnpm dev --port 3121
 ```
+
+Para correr el e2e de este flujo, con ese servidor y el M1 falso arriba: `$env:M6_E2E_REAL_M1 = "true"; $env:PLAYWRIGHT_BASE_URL = "http://localhost:3121"; pnpm exec playwright test e2e/real-m1-login.spec.ts`. Sin `M6_E2E_REAL_M1=true` la spec se saltea, porque el e2e normal (y el CI) corren en modo mock.
 
 Abrí `http://localhost:3121/login`. El Backend MSW solo responde `GET /me` para estas pruebas y deriva roles de M6 de los perfiles de desarrollo; las rutas de dominio requieren un Backend disponible. La cuenta sin rol permite revisar el flujo de ingreso y la pantalla `/no-role` sin asignar capacidades.
 

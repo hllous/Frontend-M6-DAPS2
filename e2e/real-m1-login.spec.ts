@@ -19,6 +19,9 @@ async function expectNoSessionCookie(context: import("@playwright/test").Browser
 }
 
 test.describe("Ingreso real con M1", () => {
+  // Needs the fake M1 and the MSW backend of docs/agents/real-m1-development.md; the default e2e run is in mock mode.
+  test.skip(process.env.M6_E2E_REAL_M1 !== "true", "Solo con M6_E2E_REAL_M1=true contra el modo real-m1 (ver docs/agents/real-m1-development.md).");
+
   test("explica el arranque en frío mientras M1 responde", async ({ page }) => {
     await page.route("**/api/session/login", async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 500));

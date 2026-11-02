@@ -10,9 +10,9 @@ const employees = new Map([
   ["3", { roles: ["M6_OFICINA_OPERACIONES"] }],
   ["5", { roles: ["M6_OFICINA_AMBIENTAL"] }],
   ["8", { roles: ["M6_AUDITOR"] }],
-  ["101", { roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "crew-101", name: "Cuadrilla Demo", role: "LEADER" }] }],
-  ["102", { roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "crew-102", name: "Cuadrilla Demo", role: "MEMBER" }] }],
-  ["601", { roles: ["M6_CAMPO_INSPECTOR"] }],
+  ["10000", { roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "crew-10000", name: "Cuadrilla Demo", role: "LEADER" }] }],
+  ["10001", { roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "crew-10001", name: "Cuadrilla Demo", role: "MEMBER" }] }],
+  ["10070", { roles: ["M6_CAMPO_INSPECTOR"] }],
   ["900", { roles: [] }],
 ]);
 
