@@ -184,7 +184,9 @@ describe("street closure request BFF routes", () => {
     const forwardedBody = JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body));
     expect(forwardedBody).toMatchObject({
       closureType: "PARTIAL",
-      affectedSections: [{ streetName: "Bulevar Costero", direction: "FORWARD" }],
+      sections: [{ streetName: "Bulevar Costero", direction: "FORWARD" }],
     });
+    expect(forwardedBody).not.toHaveProperty("affectedSections");
+    expect(forwardedBody).not.toHaveProperty("sourceModule");
   });
 });
