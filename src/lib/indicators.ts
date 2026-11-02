@@ -144,6 +144,8 @@ export type IndicatorFreshness = { updatedAt: string };
 
 export type CoverageIndicator = Pick<CoverageWire, "targets" | "series" | "previous" | "delta"> & {
   family: "coverage";
+  /** Mensaje del backend cuando rechazó el intervalo de la serie; el resto de la familia sí llegó. */
+  seriesError?: string;
   period: IndicatorPeriod;
   freshness: IndicatorFreshness;
   primary: IndicatorMetric;
@@ -257,12 +259,13 @@ export function serializeIndicatorUrlState(state: Omit<IndicatorUrlState, "query
   return params.toString();
 }
 
-function queryString(query: IndicatorQuery, family: string) {
+function queryString(query: IndicatorQuery, family: string, withSeries = true) {
   const resolved = resolveIndicatorQuery(query);
   const start = new Date(`${resolved.from}T00:00:00Z`);
   const days = (Date.parse(`${resolved.to}T00:00:00Z`) - start.getTime()) / 86400000 + 1;
   const weeks = Math.ceil((days + (start.getUTCDay() + 6) % 7) / 7);
-  const params = new URLSearchParams({ from: resolved.from, to: resolved.to, compare: "previous", bucket: weeks > 90 ? "month" : "week" });
+  const params = new URLSearchParams({ from: resolved.from, to: resolved.to, compare: "previous" });
+  if (withSeries) params.set("bucket", weeks > 90 ? "month" : "week");
   if (familyAppliesCatalogFilters(family)) {
     if (resolved.zoneId) params.set("zoneId", resolved.zoneId);
     if (resolved.serviceTypeId) params.set("serviceTypeId", resolved.serviceTypeId);
@@ -436,8 +439,8 @@ function normalizeWaste(wire: WasteWire, readAt: string): WasteIndicator {
   };
 }
 
-async function get<T>(family: string, query: IndicatorQuery, schema: z.ZodType<T>, normalize: (wire: T, readAt: string) => T extends CoverageWire ? CoverageIndicator : T extends ComplianceWire ? ComplianceIndicator : T extends IncidentsWire ? IncidentsIndicator : WasteIndicator, message: string) {
-  const parsed = schema.safeParse(await request(`/api/indicators/${family}${queryString(query, family)}`));
+async function get<T>(family: string, query: IndicatorQuery, schema: z.ZodType<T>, normalize: (wire: T, readAt: string) => T extends CoverageWire ? CoverageIndicator : T extends ComplianceWire ? ComplianceIndicator : T extends IncidentsWire ? IncidentsIndicator : WasteIndicator, message: string, withSeries = true) {
+  const parsed = schema.safeParse(await request(`/api/indicators/${family}${queryString(query, family, withSeries)}`));
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "indicators" });
     throw new IndicatorContractError(message, { cause: parsed.error });
@@ -448,7 +451,20 @@ async function get<T>(family: string, query: IndicatorQuery, schema: z.ZodType<T
 }
 
 export const indicatorsAdapter = {
-  getCoverage(query: IndicatorQuery = {}) { return get("coverage", query, coverageWireSchema, normalizeCoverage, "La cobertura no respeta el contrato de indicadores."); },
+  async getCoverage(query: IndicatorQuery = {}): Promise<CoverageIndicator> {
+    const contractMessage = "La cobertura no respeta el contrato de indicadores.";
+    try {
+      return await get("coverage", query, coverageWireSchema, normalizeCoverage, contractMessage);
+    } catch (error) {
+      if (!(error instanceof IndicatorRequestError) || error.status !== 400) throw error;
+      // Si el rango no admite serie, el resto de la familia se muestra igual y la tendencia explica el rechazo.
+      try {
+        return { ...await get("coverage", query, coverageWireSchema, normalizeCoverage, contractMessage, false), seriesError: error.message };
+      } catch {
+        throw error;
+      }
+    }
+  },
   getCompliance(query: IndicatorQuery = {}) { return get("compliance", query, complianceWireSchema, normalizeCompliance, "El cumplimiento no respeta el contrato de indicadores."); },
   getIncidents(query: IndicatorQuery = {}) { return get("incidents", query, incidentsWireSchema, normalizeIncidents, "Las incidencias no respetan el contrato de indicadores."); },
   getWaste(query: IndicatorQuery = {}) { return get("waste", query, wasteWireSchema, normalizeWaste, "Los residuos no respetan el contrato de indicadores."); },

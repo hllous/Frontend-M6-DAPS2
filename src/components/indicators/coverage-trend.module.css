@@ -1,0 +1,25 @@
+/* Línea (#2A78D6, ranura 1) y meta (#EB6834, ranura 2) validadas con dataviz/validate_palette.js, modo claro: todas las pruebas pasan. */
+.trend { --color-trend-line: #2A78D6; --color-trend-target: #EB6834; display: flex; min-width: 0; flex-direction: column; gap: var(--space-12); }
+.header h2 { margin: 0; font-size: 19px; line-height: 1.3; }
+.header p { margin: var(--space-4) 0 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.45; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-16); margin: 0; padding: 0; list-style: none; color: var(--color-text-secondary); font-size: 12px; }
+.legend li { display: inline-flex; align-items: center; gap: var(--space-6); }
+.lineSwatch { width: 18px; height: 0; border-top: 2px solid var(--color-trend-line); }
+.targetSwatch { width: 18px; height: 0; border-top: 2px dashed var(--color-trend-target); }
+.gapSwatch { width: 10px; height: 10px; border: 2px dashed var(--color-text-secondary); border-radius: 50%; }
+.chart { width: 100%; min-width: 0; }
+.plot { width: 100%; height: 260px; min-width: 0; }
+.gapMarker { fill: var(--color-surface); stroke: var(--color-text-secondary); stroke-width: 2; stroke-dasharray: 3 2; }
+.hit.hit { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; outline: none; }
+.hit.hit:hover, .hit.hit:focus { background: transparent; box-shadow: inset 0 0 0 2px var(--color-trend-line); }
+.hit.hit:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 1px; }
+.detail { display: flex; align-items: baseline; gap: var(--space-8); }
+.detail strong { margin-inline-end: var(--space-8); }
+.detail span { color: var(--color-text-secondary); }
+.tableWrap { overflow-x: auto; }
+
+@media (max-width: 760px) {
+  .trend { margin-top: var(--space-12); padding: var(--space-14); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
+  .plot { height: 220px; }
+  .detail { align-items: flex-start; flex-direction: column; gap: var(--space-4); }
+}
