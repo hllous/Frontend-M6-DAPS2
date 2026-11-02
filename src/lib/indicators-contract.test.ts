@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { indicatorsAdapter } from "./indicators";
-import { coverageIndicatorFixture } from "./indicator-fixtures";
+import { coverageIndicatorFixture, incidentsStage2NoDataFixture } from "./indicator-fixtures";
 import { handlers } from "@/mocks/handlers";
 
 const server = setupServer(...handlers);
@@ -20,6 +20,24 @@ import { describe } from "vitest";
 
 
 describe("contrato de indicadores", () => {
+  it("usa días hábiles como resolución principal y conserva los días corridos", async () => {
+    const incidents = await indicatorsAdapter.getIncidents();
+
+    expect(incidents.primary).toEqual({ value: 1.8, label: "Resolución media de reportes", unit: "días hábiles" });
+    expect(incidents.reports.avgResolutionDays).toBe(2.4);
+  });
+
+  it("conserva los valores nulos de etapa 2 y la fecha de inicio del historial", async () => {
+    server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json(incidentsStage2NoDataFixture)));
+
+    const incidents = await indicatorsAdapter.getIncidents();
+
+    expect(incidents.reports.withinDeadline?.pct).toBeNull();
+    expect(incidents.reports.overdue?.pct).toBeNull();
+    expect(incidents.containers.history?.pendingDamage).toBeNull();
+    expect(incidents.containers.history?.trackingSince).toBe("2026-10-30T15:00:00.000Z");
+  });
+
   it("conserva series, comparación y metas sin número para las familias", async () => {
     const incidents = await indicatorsAdapter.getIncidents();
     const waste = await indicatorsAdapter.getWaste();

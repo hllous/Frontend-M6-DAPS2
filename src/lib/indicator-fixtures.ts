@@ -92,6 +92,25 @@ export const incidentsIndicatorFixture: IncidentsWire = {
   },
 };
 
+// Casos stage 2 sin base estadística. La fixture base conserva sus valores.
+export const incidentsStage2NoDataFixture: IncidentsWire = {
+  ...incidentsIndicatorFixture,
+  containers: {
+    ...incidentsIndicatorFixture.containers,
+    history: {
+      ...incidentsIndicatorFixture.containers.history!,
+      pendingDamage: null,
+      trackingSince: "2026-10-30T15:00:00.000Z",
+    },
+  },
+  reports: {
+    ...incidentsIndicatorFixture.reports,
+    withinDeadline: { resolved: 0, withinDeadline: 0, pct: null },
+    overdue: { open: 0, overdue: 0, pct: null },
+  },
+  delta: { ...incidentsIndicatorFixture.delta!, pendingDamage: null },
+};
+
 export const wasteIndicatorFixture: WasteWire = {
   period,
   totals: { weightKg: 24860, volumeM3: 176.4, divertedKg: 10620, divertedPct: 42.7 },

@@ -47,6 +47,7 @@ test.describe("operational indicator dashboard #138", () => {
   test("Coverage distinguishes upcoming work and flags low samples", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=dashboards");
+    await expect(page.getByRole("button", { name: "Cobertura: seleccionar familia" })).toContainText("82,2 %", { timeout: 15_000 });
     const detail = page.locator("section[aria-labelledby='indicator-detail-title']");
     await expect(detail.getByText("Programado a futuro").first()).toBeVisible();
     const small = detail.getByRole("row").filter({ hasText: "Intervención puntual" });
@@ -80,8 +81,8 @@ test.describe("operational indicator dashboard #138", () => {
   test("the dashboard alias opens the same gated Office surface", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/dashboard");
-    await expect(page).toHaveURL(/\/app\?destination=dashboards(&|$)/);
     await expect(page.getByRole("heading", { name: "Indicadores operativos" })).toBeVisible();
+    await expect(page).toHaveURL(/\/app\?destination=dashboards(&|$)/, { timeout: 15_000 });
   });
 
   test("Office can inspect exact Cobertura and Cumplimiento details", async ({ page }) => {
@@ -117,7 +118,7 @@ test.describe("operational indicator dashboard #138", () => {
 
     await page.getByRole("button", { name: /Incidencias/ }).click();
     await expect(page.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
-    await expect(page.getByText("Contenedores y arbolado: situación actual.")).toBeVisible();
+    await expect(page.getByText(/Estados de contenedores y riesgo de arbolado: situación actual/)).toBeVisible();
     await expect(page.getByText(/reportes consideran el período/i)).toHaveCount(0);
 
     await page.getByRole("button", { name: "Tabla", exact: true }).click();

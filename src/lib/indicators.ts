@@ -372,9 +372,9 @@ function normalizeIncidents(wire: IncidentsWire, readAt: string): IncidentsIndic
     targets: wire.targets ?? { resolutionBusinessDays: { value: 5, direction: "max" } }, series: wire.series, previous: wire.previous, delta: wire.delta,
     containers: wire.containers, reports: wire.reports,
     family: "incidents", period: wire.period, freshness: { updatedAt: readAt },
-    primary: { value: wire.reports.avgResolutionDays, label: "Resolución media de reportes", unit: "días" },
+    primary: { value: wire.reports.avgResolutionBusinessDays ?? null, label: "Resolución media de reportes", unit: "días hábiles" },
     breakdowns: [
-      { id: "containers", title: "Contenedores por zona", description: "Instantánea actual de incidentes por desborde y daño; valores en incidentes.", points: wire.containers.byZone.map((zone): IndicatorPoint => ({
+      { id: "containers", title: "Contenedores por zona", description: "Estado actual de desbordes y daños por zona; valores en incidentes.", points: wire.containers.byZone.map((zone): IndicatorPoint => ({
         id: zone.zoneId,
         label: zone.name,
         value: zone.overflowed + zone.damaged,
@@ -383,7 +383,7 @@ function normalizeIncidents(wire: IncidentsWire, readAt: string): IncidentsIndic
         details: [{ label: "Desbordes", value: zone.overflowed, unit: "incidentes" }, { label: "Daños", value: zone.damaged, unit: "incidentes" }, { label: "Contenedores", value: zone.total, unit: "contenedores" }],
         tone: zone.overflowed + zone.damaged > 4 ? "danger" : "primary",
       })) },
-      { id: "container-status", title: "Contenedores por estado", description: "Instantánea actual del parque de contenedores.", points: wire.containers.byStatus.map((item): IndicatorPoint => ({
+      { id: "container-status", title: "Contenedores por estado", description: "Estado actual del parque de contenedores.", points: wire.containers.byStatus.map((item): IndicatorPoint => ({
         id: item.status,
         label: labelFor(CONTAINER_STATUS_LABELS, item.status),
         value: item.count,
