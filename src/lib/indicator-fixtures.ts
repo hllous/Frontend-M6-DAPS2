@@ -111,3 +111,20 @@ export const wasteIndicatorFixture: WasteWire = {
   ],
   records: 148,
 };
+
+// Variantes de `series` para la tendencia de cobertura (#780). Las fixtures base no cambian.
+export const coverageWeeklySeries: NonNullable<CoverageWire["series"]> = [
+  { from: "2026-08-03", to: "2026-08-09", scheduled: 100, served: 90, partial: 4, notServiced: 2, pending: 4, upcoming: 0, coveragePct: 90 },
+  { from: "2026-08-10", to: "2026-08-16", scheduled: 120, served: 110, partial: 4, notServiced: 2, pending: 4, upcoming: 0, coveragePct: 91.7 },
+  { from: "2026-08-17", to: "2026-08-23", scheduled: 0, served: 0, partial: 0, notServiced: 0, pending: 0, upcoming: 6, coveragePct: 0 },
+  { from: "2026-08-24", to: "2026-08-30", scheduled: 80, served: 78, partial: 1, notServiced: 0, pending: 1, upcoming: 3, coveragePct: 97.5 },
+];
+
+export const coverageMonthlySeries: NonNullable<CoverageWire["series"]> = [
+  { from: "2026-07-15", to: "2026-07-31", scheduled: 50, served: 40, partial: 5, notServiced: 2, pending: 3, upcoming: 0, coveragePct: 80 },
+  { from: "2026-08-01", to: "2026-08-31", scheduled: 200, served: 190, partial: 4, notServiced: 2, pending: 4, upcoming: 0, coveragePct: 95 },
+];
+
+export const coverageWeeklyFixture: CoverageWire = { ...coverageIndicatorFixture, series: coverageWeeklySeries };
+export const coverageMonthlyFixture: CoverageWire = { ...coverageIndicatorFixture, series: coverageMonthlySeries };
+export const coverageWithoutSeriesFixture: CoverageWire = (({ series, ...rest }) => (void series, rest))(coverageIndicatorFixture);
