@@ -5,6 +5,7 @@ import {
   AuthUnavailableError,
   SESSION_ABSOLUTE_MS,
   SESSION_IDLE_MS,
+  createM1Session,
   createSession,
   effectiveSessionExpiry,
   getAuthMode,
@@ -61,6 +62,22 @@ describe("owned BFF session", () => {
     expect(effectiveSessionExpiry(session)).toBe(now + 20 * 60 * 1000);
     expect(isSessionActive(session, now + 19 * 60 * 1000)).toBe(true);
     expect(isSessionActive(session, now + 21 * 60 * 1000)).toBe(false);
+  });
+
+  it("keeps an M1 session alive past the access JWT expiry, bounded by idle and absolute expiry", () => {
+    const session = createM1Session({
+      accessToken: "header.payload.signature",
+      refreshToken: "refresh-test",
+      jwtExpiresAt: now + 15 * 60 * 1000,
+      identity: { userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO" },
+      roles: ["M6_ADMIN"],
+      now,
+    });
+
+    expect(effectiveSessionExpiry(session)).toBe(now + SESSION_IDLE_MS);
+    expect(isSessionActive(session, now + 16 * 60 * 1000)).toBe(true);
+    expect(isSessionActive(session, now + SESSION_IDLE_MS)).toBe(false);
+    expect(isSessionActive(session, session.absoluteExpiresAt)).toBe(false);
   });
 
   it("round-trips the server-only development credential through the sealed value", () => {
