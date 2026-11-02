@@ -1,3 +1,4 @@
+import { roleAssignmentRouteHandlers } from "./role-assignment-route-handlers";
 import { createSessionCookie } from "@/test/session";
 import { addressSearchRouteHandlers } from "./address-search-route-handlers";
 
@@ -17,6 +18,7 @@ const fieldCrewSessionCookie = createSessionCookie("field-crew-leader-route", { 
 
 export const handlers = [
   ...sharedHandlers,
+  ...roleAssignmentRouteHandlers(officeSessionCookie),
   ...addressSearchRouteHandlers(fieldCrewSessionCookie),
   ...serviceTypeRouteHandlers(officeSessionCookie),
   ...zoneRouteHandlers(officeSessionCookie),

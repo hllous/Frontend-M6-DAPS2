@@ -1,3 +1,4 @@
+import { resetRoleAssignmentFixtures } from "@/mocks/role-assignment-fixtures";
 import { NextResponse } from "next/server";
 
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
@@ -27,6 +28,7 @@ import { resetZoneFixtures } from "@/lib/zones-fixtures";
 
 /** Every in-memory fixture a mock-mode BFF route can mutate. Add new `reset*Fixtures` here. */
 const FIXTURE_RESETS = [
+  resetRoleAssignmentFixtures,
   resetContainerFixtures,
   resetCrewFixtures,
   resetDisposalSiteFixtures,

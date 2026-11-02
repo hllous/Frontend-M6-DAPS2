@@ -34,6 +34,7 @@ const FIELD_ROLES: readonly M6Role[] = ["M6_CAMPO_CUADRILLA", "M6_CAMPO_INSPECTO
  * (docs/api/endpoints.md); `null` = cualquier rol de M6. Es solo optimista: el backend decide (ADR-0005).
  */
 const ROLES_BY_CAPABILITY: Record<Capability, readonly M6Role[] | null> = {
+  "role:manage": ["M6_ADMIN"],
   "service:view": null,
   "inventory:view": null,
   "environmentalReport:view": null,

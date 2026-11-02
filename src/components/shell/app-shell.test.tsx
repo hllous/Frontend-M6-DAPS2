@@ -35,6 +35,7 @@ describe("AppShell", () => {
       ["Mapa", "/app?destination=map"],
       ["Catálogo", "/app?destination=catalog"],
       ["Tableros", "/app?destination=dashboards"],
+      ["Accesos", "/app/access"],
     ]);
     expect(within(moduleNavigation).queryAllByRole("button")).toHaveLength(0);
   });
