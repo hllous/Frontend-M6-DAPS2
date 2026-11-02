@@ -60,27 +60,31 @@ describe("metas de las tarjetas de indicadores", () => {
 
     const incidents = familyCard("Incidencias");
     expect(await within(incidents).findByText("Cumple la meta")).toBeVisible();
-    expect(within(incidents).getByText("Meta ≤ 5 días")).toBeVisible();
+    expect(within(incidents).getByText("1,8 días hábiles")).toBeVisible();
+    expect(within(incidents).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
     expect(within(incidents).getByText("menos es mejor")).toBeVisible();
+    expect(within(incidents).getByText(/Resolución media en días corridos:/)).toHaveTextContent("2,4 días");
 
     const waste = familyCard("Residuos");
     expect(await within(waste).findByText("Sin meta definida")).toBeVisible();
-    expect(within(waste).getByText("más es mejor")).toBeVisible();
+    expect(within(waste).queryByText("más es mejor")).not.toBeInTheDocument();
     expect(within(waste).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
   });
 
   it("marca sobre la meta cuando las incidencias superan el máximo", async () => {
     server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json({
       ...incidentsIndicatorFixture,
-      reports: { ...incidentsIndicatorFixture.reports, avgResolutionDays: 8.2 },
+      reports: { ...incidentsIndicatorFixture.reports, avgResolutionBusinessDays: 8.2 },
     })));
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     const incidents = familyCard("Incidencias");
     expect(await within(incidents).findByText("Sobre la meta")).toBeVisible();
-    expect(within(incidents).getByText("Meta ≤ 5 días")).toBeVisible();
+    expect(within(incidents).getByText("8,2 días hábiles")).toBeVisible();
+    expect(within(incidents).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
     expect(within(incidents).getByText("menos es mejor")).toBeVisible();
+    expect(within(incidents).getByText(/Resolución media en días corridos:/)).toHaveTextContent("2,4 días");
   });
 
   it("muestra los mismos datos de la familia seleccionada en la pestaña móvil Resumen", async () => {
@@ -102,7 +106,8 @@ describe("metas de las tarjetas de indicadores", () => {
     await user.click(incidents);
 
     const summary = screen.getByRole("tabpanel");
-    expect(within(summary).getByText("Meta ≤ 5 días")).toBeVisible();
+    expect(within(summary).getByText("1,8 días hábiles")).toBeVisible();
+    expect(within(summary).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
     expect(within(summary).getByText("menos es mejor")).toBeVisible();
     expect(within(summary).getByText("Cumple la meta")).toBeVisible();
   });

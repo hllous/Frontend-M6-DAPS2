@@ -215,7 +215,7 @@ describe("IndicatorsDashboard", () => {
     await user.click(screen.getByRole("button", { name: /Incidencias/ }));
 
     expect(screen.getAllByText(/Resolución media de reportes/)[0]).toBeVisible();
-    expect(screen.getByText("Contenedores y arbolado: situación actual.")).toBeVisible();
+    expect(screen.getByText(/Estados de contenedores y riesgo de arbolado: situación actual/)).toBeVisible();
     expect(screen.queryByText(/reportes consideran el período/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
 
@@ -234,16 +234,18 @@ describe("IndicatorsDashboard", () => {
     expect(within(wasteTable).getAllByText("62,8 m³")[0]).toBeVisible();
   });
 
-  it("shows fractional mean resolution days without rounding them away (#421)", async () => {
+  it("shows the fractional calendar-day average as secondary text without rounding it away (#421)", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("heading", { name: "Cobertura" });
     await user.click(screen.getByRole("button", { name: /Incidencias/ }));
-    expect((await screen.findAllByText("2,4 días"))[0]).toBeVisible();
+    const incidentsCard = screen.getByRole("button", { name: "Incidencias: seleccionar familia" });
+    expect(within(incidentsCard).getByText("1,8 días hábiles")).toBeVisible();
+    expect(screen.getByText(/Resolución media en días corridos:/)).toHaveTextContent("2,4 días");
   });
 
-  it("does not add a trailing decimal to whole mean resolution days (#421)", async () => {
+  it("does not add a trailing decimal to whole calendar-day averages (#421)", async () => {
     server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json({
       ...incidentsIndicatorFixture,
       reports: { ...incidentsIndicatorFixture.reports, avgResolutionDays: 2 },
@@ -253,8 +255,11 @@ describe("IndicatorsDashboard", () => {
 
     await screen.findByRole("heading", { name: "Cobertura" });
     await user.click(screen.getByRole("button", { name: /Incidencias/ }));
-    expect((await screen.findAllByText("2 días"))[0]).toBeVisible();
-    expect(screen.queryByText("2,0 días")).not.toBeInTheDocument();
+    const incidentsCard = screen.getByRole("button", { name: "Incidencias: seleccionar familia" });
+    expect(within(incidentsCard).getByText("1,8 días hábiles")).toBeVisible();
+    const calendarAverage = screen.getByText(/Resolución media en días corridos:/);
+    expect(calendarAverage).toHaveTextContent("Resolución media en días corridos: 2 días");
+    expect(calendarAverage).not.toHaveTextContent("2,0 días");
   });
 
   it("unions compliance detail columns across zones and leaves missing details empty (#421)", async () => {
@@ -345,19 +350,21 @@ describe("IndicatorsDashboard", () => {
     expect(screen.queryByRole("link", { name: /Ver árboles/i })).not.toBeInTheDocument();
   });
 
-  it("shows «Sin reportes cerrados» when the backend sends avgResolutionDays null (#302)", async () => {
+  it("shows «Sin reportes cerrados» as secondary text when avgResolutionDays is null (#302)", async () => {
     server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json({ ...incidentsIndicatorFixture, reports: { ...incidentsIndicatorFixture.reports, avgResolutionDays: null } })));
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     const familyBand = await screen.findByRole("region", { name: "Familias" });
     const incidentsButton = within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i });
-    expect(await within(incidentsButton).findByText("Sin reportes cerrados")).toBeVisible();
+    const calendarAverage = await within(incidentsButton).findByText(/Resolución media en días corridos:/);
+    expect(calendarAverage).toHaveTextContent("Sin reportes cerrados");
+    expect(within(incidentsButton).getByText("1,8 días hábiles")).toBeVisible();
     expect(within(familyBand).queryByText("No se pudo cargar Incidencias")).not.toBeInTheDocument();
 
     await user.click(incidentsButton);
     expect(await screen.findByRole("heading", { name: "Incidencias" })).toBeVisible();
-    expect(screen.getByText(/Resolución media de reportes:/).closest("p")).toHaveTextContent("Sin reportes cerrados");
+    expect(screen.getByText(/Resolución media de reportes:/).closest("p")).toHaveTextContent("1,8 días hábiles");
   });
 
   it("marks Incidencias and Residuos as empty when their families have no records", async () => {
@@ -369,6 +376,7 @@ describe("IndicatorsDashboard", () => {
     incidents.reports.byType = [];
     incidents.reports.byStatus = [];
     incidents.reports.avgResolutionDays = null;
+    incidents.reports.avgResolutionBusinessDays = null;
 
     const waste = structuredClone(wasteIndicatorFixture);
     waste.totals = { weightKg: 0, volumeM3: 0, divertedKg: 0, divertedPct: 0 };
