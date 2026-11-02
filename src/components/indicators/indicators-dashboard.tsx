@@ -31,6 +31,7 @@ import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { CoverageBreakdownTable } from "./coverage-breakdown-table";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
+import { IndicatorVariation, type IndicatorVariationDirection, type IndicatorVariationProps } from "./indicator-variation";
 
 import styles from "./indicators-dashboard.module.css";
 
@@ -195,6 +196,35 @@ function indicatorSummaryDetails(family: FamilyKey, value: number | null | undef
   return { targetLabel, directionLabel, status };
 }
 
+function knownVariationDirection(target: { direction: string } | null | undefined): IndicatorVariationDirection | undefined {
+  return target?.direction === "min" || target?.direction === "max" || target?.direction === "down"
+    ? target.direction
+    : undefined;
+}
+
+function indicatorVariationDetails(data: IndicatorData): Omit<IndicatorVariationProps, "id"> {
+  const previousPeriod = data.previous?.period;
+  const previous = previousPeriod ? { previousPeriod } : {};
+
+  if (data.family === "coverage") {
+    const direction = knownVariationDirection(data.targets?.coveragePct);
+    return { delta: data.delta?.coveragePct, unitKind: "percentage-points", ...previous, ...(direction ? { direction } : {}) };
+  }
+
+  if (data.family === "compliance") {
+    const direction = knownVariationDirection(data.targets?.compliancePct);
+    return { delta: data.delta?.onTimePct, unitKind: "percentage-points", ...previous, ...(direction ? { direction } : {}) };
+  }
+
+  if (data.family === "incidents") {
+    const direction = knownVariationDirection(data.targets?.resolutionBusinessDays);
+    return { delta: data.delta?.avgResolutionDays, unitKind: "days", ...previous, ...(direction ? { direction } : {}) };
+  }
+
+  const direction = knownVariationDirection(data.targets?.landfillDiversionPct);
+  return { delta: data.delta?.divertedPct, unitKind: "percentage-points", ...previous, ...(direction ? { direction } : {}) };
+}
+
 function indicatorSummaryDescription(targetLabel: string, directionLabel: string, status?: IndicatorSummaryStatus) {
   return [
     `${targetLabel}.`,
@@ -255,15 +285,18 @@ function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { sta
         const Icon = meta.icon;
         const summary = indicatorSummaryDetails(family, item?.primary.value, state.status === "ready", item);
         const descriptionId = `indicator-${family}-summary-description`;
+        const variation = item ? indicatorVariationDetails(item) : null;
+        const variationId = `indicator-${family}-variation-description`;
         return <Card className={styles.summaryCard} data-state={state.status} key={family} size="sm">
-          <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`} aria-describedby={descriptionId}>
+          <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`} aria-describedby={variation ? `${descriptionId} ${variationId}` : descriptionId}>
             <span className={styles.summaryCardHeader}><span className="text-sm font-semibold text-muted-foreground">{meta.label}</span><span className={`${styles.summaryIcon} size-8 rounded-lg bg-muted text-primary`}><Icon size={17} aria-hidden /></span></span>
             {state.status === "loading" && !item ? <Skeleton aria-hidden className="h-[30px] w-24" /> : <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item ? familySummary(item) : "—"}</span>}
             <span className="text-xs leading-snug text-muted-foreground">{item?.primary.label ?? meta.description}</span>
+            {variation ? <IndicatorVariation id={variationId} {...variation} /> : null}
             <span className={styles.summaryTargetDetails}>
               <span className="text-xs font-semibold text-foreground">{summary.targetLabel}</span>
               <span className="text-xs text-muted-foreground">{summary.directionLabel}</span>
-              {summary.status ? <Badge variant={summary.status.variant} aria-hidden="true">
+              {summary.status ? <Badge className="h-auto min-h-6 py-1" variant={summary.status.variant} aria-hidden="true">
                 {summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}
                 {summary.status.label}
               </Badge> : null}
