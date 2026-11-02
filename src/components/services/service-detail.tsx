@@ -28,13 +28,25 @@ import {
   REPAIR_SEVERITY_LABEL,
   type RepairRequest,
 } from "@/lib/repair-requests";
-import { formatCalendarDay } from "@/lib/argentina-date";
+import { formatArgentinaNumericDateTime, formatCalendarDay } from "@/lib/argentina-date";
 import { checkServiceWindowTiming, type Service } from "@/lib/services";
-import type { StreetClosureDependency } from "@/lib/street-closure-requests";
+import type { StreetClosureDependency, StreetClosureRequest } from "@/lib/street-closure-requests";
 import { StatusBadge } from "./status-badge";
 import { ZoneExecutionPanel } from "./zone-execution-panel";
 import { InspectionExecutionPanel } from "./inspection-execution-panel";
 import { SERVICE_ORIGIN_LABEL, serviceTargetTypeLabel } from "./service-ui-labels";
+
+function approvedClosurePeriod(request: StreetClosureRequest | null): string {
+  const from = request?.approvedFrom;
+  const to = request?.approvedTo;
+  if (!from && !to) return "Sin informar";
+  const format = (value: string) => formatArgentinaNumericDateTime(value).replace(",", "");
+  return `${from ? format(from) : "Sin informar"} – ${to ? format(to) : "Sin informar"}`;
+}
+
+function closureRejectionReason(request: StreetClosureRequest | null): string {
+  return request?.rejectionReason || "Sin informar";
+}
 
 export function ServiceDetail({
   service,
@@ -314,6 +326,9 @@ export function ServiceDetail({
               className="p-4 text-sm text-[var(--color-success)]"
             >
               <p className="font-bold">Corte de calle aprobado</p>
+              <p className="mt-1 text-sm">
+                Período autorizado: {approvedClosurePeriod(streetClosureDependency.request)}
+              </p>
             </Alert>
           )}
 
@@ -342,6 +357,9 @@ export function ServiceDetail({
               <p className="mt-1 text-sm text-[var(--color-warning)]">
                 El corte venció sin usarse.
               </p>
+              <p className="mt-1 text-sm text-[var(--color-warning)]">
+                Período autorizado: {approvedClosurePeriod(streetClosureDependency.request)}
+              </p>
             </Alert>
           )}
 
@@ -358,6 +376,9 @@ export function ServiceDetail({
               </div>
               <p className="mt-1 text-sm text-[var(--color-danger)]">
                 Tránsito rechazó el corte. Reprograme o cancele el servicio.
+              </p>
+              <p className="mt-1 text-sm text-[var(--color-danger)]">
+                Motivo del rechazo: {closureRejectionReason(streetClosureDependency.request)}
               </p>
               {(onRejectedClosureReschedule || onRejectedClosureCancel) && (
                 <div className="mt-3 flex flex-wrap gap-2">
