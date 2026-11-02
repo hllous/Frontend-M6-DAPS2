@@ -11,6 +11,7 @@ import { zoneRouteHandlers } from "./zone-route-handlers";
 import { publicRouteHandlers } from "./public-route-handlers";
 import { serviceRouteHandlers } from "./service-route-handlers";
 import { streetRepairRouteHandlers } from "./street-repair-route-handlers";
+import { integrationMonitorRouteHandlers } from "./integration-monitor-route-handlers";
 
 const officeSessionCookie = createSessionCookie("office-duty-queue", { mode: "mock" });
 const fieldCrewSessionCookie = createSessionCookie("field-crew-leader-route", { mode: "mock" });
@@ -26,5 +27,6 @@ export const handlers = [
   ...treeRouteHandlers(officeSessionCookie, fieldCrewSessionCookie),
   ...containerRouteHandlers(officeSessionCookie, fieldCrewSessionCookie),
   ...crewVehicleRouteHandlers(officeSessionCookie),
+  ...integrationMonitorRouteHandlers(officeSessionCookie),
   ...publicRouteHandlers(),
 ];
