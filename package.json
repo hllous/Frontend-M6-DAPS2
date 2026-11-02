@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:fake-m1": "node scripts/fake-m1.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --cache",

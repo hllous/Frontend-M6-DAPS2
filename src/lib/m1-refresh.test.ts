@@ -71,6 +71,7 @@ afterEach(() => {
   delete process.env.M6_AUTH_MODE;
   delete process.env.M6_BACKEND_ORIGIN;
   delete process.env.M1_BASE_URL;
+  delete process.env.M1_FAKE_ENABLED;
   vi.unstubAllEnvs();
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -295,8 +296,8 @@ describe("cuándo se renueva", () => {
     expect(m1Calls(fetchSpy)).toHaveLength(renews ? 1 : 0);
   });
 
-  it("un access token ya vencido no se puede renovar: la sesión no está activa y va al login", async () => {
-    const { request } = build(inSeconds(600), { jwtExpiresAt: Date.now() - 5_000 });
+  it("una sesión de desarrollo con access token vencido no está activa y va al login", async () => {
+    const { request } = build(inSeconds(600), { jwtExpiresAt: Date.now() - 5_000, source: undefined });
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
     await expect(fetchBackend(request, "/services")).rejects.toBeInstanceOf(InvalidSessionError);
@@ -340,6 +341,20 @@ describe("cuándo se renueva", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 401 }));
 
     await fetchBackend(request, "/services");
+    expect(m1Calls(fetchSpy)).toHaveLength(0);
+  });
+
+  it("en producción rechaza el M1 falso incluso si usa HTTPS", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("M6_SESSION_SECRET", "test-secret");
+    process.env.M1_BASE_URL = "https://m1.internal";
+    process.env.M1_FAKE_ENABLED = "true";
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { request } = near();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 401 }));
+
+    await fetchBackend(request, "/services");
+
     expect(m1Calls(fetchSpy)).toHaveLength(0);
   });
 
