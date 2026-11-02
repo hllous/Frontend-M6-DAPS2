@@ -106,6 +106,62 @@ describe("ReferralsWorkspace", () => {
     expect(within(detail).queryByText(/módulo de origen/)).not.toBeInTheDocument();
   });
 
+  it("shows section directions in the list and detail, with final M7 response fields", async () => {
+    const base = fixtureReferrals().find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "SERVICE");
+    if (!base || base.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a StreetClosureRequest fixture");
+    const approved = {
+      ...base,
+      id: "SCR-APPROVED",
+      status: "APPROVED" as const,
+      request: {
+        ...base.request,
+        id: "SCR-APPROVED",
+        status: "APPROVED" as const,
+        affectedSections: [
+          { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12", direction: "FORWARD" as const },
+          { streetName: "Av. Independencia", fromCross: "Calle 1", toCross: "Calle 2" },
+        ],
+        startDate: "2026-10-01T09:00:00.000Z",
+        endDate: "2026-10-01T12:00:00.000Z",
+      },
+    };
+    const rejected = {
+      ...base,
+      id: "SCR-REJECTED",
+      status: "REJECTED" as const,
+      request: {
+        ...base.request,
+        id: "SCR-REJECTED",
+        status: "REJECTED" as const,
+        rejectionReason: "Debe quedar libre el corredor durante el evento.",
+      },
+    };
+    server.use(http.get("*/api/referrals", () => HttpResponse.json({ data: [approved, rejected], meta: { total: 2 } })));
+
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    const approvedRow = within(list).getByRole("button", { name: /SCR-APPROVED/ });
+    expect(approvedRow).toHaveAccessibleName(expect.stringContaining("Bulevar Costero: Ascendente"));
+    expect(within(list).getByText(/Av\. Independencia: Sentido no informado/)).toBeVisible();
+    await user.click(approvedRow);
+
+    const approvedDetail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
+    expect(within(approvedDetail).getByText("Sentido: Ascendente")).toBeVisible();
+    expect(within(approvedDetail).getByText("Sentido no informado")).toBeVisible();
+    expect(within(approvedDetail).getByText("Período autorizado")).toBeVisible();
+    expect(within(approvedDetail).getByText(/01\/10\/2026/)).toBeVisible();
+
+    await user.click(within(approvedDetail).getByRole("button", { name: "Volver a derivaciones" }));
+    const returnedList = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(returnedList).getByRole("button", { name: /SCR-REJECTED/ }));
+
+    const rejectedDetail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
+    expect(within(rejectedDetail).getByText("Motivo del rechazo")).toBeVisible();
+    expect(within(rejectedDetail).getByText("Debe quedar libre el corredor durante el evento.")).toBeVisible();
+  });
+
   it("exposes an EnvironmentalInspection source and keeps the RepairRequest pending", async () => {
     addRepairRequestFixture({
       id: "RR-INS-1012",

@@ -29,14 +29,28 @@ import type { Service } from "@/lib/services";
 import type { TreeIntervention } from "@/lib/tree-interventions";
 import {
   createStreetClosureRequestInputSchema,
+  streetClosureDirectionLabel,
   streetClosureRequestsAdapter,
-  type AffectedSection,
+  type CreateAffectedSection,
   type CreateStreetClosureRequestInput,
   type StreetClosureRequest,
+  type StreetClosureDirection,
   type StreetClosureType,
 } from "@/lib/street-closure-requests";
 
-const EMPTY_SECTION: AffectedSection = { streetName: "", fromCross: "", toCross: "" };
+type StreetClosureSectionDraft = Omit<CreateAffectedSection, "direction"> & {
+  direction: StreetClosureDirection | "";
+};
+type StreetClosureRequestDraft = Omit<CreateStreetClosureRequestInput, "affectedSections"> & {
+  affectedSections: StreetClosureSectionDraft[];
+};
+
+const EMPTY_SECTION: StreetClosureSectionDraft = {
+  streetName: "",
+  fromCross: "",
+  toCross: "",
+  direction: "",
+};
 
 type FormErrors = Record<string, string>;
 
@@ -57,7 +71,7 @@ type StreetClosureSource =
   | { kind: "SERVICE"; record: Service }
   | { kind: "TREE_INTERVENTION"; record: TreeIntervention };
 
-function initialForm(source: StreetClosureSource): CreateStreetClosureRequestInput {
+function initialForm(source: StreetClosureSource): StreetClosureRequestDraft {
   if (source.kind === "TREE_INTERVENTION") {
     return {
       reason: "",
@@ -72,8 +86,16 @@ function initialForm(source: StreetClosureSource): CreateStreetClosureRequestInp
   }
 
   const service = source.record;
-  const stored = getFieldDraft<CreateStreetClosureRequestInput>(service.id, "streetClosureRequest");
-  if (stored?.payload) return stored.payload;
+  const stored = getFieldDraft<StreetClosureRequestDraft>(service.id, "streetClosureRequest");
+  if (stored?.payload) {
+    return {
+      ...stored.payload,
+      affectedSections: stored.payload.affectedSections.map((section) => ({
+        ...section,
+        direction: section.direction ?? "",
+      })),
+    };
+  }
   return {
     reason: "",
     sourceType: "SERVICE",
@@ -117,7 +139,7 @@ export function CreateStreetClosureRequestDialog({
   onCreated?: (request: StreetClosureRequest) => void;
 }) {
   const source = sourceFromProps(service, treeIntervention);
-  const [form, setForm] = useState<CreateStreetClosureRequestInput | null>(
+  const [form, setForm] = useState<StreetClosureRequestDraft | null>(
     source ? initialForm(source) : null,
   );
   const [requestedWindow, setRequestedWindow] = useState(() => ({
@@ -145,9 +167,9 @@ export function CreateStreetClosureRequestDialog({
     onOpenChange(nextOpen);
   }
 
-  function updateForm<K extends keyof CreateStreetClosureRequestInput>(
+  function updateForm<K extends keyof StreetClosureRequestDraft>(
     key: K,
-    value: CreateStreetClosureRequestInput[K],
+    value: StreetClosureRequestDraft[K],
   ) {
     setForm((current) => (current ? { ...current, [key]: value } : current));
     setErrors((current) => {
@@ -171,7 +193,11 @@ export function CreateStreetClosureRequestDialog({
     });
   }
 
-  function updateSection(index: number, key: keyof AffectedSection, value: string) {
+  function updateSection<K extends keyof StreetClosureSectionDraft>(
+    index: number,
+    key: K,
+    value: StreetClosureSectionDraft[K],
+  ) {
     setForm((current) => {
       if (!current) return current;
       const affectedSections = current.affectedSections.map((section, sectionIndex) =>
@@ -452,6 +478,36 @@ export function CreateStreetClosureRequestDialog({
                         {errors[`affectedSections.${index}.toCross`] && <FieldError id={`affected-section-${index}-to-error`}>{errors[`affectedSections.${index}.toCross`]}</FieldError>}
                       </Field>
                     </FieldGroup>
+                    <Field data-invalid={Boolean(errors[`affectedSections.${index}.direction`]) || undefined}>
+                      <FieldLabel htmlFor={`affected-section-${index}-direction`}>Sentido *</FieldLabel>
+                      <Select
+                        value={section.direction || null}
+                        onValueChange={(value) => updateSection(index, "direction", value as StreetClosureDirection)}
+                      >
+                        <SelectTrigger
+                          id={`affected-section-${index}-direction`}
+                          aria-required="true"
+                          aria-invalid={Boolean(errors[`affectedSections.${index}.direction`]) || undefined}
+                          aria-describedby={errors[`affectedSections.${index}.direction`] ? `affected-section-${index}-direction-error` : undefined}
+                        >
+                          <SelectValue placeholder="Seleccione un sentido">
+                            {section.direction ? streetClosureDirectionLabel(section.direction) : undefined}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="FORWARD">Ascendente</SelectItem>
+                            <SelectItem value="REVERSE">Descendente</SelectItem>
+                            <SelectItem value="BOTH">Ambos sentidos</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      {errors[`affectedSections.${index}.direction`] && (
+                        <FieldError id={`affected-section-${index}-direction-error`}>
+                          {errors[`affectedSections.${index}.direction`]}
+                        </FieldError>
+                      )}
+                    </Field>
                     <Button
                       type="button"
                       variant="outline"
