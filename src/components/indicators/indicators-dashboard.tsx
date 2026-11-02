@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime, todayInArgentina } from "@/lib/argentina-date";
 import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
-import { familyAppliesCatalogFilters, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, INDICATOR_TARGETS, type IndicatorBreakdown, type IndicatorData, type IndicatorPeriod, type IndicatorPoint, type IndicatorQuery } from "@/lib/indicators";
+import { defaultIndicatorTarget, familyAppliesCatalogFilters, hasNumericThreshold, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPeriod, type IndicatorPoint, type IndicatorQuery, type IndicatorTarget } from "@/lib/indicators";
 import { serviceSourceHref } from "@/lib/referrals";
 import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
@@ -33,6 +33,7 @@ import { CoverageBreakdownTable } from "./coverage-breakdown-table";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
 import { CoverageTrend } from "./coverage-trend";
 import { IndicatorVariation, type IndicatorVariationDirection, type IndicatorVariationProps } from "./indicator-variation";
+import { formatIndicatorNumber } from "./number-format";
 
 import styles from "./indicators-dashboard.module.css";
 
@@ -156,7 +157,7 @@ function containerToTraceRecord(container: Container, zones: Map<string, string>
 }
 
 function formatNumber(value: number, unit: string) {
-  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: unit === "%" || unit === "h" || unit === "m³" || unit === "días" || unit === "días hábiles" ? 1 : 0 }).format(value);
+  return formatIndicatorNumber(value, { maximumFractionDigits: unit === "%" || unit === "h" || unit === "m³" || unit.startsWith("días") ? 1 : 0 });
 }
 
 function formatDate(value: string) {
@@ -173,18 +174,28 @@ function familySummary(data: IndicatorData) {
 
 type IndicatorSummaryStatus = { label: string; variant: "success" | "danger" };
 
+function primaryTarget(family: FamilyKey, data?: IndicatorData): IndicatorTarget | undefined {
+  if (!data) return defaultIndicatorTarget(family);
+  if (data.family === "incidents") {
+    if (data.targets?.resolutionBusinessDays !== undefined) return data.targets.resolutionBusinessDays;
+    if (data.reports.deadlineBusinessDays !== undefined) return { value: data.reports.deadlineBusinessDays, direction: "max" };
+    return data.targets === undefined ? defaultIndicatorTarget(family) : undefined;
+  }
+  if (data.targets === undefined) return defaultIndicatorTarget(family);
+  if (data.family === "coverage") return data.targets?.coveragePct;
+  if (data.family === "compliance") return data.targets?.compliancePct;
+  return data.targets?.landfillDiversionPct;
+}
+
 function indicatorSummaryDetails(family: FamilyKey, value: number | null | undefined, showStatus: boolean, data?: IndicatorData) {
-  const backend = data?.family === "coverage" ? data.targets?.coveragePct : data?.family === "compliance" ? data.targets?.compliancePct : data?.family === "incidents" ? data.targets?.resolutionBusinessDays : data?.targets?.landfillDiversionPct;
-  const incidentDeadline = data?.family === "incidents" ? data.reports.deadlineBusinessDays : undefined;
-  const targetValue = incidentDeadline ?? backend?.value;
-  const targetDirection = backend?.direction ?? (incidentDeadline !== undefined ? "max" : undefined);
-  const definition = backend === undefined && data?.targets === undefined ? INDICATOR_TARGETS[family] : {
-    target: targetValue != null && (targetDirection === "min" || targetDirection === "max") ? { comparator: targetDirection === "min" ? "≥" as const : "≤" as const, value: targetValue, unit: family === "incidents" ? "días hábiles" as const : "%" as const } : null,
-    direction: targetDirection === "max" ? "less-is-better" as const : "more-is-better" as const,
+  const target = primaryTarget(family, data);
+  const definition = {
+    target: hasNumericThreshold(target) ? { comparator: target.direction === "min" ? "≥" as const : "≤" as const, value: target.value, unit: family === "incidents" ? "días hábiles" as const : "%" as const } : null,
+    direction: target?.direction === "max" || target?.direction === "down" ? "less-is-better" as const : "more-is-better" as const,
   };
   const targetLabel = definition.target
     ? `Meta ${definition.target.comparator} ${formatNumber(definition.target.value, definition.target.unit)} ${definition.target.unit}`
-    : backend?.direction === "down" ? "Tendencia descendente" : "Sin meta definida";
+    : target?.direction === "down" ? "Tendencia descendente" : "Sin meta definida";
   const directionLabel = definition.target ? (definition.direction === "more-is-better" ? "más es mejor" : "menos es mejor") : "";
   let status: IndicatorSummaryStatus | undefined;
 
@@ -206,27 +217,50 @@ function knownVariationDirection(target: { direction: string } | null | undefine
     : undefined;
 }
 
-function indicatorVariationDetails(data: IndicatorData): Omit<IndicatorVariationProps, "id"> {
-  const previousPeriod = data.previous?.period;
-  const previous = previousPeriod ? { previousPeriod } : {};
+function computedPreviousPeriod(period: IndicatorPeriod) {
+  const start = new Date(`${period.from}T00:00:00.000Z`);
+  const end = new Date(`${period.to}T00:00:00.000Z`);
+  const day = 86400000;
+  const duration = (end.getTime() - start.getTime()) / day + 1;
+  if (!Number.isInteger(duration) || duration < 1 || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return undefined;
 
+  const previousTo = new Date(start);
+  previousTo.setUTCDate(previousTo.getUTCDate() - 1);
+  const previousFrom = new Date(previousTo);
+  previousFrom.setUTCDate(previousFrom.getUTCDate() - duration + 1);
+  return { from: previousFrom.toISOString().slice(0, 10), to: previousTo.toISOString().slice(0, 10) };
+}
+
+function comparisonPeriod(data: IndicatorData, delta: number | null | undefined) {
+  return data.previous?.period ?? (delta === null || delta === undefined ? undefined : computedPreviousPeriod(data.period));
+}
+
+function indicatorVariationDetails(data: IndicatorData): Omit<IndicatorVariationProps, "id"> {
   if (data.family === "coverage") {
-    const direction = knownVariationDirection(data.targets?.coveragePct);
-    return { delta: data.delta?.coveragePct, unitKind: "percentage-points", ...previous, ...(direction ? { direction } : {}) };
+    const delta = data.delta?.coveragePct;
+    const direction = knownVariationDirection(primaryTarget(data.family, data));
+    const previousPeriod = comparisonPeriod(data, delta);
+    return { delta, unitKind: "percentage-points", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
   }
 
   if (data.family === "compliance") {
-    const direction = knownVariationDirection(data.targets?.compliancePct);
-    return { delta: data.delta?.onTimePct, unitKind: "percentage-points", ...previous, ...(direction ? { direction } : {}) };
+    const delta = data.delta?.onTimePct;
+    const direction = knownVariationDirection(primaryTarget(data.family, data));
+    const previousPeriod = comparisonPeriod(data, delta);
+    return { delta, unitKind: "percentage-points", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
   }
 
   if (data.family === "incidents") {
-    const direction = knownVariationDirection(data.targets?.resolutionBusinessDays);
-    return { delta: data.delta?.avgResolutionBusinessDays, unitKind: "days", ...previous, ...(direction ? { direction } : {}) };
+    const delta = data.reports.avgResolutionBusinessDays === undefined ? data.delta?.avgResolutionDays : data.delta?.avgResolutionBusinessDays;
+    const direction = knownVariationDirection(primaryTarget(data.family, data));
+    const previousPeriod = comparisonPeriod(data, delta);
+    return { delta, unitKind: "days", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
   }
 
-  const direction = knownVariationDirection(data.targets?.landfillDiversionPct);
-  return { delta: data.delta?.divertedPct, unitKind: "percentage-points", ...previous, ...(direction ? { direction } : {}) };
+  const delta = data.delta?.divertedPct;
+  const direction = knownVariationDirection(primaryTarget(data.family, data));
+  const previousPeriod = comparisonPeriod(data, delta);
+  return { delta, unitKind: "percentage-points", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
 }
 
 function indicatorSummaryDescription(targetLabel: string, directionLabel: string, status?: IndicatorSummaryStatus) {
@@ -239,7 +273,7 @@ function indicatorSummaryDescription(targetLabel: string, directionLabel: string
 
 function indicatorTargetLabel(target: { direction: string; value: number | null } | null | undefined, unit: string) {
   if (target?.direction === "down") return "Meta: tendencia descendente";
-  if (target?.value == null || (target.direction !== "min" && target.direction !== "max")) return "Sin meta definida";
+  if (!hasNumericThreshold(target)) return "Sin meta definida";
   const comparator = target.direction === "min" ? "≥" : "≤";
   return `Meta ${comparator} ${formatNumber(target.value, unit)} ${unit}`;
 }
@@ -256,7 +290,7 @@ function AdditionalIndicators({ data }: { data: IndicatorData }) {
           <strong className="text-2xl font-semibold leading-none tabular-nums">{formatNumber(deviation.deviatedPct, "%")} %</strong>
           <p className="text-sm leading-snug text-muted-foreground">{formatNumber(deviation.deviated, "servicios")} de {formatNumber(deviation.total, "servicios")} servicios se desviaron de la programación.</p>
           <p className="text-xs font-semibold text-foreground">{indicatorTargetLabel(data.targets?.schedulingDeviationPct, "%")}</p>
-          <IndicatorVariation delta={data.delta?.deviatedPct} unitKind="percentage-points" direction={knownVariationDirection(data.targets?.schedulingDeviationPct)} previousPeriod={data.previous?.period} />
+          <IndicatorVariation delta={data.delta?.deviatedPct} unitKind="percentage-points" direction={knownVariationDirection(data.targets?.schedulingDeviationPct)} previousPeriod={comparisonPeriod(data, data.delta?.deviatedPct)} />
         </CardContent>
       </Card>
     </section>;
@@ -265,8 +299,6 @@ function AdditionalIndicators({ data }: { data: IndicatorData }) {
   if (data.family !== "incidents") return null;
   const { reports, containers } = data;
   const history = containers.history;
-  const hasCards = Boolean(reports.withinDeadline || reports.overdue || history);
-  if (!hasCards) return null;
 
   return <section className={styles.indicatorMetricGrid} aria-label="Indicadores complementarios de Incidencias">
     {reports.withinDeadline ? <Card role="group" aria-labelledby="indicator-within-deadline-title" size="sm" className={styles.indicatorMetricCard}>
@@ -275,7 +307,7 @@ function AdditionalIndicators({ data }: { data: IndicatorData }) {
         <strong className="text-2xl font-semibold leading-none tabular-nums">{reports.withinDeadline.pct === null ? "Sin datos" : `${formatNumber(reports.withinDeadline.pct, "%")} %`}</strong>
         <p className="text-sm leading-snug text-muted-foreground">{reports.withinDeadline.resolved === 0 ? "No hubo reportes resueltos." : `${formatNumber(reports.withinDeadline.withinDeadline, "reportes")} de ${formatNumber(reports.withinDeadline.resolved, "reportes")} reportes se resolvieron en plazo.`}</p>
         <p className="text-xs font-semibold text-foreground">{indicatorTargetLabel(data.targets?.reportsWithinDeadlinePct, "%")}</p>
-        <IndicatorVariation delta={data.delta?.withinDeadlinePct} unitKind="percentage-points" direction={knownVariationDirection(data.targets?.reportsWithinDeadlinePct)} previousPeriod={data.previous?.period} />
+        <IndicatorVariation delta={data.delta?.withinDeadlinePct} unitKind="percentage-points" direction={knownVariationDirection(data.targets?.reportsWithinDeadlinePct)} previousPeriod={comparisonPeriod(data, data.delta?.withinDeadlinePct)} />
       </CardContent>
     </Card> : null}
     {reports.overdue ? <Card role="group" aria-labelledby="indicator-overdue-title" size="sm" className={styles.indicatorMetricCard}>
@@ -286,26 +318,26 @@ function AdditionalIndicators({ data }: { data: IndicatorData }) {
         <p className="text-xs font-semibold text-foreground">{indicatorTargetLabel(data.targets?.reportsOverduePct, "%")}</p>
       </CardContent>
     </Card> : null}
-    {history ? <Card role="group" aria-labelledby="indicator-container-overflows-title" size="sm" className={styles.indicatorMetricCard}>
+    <Card role="group" aria-labelledby="indicator-container-overflows-title" size="sm" className={styles.indicatorMetricCard}>
       <CardHeader><CardTitle id="indicator-container-overflows-title">Desbordes de contenedores</CardTitle></CardHeader>
       <CardContent className={styles.indicatorMetricContent}>
-        <strong className="text-2xl font-semibold leading-none tabular-nums">{formatNumber(history.overflowIncidents, "incidentes")} incidentes</strong>
-        <p className="text-sm leading-snug text-muted-foreground">Eventos de desborde durante el período.</p>
+        <strong className="text-2xl font-semibold leading-none tabular-nums">{history ? `${formatNumber(history.overflowIncidents, "incidentes")} incidentes` : "Sin dato"}</strong>
+        <p className="text-sm leading-snug text-muted-foreground">{history ? "Eventos de desborde durante el período." : "No hay datos del historial para el período."}</p>
         <p className="text-xs font-semibold text-foreground">{indicatorTargetLabel(data.targets?.overflowTrend, "incidentes")}</p>
-        <IndicatorVariation delta={data.delta?.overflowIncidents} unitKind="count" direction={knownVariationDirection(data.targets?.overflowTrend)} previousPeriod={data.previous?.period} />
+        <IndicatorVariation delta={data.delta?.overflowIncidents} unitKind="count" direction={knownVariationDirection(data.targets?.overflowTrend)} previousPeriod={comparisonPeriod(data, data.delta?.overflowIncidents)} />
       </CardContent>
-    </Card> : null}
-    {history ? <Card role="group" aria-labelledby="indicator-pending-container-damage-title" size="sm" className={styles.indicatorMetricCard}>
+    </Card>
+    <Card role="group" aria-labelledby="indicator-pending-container-damage-title" size="sm" className={styles.indicatorMetricCard}>
       <CardHeader><CardTitle id="indicator-pending-container-damage-title">Contenedores con daños pendientes</CardTitle></CardHeader>
       <CardContent className={styles.indicatorMetricContent}>
-        <strong className="text-2xl font-semibold leading-none tabular-nums">{history.pendingDamage === null ? "Sin dato" : `${formatNumber(history.pendingDamage, "contenedores")} contenedores`}</strong>
-        <p className="text-sm leading-snug text-muted-foreground">{history.pendingDamage === null
-          ? history.trackingSince ? `Historial disponible desde ${formatArgentinaCalendarDate(history.trackingSince)}.` : "No se informó cuándo comienza el historial."
+        <strong className="text-2xl font-semibold leading-none tabular-nums">{history?.pendingDamage == null ? "Sin dato" : `${formatNumber(history.pendingDamage, "contenedores")} contenedores`}</strong>
+        <p className="text-sm leading-snug text-muted-foreground">{history?.pendingDamage == null
+          ? history?.trackingSince ? `Historial disponible desde ${formatArgentinaCalendarDate(history.trackingSince)}.` : "No se informó cuándo comienza el historial."
           : "Contenedores dañados o en reparación al cierre del período."}</p>
         <p className="text-xs font-semibold text-foreground">{indicatorTargetLabel(data.targets?.pendingDamageTrend, "contenedores")}</p>
-        <IndicatorVariation delta={data.delta?.pendingDamage} unitKind="count" direction={knownVariationDirection(data.targets?.pendingDamageTrend)} previousPeriod={data.previous?.period} />
+        <IndicatorVariation delta={data.delta?.pendingDamage} unitKind="count" direction={knownVariationDirection(data.targets?.pendingDamageTrend)} previousPeriod={comparisonPeriod(data, data.delta?.pendingDamage)} />
       </CardContent>
-    </Card> : null}
+    </Card>
   </section>;
 }
 
@@ -675,14 +707,13 @@ function CatalogFilter({ id, label, allLabel, noun, options, value, onChange }: 
 }
 
 function metricText(metric: { value: number | null; unit: string }) {
-  // Hoy sólo la resolución media de reportes puede venir null (ningún reporte cerrado en el período).
-  if (metric.value === null) return "Sin reportes cerrados";
+  if (metric.value === null) return metric.unit.startsWith("días") ? "Sin reportes cerrados" : "Sin dato";
   return `${formatNumber(metric.value, metric.unit)} ${metric.unit}`;
 }
 
 function pointText(point: IndicatorPoint) {
   const value = metricText(point);
-  const details = point.details?.map((detail) => `${formatNumber(detail.value, detail.unit)} ${detail.label.toLowerCase()}`).join(" · ");
+  const details = point.details?.map((detail) => detail.value === null ? "Sin dato" : `${formatNumber(detail.value, detail.unit)} ${detail.label.toLowerCase()}`).join(" · ");
   return details ? `${value} · ${details}` : value;
 }
 

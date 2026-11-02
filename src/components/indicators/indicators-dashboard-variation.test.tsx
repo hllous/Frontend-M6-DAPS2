@@ -76,6 +76,18 @@ describe("variación de las tarjetas de indicadores", () => {
     expect(within(card).getByText("Período anterior: 09/07/2026 – 07/08/2026")).toBeVisible();
   });
 
+  it("computes an equal-length previous range when a delta exists without previous totals", async () => {
+    const comparison = { ...coverageIndicatorFixture, delta: { coveragePct: 2.2 } };
+    delete comparison.previous;
+    server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(comparison)));
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const card = await variationCard("Cobertura");
+    expect(await within(card).findByText("+2,2 p. p.")).toBeVisible();
+    expect(within(card).getByText("Período anterior: 09/07/2026 – 07/08/2026")).toBeVisible();
+  });
+
   it("uses a missing-data message when the comparison is absent", async () => {
     const comparison = { ...coverageIndicatorFixture };
     delete comparison.delta;

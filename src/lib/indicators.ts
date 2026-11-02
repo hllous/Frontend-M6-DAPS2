@@ -135,7 +135,7 @@ export type WasteWire = z.infer<typeof wasteWireSchema>;
 
 /** `value: null` = no hay base para calcular la métrica (p. ej. ningún reporte cerrado). */
 export type IndicatorMetric = { value: number | null; label: string; unit: string };
-export type IndicatorPointDetail = { label: string; value: number; unit: string };
+export type IndicatorPointDetail = { label: string; value: number | null; unit: string };
 export type IndicatorPoint = { id: string; label: string; value: number; unit: string; note?: string; details?: IndicatorPointDetail[]; tone?: "primary" | "success" | "warning" | "danger"; lowSample?: boolean };
 export type IndicatorTarget = { value: number | null; direction: string } | null;
 export type IndicatorBreakdown = { target?: IndicatorTarget; id: string; title: string; description: string; points: IndicatorPoint[] };
@@ -144,6 +144,7 @@ export type IndicatorFreshness = { updatedAt: string };
 
 export type CoverageIndicator = Pick<CoverageWire, "targets" | "series" | "previous" | "delta"> & {
   family: "coverage";
+  seriesBucket?: "week" | "month";
   /** Mensaje del backend cuando rechazó el intervalo de la serie; el resto de la familia sí llegó. */
   seriesError?: string;
   period: IndicatorPeriod;
@@ -213,6 +214,8 @@ export function resolveIndicatorQuery(query: IndicatorQuery = {}, now = new Date
 
 export const INDICATOR_FAMILIES = ["coverage", "compliance", "incidents", "waste"] as const;
 export type IndicatorFamily = (typeof INDICATOR_FAMILIES)[number];
+export const indicatorBucketSchema = z.enum(["day", "week", "month"]);
+export type IndicatorBucket = z.infer<typeof indicatorBucketSchema>;
 
 // openapi.json del backend: sólo coverage y compliance reciben zoneId/serviceTypeId;
 // incidents y waste aceptan únicamente from/to.
@@ -259,13 +262,18 @@ export function serializeIndicatorUrlState(state: Omit<IndicatorUrlState, "query
   return params.toString();
 }
 
-function queryString(query: IndicatorQuery, family: string, withSeries = true) {
+function coverageBucket(query: IndicatorQuery): "week" | "month" {
   const resolved = resolveIndicatorQuery(query);
   const start = new Date(`${resolved.from}T00:00:00Z`);
   const days = (Date.parse(`${resolved.to}T00:00:00Z`) - start.getTime()) / 86400000 + 1;
   const weeks = Math.ceil((days + (start.getUTCDay() + 6) % 7) / 7);
+  return weeks > 90 ? "month" : "week";
+}
+
+function queryString(query: IndicatorQuery, family: string, withSeries = true) {
+  const resolved = resolveIndicatorQuery(query);
   const params = new URLSearchParams({ from: resolved.from, to: resolved.to, compare: "previous" });
-  if (withSeries) params.set("bucket", weeks > 90 ? "month" : "week");
+  if (withSeries && family === "coverage") params.set("bucket", coverageBucket(resolved));
   if (familyAppliesCatalogFilters(family)) {
     if (resolved.zoneId) params.set("zoneId", resolved.zoneId);
     if (resolved.serviceTypeId) params.set("serviceTypeId", resolved.serviceTypeId);
@@ -297,6 +305,14 @@ async function request(path: string) {
   return payload;
 }
 
+function isTooManySeriesPoints(error: unknown): error is IndicatorRequestError {
+  if (!(error instanceof IndicatorRequestError) || error.status !== 400) return false;
+  const message = error.message.toLocaleLowerCase("es-AR").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return message.includes("90")
+    && /\b(?:puntos?|intervalos?)\b/.test(message)
+    && /\b(?:supera|excede|maximo|limite|mas de|more than|maximum|exceeds?|too many)\b/.test(message);
+}
+
 const RISK_LEVEL_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "NONE"];
 
 function coveragePoints(rows: CoverageWire["byZone"]): IndicatorPoint[] {
@@ -312,27 +328,28 @@ function coveragePoints(rows: CoverageWire["byZone"]): IndicatorPoint[] {
       { label: "Parciales", value: row.partial, unit: "objetivos" },
       { label: "No atendidos", value: row.notServiced, unit: "objetivos" },
       { label: "Pendientes", value: row.pending, unit: "objetivos" },
-      { label: "Programado a futuro", value: row.upcoming ?? 0, unit: "objetivos" },
+      { label: "Programado a futuro", value: row.upcoming ?? null, unit: "objetivos" },
       { label: "Programados", value: row.scheduled, unit: "objetivos" },
     ],
   }));
 }
 
 function normalizeCoverage(wire: CoverageWire, readAt: string): CoverageIndicator {
+  const coverageTarget = wire.targets === undefined ? defaultIndicatorTarget("coverage") : wire.targets.coveragePct ?? null;
   return {
-    targets: wire.targets ?? { coveragePct: { value: 95, direction: "min" } }, series: wire.series, previous: wire.previous, delta: wire.delta,
+    targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
     family: "coverage", period: wire.period, freshness: { updatedAt: readAt },
     primary: { value: wire.totals.coveragePct, label: "Cobertura de objetivos", unit: "%" },
     summaryMetrics: [
       { value: wire.totals.served, label: "Atendidos", unit: "objetivos" },
       { value: wire.totals.partial, label: "Parciales", unit: "objetivos" },
       { value: wire.totals.pending, label: "Pendientes", unit: "objetivos" },
-      { value: wire.totals.upcoming ?? 0, label: "Programado a futuro", unit: "objetivos" },
+      { value: wire.totals.upcoming ?? null, label: "Programado a futuro", unit: "objetivos" },
       { value: wire.totals.scheduled, label: "Programados", unit: "objetivos" },
     ],
     breakdowns: [
-      { target: wire.targets === undefined ? { value: 95, direction: "min" } : wire.targets.coveragePct, id: "zones", title: "Cobertura por zona", description: "Objetivos atendidos sobre objetivos programados.", points: coveragePoints(wire.byZone) },
-      { target: wire.targets === undefined ? { value: 95, direction: "min" } : wire.targets.coveragePct, id: "service-types", title: "Cobertura por tipo de servicio", description: "Comparación de cobertura entre servicios.", points: coveragePoints(wire.byServiceType) },
+      { target: coverageTarget, id: "zones", title: "Cobertura por zona", description: "Objetivos atendidos sobre objetivos programados.", points: coveragePoints(wire.byZone) },
+      { target: coverageTarget, id: "service-types", title: "Cobertura por tipo de servicio", description: "Comparación de cobertura entre servicios.", points: coveragePoints(wire.byServiceType) },
     ],
   };
 }
@@ -342,7 +359,7 @@ function normalizeCompliance(wire: ComplianceWire, readAt: string): ComplianceIn
     ? "Sin motivo registrado"
     : labelFor(NOT_SERVICED_REASON_LABEL, reason);
   return {
-    targets: wire.targets ?? { compliancePct: { value: 90, direction: "min" } }, series: wire.series, previous: wire.previous, delta: wire.delta,
+    targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
     schedulingDeviation: wire.schedulingDeviation,
     family: "compliance", period: wire.period, freshness: { updatedAt: readAt },
     primary: { value: wire.finished.onTimePct, label: "Cumplimiento en fecha", unit: "%" },
@@ -369,10 +386,12 @@ function normalizeCompliance(wire: ComplianceWire, readAt: string): ComplianceIn
 function normalizeIncidents(wire: IncidentsWire, readAt: string): IncidentsIndicator {
   const riskLevels = [...wire.trees.byRiskLevel].sort((a, b) => RISK_LEVEL_ORDER.indexOf(a.riskLevel) - RISK_LEVEL_ORDER.indexOf(b.riskLevel));
   return {
-    targets: wire.targets ?? { resolutionBusinessDays: { value: 5, direction: "max" } }, series: wire.series, previous: wire.previous, delta: wire.delta,
+    targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
     containers: wire.containers, reports: wire.reports,
     family: "incidents", period: wire.period, freshness: { updatedAt: readAt },
-    primary: { value: wire.reports.avgResolutionBusinessDays ?? null, label: "Resolución media de reportes", unit: "días hábiles" },
+    primary: wire.reports.avgResolutionBusinessDays === undefined
+      ? { value: wire.reports.avgResolutionDays, label: "Resolución media de reportes", unit: "días corridos" }
+      : { value: wire.reports.avgResolutionBusinessDays, label: "Resolución media de reportes", unit: "días hábiles" },
     breakdowns: [
       { id: "containers", title: "Contenedores por zona", description: "Estado actual de desbordes y daños por zona; valores en incidentes.", points: wire.containers.byZone.map((zone): IndicatorPoint => ({
         id: zone.zoneId,
@@ -424,7 +443,7 @@ function normalizeWaste(wire: WasteWire, readAt: string): WasteIndicator {
     details: [{ label: "Metros cúbicos", value: volumeM3, unit: "m³" }],
   });
   return {
-    targets: wire.targets ?? { landfillDiversionPct: null }, series: wire.series, previous: wire.previous, delta: wire.delta,
+    targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
     family: "waste", period: wire.period, freshness: { updatedAt: readAt },
     primary: { value: wire.totals.divertedPct, label: "Desvío de relleno sanitario", unit: "%" },
     summaryMetrics: [
@@ -453,13 +472,14 @@ async function get<T>(family: string, query: IndicatorQuery, schema: z.ZodType<T
 export const indicatorsAdapter = {
   async getCoverage(query: IndicatorQuery = {}): Promise<CoverageIndicator> {
     const contractMessage = "La cobertura no respeta el contrato de indicadores.";
+    const seriesBucket = coverageBucket(query);
     try {
-      return await get("coverage", query, coverageWireSchema, normalizeCoverage, contractMessage);
+      return { ...await get("coverage", query, coverageWireSchema, normalizeCoverage, contractMessage), seriesBucket };
     } catch (error) {
-      if (!(error instanceof IndicatorRequestError) || error.status !== 400) throw error;
+      if (!isTooManySeriesPoints(error)) throw error;
       // Si el rango no admite serie, el resto de la familia se muestra igual y la tendencia explica el rechazo.
       try {
-        return { ...await get("coverage", query, coverageWireSchema, normalizeCoverage, contractMessage, false), seriesError: error.message };
+        return { ...await get("coverage", query, coverageWireSchema, normalizeCoverage, contractMessage, false), seriesBucket, seriesError: error.message };
       } catch {
         throw error;
       }
@@ -476,16 +496,27 @@ export const getIncidents = indicatorsAdapter.getIncidents;
 export const getWaste = indicatorsAdapter.getWaste;
 
 export type IndicatorTargetDefinition = {
-  target: { comparator: "≥" | "≤"; value: number; unit: "%" | "días" } | null;
+  target: { comparator: "≥" | "≤"; value: number; unit: "%" | "días" | "días hábiles" } | null;
   direction: "more-is-better" | "less-is-better";
 };
 
 export const INDICATOR_TARGETS = {
   coverage: { target: { comparator: "≥", value: 95, unit: "%" }, direction: "more-is-better" },
   compliance: { target: { comparator: "≥", value: 90, unit: "%" }, direction: "more-is-better" },
-  incidents: { target: { comparator: "≤", value: 5, unit: "días" }, direction: "less-is-better" },
+  incidents: { target: { comparator: "≤", value: 5, unit: "días hábiles" }, direction: "less-is-better" },
   waste: { target: null, direction: "more-is-better" },
 } as const satisfies Record<IndicatorFamily, IndicatorTargetDefinition>;
+
+export function defaultIndicatorTarget(family: IndicatorFamily): IndicatorTarget {
+  const { target, direction } = INDICATOR_TARGETS[family];
+  if (!target) return null;
+  return { value: target.value, direction: direction === "less-is-better" ? "max" : "min" };
+}
+
+export function hasNumericThreshold(target: IndicatorTarget | undefined): target is { value: number; direction: "min" | "max" } {
+  return target !== undefined && target !== null && target.value !== null
+    && (target.direction === "min" || target.direction === "max");
+}
 
 export type CoverageCsvRow = {
   name: string;
@@ -495,12 +526,12 @@ export type CoverageCsvRow = {
   notServiced: number;
   pending: number;
   coveragePct: number;
-  upcoming?: number;
+  upcoming?: number | null;
   lowSample?: boolean;
 };
 
-export function isCoverageBelowTarget(scheduled: number, coveragePct: number, target: IndicatorTarget = { value: 95, direction: "min" }) {
-  return scheduled > 0 && target?.value != null && (target.direction === "min" ? coveragePct < target.value : target.direction === "max" ? coveragePct > target.value : false);
+export function isCoverageBelowTarget(scheduled: number, coveragePct: number, target: IndicatorTarget = defaultIndicatorTarget("coverage")) {
+  return scheduled > 0 && hasNumericThreshold(target) && (target.direction === "min" ? coveragePct < target.value : coveragePct > target.value);
 }
 
 const coverageCsvIntegerFormat = new Intl.NumberFormat("es-AR");
@@ -528,7 +559,7 @@ export function coverageRowsToCsv(rows: CoverageCsvRow[], nameHeading: string, t
       coverageCsvIntegerFormat.format(row.pending),
       row.scheduled === 0 ? "Sin programados" : coverageCsvDecimalFormat.format(row.coveragePct),
       isCoverageBelowTarget(row.scheduled, row.coveragePct, target) ? "Sí" : "No",
-      coverageCsvIntegerFormat.format(row.upcoming ?? 0),
+      row.upcoming == null ? "Sin dato" : coverageCsvIntegerFormat.format(row.upcoming),
       row.lowSample ? "Sí" : "No",
     ]),
   ];

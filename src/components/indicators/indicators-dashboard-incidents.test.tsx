@@ -22,7 +22,7 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("indicadores stage 2 de Incidencias", () => {
-  it("prioriza días hábiles, muestra el plazo recibido y conserva los días corridos", async () => {
+  it("prioriza días hábiles y prefiere la meta del backend al plazo de reportes", async () => {
     server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json({
       ...incidentsIndicatorFixture,
       reports: {
@@ -38,10 +38,37 @@ describe("indicadores stage 2 de Incidencias", () => {
 
     const incidents = await screen.findByRole("button", { name: "Incidencias: seleccionar familia" });
     expect(within(incidents).getByText("2 días hábiles")).toBeVisible();
-    expect(within(incidents).getByText("Meta ≤ 3 días hábiles")).toBeVisible();
+    expect(within(incidents).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
     expect(within(incidents).getByText(/-0,2 días/)).toBeVisible();
     expect(within(incidents).getByText("Mejor")).toBeVisible();
     expect(within(incidents).getByText("Resolución media en días corridos: 4,6 días")).toBeVisible();
+  });
+
+  it("uses the report deadline when targets are absent", async () => {
+    const response = structuredClone(incidentsIndicatorFixture);
+    delete response.targets;
+    response.reports.deadlineBusinessDays = 3;
+    server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json(response)));
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const incidents = await screen.findByRole("button", { name: "Incidencias: seleccionar familia" });
+    expect(within(incidents).getByText("Meta ≤ 3 días hábiles")).toBeVisible();
+  });
+
+  it("shows calendar-day resolution and its variation for an older backend", async () => {
+    const response = structuredClone(incidentsIndicatorFixture);
+    delete response.reports.avgResolutionBusinessDays;
+    delete response.delta!.avgResolutionBusinessDays;
+    response.delta!.avgResolutionDays = -0.6;
+    server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json(response)));
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const incidents = await screen.findByRole("button", { name: "Incidencias: seleccionar familia" });
+    expect(within(incidents).getByText("2,4 días corridos")).toBeVisible();
+    expect(within(incidents).getByText("-0,6 días")).toBeVisible();
+    expect(within(incidents).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
   });
 
   it("muestra reportes en plazo y vencidos hoy con su comparación y sus metas", async () => {
@@ -94,6 +121,20 @@ describe("indicadores stage 2 de Incidencias", () => {
     expect(within(pendingDamage).queryByText("0 contenedores")).not.toBeInTheDocument();
 
     expect(screen.getByText(/Estados de contenedores y riesgo de arbolado: situación actual/)).toBeVisible();
+  });
+
+  it("shows missing overflow history as no data instead of hiding the indicator", async () => {
+    const response = structuredClone(incidentsIndicatorFixture);
+    delete response.containers.history;
+    server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json(response)));
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Incidencias: seleccionar familia" }));
+
+    const metrics = await screen.findByRole("region", { name: "Indicadores complementarios de Incidencias" });
+    const overflow = within(metrics).getByRole("group", { name: "Desbordes de contenedores" });
+    expect(within(overflow).getByText("Sin dato")).toBeVisible();
+    expect(within(overflow).queryByText(/\d+ incidentes/)).not.toBeInTheDocument();
   });
 
   it("muestra sin datos cuando no hubo reportes resueltos ni abiertos", async () => {

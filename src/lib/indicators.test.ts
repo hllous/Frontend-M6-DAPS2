@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "./indicator-fixtures";
-import { familyAppliesCatalogFilters, parseIndicatorUrlState, serializeIndicatorUrlState, defaultIndicatorQuery, indicatorQueryErrorMessage, indicatorQuerySchema, indicatorsAdapter, IndicatorContractError, INVERTED_RANGE_MESSAGE, resolveIndicatorQuery } from "./indicators";
+import { defaultIndicatorTarget, familyAppliesCatalogFilters, parseIndicatorUrlState, serializeIndicatorUrlState, defaultIndicatorQuery, indicatorQueryErrorMessage, indicatorQuerySchema, indicatorsAdapter, IndicatorContractError, INVERTED_RANGE_MESSAGE, resolveIndicatorQuery } from "./indicators";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -31,6 +31,33 @@ describe("indicatorsAdapter", () => {
 
     expect(result.primary).toEqual({ value: 1.8, label: "Resolución media de reportes", unit: "días hábiles" });
     expect(result.reports.avgResolutionDays).toBeNull();
+  });
+
+  it("uses calendar days when an older incidents response omits the business-day average", async () => {
+    const response = structuredClone(incidentsIndicatorFixture);
+    delete response.reports.avgResolutionBusinessDays;
+    response.reports.avgResolutionDays = 3.2;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(response)));
+
+    const result = await indicatorsAdapter.getIncidents({});
+
+    expect(result.primary).toEqual({ value: 3.2, label: "Resolución media de reportes", unit: "días corridos" });
+  });
+
+  it("preserves absent coverage targets and represents missing future programming as unknown", async () => {
+    const response = structuredClone(coverageIndicatorFixture);
+    delete response.targets;
+    delete response.totals.upcoming;
+    delete response.byZone[0]!.upcoming;
+    delete response.series![0]!.upcoming;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(response)));
+
+    const result = await indicatorsAdapter.getCoverage({});
+
+    expect(result.targets).toBeUndefined();
+    expect(result.breakdowns[0]?.target).toEqual(defaultIndicatorTarget("coverage"));
+    expect(result.summaryMetrics.find((metric) => metric.label === "Programado a futuro")?.value).toBeNull();
+    expect(result.breakdowns[0]?.points[0]?.details?.find((detail) => detail.label === "Programado a futuro")?.value).toBeNull();
   });
 
   it("rejects an inverted date range with a message on the `to` field", () => {
@@ -69,7 +96,7 @@ describe("indicatorsAdapter", () => {
     });
   });
 
-  it("forwards coverage and compliance filters, but keeps snapshot families period-only", async () => {
+  it("requests a bucket only for coverage and keeps catalog filters family-specific", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path.includes("/coverage")) return new Response(JSON.stringify(coverageIndicatorFixture));
@@ -85,10 +112,36 @@ describe("indicatorsAdapter", () => {
 
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
       "/api/indicators/coverage?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week&zoneId=zone-2&serviceTypeId=service-sweeping",
-      "/api/indicators/compliance?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week&zoneId=zone-2&serviceTypeId=service-sweeping",
-      "/api/indicators/incidents?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week",
-      "/api/indicators/waste?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week",
+      "/api/indicators/compliance?from=2026-08-08&to=2026-09-06&compare=previous&zoneId=zone-2&serviceTypeId=service-sweeping",
+      "/api/indicators/incidents?from=2026-08-08&to=2026-09-06&compare=previous",
+      "/api/indicators/waste?from=2026-08-08&to=2026-09-06&compare=previous",
     ]);
+  });
+
+  it("retries coverage without its bucket only when the backend rejects too many points", async () => {
+    const message = "El rango supera el máximo de 90 intervalos.";
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 400, message }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(coverageIndicatorFixture)));
+
+    const result = await indicatorsAdapter.getCoverage({ from: "2026-01-01", to: "2026-10-01" });
+
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
+      "/api/indicators/coverage?from=2026-01-01&to=2026-10-01&compare=previous&bucket=week",
+      "/api/indicators/coverage?from=2026-01-01&to=2026-10-01&compare=previous",
+    ]);
+    expect(result.seriesError).toBe(message);
+  });
+
+  it("does not retry a coverage request for an unrelated 400 response", async () => {
+    const message = "El filtro de fechas no es válido.";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ statusCode: 400, message }), { status: 400 }),
+    );
+
+    await expect(indicatorsAdapter.getCoverage({})).rejects.toMatchObject({ status: 400, message });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("forwards zone-only and service-type-only catalog filters", async () => {

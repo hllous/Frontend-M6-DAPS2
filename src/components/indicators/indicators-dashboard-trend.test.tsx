@@ -61,10 +61,20 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
 
   it("rotula por mes cuando el intervalo es mensual", async () => {
     serveCoverage(coverageMonthlyFixture);
+    window.history.replaceState(null, "", "/?from=2024-01-01&to=2026-10-01");
     const trend = await renderTrend();
 
     expect(within(trend).getByRole("button", { name: /julio de 2026: 80 %/ })).toBeInTheDocument();
     expect(within(trend).getByRole("button", { name: /agosto de 2026: 95 %/ })).toBeInTheDocument();
+  });
+
+  it("uses weekly labels when the requested bucket is weekly even if a response point spans a month", async () => {
+    serveCoverage(coverageMonthlyFixture);
+    window.history.replaceState(null, "", "/?from=2026-07-15&to=2026-08-31");
+    const trend = await renderTrend();
+
+    expect(within(trend).getByText("Cobertura de objetivos por semana en el período aplicado.")).toBeInTheDocument();
+    expect(within(trend).getByRole("button", { name: /15\/07\/2026 – 31\/07\/2026: 80 %/ })).toBeInTheDocument();
   });
 
   it("no muestra la sección cuando el backend no devuelve serie", async () => {

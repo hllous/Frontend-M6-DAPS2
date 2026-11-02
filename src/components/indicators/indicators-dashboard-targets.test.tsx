@@ -98,6 +98,37 @@ describe("metas de las tablas de cobertura", () => {
     expect(rowFor(zones, "Centro").queryByText("Bajo la meta")).not.toBeInTheDocument();
   });
 
+  it("uses the local default target in the summary, trend and rows when backend targets are absent", async () => {
+    const response = structuredClone(coverageIndicatorFixture);
+    delete response.targets;
+    server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(response)));
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const coverage = await screen.findByRole("button", { name: "Cobertura: seleccionar familia" });
+    expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
+    const trend = await screen.findByRole("region", { name: "Tendencia" });
+    expect(within(trend).getByText("Meta de cobertura ≥ 95 %")).toBeVisible();
+    const detail = screen.getByRole("region", { name: "Detalle de Cobertura" });
+    const zones = await within(detail).findByRole("table", { name: /Cobertura por zona/ });
+    expect(within(detail).getAllByText("Meta ≥ 95 %")).toHaveLength(2);
+    expect(rowFor(zones, "Centro").getByText("Bajo la meta")).toBeVisible();
+  });
+
+  it("shows missing future-programming values as no data in the summary and table", async () => {
+    const response = structuredClone(targetCoverageFixture);
+    delete response.totals.upcoming;
+    delete response.byZone[0]!.upcoming;
+    delete response.byServiceType[0]!.upcoming;
+    server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(response)));
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await screen.findByRole("button", { name: "Cobertura: seleccionar familia" });
+    const summary = screen.getByLabelText("Resumen exacto de Cobertura");
+    expect(within(summary).getByText("Sin dato")).toBeVisible();
+    const zones = await screen.findByRole("table", { name: /Cobertura por zona/ });
+    expect(rowFor(zones, "Centro").getByText("Sin dato")).toBeVisible();
+  });
+
   it("conserva el estado de cobertura y la exportación al cambiar a Tabla", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);

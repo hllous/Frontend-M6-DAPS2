@@ -3,6 +3,8 @@ import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
 
+import { formatIndicatorNumber } from "./number-format";
+
 export type IndicatorVariationDirection = "min" | "max" | "down";
 export type IndicatorVariationUnitKind = "percentage-points" | "days" | "count";
 
@@ -27,10 +29,10 @@ const unitLabels: Record<IndicatorVariationUnitKind, string> = {
 
 function formatDelta(value: number, unitKind: IndicatorVariationUnitKind) {
   const maximumFractionDigits = unitKind === "count" ? 0 : 1;
-  const amount = new Intl.NumberFormat("es-AR", {
+  const amount = formatIndicatorNumber(value, {
     maximumFractionDigits,
     signDisplay: value === 0 ? "never" : "always",
-  }).format(value);
+  });
   const unitLabel = unitKind === "count" && Math.abs(value) === 1 ? "unidad" : unitLabels[unitKind];
 
   return `${amount} ${unitLabel}`;

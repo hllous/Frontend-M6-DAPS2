@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
-import type { CoverageIndicator } from "@/lib/indicators";
+import { defaultIndicatorTarget, hasNumericThreshold, type CoverageIndicator } from "@/lib/indicators";
 
+import { formatIndicatorNumber } from "./number-format";
 import styles from "./coverage-trend.module.css";
 
 type CoverageSeries = NonNullable<CoverageIndicator["series"]>;
@@ -20,7 +21,7 @@ type TrendPoint = {
   tick: string;
   scheduled: number;
   served: number;
-  upcoming: number;
+  upcoming: number | null;
   /** null = ningún objetivo programado en el período: se dibuja como hueco. */
   pct: number | null;
   /** Posición del marcador enfocable; los huecos van sobre el eje. */
@@ -29,19 +30,14 @@ type TrendPoint = {
 type DotProps = { cx?: number; cy?: number; index?: number };
 
 const chartConfig = { pct: { label: "Cobertura", color: "var(--color-trend-line)" } } satisfies ChartConfig;
-const percentFormat = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
 const monthLong = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric", timeZone: "UTC" });
 const monthShort = new Intl.DateTimeFormat("es-AR", { month: "short", timeZone: "UTC" });
-const count = new Intl.NumberFormat("es-AR");
 const HIT_SIZE = 28;
 
 const asDate = (day: string) => new Date(`${day}T00:00:00Z`);
-const spanDays = (from: string, to: string) => (asDate(to).getTime() - asDate(from).getTime()) / 86400000 + 1;
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
-const isMonthly = (series: CoverageSeries) => series.some((entry) => spanDays(entry.from, entry.to) > 7);
-
-export function toTrendPoints(series: CoverageSeries): TrendPoint[] {
-  const monthly = isMonthly(series);
+export function toTrendPoints(series: CoverageSeries, bucket: "week" | "month"): TrendPoint[] {
+  const monthly = bucket === "month";
   return series.map((entry) => {
     const pct = entry.scheduled === 0 ? null : entry.coveragePct;
     return {
@@ -50,7 +46,7 @@ export function toTrendPoints(series: CoverageSeries): TrendPoint[] {
       tick: monthly ? monthShort.format(asDate(entry.from)).replace(".", "") : formatArgentinaCalendarDate(entry.from).slice(0, 5),
       scheduled: entry.scheduled,
       served: entry.served,
-      upcoming: entry.upcoming ?? 0,
+      upcoming: entry.upcoming ?? null,
       pct,
       anchorY: pct ?? 0,
     };
@@ -58,20 +54,21 @@ export function toTrendPoints(series: CoverageSeries): TrendPoint[] {
 }
 
 function valueText(point: TrendPoint) {
-  return point.pct === null ? "sin datos" : `${percentFormat.format(point.pct)} %`;
+  return point.pct === null ? "sin datos" : `${formatIndicatorNumber(point.pct, { maximumFractionDigits: 1 })} %`;
 }
 
 function extraText(point: TrendPoint) {
-  const parts = [point.pct === null ? "sin objetivos programados" : `${count.format(point.served)} de ${count.format(point.scheduled)} objetivos atendidos`];
-  if (point.upcoming > 0) parts.push(`${count.format(point.upcoming)} programados a futuro`);
+  const parts = [point.pct === null ? "sin objetivos programados" : `${formatIndicatorNumber(point.served)} de ${formatIndicatorNumber(point.scheduled)} objetivos atendidos`];
+  if (point.upcoming === null) parts.push("programado a futuro: sin dato");
+  else if (point.upcoming > 0) parts.push(`${formatIndicatorNumber(point.upcoming)} programados a futuro`);
   return parts.join(" · ");
 }
 
 function targetOf(data: CoverageIndicator) {
-  const target = data.targets?.coveragePct;
-  if (!target || target.value === null) return null;
-  const comparator = target.direction === "min" ? "≥ " : target.direction === "max" ? "≤ " : "";
-  return { value: target.value, label: `Meta de cobertura ${comparator}${percentFormat.format(target.value)} %` };
+  const target = data.targets === undefined ? defaultIndicatorTarget("coverage") : data.targets?.coveragePct;
+  if (!hasNumericThreshold(target)) return null;
+  const comparator = target.direction === "min" ? "≥ " : "≤ ";
+  return { value: target.value, label: `Meta de cobertura ${comparator}${formatIndicatorNumber(target.value, { maximumFractionDigits: 1 })} %` };
 }
 
 type TrendPlotProps = {
@@ -116,7 +113,8 @@ const TrendPlot = memo(function TrendPlot({ points, target, registerTrigger, onF
 });
 
 export function CoverageTrend({ data, viewMode }: { data: CoverageIndicator; viewMode: "bars" | "table" }) {
-  const points = useMemo(() => (data.series?.length ? toTrendPoints(data.series) : []), [data.series]);
+  const bucket = data.seriesBucket ?? "week";
+  const points = useMemo(() => (data.series?.length ? toTrendPoints(data.series, bucket) : []), [bucket, data.series]);
   const target = targetOf(data);
   const [hovered, setHovered] = useState<number>();
   const [focused, setFocused] = useState<number>();
@@ -146,7 +144,7 @@ export function CoverageTrend({ data, viewMode }: { data: CoverageIndicator; vie
   // Sin `series` no hay sección; con un rechazo del backend, la sección explica por qué.
   if (!data.seriesError && points.length === 0) return null;
 
-  const description = `Cobertura de objetivos por ${data.series && isMonthly(data.series) ? "mes" : "semana"} en el período aplicado.`;
+  const description = `Cobertura de objetivos por ${bucket === "month" ? "mes" : "semana"} en el período aplicado.`;
 
   return <section className={styles.trend} role="region" aria-label="Tendencia">
     <div className={styles.header}><h2>Tendencia</h2>{data.seriesError ? null : <p>{description}</p>}</div>
@@ -181,10 +179,10 @@ function TrendTable({ points }: { points: TrendPoint[] }) {
     </TableRow></TableHeader>
     <TableBody>{points.map((point) => <TableRow key={point.id}>
       <TableHead scope="row" className="font-medium whitespace-normal">{point.label}</TableHead>
-      <TableCell className="text-right tabular-nums">{count.format(point.scheduled)}</TableCell>
-      <TableCell className="text-right tabular-nums">{count.format(point.served)}</TableCell>
-      <TableCell className="text-right tabular-nums">{count.format(point.upcoming)}</TableCell>
-      <TableCell className="text-right tabular-nums">{point.pct === null ? "Sin datos" : `${percentFormat.format(point.pct)} %`}</TableCell>
+      <TableCell className="text-right tabular-nums">{formatIndicatorNumber(point.scheduled)}</TableCell>
+      <TableCell className="text-right tabular-nums">{formatIndicatorNumber(point.served)}</TableCell>
+      <TableCell className="text-right tabular-nums">{point.upcoming === null ? "Sin dato" : formatIndicatorNumber(point.upcoming)}</TableCell>
+      <TableCell className="text-right tabular-nums">{point.pct === null ? "Sin datos" : `${formatIndicatorNumber(point.pct, { maximumFractionDigits: 1 })} %`}</TableCell>
     </TableRow>)}</TableBody>
   </Table></div>;
 }

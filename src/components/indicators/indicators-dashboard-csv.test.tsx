@@ -126,13 +126,13 @@ describe("IndicatorsDashboard CSV export", () => {
     const zoneLines = zoneCsv.replace(/^\uFEFF/, "").split("\r\n");
     expect(zoneLines[0]).toBe("Zona;Programados;Atendidos;Parciales;No atendidos;Pendientes;Cobertura %;Bajo la meta;Programado a futuro;Muestra baja");
     expect(zoneLines).toHaveLength(13);
-    expect(zoneLines[1]).toMatch(/^Zona 01;.*;Sí;0;No$/);
-    expect(zoneLines[4]).toBe('"Zona; ""especial""";10;6;1;1;2;75,4;Sí;0;No');
-    expect(zoneLines[8]).toMatch(/^Zona 08;.*;Sí;0;No$/);
-    expect(zoneLines[9]).toMatch(/^Zona 09;.*;No;0;No$/);
-    expect(zoneLines[10]).toMatch(/^Zona 10;.*;No;0;No$/);
-    expect(zoneLines[11]).toMatch(/^Zona fuera de las primeras diez;.*;No;0;No$/);
-    expect(zoneLines[12]).toBe("Zona sin programados;0;0;0;0;0;Sin programados;No;0;No");
+    expect(zoneLines[1]).toMatch(/^Zona 01;.*;Sí;Sin dato;No$/);
+    expect(zoneLines[4]).toBe('"Zona; ""especial""";10;6;1;1;2;75,4;Sí;Sin dato;No');
+    expect(zoneLines[8]).toMatch(/^Zona 08;.*;Sí;Sin dato;No$/);
+    expect(zoneLines[9]).toMatch(/^Zona 09;.*;No;Sin dato;No$/);
+    expect(zoneLines[10]).toMatch(/^Zona 10;.*;No;Sin dato;No$/);
+    expect(zoneLines[11]).toMatch(/^Zona fuera de las primeras diez;.*;No;Sin dato;No$/);
+    expect(zoneLines[12]).toBe("Zona sin programados;0;0;0;0;0;Sin programados;No;Sin dato;No");
 
     await user.click(serviceTypeExport);
     expect(downloads).toHaveLength(2);
@@ -142,9 +142,9 @@ describe("IndicatorsDashboard CSV export", () => {
     const serviceTypeLines = serviceTypeCsv.replace(/^\uFEFF/, "").split("\r\n");
     expect(serviceTypeLines[0]).toBe("Tipo de servicio;Programados;Atendidos;Parciales;No atendidos;Pendientes;Cobertura %;Bajo la meta;Programado a futuro;Muestra baja");
     expect(serviceTypeLines).toHaveLength(13);
-    expect(serviceTypeLines[1]).toMatch(/^Tipo 11;.*;No;0;No$/);
-    expect(serviceTypeLines[8]).toBe('"Tipo; ""especial""";10;6;1;1;2;75,5;Sí;0;No');
-    expect(serviceTypeLines[12]).toBe("Tipo sin programados;0;0;0;0;0;Sin programados;No;0;No");
+    expect(serviceTypeLines[1]).toMatch(/^Tipo 11;.*;No;Sin dato;No$/);
+    expect(serviceTypeLines[8]).toBe('"Tipo; ""especial""";10;6;1;1;2;75,5;Sí;Sin dato;No');
+    expect(serviceTypeLines[12]).toBe("Tipo sin programados;0;0;0;0;0;Sin programados;No;Sin dato;No");
   });
 
   it("neutraliza los prefijos de fórmula solo en los nombres exportados", async () => {

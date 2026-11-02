@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { indicatorsAdapter } from "./indicators";
+import { defaultIndicatorTarget, indicatorsAdapter } from "./indicators";
 import { coverageIndicatorFixture, incidentsStage2NoDataFixture } from "./indicator-fixtures";
 import { handlers } from "@/mocks/handlers";
 
@@ -38,15 +38,15 @@ describe("contrato de indicadores", () => {
     expect(incidents.containers.history?.trackingSince).toBe("2026-10-30T15:00:00.000Z");
   });
 
-  it("conserva series, comparación y metas sin número para las familias", async () => {
+  it("conserva comparaciones y metas sin número sin pedir series a familias sin tendencia", async () => {
     const incidents = await indicatorsAdapter.getIncidents();
     const waste = await indicatorsAdapter.getWaste();
     expect(incidents.targets?.overflowTrend).toEqual({ direction: "down", value: null });
     expect(incidents.containers.history?.pendingDamage).toBeNull();
-    expect(incidents.series?.[0].withinDeadline?.pct).toBe(100);
+    expect(incidents.series).toBeUndefined();
     expect(incidents.delta?.pendingDamage).toBeNull();
     expect(waste.targets?.landfillDiversionPct).toBeNull();
-    expect(waste.series?.[0].divertedPct).toBe(42.7);
+    expect(waste.series).toBeUndefined();
   });
 
   it("tolera bloques ausentes y direcciones desconocidas sin perder el valor", async () => {
@@ -59,12 +59,13 @@ describe("contrato de indicadores", () => {
     expect(result.targets?.coveragePct?.direction).toBe("future");
   });
 
-  it("usa la meta local cuando faltan los bloques opcionales", async () => {
+  it("mantiene la meta local en el detalle sin inventarla en los datos recibidos", async () => {
     const { series, previous, delta, targets, ...old } = coverageIndicatorFixture;
     void series; void previous; void delta; void targets;
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(old)));
     const result = await indicatorsAdapter.getCoverage();
-    expect(result.targets?.coveragePct).toEqual({ value: 95, direction: "min" });
+    expect(result.targets).toBeUndefined();
+    expect(result.breakdowns[0]?.target).toEqual(defaultIndicatorTarget("coverage"));
     expect(result.previous).toBeUndefined();
     expect(result.delta).toBeUndefined();
   });
