@@ -6,6 +6,7 @@ import type { RepairRequest } from "./repair-requests";
 import { serviceFixtures } from "./services-fixtures";
 import type { OperationalScenario } from "./scenarios";
 import {
+  affectedSectionSchema,
   streetClosureRequestSourceTypeSchema,
   type StreetClosureRequest,
 } from "./street-closure-requests";
@@ -102,11 +103,7 @@ const referralSchema = z.discriminatedUnion("kind", [
       closureType: z.enum(["TOTAL", "PARTIAL"]).nullable(),
       requestedFrom: z.string().nullable(),
       requestedTo: z.string().nullable(),
-      affectedSections: z.array(z.object({
-        streetName: z.string(),
-        fromCross: z.string(),
-        toCross: z.string(),
-      })),
+      affectedSections: z.array(affectedSectionSchema),
       status: z.enum(["REQUESTED", "APPROVED", "REJECTED", "ENDED", "EXPIRED"]),
       closureId: z.string().nullable(),
       createdAt: z.string(),
