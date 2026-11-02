@@ -11,6 +11,7 @@ import {
 } from "./street-closure-request-fixtures";
 import { resetTreeInterventionFixtures } from "./tree-intervention-fixtures";
 import {
+  createStreetClosureRequestInputSchema,
   streetClosureRequestSchema,
   StreetClosureRequestContractError,
   StreetClosureRequestError,
@@ -41,7 +42,7 @@ const createInput = {
   requestedFrom: "2026-09-10T08:00",
   requestedTo: "2026-09-10T12:00",
   affectedSections: [
-    { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12" },
+    { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12", direction: "FORWARD" as const },
   ],
 };
 
@@ -65,13 +66,26 @@ describe("street closure request adapter", () => {
       ...createInput,
       affectedSections: [
         ...createInput.affectedSections,
-        { streetName: "Calle 12", fromCross: "Bulevar Costero", toCross: "Av. Libertad" },
+        { streetName: "Calle 12", fromCross: "Bulevar Costero", toCross: "Av. Libertad", direction: "REVERSE" },
       ],
     });
 
     expect(created.status).toBe("REQUESTED");
+    expect(created.closureType).toBe("PARTIAL");
     expect(created.affectedSections).toHaveLength(2);
+    expect(created.affectedSections.map((section) => section.direction)).toEqual(["FORWARD", "REVERSE"]);
     expect(created.sourceContext?.sourceId).toBe("SVC-1050");
+  });
+
+  it("requires a direction for every newly created section", () => {
+    const parsed = createStreetClosureRequestInputSchema.safeParse({
+      ...createInput,
+      affectedSections: [
+        { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12" },
+      ],
+    });
+
+    expect(parsed.success).toBe(false);
   });
 
   it("creates a TreeIntervention-sourced request with a compact canonical context", async () => {
@@ -233,9 +247,25 @@ describe("wire shape of StreetClosureRequestResponseDto", () => {
   };
 
   it("parses a record with closureId, closureFrom, closureTo and closureType ABSENT", () => {
-    expect(streetClosureRequestSchema.parse(wire)).toMatchObject({
+    const parsed = streetClosureRequestSchema.parse(wire);
+    expect(parsed).toMatchObject({
       sourceModule: "M6", closureId: null, closureType: null, requestedFrom: null, requestedTo: null,
       affectedSections: [{ streetName: "Rivadavia", fromCross: "Mitre", toCross: "San Martín" }],
+    });
+    expect(parsed.affectedSections[0]?.direction).toBeUndefined();
+  });
+
+  it("reads M7's final approved-window and rejection fields", () => {
+    expect(streetClosureRequestSchema.parse({
+      ...wire,
+      status: "REJECTED",
+      startDate: "2026-10-01T09:00:00.000Z",
+      endDate: "2026-10-01T12:00:00.000Z",
+      rejectionReason: "Debe quedar libre el corredor durante el evento.",
+    })).toMatchObject({
+      startDate: "2026-10-01T09:00:00.000Z",
+      endDate: "2026-10-01T12:00:00.000Z",
+      rejectionReason: "Debe quedar libre el corredor durante el evento.",
     });
   });
 

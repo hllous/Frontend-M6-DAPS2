@@ -31,7 +31,7 @@ function requestBody() {
     requestedFrom: "2026-09-10T08:00",
     requestedTo: "2026-09-10T12:00",
     affectedSections: [
-      { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12" },
+      { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12", direction: "FORWARD" },
     ],
   };
 }
@@ -167,5 +167,24 @@ describe("street closure request BFF routes", () => {
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/street-closure-requests?page=2&pageSize=50");
     expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
     expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+  });
+
+  it("forwards closure type and each section direction to the backend", async () => {
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "SCR-1003" }));
+
+    const response = await POST(new Request("http://localhost/api/street-closure-requests", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify(requestBody()),
+    }));
+
+    expect(response.status).toBe(200);
+    const forwardedBody = JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body));
+    expect(forwardedBody).toMatchObject({
+      closureType: "PARTIAL",
+      affectedSections: [{ streetName: "Bulevar Costero", direction: "FORWARD" }],
+    });
   });
 });
