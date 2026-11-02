@@ -71,9 +71,10 @@ describe("AppShell", () => {
     window.history.replaceState(null, "", `/app?destination=${destination}`);
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
     expect(screen.getByRole("heading", { level: 1, name: "Catálogo" })).toBeVisible();
-    for (const name of ["Cuadrillas", "Espacios verdes", "Contenedores", "Puntos verdes", "Árboles"]) {
+    for (const name of ["Cuadrillas", "Espacios verdes", "Contenedores", "Puntos verdes", "Árboles", "Intervenciones de arbolado"]) {
       expect(screen.getByRole("link", { name: `Abrir ${name}` })).toBeVisible();
     }
+    expect(screen.getByRole("link", { name: "Abrir Intervenciones de arbolado" })).toHaveAttribute("href", "/app/catalog/tree-interventions");
   });
 
   it("navigates client-side on a plain click but leaves modified clicks to the browser", async () => {

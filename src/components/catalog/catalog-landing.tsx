@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Boxes, CalendarClock, MapPin, Recycle, Route as RouteIcon, Trash2, Truck, Trees, UsersRound } from "lucide-react";
+import { ArrowRight, Boxes, CalendarClock, MapPin, Recycle, Route as RouteIcon, Scissors, Trash2, Truck, Trees, UsersRound } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -74,6 +74,12 @@ const inventoryCards = [
     href: "/app/catalog/trees",
     title: "Árboles",
     icon: Trees,
+    tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
+  },
+  {
+    href: "/app/catalog/tree-interventions",
+    title: "Intervenciones de arbolado",
+    icon: Scissors,
     tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
   },
 ];
