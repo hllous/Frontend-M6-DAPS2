@@ -353,7 +353,7 @@ Drawn from [Define the outbound infrastructure referral workflows](https://githu
 | `POST /street-closure-requests/:id/reject` | `streetClosureRequest:reconcile` | Move `REQUESTED -> REJECTED`. Rejection requires an Office decision to reschedule or cancel the dependent work; the endpoint does not itself choose that outcome. | confirmed route/transition; exact reason/DTO is a gap |
 | `POST /street-closure-requests/:id/end` | `streetClosureRequest:reconcile` | Move `APPROVED -> ENDED` (also `EXPIRED -> ENDED`), releasing the dependency on the linked Service. | confirmed route/transition; exact recovery DTO is a gap |
 
-Example create body using the M6 section field names retained until Backend publishes #447:
+Example create body as the BFF forwards it to the Backend (`sections`, no `sourceModule`; the DTO rejects extra fields). The browser-to-BFF body keeps `affectedSections` and `sourceModule`:
 
 ```json
 {
@@ -363,7 +363,7 @@ Example create body using the M6 section field names retained until Backend publ
   "closureType": "PARTIAL",
   "requestedFrom": "2026-09-10T08:00",
   "requestedTo": "2026-09-10T12:00",
-  "affectedSections": [
+  "sections": [
     {
       "streetName": "Bulevar Costero",
       "fromCross": "Av. Belgrano",
@@ -376,7 +376,7 @@ Example create body using the M6 section field names retained until Backend publ
 
 `StreetClosureRequest.status` is `REQUESTED | APPROVED | REJECTED | ENDED | EXPIRED` (Backend #321). `EXPIRED` means the backend timed out an `APPROVED` closure that M7 let lapse without notifying; the unstarted Service that depended on it is already `RESCHEDULED` by the backend. A late `Ended` from M7 (or the manual `/end`) may still move `EXPIRED -> ENDED`. The frontend treats `EXPIRED` as terminal (never stale), labels it "Vencido", and resolves the Service dependency outcome as `expired` (informational, "reschedule"; it does not by itself block `start`, the backend state machine does).
 
-The frontend keeps `streetName`, `fromCross`, and `toCross` on each submitted section and adds a required `direction`; a response without direction remains readable as "Sentido no informado". On approval it displays the authorized period from `startDate` and `endDate`; on rejection it displays `rejectionReason`. These final wire fields are pending publication in Backend #447.
+The frontend keeps `streetName`, `fromCross`, and `toCross` on each submitted section and adds a required `direction`; a response without direction remains readable as "Sentido no informado". On approval it displays the authorized period from `startDate` and `endDate`; on rejection it displays `rejectionReason`. Backend published this contract in Backend #478: `sections[]` and `closureType` are required on create, responses always carry `direction` per section, and `closureType` may be null on old rows.
 
 Robustness rule for backend enums: a closed enum must not take down a whole list. `GET /api/referrals` and the `street-closure-requests` adapter validate each record on its own; a record that does not match the contract (for example an unknown future status) is dropped, logged with `console.warn` (id and status only) and counted in `meta.invalid` / `page.invalid`, and the referrals workspace shows a "Hay derivaciones sin mostrar" warning. Statuses are never invented, and `getForService` fails closed (contract error) instead of guessing a dependency when a linked record is unreadable.
 
