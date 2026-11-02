@@ -17,11 +17,18 @@ export const SESSION_IDLE_MS = 30 * 60 * 1000;
 export const SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000;
 
 export type AuthMode = "mock" | "backend-development" | "real-m1";
-export type SupportedAuthMode = Exclude<AuthMode, "real-m1">;
+export type SupportedAuthMode = AuthMode;
+
+export type SessionIdentity = {
+  userId: string;
+  subType: "EMPLEADO";
+  m1Role: string;
+};
 
 export type Session = {
   mode: SupportedAuthMode;
-  scenarioId: ScenarioId;
+  /** Escenario de presentación; las sesiones M1 se pueden crear sin uno. */
+  scenarioId?: ScenarioId;
   issuedAt: number;
   lastActivityAt: number;
   absoluteExpiresAt: number;
@@ -34,6 +41,8 @@ export type Session = {
    * `demo`: la sesión no guarda token, el BFF firma uno corto por pedido (demo-jwt.ts) y el vencimiento del token no la cierra.
    */
   source?: "m1" | "demo";
+  /** Identidad validada por el token M1 y confirmada por Backend GET /me. */
+  identity?: SessionIdentity;
   /** Roles de M6 efectivos: en modo backend los trae GET /me (login y refresco); en mock, el fixture del escenario. */
   roles: M6Role[];
   /** Cuadrilla y función informadas por GET /me en modo backend. */
@@ -180,15 +189,43 @@ export function createSession(
   };
 }
 
+export function createM1Session(options: {
+  accessToken: string;
+  refreshToken: string;
+  jwtExpiresAt: number;
+  identity: SessionIdentity;
+  roles?: readonly M6Role[];
+  now?: number;
+}): Session {
+  const now = options.now ?? Date.now();
+  return {
+    mode: "real-m1",
+    issuedAt: now,
+    lastActivityAt: now,
+    absoluteExpiresAt: now + SESSION_ABSOLUTE_MS,
+    jwtExpiresAt: options.jwtExpiresAt,
+    accessToken: options.accessToken,
+    refreshToken: options.refreshToken,
+    source: "m1",
+    identity: options.identity,
+    roles: [...(options.roles ?? [])],
+  };
+}
+
 /** El token con el que el BFF habla con el backend: el de la sesión, o uno recién firmado si la sesión es de demo. */
 export function sessionToken(session: Session): string | undefined {
   if (session.accessToken || session.source !== "demo") return session.accessToken;
   // Sesión demo viva pero sin la clave de firma (se quitó la variable): se trata como sesión caída, no como un 500.
   if (!demoSigningConfigured()) throw new InvalidSessionError("La firma de demo ya no está configurada.");
+  if (!session.scenarioId) throw new InvalidSessionError("La sesión de demo no tiene un escenario.");
   return signDemoJwt(session.scenarioId);
 }
 
 export function effectiveSessionExpiry(session: Session): number {
+  // Demo firma por pedido. M1 renueva el token dentro de la sesión; su expiración no cierra la cookie.
+  if (session.source === "m1") {
+    return Math.min(session.lastActivityAt + SESSION_IDLE_MS, session.absoluteExpiresAt);
+  }
   // La sesión de demo no depende del token (se firma por pedido) ni se corta por inactividad: vale el tope absoluto.
   if (session.source === "demo") return session.absoluteExpiresAt;
   return Math.min(
@@ -326,8 +363,10 @@ export function getSessionFromRequest(
   return getSessionFromCookieValue(cookieValue, secret, now);
 }
 
-export function getRequiredSession(request: Request): Session {
-  return requireSession(getSessionFromRequest(request));
+export function getRequiredSession(request: Request): Session & { scenarioId: ScenarioId } {
+  const session = requireSession(getSessionFromRequest(request));
+  if (!session.scenarioId) throw new ForbiddenSessionError("La sesión no tiene un escenario operativo asignado.");
+  return session as Session & { scenarioId: ScenarioId };
 }
 
 export async function getSession(
@@ -399,8 +438,8 @@ export function readJwtSubject(token: string): string | undefined {
 
 function isSession(value: Partial<Session>): value is Session {
   return (
-    (value.mode === "mock" || value.mode === "backend-development") &&
-    typeof value.scenarioId === "string" &&
+    (value.mode === "mock" || value.mode === "backend-development" || value.mode === "real-m1") &&
+    (typeof value.scenarioId === "string" || (value.mode === "real-m1" && value.scenarioId === undefined)) &&
     typeof value.issuedAt === "number" &&
     typeof value.lastActivityAt === "number" &&
     typeof value.absoluteExpiresAt === "number" &&
@@ -409,6 +448,13 @@ function isSession(value: Partial<Session>): value is Session {
     (value.mode === "mock" || value.source === "demo" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
     (value.source === undefined || ((value.source === "m1" || value.source === "demo") && value.mode !== "mock")) &&
     (value.refreshToken === undefined || (value.mode !== "mock" && typeof value.refreshToken === "string")) &&
+    (value.mode !== "real-m1" || (
+      value.source === "m1" &&
+      typeof value.refreshToken === "string" &&
+      typeof value.identity?.userId === "string" &&
+      value.identity.subType === "EMPLEADO" &&
+      typeof value.identity.m1Role === "string"
+    )) &&
     (value.fieldRole === undefined || value.fieldRole === "CREW_LEADER" || value.fieldRole === "CREW_MEMBER") &&
     (value.crew === undefined || (typeof value.crew?.id === "string" && typeof value.crew?.name === "string"))
   );

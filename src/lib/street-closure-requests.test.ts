@@ -349,6 +349,11 @@ describe("wire shape of StreetClosureRequestResponseDto", () => {
     });
   });
 
+  it("maps the REST approvedFrom/approvedTo onto the approved window", () => {
+    expect(streetClosureRequestSchema.parse({ ...wire, status: "APPROVED", approvedFrom: "2026-10-01T09:00:00.000Z", approvedTo: "2026-10-01T12:00:00.000Z" }))
+      .toMatchObject({ startDate: "2026-10-01T09:00:00.000Z", endDate: "2026-10-01T12:00:00.000Z" });
+  });
+
   it("maps the wire aliases when they are present", () => {
     expect(streetClosureRequestSchema.parse({ ...wire, closureFrom: "2026-10-01T09:00:00.000Z", closureTo: "2026-10-01T12:00:00.000Z", closureType: "TOTAL", closureId: "M7-1" }))
       .toMatchObject({ requestedFrom: "2026-10-01T09:00:00.000Z", requestedTo: "2026-10-01T12:00:00.000Z", closureType: "TOTAL", closureId: "M7-1" });

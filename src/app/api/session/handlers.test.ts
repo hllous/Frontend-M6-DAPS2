@@ -20,6 +20,7 @@ afterEach(() => {
   if (originalEnvironment.devJwt === undefined) delete process.env.M6_DEV_JWT;
   else process.env.M6_DEV_JWT = originalEnvironment.devJwt;
   delete process.env.M6_BACKEND_ORIGIN;
+  delete process.env.M1_BASE_URL;
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
@@ -46,6 +47,14 @@ function loginRequest(
     method: "POST",
     headers,
     body: JSON.stringify({ scenarioId }),
+  });
+}
+
+function realM1LoginRequest(email: string, password: string) {
+  return new Request("http://localhost/api/session/login", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
+    body: JSON.stringify({ email, password }),
   });
 }
 
@@ -221,9 +230,11 @@ describe("session route handlers", () => {
 
   it("does not fall back when real M1 mode is requested", async () => {
     process.env.M6_AUTH_MODE = "real-m1";
-    const response = await login(loginRequest("office-duty-queue"));
+    delete process.env.M1_BASE_URL;
+    const response = await login(realM1LoginRequest("persona@example.test", "clave"));
 
     expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ message: "El servicio de ingreso no está disponible. Intente nuevamente en unos minutos." });
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 
