@@ -48,6 +48,7 @@ import type { OperationalScenario } from "@/lib/scenarios";
 import { servicesAdapter, type Service } from "@/lib/services";
 import {
   StreetClosureRequestError,
+  streetClosureDirectionLabel,
   streetClosureRequestsAdapter,
 } from "@/lib/street-closure-requests";
 
@@ -89,6 +90,13 @@ function sourceLinkLabel(referral: Referral): string {
   }
   if (isInspectionSourcedRepair(referral)) return "Ver inspección";
   return "Ver servicio";
+}
+
+function streetClosureSectionSummary(referral: Referral): string | null {
+  if (referral.kind !== "STREET_CLOSURE_REQUEST") return null;
+  return referral.request.affectedSections
+    .map((section) => `${section.streetName}: ${streetClosureDirectionLabel(section.direction)}`)
+    .join(" · ");
 }
 
 const repairStatusLabel: Record<"REQUESTED" | "IN_PROGRESS" | "CLOSED", string> = {
@@ -498,6 +506,7 @@ function ReferralRow({
   onOpen: () => void;
 }) {
   const label = referralLabel(referral, repairDamageLabel);
+  const sectionSummary = streetClosureSectionSummary(referral);
   return (
     <Item
       variant="interactive"
@@ -508,7 +517,7 @@ function ReferralRow({
           variant="ghost"
           className="h-auto min-h-12 min-w-0 w-full items-start justify-start whitespace-normal text-left sm:items-center"
           onClick={onOpen}
-          aria-label={`${label}, ${shortId(referral.id)}, ${statusLabel(referral)}`}
+          aria-label={`${label}${sectionSummary ? `, ${sectionSummary}` : ""}, ${shortId(referral.id)}, ${statusLabel(referral)}`}
         />
       )}
     >
@@ -524,6 +533,7 @@ function ReferralRow({
             <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{referralKindLabel[referral.kind]}</span>
             <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">{shortId(referral.id)}</span>
           </span>
+          {sectionSummary && <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">{sectionSummary}</span>}
           <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {isUuid(referral.sourceId) ? "" : `${referral.sourceId} · `}{referral.sourceLabel}</span>
         </span>
         <ItemActions className="w-full basis-full justify-end sm:ml-auto sm:w-auto sm:basis-auto">
@@ -917,6 +927,15 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
         <DataField label="Motivo" value={request.reason} />
         <DataField label="Inicio" value={request.requestedFrom ? formatDateTime(request.requestedFrom) : "—"} />
         <DataField label="Fin" value={request.requestedTo ? formatDateTime(request.requestedTo) : "—"} />
+        {(request.startDate || request.endDate) && (
+          <DataField
+            label="Período autorizado"
+            value={`${request.startDate ? formatDateTime(request.startDate) : "—"} – ${request.endDate ? formatDateTime(request.endDate) : "—"}`}
+          />
+        )}
+        {referral.status === "REJECTED" && (
+          <DataField label="Motivo del rechazo" value={request.rejectionReason || "No se informó el motivo del rechazo"} />
+        )}
         {request.closureId && <DataField label="Nº de corte" value={request.closureId} />}
       </dl>
       <div className="mt-5 border-t border-[var(--color-border)] pt-4">
@@ -926,6 +945,9 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
             <Item key={`${section.streetName}-${index}`} variant="muted" className="block rounded-xl p-3 text-[var(--color-text)]">
               <span className="font-semibold">{section.streetName}</span>
               <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">Entre {section.fromCross} y {section.toCross}</span>
+              <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">
+                {section.direction ? `Sentido: ${streetClosureDirectionLabel(section.direction)}` : streetClosureDirectionLabel(section.direction)}
+              </span>
             </Item>
           ))}
         </ItemGroup>

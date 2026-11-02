@@ -16,6 +16,9 @@ const INITIAL_STREET_CLOSURE_REQUESTS: StreetClosureRequest[] = [
     closureType: "PARTIAL",
     requestedFrom: "2026-09-05T08:00",
     requestedTo: "2026-09-05T12:00",
+    startDate: null,
+    endDate: null,
+    rejectionReason: null,
     affectedSections: [
       { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12" },
     ],
@@ -43,6 +46,9 @@ const INITIAL_STREET_CLOSURE_REQUESTS: StreetClosureRequest[] = [
     closureType: "PARTIAL",
     requestedFrom: "2026-09-10T09:00",
     requestedTo: "2026-09-10T11:00",
+    startDate: null,
+    endDate: null,
+    rejectionReason: null,
     affectedSections: [
       { streetName: "Av. Mitre", fromCross: "Calle 10", toCross: "Calle 12" },
     ],
@@ -164,6 +170,9 @@ export function createStreetClosureRequestFixture(
     sourceContext,
     status: "REQUESTED",
     closureId: null,
+    startDate: null,
+    endDate: null,
+    rejectionReason: null,
     createdAt: now,
     updatedAt: now,
   };

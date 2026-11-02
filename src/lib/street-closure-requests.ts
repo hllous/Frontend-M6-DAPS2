@@ -7,6 +7,11 @@ import { treeInterventionTypeSchema } from "./tree-interventions";
 export const streetClosureTypeSchema = z.enum(["TOTAL", "PARTIAL"]);
 export type StreetClosureType = z.infer<typeof streetClosureTypeSchema>;
 
+export const streetClosureDirectionSchema = z.enum(["FORWARD", "REVERSE", "BOTH"], {
+  error: "Indique el sentido del tramo",
+});
+export type StreetClosureDirection = z.infer<typeof streetClosureDirectionSchema>;
+
 export const streetClosureRequestStatusSchema = z.enum([
   "REQUESTED",
   "APPROVED",
@@ -21,12 +26,33 @@ export type StreetClosureRequestSourceType = z.infer<
   typeof streetClosureRequestSourceTypeSchema
 >;
 
-export const affectedSectionSchema = z.object({
+const affectedSectionFields = {
   streetName: z.string().trim().min(1, "Indique el nombre de la calle"),
   fromCross: z.string().trim().min(1, "Indique la calle transversal de inicio"),
   toCross: z.string().trim().min(1, "Indique la calle transversal de fin"),
+};
+
+/** Direction can be absent on older requests returned by the backend. */
+export const affectedSectionSchema = z.object({
+  ...affectedSectionFields,
+  direction: streetClosureDirectionSchema.nullish(),
 });
 export type AffectedSection = z.infer<typeof affectedSectionSchema>;
+
+export const createAffectedSectionSchema = z.object({
+  ...affectedSectionFields,
+  direction: streetClosureDirectionSchema,
+});
+export type CreateAffectedSection = z.infer<typeof createAffectedSectionSchema>;
+
+export function streetClosureDirectionLabel(
+  direction: StreetClosureDirection | null | undefined,
+): string {
+  if (direction === "FORWARD") return "Ascendente";
+  if (direction === "REVERSE") return "Descendente";
+  if (direction === "BOTH") return "Ambos sentidos";
+  return "Sentido no informado";
+}
 
 const serviceStreetClosureSourceContextSchema = z.object({
   sourceType: z.literal("SERVICE"),
@@ -64,7 +90,7 @@ export const createStreetClosureRequestInputSchema = z
     requestedTo: z.string().trim().min(1, "Indique el fin de la ventana solicitada"),
     // Backend's exact collection wire name is a documented hypothesis. The adapter
     // owns this shape so the UI does not depend on that integration detail.
-    affectedSections: z.array(affectedSectionSchema).min(1, "Agregue al menos un tramo afectado"),
+    affectedSections: z.array(createAffectedSectionSchema).min(1, "Agregue al menos un tramo afectado"),
   })
   .superRefine((data, ctx) => {
     const from = Date.parse(data.requestedFrom);
@@ -87,11 +113,13 @@ const streetClosureRequestShape = z.object({
   sourceType: streetClosureRequestSourceTypeSchema,
   sourceId: z.string().min(1),
   sourceModule: z.literal("M6"),
-  // openapi.json does not mark closureType / closureFrom / closureTo / closureId as required and
-  // the backend sends null when unset: the key may be null or absent. Normalized to null.
+  // Legacy records may omit optional M7 response fields or send null; normalize both to null.
   closureType: streetClosureTypeSchema.nullish().transform((value) => value ?? null),
   requestedFrom: z.string().nullish().transform((value) => value ?? null),
   requestedTo: z.string().nullish().transform((value) => value ?? null),
+  startDate: z.string().nullish().transform((value) => value ?? null),
+  endDate: z.string().nullish().transform((value) => value ?? null),
+  rejectionReason: z.string().nullish().transform((value) => value ?? null),
   affectedSections: z.array(affectedSectionSchema).min(1),
   status: streetClosureRequestStatusSchema,
   closureId: z.string().nullish().transform((value) => value ?? null),

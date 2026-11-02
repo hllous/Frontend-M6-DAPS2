@@ -9,6 +9,7 @@ import {
   paginateStreetClosureRequestFixtures,
 } from "@/lib/street-closure-request-fixtures";
 import {
+  type CreateStreetClosureRequestInput,
   createStreetClosureRequestInputSchema,
   streetClosureRequestQuerySchema,
 } from "@/lib/street-closure-requests";
@@ -78,6 +79,12 @@ export async function GET(request: Request) {
   }
 }
 
+// Backend's CreateStreetClosureRequestDto is strict (forbidNonWhitelisted): it names the
+// collection `sections` and has no `sourceModule`, so send exactly its wire shape.
+function toBackendCreateBody({ affectedSections, sourceModule: _sourceModule, ...rest }: CreateStreetClosureRequestInput) {
+  return { ...rest, sections: affectedSections };
+}
+
 export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
   try {
@@ -101,7 +108,7 @@ export async function POST(request: Request) {
       const backendResponse = await fetchBackend(request, "/street-closure-requests", undefined, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify(toBackendCreateBody(parsed.data)),
       });
       return forwardResponse(backendResponse);
     }
