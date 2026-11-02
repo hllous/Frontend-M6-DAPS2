@@ -10,13 +10,16 @@
 .chart { width: 100%; min-width: 0; }
 .plot { width: 100%; height: 260px; min-width: 0; }
 .gapMarker { fill: var(--color-surface); stroke: var(--color-text-secondary); stroke-width: 2; stroke-dasharray: 3 2; }
-.hit { display: block; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; outline: none; }
-.hit:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -2px; }
+.hit.hit { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; outline: none; }
+.hit.hit:hover, .hit.hit:focus { background: transparent; box-shadow: inset 0 0 0 2px var(--color-trend-line); }
+.hit.hit:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 1px; }
 .detail { display: flex; align-items: baseline; gap: var(--space-8); }
+.detail strong { margin-inline-end: var(--space-8); }
 .detail span { color: var(--color-text-secondary); }
 .tableWrap { overflow-x: auto; }
 
 @media (max-width: 760px) {
+  .trend { margin-top: var(--space-12); padding: var(--space-14); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
   .plot { height: 220px; }
   .detail { align-items: flex-start; flex-direction: column; gap: var(--space-4); }
 }

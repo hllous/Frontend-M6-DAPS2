@@ -103,7 +103,6 @@ const TrendPlot = memo(function TrendPlot({ points, target, registerTrigger, onF
               size="icon"
               ref={(element) => registerTrigger(index, element)}
               className={styles.hit}
-              style={{ width: "100%", height: "100%", minWidth: 0, minHeight: 0, padding: 0, border: 0, borderRadius: "50%", background: "transparent" }}
               tabIndex={index === 0 ? 0 : -1}
               aria-label={`${point.label}: ${valueText(point)}, ${extraText(point)}`}
               onFocus={() => onFocusPoint(index)}
@@ -128,6 +127,7 @@ export function CoverageTrend({ data, viewMode }: { data: CoverageIndicator; vie
   const registerTrigger = useCallback((index: number, element: HTMLButtonElement | null) => { triggers.current[index] = element; }, []);
   const focusPoint = useCallback((index: number) => {
     setFocused(index);
+    setHovered(undefined);
     // Foco itinerante: sólo el último punto enfocado entra en el orden de tabulación.
     triggers.current.forEach((trigger, position) => trigger?.setAttribute("tabindex", position === index ? "0" : "-1"));
   }, []);
@@ -171,7 +171,7 @@ export function CoverageTrend({ data, viewMode }: { data: CoverageIndicator; vie
 
 function TrendTable({ points }: { points: TrendPoint[] }) {
   return <div className={styles.tableWrap}><Table>
-    <TableCaption>Cobertura por período</TableCaption>
+    <TableCaption className="sr-only">Cobertura por período</TableCaption>
     <TableHeader><TableRow>
       <TableHead>Período</TableHead>
       <TableHead className="text-right">Programados</TableHead>
@@ -180,7 +180,7 @@ function TrendTable({ points }: { points: TrendPoint[] }) {
       <TableHead className="text-right">Cobertura</TableHead>
     </TableRow></TableHeader>
     <TableBody>{points.map((point) => <TableRow key={point.id}>
-      <TableHead scope="row" className="font-medium">{point.label}</TableHead>
+      <TableHead scope="row" className="font-medium whitespace-normal">{point.label}</TableHead>
       <TableCell className="text-right tabular-nums">{count.format(point.scheduled)}</TableCell>
       <TableCell className="text-right tabular-nums">{count.format(point.served)}</TableCell>
       <TableCell className="text-right tabular-nums">{count.format(point.upcoming)}</TableCell>
