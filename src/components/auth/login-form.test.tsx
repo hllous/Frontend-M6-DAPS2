@@ -89,6 +89,21 @@ describe("LoginForm", () => {
     fetchMock.mockRestore();
   });
 
+  it("does not blame the connection when the BFF answers with a non-JSON error page", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<html>Gateway Timeout</html>", { status: 504, headers: { "content-type": "text/html" } }),
+    );
+
+    render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
+    await user.click(screen.getByRole("button", { name: "Ingresar al sistema" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("No se pudo ingresar. Intente nuevamente.");
+    expect(alert).not.toHaveTextContent("Revise la conexión");
+    fetchMock.mockRestore();
+  });
+
   it("asks the operator to check the connection when login cannot reach the BFF", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
