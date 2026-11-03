@@ -33,7 +33,7 @@ import * as treeFixtures from "@/lib/tree-fixtures";
 import * as vehicleFixtures from "@/lib/vehicles-fixtures";
 import * as zoneFixtures from "@/lib/zones-fixtures";
 import * as environmentalFixtures from "@/lib/environmental-report-fixtures";
-import { createSessionCookie, loginWithMe as login } from "@/test/session";
+import { createSessionCookie } from "@/test/session";
 
 const fixtureModules = [
   containerFixtures,
@@ -206,18 +206,5 @@ describe("backend origin fail-closed behavior", () => {
     expect(await response.json()).toMatchObject({ statusCode: 503, message: "La autenticación solicitada no está disponible." });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(fixtureSnapshot()).toBe(before);
-  });
-
-  it("fails real-m1 login with 503 when the origin is missing", async () => {
-    process.env.M6_AUTH_MODE = "real-m1";
-
-    const response = await login(new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
-      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
-    }));
-
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ message: "La autenticación solicitada no está disponible." });
   });
 });

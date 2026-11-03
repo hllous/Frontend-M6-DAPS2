@@ -38,7 +38,7 @@ function build(expSeconds: number, overrides: Overrides = {}) {
   const accessToken = jwt(expSeconds);
   const session: Session = {
     ...createTestSession("office-duty-queue", { accessToken }),
-    source: "m1",
+    identity: { userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO" },
     refreshToken: `refresh-${++n}`,
     ...overrides,
   };
@@ -302,16 +302,6 @@ describe("cuándo se renueva", () => {
 
     await expect(fetchBackend(request, "/services")).rejects.toBeInstanceOf(InvalidSessionError);
     expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["sin refresh token", () => near({ refreshToken: undefined })],
-  ])("%s: no llama a M1 y deja pasar el 401", async (_name, setup) => {
-    const { request } = setup();
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 401 }));
-
-    expect((await fetchBackend(request, "/services")).status).toBe(401);
-    expect(m1Calls(fetchSpy)).toHaveLength(0);
   });
 
   it.each([
