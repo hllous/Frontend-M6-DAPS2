@@ -14,7 +14,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app/catalog/containers");
 
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
 
     // CONT-008 is a dedicated ACTIVE fixture for this test — CONT-001 is relied on by
     // containers-catalog.spec.ts to stay un-overflowed across the same CI run.
@@ -50,7 +50,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app/catalog/containers");
 
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
 
     const row = page.locator("tr", { hasText: "CONT-007" });
     await expect(row).toBeVisible();
@@ -105,7 +105,7 @@ test.describe("Ambient Container overflow and damage reporting #121", () => {
     await loginViaApi(page, "office-limited-intake");
     await page.goto("/app/catalog/containers");
 
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
     await expect(page.getByText("CONT-001")).toBeVisible();
 
     // Report buttons must be completely absent for actors lacking container:report

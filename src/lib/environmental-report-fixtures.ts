@@ -2,9 +2,11 @@ import { argentinaDay } from "./argentina-date";
 import type {
   CreateEnvironmentalReportInput,
   EnvironmentalInspection,
+  EnvironmentalInspectionAllowedActions,
   EnvironmentalInspectionScheduleInput,
   EnvironmentalReport,
   EnvironmentalReportQuery,
+  EnvironmentalReportType,
   EnvironmentalReportStatus,
   IssueViolationNoticeInput,
   SanctionOutcome,
@@ -63,6 +65,7 @@ const inspections: EnvironmentalInspection[] = [
     ],
     findings: null,
     outcome: null,
+    allowedActions: { repair: false, notice: false, suggestedViolationType: null },
     nextStep: null,
     notes: null,
     createdAt: "2026-09-05T08:30:00.000Z",
@@ -83,6 +86,7 @@ const inspections: EnvironmentalInspection[] = [
     attachments: [],
     findings: null,
     outcome: null,
+    allowedActions: { repair: false, notice: false, suggestedViolationType: null },
     nextStep: null,
     notes: null,
     createdAt: "2026-09-06T08:30:00.000Z",
@@ -103,6 +107,8 @@ const inspections: EnvironmentalInspection[] = [
     severity: "HIGH",
     suggestedAction: "FORMAL_NOTICE",
     outcome: "VIOLATION_FOUND",
+    // Mock mirror of the backend's `allowedActions` (the client never computes it).
+    allowedActions: { repair: true, notice: true, suggestedViolationType: "ILLEGAL_DUMPING" },
     nextStep: "NOTICE_TO_BE_ISSUED",
     conclusion: "Se constató la infracción.",
     createdAt: "2026-09-03T08:00:00.000Z",
@@ -125,6 +131,7 @@ inspections.push({
     severity: "CRITICAL",
     suggestedAction: "FINE",
     outcome: "VIOLATION_FOUND",
+    allowedActions: { repair: true, notice: true, suggestedViolationType: "UNTREATED_DISCHARGE" },
     nextStep: "NOTICE_TO_BE_ISSUED",
     conclusion: "Se constató la infracción.",
   createdAt: "2026-08-31T08:00:00.000Z",
@@ -294,6 +301,7 @@ export function createEnvironmentalInspectionFixture(reportId: string, input: En
     attachments: [],
     findings: null,
     outcome: null,
+    allowedActions: { repair: false, notice: false, suggestedViolationType: null },
     nextStep: null,
     notes: input.notes ?? null,
     createdAt: now,
@@ -369,4 +377,25 @@ export function transitionEnvironmentalReportFixture(id: string, status: Environ
   report.status = status;
   report.updatedAt = new Date().toISOString();
   return report;
+}
+
+// Mock mirror of the backend's follow-up matrix (Backend-M6-DAPS2#451). Only the mocks use it:
+// product code reads `allowedActions` from the response and never computes it.
+const REPORT_TYPES_WITHOUT_REPAIR: readonly EnvironmentalReportType[] = ["NOISE", "ODOR", "PEST_INFESTATION", "AIR_EMISSION"];
+const SUGGESTED_VIOLATION_TYPE_BY_REPORT_TYPE: Partial<Record<EnvironmentalReportType, string>> = {
+  ILLEGAL_DUMPSITE: "ILLEGAL_DUMPING",
+  DUMPING: "ILLEGAL_DUMPING",
+  WATER_DISCHARGE: "UNTREATED_DISCHARGE",
+};
+
+export function mockAllowedActionsForCompletedInspection(
+  reportType: EnvironmentalReportType,
+  outcome: NonNullable<EnvironmentalInspection["outcome"]>,
+): EnvironmentalInspectionAllowedActions {
+  const notice = outcome === "VIOLATION_FOUND";
+  return {
+    repair: outcome !== "NO_VIOLATION" && !REPORT_TYPES_WITHOUT_REPAIR.includes(reportType),
+    notice,
+    suggestedViolationType: notice ? SUGGESTED_VIOLATION_TYPE_BY_REPORT_TYPE[reportType] ?? null : null,
+  };
 }

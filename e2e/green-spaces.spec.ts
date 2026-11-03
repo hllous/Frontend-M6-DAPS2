@@ -10,8 +10,8 @@ import { loginViaApi } from "./support/auth";
 test.describe("Green Spaces catalog management @smoke", () => {
   test("Office can filter, create, edit, and deactivate a GreenSpace without action controls", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
-    await page.goto("/app?destination=catalog");
-    await page.getByRole("listitem").filter({ hasText: "Espacios verdes" }).getByRole("link", { name: "Abrir catálogo" }).click();
+    await page.goto("/app?destination=inventory");
+    await page.getByRole("listitem").filter({ hasText: "Espacios verdes" }).getByRole("link", { name: /^Abrir/ }).click();
 
     const panel = page.locator('section[aria-labelledby="green-spaces-title"]');
     await expect(panel.getByRole("heading", { name: "Espacios verdes" })).toBeVisible();
@@ -50,8 +50,8 @@ test.describe("Green Spaces catalog management @smoke", () => {
 
   test("Field can consult GreenSpaces but cannot manage them", async ({ page }) => {
     await loginViaApi(page, "field-crew-member-route");
-    await page.goto("/app?destination=catalog");
-    await page.getByRole("listitem").filter({ hasText: "Espacios verdes" }).getByRole("link", { name: "Abrir catálogo" }).click();
+    await page.goto("/app?destination=inventory");
+    await page.getByRole("listitem").filter({ hasText: "Espacios verdes" }).getByRole("link", { name: /^Abrir/ }).click();
 
     const panel = page.locator('section[aria-labelledby="green-spaces-title"]');
     await expect(panel.getByText("Parque del Bicentenario")).toBeVisible();

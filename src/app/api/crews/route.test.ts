@@ -33,3 +33,39 @@ describe("crews BFF route", () => {
     expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 });
+
+describe("crews BFF route: zone and specialty", () => {
+  const officeGet = async (query: string) => GET(new Request(`http://localhost/api/crews${query}`, { headers: { cookie: await loginAs("office-duty-queue", { mode: "mock" }) } }));
+
+  it("filters fixtures by the zone in effect today", async () => {
+    const body = await (await officeGet("?zoneId=zone-4")).json();
+    expect(body.data.map((crew: { id: string }) => crew.id)).toEqual(["crew-c"]);
+  });
+
+  it("filters fixtures by specialty and combines it with the other filters", async () => {
+    const bySpecialty = await (await officeGet("?specialty=COLLECTION")).json();
+    expect(bySpecialty.data.map((crew: { id: string }) => crew.id)).toEqual(["crew-a"]);
+    const none = await (await officeGet("?specialty=COLLECTION&crewType=CONTRACTOR")).json();
+    expect(none.data).toEqual([]);
+  });
+
+  it("creates a crew with specialty and home zone and rejects a missing specialty", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const post = (body: object) => POST(new Request("http://localhost/api/crews", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(body) }));
+    const base = { name: "Nueva", crewType: "MUNICIPAL", leaderUserId: "user-maria", organizationId: "org-municipal", defaultShift: "MORNING" };
+    expect((await post(base)).status).toBe(400);
+    const created = await post({ ...base, specialty: "TREES", homeZoneId: "zone-2" });
+    expect(created.status).toBe(201);
+    expect(await created.json()).toMatchObject({ specialty: "TREES", homeZoneId: "zone-2", effectiveZoneId: "zone-2" });
+  });
+
+  it("forwards zoneId and specialty to the backend", async () => {
+    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [] }));
+    await GET(new Request("http://localhost/api/crews?zoneId=zone-4&specialty=TREES", { headers: { cookie } }));
+    const url = new URL(String(backendFetch.mock.calls[0]?.[0]));
+    expect(url.searchParams.get("zoneId")).toBe("zone-4");
+    expect(url.searchParams.get("specialty")).toBe("TREES");
+  });
+});

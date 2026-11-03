@@ -27,6 +27,7 @@ import {
   REPAIR_DAMAGE_TYPE_LABEL,
   REPAIR_SEVERITY_LABEL,
   repairRequestsAdapter,
+  RepairRequestRequestError,
   type CreateRepairRequestInput,
   type RepairDamageType,
   type RepairRequest,
@@ -89,6 +90,9 @@ async function findExistingServiceRepairRequest(
   }) ?? null;
 }
 
+// El backend no manda un código: una sola frase cubre las tres causas del 409 sin interpretar su texto.
+const INSPECTION_REPAIR_REFUSED_MESSAGE = "No se puede derivar esta reparación: la inspección no la justifica, el tipo de expediente no la admite o ya hay una reparación abierta para este origen y tipo de daño. Revise Derivaciones.";
+
 export function CreateRepairRequestDialog({
   open,
   service,
@@ -96,6 +100,7 @@ export function CreateRepairRequestDialog({
   report,
   onOpenChange,
   onCreated,
+  onRefused,
 }: {
   open: boolean;
   service?: Service;
@@ -103,6 +108,8 @@ export function CreateRepairRequestDialog({
   report?: EnvironmentalReport;
   onOpenChange: (open: boolean) => void;
   onCreated: (request: RepairRequest) => void;
+  /** #733: el backend rechazó una derivación desde una inspección (409); quien llama refresca sus acciones permitidas. */
+  onRefused?: () => void;
 }) {
   const isInspection = Boolean(inspection);
   const sourceId = inspection?.id ?? service?.id ?? "";
@@ -221,6 +228,19 @@ export function CreateRepairRequestDialog({
     if (!composedAgainst) setOutcome(null);
   }
 
+  // 409 desde una inspección: mensaje propio y el origen refresca sus acciones permitidas.
+  async function createRepairRequest(input: CreateRepairRequestInput) {
+    try {
+      return await repairRequestsAdapter.create(input);
+    } catch (cause) {
+      if (isInspection && cause instanceof RepairRequestRequestError && cause.status === 409) {
+        onRefused?.();
+        throw new Error(INSPECTION_REPAIR_REFUSED_MESSAGE, { cause });
+      }
+      throw cause;
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrors({});
@@ -272,7 +292,7 @@ export function CreateRepairRequestDialog({
             actionType: "repairRequest",
             composedAgainst: storedDraft.composedAgainst,
             payload,
-            submit: (draftPayload) => repairRequestsAdapter.create(draftPayload.input),
+            submit: (draftPayload) => createRepairRequest(draftPayload.input),
           });
           if (result.kind === "success") {
             setOutcome(null);
@@ -296,7 +316,7 @@ export function CreateRepairRequestDialog({
           service,
           actionType: "repairRequest",
           payload,
-          submit: (draftPayload) => repairRequestsAdapter.create(draftPayload.input),
+          submit: (draftPayload) => createRepairRequest(draftPayload.input),
         });
         if (result.kind === "success") {
           setCreatedRequest(result.result);
@@ -310,7 +330,7 @@ export function CreateRepairRequestDialog({
           setErrors({ form: result.message });
         }
       } else {
-        const created = await repairRequestsAdapter.create(parsed.data);
+        const created = await createRepairRequest(parsed.data);
         setCreatedRequest(created);
         onCreated(created);
         notifySuccess("Derivación creada.");

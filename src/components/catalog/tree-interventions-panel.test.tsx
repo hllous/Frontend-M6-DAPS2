@@ -33,6 +33,14 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("TreeInterventionsPanel", () => {
+  it("opens a linked intervention outside the current page", async () => {
+    window.history.replaceState(null, "", "/app/catalog/tree-interventions?detail=intervention-1");
+    server.use(http.get("*/api/tree-interventions", () => HttpResponse.json({ data: [], meta: { page: 1, pageSize: 10, total: 0, totalPages: 0 } })));
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const dialog = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    expect(await within(dialog).findByText("Poda de seguridad")).toBeVisible();
+    window.history.replaceState(null, "", "/app");
+  });
   it("filters priority on the server and restores all requests", async () => {
     const user = userEvent.setup();
     render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
@@ -269,7 +277,7 @@ describe("TreeInterventionsPanel", () => {
     const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
 
-    expect(await within(detail).findByRole("alert")).toHaveTextContent("No hay un tipo de servicio activo de poda de arbolado en el catálogo");
+    expect(await within(detail).findByRole("alert")).toHaveTextContent("No hay un tipo de servicio activo de poda de arbolado en la configuración");
     expect(createSpy).not.toHaveBeenCalled();
     expect(within(detail).getByRole("form", { name: "Programar servicio para la intervención" })).toBeVisible();
     createSpy.mockRestore();
@@ -401,15 +409,31 @@ describe("TreeInterventionsPanel", () => {
   }
 
   it("assigns the chosen crew and vehicle when it creates the Service", async () => {
+    const create = vi.spyOn(servicesAdapter, "create");
     const user = userEvent.setup();
     const { detail, form } = await openScheduleForm(user, /intervention-2|Tratamiento/i);
     await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Cuadrilla (opcional)" }), /Cuadrilla A/);
     await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Vehículo (opcional)" }), /AA 123 AA/);
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+    const note = await within(form).findByLabelText(/Justificación de la asignación/i);
+    await user.type(note, "Refuerzo coordinado para la intervención.");
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
 
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ overrideNote: "Refuerzo coordinado para la intervención." }));
     const serviceId = (await within(detail).findByRole("link", { name: /SVC-\d+/ })).textContent;
     expect(serviceFixtures.find((service) => service.id === serviceId)).toMatchObject({ crewId: "crew-a", vehicleId: "vehicle-1" });
     expect(within(detail).getByRole("link", { name: /SVC-\d+/ })).toHaveAttribute("href", expect.stringContaining(`detail=${serviceId}`));
+  });
+
+  it("un 409 que no pide justificación muestra su error y no abre la justificación", async () => {
+    server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla está inactiva.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 })));
+    const user = userEvent.setup();
+    const { detail, form } = await openScheduleForm(user, /intervention-2|Tratamiento/i);
+    await chooseSelectOption(user, within(form).getByRole("combobox", { name: "Cuadrilla (opcional)" }), /Cuadrilla A/);
+    await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
+    expect(await within(detail).findByText("La cuadrilla está inactiva.")).toBeVisible();
+    expect(within(form).queryByLabelText(/Justificación de la asignación/i)).not.toBeInTheDocument();
   });
 
   it("re-reads the intervention after a 409 and treats an existing link as done", async () => {
@@ -486,6 +510,35 @@ describe("TreeInterventionsPanel", () => {
     expect(within(detail).getByRole("button", { name: "Rechazar intervención" })).toBeVisible();
   });
 
+  it("hides authorize and reject on a pending removal for Operations, who still authorizes other types", async () => {
+    const user = userEvent.setup();
+    updateTreeInterventionFixture("intervention-3", { status: "PENDING_AUTHORIZATION" });
+    render(<TreeInterventionsPanel scenario={scenarios.officeOperations} />);
+    const removal = await screen.findByRole("article", { name: /intervention-3|Extracción/i });
+    await user.click(within(removal).getByRole("button", { name: "Ver detalle" }));
+    const removalDetail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    expect(await within(removalDetail).findByText("Pendiente de autorización")).toBeVisible();
+    expect(within(removalDetail).queryByRole("button", { name: "Autorizar intervención" })).not.toBeInTheDocument();
+    expect(within(removalDetail).queryByRole("button", { name: "Rechazar intervención" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    const pruning = await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i });
+    await user.click(within(pruning).getByRole("button", { name: "Ver detalle" }));
+    const pruningDetail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    expect(await within(pruningDetail).findByRole("button", { name: "Autorizar intervención" })).toBeVisible();
+  });
+
+  it("shows authorize and reject on a pending removal to the Admin", async () => {
+    const user = userEvent.setup();
+    updateTreeInterventionFixture("intervention-3", { status: "PENDING_AUTHORIZATION" });
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const removal = await screen.findByRole("article", { name: /intervention-3|Extracción/i });
+    await user.click(within(removal).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    expect(await within(detail).findByRole("button", { name: "Autorizar intervención" })).toBeVisible();
+    expect(within(detail).getByRole("button", { name: "Rechazar intervención" })).toBeVisible();
+  });
+
   it("rejects a removal terminally and offers a fresh request with its original values", async () => {
     const user = userEvent.setup();
     render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
@@ -529,6 +582,49 @@ describe("TreeInterventionsPanel", () => {
 
     expect(await within(detail).findByRole("alert")).toHaveTextContent("ya fue autorizada");
     expect(within(detail).getByText("Solicitada")).toBeVisible();
+  });
+
+  it("lets Operations submit a requested removal for authorization", async () => {
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeOperations} />);
+    const removal = await screen.findByRole("article", { name: /Extracción/i });
+    await user.click(within(removal).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+
+    await user.click(within(detail).getByRole("button", { name: "Enviar a autorización" }));
+
+    expect(await within(detail).findByText("Pendiente de autorización")).toBeVisible();
+    expect(within(detail).queryByRole("button", { name: "Autorizar intervención" })).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("button", { name: "Rechazar intervención" })).not.toBeInTheDocument();
+  });
+
+  it("shows the role denial and asks for a fresh GET /me when the backend refuses a removal decision", async () => {
+    const roleStale = vi.fn();
+    window.addEventListener("m6:roles-stale", roleStale);
+    updateTreeInterventionFixture("intervention-3", { status: "PENDING_AUTHORIZATION" });
+    server.use(
+      http.post("*/api/tree-interventions/:interventionId/reject", () => HttpResponse.json({
+        statusCode: 403,
+        message: "Requiere M6_ADMIN.",
+        error: "Forbidden",
+        code: "ROLE_REQUIRED",
+        timestamp: new Date().toISOString(),
+        path: "/api/tree-interventions/intervention-3/reject",
+      }, { status: 403 })),
+    );
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const removal = await screen.findByRole("article", { name: /Extracción/i });
+    await user.click(within(removal).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    await user.click(await within(detail).findByRole("button", { name: "Rechazar intervención" }));
+    const confirmation = await screen.findByRole("dialog", { name: /Confirmar rechazo/ });
+    await user.click(within(confirmation).getByRole("button", { name: "Confirmar rechazo de intervención" }));
+
+    await waitFor(() => expect(roleStale).toHaveBeenCalled());
+    expect(await within(confirmation).findByRole("alert")).toHaveTextContent(/No tiene el rol necesario/);
+    expect(within(detail).getByText("Pendiente de autorización")).toBeVisible();
+    window.removeEventListener("m6:roles-stale", roleStale);
   });
 
   it("does not expose authorization controls to Field", async () => {

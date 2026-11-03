@@ -334,7 +334,7 @@ export async function GET(request: Request) {
   const ownerId = url.searchParams.get("ownerId");
 
   try {
-    getRequiredSession(request);
+    const session = getRequiredSession(request);
 
     if (!ownerType || !ownerId) {
       return errorResponse(400, "Los parámetros ownerType y ownerId son obligatorios.", path);
@@ -343,6 +343,27 @@ export async function GET(request: Request) {
     const parsedOwnerType = evidenceOwnerTypeSchema.safeParse(ownerType);
     if (!parsedOwnerType.success) {
       return errorResponse(400, "Tipo de propietario de evidencia inválido.", path);
+    }
+
+    // Con backend real el dueño no vive en los fixtures: sin este proxy, el GET devolvía 404 para todo id real (#732).
+    if (backendMode(session)) {
+      if (!/^[A-Za-z0-9_-]{1,100}$/.test(ownerId)) {
+        return errorResponse(400, "El parámetro ownerId debe ser un identificador válido de hasta 100 caracteres.", path);
+      }
+      // El backend no filtra el GET por cuadrilla ni dueño (cualquier rol de M6): Campo pasa por el mismo chequeo que el POST.
+      if (getScenario(session).actor.kind === "FIELD" && parsedOwnerType.data !== "CONTAINER") {
+        const rawServiceId = url.searchParams.get("serviceId");
+        if (rawServiceId !== null && !scopeIdSchema.safeParse(rawServiceId).success) {
+          return errorResponse(400, "El parámetro serviceId debe ser un identificador válido de hasta 100 caracteres.", path);
+        }
+        const denied = await checkBackendEvidenceCrew(request, parsedOwnerType.data, ownerId, rawServiceId, session.crew?.id, path);
+        if (denied) return denied;
+      }
+      const backendResponse = await fetchBackend(
+        request,
+        `/evidence?ownerType=${parsedOwnerType.data}&ownerId=${encodeURIComponent(ownerId)}`,
+      );
+      return forwardResponse(backendResponse);
     }
 
     if (parsedOwnerType.data === "CONTAINER") {

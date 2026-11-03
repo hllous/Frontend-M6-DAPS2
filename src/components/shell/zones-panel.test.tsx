@@ -21,7 +21,7 @@ describe("ZonesPanel", () => {
   it("shows a loading state before the read resolves", () => {
     render(<ZonesPanel />);
 
-    expect(screen.getByLabelText("Cargando zonas operativas")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Zonas operativas" })).toBeVisible();
   });
 
   it("renders the fixture zones on a successful read", async () => {
@@ -30,6 +30,23 @@ describe("ZonesPanel", () => {
     expect(await screen.findByRole("heading", { name: "Zonas operativas" })).toBeVisible();
     expect(screen.getByText("Belgrano")).toBeVisible();
     expect(screen.queryByText(/Z-BEL/)).not.toBeInTheDocument();
+  });
+
+  it("groups zones under a heading per commune in numeric order, with Comuna 2 before Comuna 10", async () => {
+    const zone = (id: string, name: string, commune: string) => ({ id, code: id, name, active: true, commune: { id: commune, code: commune, name: commune } });
+    server.use(
+      http.get("*/api/zones", () =>
+        HttpResponse.json({
+          data: [zone("a", "Parque Chacabuco", "Comuna 10"), zone("b", "Recoleta", "Comuna 2"), zone("c", "Retiro", "Comuna 1")],
+          meta: { total: 3, page: 1, pageSize: 100, totalPages: 1 },
+        }),
+      ),
+    );
+
+    render(<ZonesPanel />);
+
+    const headings = await screen.findAllByRole("heading", { level: 3 });
+    expect(headings.map((heading) => heading.textContent)).toEqual(["Comuna 1", "Comuna 2", "Comuna 10"]);
   });
 
   it("renders an empty state when the adapter returns no zones", async () => {

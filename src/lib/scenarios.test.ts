@@ -40,6 +40,6 @@ describe("operational scenarios", () => {
   });
 
   it("returns operational scenarios by their stable name", () => {
-    expect(getScenario("field-crew-leader-route").work.items[0]).toMatch(/recorrido/i);
+    expect(getScenario("field-crew-leader-route").work.title).toBe("Servicios asignados");
   });
 });

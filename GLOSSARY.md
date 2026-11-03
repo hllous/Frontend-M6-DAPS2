@@ -13,8 +13,12 @@ Asociación de una cuadrilla y un vehículo con un Service ya programado. Asigna
 _Avoid_: Staffing, dispatch
 
 **Zone (M6)**:
-Agrupación operativa de barrios usada para componer Routes y organizar Services. Es distinta de los conceptos llamados “zona” en otros módulos.
-_Avoid_: M9 zone, neighborhood (the unit a Zone groups)
+Unidad operativa de M6 que corresponde a un barrio del catálogo de M9, usada para componer Routes y organizar Services. Es distinta de los conceptos llamados “zona” en otros módulos.
+_Avoid_: M9 zone, neighborhood (the M9 catalog entry a Zone maps to)
+
+**Commune**:
+Agrupación de Zones (M6) que sigue las comunas de la ciudad del catálogo de M9. Ordena y filtra Zones; no es una unidad de trabajo.
+_Avoid_: district, M9 zone, comuna (in English text)
 
 **Validity (ServiceFrequency)**:
 Período durante el cual una regla de ServiceFrequency está vigente. Su finalización no cambia los Services que ya se generaron con esa regla.
@@ -45,8 +49,12 @@ Actor de M6 responsable de planificar Services, organizar catálogos y tomar dec
 _Avoid_: Supervisor, admin, back-office
 
 **Field**:
-Actor de M6 que ejecuta Services asignados en territorio y puede realizar inspecciones ambientales. Comprende Crew Leaders y Crew Members; es distinto de Office.
-_Avoid_: Crew (the team a Field actor belongs to), worker, inspector (as a separate actor kind)
+Actor de M6 que trabaja en territorio: ejecuta Services asignados o EnvironmentalInspections. Comprende Crew Leaders, Crew Members e Inspectors; es distinto de Office.
+_Avoid_: Crew (the team a Field actor belongs to), worker
+
+**Inspector**:
+Actor de Field que ejecuta las EnvironmentalInspections. Cuando Office asigna una inspección a un Inspector, solo ese Inspector puede registrar su resultado.
+_Avoid_: Crew Member (when executing an inspection), auditor
 
 **Crew Leader**:
 Integrante de Campo responsable de conducir la ejecución de una asignación y registrar sus resultados.
@@ -55,6 +63,22 @@ _Avoid_: Foreman, crew lead
 **Crew Member**:
 Integrante de una Crew que participa de la ejecución y consulta el trabajo asignado; el Crew Leader registra sus resultados.
 _Avoid_: Worker, staff
+
+**Crew specialty**:
+Clase de trabajo que se espera que realice una Crew, como recolección, barrido o arbolado. Asignar la Crew a un Service de otra clase es una excepción que se justifica.
+_Avoid_: crew type (the employment form: own staff, cooperative or contractor), skill
+
+**Home zone**:
+Zone (M6) donde trabaja una Crew de forma habitual. Cada Crew tiene una sola.
+_Avoid_: crew zones, base zone list
+
+**Crew relocation**:
+Período durante el cual una Crew trabaja en otra Zone (M6) en lugar de su Home zone. Al terminar, la Crew vuelve a su Home zone.
+_Avoid_: reassignment, transfer, Assignment (that is crew-to-Service)
+
+**Effective zone**:
+Zone (M6) donde trabaja una Crew en una fecha dada: la de su Crew relocation vigente o, si no hay, su Home zone.
+_Avoid_: current zone, home zone (when a relocation applies)
 
 **Capability**:
 Acción específica de M6 que un actor puede realizar, como programar un Service, emitir un acta o autorizar una TreeIntervention. Una Capability es más acotada que un rol.

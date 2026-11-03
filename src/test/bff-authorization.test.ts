@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 async function requestAs(scenarioId: string) {
-  return new Request("http://localhost/api/test", { headers: { cookie: await loginAs(scenarioId) } });
+  return new Request("http://localhost/api/test", { headers: { cookie: await loginAs(scenarioId, scenarioId.startsWith("field") ? { crew: { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } } : {}) } });
 }
 
 describe("authorize", () => {
@@ -48,12 +48,10 @@ describe("authorize", () => {
 describe("requireCrewScope", () => {
   const serviceId = "73f53d2d-d090-4a4e-aefc-15d945e14474";
   const crewId = "c1ba1a57-6f23-4871-b6b3-1d7ce231a516";
-  const crewName = "Cuadrilla Belgrano — Recolección";
 
   it("reads and returns the backend Service assigned to the real Field crew", async () => {
     restoreEnv = backendEnv();
     const backendFetch = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: crewName }] }))
       .mockResolvedValueOnce(Response.json({ id: serviceId, crewId, status: "SCHEDULED", zones: [] }));
     const request = await requestAs("field-crew-leader-route");
     backendFetch.mockClear();
@@ -71,7 +69,6 @@ describe("requireCrewScope", () => {
   it.each(["another-crew", null, undefined])("rejects backend Service ownership %s", async (owner) => {
     restoreEnv = backendEnv();
     const backendFetch = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: crewName }] }))
       .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: owner }));
     const request = await requestAs("field-crew-leader-route");
     backendFetch.mockClear();
@@ -92,7 +89,6 @@ describe("requireCrewScope", () => {
     restoreEnv = backendEnv();
     const error = { statusCode: status, message: "Servicio no disponible." };
     const backendFetch = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: crewName }] }))
       .mockResolvedValueOnce(Response.json(error, { status }));
     const request = await requestAs("field-crew-leader-route");
     backendFetch.mockClear();
@@ -104,8 +100,7 @@ describe("requireCrewScope", () => {
 
   it("returns 503 without fixture fallback when backend origin disappears", async () => {
     restoreEnv = backendEnv();
-    const backendFetch = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: crewName }] }));
+    const backendFetch = vi.spyOn(globalThis, "fetch");
     const request = await requestAs("field-crew-leader-route");
     delete process.env.M6_BACKEND_ORIGIN;
     backendFetch.mockClear();
@@ -116,7 +111,7 @@ describe("requireCrewScope", () => {
 
   it("rejects a Field session missing its resolved backend crew before any read", async () => {
     restoreEnv = backendEnv();
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: crewName }] }));
+    vi.spyOn(globalThis, "fetch");
     const request = await requestAs("field-crew-leader-route");
     const session = { ...getRequiredSession(request), crew: undefined };
     vi.mocked(globalThis.fetch).mockClear();
@@ -127,7 +122,6 @@ describe("requireCrewScope", () => {
   it.each([{ id: serviceId, crewId: 42 }, { crewId }, null])("rejects malformed scope payload %j", async (payload) => {
     restoreEnv = backendEnv();
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: crewName }] }))
       .mockResolvedValueOnce(Response.json(payload));
     const request = await requestAs("field-crew-leader-route");
     expect((await requireCrewScope(request, getRequiredSession(request), { serviceId }) as Response).status).toBe(502);
@@ -136,7 +130,6 @@ describe("requireCrewScope", () => {
   it("returns 502 for a non-JSON success body", async () => {
     restoreEnv = backendEnv();
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: crewName }] }))
       .mockResolvedValueOnce(new Response("<html>upstream</html>"));
     const request = await requestAs("field-crew-leader-route");
     expect((await requireCrewScope(request, getRequiredSession(request), { serviceId }) as Response).status).toBe(502);
@@ -145,7 +138,6 @@ describe("requireCrewScope", () => {
   it("returns 503 when the backend cannot be reached", async () => {
     restoreEnv = backendEnv();
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json({ data: [{ id: crewId, name: crewName }] }))
       .mockRejectedValueOnce(new TypeError("fetch failed"));
     const request = await requestAs("field-crew-leader-route");
     expect((await requireCrewScope(request, getRequiredSession(request), { serviceId }) as Response).status).toBe(503);

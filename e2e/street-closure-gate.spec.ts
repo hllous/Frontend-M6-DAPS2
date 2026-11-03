@@ -11,7 +11,7 @@ const closureInput = (sourceId: string) => ({
   requestedFrom: "2026-09-05T08:00",
   requestedTo: "2026-09-05T12:00",
   affectedSections: [
-    { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12" },
+    { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12", direction: "FORWARD" },
   ],
 });
 

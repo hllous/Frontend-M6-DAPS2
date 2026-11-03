@@ -1,4 +1,6 @@
 "use client";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useState, type FormEvent } from "react";
@@ -7,6 +9,7 @@ import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import {
   Empty,
   EmptyDescription,
@@ -15,7 +18,6 @@ import {
 } from "@/components/ui/empty";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -27,7 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   disposalSiteTypeSchema,
   disposalSitesAdapter,
@@ -79,6 +80,9 @@ type LoadState =
   | { status: "loading" }
   | { status: "ready"; items: DisposalSite[] }
   | { status: "error"; message: string };
+
+const EMPTY_ITEMS: DisposalSite[] = [];
+const COLUMNS: DataTableColumn<DisposalSite>[] = [{ accessorKey: "code", enableSorting: false }, { accessorKey: "name", enableSorting: false }, { accessorKey: "siteType", enableSorting: false }, { accessorKey: "active", enableSorting: false }];
 
 export function DisposalSitesPanel({
   scenario,
@@ -210,6 +214,12 @@ export function DisposalSitesPanel({
       setIsSubmittingDeactivate(false);
     }
   };
+
+  const table = useDataTable({
+    data: state.status === "ready" ? state.items : EMPTY_ITEMS,
+    columns: COLUMNS,
+    getRowId: (item) => item.id,
+  });
 
   return (
     <section
@@ -423,7 +433,7 @@ export function DisposalSitesPanel({
           </FieldGroup>
         </CardContent>
       </Card>
-      {state.status === "loading" ? <div role="status" aria-label="Cargando sitios de disposición" className="flex flex-col gap-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de sitios de disposición"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-16","w-40","w-28","w-16","w-4"]} columnLabels={["Código","Nombre","Tipo","Estado","Ver detalle"]} actionColumn actionCount={1} className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>
@@ -453,9 +463,11 @@ export function DisposalSitesPanel({
       ) : null}
       {state.status === "ready" && state.items.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <caption className="sr-only">Sitios de disposición</caption>
-            <thead>
+          <DataTable
+            table={table}
+            container={false}
+            className={`${styles.table} leading-[inherit]`}
+            renderHeader={() => (<thead>
               <tr>
                 <th scope="col">Código</th>
                 <th scope="col">Nombre</th>
@@ -463,9 +475,10 @@ export function DisposalSitesPanel({
                 <th scope="col">Estado</th>
                 <th scope="col"><span className="sr-only">Ver detalle</span></th>
               </tr>
-            </thead>
-            <tbody>{state.items.map((item) => (
-              <tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
+            </thead>)}
+            renderRow={(row) => {
+              const item = row.original;
+              return (<tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
                 <th scope="row" data-label="Código">
                   <Button
                     type="button"
@@ -483,9 +496,11 @@ export function DisposalSitesPanel({
                 <td data-label="" aria-hidden="true" className="text-right">
                   <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </td>
-              </tr>
-            ))}</tbody>
-          </table>
+              </tr>);
+            }}
+          >
+            <caption className="sr-only">Sitios de disposición</caption>
+          </DataTable>
         </div>
       ) : null}
       <Sheet

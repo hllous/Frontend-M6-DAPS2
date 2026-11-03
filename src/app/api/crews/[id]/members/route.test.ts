@@ -53,6 +53,19 @@ describe("crew membership BFF route", () => {
     expect(JSON.parse(String(init.body))).toEqual({ userIds: ["user-ana", "user-pedro"] });
   });
 
+  it("forwards named members alongside plain ids", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    process.env.M6_AUTH_MODE = "backend-development";
+    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
+    const loginResponse = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" }, body: JSON.stringify({ scenarioId: "office-duty-queue" }) }));
+    backendFetch.mockClear();
+    const body = { userIds: ["101"], members: [{ userId: "102", displayName: "Ana" }] };
+    const response = await POST(new Request("http://localhost/api/crews/crew-b/members", { method: "POST", headers: { cookie: loginResponse.headers.get("set-cookie") ?? "", "content-type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ id: "crew-b" }) });
+    expect(response.status).toBe(200);
+    expect(JSON.parse(String(backendFetch.mock.calls[0][1]?.body))).toEqual(body);
+  });
+
   it("rejects more than 100 members before reaching the backend (#251)", async () => {
     const response = await POST(new Request("http://localhost/api/crews/crew-membership/members", {
       method: "POST",

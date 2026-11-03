@@ -21,7 +21,15 @@ test.describe("session lifecycle failure journeys @smoke", () => {
   test("an expired session redirects to login", async ({ page, baseURL }) => {
     await page.context().addCookies([buildExpiredSessionCookie("office-duty-queue", baseURL!)]);
     await page.goto("/app");
-    await page.waitForURL("**/login");
+    await page.waitForURL("**/login?expired=1");
+    await expect(page.getByText("Su sesión terminó. Vuelva a ingresar.")).toBeVisible();
+  });
+
+  test("a vanished session cookie with the signed-in marker returns to the same screen with a notice", async ({ page, baseURL }) => {
+    await page.context().addCookies([{ name: "m6_signed_in", value: "1", url: baseURL! }]);
+    await page.goto("/app?destination=services");
+    await page.waitForURL("**/login?expired=1&destination=services");
+    await expect(page.getByText("Su sesión terminó. Vuelva a ingresar.")).toBeVisible();
   });
 
   test("a 401 on one tab logs every open tab out", async ({ browser }) => {
@@ -54,7 +62,7 @@ test.describe("session lifecycle failure journeys @smoke", () => {
     // first keystroke after mount, which is what turns this into a real 401 response.
     await tabA.keyboard.press("Shift");
 
-    await tabA.waitForURL("**/login");
+    await tabA.waitForURL(/\/login\?expired=1/);
     await tabB.waitForURL("**/login");
 
     await context.close();

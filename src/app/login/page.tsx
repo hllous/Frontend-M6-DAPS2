@@ -3,20 +3,17 @@ import { connection } from "next/server";
 
 import { LoginForm } from "@/components/auth/login-form";
 import { getAuthMode, getSession } from "@/lib/session";
+import { returnPathFor } from "@/lib/login-return";
 import { scenarios } from "@/lib/scenarios";
 
-type LoginSearchParams = Promise<{ destination?: string | string[] }>;
-
-function getLoginReturnPath(searchParams: Awaited<LoginSearchParams>) {
-  const destination = Array.isArray(searchParams.destination) ? searchParams.destination[0] : searchParams.destination;
-  return destination === "services" ? "/app?destination=services" : "/app";
-}
+type LoginSearchParams = Promise<{ destination?: string | string[]; expired?: string | string[] }>;
 
 export default async function LoginPage({ searchParams }: { searchParams: LoginSearchParams }) {
   await connection();
-  const returnPath = getLoginReturnPath(await searchParams);
+  const params = await searchParams;
+  const returnPath = returnPathFor(params.destination);
   const session = await getSession();
   if (session) redirect(returnPath);
 
-  return <LoginForm scenarios={Object.values(scenarios)} authMode={getAuthMode()} redirectTo={returnPath} />;
+  return <LoginForm scenarios={Object.values(scenarios)} authMode={getAuthMode()} redirectTo={returnPath} sessionExpired={params.expired === "1"} />;
 }

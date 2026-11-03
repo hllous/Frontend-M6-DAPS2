@@ -17,3 +17,7 @@ Datasets abiertos de BA Data, Gobierno de la Ciudad de Buenos Aires (GCBA). Lice
 - Comuna: `COMUNA` o `COMUNAS` igual a `N` corresponde a `comuna-N` (`commune.code` de `GET /communes`).
 
 Verificado por el Backend el 27/10/2026 contra el catálogo real de M9: coinciden los 48 barrios y las 15 comunas. Detalle en [`docs/geojson/README.md` del Backend](https://github.com/hllous/Backend-M6-DAPS2/blob/develop/docs/geojson/README.md).
+
+## Archivos que carga el mapa
+
+El mapa (#708, #709, #720) descarga `comunas.geojson` y `barrios.geojson`: los mismos datos de `caba_comunas.geojson` y `caba_barrios.geojson` con las coordenadas redondeadas a 6 decimales (0,1 m) y los vértices simplificados con Douglas-Peucker a 1e-5 grados (cerca de 1 m). Pasan de 1,8 MB a unos 150 KB, sin cambios visibles en el mapa. Propiedades y orden de las features se conservan. Los `caba_*` originales quedan como fuente: si cambian, regenerar los dos archivos.

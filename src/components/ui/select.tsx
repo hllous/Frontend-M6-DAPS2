@@ -42,17 +42,21 @@ function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
 function SelectTrigger({
   className,
   size = "default",
+  surface = "default",
   children,
   ...props
 }: SelectPrimitive.Trigger.Props & {
   size?: "sm" | "default"
+  // "card": the trigger sits on a muted panel (filters, forms in a sheet) and takes the card surface.
+  surface?: "default" | "card"
 }) {
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       data-size={size}
+      data-surface={surface}
       className={cn(
-        "flex w-full items-center justify-between gap-1.5 rounded-lg border border-[var(--color-border-strong)] bg-background py-2 pr-2 pl-3 text-sm [@media(max-width:760px)]:text-base whitespace-nowrap transition-colors outline-none select-none focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-10 data-[size=default]:[@media(max-width:760px)]:h-12 data-[size=sm]:h-8 data-[size=sm]:[@media(max-width:760px)]:h-10 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "flex w-full items-center justify-between gap-1.5 rounded-lg border border-[var(--color-border-strong)] bg-background data-[surface=card]:bg-card py-2 pr-2 pl-3 text-sm [@media(max-width:760px)]:text-base whitespace-nowrap transition-colors outline-none select-none focus-visible:outline-[3px] focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-10 data-[size=default]:[@media(max-width:760px)]:h-12 data-[size=sm]:h-8 data-[size=sm]:[@media(max-width:760px)]:h-10 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}

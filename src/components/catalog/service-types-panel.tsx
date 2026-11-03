@@ -1,4 +1,5 @@
 "use client";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useState, type FormEvent } from "react";
@@ -7,6 +8,7 @@ import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import {
   Empty,
   EmptyDescription,
@@ -15,7 +17,6 @@ import {
 } from "@/components/ui/empty";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -103,6 +104,9 @@ type LoadState =
   | { status: "loading"; rowCount: number }
   | { status: "ready"; items: ServiceType[] }
   | { status: "error"; message: string };
+
+const EMPTY_ITEMS: ServiceType[] = [];
+const COLUMNS: DataTableColumn<ServiceType>[] = [{ accessorKey: "code", enableSorting: false }, { accessorKey: "name", enableSorting: false }, { accessorKey: "category", enableSorting: false }, { accessorKey: "mode", enableSorting: false }, { accessorKey: "requiresVehicle", enableSorting: false }, { accessorKey: "active", enableSorting: false }];
 
 export function ServiceTypesPanel({
   scenario,
@@ -252,6 +256,12 @@ export function ServiceTypesPanel({
       setIsSubmittingDeactivate(false);
     }
   };
+
+  const table = useDataTable({
+    data: state.status === "ready" ? state.items : EMPTY_ITEMS,
+    columns: COLUMNS,
+    getRowId: (item) => item.id,
+  });
 
   return (
     <section
@@ -553,7 +563,7 @@ export function ServiceTypesPanel({
         </CardContent>
       </Card>
 
-      {state.status === "loading" ? <div role="status" aria-label="Cargando tipos de servicio"><TableRowsSkeleton rowCount={state.rowCount} rowHeight="" columnClasses={tableColumnClasses} columnWidths={["w-16", "w-40", "w-28", "w-20", "w-8", "w-12", "w-4"]} columnLabels={["Código", "Nombre", "Categoría", "Modo", "Vehículo", "Estado", "Ver detalle"]} className={styles.tableWrap} tableClassName={`${styles.table} min-[761px]:table-fixed`} /></div> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de tipos de servicio"><TableRowsSkeleton rowCount={state.rowCount} rowHeight="" columnClasses={tableColumnClasses} columnWidths={["w-16", "w-40", "w-28", "w-20", "w-8", "w-12", "w-4"]} columnLabels={["Código", "Nombre", "Categoría", "Modo", "Vehículo", "Estado", "Ver detalle"]} className={styles.tableWrap} tableClassName={`${styles.table} min-[761px]:table-fixed`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>
@@ -583,10 +593,11 @@ export function ServiceTypesPanel({
       ) : null}
       {state.status === "ready" && state.items.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table className={`${styles.table} min-[761px]:table-fixed`}>
-            <caption className="sr-only">Tipos de servicio</caption>
-            <colgroup>{tableColumnClasses.map((width, column) => <col key={column} className={width} />)}</colgroup>
-            <thead>
+          <DataTable
+            table={table}
+            container={false}
+            className={`${styles.table} min-[761px]:table-fixed leading-[inherit]`}
+            renderHeader={() => (<thead>
               <tr>
                 <th scope="col">Código</th>
                 <th scope="col">Nombre</th>
@@ -596,9 +607,10 @@ export function ServiceTypesPanel({
                 <th scope="col">Estado</th>
                 <th scope="col"><span className="sr-only">Ver detalle</span></th>
               </tr>
-            </thead>
-            <tbody>{state.items.map((item) => (
-              <tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
+            </thead>)}
+            renderRow={(row) => {
+              const item = row.original;
+              return (<tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
                 <th scope="row" data-label="Código">
                   <Button
                     type="button"
@@ -618,9 +630,12 @@ export function ServiceTypesPanel({
                 <td data-label="" aria-hidden="true" className="text-right">
                   <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </td>
-              </tr>
-            ))}</tbody>
-          </table>
+              </tr>);
+            }}
+          >
+            <caption className="sr-only">Tipos de servicio</caption>
+            <colgroup>{tableColumnClasses.map((width, column) => <col key={column} className={width} />)}</colgroup>
+          </DataTable>
         </div>
       ) : null}
 

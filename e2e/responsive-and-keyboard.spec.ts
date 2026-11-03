@@ -129,7 +129,7 @@ test.describe("keyboard-only shell operation @smoke", () => {
     await expect(page.locator(":focus")).not.toHaveAttribute("aria-current", "page");
 
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
     await expect(page.getByRole("main")).toBeFocused();
     await expect(page).toHaveTitle("Servicios — Ambiente e Higiene");
   });

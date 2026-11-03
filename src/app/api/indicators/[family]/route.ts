@@ -1,16 +1,13 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { fetchBackend } from "@/lib/bff-backend";
-import { complianceIndicatorFixture, coverageIndicatorFixture, incidentsIndicatorFixture, wasteIndicatorFixture } from "@/lib/indicator-fixtures";
-import { defaultIndicatorQuery, familyAppliesCatalogFilters, indicatorQueryErrorMessage, indicatorQuerySchema } from "@/lib/indicators";
+import { indicatorFixtureResponse } from "@/lib/indicator-fixtures";
+import { familyAppliesCatalogFilters, indicatorBucketSchema, indicatorQueryErrorMessage, indicatorQuerySchema } from "@/lib/indicators";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
 const families = ["coverage", "compliance", "incidents", "waste"] as const;
 type IndicatorFamily = (typeof families)[number];
-
-
-
 
 function queryString(request: Request, family: IndicatorFamily) {
   const url = new URL(request.url);
@@ -20,24 +17,16 @@ function queryString(request: Request, family: IndicatorFamily) {
   const allowedKeys = familyAppliesCatalogFilters(family)
     ? ["from", "to", "zoneId", "serviceTypeId"]
     : ["from", "to"];
-  return { value: backendQuery(parsed.data, allowedKeys) } as const;
-}
-
-function fixtureResponse(family: IndicatorFamily, request: Request) {
-  const url = new URL(request.url);
-  const defaults = defaultIndicatorQuery();
-  const period = { from: url.searchParams.get("from") ?? defaults.from, to: url.searchParams.get("to") ?? defaults.to };
-  if (family === "coverage") {
-    const zoneId = url.searchParams.get("zoneId");
-    const serviceTypeId = url.searchParams.get("serviceTypeId");
-    return { ...coverageIndicatorFixture, period, byZone: zoneId ? coverageIndicatorFixture.byZone.filter((item) => item.id === zoneId) : coverageIndicatorFixture.byZone, byServiceType: serviceTypeId ? coverageIndicatorFixture.byServiceType.filter((item) => item.id === serviceTypeId) : coverageIndicatorFixture.byServiceType };
-  }
-  if (family === "compliance") {
-    const zoneId = url.searchParams.get("zoneId");
-    return { ...complianceIndicatorFixture, period, notServicedRanking: zoneId ? complianceIndicatorFixture.notServicedRanking.filter((item) => item.zoneId === zoneId) : complianceIndicatorFixture.notServicedRanking };
-  }
-  if (family === "incidents") return { ...incidentsIndicatorFixture, period };
-  return { ...wasteIndicatorFixture, period };
+  const bucketValue = url.searchParams.get("bucket");
+  const bucket = bucketValue === null ? undefined : indicatorBucketSchema.safeParse(bucketValue);
+  const compare = url.searchParams.get("compare");
+  if (bucket && !bucket.success) return { error: "Intervalo de indicadores inválido." } as const;
+  if (compare && compare !== "previous") return { error: "Comparación de indicadores inválida." } as const;
+  const query = backendQuery(parsed.data, allowedKeys);
+  const params = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);
+  if (bucket?.success) params.set("bucket", bucket.data);
+  if (compare) params.set("compare", compare);
+  return { value: `?${params.toString()}` } as const;
 }
 
 export async function GET(request: Request, context: { params: Promise<{ family: string }> }) {
@@ -55,7 +44,9 @@ export async function GET(request: Request, context: { params: Promise<{ family:
       const backendResponse = await fetchBackend(request, `/indicators/${typedFamily}${query.value}`, "indicator:view");
       return forwardResponse(backendResponse);
     }
-    return NextResponse.json(fixtureResponse(typedFamily, request));
+    const fixture = indicatorFixtureResponse(typedFamily, request);
+    if (fixture.error) return errorResponse(400, fixture.error, path);
+    return NextResponse.json(fixture);
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof ForbiddenSessionError) return errorResponse(403, "La sesión no tiene la capacidad indicator:view.", path, FORBIDDEN_CODES.roleRequired);

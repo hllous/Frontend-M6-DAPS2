@@ -24,10 +24,12 @@ export async function POST(request: Request, routeContext: PostContext) {
     try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
     const parsed = addCrewMembersInputSchema.safeParse(body);
     if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}/members`, "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userIds: parsed.data.memberUserIds }) }));
+    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}/members`, "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(parsed.data.userIds || parsed.data.memberUserIds ? { userIds: parsed.data.userIds ?? parsed.data.memberUserIds } : {}), ...(parsed.data.members ? { members: parsed.data.members } : {}) }) }));
     const crew = crewFixtures.find((item) => item.id === id);
     if (!crew) return errorResponse(404, `La cuadrilla ${id} no existe.`, path);
-    crew.memberUserIds = [...new Set([...crew.memberUserIds, ...parsed.data.memberUserIds])];
+    const incoming = [...(parsed.data.userIds ?? parsed.data.memberUserIds ?? []).map((userId) => ({ userId, displayName: null })), ...(parsed.data.members ?? []).map((member) => ({ userId: member.userId, displayName: member.displayName ?? null }))];
+    for (const member of incoming) if (!crew.members.some((item) => item.userId === member.userId)) crew.members.push(member);
+    crew.memberUserIds = crew.members.map((member) => member.userId);
     return NextResponse.json(crew);
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);

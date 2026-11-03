@@ -2,6 +2,7 @@
 import { errorMessage } from "@/lib/error-message";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3, Eye, Info, Plus, RefreshCw, Send, ShieldAlert, UserRound } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -17,14 +18,17 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Item, ItemGroup } from "@/components/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DetailFieldsSkeleton, InterventionCardSkeleton } from "./catalog-a-loading";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
 import { CreateStreetClosureRequestDialog } from "@/components/services/create-street-closure-request-dialog";
 import Link from "next/link";
-import { servicesAdapter, type CreateServiceInput, type Service } from "@/lib/services";
+import { servicesAdapter, ServiceRequestError, OVERRIDE_NOTE_MIN, OVERRIDE_NOTE_MAX, type CreateServiceInput, type Service } from "@/lib/services";
 import { resolveServiceType, TREE_PRUNING_SERVICE_TYPE_RULE } from "@/lib/service-types";
 import { treeInterventionCreateInputSchema, treeInterventionsAdapter, TreeInterventionRequestError, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionPriority, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
+import { asksForOverrideNote } from "@/lib/crew-fit";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import { vehiclesAdapter, type Vehicle } from "@/lib/vehicles";
 import { todayInArgentina } from "@/lib/argentina-date";
@@ -92,7 +96,6 @@ type RequestDialogProps = {
   onCreated?: (intervention: TreeInterventionDetail) => void;
 };
 
-const emptyForm: RequestForm = { interventionType: "", treeIds: [], address: "", requiresStreetClosure: false, priority: "MEDIUM", justification: "" };
 
 function formFor(props: RequestDialogProps): RequestForm {
   const selectedTrees = props.trees.filter((tree) => props.initialTreeIds?.includes(tree.id));
@@ -258,6 +261,7 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
 export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScenario }) {
   const canRequest = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("treeIntervention:request");
   const canAuthorize = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("treeIntervention:authorize");
+  const canAuthorizeRemoval = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("treeIntervention:authorizeRemoval");
   const canSchedule = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("service:schedule");
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [trees, setTrees] = useState<Tree[]>([]);
@@ -283,10 +287,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const serviceLookupRequest = useRef(0);
   const [streetClosureIntervention, setStreetClosureIntervention] = useState<TreeInterventionDetail | null>(null);
   const detailOpenedFromUrl = useRef(false);
-  const [initialDetailId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return new URLSearchParams(window.location.search).get("detail");
-  });
+  const initialDetailId = useSearchParams()?.get("detail") ?? null;
   const [notice, setNotice] = useState<string | null>(null);
   const query = useMemo<TreeInterventionQuery>(() => ({ interventionType: interventionType || undefined, status: status || undefined, priority: priority || undefined, page, pageSize: 10 }), [interventionType, page, priority, status]);
 
@@ -379,11 +380,13 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   useEffect(() => {
     if (state.status !== "ready" || !initialDetailId || detail || detailOpenedFromUrl.current) return;
     const intervention = state.page.interventions.find((item) => item.id === initialDetailId);
-    if (!intervention) return;
     detailOpenedFromUrl.current = true;
-    void Promise.resolve().then(() => openDetail(intervention));
+    if (intervention) void Promise.resolve().then(() => openDetail(intervention));
+    else void treeInterventionsAdapter.get(initialDetailId).then(openDetail).catch(() => undefined);
   }, [state, initialDetailId, detail, openDetail]);
   const treeById = (id: string) => trees.find((tree) => tree.id === id);
+  const [crewConflict, setCrewConflict] = useState(false);
+  const [overrideNote, setOverrideNote] = useState("");
   const runAction = async (action: "submit" | "authorize" | "reject" | "schedule", input?: ReturnType<typeof emptySchedule>) => {
     if (!detail) return;
     setActionError(null); setActiveAction(action);
@@ -406,6 +409,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           targetRef: treeTargetRef(treesForService, detail.treeIds),
           scheduledDate: input.scheduledDate,
           crewId: input.crewId || undefined,
+          overrideNote: crewConflict ? overrideNote.trim() : undefined,
           vehicleId: input.vehicleId || undefined,
           timeWindow: { start: input.windowFrom, end: input.windowTo },
           notes: `Intervención de arbolado ${detail.id}.`,
@@ -438,6 +442,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       setNotice(action === "submit" ? "Extracción enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
       if (action === "reject") setRejectConfirmOpen(false);
     } catch (caught) {
+      if (action === "schedule" && caught instanceof ServiceRequestError && caught.status === 409 && asksForOverrideNote(caught.message)) { setCrewConflict(true); return; }
       setActionError(errorMessage(caught, "No se pudo actualizar la intervención."));
     } finally { setActiveAction(null); }
   };
@@ -507,7 +512,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           </Select>
         </Field>
       </FieldGroup>
-      {state.status === "loading" ? <div role="status" aria-label="Cargando intervenciones" className="flex flex-col gap-3"><Skeleton className="h-28 w-full" /><Skeleton className="h-28 w-full" /></div> : null}
+      {state.status === "loading" ? <LoadingRegion label="Solicitudes de intervención" className="flex flex-col gap-5"><Skeleton className="h-5 w-28" /><div className="grid gap-3">{Array.from({ length: 10 }, (_, card) => <InterventionCardSkeleton key={card} />)}</div></LoadingRegion> : null}
       {state.status === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{state.message}</span><Button type="button" variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></AlertDescription></Alert> : null}
       {state.status === "ready" && state.page.interventions.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin solicitudes de intervención</EmptyTitle><EmptyDescription>{interventionType || status || priority ? "No hay solicitudes para los filtros seleccionados. Quite uno o más filtros para consultar el registro completo." : "Todavía no hay solicitudes de intervención registradas."}</EmptyDescription></EmptyHeader></Empty> : null}
       {state.status === "ready" && state.page.interventions.length > 0 ? <>
@@ -584,7 +589,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { serviceLookupRequest.current += 1; setDetail(null); setUnsyncedService(null); setServiceLookupStatus("idle"); setRejectConfirmOpen(false); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle></DialogHeader>
-          {detailLoading ? <Alert role="status"><AlertDescription>Cargando detalle…</AlertDescription></Alert> : null}
+          {detailLoading ? <LoadingRegion label="Detalle de la intervención"><DetailFieldsSkeleton fieldCount={6} /></LoadingRegion> : null}
           {detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}
           {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <Item key={tree?.id ?? detail.treeIds[index]} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</Item>)}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
           {detail && !detailLoading && !detailError ? (
@@ -616,6 +621,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                         setActionError(SCHEDULE_REQUIRED_ERROR);
                         return;
                       }
+                      if (crewConflict && overrideNote.trim().length < OVERRIDE_NOTE_MIN) { setActionError(`Escriba al menos ${OVERRIDE_NOTE_MIN} caracteres de justificación.`); return; }
                       setActionError(null);
                       void runAction("schedule", scheduleForm);
                     }}
@@ -641,7 +647,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                     <FieldGroup className="grid gap-3 sm:grid-cols-2">
                       <Field>
                         <FieldLabel htmlFor="tree-service-crew">Cuadrilla (opcional)</FieldLabel>
-                        <Select items={{ __none__: "Sin asignar", ...Object.fromEntries(resources && resources !== "error" ? resources.crews.map((crew) => [crew.id, crew.name]) : []) }} value={scheduleForm.crewId || "__none__"} disabled={!resources || resources === "error"} onValueChange={(value) => setScheduleForm({ ...scheduleForm, crewId: value === "__none__" ? "" : String(value ?? "") })}>
+                        <Select items={{ __none__: "Sin asignar", ...Object.fromEntries(resources && resources !== "error" ? resources.crews.map((crew) => [crew.id, crew.name]) : []) }} value={scheduleForm.crewId || "__none__"} disabled={!resources || resources === "error"} onValueChange={(value) => { setScheduleForm({ ...scheduleForm, crewId: value === "__none__" ? "" : String(value ?? "") }); setCrewConflict(false); setOverrideNote(""); }}>
                           <SelectTrigger id="tree-service-crew" aria-label="Cuadrilla (opcional)"><SelectValue /></SelectTrigger>
                           <SelectContent><SelectGroup><SelectItem value="__none__">Sin asignar</SelectItem>{resources && resources !== "error" ? resources.crews.map((crew) => <SelectItem key={crew.id} value={crew.id}>{crew.name}</SelectItem>) : null}</SelectGroup></SelectContent>
                         </Select>
@@ -655,6 +661,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                         {resources === "error" ? <FieldDescription className="text-xs leading-4">No se pudieron cargar. Asigne luego desde Servicios.</FieldDescription> : null}
                       </Field>
                     </FieldGroup>
+                    {crewConflict && <Field><FieldLabel htmlFor="tree-service-override">Justificación de la asignación <span aria-hidden="true">*</span></FieldLabel><FieldDescription id="tree-service-override-help" role="status">La asignación presenta un conflicto de horario, zona o especialidad. Indique el motivo.</FieldDescription><Textarea id="tree-service-override" aria-required="true" aria-describedby="tree-service-override-help" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} maxLength={OVERRIDE_NOTE_MAX} /></Field>}
                     <p className="text-xs text-muted-foreground">{"Se crear\u00e1 un servicio de punto, con el primer \u00e1rbol como objetivo t\u00e9cnico y el listado completo de \u00e1rboles como contexto relacionado."}</p>
                     <div className="flex flex-wrap justify-end gap-2">
                       <Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => setScheduleOpen(false)}>{"Cancelar programaci\u00f3n"}</Button>
@@ -670,10 +677,10 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
             <Button type="button" variant="outline" className="w-full min-w-0 whitespace-normal sm:w-auto" onClick={() => setDetail(null)}>Cerrar detalle</Button>
             {detail && !detailLoading && !detailError ? <>
               {canRequest && detail.status === "AUTHORIZED" ? <Button type="button" variant="outline" className="w-full min-w-0 whitespace-normal sm:w-auto" onClick={() => { setDetail(null); setStreetClosureIntervention(detail); }}>Solicitar corte de calle</Button> : null}
-              {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && !scheduleOpen ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} onClick={() => { setScheduleForm(emptySchedule()); setScheduleFieldErrors([]); setActionError(null); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
+              {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && !scheduleOpen ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} onClick={() => { setScheduleForm(emptySchedule()); setScheduleFieldErrors([]); setActionError(null); setCrewConflict(false); setOverrideNote(""); setScheduleOpen(true); }}><CalendarClock data-icon="inline-start" aria-hidden />Programar servicio</Button> : null}
               {detail.interventionType === "REMOVAL" && detail.status === "REQUESTED" && canRequest ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} aria-busy={activeAction === "submit"} onClick={() => void runAction("submit")}><Send data-icon="inline-start" aria-hidden />{activeAction === "submit" ? "Enviando a autorización…" : "Enviar a autorización"}</Button> : null}
               {detail.status === "REJECTED" && canRequest ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" onClick={() => { setDetail(null); openRequest({ initialTreeIds: detail.treeIds, initialType: detail.interventionType, initialAddress: detail.address ?? undefined, initialRequiresStreetClosure: detail.requiresStreetClosure, initialPriority: detail.priority ?? undefined, initialJustification: detail.justification ?? "" }); }}>Crear nueva solicitud</Button> : null}
-              {canAuthorize && ((detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <>
+              {((canAuthorizeRemoval && detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (canAuthorize && detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <>
                 {detail.interventionType === "REMOVAL" ? <Button type="button" variant="destructive" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(true)}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button> : null}
                 <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} aria-busy={activeAction === "authorize"} onClick={() => void runAction("authorize")}><CheckCircle2 data-icon="inline-start" aria-hidden />{activeAction === "authorize" ? "Autorizando intervención…" : "Autorizar intervención"}</Button>
               </> : null}

@@ -2,6 +2,8 @@ import path from "node:path";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Allows concurrent local Next dev servers to use independent build state.
+  distDir: process.env.M6_NEXT_DIST_DIR || ".next",
   // Necesario para el build de Docker: genera un servidor "standalone"
   // con solo lo necesario para correr en producción. Vercel arma su propio
   // empaquetado y con "standalone" el build falla buscando

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -16,6 +16,7 @@ const mapState = vi.hoisted(() => {
   return state;
 });
 
+const polygonState = vi.hoisted(() => ({ pathOptions: new Set<unknown>() }));
 const clusterGroupState = vi.hoisted(() => ({ animate: undefined as boolean | undefined }));
 
 vi.mock("leaflet.markercluster", () => ({}));
@@ -40,8 +41,11 @@ vi.mock("react-leaflet", async () => {
       "data-icon-html": icon?.options?.html,
       onClick: eventHandlers?.click,
     }, children),
-    Pane: emptyComponent,
-    Polygon: emptyComponent,
+    Pane: ({ children }: { children?: React.ReactNode }) => ReactModule.createElement(ReactModule.Fragment, null, children),
+    Polygon: ({ pathOptions }: { pathOptions?: unknown }) => {
+      polygonState.pathOptions.add(pathOptions);
+      return null;
+    },
     Popup: emptyComponent,
     TileLayer: emptyComponent,
     Tooltip: emptyComponent,
@@ -75,6 +79,19 @@ vi.mock("react-leaflet-cluster", async () => {
   };
 });
 
+vi.mock("@/lib/communes", () => ({
+  communesAdapter: { list: vi.fn().mockResolvedValue([{ id: "c1", code: "comuna-14", name: "Comuna 14", active: true, zones: [] }]) },
+}));
+vi.mock("@/lib/neighborhoods", () => ({
+  neighborhoodsAdapter: {
+    list: vi.fn().mockResolvedValue([
+      { id: "n1", codigo: "palermo", nombre: "Palermo", zona: "comuna-14", activo: true },
+      { id: "n2", codigo: "sin-poligono", nombre: "Barrio sin polígono", zona: "comuna-14", activo: true },
+    ]),
+  },
+}));
+
+import { resetMapBoundariesCache } from "./map-boundaries";
 import { OperationalMapCanvas } from "./operational-map-canvas";
 
 afterEach(() => {
@@ -155,5 +172,129 @@ describe("OperationalMapCanvas inventory clusters", () => {
     render(<OperationalMapCanvas view="inventory" markers={[]} />);
 
     await vi.waitFor(() => expect(clusterGroupState.animate).toBe(false));
+  });
+});
+
+describe("OperationalMapCanvas comunas y barrios (#708, #709, #720)", () => {
+  beforeEach(() => {
+    resetMapBoundariesCache();
+    polygonState.pathOptions.clear();
+  });
+
+  const square = (south: number, west: number) => ({
+    type: "Polygon",
+    coordinates: [[[west, south], [west + 1, south], [west + 1, south + 1], [west, south + 1], [west, south]]],
+  });
+  const communes = {
+    features: [
+      { properties: { COMUNAS: 14 }, geometry: square(0, 0) },
+      { properties: { COMUNAS: 1 }, geometry: square(0, 2) },
+    ],
+  };
+  const barrios = {
+    features: [
+      { properties: { BARRIO: "PALERMO", COMUNA: 14 }, geometry: square(0, 0) },
+      // Polygon whose barrio the API does not know.
+      { properties: { BARRIO: "RETIRO", COMUNA: 1 }, geometry: square(0, 2) },
+    ],
+  };
+  const marker = (id: string, lat: number, lng: number) => ({
+    id,
+    layer: "containers",
+    title: id,
+    description: "Contenedor",
+    lat,
+    lng,
+    markerSymbol: "C",
+    markerTone: "info" as const,
+  });
+  const markers = [marker("EN-PALERMO", 0.5, 0.5), marker("EN-RETIRO", 0.5, 2.5), marker("AFUERA", 50, 50)];
+
+  function stubGeoJson() {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => (url.includes("comunas") ? communes : barrios),
+    })));
+  }
+
+  it("shows every marker with everything visible and filters by the layer list", async () => {
+    stubGeoJson();
+    const user = userEvent.setup();
+    render(<OperationalMapCanvas view="inventory" markers={markers} />);
+
+    await user.click(await screen.findByRole("button", { name: "Comunas y barrios" }));
+    expect(screen.getByRole("button", { name: /EN-PALERMO/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /AFUERA/ })).toBeVisible();
+    // The API barrio without a polygon is listed but cannot be toggled.
+    expect(screen.getByRole("checkbox", { name: /Barrio sin polígono/ })).toHaveAttribute("aria-disabled", "true");
+
+    await user.click(screen.getByRole("button", { name: "Ocultar todos" }));
+    expect(screen.queryByRole("button", { name: /EN-PALERMO/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /AFUERA/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: "Palermo" }));
+    expect(screen.getByRole("button", { name: /EN-PALERMO/ })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /EN-RETIRO/ })).not.toBeInTheDocument();
+    // Showing a barrio of a hidden commune shows it alone.
+    expect(screen.getByRole("checkbox", { name: "Comuna 14" })).not.toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: "Mostrar todos" }));
+    expect(screen.getAllByRole("button", { name: /EN-|AFUERA/ })).toHaveLength(3);
+  });
+
+  it("hiding a commune hides its barrios and their markers", async () => {
+    stubGeoJson();
+    const user = userEvent.setup();
+    render(<OperationalMapCanvas view="inventory" markers={markers} />);
+
+    await user.click(await screen.findByRole("button", { name: "Comunas y barrios" }));
+    await user.click(screen.getByRole("checkbox", { name: "Comuna 14" }));
+
+    expect(screen.getByRole("checkbox", { name: "Palermo" })).not.toBeChecked();
+    expect(screen.queryByRole("button", { name: /EN-PALERMO/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /EN-RETIRO/ })).toBeVisible();
+  });
+
+  it("keeps the map working and says so when the GeoJSON cannot be loaded", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, json: async () => ({}) })));
+    render(<OperationalMapCanvas view="inventory" markers={markers} />);
+
+    expect(await screen.findByRole("button", { name: /EN-PALERMO/ })).toBeVisible();
+    expect(await screen.findByRole("status")).toHaveTextContent("No se pudieron cargar las comunas y barrios.");
+    expect(screen.queryByRole("button", { name: "Comunas y barrios" })).not.toBeInTheDocument();
+  });
+
+  it("hides markers outside every barrio once a filter is active", async () => {
+    stubGeoJson();
+    const user = userEvent.setup();
+    render(<OperationalMapCanvas view="inventory" markers={markers} />);
+
+    await user.click(await screen.findByRole("button", { name: "Comunas y barrios" }));
+    await user.click(screen.getByRole("checkbox", { name: "Comuna 1" }));
+    expect(screen.queryByRole("button", { name: /AFUERA/ })).not.toBeInTheDocument();
+    expect(screen.getByText("(filtro activo)")).toBeInTheDocument();
+  });
+
+  it("never hides the selected marker, so its detail cannot stay open over nothing", async () => {
+    stubGeoJson();
+    const user = userEvent.setup();
+    render(<OperationalMapCanvas view="inventory" markers={markers} selectedMarkerKey="containers-AFUERA" />);
+
+    await user.click(await screen.findByRole("button", { name: "Comunas y barrios" }));
+    await user.click(screen.getByRole("button", { name: "Ocultar todos" }));
+    expect(screen.getByRole("button", { name: /AFUERA/ })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /EN-PALERMO/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps the polygon style objects stable across re-renders", async () => {
+    stubGeoJson();
+    const { rerender } = render(<OperationalMapCanvas view="inventory" markers={markers} />);
+    await screen.findByRole("button", { name: "Comunas y barrios" });
+    const before = polygonState.pathOptions.size;
+    expect(before).toBeGreaterThan(0);
+
+    rerender(<OperationalMapCanvas view="inventory" markers={[...markers]} />);
+    rerender(<OperationalMapCanvas view="inventory" markers={[...markers]} />);
+    expect(polygonState.pathOptions.size).toBe(before);
   });
 });

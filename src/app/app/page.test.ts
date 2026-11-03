@@ -7,7 +7,7 @@ describe("AppPage metadata", () => {
     ["work", "Mi trabajo"],
     ["services", "Servicios"],
     ["referrals", "Derivaciones"],
-    ["inventory", "Inventario"],
+    ["inventory", "Catálogo"],
     ["environment", "Control Ambiental"],
     ["map", "Mapa"],
     ["catalog", "Catálogo"],

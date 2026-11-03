@@ -56,7 +56,7 @@ test.describe("automated WCAG checks @smoke", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
     await expect(page.getByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Mapa de servicios" })).toBeVisible();
     await expectNoViolations(page);

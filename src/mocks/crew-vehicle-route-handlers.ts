@@ -2,6 +2,7 @@ import { GET as listCrews, POST as createCrew } from "@/app/api/crews/route";
 import { DELETE as deleteCrew, GET as getCrew, PATCH as updateCrew } from "@/app/api/crews/[id]/route";
 import { POST as addCrewMembers } from "@/app/api/crews/[id]/members/route";
 import { DELETE as removeCrewMember } from "@/app/api/crews/[id]/members/[userId]/route";
+import { GET as listCrewZoneAssignments, POST as createCrewZoneAssignment } from "@/app/api/crews/[id]/zone-assignments/route";
 import { GET as listVehicles, POST as createVehicle } from "@/app/api/vehicles/route";
 import { DELETE as deleteVehicle, GET as getVehicle, PATCH as updateVehicle } from "@/app/api/vehicles/[id]/route";
 import { GET as listServiceFrequencies, POST as createServiceFrequency } from "@/app/api/service-frequencies/route";
@@ -31,6 +32,8 @@ export function crewVehicleRouteHandlers(fallbackCookie: string) {
       route: removeCrewMember,
       params: { id: "crewId", userId: "userId" },
     },
+    { method: "get", path: "*/api/crews/:crewId/zone-assignments", route: listCrewZoneAssignments, params: byCrewId },
+    { method: "post", path: "*/api/crews/:crewId/zone-assignments", route: createCrewZoneAssignment, params: byCrewId },
     { method: "get", path: "*/api/vehicles", route: listVehicles },
     { method: "get", path: "*/api/vehicles/:vehicleId", route: getVehicle, params: byVehicleId },
     { method: "post", path: "*/api/vehicles", route: createVehicle },

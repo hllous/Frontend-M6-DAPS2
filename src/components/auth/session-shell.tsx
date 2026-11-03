@@ -8,9 +8,10 @@ import { getFieldDraftOwner, setFieldDraftOwner, subscribeFieldDraftOwner } from
 import type { ScenarioId } from "@/lib/scenarios";
 import { broadcastLogout } from "@/lib/session-client";
 
-export function SessionShell({ actorId, scenarioId, logoutAction, children }: {
+export function SessionShell({ actorId, scenarioId, identity, logoutAction, children }: {
   actorId: string;
   scenarioId: ScenarioId;
+  identity?: { userId: string; label: string };
   logoutAction: (formData: FormData) => Promise<void>;
   children?: ReactNode;
 }) {
@@ -28,7 +29,7 @@ export function SessionShell({ actorId, scenarioId, logoutAction, children }: {
   }
 
   return (
-    <FoundationDemo scenarioId={scenarioId} logoutAction={logout} contentReady={draftOwner === actorId}>
+    <FoundationDemo scenarioId={scenarioId} identity={identity} logoutAction={logout} contentReady={draftOwner === actorId}>
       {draftOwner === actorId ? children : null}
     </FoundationDemo>
   );

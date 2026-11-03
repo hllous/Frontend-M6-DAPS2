@@ -144,7 +144,7 @@ it.each([403, 409, 500, 503])("preserves backend error status and body (%s)", as
     if ((init?.method ?? "GET") === "GET") return Response.json({ id: "real-service", crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
-  const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+  const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { ...backendCrew, role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/resume", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(undefined),
@@ -162,6 +162,7 @@ describe("POST /api/services/[id]/resume backend forward path", () => {
     const backendFetch = mockFieldBackend();
     const cookie = await loginAs("field-crew-leader-route", {
       mode: "backend-development",
+      crew: { ...backendCrew, role: "LEADER" },
       devJwt: backendDevJwt,
       backendOrigin,
     });
@@ -187,6 +188,7 @@ describe("POST /api/services/[id]/resume backend forward path", () => {
     const backendFetch = mockFieldBackend("22222222-2222-4222-8222-222222222222");
     const cookie = await loginAs("field-crew-leader-route", {
       mode: "backend-development",
+      crew: { ...backendCrew, role: "LEADER" },
       devJwt: backendDevJwt,
       backendOrigin,
     });

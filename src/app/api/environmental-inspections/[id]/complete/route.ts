@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   getEnvironmentalInspectionFixture,
+  getEnvironmentalReportFixture,
+  mockAllowedActionsForCompletedInspection,
   transitionEnvironmentalReportFixture,
   updateEnvironmentalInspectionFixture,
 } from "@/lib/environmental-report-fixtures";
@@ -119,6 +121,7 @@ export async function POST(
       suggestedAction: parsedInput.data.suggestedAction ?? null,
       conclusion: parsedInput.data.conclusion ?? inspection.conclusion,
       outcome: parsedInput.data.outcome,
+      allowedActions: mockAllowedActionsForCompletedInspection(getEnvironmentalReportFixture(inspection.reportId)?.reportType ?? "OTHER", parsedInput.data.outcome),
       nextStep: parsedInput.data.nextStep ?? nextStepForOutcome(parsedInput.data.outcome),
     });
     if (!updatedInspection) return errorResponse(404, "Inspección no encontrada.", path);

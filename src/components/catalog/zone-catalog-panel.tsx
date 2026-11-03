@@ -1,4 +1,13 @@
 "use client";
+import { ListItemsSkeleton, TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import {
+  DataTable,
+  useDataTable,
+  type DataTableColumn,
+} from "@/components/ui/data-table";
+import { TableCaption } from "@/components/ui/table";
+
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -54,7 +63,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { notifySuccess } from "@/components/ui/feedback";
 import { communesAdapter, type Commune } from "@/lib/communes";
@@ -69,7 +77,6 @@ import {
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   type CreateZoneInput,
-  type UpdateZoneInput,
   type Zone,
   type ZoneReferenceReport,
   ZoneRequestError,
@@ -148,6 +155,8 @@ function mapFormError(message: string): FormErrors {
   if (!errors.code && !errors.name) errors.form = message;
   return errors;
 }
+
+const NO_ZONES: Zone[] = [];
 
 export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }) {
   const canManage =
@@ -530,6 +539,137 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     setSelectedNeighborhoodIds([]);
   };
 
+  const columns: DataTableColumn<Zone>[] = [
+    {
+      id: "name",
+      header: "Nombre",
+      enableSorting: false,
+      meta: {
+        headClassName:
+          "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
+        cellClassName:
+          "h-auto whitespace-normal px-4 py-3 font-medium text-foreground",
+      },
+      cell: ({ row }) => {
+        const zone = row.original;
+        return <>{zone.name}</>;
+      },
+    },
+    {
+      id: "commune",
+      header: "Comuna",
+      enableSorting: false,
+      meta: {
+        headClassName:
+          "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
+        cellClassName:
+          "h-auto whitespace-normal px-4 py-3 text-muted-foreground",
+      },
+      cell: ({ row }) => {
+        const zone = row.original;
+        return <>{zone.commune?.name ?? "Sin comuna"}</>;
+      },
+    },
+    {
+      id: "neighborhoods",
+      header: "Barrios",
+      enableSorting: false,
+      meta: {
+        headClassName:
+          "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
+        cellClassName:
+          "h-auto whitespace-normal px-4 py-3 text-muted-foreground",
+      },
+      cell: ({ row }) => {
+        const zone = row.original;
+        return <>{neighborhoodCell(zone)}</>;
+      },
+    },
+    {
+      id: "status",
+      header: "Estado",
+      enableSorting: false,
+      meta: {
+        headClassName:
+          "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
+        cellClassName: "h-auto whitespace-normal px-4 py-3",
+      },
+      cell: ({ row }) => {
+        const zone = row.original;
+        return (
+          <>
+            <Badge variant={zone.active ? "success" : "secondary"}>
+              {zone.active ? "Activa" : "Inactiva"}
+            </Badge>
+          </>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: () => <span className="sr-only">Acciones</span>,
+      enableSorting: false,
+      meta: {
+        headClassName:
+          "h-auto whitespace-normal text-inherit font-bold px-4 py-3 text-right",
+        cellClassName: "h-auto whitespace-normal px-4 py-3 text-right",
+      },
+      cell: ({ row }) => {
+        const zone = row.original;
+        return (
+          <>
+            {canManage ? (
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void handleStartNeighborhoods(zone)}
+                  className="h-8 max-[760px]:h-10 gap-1 text-xs"
+                >
+                  <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                  Barrios
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleStartEdit(zone)}
+                  className="h-8 max-[760px]:h-10 gap-1 text-xs"
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  Editar
+                </Button>
+                {zone.active && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleStartDeactivate(zone)}
+                    className="h-8 max-[760px]:h-10 gap-1 text-xs"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Dar de baja
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                Solo consulta
+              </span>
+            )}
+          </>
+        );
+      },
+    },
+  ];
+
+  const table = useDataTable({
+    data: state.status === "ready" ? state.items : NO_ZONES,
+    columns,
+    getRowId: (item) => item.id,
+  });
+
   return (
     <section aria-labelledby="zones-catalog-heading" className="flex flex-col gap-6">
       <CatalogPageHeader
@@ -837,11 +977,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
       {/* Main content table / states */}
       {state.status === "loading" && (
-        <div aria-label="Cargando zonas operativas" className="flex flex-col gap-3">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
+        <LoadingRegion label="Listado de zonas operativas"><TableRowsSkeleton rowCount={5} rowHeight="h-[65px]" columnWidths={["w-40", "w-28", "w-36", "w-16", "w-72"]} columnLabels={["NOMBRE", "COMUNA", "BARRIOS", "ESTADO", ""]} className="relative overflow-x-auto rounded-xl border border-border bg-card" /></LoadingRegion>
       )}
 
       {state.status === "error" && (
@@ -876,78 +1012,21 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
       {state.status === "ready" && state.items.length > 0 && (
         <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">Listado de zonas operativas</caption>
-            <thead className="border-b border-border bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3">Nombre</th>
-                <th className="px-4 py-3">Comuna</th>
-                <th className="px-4 py-3">Barrios</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3 text-right">
-                  <span className="sr-only">Acciones</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.items.map((zone) => (
-                <tr key={zone.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                  <td className="px-4 py-3 font-medium text-foreground">
-                    {zone.name}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{zone.commune?.name ?? "Sin comuna"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {neighborhoodCell(zone)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={zone.active ? "success" : "secondary"}>
-                      {zone.active ? "Activa" : "Inactiva"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {canManage ? (
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void handleStartNeighborhoods(zone)}
-                          className="h-8 max-[760px]:h-10 gap-1 text-xs"
-                        >
-                          <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                          Barrios
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleStartEdit(zone)}
-                          className="h-8 max-[760px]:h-10 gap-1 text-xs"
-                        >
-                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                          Editar
-                        </Button>
-                        {zone.active && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleStartDeactivate(zone)}
-                            className="h-8 max-[760px]:h-10 gap-1 text-xs"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                            Dar de baja
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Solo consulta</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            table={table}
+            container={false}
+            className="w-full text-left text-sm leading-[inherit]"
+            headerClassName="border-b border-border bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground [&_tr]:border-b-0"
+            bodyClassName=""
+            rowProps={() => ({
+              className:
+                "border-b border-border last:border-0 hover:bg-muted/20",
+            })}
+          >
+            <TableCaption className="sr-only">
+              Listado de zonas operativas
+            </TableCaption>
+          </DataTable>
         </div>
       )}
 
@@ -999,10 +1078,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               </div>
 
               {isLoadingNeighborhoods ? (
-                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                  <Spinner aria-hidden="true" />
-                  Cargando barrios...
-                </div>
+                <LoadingRegion label="Barrios de la zona"><ListItemsSkeleton itemCount={2} /></LoadingRegion>
               ) : assignedNeighborhoods.length === 0 ? (
                 <Empty className="border p-3">
                   <EmptyDescription>Esta zona todavía no tiene barrios asignados.</EmptyDescription>
@@ -1081,7 +1157,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
               {neighborhoodGroups.length === 0 ? (
                 <Empty className="border p-3">
                   <EmptyDescription>
-                    {catalogLoaded ? "No se encontraron barrios para esta búsqueda." : catalogFailed ? "El catálogo de barrios no está disponible." : "Cargando barrios…"}
+                    {catalogLoaded ? "No se encontraron barrios para esta búsqueda." : catalogFailed ? "El catálogo de barrios no está disponible." : <LoadingRegion label="Barrios disponibles"><ListItemsSkeleton itemCount={3} /></LoadingRegion>}
                   </EmptyDescription>
                 </Empty>
               ) : (
@@ -1176,7 +1252,7 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
           </Alert>
         ) : null}
         {isLoadingReferences ? (
-          <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+          <div role="status" className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
             <Spinner aria-hidden="true" />
             Verificando…
           </div>

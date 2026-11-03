@@ -1,4 +1,6 @@
 "use client";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -6,6 +8,7 @@ import { Check, ChevronRight, Pencil, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import {
   Dialog,
   DialogClose,
@@ -23,7 +26,6 @@ import {
 } from "@/components/ui/empty";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -31,7 +33,6 @@ import {
   FieldLegend,
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Skeleton } from "@/components/ui/skeleton";
 import { routesAdapter, type Route } from "@/lib/routes";
 import { serviceTypesAdapter, type ServiceType } from "@/lib/service-types";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -126,6 +127,9 @@ function weekdayLabel(value: number) {
     weekdays.find((weekday) => weekday.value === value)?.short ?? String(value)
   );
 }
+
+const EMPTY_ITEMS: ServiceFrequency[] = [];
+const COLUMNS: DataTableColumn<ServiceFrequency>[] = [{ accessorKey: "serviceTypeId", enableSorting: false }, { accessorKey: "routeId", enableSorting: false }, { accessorKey: "weekdays", enableSorting: false }, { accessorKey: "shift", enableSorting: false }, { accessorKey: "validFrom", enableSorting: false }];
 
 export function ServiceFrequenciesPanel({
   scenario,
@@ -327,6 +331,12 @@ export function ServiceFrequenciesPanel({
       setCloseError(getErrorMessage(error, "No se pudo cerrar la vigencia."));
     }
   }
+
+  const table = useDataTable({
+    data: state.status === "ready" ? state.items : EMPTY_ITEMS,
+    columns: COLUMNS,
+    getRowId: (item) => item.id,
+  });
 
   return (
     <section
@@ -674,7 +684,7 @@ export function ServiceFrequenciesPanel({
         </CardContent>
       </Card>
 
-      {state.status === "loading" ? <div role="status" aria-label="Cargando frecuencias" className="flex flex-col gap-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : null}
+      {state.status === "loading" ? <LoadingRegion label="Listado de frecuencias de servicio"><TableRowsSkeleton rowCount={5} rowHeight="" columnWidths={["w-32","w-28","w-24","w-16","w-28","w-4"]} columnLabels={["Tipo de servicio","Recorrido","Días","Turno","Vigencia","Ver detalle"]} actionColumn actionCount={1} className={styles.tableWrap} tableClassName={`${styles.table} leading-[inherit]`} /></LoadingRegion> : null}
       {state.status === "error" ? (
         <Alert variant="destructive">
           <AlertDescription>
@@ -704,11 +714,14 @@ export function ServiceFrequenciesPanel({
       ) : null}
       {state.status === "ready" && state.items.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <caption className="sr-only">Frecuencias de servicio</caption>
-            <thead><tr><th scope="col">Tipo de servicio</th><th scope="col">Recorrido</th><th scope="col">Días</th><th scope="col">Turno</th><th scope="col">Vigencia</th><th scope="col"><span className="sr-only">Ver detalle</span></th></tr></thead>
-            <tbody>{state.items.map((item) => (
-              <tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
+          <DataTable
+            table={table}
+            container={false}
+            className={`${styles.table} leading-[inherit]`}
+            renderHeader={() => (<thead><tr><th scope="col">Tipo de servicio</th><th scope="col">Recorrido</th><th scope="col">Días</th><th scope="col">Turno</th><th scope="col">Vigencia</th><th scope="col"><span className="sr-only">Ver detalle</span></th></tr></thead>)}
+            renderRow={(row) => {
+              const item = row.original;
+              return (<tr key={item.id} className="group relative cursor-pointer transition-colors hover:bg-muted/40">
                 <th scope="row" data-label="Tipo de servicio">
                   <Button
                     type="button"
@@ -727,9 +740,11 @@ export function ServiceFrequenciesPanel({
                 <td data-label="" aria-hidden="true" className="text-right">
                   <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </td>
-              </tr>
-            ))}</tbody>
-          </table>
+              </tr>);
+            }}
+          >
+            <caption className="sr-only">Frecuencias de servicio</caption>
+          </DataTable>
         </div>
       ) : null}
 

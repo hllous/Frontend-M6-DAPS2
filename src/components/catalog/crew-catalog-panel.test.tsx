@@ -6,6 +6,9 @@ import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
 import { crewsAdapter } from "@/lib/crews";
+import { crewZoneAssignmentsAdapter } from "@/lib/crew-zone-assignments";
+import { crewFixtures, resetCrewFixtures } from "@/lib/crew-fixtures";
+import { m1IdentityAdapter } from "@/lib/m1-identity";
 import { CrewCatalogPanel } from "./crew-catalog-panel";
 
 const server = setupServer(...handlers);
@@ -13,7 +16,7 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
   server.listen({ onUnhandledRequest: "error" });
 });
-afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
+afterEach(() => { server.resetHandlers(); resetCrewFixtures(); vi.restoreAllMocks(); });
 afterAll(() => server.close());
 
 describe("CrewCatalogPanel", () => {
@@ -144,7 +147,7 @@ describe("CrewCatalogPanel", () => {
 
 describe("CrewCatalogPanel pagination", () => {
   it("pages through backend results and resets the page when filtering", async () => {
-    const list = vi.spyOn(crewsAdapter, "list").mockImplementation(async (query) => ({ crews: Array.from({ length: 20 }, (_, index) => ({ ...{ id: "a358142e-a427-46b3-8b36-fb13091e023f", name: "Equipo remoto", crewType: "MUNICIPAL" as const, leaderUserId: null, organizationId: null, memberUserIds: [], defaultShift: "MORNING" as const, active: true }, id: `remote-${index}` })), page: query?.page ?? 1, pageSize: 20, total: 57, totalPages: 3 }));
+    const list = vi.spyOn(crewsAdapter, "list").mockImplementation(async (query) => ({ crews: Array.from({ length: 20 }, (_, index) => ({ ...{ id: "a358142e-a427-46b3-8b36-fb13091e023f", name: "Equipo remoto", crewType: "MUNICIPAL" as const, leaderUserId: null, leaderName: null, organizationId: null, organizationName: null, members: [], memberUserIds: [], specialty: null, homeZoneId: null, effectiveZoneId: null, membersCount: null, defaultShift: "MORNING" as const, active: true }, id: `remote-${index}` })), page: query?.page ?? 1, pageSize: 20, total: 57, totalPages: 3 }));
     const user = userEvent.setup();
     render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
     expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
@@ -164,7 +167,7 @@ describe("CrewCatalogPanel pagination", () => {
 
 
 it("clamps the current page after its last active record is deactivated", async () => {
-  const vehicle = { id: "a358142e-a427-46b3-8b36-fb13091e023f", name: "Equipo remoto", crewType: "MUNICIPAL" as const, leaderUserId: null, organizationId: null, memberUserIds: [], defaultShift: "MORNING" as const, active: true };
+  const vehicle = { id: "a358142e-a427-46b3-8b36-fb13091e023f", name: "Equipo remoto", crewType: "MUNICIPAL" as const, leaderUserId: null, leaderName: null, organizationId: null, organizationName: null, members: [], memberUserIds: [], specialty: null, homeZoneId: null, effectiveZoneId: null, membersCount: null, defaultShift: "MORNING" as const, active: true };
   let removed = false;
   vi.spyOn(crewsAdapter, "remove").mockImplementation(async () => { removed = true; return { ...vehicle, active: false }; });
   vi.spyOn(crewsAdapter, "get").mockResolvedValue(vehicle);
@@ -187,4 +190,325 @@ it("clamps the current page after its last active record is deactivated", async 
   await user.click(within(dialog).getByRole("button", { name: "Dar de baja" }));
   expect(await screen.findByText("Página 2 de 2")).toBeVisible();
   await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, active: true })));
+});
+
+ it("shows response names and neutral identifiers in the table and detail", async () => {
+  const user = userEvent.setup();
+  render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+  const row = await screen.findByRole("row", { name: /Cuadrilla B/ });
+  expect(within(row).getByText("Usuario user-maria")).toBeVisible();
+  expect(within(row).getByText("Organizaci\u00f3n sin nombre (id org-cooperativa)")).toBeVisible();
+  const emptyRow = screen.getByRole("row", { name: /Cuadrilla D/ });
+  expect(within(emptyRow).getByText("\u2014")).toBeVisible();
+  expect(within(emptyRow).getByText("Sin organizaci\u00f3n externa")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Ver detalle de Cuadrilla A \u00b7 L\u00f3pez" }));
+  const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+  expect(within(sheet).getByRole("button", { name: "Quitar a Carlos L\u00f3pez" })).toBeVisible();
+  expect(within(sheet).getByRole("button", { name: "Quitar a Usuario user-lucia" })).toBeVisible();
+  expect(within(sheet).getByText(/lista de ejemplo/)).toBeVisible();
+});
+
+
+describe("nombres de referencias de cuadrilla", () => {
+  it("muestra nombres, identificadores y ausencia en tabla y detalle", async () => {
+    const empty = crewFixtures.find((crew) => crew.id === "crew-d")!;
+    empty.members = [];
+    empty.memberUserIds = [];
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const named = await screen.findByRole("row", { name: /Cuadrilla A/ });
+    expect(within(named).getByText("Carlos López")).toBeVisible();
+    expect(within(named).getByText("Municipalidad")).toBeVisible();
+    const unnamed = screen.getByRole("row", { name: /Cuadrilla B/ });
+    expect(within(unnamed).getByText("Usuario user-maria")).toBeVisible();
+    expect(within(unnamed).getByText("Organización sin nombre (id org-cooperativa)")).toBeVisible();
+    const absent = screen.getByRole("row", { name: /Cuadrilla D/ });
+    expect(within(absent).getByText("—")).toBeVisible();
+    expect(within(absent).getByText("Sin organización externa")).toBeVisible();
+    await user.click(within(named).getByRole("button", { name: /Ver detalle/ }));
+    let sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    const members = within(sheet).getByRole("list", { name: "Integrantes de la cuadrilla" });
+    expect(within(members).getByText("Carlos López")).toBeVisible();
+    expect(within(members).getByText("Usuario user-lucia")).toBeVisible();
+    expect(within(members).getByRole("button", { name: "Quitar a Carlos López" })).toBeVisible();
+    expect(within(members).getByRole("button", { name: "Quitar a Usuario user-lucia" })).toBeVisible();
+    await user.keyboard("{Escape}");
+    await user.click(within(absent).getByRole("button", { name: /Ver detalle/ }));
+    sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    expect(within(sheet).getByRole("list", { name: "Integrantes de la cuadrilla" })).toBeEmptyDOMElement();
+    expect(within(sheet).queryByRole("button", { name: /^Quitar/ })).not.toBeInTheDocument();
+  });
+
+  it("envía el nombre del integrante seleccionado al BFF", async () => {
+    let payload: unknown;
+    const listener = async ({ request }: { request: Request }) => {
+      if (request.method === "POST" && new URL(request.url).pathname === "/api/crews/crew-membership/members") {
+        payload = await request.clone().json();
+      }
+    };
+    server.events.on("request:start", listener);
+    try {
+      const user = userEvent.setup();
+      render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla E - Membresia" }));
+      const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+      await user.click(within(sheet).getByRole("combobox", { name: /^Agregar integrantes/ }));
+      await user.click(await screen.findByRole("option", { name: "Pedro Ruiz, no seleccionado" }));
+      await user.keyboard("{Escape}");
+      await user.click(within(sheet).getByRole("button", { name: "Agregar integrantes" }));
+      await screen.findByRole("button", { name: "Quitar a Pedro Ruiz" });
+      expect(payload).toEqual({ members: [{ userId: "user-pedro", displayName: "Pedro Ruiz" }] });
+    } finally {
+      server.events.removeListener("request:start", listener);
+    }
+  });
+
+  it("explica la fuente y la ausencia de candidatos disponibles", async () => {
+    const crew = crewFixtures.find((item) => item.id === "crew-membership")!;
+    crew.members = (await m1IdentityAdapter.listUsers()).map(({ id, displayName }) => ({ userId: id, displayName }));
+    crew.memberUserIds = crew.members.map(({ userId }) => userId);
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla E - Membresia" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    expect(within(sheet).getByText("Los candidatos provienen de una lista de ejemplo de personas.")).toBeVisible();
+    expect(within(sheet).getByText("No hay integrantes disponibles para agregar.")).toBeVisible();
+    await user.click(within(sheet).getByRole("combobox", { name: /^Agregar integrantes/ }));
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+  });
+});
+
+describe("especialidad y zona de cuadrilla", () => {
+  async function pick(user: ReturnType<typeof userEvent.setup>, name: string | RegExp, option: string) {
+    await user.click(screen.getByRole("combobox", { name }));
+    await user.click(await screen.findByRole("option", { name: option }));
+  }
+
+  it("muestra especialidad y zona vigente en la tabla, con el identificador de zonas desconocidas", async () => {
+    crewFixtures.find((crew) => crew.id === "crew-d")!.effectiveZoneId = "zone-inexistente";
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const table = await screen.findByRole("table");
+    expect(within(table).getByRole("columnheader", { name: "Especialidad" })).toBeVisible();
+    expect(within(table).getByRole("columnheader", { name: "Zona" })).toBeVisible();
+    const a = await screen.findByRole("row", { name: /Cuadrilla A/ });
+    expect(within(a).getByText("Recolección")).toBeVisible();
+    expect(await within(a).findByText("Belgrano")).toBeVisible();
+    const d = screen.getByRole("row", { name: /Cuadrilla D/ });
+    expect(within(d).getByText("Sin especialidad")).toBeVisible();
+    expect(within(d).getByText("zone-inexistente")).toBeVisible();
+    expect(within(screen.getByRole("row", { name: /Cuadrilla E/ })).getByText("Sin zona")).toBeVisible();
+  });
+
+  it("filtra por zona y por especialidad y conserva los filtros al paginar", async () => {
+    const list = vi.spyOn(crewsAdapter, "list");
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("row", { name: /Cuadrilla A/ });
+    await pick(user, "Zona", "Retiro");
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ zoneId: "zone-4" })));
+    expect(await screen.findByRole("row", { name: /Cuadrilla C/ })).toBeVisible();
+    expect(screen.queryByRole("row", { name: /Cuadrilla A/ })).not.toBeInTheDocument();
+    await pick(user, "Especialidad", "Arbolado");
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ zoneId: "zone-4", specialty: "TREES", page: 1 })));
+    await pick(user, "Turno", "Mañana");
+    expect(await screen.findByText("No hay cuadrillas que coincidan con los filtros.")).toBeVisible();
+  });
+
+  it("muestra en el detalle especialidad, zona base, zona vigente y la marca de reubicada", async () => {
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla C · Ibáñez" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    const field = (label: string) => within(sheet).getByText(label, { selector: "dt" }).nextElementSibling as HTMLElement;
+    expect(field("Especialidad")).toHaveTextContent("Arbolado");
+    await waitFor(() => expect(field("Zona base")).toHaveTextContent("Recoleta"));
+    expect(field("Zona vigente hoy")).toHaveTextContent("Retiro");
+    expect(within(sheet).getByText("Reubicada")).toBeVisible();
+  });
+
+  it("no marca como reubicada a una cuadrilla en su zona base", async () => {
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla A · López" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    expect(within(sheet).queryByText("Reubicada")).not.toBeInTheDocument();
+  });
+
+  it("muestra a Campo la especialidad y la zona de su cuadrilla sin acciones", async () => {
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.fieldCrewMember} />);
+    const row = await screen.findByRole("row", { name: /Cuadrilla B/ });
+    expect(within(row).getByText("Barrido")).toBeVisible();
+    expect(await within(row).findByText("Palermo")).toBeVisible();
+    await user.click(within(row).getByRole("button", { name: /Ver detalle/ }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    expect(within(sheet).getByText("Barrido", { selector: "dd" })).toBeVisible();
+    expect(within(sheet).queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+  });
+
+  it("exige la especialidad al registrar, en español y antes de enviar", async () => {
+    const create = vi.spyOn(crewsAdapter, "create");
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Registrar cuadrilla" }));
+    const dialog = await screen.findByRole("dialog", { name: "Registrar cuadrilla" });
+    await user.type(within(dialog).getByLabelText("Nombre"), "Cuadrilla nueva");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cuadrilla" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("La especialidad es obligatoria.");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("registra con especialidad y zona base opcional", async () => {
+    const create = vi.spyOn(crewsAdapter, "create");
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Registrar cuadrilla" }));
+    const dialog = await screen.findByRole("dialog", { name: "Registrar cuadrilla" });
+    await user.type(within(dialog).getByLabelText("Nombre"), "Cuadrilla nueva");
+    await user.click(within(dialog).getByRole("combobox", { name: "Especialidad" }));
+    await user.click(await screen.findByRole("option", { name: "Reciclaje" }));
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cuadrilla" }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ specialty: "RECYCLING", homeZoneId: undefined })));
+    const row = await screen.findByRole("row", { name: /Cuadrilla nueva/ });
+    expect(within(row).getByText("Reciclaje")).toBeVisible();
+    expect(within(row).getByText("Sin zona")).toBeVisible();
+  });
+
+  it("edita especialidad y zona base", async () => {
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla A · López" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Detalle de cuadrilla" })).getByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar cuadrilla" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Especialidad" }));
+    await user.click(await screen.findByRole("option", { name: "Barrido" }));
+    await user.click(within(dialog).getByRole("combobox", { name: "Zona base" }));
+    await user.click(await screen.findByRole("option", { name: "Palermo" }));
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cuadrilla" }));
+    const row = await screen.findByRole("row", { name: /Cuadrilla A/ });
+    await waitFor(() => expect(within(row).getByText("Barrido")).toBeVisible());
+    expect(within(row).getByText("Palermo")).toBeVisible();
+  });
+
+  it("quita la zona base de una cuadrilla y envía null", async () => {
+    const update = vi.spyOn(crewsAdapter, "update");
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla A · López" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Detalle de cuadrilla" })).getByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar cuadrilla" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Zona base" }));
+    await user.click(await screen.findByRole("option", { name: "Sin zona base" }));
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cuadrilla" }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith("crew-a", expect.objectContaining({ homeZoneId: null })));
+    expect(await screen.findByRole("row", { name: /Cuadrilla A/ })).toHaveTextContent("Sin zona");
+  });
+});
+
+describe("CrewCatalogPanel: reubicar cuadrilla e historial", () => {
+  async function openDetail(user: ReturnType<typeof userEvent.setup>, scenario: typeof scenarios.officeDutyQueue, crew: string) {
+    render(<CrewCatalogPanel scenario={scenario} />);
+    await user.click(await screen.findByRole("button", { name: `Ver detalle de ${crew}` }));
+    return screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+  }
+
+  it("muestra la reubicación vigente y el historial, la más reciente primero", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeDutyQueue, "Cuadrilla C · Ibáñez");
+    const active = await within(sheet).findByRole("region", { name: "Reubicación vigente" });
+    await waitFor(() => expect(active).toHaveTextContent("Retiro"));
+    expect(active).toHaveTextContent("Operativo de arbolado en la zona 4");
+    expect(active).toHaveTextContent(/\d{2}\/\d{2}\/\d{4}/);
+    const history = within(sheet).getByRole("list", { name: "Historial de reubicaciones" });
+    const items = within(history).getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    await waitFor(() => expect(items[0]).toHaveTextContent("Retiro"));
+    expect(items[1]).toHaveTextContent("Refuerzo de poda por temporal");
+  });
+
+  it("marca en la tabla la cuadrilla reubicada con su zona temporal y el fin de la reubicación", async () => {
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /Cuadrilla C/ });
+    expect(within(row).getByText("Retiro")).toBeVisible();
+    expect(within(row).getByText("Reubicada")).toBeVisible();
+    expect(await within(row).findByText(/^(Hasta el \d{2}\/\d{2}\/\d{4}|Hasta nuevo aviso)$/)).toBeVisible();
+    expect(within(await screen.findByRole("row", { name: /Cuadrilla A/ })).queryByText("Reubicada")).not.toBeInTheDocument();
+  });
+
+  it("muestra Reubicada y Vigente con el tratamiento de estado operativo (fondo suave, ícono y texto)", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeDutyQueue, "Cuadrilla C · Ibáñez");
+    const history = await within(sheet).findByRole("list", { name: "Historial de reubicaciones" });
+    const current = await within(history).findByText("Vigente");
+    const relocated = within(sheet).getByText("Reubicada");
+    expect(current).toHaveAttribute("data-variant", "success");
+    expect(relocated).toHaveAttribute("data-variant", "warning");
+    expect(current.querySelector("svg")).not.toBeNull();
+    expect(relocated.querySelector("svg")).not.toBeNull();
+  });
+
+  it("dice que no hay reubicaciones cuando la cuadrilla nunca fue movida", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeDutyQueue, "Cuadrilla A · López");
+    expect(await within(sheet).findByText("Esta cuadrilla no tiene reubicaciones registradas.")).toBeVisible();
+    expect(within(sheet).queryByRole("region", { name: "Reubicación vigente" })).not.toBeInTheDocument();
+  });
+
+  it("reubica la cuadrilla: Operaciones elige zona y motivo y el historial lo refleja", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeOperations, "Cuadrilla A · López");
+    await user.click(within(sheet).getByRole("button", { name: "Reubicar cuadrilla" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reubicar cuadrilla" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Zona de destino" }));
+    await user.click(await screen.findByRole("option", { name: "Palermo" }));
+    await user.type(within(dialog).getByRole("textbox", { name: /Motivo/ }), "Refuerzo por evento masivo");
+    await user.click(within(dialog).getByRole("button", { name: "Reubicar" }));
+
+    const detail = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    const history = await within(detail).findByRole("list", { name: "Historial de reubicaciones" });
+    expect(within(history).getByText("Refuerzo por evento masivo")).toBeVisible();
+    expect(within(detail).getByRole("region", { name: "Reubicación vigente" })).toHaveTextContent("Palermo");
+    expect(within(detail).getByText("Reubicada")).toBeVisible();
+  });
+
+  it("exige el motivo antes de enviar", async () => {
+    const user = userEvent.setup();
+    const create = vi.spyOn(crewZoneAssignmentsAdapter, "create");
+    const sheet = await openDetail(user, scenarios.officeOperations, "Cuadrilla A · López");
+    await user.click(within(sheet).getByRole("button", { name: "Reubicar cuadrilla" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reubicar cuadrilla" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Zona de destino" }));
+    await user.click(await screen.findByRole("option", { name: "Palermo" }));
+    await user.click(within(dialog).getByRole("button", { name: "Reubicar" }));
+    expect(await within(dialog).findByText("El motivo es obligatorio.")).toBeVisible();
+    expect(within(dialog).getByRole("textbox", { name: /Motivo/ })).toHaveAttribute("aria-invalid", "true");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("avisa en español cuando el período se superpone con otra reubicación", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeOperations, "Cuadrilla C · Ibáñez");
+    await user.click(within(sheet).getByRole("button", { name: "Reubicar cuadrilla" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reubicar cuadrilla" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Zona de destino" }));
+    await user.click(await screen.findByRole("option", { name: "Palermo" }));
+    await user.type(within(dialog).getByRole("textbox", { name: /Motivo/ }), "Pisa la vigente");
+    await user.click(within(dialog).getByRole("button", { name: "Reubicar" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("se superpone con otra reubicación");
+    expect(dialog).toBeVisible();
+  });
+
+  it("oculta la acción a quien no tiene la capacidad de Operaciones pero muestra el historial", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.officeEnvironmental, "Cuadrilla C · Ibáñez");
+    expect(await within(sheet).findByRole("list", { name: "Historial de reubicaciones" })).toBeVisible();
+    expect(within(sheet).queryByRole("button", { name: "Reubicar cuadrilla" })).not.toBeInTheDocument();
+  });
+
+  it("muestra el historial a Campo en su propia cuadrilla, sin acción", async () => {
+    const user = userEvent.setup();
+    const sheet = await openDetail(user, scenarios.fieldCrewMember, "Cuadrilla B · Fernández");
+    expect(await within(sheet).findByText("Esta cuadrilla no tiene reubicaciones registradas.")).toBeVisible();
+    expect(within(sheet).queryByRole("button", { name: "Reubicar cuadrilla" })).not.toBeInTheDocument();
+  });
 });

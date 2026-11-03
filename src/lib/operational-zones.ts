@@ -27,7 +27,7 @@ const multiPolygonSchema = z.object({
   type: z.literal("MultiPolygon"),
   coordinates: z.array(polygonCoordinatesSchema).min(1),
 });
-const geometrySchema = z.discriminatedUnion("type", [polygonSchema, multiPolygonSchema]);
+export const geometrySchema = z.discriminatedUnion("type", [polygonSchema, multiPolygonSchema]);
 
 const operationalZonesGeoJsonSchema = z.object({
   type: z.literal("FeatureCollection"),
@@ -70,7 +70,7 @@ function toLeafletPolygon(coordinates: z.infer<typeof polygonCoordinatesSchema>)
   return coordinates.map((ring) => ring.map(([lng, lat]) => [lat, lng]));
 }
 
-function toLeafletPolygons(geometry: z.infer<typeof geometrySchema>): MapPolygon[] {
+export function toLeafletPolygons(geometry: z.infer<typeof geometrySchema>): MapPolygon[] {
   return geometry.type === "Polygon"
     ? [toLeafletPolygon(geometry.coordinates)]
     : geometry.coordinates.map(toLeafletPolygon);
@@ -212,7 +212,7 @@ function ringCenter(ring: MapCoordinate[]): MapCoordinate {
   return [centerLat / (3 * areaTwice), centerLng / (3 * areaTwice)];
 }
 
-function polygonCenter(coordinates: MapPolygon[]): MapCoordinate {
+export function polygonCenter(coordinates: MapPolygon[]): MapCoordinate {
   const outerRings = coordinates.map((polygon) => polygon[0] ?? []);
   const largestOuterRing = outerRings.reduce((largest, ring) =>
     Math.abs(ringDoubleArea(ring)) > Math.abs(ringDoubleArea(largest)) ? ring : largest,

@@ -28,9 +28,12 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
+import { asksForOverrideNote, crewFit, crewFitWarnings, crewsInZoneFirst } from "@/lib/crew-fit";
 import { crewsAdapter, type Crew } from "@/lib/crews";
 import {
   checkAssignmentConflicts,
@@ -106,7 +109,7 @@ function AssignCrewForm({
   const [resources, setResources] = useState<
     | { status: "loading" }
     | { status: "error"; message: string }
-    | { status: "ready"; crews: Crew[]; vehicles: Vehicle[]; requiresVehicle: boolean }
+    | { status: "ready"; crews: Crew[]; vehicles: Vehicle[]; requiresVehicle: boolean; code: string }
   >({ status: "loading" });
   const [loadVersion, setLoadVersion] = useState(0);
 
@@ -124,6 +127,7 @@ function AssignCrewForm({
             crews: crewsPage.crews,
             vehicles: vehiclesPage.vehicles,
             requiresVehicle: type.requiresVehicle,
+            code: type.code,
           });
         }
       })
@@ -154,7 +158,8 @@ function AssignCrewForm({
       allServices,
     });
   }, [service, crewId, vehicleId, allServices]);
-  const needsOverrideNote = Boolean(conflicts.crewConflict || conflicts.vehicleConflict || backendConflict);
+  const fit = crewFit(crews.find((crew) => crew.id === crewId), service.zoneIds, ready ? resources.code : undefined);
+  const needsOverrideNote = Boolean(conflicts.crewConflict || conflicts.vehicleConflict || backendConflict || fit.zone || fit.specialty);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -192,14 +197,11 @@ function AssignCrewForm({
       onOpenChange(false);
     } catch (cause) {
       if (cause instanceof ServiceRequestError && cause.status === 409) {
-        const hasAdvisoryOverlap = Boolean(conflicts.crewConflict || conflicts.vehicleConflict);
-        if (hasAdvisoryOverlap) {
-          setBackendConflict("Otra asignación ocupa esa cuadrilla en el mismo horario.");
+        if (asksForOverrideNote(cause.message)) {
+          setBackendConflict("La asignación presenta un conflicto de horario, zona o especialidad.");
         } else {
           setBackendConflict(null);
-          setErrorMessage(
-            "El servicio cambió. Actualice la lista e intente nuevamente.",
-          );
+          setErrorMessage(getErrorMessage(cause, "El servicio cambió. Actualice la lista e intente nuevamente."));
         }
         return;
       }
@@ -283,13 +285,6 @@ function AssignCrewForm({
           </Alert>
         )}
 
-        {resources.status === "loading" && (
-          <Alert variant="info" role="status">
-            <Spinner aria-hidden="true" />
-            <AlertDescription>Cargando…</AlertDescription>
-          </Alert>
-        )}
-
         {resources.status === "error" && (
           <Alert variant="danger">
             <AlertCircle aria-hidden />
@@ -312,6 +307,17 @@ function AssignCrewForm({
         )}
 
         <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <LoadingRegion label="Datos de asignación" isLoading={resources.status === "loading"}>
+          {resources.status === "loading" ? (
+            <div aria-hidden="true" className="flex flex-col gap-7">
+              {[0, 1].map((field) => (
+                <div key={field} data-slot="field-skeleton" className="flex flex-col gap-3">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ))}
+            </div>
+          ) : (
           <FieldGroup>
             <Field data-invalid={Boolean(fieldErrors.crew) || undefined}>
               <FieldLabel htmlFor={`${formId}-crew`}>
@@ -338,7 +344,7 @@ function AssignCrewForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {crews.map((c) => (
+                    {crewsInZoneFirst(crews, service.zoneIds).map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
                       </SelectItem>
@@ -391,12 +397,15 @@ function AssignCrewForm({
               {fieldErrors.vehicle && <FieldError id={`${formId}-vehicle-error`}>{fieldErrors.vehicle}</FieldError>}
             </Field>
           </FieldGroup>
+          )}
+          </LoadingRegion>
 
           {needsOverrideNote && (
             <Alert variant="warning" role="alert">
               <AlertTriangle aria-hidden />
-              <AlertTitle className="font-semibold uppercase tracking-wider">Se superpone con otro servicio</AlertTitle>
+              <AlertTitle className="font-semibold uppercase tracking-wider">Revise la asignación</AlertTitle>
               <AlertDescription className="flex flex-col gap-2">
+                {crewFitWarnings(fit).map((warning) => <p key={warning}>{warning}</p>)}
                 {conflicts.crewConflict && (
                   <p>
                     La cuadrilla{" "}
@@ -428,7 +437,7 @@ function AssignCrewForm({
           {needsOverrideNote && (
             <Field data-invalid={Boolean(fieldErrors.overrideNote) || undefined}>
               <FieldLabel htmlFor={`${formId}-override-note`}>
-                Justificación del solapamiento <span aria-hidden>*</span>
+                Justificación de la asignación <span aria-hidden>*</span>
               </FieldLabel>
               <Textarea
                 id={`${formId}-override-note`}

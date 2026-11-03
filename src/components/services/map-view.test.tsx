@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -82,6 +82,22 @@ describe("MapView", () => {
   beforeEach(() => {
     vi.spyOn(operationalMapAdapter, "load").mockResolvedValue(mapData);
     vi.spyOn(operationalZonesAdapter, "list").mockResolvedValue(zones);
+  });
+
+  it("shows a map skeleton while the territory loads and the map replaces it", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    vi.spyOn(operationalMapAdapter, "load").mockImplementation(async () => { await gate; return mapData; });
+    render(<MapView services={[makeService({ id: "SVC-1", title: "Servicio uno" })]} selectedId={null} onSelect={vi.fn()} />);
+
+    const region = screen.getByRole("region", { name: "Mapa de servicios" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(screen.queryByText(/Cargando mapa/)).not.toBeInTheDocument();
+    release();
+    expect(await screen.findByTestId("services-map-canvas")).toBeVisible();
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
+    expect(within(region).queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("shows resolved services without covering the map with location notices", async () => {

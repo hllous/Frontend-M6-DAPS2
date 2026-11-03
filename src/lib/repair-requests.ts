@@ -50,7 +50,8 @@ export type RepairRequestRecoveryInput = z.infer<typeof repairRequestRecoveryInp
 export const repairRequestSchema = z.object({
   id: z.string(),
   damageType: repairDamageTypeSchema,
-  address: z.string().min(1),
+  // Backend: nullable (`RepairRequestResponseDto.address`); inspection-derived requests may have none (#735).
+  address: z.string().nullish().transform((value) => value ?? null),
   severity: repairSeveritySchema,
   publicSafetyRisk: z.boolean(),
   detectedInType: detectedInTypeSchema,

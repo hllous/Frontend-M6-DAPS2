@@ -210,6 +210,11 @@ describe("environmental reports adapter", () => {
     expect(inspection).toMatchObject({ outcome: "NO_VIOLATION", nextStep: "CASE_CLOSED" });
   });
 
+  it("reads a 200 null body as an inspection without a violation notice", async () => {
+    server.use(http.get("*/api/environmental-inspections/INS-1008/violation-notice", () => HttpResponse.json(null)));
+    await expect(environmentalReportsAdapter.getViolationNotice("INS-1008")).resolves.toBeNull();
+  });
+
   it("issues and reads an immutable violation notice through the dedicated inspection endpoints", async () => {
     let requestBody: unknown;
     server.use(

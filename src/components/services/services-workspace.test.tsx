@@ -50,6 +50,41 @@ describe("ServicesWorkspace component", () => {
     expect(screen.getByRole("region", { name: "Mapa de servicios" })).toBeInTheDocument();
   });
 
+  it("shows a table skeleton while the services load and lands the table where it was", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    // Resolving with nothing hands the request on to the default handler once released.
+    server.use(http.get("*/api/services", async () => { await gate; }));
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const region = await screen.findByRole("region", { name: "Listado de servicios" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(screen.queryByText(/Cargando\.\.\.|Cargando…/)).not.toBeInTheDocument();
+    release();
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
+    expect(await within(region).findByRole("region", { name: "Tabla operativa de Servicios" })).toBeInTheDocument();
+    // The map inside keeps its own loading message; only this region's own message must be gone.
+    expect(region.querySelector(":scope > [role=status]")).toBeNull();
+  });
+
+  it("keeps the real toolbar and the loaded column headers while the services load", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    server.use(http.get("*/api/services", async () => { await gate; }));
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const region = await screen.findByRole("region", { name: "Listado de servicios" });
+    expect(within(region).getByLabelText("Período")).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: /Categorías/, hidden: true })).toBeInTheDocument();
+    const loadingHeaders = within(region).getAllByRole("columnheader", { hidden: true }).map((header) => header.textContent?.trim());
+    expect(loadingHeaders).toEqual(["#", "Servicio", "Estado", "Zona", "Equipo", "Fecha"]);
+    release();
+    const table = await within(region).findByRole("region", { name: "Tabla operativa de Servicios" });
+    const loadedHeaders = within(table).getAllByRole("columnheader").map((header) => header.textContent?.trim());
+    expect(loadedHeaders.slice(0, 6)).toEqual(loadingHeaders);
+  });
+
   it("hides planning mutation actions for office-limited intake", async () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace scenario={scenarios.officeLimited} />);
@@ -351,6 +386,21 @@ describe("ServicesWorkspace component", () => {
     });
   });
 
+  it("sets and clears a schedule filter through the time picker", async () => {
+    const user = userEvent.setup();
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    await user.click(screen.getByRole("button", { name: "Filtrar por horario" }));
+    const from = screen.getByRole("group", { name: "Desde" });
+    await user.click(within(from).getByRole("combobox", { name: "Hora" }));
+    await user.click(await screen.findByRole("option", { name: "08" }));
+    await user.click(within(from).getByRole("combobox", { name: "Minutos" }));
+    await user.click(await screen.findByRole("option", { name: "30" }));
+    expect(within(from).getByRole("combobox", { name: "Hora" })).toHaveTextContent("08");
+    await user.click(screen.getByRole("button", { name: "Limpiar" }));
+    expect(within(from).getByRole("combobox", { name: "Hora" })).toHaveTextContent("hh");
+  });
+
   it("keeps loaded zones available while column filters narrow the service list", async () => {
     resetServiceFixtures();
     updateServiceFixture("SVC-1042", { zoneNames: ["Zona A"], status: "SCHEDULED", crewName: "Cuadrilla A" });
@@ -517,6 +567,7 @@ describe("ServicesWorkspace component", () => {
 
     // Status sort button
     const statusSortBtn = within(table).getByRole("button", { name: /Ordenar por Estado/ });
+    await user.click(statusSortBtn); // the list starts in chronological order: first click sorts ascending
     await user.click(statusSortBtn); // toggles to desc
 
     const rowsDesc = within(table).getAllByRole("row").slice(1);
@@ -610,6 +661,11 @@ describe("ServicesWorkspace component", () => {
     // Dialog opens
     expect(await screen.findByRole("heading", { name: "Programar servicio" })).toBeInTheDocument();
 
+    // El tipo de servicio ya no viene preseleccionado.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Programar servicio" })).toBeEnabled());
+    await user.click(screen.getByRole("combobox", { name: /Tipo de servicio/ }));
+    await user.click(await screen.findByRole("option", { name: /Recolección domiciliaria/ }));
+
     // Select Route 1
     await waitFor(() => expect(screen.getByRole("combobox", { name: /Recorrido asignado/ })).toHaveTextContent(/\(.+\)/));
     await user.click(screen.getByRole("combobox", { name: /Recorrido asignado/ }));
@@ -671,9 +727,10 @@ describe("ServicesWorkspace component", () => {
     await user.click(within(dialog).getByRole("combobox", { name: /Cuadrilla asignada/i }));
     await user.click(await screen.findByRole("option", { name: "Cuadrilla C · Ibáñez" }));
 
-    // crew-c already holds SVC-1072 (13:00–16:00) that day: the backend requires a justification
+    // La cuadrilla está reubicada y también tiene un servicio en esa franja.
+    expect(within(dialog).getByText(/zona distinta/i)).toBeVisible();
     await user.type(
-      within(dialog).getByLabelText(/Justificación del solapamiento/i),
+      within(dialog).getByLabelText(/Justificación de la asignación/i),
       "La poda termina antes de la inspección de las 16.",
     );
 
@@ -695,6 +752,13 @@ describe("ServicesWorkspace component", () => {
     expect(within(row).getByText("Cuadrilla C · Ibáñez")).toBeInTheDocument();
   });
 
+  it("opens assignment for a service outside the loaded window", async () => {
+    window.history.replaceState(null, "", "/app?destination=services&action=assign&serviceId=SVC-1043");
+    server.use(http.get("*/api/services", () => HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 } })));
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Poda de árbol — Av. Rivadavia 2200")).toBeVisible();
+  });
   it("opens assign crew dialog via URL parameters and updates the service", async () => {
     window.history.replaceState(null, "", "/app?destination=services&action=assign&serviceId=SVC-1043");
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);

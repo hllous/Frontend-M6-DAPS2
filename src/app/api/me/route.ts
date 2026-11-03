@@ -16,6 +16,8 @@ export async function GET(request: Request) {
         subType: "EMPLEADO",
         m1Role: "MOCK",
         roles: session.roles,
+        crews: getScenario(session).actor.crewId && getScenario(session).actor.crewName ? [{ id: getScenario(session).actor.crewId, name: getScenario(session).actor.crewName, role: getScenario(session).actor.fieldRole === "CREW_MEMBER" ? "MEMBER" : "LEADER" }] : [],
+        isAssignedInspector: session.roles.includes("M6_CAMPO_INSPECTOR"),
       });
     }
 

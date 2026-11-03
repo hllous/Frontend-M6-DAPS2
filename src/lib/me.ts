@@ -1,7 +1,10 @@
+import { getScenario } from "./scenarios";
+
 import type { NextResponse } from "next/server";
 
 import { fetchBackend } from "./bff-backend";
 import { meSchema, type Me, type M6Role } from "./m6-roles";
+import type { ScenarioId } from "./scenarios";
 import {
   AUTH_COOKIE_NAME,
   BackendUnavailableError,
@@ -59,4 +62,35 @@ export function sealRolesIfChanged(response: NextResponse, request: Request, rol
   if (sameRoles(session.roles, roles)) return;
   const next = { ...session, roles: [...roles] };
   response.cookies.set({ name: AUTH_COOKIE_NAME, value: sealSession(next), ...sessionCookieOptions(next) });
+}
+
+/** Selecciona la cuadrilla del backend, priorizando liderazgo y luego el nombre del perfil. */
+export function sessionFromMe(session: Session, me: Me): Session {
+  if (session.identity && (me.subType !== "EMPLEADO" || me.userId !== session.identity.userId)) {
+    throw new InvalidSessionError("La identidad de Backend no coincide con la sesión M1.");
+  }
+
+  const isFieldCrew = me.roles.includes("M6_CAMPO_CUADRILLA");
+  const candidates = isFieldCrew ? me.crews.filter((crew) => crew.role === (me.crews.some((item) => item.role === "LEADER") ? "LEADER" : "MEMBER")) : [];
+  const scenarioId = session.scenarioId ?? scenarioForMe(me, candidates[0]?.role);
+  const preferredName = scenarioId ? getScenario(scenarioId).actor.backendCrewName : undefined;
+  const selected = candidates.find((crew) => crew.name === preferredName) ?? candidates[0];
+  return {
+    ...session,
+    scenarioId,
+    identity: session.identity ? { userId: me.userId, subType: "EMPLEADO", m1Role: me.m1Role } : undefined,
+    roles: me.roles,
+    crew: selected ? { id: selected.id, name: selected.name } : undefined,
+    fieldRole: selected ? (selected.role === "LEADER" ? "CREW_LEADER" : "CREW_MEMBER") : undefined,
+  };
+}
+
+function scenarioForMe(me: Me, crewRole?: "LEADER" | "MEMBER"): ScenarioId | undefined {
+  if (me.roles.length === 0) return undefined;
+  if (me.roles.includes("M6_CAMPO_CUADRILLA")) {
+    return crewRole === "MEMBER" ? "field-crew-member-route" : "field-crew-leader-route";
+  }
+  if (me.roles.includes("M6_CAMPO_INSPECTOR")) return "field-inspector";
+  if (me.roles.includes("M6_AUDITOR")) return "office-limited-intake";
+  return "office-duty-queue";
 }

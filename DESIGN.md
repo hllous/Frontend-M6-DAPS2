@@ -164,7 +164,7 @@ Use the approved **Sidebar plegable** app shell for Office-sized viewports:
 Use the approved **Tareas + Más** pattern for Field and narrow-screen navigation:
 
 - Keep four bottom-bar destinations: `Mi trabajo`, `Servicios`, `Mapa`, and `Más`.
-- Use `Más` to open a bottom sheet containing the complete module list, including `Inventario` and `Control ambiental`.
+- Use `Más` to open a bottom sheet containing the complete module list, including `Inventario urbano` and `Control ambiental`.
 - Preserve the active destination indicator when the current module also appears in the complete list.
 - Keep each bottom target at least 48 px high and provide both an icon and a visible Spanish label.
 - Allow new or lower-frequency modules to enter the complete list without expanding the persistent bar.

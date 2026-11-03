@@ -19,6 +19,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { CopyableId } from "@/components/ui/copyable-id";
+import { isUuid, referralLabel, shortId } from "@/lib/display-ids";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +48,7 @@ import type { OperationalScenario } from "@/lib/scenarios";
 import { servicesAdapter, type Service } from "@/lib/services";
 import {
   StreetClosureRequestError,
+  streetClosureDirectionLabel,
   streetClosureRequestsAdapter,
 } from "@/lib/street-closure-requests";
 
@@ -87,6 +90,13 @@ function sourceLinkLabel(referral: Referral): string {
   }
   if (isInspectionSourcedRepair(referral)) return "Ver inspección";
   return "Ver servicio";
+}
+
+function streetClosureSectionSummary(referral: Referral): string | null {
+  if (referral.kind !== "STREET_CLOSURE_REQUEST") return null;
+  return referral.request.affectedSections
+    .map((section) => `${section.streetName}: ${streetClosureDirectionLabel(section.direction)}`)
+    .join(" · ");
 }
 
 const repairStatusLabel: Record<"REQUESTED" | "IN_PROGRESS" | "CLOSED", string> = {
@@ -234,6 +244,11 @@ function formatDateTime(value: string): string {
     timeZone,
   }).format(date);
   return `${dateLabel} ${timeLabel}`;
+}
+
+function approvedClosurePeriod(from: string | null, to: string | null): string {
+  if (!from && !to) return "Sin informar";
+  return `${from ? formatDateTime(from) : "Sin informar"} – ${to ? formatDateTime(to) : "Sin informar"}`;
 }
 
 export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario }) {
@@ -495,6 +510,8 @@ function ReferralRow({
   sourceUnavailable?: boolean;
   onOpen: () => void;
 }) {
+  const label = referralLabel(referral, repairDamageLabel);
+  const sectionSummary = streetClosureSectionSummary(referral);
   return (
     <Item
       variant="interactive"
@@ -505,7 +522,7 @@ function ReferralRow({
           variant="ghost"
           className="h-auto min-h-12 min-w-0 w-full items-start justify-start whitespace-normal text-left sm:items-center"
           onClick={onOpen}
-          aria-label={`${referral.id}, ${referralKindLabel[referral.kind]}, ${statusLabel(referral)}`}
+          aria-label={`${label}${sectionSummary ? `, ${sectionSummary}` : ""}, ${shortId(referral.id)}, ${statusLabel(referral)}`}
         />
       )}
     >
@@ -517,10 +534,12 @@ function ReferralRow({
             <AnomalyBadges anomaly={anomaly} sourceUnavailable={sourceUnavailable} />
           </span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-bold tabular-nums text-[var(--color-text)]">{referral.id}</span>
+            <span className="font-bold text-[var(--color-text)]">{label}</span>
             <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{referralKindLabel[referral.kind]}</span>
+            <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">{shortId(referral.id)}</span>
           </span>
-          <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {referral.sourceId} · {referral.sourceLabel}</span>
+          {sectionSummary && <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">{sectionSummary}</span>}
+          <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {isUuid(referral.sourceId) ? "" : `${referral.sourceId} · `}{referral.sourceLabel}</span>
         </span>
         <ItemActions className="w-full basis-full justify-end sm:ml-auto sm:w-auto sm:basis-auto">
           <Badge variant="status" className="min-h-7 shrink-0 gap-1.5 px-2.5 py-1 text-xs font-semibold" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
@@ -554,22 +573,23 @@ function ReferralDetail({
   }, [referral.id]);
 
   return (
-    <div className="flex min-h-full flex-col bg-[var(--color-surface)]" role="region" aria-label={`Detalle de ${referral.id}`}>
+    <div className="flex min-h-full flex-col bg-[var(--color-surface)]" role="region" aria-label={`Detalle de ${referralLabel(referral, repairDamageLabel)}`}>
       <header className="border-b border-[var(--color-border)] bg-[var(--color-canvas)] px-4 py-3 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
           <Button variant="outline" size="sm" onClick={onBack} className="gap-1.5">
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Volver a derivaciones
           </Button>
-          <span className="text-xs font-semibold tabular-nums text-[var(--color-text-secondary)]">{referral.id}</span>
+          <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{shortId(referral.id)}</span>
         </div>
       </header>
       <div className="mx-auto w-full max-w-6xl flex-1 space-y-5 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-[var(--color-action)]">{referralKindLabel[referral.kind]}</p>
-            <h1 ref={headingRef} tabIndex={-1} className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-text)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] sm:text-[28px]">Detalle de {referral.id}</h1>
+            <h1 ref={headingRef} tabIndex={-1} className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-text)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] sm:text-[28px]">Detalle de {referralLabel(referral, repairDamageLabel)}</h1>
             <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+              <div className="flex items-center gap-1.5"><dt className="text-[var(--color-text-secondary)]">Identificador técnico</dt><dd><CopyableId value={referral.id} label="identificador técnico de la derivación" /></dd></div>
               <div className="flex gap-1.5"><dt className="text-[var(--color-text-secondary)]">Creada</dt><dd className="text-[var(--color-text)]">{formatDateTime(referral.createdAt)}</dd></div>
               <div className="flex gap-1.5"><dt className="text-[var(--color-text-secondary)]">Actualizada</dt><dd className="text-[var(--color-text)]">{formatDateTime(referral.updatedAt)}</dd></div>
             </dl>
@@ -836,7 +856,7 @@ function ReferralRecoveryForm({
 
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-sm">
           <dl className="grid gap-2 sm:grid-cols-2">
-            <DataField label="Derivación" value={referral.id} />
+            <DataField label="Derivación" value={referralLabel(referral, repairDamageLabel)} />
             <DataField label="Estado" value={currentStatus} />
             <DataField label="Pasará a" value={action.targetLabel} />
             <DataField label="Destino" value={destinationLabel[referral.destination]} />
@@ -895,7 +915,7 @@ function RepairDetail({ referral }: { referral: Extract<Referral, { kind: "REPAI
         <DataField label="Tipo de daño" value={repairDamageLabel[request.damageType] ?? request.damageType} />
         <DataField label="Severidad" value={severityLabel[request.severity] ?? request.severity} />
         <DataField label="Riesgo" value={request.publicSafetyRisk ? "Sí" : "No"} />
-        <DataField label="Ubicación" value={request.address} />
+        <DataField label="Ubicación" value={request.address ?? "Sin dirección registrada"} />
         {request.workOrderId && <DataField label="Nº de orden de trabajo" value={request.workOrderId} />}
       </dl>
     </section>
@@ -908,10 +928,19 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
     <section className="rounded-2xl border border-[var(--color-border)] p-4 sm:p-5" aria-labelledby="closure-data-title">
       <h2 id="closure-data-title" className="text-sm font-bold uppercase tracking-wide text-[var(--color-text)]">Corte de calle</h2>
       <dl className="mt-4 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-        <DataField label="Tipo" value={request.closureType === "TOTAL" ? "Total" : "Parcial"} />
+        <DataField label="Tipo" value={request.closureType === "TOTAL" ? "Total" : request.closureType === "PARTIAL" ? "Parcial" : "Sin especificar"} />
         <DataField label="Motivo" value={request.reason} />
-        <DataField label="Inicio" value={formatDateTime(request.requestedFrom)} />
-        <DataField label="Fin" value={formatDateTime(request.requestedTo)} />
+        {(request.approvedFrom || request.approvedTo || request.status === "APPROVED" || request.status === "EXPIRED") && (
+          <DataField
+            label="Período autorizado"
+            value={approvedClosurePeriod(request.approvedFrom, request.approvedTo)}
+          />
+        )}
+        <DataField label="Inicio solicitado" value={request.requestedFrom ? formatDateTime(request.requestedFrom) : "—"} />
+        <DataField label="Fin solicitado" value={request.requestedTo ? formatDateTime(request.requestedTo) : "—"} />
+        {referral.status === "REJECTED" && (
+          <DataField label="Motivo del rechazo" value={request.rejectionReason || "Sin informar"} />
+        )}
         {request.closureId && <DataField label="Nº de corte" value={request.closureId} />}
       </dl>
       <div className="mt-5 border-t border-[var(--color-border)] pt-4">
@@ -921,6 +950,9 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
             <Item key={`${section.streetName}-${index}`} variant="muted" className="block rounded-xl p-3 text-[var(--color-text)]">
               <span className="font-semibold">{section.streetName}</span>
               <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">Entre {section.fromCross} y {section.toCross}</span>
+              <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">
+                {section.direction ? `Sentido: ${streetClosureDirectionLabel(section.direction)}` : streetClosureDirectionLabel(section.direction)}
+              </span>
             </Item>
           ))}
         </ItemGroup>
@@ -948,7 +980,7 @@ function ReferralStatusIcon({ referral, className }: { referral: Referral; class
   return <CircleDashed className={className} aria-hidden />;
 }
 
-function DataField({ label, value }: { label: string; value: string }) {
+function DataField({ label, value }: { label: string; value: React.ReactNode }) {
   return <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">{label}</dt><dd className="mt-1 text-[var(--color-text)]">{value}</dd></div>;
 }
 

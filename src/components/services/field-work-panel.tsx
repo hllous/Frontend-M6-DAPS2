@@ -269,6 +269,8 @@ export function FieldWorkPanel({
         </span>
       </div>
 
+      {!crewId && <p>Sin cuadrilla asignada. Pida a un administrador que lo agregue a una cuadrilla.</p>}
+
       {loadError && (
         <div role="alert" className="rounded-xl border border-[var(--color-danger-line)] bg-[var(--color-danger-fill)] p-3 text-sm text-[var(--color-danger)]">
           {loadError}
@@ -277,11 +279,11 @@ export function FieldWorkPanel({
 
       <DroppedRecordsAlert count={dropped} />
 
-      {services.length === 0 && !loadError ? (
+      {crewId && services.length === 0 && !loadError ? (
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-center text-sm text-[var(--color-text-secondary)]">
           Sin servicios asignados.
         </div>
-      ) : (
+      ) : crewId ? (
         <ol className="m-0 flex list-none flex-col gap-3 p-0">
           {services.map((service, index) => {
             const windowTiming = checkServiceWindowTiming(service);
@@ -389,7 +391,7 @@ export function FieldWorkPanel({
             );
           })}
         </ol>
-      )}
+      ) : null}
 
       {!mayExecuteService && <p className={styles.permissionNote}>Solo consulta</p>}
 

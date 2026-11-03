@@ -9,6 +9,8 @@ import type { Service } from "@/lib/services";
 import type { MapCoordinate } from "@/lib/operational-zones";
 import { summarizeServiceZones, type ServiceMapLocation } from "@/lib/services-map";
 
+import { MapBoundaryControl, MapBoundaryLayers, useMapBoundaries } from "@/components/map/map-boundaries";
+
 import { SERVICE_MODE_LABEL } from "./service-ui-labels";
 import styles from "./services-map.module.css";
 
@@ -252,58 +254,67 @@ export function ServicesMapCanvas({
   );
   // Every zone with a service gets its outline, so neighbouring barrios stay distinguishable.
   const serviceZones = useMemo(() => summarizeServiceZones(locations), [locations]);
+  const boundaries = useMapBoundaries();
+  const { isPointVisible } = boundaries;
   const visibleMarkers = services.flatMap((service) => {
     const location = locationsByServiceId.get(service.id);
     const markerNumber = serviceOrdinals.get(service.id);
     if (!location || !location.coordinates || markerNumber === undefined) return [];
+    // La visibilidad de comunas y barrios también filtra los marcadores (#720); el servicio seleccionado
+    // nunca se oculta, para no dejar su panel de detalle abierto sobre algo invisible.
+    if (service.id !== selectedId && !isPointVisible(location.coordinates)) return [];
 
     return [{ service, location, markerNumber }];
   });
 
   return (
-    <MapContainer
-      center={defaultCenter}
-      zoom={12}
-      scrollWheelZoom
-      className={compact ? `${styles.map} ${styles.mapCompact}` : styles.map}
-      aria-label="Mapa de servicios"
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <MapResizeController />
-      <MapViewportController locations={locations} />
-      <MapSelectionController selectedId={selectedId} locations={locations} />
+    <div className={styles.canvas}>
+      <MapContainer
+        center={defaultCenter}
+        zoom={12}
+        scrollWheelZoom
+        className={compact ? `${styles.map} ${styles.mapCompact}` : styles.map}
+        aria-label="Mapa de servicios"
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <MapBoundaryLayers state={boundaries} />
+        <MapResizeController />
+        <MapViewportController locations={locations} />
+        <MapSelectionController selectedId={selectedId} locations={locations} />
 
-      {serviceZones.flatMap(({ zone, serviceIds }) =>
-        zone.coordinates.map((polygon, partIndex) => (
-          <Polygon
-            key={`${zone.zoneId}-${partIndex}`}
-            positions={polygon}
-            pathOptions={serviceZonePathOptions(serviceIds.includes(selectedId ?? ""))}
-          >
-            <Tooltip sticky>
-              <strong>{zone.name}</strong>
-              <br />
-              {serviceIds.length} servicio{serviceIds.length === 1 ? "" : "s"} en la zona
-            </Tooltip>
-          </Polygon>
-        )),
-      )}
+        {serviceZones.flatMap(({ zone, serviceIds }) =>
+          zone.coordinates.map((polygon, partIndex) => (
+            <Polygon
+              key={`${zone.zoneId}-${partIndex}`}
+              positions={polygon}
+              pathOptions={serviceZonePathOptions(serviceIds.includes(selectedId ?? ""))}
+            >
+              <Tooltip sticky>
+                <strong>{zone.name}</strong>
+                <br />
+                {serviceIds.length} servicio{serviceIds.length === 1 ? "" : "s"} en la zona
+              </Tooltip>
+            </Polygon>
+          )),
+        )}
 
-      {visibleMarkers.map(({ service, location, markerNumber }) => {
-        return (
-          <AccessibleServiceMarker
-            key={service.id}
-            service={service}
-            location={location}
-            markerNumber={markerNumber}
-            selected={service.id === selectedId}
-            onSelect={onSelect}
-          />
-        );
-      })}
-    </MapContainer>
+        {visibleMarkers.map(({ service, location, markerNumber }) => {
+          return (
+            <AccessibleServiceMarker
+              key={service.id}
+              service={service}
+              location={location}
+              markerNumber={markerNumber}
+              selected={service.id === selectedId}
+              onSelect={onSelect}
+            />
+          );
+        })}
+      </MapContainer>
+      <MapBoundaryControl state={boundaries} />
+    </div>
   );
 }
