@@ -98,7 +98,7 @@ const INITIAL_STREET_CLOSURE_REQUESTS: StreetClosureRequest[] = [
     id: "SCR-1004",
     reason: "La limpieza requiere ordenar la circulación durante la intervención.",
     sourceType: "SERVICE",
-    sourceId: "SVC-1055",
+    sourceId: "SVC-1052",
     sourceModule: "M6",
     closureType: "PARTIAL",
     requestedFrom: "2026-09-05T09:00",
@@ -113,7 +113,7 @@ const INITIAL_STREET_CLOSURE_REQUESTS: StreetClosureRequest[] = [
     closureId: null,
     sourceContext: {
       sourceType: "SERVICE",
-      sourceId: "SVC-1055",
+      sourceId: "SVC-1052",
       title: "Barrido mecánico — Bulevar Norte",
       mode: "ROUTE",
       serviceTypeName: "Barrido mecánico",
