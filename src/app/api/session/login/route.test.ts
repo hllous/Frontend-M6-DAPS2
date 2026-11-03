@@ -110,6 +110,30 @@ describe("POST /api/session/login", () => {
     expect(excess.headers.get("retry-after")).toBe("5");
   });
 
+  it("does not hold a login slot while a client is still sending its body", async () => {
+    vi.stubEnv("M6_AUTH_MODE", "real-m1");
+    vi.stubEnv("M1_BASE_URL", "https://m1.test/api/v1/");
+    vi.stubEnv("M6_BACKEND_ORIGIN", "https://backend.test");
+    server.use(
+      http.get("https://backend.test/health", () => HttpResponse.json({ status: "ok" })),
+      http.post("https://m1.test/api/v1/auth/usuario/login", () => HttpResponse.json({ message: "No autorizado" }, { status: 401 })),
+    );
+    const controllers: ReadableStreamDefaultController<Uint8Array>[] = [];
+    const stalled = Array.from({ length: 5 }, () => login(new Request("http://localhost/api/session/login", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
+      body: new ReadableStream<Uint8Array>({ start: (controller) => { controllers.push(controller); } }),
+      duplex: "half",
+    } as RequestInit)));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const response = await login(request({ email: "persona@example.test", password: "incorrecta" }));
+
+    controllers.forEach((controller) => controller.error(new Error("closed")));
+    await Promise.allSettled(stalled);
+    expect(response.status).toBe(401);
+  });
+
   it("starts the backend health wake-up alongside M1 and does not wait for it", async () => {
     vi.stubEnv("M6_AUTH_MODE", "real-m1");
     vi.stubEnv("M1_BASE_URL", "https://m1.test/api/v1/");

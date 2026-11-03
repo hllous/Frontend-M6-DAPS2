@@ -56,19 +56,7 @@ export async function POST(request: Request) {
   const rejection = getSessionMutationRejection(request);
   if (rejection) return loginFailure(rejection.status, rejection.message);
 
-  if (concurrentLoginAttempts >= MAX_CONCURRENT_LOGIN_ATTEMPTS) {
-    return loginFailure(429, "Hay demasiados intentos de ingreso en curso. Espere unos segundos e intente nuevamente.");
-  }
-  concurrentLoginAttempts += 1;
-
-  try {
-    return await handleLoginRequest(request);
-  } finally {
-    concurrentLoginAttempts -= 1;
-  }
-}
-
-async function handleLoginRequest(request: Request) {
+  // El cuerpo se lee antes de tomar un cupo: un cliente lento no debe agotar los intentos concurrentes (solo acotan a M1).
   let body: Record<string, unknown>;
   try {
     const value: unknown = await readBoundedJson(request);
@@ -81,6 +69,19 @@ async function handleLoginRequest(request: Request) {
     return loginFailure(400, "La solicitud de ingreso no es válida.");
   }
 
+  if (concurrentLoginAttempts >= MAX_CONCURRENT_LOGIN_ATTEMPTS) {
+    return loginFailure(429, "Hay demasiados intentos de ingreso en curso. Espere unos segundos e intente nuevamente.");
+  }
+  concurrentLoginAttempts += 1;
+
+  try {
+    return await handleLoginRequest(request, body);
+  } finally {
+    concurrentLoginAttempts -= 1;
+  }
+}
+
+async function handleLoginRequest(request: Request, body: Record<string, unknown>) {
   const mode = getAuthMode();
   if (mode === "real-m1") {
     if (!hasOnlyKeys(body, ["email", "password"]) || typeof body.email !== "string" || typeof body.password !== "string") {

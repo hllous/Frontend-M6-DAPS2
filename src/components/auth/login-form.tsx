@@ -47,7 +47,7 @@ export function LoginForm({
         body: JSON.stringify(authMode === "real-m1" ? { email, password } : { scenarioId }),
       });
       if (!response.ok) {
-        const body = (await response.json()) as { message?: string };
+        const body = (await response.json().catch(() => ({}))) as { message?: string };
         setError({
           message: body.message ?? "No se pudo ingresar. Intente nuevamente.",
           denied: response.status === 403,
