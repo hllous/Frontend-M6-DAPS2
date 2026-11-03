@@ -26,7 +26,7 @@ describe("demo JWT signing (contract of scripts/generate-demo-jwt.mjs)", () => {
     expect(header).toEqual({ alg: "HS256", typ: "JWT" });
     expect(payload).toEqual({
       iss: "modulo1-ciudadanos",
-      sub: "3",
+      sub: "10002",
       sub_type: "EMPLEADO",
       rol: "ADMINISTRATIVO",
       typ: "access",

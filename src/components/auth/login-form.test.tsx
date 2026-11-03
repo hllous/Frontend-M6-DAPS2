@@ -53,7 +53,7 @@ describe("LoginForm", () => {
     expect(screen.getByText(/Entorno de demostración/)).not.toHaveTextContent("del seed del backend");
 
     rerender(<LoginForm scenarios={Object.values(scenarios)} authMode="backend-development" redirectTo="/app" />);
-    expect(screen.getByText(/Entorno de demostración/)).toHaveTextContent("id 2 del seed del backend");
+    expect(screen.getByText(/Entorno de demostración/)).toHaveTextContent("id 10000 del seed del backend");
     expect(screen.getByRole("combobox", { name: "Perfil" })).toHaveAccessibleDescription(/Entorno de demostración/);
   });
 
