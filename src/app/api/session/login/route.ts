@@ -24,7 +24,7 @@ import {
   sessionCookieOptions,
 } from "@/lib/session";
 
-export const maxDuration = 120;
+export const maxDuration = 190;
 
 function loginFailure(status: 400 | 401 | 403 | 415 | 500 | 502 | 503 | 504, message: string) {
   recordTelemetryEvent({ name: "auth_login_failed", status });
@@ -69,11 +69,12 @@ export async function POST(request: Request) {
     }
 
     try {
+      const backendOrigin = process.env.M6_BACKEND_ORIGIN;
+      if (!backendOrigin) throw new BackendUnavailableError(503);
+      wakeBackend(backendOrigin);
       const result = await loginWithM1(email, password);
       if (result.claims.subType !== "EMPLEADO") throw new CitizenForbiddenError();
 
-      const backendOrigin = process.env.M6_BACKEND_ORIGIN;
-      if (!backendOrigin) throw new BackendUnavailableError(503);
       const me = await fetchMeWithToken(backendOrigin, result.accessToken);
       if (me.subType !== "EMPLEADO") throw new CitizenForbiddenError();
       if (me.userId !== result.claims.subject) throw new InvalidSessionError();
@@ -128,6 +129,19 @@ export async function POST(request: Request) {
       return loginFailure(503, error.message);
     }
     return loginFailure(500, "No se pudo iniciar la sesión.");
+  }
+}
+
+function wakeBackend(origin: string): void {
+  try {
+    void fetch(new URL("/health", origin), {
+      method: "GET",
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(2_000),
+    }).catch(() => undefined);
+  } catch {
+    // The real /me call below reports a misconfigured or unavailable backend.
   }
 }
 
