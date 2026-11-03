@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { authorize, backendMode, errorResponse, forwardResponse, mapSessionError } from "@/lib/bff-route";
-import { DEMO_IDENTITIES } from "@/lib/demo-identities";
-import { sealRolesIfChanged } from "@/lib/me";
+import { fetchMe, sealRolesIfChanged } from "@/lib/me";
 import { fetchBackend } from "@/lib/bff-backend";
 import { getRoles, replacementSchema, setRoles, validUserId } from "@/mocks/role-assignment-fixtures";
+import { sessionUserId } from "@/lib/session-actor";
 
 type Context = { params: Promise<{ userId: string }> };
 async function handle(request: Request, context: Context, method: "GET" | "PUT" | "DELETE") {
@@ -20,11 +20,19 @@ async function handle(request: Request, context: Context, method: "GET" | "PUT" 
       if (!parsed.success) return errorResponse(400, "La selección de roles no es válida.", path);
       roles = parsed.data.roles;
     }
-    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/role-assignments/${userId}`, "role:manage", { method, ...(method === "PUT" ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ roles }) } : {}) }));
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/role-assignments/${userId}`, "role:manage", { method, ...(method === "PUT" ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ roles }) } : {}) });
+      const response = forwardResponse(backendResponse);
+      if (method !== "GET" && backendResponse.ok && userId === sessionUserId(session)) {
+        const me = await fetchMe(request);
+        sealRolesIfChanged(response, request, me.roles);
+      }
+      return response;
+    }
     if (method === "GET") return NextResponse.json({ userId, roles: getRoles(userId) });
     if (!setRoles(userId, roles)) return errorResponse(409, "No se puede quitar el último administrador.", path);
     const response = method === "DELETE" ? new NextResponse(null, { status: 204 }) : NextResponse.json({ userId, roles });
-    if (userId === DEMO_IDENTITIES[session.scenarioId].sub) sealRolesIfChanged(response, request, roles);
+    if (userId === sessionUserId(session)) sealRolesIfChanged(response, request, roles);
     return response;
   } catch (error) { return mapSessionError(error, path, "No se pudieron gestionar los roles."); }
 }

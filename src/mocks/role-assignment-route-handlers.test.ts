@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { backendEnv, createSessionCookie } from "@/test/session";
-import { getSessionFromRequest } from "@/lib/session";
+import { AUTH_COOKIE_NAME, createM1Session, getSessionFromRequest, sealSession } from "@/lib/session";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import { resetRoleAssignmentFixtures } from "./role-assignment-fixtures";
 import { handlers } from "./handlers";
@@ -51,6 +51,73 @@ describe("asignaciones mediante las rutas BFF", () => {
 });
 
 describe("respuestas del backend", () => {
+  it("usa la identidad M1 para reconocer a la persona propia y vuelve a sellar los roles efectivos de /me", async () => {
+    const restore = backendEnv();
+    const previousM1BaseUrl = process.env.M1_BASE_URL;
+    try {
+      process.env.M6_AUTH_MODE = "real-m1";
+      delete process.env.M1_BASE_URL;
+      const now = Date.now();
+      const session = {
+        ...createM1Session({
+          accessToken: "header.payload.signature",
+          refreshToken: "refresh-for-test",
+          jwtExpiresAt: now + 60_000,
+          identity: { userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO" },
+          roles: ["M6_ADMIN"],
+          now,
+        }),
+        scenarioId: "office-duty-queue" as const,
+      };
+      const cookie = `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
+      server.use(
+        http.put("https://backend.internal/role-assignments/42", () => HttpResponse.json({ userId: "42", roles: ["M6_ADMIN"] })),
+        http.get("https://backend.internal/me", () => HttpResponse.json({
+          userId: "42",
+          subType: "EMPLEADO",
+          m1Role: "ADMINISTRATIVO",
+          roles: ["M6_OFICINA_OPERACIONES"],
+        })),
+      );
+
+      const response = await call("PUT", "/42", { roles: ["M6_ADMIN"] }, cookie);
+      const renewedCookie = response.headers.get("set-cookie")?.split(";")[0];
+
+      expect(response.status).toBe(200);
+      expect(renewedCookie).toBeTruthy();
+      expect(getSessionFromRequest(new Request("http://localhost", { headers: { cookie: renewedCookie! } })))
+        .toMatchObject({ identity: { userId: "42" }, roles: ["M6_OFICINA_OPERACIONES"] });
+    } finally {
+      restore();
+      if (previousM1BaseUrl === undefined) delete process.env.M1_BASE_URL;
+      else process.env.M1_BASE_URL = previousM1BaseUrl;
+    }
+  });
+
+  it("reconoce el propio usuario del demo por el subject del perfil", async () => {
+    const restore = backendEnv();
+    try {
+      const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development", roles: ["M6_ADMIN"] });
+      server.use(
+        http.put("https://backend.internal/role-assignments/2", () => HttpResponse.json({ userId: "2", roles: ["M6_ADMIN"] })),
+        http.get("https://backend.internal/me", () => HttpResponse.json({
+          userId: "2",
+          subType: "EMPLEADO",
+          m1Role: "RESPONSABLE_AREA",
+          roles: ["M6_OFICINA_AMBIENTAL"],
+        })),
+      );
+
+      const response = await call("PUT", "/2", { roles: ["M6_ADMIN"] }, cookie);
+      const renewedCookie = response.headers.get("set-cookie")?.split(";")[0];
+
+      expect(response.status).toBe(200);
+      expect(renewedCookie).toBeTruthy();
+      expect(getSessionFromRequest(new Request("http://localhost", { headers: { cookie: renewedCookie! } })))
+        .toMatchObject({ roles: ["M6_OFICINA_AMBIENTAL"] });
+    } finally { restore(); }
+  });
+
   it("reenvía estados y contenido de las cuatro operaciones", async () => {
     const restore = backendEnv();
     try {
