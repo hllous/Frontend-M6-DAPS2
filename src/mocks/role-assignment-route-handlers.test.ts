@@ -1,12 +1,14 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import { DEMO_IDENTITIES } from "@/lib/demo-identities";
 import { backendEnv, createSessionCookie } from "@/test/session";
 import { AUTH_COOKIE_NAME, createM1Session, getSessionFromRequest, sealSession } from "@/lib/session";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import { resetRoleAssignmentFixtures } from "./role-assignment-fixtures";
 import { handlers } from "./handlers";
 const server = setupServer(...handlers);
+const demoAdminId = DEMO_IDENTITIES["office-duty-queue"].sub;
 const field = createSessionCookie("field-crew-leader-route", { mode: "mock" });
 const auditor = createSessionCookie("office-limited-intake", { mode: "mock" });
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -19,7 +21,7 @@ describe("asignaciones mediante las rutas BFF", () => {
   it("lista y consulta una persona sin roles", async () => {
     const response = await call("GET", "");
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toEqual(expect.arrayContaining([expect.objectContaining({ userId: "2", roles: ["M6_ADMIN"] })]));
+    expect((await response.json()).data).toEqual(expect.arrayContaining([expect.objectContaining({ userId: demoAdminId, roles: ["M6_ADMIN"] })]));
     expect(await (await call("GET", "/999")).json()).toEqual({ userId: "999", roles: [] });
   });
   it("guarda y quita roles", async () => {
@@ -35,15 +37,15 @@ describe("asignaciones mediante las rutas BFF", () => {
   it("actualiza la sesión al modificar los propios roles", async () => {
     const cookie = createSessionCookie("office-duty-queue", { mode: "mock" });
     expect((await call("PUT", "/999", { roles: ["M6_ADMIN"] }, cookie)).status).toBe(200);
-    const response = await call("PUT", "/2", { roles: ["M6_AUDITOR"] }, cookie);
+    const response = await call("PUT", `/${demoAdminId}`, { roles: ["M6_AUDITOR"] }, cookie);
     expect(response.status).toBe(200);
     const renewed = response.headers.get("set-cookie")?.split(";")[0];
     expect(renewed).toBeTruthy();
     expect(getSessionFromRequest(new Request("http://localhost", { headers: { cookie: renewed! } }))?.roles).toEqual(["M6_AUDITOR"]);
   });
   it("protege al último administrador", async () => {
-    expect((await call("PUT", "/2", { roles: [] })).status).toBe(409);
-    expect((await call("DELETE", "/2")).status).toBe(409);
+    expect((await call("PUT", `/${demoAdminId}`, { roles: [] })).status).toBe(409);
+    expect((await call("DELETE", `/${demoAdminId}`)).status).toBe(409);
   });
   it("niega acceso a Campo y auditoría", async () => {
     for (const cookie of [field, auditor]) for (const [method, path] of [["GET", ""], ["GET", "/2"], ["PUT", "/2"], ["DELETE", "/2"]]) expect((await call(method, path, { roles: [] }, cookie)).status).toBe(403);
@@ -98,17 +100,18 @@ describe("respuestas del backend", () => {
     const restore = backendEnv();
     try {
       const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development", roles: ["M6_ADMIN"] });
+      const demoUserId = DEMO_IDENTITIES["office-duty-queue"].sub;
       server.use(
-        http.put("https://backend.internal/role-assignments/2", () => HttpResponse.json({ userId: "2", roles: ["M6_ADMIN"] })),
+        http.put(`https://backend.internal/role-assignments/${demoUserId}`, () => HttpResponse.json({ userId: demoUserId, roles: ["M6_ADMIN"] })),
         http.get("https://backend.internal/me", () => HttpResponse.json({
-          userId: "2",
+          userId: demoUserId,
           subType: "EMPLEADO",
           m1Role: "RESPONSABLE_AREA",
           roles: ["M6_OFICINA_AMBIENTAL"],
         })),
       );
 
-      const response = await call("PUT", "/2", { roles: ["M6_ADMIN"] }, cookie);
+      const response = await call("PUT", `/${demoUserId}`, { roles: ["M6_ADMIN"] }, cookie);
       const renewedCookie = response.headers.get("set-cookie")?.split(";")[0];
 
       expect(response.status).toBe(200);
