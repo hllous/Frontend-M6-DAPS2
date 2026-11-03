@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const session = getSessionFromRequest(request, undefined, now);
   if (!session) {
     const response = NextResponse.json({ message: "La sesión no está activa." }, { status: 401 });
-    response.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions());
+    response.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions(request));
     return response;
   }
 
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     } catch (error) {
       if (error instanceof InvalidSessionError) {
         const rejected = NextResponse.json({ message: "La sesión no está activa." }, { status: 401 });
-        rejected.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions());
+        rejected.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions(request));
         return rejected;
       }
       // Indisponibilidad o ciudadano: se conservan los roles de la cookie; el backend sigue siendo la autoridad.
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   response.cookies.set({
     name: AUTH_COOKIE_NAME,
     value: sealSession(activeSession),
-    ...sessionCookieOptions(activeSession),
+    ...sessionCookieOptions(activeSession, request),
   });
   return response;
 }

@@ -30,15 +30,14 @@ type Renewal = { accessToken: string; refreshToken: string; jwtExpiresAt: number
 const renewals = new Map<string, { at: number; ttl: number; result: Promise<Renewal | null> }>();
 let warnedInvalidBase = false;
 
-/** `M1_BASE_URL` válida: URL absoluta, sin credenciales, https en producción. Inválida o ausente → undefined. */
+/** `M1_BASE_URL` válida: URL absoluta, sin credenciales; HTTP solo para loopback. Inválida o ausente → undefined. */
 export function m1BaseUrl(): URL | undefined {
   const raw = process.env.M1_BASE_URL;
   if (!raw) return undefined;
   try {
     const url = new URL(raw.replace(/\/?$/, "/"));
-    const protocolOk = url.protocol === "https:" || (url.protocol === "http:" && process.env.NODE_ENV !== "production");
-    const host = url.hostname.toLowerCase();
-    const localHost = host === "localhost" || host === "[::1]" || host === "::1" || host === "0.0.0.0" || /^127(?:\.\d{1,3}){3}$/.test(host);
+    const localHost = isLoopbackHost(url.hostname);
+    const protocolOk = url.protocol === "https:" || (url.protocol === "http:" && localHost && process.env.NODE_ENV !== "production");
     const productionSafe = process.env.NODE_ENV !== "production" || (!localHost && process.env.M1_FAKE_ENABLED !== "true");
     if (protocolOk && productionSafe && !url.username && !url.password) return url;
   } catch {
@@ -46,9 +45,18 @@ export function m1BaseUrl(): URL | undefined {
   }
   if (!warnedInvalidBase) {
     warnedInvalidBase = true;
-    console.error("[m1-refresh] M1_BASE_URL no es válida (URL absoluta, https en producción, sin credenciales); la renovación queda deshabilitada.");
+    console.error("[m1-refresh] M1_BASE_URL no es válida (URL absoluta, HTTPS salvo HTTP de loopback, sin credenciales); la renovación queda deshabilitada.");
   }
   return undefined;
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host === "::1") return true;
+  const octets = host.split(".");
+  return octets.length === 4 &&
+    Number(octets[0]) === 127 &&
+    octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255);
 }
 
 /** Hay con qué renovar: el login real de M1 dejó un refresh token en la sesión y M1_BASE_URL es válida. */
@@ -169,6 +177,6 @@ export async function renewRequestSession<T extends RenewableSession>(
   }
   if (!next) throw new InvalidSessionError("M1 rechazó la renovación de la sesión.");
   rememberRenewedSession(request, next);
-  await persistRenewedSession(next);
+  await persistRenewedSession(next, request);
   return next as T;
 }

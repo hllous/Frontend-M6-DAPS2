@@ -13,6 +13,7 @@ import {
   AUTH_COOKIE_NAME,
   InvalidSessionError,
   getRequiredSession,
+  renewedRequestForResponse,
   renewedSessionForResponse,
   requireCapability,
   sealSession,
@@ -240,6 +241,10 @@ export function forwardResponse(response: Response, path = bffPathForResponse(re
   });
   // Si el pedido renovó los tokens contra M1, la cookie se resella con el material nuevo (no solo se extiende).
   const renewed = renewedSessionForResponse(response);
-  if (renewed) forwarded.cookies.set({ name: AUTH_COOKIE_NAME, value: sealSession(renewed), ...sessionCookieOptions(renewed) });
+  if (renewed) forwarded.cookies.set({
+    name: AUTH_COOKIE_NAME,
+    value: sealSession(renewed),
+    ...sessionCookieOptions(renewed, renewedRequestForResponse(response)),
+  });
   return forwarded;
 }

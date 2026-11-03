@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         identity: { userId: result.claims.subject, subType: "EMPLEADO", m1Role: me.m1Role },
         roles: me.roles,
       });
-      return sessionResponse(sessionFromMe(created, me));
+      return sessionResponse(request, sessionFromMe(created, me));
     } catch (error) {
       if (error instanceof M1CredentialsRejectedError) return loginFailure(401, "El correo o la contraseña no son correctos.");
       if (error instanceof M1AccountBlockedError) return loginFailure(403, "La cuenta no puede iniciar sesión. Contacte al soporte de M1.");
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
       : undefined;
     const created = createSession(body.scenarioId, { mode, devJwt, backendOrigin, roles: me?.roles, demoSigning });
     const session = me ? sessionFromMe(created, me) : created;
-    return sessionResponse(session);
+    return sessionResponse(request, session);
   } catch (error) {
     if (error instanceof CitizenForbiddenError) {
       return loginFailure(403, error.message);
@@ -145,13 +145,14 @@ function wakeBackend(origin: string): void {
   }
 }
 
-function sessionResponse(session: Parameters<typeof publicSession>[0]) {
+function sessionResponse(request: Request, session: Parameters<typeof publicSession>[0]) {
   const response = NextResponse.json({ session: publicSession(session) });
+  response.headers.set("cache-control", "no-store");
   response.cookies.set({
     name: AUTH_COOKIE_NAME,
     value: sealSession(session),
-    ...sessionCookieOptions(session),
+    ...sessionCookieOptions(session, request),
   });
-  response.cookies.set(SESSION_MARKER_COOKIE_NAME, "1", sessionMarkerCookieOptions());
+  response.cookies.set(SESSION_MARKER_COOKIE_NAME, "1", sessionMarkerCookieOptions(request));
   return response;
 }

@@ -37,6 +37,15 @@ describe("owned BFF session", () => {
     expect(sessionCookieOptions(session).secure).toBe(true);
   });
 
+  it("keeps session cookies Secure on non-loopback hosts even outside production", () => {
+    const session = createSession("office-duty-queue", { mode: "mock", now });
+    vi.stubEnv("NODE_ENV", "development");
+
+    expect(sessionCookieOptions(session, new Request("http://localhost:3000/login")).secure).toBe(false);
+    expect(sessionCookieOptions(session, new Request("http://m6.example.test/login")).secure).toBe(true);
+    expect(sessionCookieOptions(session, new Request("https://m6.example.test/login")).secure).toBe(true);
+  });
+
   it("seals a mock Office session without exposing its token-shaped contents", () => {
     const session = createSession("office-duty-queue", { mode: "mock", now });
     const cookie = sealSession(session, secret);

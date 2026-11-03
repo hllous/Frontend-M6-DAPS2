@@ -66,7 +66,7 @@ export function sealRolesIfChanged(response: NextResponse, request: Request, rol
   const session = getRequiredSession(request);
   if (sameRoles(session.roles, roles)) return;
   const next = { ...session, roles: [...roles] };
-  response.cookies.set({ name: AUTH_COOKIE_NAME, value: sealSession(next), ...sessionCookieOptions(next) });
+  response.cookies.set({ name: AUTH_COOKIE_NAME, value: sealSession(next), ...sessionCookieOptions(next, request) });
 }
 
 /** Selecciona la cuadrilla del backend, priorizando liderazgo y luego el nombre del perfil. */

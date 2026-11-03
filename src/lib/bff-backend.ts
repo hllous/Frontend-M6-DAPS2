@@ -81,7 +81,7 @@ export async function fetchBackend(
   };
   const finish = (response: Response): Response => {
     const renewed = wasSessionRenewed(request) ? getSessionFromRequest(request) : undefined;
-    if (renewed) rememberRenewedResponse(response, renewed);
+    if (renewed) rememberRenewedResponse(response, renewed, request);
     rememberBffPath(response, new URL(request.url).pathname);
     return response;
   };
