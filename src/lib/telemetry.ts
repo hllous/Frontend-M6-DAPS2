@@ -2,7 +2,7 @@
 export type TelemetryEvent =
   | { name: "auth_session_expired"; status: 401 }
   | { name: "auth_forbidden"; status: 403 }
-  | { name: "auth_login_failed"; status: 400 | 401 | 403 | 415 | 500 | 502 | 503 | 504 }
+  | { name: "auth_login_failed"; status: 400 | 401 | 403 | 413 | 415 | 429 | 500 | 502 | 503 | 504 }
   | { name: "auth_logout_broadcast" }
   | { name: "request_malformed_response"; resource: "zones" | "routes" | "scenario" | "services" | "service-frequencies" | "vehicles" | "crews" | "green-spaces" | "green-points" | "trees" | "tree-surveys" | "tree-interventions" | "containers" | "street-closure-requests" | "repair-requests" | "environmental-reports" | "indicators" | "service-types" | "disposal-sites" | "neighborhoods" | "communes" }
   | { name: "request_network_failure"; resource: "zones" | "routes" | "scenario" | "services" | "service-frequencies" | "vehicles" | "crews" | "green-spaces" | "green-points" | "trees" | "tree-surveys" | "tree-interventions" | "containers" | "street-closure-requests" | "repair-requests" | "environmental-reports" | "indicators" | "neighborhoods" | "communes" };

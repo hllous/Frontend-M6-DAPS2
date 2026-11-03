@@ -25,10 +25,18 @@ import {
 } from "@/lib/session";
 
 export const maxDuration = 190;
+const MAX_LOGIN_BODY_BYTES = 4_096;
+const MAX_CONCURRENT_LOGIN_ATTEMPTS = 5;
+let concurrentLoginAttempts = 0;
 
-function loginFailure(status: 400 | 401 | 403 | 415 | 500 | 502 | 503 | 504, message: string) {
+class LoginBodyTooLargeError extends Error {}
+
+function loginFailure(status: 400 | 401 | 403 | 413 | 415 | 429 | 500 | 502 | 503 | 504, message: string) {
   recordTelemetryEvent({ name: "auth_login_failed", status });
-  return NextResponse.json({ message }, { status });
+  const response = NextResponse.json({ message }, { status });
+  response.headers.set("cache-control", "no-store");
+  if (status === 429) response.headers.set("retry-after", "5");
+  return response;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -48,12 +56,28 @@ export async function POST(request: Request) {
   const rejection = getSessionMutationRejection(request);
   if (rejection) return loginFailure(rejection.status, rejection.message);
 
+  if (concurrentLoginAttempts >= MAX_CONCURRENT_LOGIN_ATTEMPTS) {
+    return loginFailure(429, "Hay demasiados intentos de ingreso en curso. Espere unos segundos e intente nuevamente.");
+  }
+  concurrentLoginAttempts += 1;
+
+  try {
+    return await handleLoginRequest(request);
+  } finally {
+    concurrentLoginAttempts -= 1;
+  }
+}
+
+async function handleLoginRequest(request: Request) {
   let body: Record<string, unknown>;
   try {
-    const value: unknown = await request.json();
+    const value: unknown = await readBoundedJson(request);
     if (!isObject(value)) throw new Error("invalid body");
     body = value;
-  } catch {
+  } catch (error) {
+    if (error instanceof LoginBodyTooLargeError) {
+      return loginFailure(413, "La solicitud de ingreso supera el tamaño permitido.");
+    }
     return loginFailure(400, "La solicitud de ingreso no es válida.");
   }
 
@@ -143,6 +167,41 @@ function wakeBackend(origin: string): void {
   } catch {
     // The real /me call below reports a misconfigured or unavailable backend.
   }
+}
+
+async function readBoundedJson(request: Request): Promise<unknown> {
+  const contentLength = request.headers.get("content-length");
+  if (contentLength && /^\d+$/.test(contentLength) && Number(contentLength) > MAX_LOGIN_BODY_BYTES) {
+    throw new LoginBodyTooLargeError();
+  }
+
+  const reader = request.body?.getReader();
+  if (!reader) throw new Error("missing body");
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      byteLength += value.byteLength;
+      if (byteLength > MAX_LOGIN_BODY_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new LoginBodyTooLargeError();
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
 }
 
 function sessionResponse(request: Request, session: Parameters<typeof publicSession>[0]) {

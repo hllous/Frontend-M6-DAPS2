@@ -433,6 +433,15 @@ describe("límites sobre la respuesta de M1", () => {
     await expect(fetchBackend(request, "/services")).rejects.toBeInstanceOf(InvalidSessionError);
   });
 
+  it("normaliza los ceros iniciales de sub al comparar tokens", async () => {
+    const { request } = near({ accessToken: jwt(inSeconds(30), "042") });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(m1Refresh(jwt(inSeconds(900), "42"))).mockResolvedValueOnce(ok());
+
+    const response = await fetchBackend(request, "/services");
+
+    expect(response.status).toBe(200);
+  });
+
   it("la llamada compartida a M1 no hereda el signal del primer llamador", async () => {
     const { request } = near();
     const controller = new AbortController();
