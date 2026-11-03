@@ -42,7 +42,7 @@ test.describe("Ingreso real con M1", () => {
     await enterCredentials(page, "carlos.rodriguez@m6.local");
 
     await expect(page).toHaveURL(/\/app\?destination=work$/, { timeout: 20_000 });
-    await expect(page.getByText("Empleado M1 · 2")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Empleado M1 · 10000")).toBeVisible({ timeout: 20_000 });
   });
 
   test("muestra un error genérico para una contraseña incorrecta y conserva el correo", async ({ page, context }) => {
