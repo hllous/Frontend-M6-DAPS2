@@ -3,6 +3,7 @@
 import { OverlayMotionPreference } from "./overlay-motion";
 
 import {
+  Activity,
   BarChart3,
   BriefcaseBusiness,
   ChevronLeft,
@@ -53,7 +54,7 @@ const MapaOperativo = dynamic(
   { ssr: false },
 );
 
-type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards";
+type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards" | "integration-monitor";
 type LogoutAction = (formData: FormData) => void | Promise<void>;
 
 type NavigationItem = {
@@ -72,11 +73,14 @@ const navigation: NavigationItem[] = [
   { id: "map", label: "Mapa", capability: "map:view", icon: Map },
   { id: "catalog", label: "Catálogo", capability: "catalog:view", icon: Settings2 },
   { id: "dashboards", label: "Tableros", capability: "indicator:view", icon: BarChart3 },
+  { id: "integration-monitor", label: "Monitor de integración", capability: "integrationMonitor:view", icon: Activity },
 ];
 
 // Una sola URL por pantalla: cada destino vive en /app?destination=<id>. Las rutas
 // /app/dashboard y /app/catalog quedan como alias que redirigen aca.
-const destinationHref = (id: Destination) => `/app?destination=${id}`;
+const destinationHref = (id: Destination) => id === "integration-monitor"
+  ? "/app/admin/integration-monitor"
+  : `/app?destination=${id}`;
 
 const mobileDestinations: Destination[] = ["work", "services", "map"];
 const tabletNavigationQuery = "(min-width: 761px) and (max-width: 1023px)";
@@ -127,7 +131,9 @@ export function AppShell({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedDestination = searchParams.get("destination") as Destination | null;
-  const destination = pathname.startsWith("/app/catalog")
+  const destination = pathname.startsWith("/app/admin/integration-monitor")
+    ? "integration-monitor"
+    : pathname.startsWith("/app/catalog")
     ? "catalog"
     : requestedDestination === "inventory" ? "catalog"
     : requestedDestination && navigation.some((item) => item.id === requestedDestination)

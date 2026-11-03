@@ -3,6 +3,8 @@ import { DEMO_IDENTITIES } from "./demo-identities";
 import { actorKindForRoles, capabilitiesForRoles, type M6Role } from "./m6-roles";
 
 export type Capability =
+  | "integrationMonitor:view"
+  | "integrationMonitor:manage"
   | "service:view"
   | "service:execute"
   // Frontend hypothesis: #8 defines Office catalog configuration, but not per-resource names.
@@ -172,7 +174,6 @@ export function scenarioForRoles(scenario: ScenarioFixture, roles: readonly M6Ro
     actor: { ...scenario.actor, kind: actorKindForRoles(roles) },
   };
 }
-
 function roleFixture(base: ScenarioFixture, id: ScenarioId, label: string, roles: M6Role[]): OperationalScenario {
   return scenarioForRoles({ ...base, id, label }, roles);
 }

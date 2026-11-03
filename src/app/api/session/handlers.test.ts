@@ -376,7 +376,7 @@ describe("session route handlers", () => {
         const cookie = loginResponse.headers.get("set-cookie") ?? "";
 
         expect(loginResponse.status).toBe(200);
-        expect(claims(backendFetch.mock.calls[0])).toMatchObject({ sub: "3", rol: "ADMINISTRATIVO", sub_type: "EMPLEADO", typ: "access" });
+        expect(claims(backendFetch.mock.calls[0])).toMatchObject({ sub: "10002", rol: "ADMINISTRATIVO", sub_type: "EMPLEADO", typ: "access" });
         const sealed = getSessionFromRequest(new Request("http://localhost", { headers: { cookie } }));
         expect(sealed).toMatchObject({ source: "demo", scenarioId: "office-operations" });
         expect(sealed).not.toHaveProperty("accessToken");

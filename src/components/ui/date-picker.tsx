@@ -101,6 +101,8 @@ function DatePicker({
             locale={es}
             weekStartsOn={1}
             labels={{
+              labelDayButton: (date, modifiers) =>
+                `${modifiers.today ? "Hoy, " : ""}${format(date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}`,
               labelPrevious: () => "Mes anterior",
               labelNext: () => "Mes siguiente",
             }}
