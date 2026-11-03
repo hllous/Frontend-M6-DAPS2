@@ -6,17 +6,17 @@ import type { ScenarioId } from "./scenarios";
 export type DemoIdentity = { sub: string; m1Role: "RESPONSABLE_AREA" | "ADMINISTRATIVO" | "AUDITOR" | "CIUDADANO"; name: string };
 
 /**
- * Perfil del login -> persona. Oficina 2 a 9 y Campo desde 10000 existen en el seed; 900 y 901 no tienen filas de roles:
+ * Perfil del login -> persona. Las 12 cuentas de M1 (10000 a 10011) existen en el seed del backend; 900 y 901 no tienen filas de roles:
  * el empleado sin rol recibe `roles: []` de GET /me y el ciudadano un 403 por `sub_type`.
  */
 export const DEMO_IDENTITIES: Record<ScenarioId, DemoIdentity> = {
-  "office-duty-queue": { sub: "2", m1Role: "RESPONSABLE_AREA", name: "Carlos Rodríguez" },
-  "office-operations": { sub: "3", m1Role: "ADMINISTRATIVO", name: "Julián López" },
-  "office-environmental": { sub: "5", m1Role: "ADMINISTRATIVO", name: "Diego Sosa" },
-  "office-limited-intake": { sub: "8", m1Role: "AUDITOR", name: "Camila Medina" },
-  "field-crew-leader-route": { sub: "10000", m1Role: "ADMINISTRATIVO", name: "Sofía López" },
-  "field-crew-member-route": { sub: "10001", m1Role: "ADMINISTRATIVO", name: "Diego Martínez" },
-  "field-inspector": { sub: "10070", m1Role: "ADMINISTRATIVO", name: "Carlos Medina" },
+  "office-duty-queue": { sub: "10000", m1Role: "RESPONSABLE_AREA", name: "Carlos Rodríguez" },
+  "office-operations": { sub: "10002", m1Role: "ADMINISTRATIVO", name: "Julián López" },
+  "office-environmental": { sub: "10004", m1Role: "ADMINISTRATIVO", name: "Diego Sosa" },
+  "office-limited-intake": { sub: "10007", m1Role: "AUDITOR", name: "Camila Medina" },
+  "field-crew-leader-route": { sub: "10009", m1Role: "ADMINISTRATIVO", name: "Sofía López" },
+  "field-crew-member-route": { sub: "10010", m1Role: "ADMINISTRATIVO", name: "Diego Martínez" },
+  "field-inspector": { sub: "10011", m1Role: "ADMINISTRATIVO", name: "Carlos Medina" },
   "employee-no-role": { sub: "900", m1Role: "ADMINISTRATIVO", name: "Empleado sin rol" },
   "citizen": { sub: "901", m1Role: "CIUDADANO", name: "Ciudadano" },
 };

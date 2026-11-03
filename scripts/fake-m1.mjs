@@ -9,13 +9,13 @@ const TOKEN_TTL_SECONDS = 900;
 const refreshTokens = new Map();
 
 const accounts = [
-  { email: "carlos.rodriguez@m6.local", password: "m6-dev-796", sub: "2", role: "RESPONSABLE_AREA" },
-  { email: "julian.lopez@m6.local", password: "m6-dev-796", sub: "3", role: "ADMINISTRATIVO" },
-  { email: "diego.sosa@m6.local", password: "m6-dev-796", sub: "5", role: "ADMINISTRATIVO" },
-  { email: "camila.medina@m6.local", password: "m6-dev-796", sub: "8", role: "AUDITOR" },
-  { email: "sofia.lopez@m6.local", password: "m6-dev-796", sub: "10000", role: "ADMINISTRATIVO" },
-  { email: "diego.martinez@m6.local", password: "m6-dev-796", sub: "10001", role: "ADMINISTRATIVO" },
-  { email: "carlos.medina@m6.local", password: "m6-dev-796", sub: "10070", role: "ADMINISTRATIVO" },
+  { email: "carlos.rodriguez@m6.local", password: "m6-dev-796", sub: "10000", role: "RESPONSABLE_AREA" },
+  { email: "julian.lopez@m6.local", password: "m6-dev-796", sub: "10002", role: "ADMINISTRATIVO" },
+  { email: "diego.sosa@m6.local", password: "m6-dev-796", sub: "10004", role: "ADMINISTRATIVO" },
+  { email: "camila.medina@m6.local", password: "m6-dev-796", sub: "10007", role: "AUDITOR" },
+  { email: "sofia.lopez@m6.local", password: "m6-dev-796", sub: "10009", role: "ADMINISTRATIVO" },
+  { email: "diego.martinez@m6.local", password: "m6-dev-796", sub: "10010", role: "ADMINISTRATIVO" },
+  { email: "carlos.medina@m6.local", password: "m6-dev-796", sub: "10011", role: "ADMINISTRATIVO" },
   { email: "sin-rol@m6.local", password: "m6-dev-796", sub: "900", role: "ADMINISTRATIVO" },
   { email: "ciudadano@m6.local", password: "m6-dev-796", sub: "901", role: "CIUDADANO", subType: "CIUDADANO" },
   { email: "inactivo@m6.local", password: "m6-dev-796", sub: "902", role: "ADMINISTRATIVO", active: false },
