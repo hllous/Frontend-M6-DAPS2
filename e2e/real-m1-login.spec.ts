@@ -19,9 +19,6 @@ async function expectNoSessionCookie(context: import("@playwright/test").Browser
 }
 
 test.describe("Ingreso real con M1", () => {
-  // Needs the fake M1 and the MSW backend of docs/agents/real-m1-development.md; the default e2e run is in mock mode.
-  test.skip(process.env.M6_E2E_REAL_M1 !== "true", "Solo con M6_E2E_REAL_M1=true contra el modo real-m1 (ver docs/agents/real-m1-development.md).");
-
   test("explica el arranque en frío mientras M1 responde", async ({ page }) => {
     await page.route("**/api/session/login", async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -45,7 +42,7 @@ test.describe("Ingreso real con M1", () => {
     await enterCredentials(page, "carlos.rodriguez@m6.local");
 
     await expect(page).toHaveURL(/\/app\?destination=work$/, { timeout: 20_000 });
-    await expect(page.getByText("Empleado M1 · 2")).toBeVisible();
+    await expect(page.getByText("Empleado M1 · 2")).toBeVisible({ timeout: 20_000 });
   });
 
   test("muestra un error genérico para una contraseña incorrecta y conserva el correo", async ({ page, context }) => {
@@ -88,6 +85,24 @@ test.describe("Ingreso real con M1", () => {
 
     await expect(page).toHaveURL(/\/login$/);
     await expectNoSessionCookie(context);
+  });
+
+  test("redirige a /no-role cuando una sesión sin permisos abre /app", async ({ page }) => {
+    await page.goto("/login");
+    await enterCredentials(page, "sin-rol@m6.local");
+
+    await expect(page).toHaveURL(/\/no-role$/, { timeout: 20_000 });
+    await page.goto("/app");
+    await expect(page).toHaveURL(/\/no-role$/);
+  });
+
+  test("redirige a /app cuando una sesión con permisos abre /no-role", async ({ page }) => {
+    await page.goto("/login");
+    await enterCredentials(page, "carlos.rodriguez@m6.local");
+
+    await expect(page).toHaveURL(/\/app$/, { timeout: 20_000 });
+    await page.goto("/no-role");
+    await expect(page).toHaveURL(/\/app$/);
   });
 
   test("informa cuando M1 no está disponible", async ({ page }) => {
