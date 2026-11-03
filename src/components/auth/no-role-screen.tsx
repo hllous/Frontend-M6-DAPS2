@@ -20,7 +20,7 @@ export function NoRoleScreen({ identity }: { identity: string }) {
     let lastPulseAt = 0;
     let redirected = false;
     const refreshRole = (event?: Event) => {
-      if (event?.type === "pointerdown" && event.target instanceof Element && event.target.closest("[data-session-logout]")) return;
+      if (event?.target instanceof Element && event.target.closest("[data-session-logout]")) return;
       const now = Date.now();
       if (now - lastPulseAt < 60_000) return;
       lastPulseAt = now;

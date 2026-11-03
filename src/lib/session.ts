@@ -119,11 +119,7 @@ const sessionKeyInfo = Buffer.from("aes-256-gcm cookie encryption v1", "utf8");
 
 export function getAuthMode(environment: RuntimeEnvironment = process.env): AuthMode {
   const configuredMode = environment.M6_AUTH_MODE;
-  if (
-    environment.NODE_ENV === "production" &&
-    environment.M6_ALLOW_DEMO !== "true" &&
-    (configuredMode === "mock" || configuredMode === "backend-development")
-  ) {
+  if (isProductionDemoModeMisconfigured(environment)) {
     return "real-m1";
   }
   if (configuredMode === "mock" || configuredMode === "backend-development" || configuredMode === "real-m1") {
@@ -136,7 +132,11 @@ export function getAuthMode(environment: RuntimeEnvironment = process.env): Auth
 export function isProductionDemoModeMisconfigured(environment: RuntimeEnvironment = process.env): boolean {
   return environment.NODE_ENV === "production" &&
     environment.M6_ALLOW_DEMO !== "true" &&
-    (environment.M6_AUTH_MODE === "mock" || environment.M6_AUTH_MODE === "backend-development");
+    isDemoMode(environment.M6_AUTH_MODE);
+}
+
+function isDemoMode(mode: string | undefined): boolean {
+  return mode === "mock" || mode === "backend-development";
 }
 
 export function createSession(
@@ -422,7 +422,7 @@ function shouldUseSecureCookie(request?: Request): boolean {
   }
 }
 
-function isLoopbackHostname(hostname: string): boolean {
+export function isLoopbackHostname(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (host === "localhost" || host === "::1") return true;
   const octets = host.split(".");

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as navigation from "next/navigation";
@@ -48,5 +48,17 @@ describe("NoRoleScreen", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "a" }));
 
     await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/app"));
+  });
+
+  it("does not refresh roles when keyboard activity targets the logout button", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ session: { roles: [] } }));
+    render(<NoRoleScreen identity="Empleado M1 · 900" />);
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(60_001);
+    fireEvent.keyDown(screen.getByRole("button", { name: "Cerrar sesión" }), { key: "Enter" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
