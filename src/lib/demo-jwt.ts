@@ -6,7 +6,7 @@ import type { ScenarioId } from "./scenarios";
 /**
  * Firma tokens de demo para `backend-development` (#745, #740). M1 ya está hosteado y su login real respondió 200,
  * pero el Backend desplegado aún devuelve 401 en `/me` hasta que #488 cargue el secreto actual. Este camino se
- * conserva hasta retirar el modo demo desplegado (#800); no sustituye el flujo real de M1 de #802.
+ * conserva hasta retirar el modo demo desplegado (#800); no sustituye el flujo real y la protección de producción de #802/#816.
  *
  * Solo servidor: `M6_JWT_SECRET` (el `JWT_SECRET` del backend, en base64) nunca lleva el prefijo NEXT_PUBLIC_.
  */
