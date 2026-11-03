@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authorize, backendMode, errorResponse, forwardResponse, mapSessionError } from "@/lib/bff-route";
 import { fetchMe, sealRolesIfChanged } from "@/lib/me";
 import { fetchBackend } from "@/lib/bff-backend";
+import { roleAssignmentResponseSchema, validatedRoleAssignmentResponse } from "@/lib/role-assignment-bff";
 import { getRoles, replacementSchema, setRoles, validUserId } from "@/mocks/role-assignment-fixtures";
 import { sessionUserId } from "@/lib/session-actor";
 
@@ -22,7 +23,9 @@ async function handle(request: Request, context: Context, method: "GET" | "PUT" 
     }
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/role-assignments/${userId}`, "role:manage", { method, ...(method === "PUT" ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ roles }) } : {}) });
-      const response = forwardResponse(backendResponse);
+      const response = method === "DELETE"
+        ? forwardResponse(backendResponse, path)
+        : await validatedRoleAssignmentResponse(backendResponse, roleAssignmentResponseSchema, path);
       if (method !== "GET" && backendResponse.ok && userId === sessionUserId(session)) {
         const me = await fetchMe(request);
         sealRolesIfChanged(response, request, me.roles);
